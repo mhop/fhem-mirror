@@ -155,6 +155,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.31.0" => "20.08.2024  rename attributes ctrlWeatherDevX to setupWeatherDevX ",
+  "1.30.0" => "18.08.2024  new attribute flowGraphicShift, Forum:https://forum.fhem.de/index.php?msg=1318597 ",
+  "1.29.4" => "03.08.2024  delete writeCacheToFile from _getRoofTopData, _specialActivities: avoid loop caused by \@widgetreadings ",
+  "1.29.3" => "20.07.2024  eleminate hand over \$hash in _getRoofTopData routines, fix label 'gcon' to 'gcons' ",
   "1.29.2" => "17.06.2024  ___readCandQ: improve manual setting of pvCorrectionFactor_XX ",
   "1.29.1" => "17.06.2024  fix Warnings, Forum: https://forum.fhem.de/index.php?msg=1315283, fix roofIdentPair ",
   "1.29.0" => "16.06.2024  _setreset: improve reset consumerMaster ".
@@ -385,7 +389,7 @@ my $WhtokJ         = 3.6;                                                       
 my $defmaxvar      = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval    = 70;                                                            # Standard Abfrageintervall
 my $slidenumdef    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
-my $weatherDevMax  = 3;                                                             # max. Anzahl Wetter Devices (Attr ctrlWeatherDevX)
+my $weatherDevMax  = 3;                                                             # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
 my $maxSoCdef      = 95;                                                            # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
 my $carecycledef   = 20;                                                            # max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
 my $batSocChgDay   = 5;                                                             # prozentuale SoC Änderung pro Tag
@@ -519,7 +523,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    ctrlBatSocManagement ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
                    ctrlLanguage ctrlNextDayForecastReadings ctrlShowLink ctrlSolCastAPImaxReq
                    ctrlSolCastAPIoptimizeReq ctrlStatisticReadings ctrlUserExitFn
-                   ctrlWeatherDev1 ctrlWeatherDev2 ctrlWeatherDev3
+                   setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    disable
                    flowGraphicSize flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer
                    flowGraphicShowConsumerDummy flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime
@@ -606,9 +610,9 @@ my %hattr = (                                                                # H
   ctrlConsRecommendReadings => { fn => \&_attrcreateConsRecRdgs   },
   ctrlStatisticReadings     => { fn => \&_attrcreateStatisticRdgs },
   ctrlDebug                 => { fn => \&_attrctrlDebug           },
-  ctrlWeatherDev1           => { fn => \&_attrWeatherDev          },
-  ctrlWeatherDev2           => { fn => \&_attrWeatherDev          },
-  ctrlWeatherDev3           => { fn => \&_attrWeatherDev          },
+  setupWeatherDev1          => { fn => \&_attrWeatherDev          },
+  setupWeatherDev2          => { fn => \&_attrWeatherDev          },
+  setupWeatherDev3          => { fn => \&_attrWeatherDev          },
   setupMeterDev             => { fn => \&_attrMeterDev            },
   setupBatteryDev           => { fn => \&_attrBatteryDev          },
   setupInverterDev          => { fn => \&_attrInverterDev         },
@@ -658,8 +662,8 @@ my %hqtxt = (                                                                   
                        "set LINK plantConfiguration check" oder mit Druck auf das angebotene Icon.<br>
                        Korrigieren sie bitte eventuelle Fehler und beachten sie m&ouml;gliche Hinweise.<br>
                        (Die Anzeigesprache kann mit dem Attribut "ctrlLanguage" umgestellt werden.)<hr><br>}                },
-  cfd    => { EN => qq{Please enter at least one weather forecast device with "attr LINK ctrlWeatherDev1"},
-              DE => qq{Bitte geben sie mindestens ein Wettervorhersage Device mit "attr LINK ctrlWeatherDev1" an}           },
+  cfd    => { EN => qq{Please enter at least one weather forecast device with "attr LINK setupWeatherDev1"},
+              DE => qq{Bitte geben sie mindestens ein Wettervorhersage Device mit "attr LINK setupWeatherDev1" an}          },
   crd    => { EN => qq{Please select the radiation forecast service with "attr LINK setupRadiationAPI"},
               DE => qq{Bitte geben sie den Strahlungsvorhersage Dienst mit "attr LINK setupRadiationAPI" an}                },
   cid    => { EN => qq{Please specify the Inverter device with "attr LINK setupInverterDev"},
@@ -1120,6 +1124,7 @@ my %hfspvh = (
 # $data{$type}{$name}{weatherdata}                                               # temporärer Speicher Wetterdaten
 # $data{$type}{$name}{dwdcatalog}                                                # DWD Stationskatalog
 
+
 ################################################################
 #               Init Fn
 ################################################################
@@ -1178,13 +1183,11 @@ sub Initialize {
                                 "ctrlSolCastAPIoptimizeReq:1,0 ".
                                 "ctrlStatisticReadings:multiple-strict,$srd ".
                                 "ctrlUserExitFn:textField-long ".
-                                "ctrlWeatherDev1 ".
-                                "ctrlWeatherDev2 ".
-                                "ctrlWeatherDev3 ".
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
                                 "flowGraphicConsumerDistance:slider,80,10,500 ".
+                                "flowGraphicShift:slider,-80,5,80 ".
                                 "flowGraphicShowConsumer:1,0 ".
                                 "flowGraphicShowConsumerDummy:1,0 ".
                                 "flowGraphicShowConsumerPower:0,1 ".
@@ -1227,6 +1230,9 @@ sub Initialize {
                                 "setupInverterDev:textField-long ".
                                 "setupInverterStrings ".
                                 "setupMeterDev:textField-long ".
+                                "setupWeatherDev1 ".
+                                "setupWeatherDev2 ".
+                                "setupWeatherDev3 ".
                                 "setupRoofTops ".
                                 "setupBatteryDev:textField-long ".
                                 "setupRadiationAPI ".
@@ -1240,6 +1246,9 @@ sub Initialize {
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
    $hash->{AttrRenameMap} = { "graphicBeamHeight"  => "graphicBeamHeightLevel1",     # 07.05.24
+                              "ctrlWeatherDev1"    => "setupWeatherDev1",            # 20.08.24
+                              "ctrlWeatherDev2"    => "setupWeatherDev2",
+                              "ctrlWeatherDev3"    => "setupWeatherDev3",
                             };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -1263,16 +1272,18 @@ sub Define {
 
   my $params = {
       hash        => $hash,
-      name        => $hash->{NAME},
-      type        => $hash->{TYPE},
+      name        => $name,
+      type        => $type,
       notes       => \%vNotesIntern,
       useAPI      => 0,
       useSMUtils  => 1,
       useErrCodes => 0,
       useCTZ      => 1,
   };
+  
   use version 0.77; our $VERSION = moduleVersion ($params);                                              # Versionsinformationen setzen
-
+  delete $params->{hash};
+  
   createAssociatedWith ($hash);
 
   $params->{file}      = $pvhcache.$name;                                                                # Cache File PV History einlesen wenn vorhanden
@@ -1318,12 +1329,13 @@ return;
 ################################################################
 sub _readCacheFile {
   my $paref     = shift;
-  my $hash      = $paref->{hash};
   my $name      = $paref->{name};
   my $type      = $paref->{type};
   my $file      = $paref->{file};
   my $cachename = $paref->{cachename};
   my $title     = $paref->{title};
+  
+  my $hash      = $defs{$name};
 
   if ($cachename eq 'aitrained') {
       my ($err, $dtree) = fileRetrieve ($file);
@@ -1526,7 +1538,6 @@ sub Set {
   }
 
   my $params = {
-      hash    => $hash,
       name    => $name,
       type    => $type,
       opt     => $opt,
@@ -1552,14 +1563,14 @@ return "$setlist";
 #                      Setter consumerImmediatePlanning
 ################################################################
 sub _setconsumerImmediatePlanning {      ## no critic "not used"
-  my $paref   = shift;
-  my $hash    = $paref->{hash};
-  my $name    = $paref->{name};
-  my $type    = $paref->{type};
-  my $opt     = $paref->{opt};
-  my $c       = $paref->{prop};
-  my $evt     = $paref->{prop1} // 0;                                                          # geändert V 1.1.0 - 1 -> 0
-
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $opt   = $paref->{opt};
+  my $c     = $paref->{prop};
+  my $evt   = $paref->{prop1} // 0;                                                          # geändert V 1.1.0 - 1 -> 0
+  my $hash  = $defs{$name};
+  
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));
 
@@ -1613,12 +1624,12 @@ return;
 #         Setter consumerNewPlanning
 ################################################################
 sub _setconsumerNewPlanning {            ## no critic "not used"
-  my $paref   = shift;
-  my $hash    = $paref->{hash};
-  my $name    = $paref->{name};
-  my $c       = $paref->{prop};
-  my $evt     = $paref->{prop1} // 0;                                                          # geändert V 1.1.0 - 1 -> 0
-
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{prop};
+  my $evt   = $paref->{prop1} // 0;                                                            # geändert V 1.1.0 - 1 -> 0
+  my $hash  = $defs{$name};
+  
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, 'name', ''));
 
@@ -1637,11 +1648,13 @@ return;
 ################################################################
 sub _setroofIdentPair {                 ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
-
+  
+  my $hash  = $defs{$name};
+  
   if (!$arg) {
       return qq{The command "$opt" needs an argument !};
   }
@@ -1656,8 +1669,6 @@ sub _setroofIdentPair {                 ## no critic "not used"
   if (!$h->{rtid} || !$h->{apikey}) {
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }
-
-  my $type = $hash->{TYPE};
 
   $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{rtid}   = $h->{rtid};
   $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{apikey} = $h->{apikey};
@@ -1678,12 +1689,12 @@ return $msg;
 ######################################################################
 sub _setVictronCredentials {                 ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
-
-  my $type  = $hash->{TYPE};
+  
+  my $hash  = $defs{$name};
   my $msg;
 
   if (!$arg) {
@@ -1719,9 +1730,10 @@ return $msg;
 ################################################################
 sub _setoperationMode {                  ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no mode specified};
+  
+  my $hash  = $defs{$name};
 
   singleUpdateState ( {hash => $hash, state => $prop, evt => 1} );
 
@@ -1733,7 +1745,6 @@ return;
 ################################################################
 sub _setTrigger {                        ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
@@ -1753,6 +1764,8 @@ sub _setTrigger {                        ## no critic "not used"
           return qq{The key "$key" is invalid. Please consider the commandref.};
       }
   }
+  
+  my $hash = $defs{$name};
 
   if ($opt eq 'powerTrigger') {
       deleteReadingspec    ($hash, 'powerTrigger.*');
@@ -1777,7 +1790,6 @@ return;
 ################################################################
 sub _setstringDeclination {              ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $arg   = $paref->{arg} // return qq{no tilt angle was provided};
 
@@ -1794,6 +1806,8 @@ sub _setstringDeclination {              ## no critic "not used"
           return qq{The inclination angle of "$key" is incorrect};
       }
   }
+  
+  my $hash = $defs{$name};
 
   readingsSingleUpdate ($hash, 'setupStringDeclination', $arg, 1);
   writeCacheToFile     ($hash, 'plantconfig',    $plantcfg.$name);                # Anlagenkonfiguration File schreiben
@@ -1815,7 +1829,6 @@ return;
 ################################################################
 sub _setstringAzimuth {                  ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $arg   = $paref->{arg} // return qq{no module direction was provided};
 
@@ -1832,6 +1845,8 @@ sub _setstringAzimuth {                  ## no critic "not used"
           return qq{The module direction of "$key" is wrong: $value};
       }
   }
+  
+  my $hash = $defs{$name};
 
   readingsSingleUpdate ($hash, 'setupStringAzimuth', $arg,    1);
   writeCacheToFile     ($hash, 'plantconfig',   $plantcfg.$name);                  # Anlagenkonfiguration File schreiben
@@ -1849,11 +1864,11 @@ return;
 ################################################################
 sub _setplantConfiguration {             ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
-
+  
+  my $hash  = $defs{$name};
   my ($err,$nr,$na,@pvconf);
 
   $arg = 'check' if (!$arg);
@@ -1910,10 +1925,11 @@ return;
 ################################################################
 sub __plantCfgAsynchOut {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $out   = $paref->{out};
-
+  
+  my $hash  = $defs{$name};
+  
   asyncOutput($hash->{HELPER}{CL}{1}, $out);
   delClHash  ($name);
 
@@ -1925,10 +1941,11 @@ return;
 ################################################################
 sub _setpvCorrectionFactor {             ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $prop  = $paref->{prop} // return qq{no correction value specified};
+  
+  my $hash  = $defs{$name};
 
   if ($prop !~ /[0-9,.]/x) {
       return qq{The correction value must be specified by numbers and optionally with decimal places};
@@ -1954,11 +1971,12 @@ return;
 ################################################################
 sub _setpvCorrectionFactorAuto {         ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $prop  = $paref->{prop} // return qq{no correction value specified};
 
+  my $hash  = $defs{$name};
+  
   if ($prop eq 'noLearning') {
       my $pfa = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');           # aktuelle Autokorrektureinstellung
       $prop   = $pfa.' '.$prop;
@@ -2004,10 +2022,11 @@ return;
 ################################################################
 sub _setreset {                          ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no source specified for reset};
   my $type  = $paref->{type};
+  
+  my $hash  = $defs{$name};
 
   if ($prop eq 'pvHistory') {
       my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
@@ -2230,9 +2249,10 @@ return;
 ################################################################
 sub _setoperatingMemory {                ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no operation specified for command};
+  
+  my $hash  = $defs{$name};
 
   if ($prop eq 'save') {
       periodicWriteMemcache ($hash);                                           # Cache File für PV History, PV Circular schreiben
@@ -2274,11 +2294,12 @@ return;
 ################################################################
 sub _setclientAction {                 ## no critic "not used"
   my $paref   = shift;
-  my $hash    = $paref->{hash};
   my $name    = $paref->{name};
   my $opt     = $paref->{opt};
   my $arg     = $paref->{arg};
   my $argsref = $paref->{argsref};
+  
+  my $hash    = $defs{$name};
 
   if (!$arg) {
       return qq{The command "$opt" needs an argument !};
@@ -2327,7 +2348,6 @@ return;
 ################################################################
 sub _setaiDecTree {                   ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return;
 
@@ -2406,7 +2426,6 @@ sub Get {
 
   my $t      = int time;
   my $params = {
-      hash  => $hash,
       name  => $name,
       type  => $type,
       opt   => $opt,
@@ -2418,7 +2437,7 @@ sub Get {
       lang  => getLang  ($hash)
   };
 
-  if($hget{$opt} && defined &{$hget{$opt}{fn}}) {
+  if ($hget{$opt} && defined &{$hget{$opt}{fn}}) {
       my $ret = q{};
 
       if (!$hash->{CREDENTIALS} && $hget{$opt}{needcred}) {
@@ -2439,35 +2458,32 @@ return $getlist;
 ################################################################
 sub _getRoofTopData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-
+  my $hash  = $defs{$name};
+   
   delete $data{$type}{$name}{current}{dwdRad1hAge};
   delete $data{$type}{$name}{current}{dwdRad1hAgeTS};
+  
+  my $ret = "$name is not a valid SolarForeCast Model: ".$hash->{MODEL};
 
-  if($hash->{MODEL} eq 'SolCastAPI') {
-      __getSolCastData ($paref);
-      return;
+  if ($hash->{MODEL} eq 'SolCastAPI') {
+      $ret = __getSolCastData ($paref);
   }
   elsif ($hash->{MODEL} eq 'ForecastSolarAPI') {
-      __getForecastSolarData ($paref);
-      return;
+      $ret = __getForecastSolarData ($paref);
   }
   elsif ($hash->{MODEL} eq 'DWD') {
-      my $ret = __getDWDSolarData ($paref);
-      return $ret;
+      $ret = __getDWDSolarData ($paref);
   }
   elsif ($hash->{MODEL} eq 'VictronKiAPI') {
-      my $ret = __getVictronSolarData ($paref);
-      return $ret;
+      $ret = __getVictronSolarData ($paref);
   }
   elsif ($hash->{MODEL} =~ /^OpenMeteo/xs) {
-      my $ret = __getopenMeteoData ($paref);
-      return $ret;
+      $ret = __getopenMeteoData ($paref);
   }
 
-return "$name is not a valid SolarForeCast Model: ".$hash->{MODEL};
+return $ret;
 }
 
 ################################################################
@@ -2475,22 +2491,23 @@ return "$name is not a valid SolarForeCast Model: ".$hash->{MODEL};
 ################################################################
 sub __getSolCastData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $force = $paref->{force} // 0;
   my $t     = $paref->{t}     // time;
   my $debug = $paref->{debug};
   my $lang  = $paref->{lang};
+  
+  my $hash  = $defs{$name};
 
   my $msg;
-  if($ctzAbsent) {
+  if ($ctzAbsent) {
       $msg = qq{The library FHEM::Utility::CTZ is missing. Please update FHEM completely.};
       Log3 ($name, 1, "$name - ERROR - $msg");
       return $msg;
   }
 
   my $rmf = reqModFail();
-  if($rmf) {
+  if ($rmf) {
       $msg = "You have to install the required perl module: ".$rmf;
       Log3 ($name, 1, "$name - ERROR - $msg");
       return $msg;
@@ -2574,13 +2591,13 @@ return;
 ################################################################################################
 sub __solCast_ApiRequest {
   my $paref      = shift;
-  my $hash       = $paref->{hash};
   my $name       = $paref->{name};
   my $allstrings = $paref->{allstrings};                                # alle Strings
   my $debug      = $paref->{debug};
 
+  my $hash       = $defs{$name};
+  
   if (!$allstrings) {                                                   # alle Strings wurden abgerufen
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);         # Cache File SolCast API Werte schreiben
       return;
   }
 
@@ -2614,7 +2631,6 @@ sub __solCast_ApiRequest {
   my $param = {
       url        => $url,
       timeout    => 30,
-      hash       => $hash,
       name       => $name,
       type       => $paref->{type},
       debug      => $debug,
@@ -2645,7 +2661,6 @@ sub __solCast_ApiResponse {
   my $err        = shift;
   my $myjson     = shift;
 
-  my $hash        = $paref->{hash};
   my $name        = $paref->{name};
   my $caller      = $paref->{caller};
   my $string      = $paref->{string};
@@ -2658,8 +2673,8 @@ sub __solCast_ApiResponse {
   $paref->{t}     = time;
 
   my $msg;
-
-  my $sta = [gettimeofday];                                                                                # Start Response Verarbeitung
+  my $hash = $defs{$name};
+  my $sta  = [gettimeofday];                                                                                # Start Response Verarbeitung
 
   if ($err ne "") {
       $msg = 'SolCast API server response: '.$err;
@@ -2675,9 +2690,9 @@ sub __solCast_ApiResponse {
       return;
   }
   elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
-      my ($success) = evaljson($hash, $myjson);
+      my ($success) = evaljson ($hash, $myjson);
 
-      if(!$success) {
+      if (!$success) {
           $msg = 'ERROR - invalid SolCast API server response';
 
           Log3 ($name, 1, "$name - $msg");
@@ -2691,7 +2706,9 @@ sub __solCast_ApiResponse {
 
       my $jdata = decode_json ($myjson);
 
-      debugLog ($paref, "apiProcess", qq{SolCast API server response for string "$string":\n}. Dumper $jdata);
+      if ($debug eq 'apiProcess') {
+          Log3 ($name, 1, qq{$name DEBUG> SolCast API server response for string "$string":\n}. Dumper $jdata);
+      }
 
       ## bei Überschreitung Limit kommt:
       ####################################
@@ -2718,7 +2735,7 @@ sub __solCast_ApiResponse {
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
           $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
-          if($debug =~ /apiProcess|apiCall/x) {
+          if ($debug =~ /apiProcess|apiCall/x) {
               my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef);
 
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - response status: ".$jdata->{'response_status'}{'message'});
@@ -2800,7 +2817,6 @@ sub __solCast_ApiResponse {
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
 
   my $param = {
-      hash       => $hash,
       name       => $name,
       type       => $type,
       debug      => $debug,
@@ -2845,7 +2861,7 @@ sub ___convPendToPstart {
   if ($cminutstr eq '00') {                                                               # Zeit/Periodenkorrektur
       $chrst -= 1;
 
-      if($chrst < 0) {
+      if ($chrst < 0) {
           my $nt     = (timestringToTimestamp ($cdatest.' 00:00:00')) - 3600;
           $nt        = (timestampToTimestring ($nt, $lang))[1];
           ($cdatest) = split " ", $nt;
@@ -2865,13 +2881,13 @@ return ($err, $starttmstr);
 sub ___setSolCastAPIcallKeyData {
   my $paref = shift;
 
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $lang  = $paref->{lang};
   my $debug = $paref->{debug};
   my $t     = $paref->{t} // time;
 
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
+  my $hash  = $defs{$name};
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];   # letzte Abrufzeit
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                       # letzter Abrufzeitstempel
@@ -2918,7 +2934,7 @@ sub ___setSolCastAPIcallKeyData {
 
   my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $solapirepdef);
 
-  if($debug =~ /apiProcess|apiCall/x) {
+  if ($debug =~ /apiProcess|apiCall/x) {
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - remaining API Calls: ".($drc - 1));
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - next API Call: ".(timestampToTimestring ($t + $apiitv, $lang))[0]);
   }
@@ -2933,11 +2949,12 @@ return;
 ################################################################
 sub __getForecastSolarData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $force = $paref->{force} // 0;
   my $t     = $paref->{t}     // time;
   my $lang  = $paref->{lang};
+  
+  my $hash  = $defs{$name};
 
   if (!$force) {                                                                                   # regulärer API Abruf
       my $etxt   = $hqtxt{bnsas}{$lang};
@@ -2990,14 +3007,14 @@ return;
 ################################################################################################
 sub __forecastSolar_ApiRequest {
   my $paref      = shift;
-  my $hash       = $paref->{hash};
   my $name       = $paref->{name};
   my $type       = $paref->{type};
   my $allstrings = $paref->{allstrings};                                               # alle Strings
   my $debug      = $paref->{debug};
+  
+  my $hash       = $defs{$name};
 
   if (!$allstrings) {                                                                  # alle Strings wurden abgerufen
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                        # Cache File API Werte schreiben
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
       return;
   }
@@ -3031,7 +3048,6 @@ sub __forecastSolar_ApiRequest {
   my $param = {
       url        => $url,
       timeout    => 30,
-      hash       => $hash,
       name       => $name,
       type       => $type,
       debug      => $debug,
@@ -3041,7 +3057,7 @@ sub __forecastSolar_ApiRequest {
       allstrings => $allstrings,
       string     => $string,
       lang       => $paref->{lang},
-      method     => "GET",
+      method     => 'GET',
       callback   => \&__forecastSolar_ApiResponse
   };
 
@@ -3062,7 +3078,6 @@ sub __forecastSolar_ApiResponse {
   my $err        = shift;
   my $myjson     = shift;
 
-  my $hash        = $paref->{hash};
   my $name        = $paref->{name};
   my $caller      = $paref->{caller};
   my $string      = $paref->{string};
@@ -3072,6 +3087,7 @@ sub __forecastSolar_ApiResponse {
   my $debug       = $paref->{debug};
   my $type        = $paref->{type};
 
+  my $hash        = $defs{$name};
   my $t           = time;
   $paref->{t}     = $t;
 
@@ -3095,7 +3111,7 @@ sub __forecastSolar_ApiResponse {
   elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson($hash, $myjson);
 
-      if(!$success) {
+      if (!$success) {
           $msg = 'ERROR - invalid ForecastSolar API server response';
 
           Log3 ($name, 1, "$name - $msg");
@@ -3109,7 +3125,9 @@ sub __forecastSolar_ApiResponse {
 
       my $jdata = decode_json ($myjson);
 
-      debugLog ($paref, "apiProcess", qq{ForecastSolar API Call - response for string "$string":\n}. Dumper $jdata);
+      if ($debug eq 'apiProcess') {
+          Log3 ($name, 1, qq{$name DEBUG> ForecastSolar API Call - response for string "$string":\n}. Dumper $jdata);
+      }
 
       ## bei Überschreitung des Stundenlimit kommt:
       ###############################################
@@ -3199,7 +3217,6 @@ sub __forecastSolar_ApiResponse {
   ___setForeCastAPIcallKeyData ($paref);
 
   my $param = {
-      hash       => $hash,
       name       => $name,
       type       => $type,
       debug      => $debug,
@@ -3218,13 +3235,13 @@ return &$caller($param);
 ################################################################
 sub ___setForeCastAPIcallKeyData {
   my $paref = shift;
-
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $lang  = $paref->{lang};
   my $debug = $paref->{debug};
   my $t     = $paref->{t} // time;
+  
+  my $hash  = $defs{$name};
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
 
@@ -3300,14 +3317,14 @@ return;
 ##################################################################################################
 sub __getDWDSolarData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $date  = $paref->{date};                                                                  # aktueller Tag "YYYY-MM-DD"
   my $t     = $paref->{t}     // time;
   my $lang  = $paref->{lang};
-
-  my $type  = $hash->{TYPE};
-
+  
+  my $hash  = $defs{$name};
+ 
   my $raname = AttrVal ($name, 'setupRadiationAPI', '');                                       # Radiation Forecast API
   return if(!$raname || !$defs{$raname});
 
@@ -3376,10 +3393,12 @@ return;
 ####################################################################################################
 sub __getVictronSolarData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $force = $paref->{force} // 0;
   my $t     = $paref->{t};
   my $lang  = $paref->{lang};
+  
+  my $hash  = $defs{$name};
 
   my $lrt    = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
   my $apiitv = $vrmapirepdef;
@@ -3404,11 +3423,11 @@ return;
 ################################################################
 sub __VictronVRM_ApiRequestLogin {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $debug = $paref->{debug};
   my $type  = $paref->{type};
-
+  
+  my $hash  = $defs{$name};
   my $url   = 'https://vrmapi.victronenergy.com/v2/auth/login';
 
   debugLog ($paref, "apiProcess|apiCall", qq{Request VictronVRM API Login: $url});
@@ -3439,7 +3458,6 @@ sub __VictronVRM_ApiRequestLogin {
   my $param = {
       url        => $url,
       timeout    => 30,
-      hash       => $hash,
       name       => $name,
       type       => $paref->{type},
       stc        => [gettimeofday],
@@ -3455,7 +3473,7 @@ sub __VictronVRM_ApiRequestLogin {
       callback   => \&__VictronVRM_ApiResponseLogin
   };
 
-  if($debug =~ /apiCall/x) {
+  if ($debug =~ /apiCall/x) {
       $param->{loglevel} = 1;
   }
 
@@ -3472,7 +3490,6 @@ sub __VictronVRM_ApiResponseLogin {
   my $err    = shift;
   my $myjson = shift;
 
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
   my $caller = $paref->{caller};
@@ -3481,8 +3498,9 @@ sub __VictronVRM_ApiResponseLogin {
   my $debug  = $paref->{debug};
 
   my $msg;
-  my $t   = time;
-  my $sta = [gettimeofday];                                                                                # Start Response Verarbeitung
+  my $hash = $defs{$name};
+  my $t    = time;
+  my $sta  = [gettimeofday];                                                                                # Start Response Verarbeitung
 
   if ($err ne "") {
       $msg = 'Victron VRM API error response: '.$err;
@@ -3498,7 +3516,7 @@ sub __VictronVRM_ApiResponseLogin {
   elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson($hash, $myjson);
 
-      if(!$success) {
+      if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API response';
           Log3              ($name, 1, "$name - $msg");
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
@@ -3537,7 +3555,9 @@ sub __VictronVRM_ApiResponseLogin {
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
 
-          debugLog ($paref, "apiProcess", qq{Victron VRM API response Login:\n}. Dumper $jdata);
+          if ($debug eq 'apiProcess') {
+              Log3 ($name, 1, qq{$name DEBUG> Victron VRM API response Login:\n}. Dumper $jdata);
+          }
 
           if (defined $jdata->{'token'}) {
               $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{token} = 'got successful at '.SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
@@ -3560,8 +3580,6 @@ return;
 ######################################################################################################
 sub __VictronVRM_ApiRequestForecast {
   my $paref  = shift;
-
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $token  = $paref->{token};
   my $debug  = $paref->{debug};
@@ -3570,6 +3588,7 @@ sub __VictronVRM_ApiRequestForecast {
   my $chour  = $paref->{chour};                                                   # aktuelle Stunde in 24h format (00-23)
   my $date   = $paref->{date};
 
+  my $hash   = $defs{$name};
   my $tstart = timestringToTimestamp ("$date $chour:00:00");
   my $tend   = $tstart + 259200;                                                  # 172800 = 2 Tage
 
@@ -3582,7 +3601,6 @@ sub __VictronVRM_ApiRequestForecast {
   my $param = {
       url     => $url,
       timeout => 30,
-      hash    => $hash,
       name    => $name,
       type    => $paref->{type},
       stc     => [gettimeofday],
@@ -3595,7 +3613,7 @@ sub __VictronVRM_ApiRequestForecast {
       callback => \&__VictronVRM_ApiResponseForecast
   };
 
-  if($debug =~ /apiCall/x) {
+  if ($debug =~ /apiCall/x) {
       $param->{loglevel} = 1;
   }
 
@@ -3612,7 +3630,6 @@ sub __VictronVRM_ApiResponseForecast {
   my $err    = shift;
   my $myjson = shift;
 
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
   my $caller = $paref->{caller};
@@ -3621,8 +3638,9 @@ sub __VictronVRM_ApiResponseForecast {
   my $debug  = $paref->{debug};
 
   my $msg;
-  my $t   = time;
-  my $sta = [gettimeofday];                                                                                # Start Response Verarbeitung
+  my $hash = $defs{$name};
+  my $t    = time;
+  my $sta  = [gettimeofday];                                                                               # Start Response Verarbeitung
 
   if ($err ne "") {
       $msg = 'Victron VRM API Forecast response: '.$err;
@@ -3638,7 +3656,7 @@ sub __VictronVRM_ApiResponseForecast {
   elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson($hash, $myjson);
 
-      if(!$success) {
+      if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API Forecast response';
           Log3              ($name, 1, "$name - $msg");
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
@@ -3663,7 +3681,7 @@ sub __VictronVRM_ApiResponseForecast {
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
 
-          if($debug =~ /apiProcess|apiCall/x) {
+          if ($debug =~ /apiProcess|apiCall/x) {
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - error_code: ".$jdata->{'error_code'});
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - errors: "    .$jdata->{'errors'});
           }
@@ -3671,8 +3689,6 @@ sub __VictronVRM_ApiResponseForecast {
           return;
       }
       else {
-          #debugLog ($paref, "apiProcess", "Victron VRM API - raw data received:\n". Dumper $jdata);
-
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}    += 1;
 
@@ -3739,10 +3755,11 @@ return;
 ################################################################
 sub __VictronVRM_ApiRequestLogout {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $token = $paref->{token};
   my $debug = $paref->{debug};
+  
+  my $hash  = $defs{$name};
 
   my $url = 'https://vrmapi.victronenergy.com/v2/auth/logout';
 
@@ -3753,7 +3770,6 @@ sub __VictronVRM_ApiRequestLogout {
   my $param = {
       url        => $url,
       timeout    => 30,
-      hash       => $hash,
       name       => $name,
       type       => $paref->{type},
       debug      => $debug,
@@ -3764,7 +3780,7 @@ sub __VictronVRM_ApiRequestLogout {
       callback   => \&__VictronVRM_ApiResponseLogout
   };
 
-  if($debug =~ /apiCall/x) {
+  if ($debug =~ /apiCall/x) {
       $param->{loglevel} = 1;
   }
 
@@ -3781,8 +3797,9 @@ sub __VictronVRM_ApiResponseLogout {
   my $err    = shift;
   my $myjson = shift;
 
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
+  my $debug  = $paref->{debug};
+  my $hash   = $defs{$name};
 
   my $msg;
 
@@ -3794,7 +3811,7 @@ sub __VictronVRM_ApiResponseLogout {
   elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson($hash, $myjson);
 
-      if(!$success) {
+      if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API response';
           Log3 ($name, 1, "$name - $msg");
           return;
@@ -3802,7 +3819,9 @@ sub __VictronVRM_ApiResponseLogout {
 
       my $jdata = decode_json ($myjson);
 
-      debugLog ($paref, "apiCall", qq{Victron VRM API response Logout:\n}. Dumper $jdata);
+      if ($debug eq 'apiCall') {
+          Log3 ($name, 1, qq{$name DEBUG> Victron VRM API response Logout:\n}. Dumper $jdata);
+      }
   }
 
 return;
@@ -3813,13 +3832,13 @@ return;
 ################################################################################################
 sub __getopenMeteoData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $force = $paref->{force} // 0;
   my $t     = $paref->{t};
   my $lang  = $paref->{lang};
   my $debug = $paref->{debug};
-
+  
+  my $hash    = $defs{$name};
   my $donearq = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
 
   if ($donearq >= $ometmaxreq) {
@@ -3881,7 +3900,6 @@ return;
 ########################################################################################################################
 sub __openMeteoDWD_ApiRequest {
   my $paref      = shift;
-  my $hash       = $paref->{hash};
   my $name       = $paref->{name};
   my $type       = $paref->{type};
   my $allstrings = $paref->{allstrings};                                     # alle Strings
@@ -3889,9 +3907,10 @@ sub __openMeteoDWD_ApiRequest {
   my $lang       = $paref->{lang};
   my $t          = $paref->{t}       // int time;
   my $submodel   = $paref->{submodel};                                       # abzufragendes Wettermodell
-
+  
+  my $hash       = $defs{$name};
+  
   if (!$allstrings) {                                                        # alle Strings wurden abgerufen
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);
       my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef);
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
@@ -3933,7 +3952,6 @@ sub __openMeteoDWD_ApiRequest {
   my $param = {
       url            => $url,
       timeout        => 30,
-      hash           => $hash,
       name           => $name,
       type           => $paref->{type},
       debug          => $debug,
@@ -3984,7 +4002,6 @@ sub __openMeteoDWD_ApiResponse {
   my $err        = shift;
   my $myjson     = shift;
 
-  my $hash        = $paref->{hash};
   my $name        = $paref->{name};
   my $type        = $paref->{type};
   my $caller      = $paref->{caller};
@@ -3995,6 +4012,7 @@ sub __openMeteoDWD_ApiResponse {
   my $debug       = $paref->{debug};
   my $submodel    = $paref->{submodel};
 
+  my $hash    = $defs{$name};
   my $t       = int time;
   my $sta     = [gettimeofday];                           # Start Response Verarbeitung
   $paref->{t} = $t;
@@ -4031,8 +4049,6 @@ sub __openMeteoDWD_ApiResponse {
 
       my $rt    = (timestampToTimestring ($t, $lang))[3];
       my $jdata = decode_json ($myjson);
-
-      # debugLog ($paref, 'apiProcess', qq{Open-Meteo API Call - response for string "$string":\n}. Dumper $jdata);
 
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = $rt;                                                    # letzte Abrufzeit
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                   # letzter Abrufzeitstempel
@@ -4209,7 +4225,6 @@ sub __openMeteoDWD_ApiResponse {
   Log3 ($name, 4, qq{$name - Open-Meteo DWD ICON API answer received for string "$string"});
 
   my $param = {
-      hash           => $hash,
       name           => $name,
       type           => $type,
       debug          => $debug,
@@ -4230,14 +4245,14 @@ return &$caller($param);
 ################################################################
 sub ___setOpenMeteoAPIcallKeyData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $lang  = $paref->{lang};
   my $debug = $paref->{debug};
   my $cequ  = $paref->{callequivalent};
   my $t     = $paref->{t} // time;
 
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
+  my $hash  = $defs{$name};
 
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += $cequ;
 
@@ -4273,7 +4288,8 @@ return;
 ###############################################################
 sub _getdata {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
 
 return centralTask ($hash);
 }
@@ -4306,8 +4322,9 @@ return pageAsHtml ($name, 'ftui', $arg);
 ###############################################################
 sub _getlistPVHistory {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $arg   = $paref->{arg};
+  my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'pvhist', $arg);
   $ret   .= lineFromSpaces ($ret, 20);
@@ -4321,7 +4338,8 @@ return $ret;
 ###############################################################
 sub _getlistPVCircular {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'circular');
   $ret   .= lineFromSpaces ($ret, 20);
@@ -4334,7 +4352,8 @@ return $ret;
 ###############################################################
 sub _getlistNextHours {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'nexthours');
   $ret   .= lineFromSpaces ($ret, 10);
@@ -4347,8 +4366,9 @@ return $ret;
 ###############################################################
 sub _getForecastQualities {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $arg   = $paref->{arg} // q{};
+  my $hash  = $defs{$name};
 
   my $ret   = listDataPool ($hash, 'qualities');
 
@@ -4364,7 +4384,8 @@ return $ret;
 ###############################################################
 sub _getlistCurrent {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'current');
   $ret   .= lineFromSpaces ($ret, 30);
@@ -4377,8 +4398,9 @@ return $ret;
 ###############################################################
 sub _getlistvalConsumerMaster {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $arg   = $paref->{arg};
+  my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'consumer', $arg);
   $ret   .= lineFromSpaces ($ret, 10);
@@ -4391,7 +4413,8 @@ return $ret;
 ###############################################################
 sub _getlistSolCastData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'solApiData');
   $ret   .= lineFromSpaces ($ret, 10);
@@ -4432,8 +4455,7 @@ sub _getdwdCatalog {
   }
 
   if (!scalar keys %{$data{$type}{$name}{dwdcatalog}}) {                             # Katalog ist nicht geladen
-      _readCacheFile ({ hash      => $paref->{hash},
-                        name      => $name,
+      _readCacheFile ({ name      => $name,
                         type      => $type,
                         debug     => $paref->{debug},
                         file      => $dwdcatalog,
@@ -4631,9 +4653,10 @@ return ('', $isfil);
 ####################################################################################################################
 sub __dwdStatCatalog_Request {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $debug = $paref->{debug};
+  
+  my $hash  = $defs{$name};
 
   my $url = "https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.cfg?view=nasPublication&nn=16102";
 
@@ -4642,7 +4665,6 @@ sub __dwdStatCatalog_Request {
   my $param = {
       url      => $url,
       timeout  => 10,
-      hash     => $hash,
       name     => $name,
       debug    => $debug,
       stc      => [gettimeofday],
@@ -4672,14 +4694,14 @@ sub __dwdStatCatalog_Response {
   my $err   = shift;
   my $data  = shift;
 
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $stc   = $paref->{stc};                                                                 # Startzeit API Abruf
   my $lang  = $paref->{lang};
   my $debug = $paref->{debug};
 
   my $msg;
-  my $sta = [gettimeofday];                                                                  # Start Response Verarbeitung
+  my $hash = $defs{$name};
+  my $sta  = [gettimeofday];                                                                 # Start Response Verarbeitung
 
   if ($err ne "") {
       Log3 ($name, 1, "$name - ERROR - $err");
@@ -4735,8 +4757,7 @@ sub __dwdStatCatalog_Response {
           Log3 ($name, 1, "$name - ERROR - $err");
       }
 
-      _readCacheFile ({ hash      => $hash,
-                        name      => $name,
+      _readCacheFile ({ name      => $name,
                         type      => $type,
                         debug     => $debug,
                         file      => $dwdcatalog,
@@ -4757,17 +4778,17 @@ return;
 ###############################################################
 sub _getaiDecTree {                   ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $arg   = $paref->{arg} // return;
 
   my $ret;
+  my $hash = $defs{$name};
 
-  if($arg eq 'aiRawData') {
-      $ret = listDataPool   ($hash, 'aiRawData');
+  if ($arg eq 'aiRawData') {
+      $ret = listDataPool ($hash, 'aiRawData');
   }
 
-  if($arg eq 'aiRuleStrings') {
+  if ($arg eq 'aiRuleStrings') {
       $ret = __getaiRuleStrings ($paref);
   }
 
@@ -4782,8 +4803,10 @@ return $ret;
 ################################################################
 sub __getaiRuleStrings {                 ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $lang  = $paref->{lang};
+  
+  my $hash  = $defs{$name};
 
   return 'the AI usage is not prepared' if(!isPrepared4AI ($hash));
 
@@ -4831,8 +4854,8 @@ return $rs;
 ###############################################################
 sub _ftuiFramefiles {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $hash  = $defs{$name};
 
   my $ret;
   my $upddo = 0;
@@ -4903,8 +4926,7 @@ return 'SolarForecast FTUI files updated';
 #    Zielverzeichnis schreiben
 ###############################################################
 sub __updPreFile {
-  my $pars = shift;
-
+  my $pars     = shift;
   my $name     = $pars->{name};
   my $root     = $pars->{root};
   my $cmfile   = $pars->{cmfile};
@@ -5149,9 +5171,8 @@ sub Attr {
   }
 
   my $params = {
-      hash  => $hash,
       name  => $name,
-      type  => $hash->{TYPE},
+      type  => $type,
       cmd   => $cmd,
       aName => $aName,
       aVal  => $aVal
@@ -5173,7 +5194,6 @@ return;
 ################################################################
 sub _attrconsumer {                      ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $aName = $paref->{aName};
@@ -5182,6 +5202,8 @@ sub _attrconsumer {                      ## no critic "not used"
 
   return if(!$init_done);                                                                  # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959
 
+  my $hash  = $defs{$name};
+  
   if ($cmd eq "set") {
       my ($err, $codev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
@@ -5300,8 +5322,10 @@ return;
 ################################################################
 sub _attrcreateConsRecRdgs {             ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $aName = $paref->{aName};
+  
+  my $hash  = $defs{$name};
 
   if ($aName eq 'ctrlConsRecommendReadings') {
       deleteReadingspec ($hash, "consumer.*_ConsumptionRecommended");
@@ -5315,7 +5339,6 @@ return;
 ################################################################
 sub _attrcreateStatisticRdgs {           ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aName = $paref->{aName};
   my $aVal  = $paref->{aVal};
@@ -5344,7 +5367,6 @@ return;
 ################################################################
 sub _attrctrlDebug {                     ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aName = $paref->{aName};
   my $aVal  = $paref->{aVal};
@@ -5372,13 +5394,14 @@ return;
 ################################################################
 sub _attrMeterDev {                    ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
   my $type  = $paref->{type};
 
   return if(!$init_done);
+  
+  my $hash = $defs{$name};
 
   if ($paref->{cmd} eq 'set') {
       my ($err, $medev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
@@ -5434,13 +5457,14 @@ return;
 ################################################################
 sub _attrInverterDev {                   ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
   my $type  = $paref->{type};
 
   return if(!$init_done);
+  
+  my $hash = $defs{$name};
 
   if ($paref->{cmd} eq 'set') {
       my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
@@ -5474,7 +5498,6 @@ return;
 ################################################################
 sub _attrInverterStrings {               ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
@@ -5505,11 +5528,12 @@ return;
 ################################################################
 sub _attrStringPeak {                    ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
 
   return if(!$init_done);
+  
+  my $hash  = $defs{$name};
 
   if ($paref->{cmd} eq 'set') {
       $aVal =~ s/,/./xg;
@@ -5551,11 +5575,12 @@ return;
 ################################################################
 sub _attrRoofTops {                      ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   
   return if(!$init_done);
+  
+  my $hash  = $defs{$name};
   
   if ($paref->{cmd} eq 'set') {
       my ($a,$h) = parseParams ($aVal);
@@ -5597,13 +5622,14 @@ return;
 ################################################################
 sub _attrBatteryDev {                    ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
   my $type  = $paref->{type};
 
   return if(!$init_done);
+  
+  my $hash  = $defs{$name};
 
   if ($paref->{cmd} eq 'set') {
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
@@ -5647,16 +5673,17 @@ return;
 }
 
 ################################################################
-#                      Attr ctrlWeatherDevX
+#                      Attr setupWeatherDevX
 ################################################################
 sub _attrWeatherDev {                    ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal} // return qq{no weather forecast device specified} if($paref->{cmd} eq 'set');
   my $aName = $paref->{aName};
 
   return if(!$init_done);
+  
+  my $hash  = $defs{$name};
 
   if ($paref->{cmd} eq 'set') {
       if ($aVal !~ /^OpenMeteo/xs && (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData")) {
@@ -5664,11 +5691,11 @@ sub _attrWeatherDev {                    ## no critic "not used"
       }
 
       if ($aVal =~ /^OpenMeteo/xs) {
-          if ($aName ne 'ctrlWeatherDev1') {
-              return qq{Only the leading attribute 'ctrlWeatherDev1' can set to '$aVal'};
+          if ($aName ne 'setupWeatherDev1') {
+              return qq{Only the leading attribute 'setupWeatherDev1' can set to '$aVal'};
           }
 
-          InternalTimer (gettimeofday()+1, 'FHEM::SolarForecast::__setRadAPIdelayed', $hash, 0);   # automatisch setupRadiationAPI setzen wenn ctrlWeatherDev1
+          InternalTimer (gettimeofday()+1, 'FHEM::SolarForecast::__setRadAPIdelayed', $hash, 0);   # automatisch setupRadiationAPI setzen wenn setupWeatherDev1
           return;
       }
 
@@ -5686,25 +5713,26 @@ return;
 ################################################################
 sub _attrRadiationAPI {                  ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
   my $type  = $paref->{type};
 
   return if(!$init_done);
+  
+  my $hash  = $defs{$name};
 
   if ($paref->{cmd} eq 'set') {
       if ($aVal !~ /-API$/x && (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData")) {
           return qq{The device "$aVal" doesn't exist or has no TYPE "DWD_OpenData"};
       }
 
-      my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
+      my $awdev1 = AttrVal ($name, 'setupWeatherDev1', '');
 
       if (($awdev1 eq 'OpenMeteoDWD-API'         && $aVal ne 'OpenMeteoDWD-API')         ||
           ($awdev1 eq 'OpenMeteoDWDEnsemble-API' && $aVal ne 'OpenMeteoDWDEnsemble-API') ||
           ($awdev1 eq 'OpenMeteoWorld-API'       && $aVal ne 'OpenMeteoWorld-API')) {
-          return "The attribute 'ctrlWeatherDev1' is set to '$awdev1'. \n".
+          return "The attribute 'setupWeatherDev1' is set to '$awdev1'. \n".
                  "Change that attribute to another weather device first if you want use an other API.";
       }
 
@@ -5774,7 +5802,7 @@ sub __setRadAPIdelayed {
   my $hash = shift;
 
   my $name   = $hash->{NAME};
-  my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
+  my $awdev1 = AttrVal ($name, 'setupWeatherDev1', '');
 
   CommandAttr (undef, "$name setupRadiationAPI $awdev1");                         # automatisch setupRadiationAPI setzen
 
@@ -6087,11 +6115,11 @@ return;
 ################################################################
 sub delConsumerFromMem {                   
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{c};
-
+  
+  my $hash   = $defs{$name};
   my $calias = ConsumerVal ($hash, $c, 'alias', '');
   
   for my $d (1..31) {
@@ -6136,8 +6164,6 @@ sub writeCacheToFile {
   }
 
   my $type = $hash->{TYPE};
-
-  my @data;
   my ($error, $err, $lw);
 
   if ($cachename eq 'aitrained') {
@@ -6164,12 +6190,12 @@ sub writeCacheToFile {
 
       if ($data) {
           $error = fileStore ($data, $file);
-      }
-
-      if ($error) {
-          $err = qq{ERROR while writing AI data to file "$file": $error};
-          Log3 ($name, 1, "$name - $err");
-          return $err;
+          
+          if ($error) {
+              $err = qq{ERROR while writing AI data to file "$file": $error};
+              Log3 ($name, 1, "$name - $err");
+              return $err;
+          }
       }
 
       $lw                 = gettimeofday();
@@ -6182,15 +6208,15 @@ sub writeCacheToFile {
   if ($cachename eq 'dwdcatalog') {
       if (scalar keys %{$data{$type}{$name}{dwdcatalog}}) {
           $error = fileStore ($data{$type}{$name}{dwdcatalog}, $file);
+          
+          if ($error) {
+              $err = qq{ERROR while writing DWD Station Catalog to file "$file": $error};
+              Log3 ($name, 1, "$name - $err");
+              return $err;
+          }
       }
       else {
           return "The DWD Station Catalog is empty";
-      }
-
-      if ($error) {
-          $err = qq{ERROR while writing DWD Station Catalog to file "$file": $error};
-          Log3 ($name, 1, "$name - $err");
-          return $err;
       }
 
       return;
@@ -6201,12 +6227,12 @@ sub writeCacheToFile {
 
       if (scalar keys %{$plantcfg}) {
           $error = fileStore ($plantcfg, $file);
-      }
-
-      if ($error) {
-          $err = qq{ERROR writing cache file "$file": $error};
-          Log3 ($name, 1, "$name - $err");
-          return $err;
+          
+          if ($error) {
+              $err = qq{ERROR writing cache file "$file": $error};
+              Log3 ($name, 1, "$name - $err");
+              return $err;
+          }
       }
 
       $lw                 = gettimeofday();
@@ -6217,10 +6243,11 @@ sub writeCacheToFile {
   }
 
   return if(!$data{$type}{$name}{$cachename});
-  my $json = encode_json ($data{$type}{$name}{$cachename});
-  push @data, $json;
-
-  $error = FileWrite ($file, @data);
+  
+  my @arr;
+  push @arr, encode_json ($data{$type}{$name}{$cachename});
+  
+  $error = FileWrite ($file, @arr);
 
   if ($error) {
       $err = qq{ERROR writing cache file "$file": $error};
@@ -6405,7 +6432,7 @@ sub _addDynAttr {
   my $hash = shift;
   my $type = $hash->{TYPE};
 
-  ## Attr ctrlWeatherDevX zur Laufzeit hinzufügen
+  ## Attr setupWeatherDevX zur Laufzeit hinzufügen
   #################################################
   my $adwds  = '';
   my @alldwd = devspec2array ("TYPE=DWD_OpenData");
@@ -6422,16 +6449,17 @@ sub _addDynAttr {
 
   my @deva   = split " ", $modules{$type}{AttrList};
 
-  my $atd = 'ctrlWeatherDev|setupRadiationAPI';
+  my $atd = 'setupWeatherDev|setupRadiationAPI';
   @deva   = grep {!/$atd/} @deva;
 
   for my $step (1..$weatherDevMax) {
       if ($step == 1) {
-          push @deva, ($adwds ? "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" : "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
+          push @deva, ($adwds ? "setupWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" : 
+                       "setupWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
           next;
       }
 
-      push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds" : "");
+      push @deva, ($adwds ? "setupWeatherDev".$step.":$adwds" : "");
   }
 
   push @deva, "setupRadiationAPI:$rdd ";
@@ -6472,49 +6500,7 @@ sub centralTask {
   return if(!$init_done);
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################
-  my $val = ReadingsVal ($name, 'currentMeterDev', '');                       # 01.06.2024
-  if ($val) {
-      CommandAttr (undef, "$name setupMeterDev $val");
-      readingsDelete ($hash, 'currentMeterDev');
-  }
-
-  my $val1 = ReadingsVal ($name, 'currentBatteryDev', '');                    # 02.06.2024
-  if ($val1) {
-      CommandAttr (undef, "$name setupBatteryDev $val1");
-      readingsDelete ($hash, 'currentBatteryDev');
-  }
-
-  my $idts = ReadingsTimestamp ($name, 'currentInverterDev', '');             # 02.06.2024
-  if ($idts) {
-      $idts = timestringToTimestamp ($idts);
-      $data{$type}{$name}{circular}{99}{attrInvChangedTs} = $idts;
-  }
-
-  my $val2 = ReadingsVal ($name, 'currentInverterDev', '');                    # 03.06.2024
-  if ($val2) {
-      CommandAttr (undef, "$name setupInverterDev $val2");
-      readingsDelete ($hash, 'currentInverterDev');
-  }
-
-  my $val3 = ReadingsVal ($name, 'inverterStrings', '');                    # 05.06.2024
-  if ($val3) {
-      CommandAttr (undef, "$name setupInverterStrings $val3");
-      readingsDelete ($hash, 'inverterStrings');
-  }
-
-  my $val4 = ReadingsVal ($name, 'currentRadiationAPI', '');                    # 10.06.2024
-  if ($val4) {
-      CommandAttr (undef, "$name setupRadiationAPI $val4");
-      readingsDelete ($hash, 'currentRadiationAPI');
-  }
-
-  my $val5 = ReadingsVal ($name, 'modulePeakString', '');                    # 12.06.2024
-  if ($val5) {
-      CommandAttr (undef, "$name setupStringPeak $val5");
-      readingsDelete ($hash, 'modulePeakString');
-  }
-  
+  ##########################################################################################################################  
   my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                         # 16.06.2024
   if ($dir) {
       readingsSingleUpdate ($hash, 'setupStringAzimuth', $dir, 0);
@@ -6565,7 +6551,6 @@ sub centralTask {
   $data{$type}{$name}{current}{ctrunning} = 1;                                                 # Central Task running Statusbit
 
   my $centpars = {
-      hash    => $hash,
       name    => $name,
       type    => $type,
       t       => $t,
@@ -6587,11 +6572,11 @@ sub centralTask {
       Log3 ($name, 4, "$name DEBUG> current hour of day: ".($chour+1));
   }
 
-  singleUpdateState           ($centpars);
+  singleUpdateState           ( {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}} );
 
   $centpars->{state} = 'updated';                                                     # kann durch Subs überschrieben werden!
 
-  _composeRemoteObj           ($centpars);                                            # Remote Objekte identifizieren und zusammenstellen
+  # _composeRemoteObj           ($centpars);                                            # Remote Objekte identifizieren und zusammenstellen
   _collectAllRegConsumers     ($centpars);                                            # alle Verbraucher Infos laden
   _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
   _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
@@ -6622,11 +6607,11 @@ sub centralTask {
 
   if ($evt) {
       $centpars->{evt} = $evt;
-      InternalTimer(gettimeofday()+1, "FHEM::SolarForecast::singleUpdateState", $centpars, 0);
+      InternalTimer(gettimeofday()+1, "FHEM::SolarForecast::singleUpdateState", {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}}, 0);
   }
   else {
       $centpars->{evt} = 1;
-      singleUpdateState ($centpars);
+      singleUpdateState ( {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}} );
   }
 
   $data{$type}{$name}{current}{ctrunning} = 0;
@@ -6912,9 +6897,10 @@ return;
 ################################################################
 sub _collectAllRegConsumers {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
+  
+  my $hash  = $defs{$name};
 
   return if(CurrentVal ($hash, 'consumerCollected', 0));                                          # Abbruch wenn Consumer bereits gesammelt
 
@@ -7071,7 +7057,6 @@ return;
 ################################################################
 sub _specialActivities {
   my $paref  = shift;
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
   my $date   = $paref->{date};                                              # aktuelles Datum
@@ -7080,6 +7065,7 @@ sub _specialActivities {
   my $t      = $paref->{t};                                                 # aktuelle Zeit
   my $day    = $paref->{day};
 
+  my $hash  = $defs{$name};
   my ($ts,$ts1,$pvfc,$pvrl,$gcon);
 
   $ts1  = $date." ".sprintf("%02d",$chour).":00:00";
@@ -7121,7 +7107,7 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 1 started");
 
-          $date = strftime "%Y-%m-%d", localtime($t-7200);                                   # Vortag (2 h Differenz reichen aus)
+          $date = strftime "%Y-%m-%d", localtime($t-7200);                                         # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
 
           $pvfc = ReadingsNum ($name, "Today_Hour24_PVforecast", 0);
@@ -7138,8 +7124,13 @@ sub _specialActivities {
           readingsDelete    ($hash, 'Today_PVdeviation');
           readingsDelete    ($hash, 'Today_PVreal');
 
-          for my $wdr (@widgetreadings) {                                                     # Array der Hilfsreadings (Attributspeicher) löschen
-              readingsDelete ($hash, $wdr);
+          if (scalar(@widgetreadings)) {                                                          # vermeide Schleife falls FHEMWEB geöfffnet
+              my @acopy       = @widgetreadings;
+              @widgetreadings = ();                                                       
+              
+              for my $wdr (@acopy) {                                                              # Array der Hilfsreadings (Attributspeicher) löschen
+                  readingsDelete ($hash, $wdr);
+              }
           }
 
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
@@ -7264,8 +7255,8 @@ return;
 #############################################################################
 sub __deletePvCorffReadings  {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $hash  = $defs{$name};
 
   for my $n (1..24) {
       $n = sprintf "%02d", $n;
@@ -7296,9 +7287,9 @@ return;
 #############################################################################
 sub __createAdditionalEvents  {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
+  my $hash  = $defs{$name};
 
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
       my $nhts = NexthoursVal ($hash, $idx, 'starttime', undef);
@@ -7317,11 +7308,11 @@ return;
 #############################################################################
 sub __delObsoleteAPIData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $date  = $paref->{date};                                                          # aktuelles Datum
-
+  my $hash  = $defs{$name};
+  
   if (!keys %{$data{$type}{$name}{solcastapi}}) {
       return;
   }
@@ -7359,12 +7350,12 @@ return;
 ################################################################
 sub _transferWeatherValues {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $t     = $paref->{t};                                                                     # Epoche Zeit
   my $chour = $paref->{chour};
+  my $hash  = $defs{$name};
 
-  my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev1');                  # Standard Weather Forecast Device
+  my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev1');                  # Standard Weather Forecast Device
   return if(!$valid);
 
   my $type = $paref->{type};
@@ -7445,18 +7436,18 @@ return;
 }
 
 ################################################################
-#   lese Wetterdaten aus Device im Attribut ctrlWeatherDevX
+#   lese Wetterdaten aus Device im Attribut setupWeatherDevX
 #   X = laufende Schleifenvariable $step
 ################################################################
 sub __readDataWeather {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $chour = $paref->{chour};                                                                  # aktuelles Datum
   my $type  = $paref->{type};
   my $step  = $paref->{step};
+  my $hash  = $defs{$name};
 
-  my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);              # Weather Forecast Device
+  my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$step);             # Weather Forecast Device
   return if(!$valid);
 
   if ($apiu) {                                                                                  # eine API wird verwendet
@@ -7515,11 +7506,11 @@ return;
 ################################################################
 sub ___readDataWeatherAPI {
   my $paref  = shift;
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
   my $step   = $paref->{step};
   my $fcname = $paref->{fcname};
+  my $hash   = $defs{$name};
 
   debugLog ($paref, 'collectData', "collect Weather data step $step - API: $fcname =>");
 
@@ -7555,16 +7546,16 @@ return;
 ################################################################
 sub __mergeDataWeather {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
+  my $hash  = $defs{$name};
 
   debugLog ($paref, 'collectData', "merge Weather data =>");
 
   my $ds = 0;
 
   for my $wd (1..$weatherDevMax) {
-      my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$wd);              # Weather Forecast Device
+      my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$wd);              # Weather Forecast Device
       $ds++ if($valid);
   }
 
@@ -7622,13 +7613,13 @@ return;
 ################################################################
 sub __sunRS {
   my $paref  = shift;
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $t      = $paref->{t};                                                       # aktuelle Zeit
   my $fcname = $paref->{fcname};
   my $type   = $paref->{type};
   my $date   = $paref->{date};                                                    # aktuelles Datum
   my $apiu   = $paref->{apiu};
+  my $hash   = $defs{$name};
 
   my ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss);
 
@@ -7686,12 +7677,12 @@ return ($fc0_sr_mm, $fc0_ss_mm, $fc1_sr_mm, $fc1_ss_mm);
 ################################################################
 sub _transferAPIRadiationValues {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $t     = $paref->{t};                                                                     # Epoche Zeit
   my $chour = $paref->{chour};
   my $date  = $paref->{date};
+  my $hash  = $defs{$name};
 
   return if(!keys %{$data{$type}{$name}{solcastapi}});
 
@@ -7838,7 +7829,6 @@ return;
 ################################################################
 sub __calcSunPosition {
   my $paref  = shift;
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
   my $t      = $paref->{t};                                                                                # Epoche Zeit
@@ -7846,6 +7836,7 @@ sub __calcSunPosition {
   my $wtday  = $paref->{wtday};
   my $num    = $paref->{num};
   my $nhtstr = $paref->{nhtstr};
+  my $hash   = $defs{$name};
 
   my ($fd, $fh) = calcDayHourMove ($chour, $num);
   last if($fd > 1);
@@ -7886,7 +7877,6 @@ return;
 #########################################################################
 sub __calcPVestimates {
   my $paref   = shift;
-  my $hash    = $paref->{hash};
   my $name    = $paref->{name};
   my $type    = $paref->{type};
   my $wantdt  = $paref->{wantdt};
@@ -7894,6 +7884,7 @@ sub __calcPVestimates {
   my $fd      = $paref->{fd};
   my $num     = $paref->{num};
   my $debug   = $paref->{debug};
+  my $hash    = $defs{$name};
 
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   my $totalrain   = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "totalrain",  0);          # Gesamtniederschlag während der letzten Stunde kg/m2
@@ -8004,7 +7995,6 @@ return $pvsum;
 ######################################################################
 sub ___readCandQ {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $num   = $paref->{num};
@@ -8012,6 +8002,7 @@ sub ___readCandQ {
   my $fd    = $paref->{fd};
   my $cc    = $paref->{cloudcover};
   my $sabin = $paref->{sabin};
+  my $hash  = $defs{$name};
 
   my ($acu, $aln) = isAutoCorrUsed ($name);                                                           # Autokorrekturmodus
   my $sunalt      = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), 'sunalt', undef);           # Sun Altitude
@@ -8080,12 +8071,11 @@ return ($hc, $hq);
 ###################################################################
 sub ___calcPeaklossByTemp {
   my $paref      = shift;
-  my $hash       = $paref->{hash};
   my $name       = $paref->{name};
   my $peak       = $paref->{peak}       // return (0,0);
   my $cloudcover = $paref->{cloudcover} // return (0,0);                                    # vorhergesagte Wolkendecke Stunde X
   my $temp       = $paref->{temp}       // return (0,0);                                    # vorhergesagte Temperatur Stunde X
-
+  
   my $modtemp  = $temp + ($tempmodinc * (1 - ($cloudcover/100)));                           # kalkulierte Modultemperatur
   my $peakloss = sprintf "%.2f", $tempcoeffdef * ($modtemp - $tempbasedef) * $peak / 100;
 
@@ -8097,12 +8087,12 @@ return ($peakloss, $modtemp);
 ################################################################
 sub ___70percentRule {
   my $paref   = shift;
-  my $hash    = $paref->{hash};
   my $name    = $paref->{name};
   my $pvsum   = $paref->{pvsum};
   my $peaksum = $paref->{peaksum};
   my $num     = $paref->{num};                                                          # Nexthour
-
+  
+  my $hash  = $defs{$name};
   my $logao = qq{};
   my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "confc", 0);
   my $max70 = $peaksum/100 * 70;
@@ -8127,7 +8117,6 @@ return ($pvsum, $logao);
 ################################################################
 sub _calcMaxEstimateToday {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $date  = $paref->{date};
@@ -8156,12 +8145,12 @@ return;
 ################################################################
 sub _transferInverterValues {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $t     = $paref->{t};                                                                    # aktuelle Unix-Zeit
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
-
+  
+  my $hash              = $defs{$name};
   my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => 'setupInverterDev', method => 'attr' } );
   return if($err);
 
@@ -8245,11 +8234,11 @@ return;
 ################################################################
 sub _transferMeterValues {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $t     = $paref->{t};
   my $chour = $paref->{chour};
 
+  my $hash              = $defs{$name};
   my ($err, $medev, $h) = isDeviceValid ( { name => $name, obj => 'setupMeterDev', method => 'attr' } );
   return if($err);
 
@@ -8457,11 +8446,11 @@ return;
 ################################################################
 sub _transferBatteryValues {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
-
+  
+  my $hash              = $defs{$name};
   my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev', method => 'attr' } );
   return if($err);
 
@@ -8620,13 +8609,13 @@ return;
 ################################################################
 sub _batSocTarget {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $t     = $paref->{t};                                                                   # aktuelle Zeit
 
   return if(!isBatteryUsed ($name));
-
+  
+  my $hash       = $defs{$name};
   my $oldd2care  = CircularVal ($hash, 99, 'days2care',            0);
   my $ltsmsr     = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
   my $batcharge  = CurrentVal  ($hash, 'batcharge',                0);                       # aktuelle Ladung in %
@@ -8794,14 +8783,14 @@ return;
 ################################################################
 sub _createSummaries {
   my $paref  = shift;
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
   my $day    = $paref->{day};
   my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
   my $minute = $paref->{minute};                                                                      # aktuelle Minute
 
-  $minute    = (int $minute) + 1;                                                                     # Minute Range umsetzen auf 1 bis 60
+  my $hash = $defs{$name}; 
+  $minute  = (int $minute) + 1;                                                                       # Minute Range umsetzen auf 1 bis 60
 
   ## Initialisierung
   ####################
@@ -8941,13 +8930,13 @@ return;
 ################################################################
 sub _manageConsumerData {
   my $paref   = shift;
-  my $hash    = $paref->{hash};
   my $name    = $paref->{name};
   my $type    = $paref->{type};
   my $t       = $paref->{t};                                                 # aktuelle Zeit
   my $chour   = $paref->{chour};
   my $day     = $paref->{day};
 
+  my $hash        = $defs{$name};
   my $nhour       = $chour + 1;
   $paref->{nhour} = sprintf "%02d", $nhour;
 
@@ -9093,11 +9082,11 @@ return;
 ################################################################
 sub __getAutomaticState {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
 
+  my $hash     = $defs{$name};
   my $consumer = ConsumerVal ($hash, $c, 'name', '');                                  # Name Consumer Device
   my ($err)    = isDeviceValid ( { name   => $name,
                                    obj    => $consumer,
@@ -9133,14 +9122,14 @@ return;
 ###################################################################
 sub __calcEnergyPieces {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
-
+  
+  my $hash = $defs{$name};
   my $etot = HistoryVal ($hash, $paref->{day}, sprintf("%02d",$paref->{nhour}), "csmt${c}", 0);
 
-  if($etot) {
+  if ($etot) {
       $paref->{etot} = $etot;
       ___csmSpecificEpieces ($paref);
       delete $paref->{etot};
@@ -9217,13 +9206,14 @@ return;
 ####################################################################################
 sub ___csmSpecificEpieces {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $etot  = $paref->{etot};
   my $t     = $paref->{t};
-
+  
+  my $hash  = $defs{$name};
+  
   if (ConsumerVal ($hash, $c, "onoff", "off") eq "on") {                                                # Status "Aus" verzögern um Pausen im Waschprogramm zu überbrücken
       $data{$type}{$name}{consumers}{$c}{lastOnTime} = $t;
   }
@@ -9323,13 +9313,12 @@ return;
 ###################################################################
 sub __planInitialSwitchTime {
   my $paref = shift;
-
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
   my $debug = $paref->{debug};
-
-  my $dnp = ___noPlanRelease ($paref);
+  
+  my $hash = $defs{$name};
+  my $dnp  = ___noPlanRelease ($paref);
 
   if ($dnp) {
       if ($debug =~ /consumerPlanning/x) {
@@ -9369,11 +9358,12 @@ return;
 ###################################################################
 sub ___noPlanRelease {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $t     = $paref->{t};                                                                 # aktuelle Zeit
   my $c     = $paref->{consumer};
 
-  my $dnp   = 0;                                                                           # 0 -> Planung, 1 -> keine Planung
+  my $hash = $defs{$name};
+  my $dnp  = 0;                                                                           # 0 -> Planung, 1 -> keine Planung
 
   if (ConsumerVal ($hash, $c, 'planstate', undef)) {                                       # Verbraucher ist schon geplant/gestartet/fertig
       $dnp = qq{consumer is already planned};
@@ -9403,9 +9393,10 @@ return $dnp;
 ###################################################################
 sub __reviewSwitchTime {
   my $paref = shift;
-
-  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
   my $c         = $paref->{consumer};
+  
+  my $hash      = $defs{$name};
   my $pstate    = ConsumerVal    ($hash, $c, 'planstate',   '');
   my $plswon    = ConsumerVal    ($hash, $c, 'planswitchon', 0);                      # bisher geplante Switch on Zeit
   my $simpCstat = simplifyCstate ($pstate);
@@ -9446,8 +9437,6 @@ return;
 ###################################################################
 sub ___doPlanning {
   my $paref = shift;
-
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $c      = $paref->{consumer};
   my $debug  = $paref->{debug};
@@ -9455,6 +9444,8 @@ sub ___doPlanning {
   my $lang   = $paref->{lang};
   my $nh     = $data{$type}{$name}{nexthours};
   my $cicfip = AttrVal ($name, 'affectConsForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
+
+  my $hash   = $defs{$name};
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Consider consumption forecast in consumer planning: }.($cicfip ? 'yes' : 'no'));
 
@@ -9628,14 +9619,14 @@ return;
 ################################################################
 sub ___saveEhodpieces {
   my $paref   = shift;
-  my $hash    = $paref->{hash};
   my $name    = $paref->{name};
   my $type    = $paref->{type};
   my $c       = $paref->{consumer};
   my $startts = $paref->{startts};                                           # Unix Timestamp für geplanten Switch on
   my $stopts  = $paref->{stopts};                                            # Unix Timestamp für geplanten Switch off
-
-  my $p = 1;
+  
+  my $hash = $defs{$name};
+  my $p    = 1;
   delete $data{$type}{$name}{consumers}{$c}{ehodpieces};
 
   for (my $i = $startts; $i <= $stopts; $i+=3600) {
@@ -9643,7 +9634,7 @@ sub ___saveEhodpieces {
       my $epieces = ConsumerVal ($hash, $c, 'epieces', '');
 
       my $ep = 0;
-      if(ref $epieces eq "HASH") {
+      if (ref $epieces eq "HASH") {
           $ep = defined $data{$type}{$name}{consumers}{$c}{epieces}{$p} ?
                         $data{$type}{$name}{consumers}{$c}{epieces}{$p} :
                         0;
@@ -9666,7 +9657,6 @@ return;
 ################################################################
 sub ___setConsumerPlanningState {
   my $paref     = shift;
-  my $hash      = $paref->{hash};
   my $name      = $paref->{name};
   my $type      = $paref->{type};
   my $c         = $paref->{consumer};
@@ -9717,7 +9707,6 @@ return;
 ################################################################
 sub ___planMust {
   my $paref    = shift;
-  my $hash     = $paref->{hash};
   my $name     = $paref->{name};
   my $type     = $paref->{type};
   my $c        = $paref->{consumer};
@@ -9760,7 +9749,6 @@ return;
 ################################################################
 sub ___switchonTimelimits {
   my $paref     = shift;
-  my $hash      = $paref->{hash};
   my $name      = $paref->{name};
   my $c         = $paref->{consumer};
   my $date      = $paref->{date};
@@ -9768,6 +9756,7 @@ sub ___switchonTimelimits {
   my $lang      = $paref->{lang};
   my $t         = $paref->{t};
 
+  my $hash = $defs{$name};
   my $startts;
 
   if (isSunPath ($hash, $c)) {                                                        # SunPath ist in mintime gesetzt
@@ -9860,11 +9849,11 @@ return $starttime;
 ################################################################
 sub ___setPlanningDeleteMeth {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
 
+  my $hash    = $defs{$name};
   my $sonkey  = ConsumerVal ($hash, $c, "planswitchon",  "");
   my $soffkey = ConsumerVal ($hash, $c, "planswitchoff", "");
 
@@ -9888,12 +9877,12 @@ return;
 ################################################################
 sub __setTimeframeState {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};                                                            # aktueller Unixtimestamp
-
+  
+  my $hash    = $defs{$name};
   my $startts = ConsumerVal ($hash, $c, "planswitchon",  undef);                      # geplante Unix Startzeit
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                      # geplante Unix Stopzeit
 
@@ -9912,16 +9901,16 @@ return;
 ################################################################
 sub __setConsRcmdState {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $debug = $paref->{debug};
-
-  my $surplus    = CurrentVal  ($hash, 'surplus',                    0);                  # aktueller Energieüberschuß
-  my $nompower   = ConsumerVal ($hash, $c, 'power',                  0);                  # Consumer nominale Leistungsaufnahme (W)
-  my $ccr        = AttrVal     ($name, 'ctrlConsRecommendReadings', '');                  # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
-  my $rescons    = isConsumerPhysOn($hash, $c) ? 0 : $nompower;                           # resultierender Verbauch nach Einschaltung Consumer
+  
+  my $hash     = $defs{$name};
+  my $surplus  = CurrentVal  ($hash, 'surplus',                    0);                    # aktueller Energieüberschuß
+  my $nompower = ConsumerVal ($hash, $c, 'power',                  0);                    # Consumer nominale Leistungsaufnahme (W)
+  my $ccr      = AttrVal     ($name, 'ctrlConsRecommendReadings', '');                    # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
+  my $rescons  = isConsumerPhysOn($hash, $c) ? 0 : $nompower;                             # resultierender Verbauch nach Einschaltung Consumer
 
   my ($spignore, $info, $err) = isSurplusIgnoCond ($hash, $c, $debug);                    # Vorhandensein PV Überschuß ignorieren ?
   Log3 ($name, 1, "$name - $err") if($err);
@@ -9961,7 +9950,6 @@ return;
 ################################################################
 sub ___switchConsumerOn {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};                                                                        # aktueller Unixtimestamp
@@ -9969,6 +9957,7 @@ sub ___switchConsumerOn {
   my $debug = $paref->{debug};
   my $lang  = $paref->{lang};
 
+  my $hash                    = $defs{$name};
   my ($err, $cname, $dswname) = getCDnames ($hash, $c);                                           # Consumer und Switch Device Name
 
   if ($err) {
@@ -10086,12 +10075,13 @@ return $state;
 ################################################################
 sub ___switchConsumerOff {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};                                                                        # aktueller Unixtimestamp
   my $state = $paref->{state};
   my $debug = $paref->{debug};
+  
+  my $hash  = $defs{$name};
 
   my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
@@ -10166,13 +10156,13 @@ return $state;
 ################################################################
 sub ___setConsumerSwitchingState {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};
   my $state = $paref->{state};
-
+  
+  my $hash      = $defs{$name};
   my $simpCstat = simplifyCstate (ConsumerVal ($hash, $c, 'planstate', ''));
   my $calias    = ConsumerVal    ($hash, $c, 'alias',                   '');                       # Consumer Device Alias
   my $auto      = ConsumerVal    ($hash, $c, 'auto',                     1);
@@ -10282,7 +10272,6 @@ return $state;
 ################################################################
 sub __getCyclesAndRuntime {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $t     = $paref->{t};
@@ -10292,20 +10281,12 @@ sub __getCyclesAndRuntime {
   my $pcurr = $paref->{pcurr};
   my $c     = $paref->{consumer};
   my $debug = $paref->{debug};
+  
+  my $hash  = $defs{$name};
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $nds = ConsumerVal ($hash, $c, 'numberDayStarts', 'leer');           # 28.05.2024
-  my $art = ConsumerVal ($hash, $c, 'avgruntime', 'leer');
-  if ($nds ne 'leer') {
-      $data{$type}{$name}{consumers}{$c}{cycleDayNum} = $nds;
-      delete $data{$type}{$name}{consumers}{$c}{numberDayStarts};
-  }
 
-  if ($art ne 'leer') {
-      $data{$type}{$name}{consumers}{$c}{runtimeAvgDay} = $art;
-      delete $data{$type}{$name}{consumers}{$c}{avgruntime};
-  }
   ##########################################################################################################################
 
   my ($starthour, $startday);
@@ -10394,12 +10375,12 @@ return;
 ################################################################
 sub __remainConsumerTime {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};                                                                   # aktueller Unixtimestamp
 
+  my $hash                            = $defs{$name};
   my ($planstate,$startstr,$stoptstr) = __getPlanningStateAndTimes ($paref);
   my $stopts                          = ConsumerVal ($hash, $c, 'planswitchoff', undef);     # geplante Unix Stopzeit
 
@@ -10418,15 +10399,15 @@ return;
 ################################################################
 sub  __setPhysLogSwState {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $pcurr = $paref->{pcurr};
   my $debug = $paref->{debug};
-
-  my $cpo = isConsumerPhysOn ($hash, $c)         ? 'on' : 'off';
-  my $clo = isConsumerLogOn  ($hash, $c, $pcurr) ? 'on' : 'off';
+  
+  my $hash = $defs{$name};
+  my $cpo  = isConsumerPhysOn ($hash, $c)         ? 'on' : 'off';
+  my $clo  = isConsumerLogOn  ($hash, $c, $pcurr) ? 'on' : 'off';
 
   $data{$type}{$name}{consumers}{$c}{physoffon} = $cpo;
   $data{$type}{$name}{consumers}{$c}{logoffon}  = $clo;
@@ -10446,10 +10427,10 @@ return;
 ################################################################
 sub ___enableSwitchByBatPrioCharge {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
 
+  my $hash    = $defs{$name};
   my $ena     = 1;
   my $pcb     = AttrVal ($name, 'affectBatteryPreferredCharge', 0);          # Vorrangladung Batterie zu X%
   my ($badev) = isBatteryUsed ($name);
@@ -10467,10 +10448,11 @@ return $ena;
 ###################################################################
 sub __getPlanningStateAndTimes {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $c     = $paref->{consumer};
   my $lang  = $paref->{lang};
 
+  my $hash      = $defs{$name};
   my $simpCstat = simplifyCstate (ConsumerVal ($hash, $c, 'planstate', ''));
   my $supplmnt  = ConsumerVal ($hash, $c, 'planSupplement', '');
   my $startts   = ConsumerVal ($hash, $c, 'planswitchon',   '');
@@ -10493,13 +10475,13 @@ return ($simpCstat, $starttime, $stoptime, $supplmnt);
 ################################################################
 sub _estConsumptionForecast {
   my $paref   = shift;
-  my $hash    = $paref->{hash};
   my $name    = $paref->{name};
   my $chour   = $paref->{chour};
   my $t       = $paref->{t};
   my $day     = $paref->{day};                                                                          # aktuelles Tagdatum (01...31)
   my $dayname = $paref->{dayname};                                                                      # aktueller Tagname
 
+  my $hash              = $defs{$name};
   my ($err, $medev, $h) = isDeviceValid ( { name   => $name,
                                             obj    => 'setupMeterDev',
                                             method => 'attr',
@@ -10645,7 +10627,6 @@ return;
 ################################################################
 sub _evaluateThresholds {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
 
   my $bt    = ReadingsVal($name, 'batteryTrigger',  '');
@@ -10688,13 +10669,12 @@ return;
 ################################################################
 sub __evaluateArray {
   my $paref  = shift;
-
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $cobj   = $paref->{cobj};           # das CurrentVal Objekt, z.B. genslidereg
   my $tname  = $paref->{tname};          # Thresholdname, z.B. powerTrigger
   my $tholds = $paref->{tholds};         # Triggervorgaben, z.B. aus Reading powerTrigger
 
+  my $hash  = $defs{$name};
   my $aaref = CurrentVal ($hash, $cobj, '');
   my @aa    = ();
   @aa       = @{$aaref} if (ref $aaref eq 'ARRAY');
@@ -10732,12 +10712,13 @@ return;
 ################################################################
 sub _calcReadingsTomorrowPVFc {
   my $paref  = shift;
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
-
+  
+  my $hash = $defs{$name};
   my $h    = $data{$type}{$name}{nexthours};
   my $hods = AttrVal($name, 'ctrlNextDayForecastReadings', '');
+  
   return if(!keys %{$h} || !$hods);
 
   for my $idx (sort keys %{$h}) {
@@ -10765,13 +10746,13 @@ return;
 ################################################################
 sub calcTodayPVdeviation {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $t     = $paref->{t};
   my $date  = $paref->{date};
   my $day   = $paref->{day};
 
+  my $hash = $defs{$name};
   my $pvfc = ReadingsNum ($name, 'Today_PVforecast', 0);
   my $pvre = ReadingsNum ($name, 'Today_PVreal',     0);
 
@@ -10805,12 +10786,13 @@ return;
 ################################################################
 sub calcValueImproves {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
   my $t     = $paref->{t};                                                            # aktuelle Unix-Zeit
 
+  my $hash = $defs{$name};
   my $idts = CircularVal ($hash, 99, "attrInvChangedTs", '');                         # Definitionstimestamp des Attr setupInverterDev
+  
   return if(!$idts);
 
   my ($acu, $aln) = isAutoCorrUsed ($name);
@@ -10864,7 +10846,6 @@ return;
 ################################################################
 sub _calcCaQcomplex {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $debug = $paref->{debug};
   my $acu   = $paref->{acu};
@@ -10872,7 +10853,8 @@ sub _calcCaQcomplex {
   my $h     = $paref->{h};
   my $day   = $paref->{day};                                                                          # aktueller Tag
 
-  my $sr = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', '');
+  my $hash = $defs{$name};
+  my $sr   = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', '');
 
   if ($sr eq 'done') {
       # Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
@@ -10934,7 +10916,6 @@ return;
 ################################################################
 sub _calcCaQsimple {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $date  = $paref->{date};
   my $acu   = $paref->{acu};
@@ -10942,7 +10923,8 @@ sub _calcCaQsimple {
   my $h     = $paref->{h};
   my $day   = $paref->{day};                                                                          # aktueller Tag
 
-  my $sr = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', '');
+  my $hash = $defs{$name};
+  my $sr   = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', '');
 
   if($sr eq "done") {
       # debugLog ($paref, 'pvCorrectionWrite', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
@@ -11001,18 +10983,17 @@ return;
 ################################################################
 sub __calcNewFactor {
   my $paref = shift;
-
-  my $hash   = $paref->{hash};
-  my $name   = $paref->{name};
-  my $type   = $paref->{type};
-  my $pvrl   = $paref->{pvrl};
-  my $pvfc   = $paref->{pvfc};
-  my $crang  = $paref->{crang};
-  my $sabin  = $paref->{sabin};
-  my $h      = $paref->{h};
-  my $calc   = $paref->{calc};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $pvrl  = $paref->{pvrl};
+  my $pvfc  = $paref->{pvfc};
+  my $crang = $paref->{crang};
+  my $sabin = $paref->{sabin};
+  my $h     = $paref->{h};
+  my $calc  = $paref->{calc};
 
   my $factor;
+  my $hash    = $defs{$name};
   my $pvrlsum = $pvrl;
   my $pvfcsum = $pvfc;
 
@@ -11163,12 +11144,12 @@ return;
 ################################################################
 sub genStatisticReadings {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $t     = $paref->{t};              # aktueller UNIX Timestamp
 
-  my @srd = sort keys (%hcsr);
-  my @csr = split ',', AttrVal ($name, 'ctrlStatisticReadings', '');
+  my $hash = $defs{$name};
+  my @srd  = sort keys (%hcsr);
+  my @csr  = split ',', AttrVal ($name, 'ctrlStatisticReadings', '');
 
   for my $item (@srd) {
       next if(grep /^$item$/, @csr);
@@ -11479,7 +11460,6 @@ sub entryGraphic {
   }
 
   my $paref = {
-      hash           => $hash,
       name           => $name,
       type           => $hash->{TYPE},
       ftui           => $ftui,
@@ -11517,6 +11497,7 @@ sub entryGraphic {
       hdrDetail      => AttrVal ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       flowgsize      => AttrVal ($name, 'flowGraphicSize',        $flowGSizedef),                # Größe Energieflußgrafik
       flowgani       => AttrVal ($name, 'flowGraphicAnimate',                 0),                # Animation Energieflußgrafik
+      flowgshift     => AttrVal ($name, 'flowGraphicShift',                   0),                # Verschiebung der Flußgrafikbox (muß negiert werden)
       flowgcons      => AttrVal ($name, 'flowGraphicShowConsumer',            1),                # Verbraucher in der Energieflußgrafik anzeigen
       flowgconX      => AttrVal ($name, 'flowGraphicShowConsumerDummy',       1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
       flowgconsPower => AttrVal ($name, 'flowGraphicShowConsumerPower'     ,  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
@@ -11687,17 +11668,7 @@ sub _checkSetupNotComplete {
   my $type  = $hash->{TYPE};
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################
-  my $val2 = ReadingsVal ($name, 'currentInverterDev', '');                    # 03.06.2024
-  if ($val2) {
-      CommandAttr (undef, "$name setupInverterDev $val2");
-  }
-
-  my $val3 = ReadingsVal ($name, 'inverterStrings', '');                       # 05.06.2024
-  if ($val3) {
-      CommandAttr (undef, "$name setupInverterStrings $val3");
-  }
-  
+  ##########################################################################################  
   my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                         # 16.06.2024
   if ($dir) {
       readingsSingleUpdate ($hash, 'setupStringAzimuth', $dir, 0);
@@ -11711,7 +11682,7 @@ sub _checkSetupNotComplete {
   ##########################################################################################
 
   my $is    = AttrVal     ($name, 'setupInverterStrings',   undef);                       # String Konfig
-  my $wedev = AttrVal     ($name, 'ctrlWeatherDev1',        undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
+  my $wedev = AttrVal     ($name, 'setupWeatherDev1',       undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
   my $radev = AttrVal     ($name, 'setupRadiationAPI',      undef);                       # Device Strahlungsdaten Vorhersage
   my $indev = AttrVal     ($name, 'setupInverterDev',       undef);                       # Inverter Device
   my $medev = AttrVal     ($name, 'setupMeterDev',          undef);                       # Meter Device
@@ -11834,10 +11805,10 @@ sub _graphicHeader {
   my $ftui      = $paref->{ftui};
   my $lang      = $paref->{lang};
   my $name      = $paref->{name};
-  my $hash      = $paref->{hash};
   my $kw        = $paref->{kw};
   my $dstyle    = $paref->{dstyle};                        # TD-Style
 
+  my $hash      = $defs{$name};
   my $lup       = ReadingsTimestamp ($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
 
   my $co4h      = ReadingsNum ($name, "NextHours_Sum04_ConsumptionForecast", 0);
@@ -12195,12 +12166,10 @@ return $header;
 ################################################################
 sub __createUpdateIcon {
   my $paref = shift;
-
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
   my $ftui  = $paref->{ftui};
-
+  
   my $upstate = ReadingsVal ($name, 'state',         '');
   my $naup    = ReadingsVal ($name, 'nextCycletime', '');
 
@@ -12237,8 +12206,6 @@ return $upicon;
 ################################################################
 sub __createAutokorrIcon {
   my $paref = shift;
-
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
 
@@ -12271,12 +12238,11 @@ return $acicon;
 ################################################################
 sub __createQuaIcon {
   my $paref = shift;
-
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
   my $ftui  = $paref->{ftui};
 
+  my $hash       = $defs{$name};
   my $pvfc00     = NexthoursVal ($hash, 'NextHour00', 'pvfc',    undef);
   my $pvcorrf00  = NexthoursVal ($hash, "NextHour00", "pvcorrf", "-/-");
   my ($pcf,$pcq) = split "/", $pvcorrf00;
@@ -12311,11 +12277,10 @@ return $pcqicon;
 ################################################################
 sub __createAIicon {
   my $paref    = shift;
-
-  my $hash     = $paref->{hash};
   my $name     = $paref->{name};
   my $lang     = $paref->{lang};
 
+  my $hash     = $defs{$name};
   my $aiprep   = isPrepared4AI ($hash, 'full');                      # isPrepared4AI full vor Abfrage 'aicanuse' ausführen !
   my $aicanuse = CurrentVal    ($hash, 'aicanuse',       '');
   my $aitst    = CurrentVal    ($hash, 'aitrainstate', 'ok');
@@ -12345,7 +12310,6 @@ return $aiicon;
 ################################################################
 sub __createOwnSpec {
   my $paref     = shift;
-  my $hash      = $paref->{hash};
   my $name      = $paref->{name};
   my $dstyle    = $paref->{dstyle};                                                    # TD-Style
   my $hdrDetail = $paref->{hdrDetail};
@@ -12592,7 +12556,6 @@ sub ___widgetFallback {
 ################################################################
 sub ___ghoValForm {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $dev   = $paref->{dev};
   my $rdg   = $paref->{rdg};
@@ -12600,7 +12563,8 @@ sub ___ghoValForm {
   my $unit  = $paref->{unit};
   my $type  = $paref->{type};
 
-  my $fn = $data{$type}{$name}{func}{ghoValForm};
+  my $fn   = $data{$type}{$name}{func}{ghoValForm};
+  
   return ($val, $unit) if(!$fn || !$dev || !$rdg || !defined $val);
 
   my $DEVICE  = $dev;
@@ -12671,12 +12635,13 @@ return ($val, $unit);
 ################################################################
 sub _showConsumerInGraphicBeam {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $hfcg  = $paref->{hfcg};
   my $lang  = $paref->{lang};
-
+  
+  my $hash = $defs{$name};
+  
   # get consumer list and display it in Graphics
   ################################################
   my @consumers = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                          # definierte Verbraucher ermitteln
@@ -12738,8 +12703,7 @@ return;
 ################################################################
 sub _graphicConsumerLegend {
   my $paref                    = shift;
-  my $hash                     = $paref->{hash};
-  my $name                     = $paref->{name};                                                    # Consumer AdviceIcon
+  my $name                     = $paref->{name};                                                   
   my ($clegendstyle, $clegend) = split '_', $paref->{clegend};
   my $clink                    = $paref->{clink};
 
@@ -12750,7 +12714,8 @@ sub _graphicConsumerLegend {
   $paref->{clegend}            = $clegend;
 
   return if(!$clegend );
-
+  
+  my $hash   = $defs{$name};
   my $ftui   = $paref->{ftui};
   my $lang   = $paref->{lang};
   my $dstyle = $paref->{dstyle};                        # TD-Style
@@ -12963,7 +12928,7 @@ return $ctable;
 ################################################################
 sub _beamGraphicFirstHour {
   my $paref     = shift;
-  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
   my $hfcg      = $paref->{hfcg};
   my $offset    = $paref->{offset};
   my $hourstyle = $paref->{hourstyle};
@@ -12973,7 +12938,8 @@ sub _beamGraphicFirstHour {
   my $kw        = $paref->{kw};
 
   my $day;
-
+  
+  my $hash                             = $defs{$name};
   my $stt                              = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
   my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
 
@@ -13070,7 +13036,7 @@ return $thishour;
 ################################################################
 sub _beamGraphicRemainingHours {
   my $paref     = shift;
-  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
   my $hfcg      = $paref->{hfcg};
   my $offset    = $paref->{offset};
   my $maxhours  = $paref->{maxhours};
@@ -13083,6 +13049,7 @@ sub _beamGraphicRemainingHours {
 
   my ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8);
 
+  my $hash   = $defs{$name};
   my $maxCon = $hfcg->{0}{beam1};
   my $maxDif = $hfcg->{0}{diff};                                                                        # für Typ diff
   my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
@@ -13183,7 +13150,6 @@ return $back;
 ################################################################
 sub _beamGraphic {
   my $paref      = shift;
-  my $hash       = $paref->{hash};
   my $name       = $paref->{name};
   my $hfcg       = $paref->{hfcg};
   my $maxhours   = $paref->{maxhours};
@@ -13207,7 +13173,7 @@ sub _beamGraphic {
   my $beam1cont  = $paref->{beam1cont};
   my $beam2cont  = $paref->{beam2cont};
 
-  $lotype        = 'single' if($beam1cont eq $beam2cont);                                                       # User Auswahl Layout überschreiben bei gleichen Beamcontent !
+  $lotype  = 'single' if($beam1cont eq $beam2cont);          # User Auswahl Layout überschreiben bei gleichen Beamcontent !
 
   # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
   # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
@@ -13589,17 +13555,18 @@ return $ret;
 ################################################################
 sub _flowGraphic {
   my $paref         = shift;
-  my $hash          = $paref->{hash};
   my $name          = $paref->{name};
   my $flowgsize     = $paref->{flowgsize};
   my $flowgani      = $paref->{flowgani};
-  my $flowgcons     = $paref->{flowgcons};
+  my $flowgshift    = $paref->{flowgshift};                   # Verschiebung der Flußgrafikbox (muß negiert werden)
+  my $flowgcons     = $paref->{flowgcons};                    # Verbraucher in der Energieflußgrafik anzeigen
+  my $flowgconTime  = $paref->{flowgconsTime};                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
   my $flowgconX     = $paref->{flowgconX};
   my $flowgconPower = $paref->{flowgconsPower};
-  my $flowgconTime  = $paref->{flowgconsTime};
   my $consDist      = $paref->{flowgconsDist};
   my $css           = $paref->{css};
-
+  
+  my $hash       = $defs{$name};
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
   my $cpv        = ReadingsNum ($name, 'Current_PV',              0);
@@ -13648,14 +13615,14 @@ sub _flowGraphic {
 
   my $batout_direction = 'M902,305 L730,510';                                                  # Batterientladung aus Netz
 
-  if($batin) {
+  if ($batin) {
       my $gbi = $batin - $cpv;
 
-      if($gbi > 1) {
-        $batin            -= $gbi;
-        $batout_style      = 'flowg active_in';
-        $batout_direction  = 'M730,510 L902,305';
-        $batout            = $gbi;
+      if ($gbi > 1) {
+          $batin            -= $gbi;
+          $batout_style      = 'flowg active_in';
+          $batout_direction  = 'M730,510 L902,305';
+          $batout            = $gbi;
       }
   }
 
@@ -13664,9 +13631,14 @@ sub _flowGraphic {
   my $csc_style    = $csc && $cpv  ? 'flowg active_out'              : 'flowg inactive_out';
   my $cgfi_style   = $cgfi         ? 'flowg active_out'              : 'flowg inactive_out';
 
-  my $vbox_default = !$flowgcons   ? '5 -25 800 480' :
-                     $flowgconTime ? '5 -25 800 700' :
-                     '5 -25 800 680';
+  my $vbminx       = -10 * $flowgshift;                                                          # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbminy       = -25;
+  my $vbwidth      = 800;                                                                        # width and height specify the viewBox size
+  my $vbhight      = !$flowgcons   ? 480 :                      
+                     $flowgconTime ? 700 :
+                     680;
+  
+  my $vbox = "$vbminx $vbminy $vbwidth $vbhight";
 
   my $ret = << "END0";
       <style>
@@ -13674,7 +13646,7 @@ sub _flowGraphic {
       $animation
       </style>
 
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox_default" style="$style" id="SVGPLOT">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$style" id="SVGPLOT">
 
       <g transform="translate(400,50)">
         <g>
@@ -13794,7 +13766,7 @@ END3
       $consumer_style    = 'flowg active_in' if($cc_dummy > 1);
 
       my $chain_color = "";                                                                       # Farbe der Laufkette Consumer-Dummy
-      if($cc_dummy > 0.5) {
+      if ($cc_dummy > 0.5) {
           $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
           #$chain_color  = 'style="stroke: #DF0101;"';
       }
@@ -13832,7 +13804,7 @@ END3
           $consumer_style    = 'flowg active_out' if($p > $defpopercent);
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
-          if($p > 0.5) {
+          if ($p > 0.5) {
               $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
               #$chain_color  = 'style="stroke: #DF0101;"';
           }
@@ -13968,7 +13940,7 @@ sub consinject {
       if ($_) {
           my ($cons,$im,$start,$end) = split (':', $_);
 
-          if($debug =~ /graphic/x) {
+          if ($debug =~ /graphic/x) {
               Log3 ($name, 1, qq{$name DEBUG> Consumer to show -> $cons, relative to current time -> start: $start, end: $end}) if($i<1);
           }
 
@@ -14057,7 +14029,7 @@ sub weather_icon {
   $id      = int $id;
   my $txt  = $lang eq "DE" ? "txtd" : "txte";
 
-  if(defined $weather_ids{$id}) {
+  if (defined $weather_ids{$id}) {
       return $weather_ids{$id}{icon}, encode("utf8", $weather_ids{$id}{$txt});
   }
 
@@ -14086,7 +14058,7 @@ sub checkdwdattr {
       $err = qq{ERROR - device "$dwddev" -> attribute "forecastProperties" must contain: }.join ",",@aneeded;
   }
 
-  if($fcr != 1) {
+  if ($fcr != 1) {
       $err .= ", " if($err);
       $err .= qq{ERROR - device "$dwddev" -> attribute "forecastResolution" must be set to "1"};
   }
@@ -14101,13 +14073,13 @@ return $err;
 ################################################################
 sub _addHourAiRawdata {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $aln   = $paref->{aln};                                                                          # Autolearning
   my $h     = $paref->{h};
 
-  my $rho = sprintf "%02d", $h;
-  my $sr  = ReadingsVal ($name, ".signaldone_".$rho, "");
+  my $hash = $defs{$name};
+  my $rho  = sprintf "%02d", $h;
+  my $sr   = ReadingsVal ($name, ".signaldone_".$rho, "");
 
   return if($sr eq "done");
 
@@ -14158,8 +14130,9 @@ return $hdv;
 ###############################################################
 sub manageTrain {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  
+  my $hash  = $defs{$name};
 
   if (CircularVal ($hash, 99, 'runTimeTrainAI', 0) < $aibcthhld) {
       BlockingKill ($hash->{HELPER}{AIBLOCKRUNNING}) if(defined $hash->{HELPER}{AIBLOCKRUNNING});
@@ -14220,8 +14193,7 @@ sub finishTrain {
   $data{$type}{$name}{circular}{99}{aitrainLastFinishTs} = $aitrainFinishTs if(defined $aitrainFinishTs);
 
   if ($aitrainstate eq 'ok') {
-      _readCacheFile ({ hash      => $hash,
-                        name      => $name,
+      _readCacheFile ({ name      => $name,
                         type      => $type,
                         file      => $aitrained.$name,
                         cachename => 'aitrained',
@@ -14268,11 +14240,12 @@ return;
 ################################################################
 sub aiAddInstance {                   ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $taa   = $paref->{taa};          # do train after add
-
+  
+  my $hash  = $defs{$name};
+  
   return if(!isPrepared4AI ($hash));
 
   my $err = aiInit ($paref);
@@ -14336,11 +14309,11 @@ return;
 ################################################################
 sub aiTrain {                            ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $block = $paref->{block} // 0;
 
+  my $hash = $defs{$name};
   my ($serial, $err);
 
   if (!isPrepared4AI ($hash)) {
@@ -14414,12 +14387,13 @@ return;
 ################################################################
 sub aiGetResult {
   my $paref  = shift;
-  my $hash   = $paref->{hash};
   my $name   = $paref->{name};
   my $type   = $paref->{type};
   my $hod    = $paref->{hod};
   my $nhtstr = $paref->{nhtstr};
 
+  my $hash = $defs{$name};
+  
   return 'AI usage is not prepared' if(!isPrepared4AI ($hash, 'full'));
 
   my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
@@ -14466,8 +14440,7 @@ sub aiGetResult {
       return ('accurate', $pvaifc);
   }
 
-  (my $msg, $pvaifc) = _aiGetSpread ( { hash   => $hash,
-                                        name   => $name,
+  (my $msg, $pvaifc) = _aiGetSpread ( { name   => $name,
                                         type   => $type,
                                         rad1h  => $rad1h,
                                         temp   => $tbin,
@@ -14574,9 +14547,10 @@ return 'No AI decition delivered';
 ################################################################
 sub aiInit {                   ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
+  
+  my $hash  = $defs{$name};
 
   if (!isPrepared4AI ($hash)) {
       my $err = CurrentVal ($hash, 'aicanuse', '');
@@ -14602,13 +14576,14 @@ return;
 ################################################################
 sub aiAddRawData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $day   = $paref->{day} // strftime "%d",  localtime(time);           # aktueller Tag (range 01 to 31)
   my $ood   = $paref->{ood} // 0;                                         # only one (current) day
   my $rho   = $paref->{rho};                                              # only this hour of day
-
+  
+  my $hash  = $defs{$name};
+  
   delete $data{$type}{$name}{current}{aitrawstate};
 
   my $err;
@@ -14686,10 +14661,11 @@ return;
 ################################################################
 sub aiDelRawData {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $type  = $paref->{type};
 
+  my $hash = $defs{$name};
+  
   if (!keys %{$data{$type}{$name}{aidectree}{airaw}}) {
       return;
   }
@@ -14747,7 +14723,6 @@ return $ridx;
 ################################################################
 sub writeToHistory {
   my $ph    = shift;
-
   my $paref = $ph->{paref};
   my $key   = $ph->{key};
   my $val   = $ph->{val};
@@ -14777,7 +14752,6 @@ return;
 ################################################################
 sub setPVhistory {
   my $paref     = shift;
-  my $hash      = $paref->{hash};
   my $name      = $paref->{name};
   my $type      = $paref->{type};
   my $day       = $paref->{day};
@@ -14788,6 +14762,8 @@ sub setPVhistory {
   my $reorg     = $paref->{reorg}     // 0;                                # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
   my $reorgday  = $paref->{reorgday}  // q{};                              # Tag der reorganisiert werden soll
 
+  my $hash = $defs{$name};
+  
   $data{$type}{$name}{pvhist}{$day}{99}{dayname} = $dayname if($day);
 
   if ($hfspvh{$histname} && defined &{$hfspvh{$histname}{fn}}) {
@@ -14883,7 +14859,6 @@ return;
 ################################################################
 sub _storeVal {                    ## no critic "not used"
   my $paref    = shift;
-  my $hash     = $paref->{hash};
   my $name     = $paref->{name};
   my $type     = $paref->{type};
   my $day      = $paref->{day};
@@ -14891,6 +14866,7 @@ sub _storeVal {                    ## no critic "not used"
   my $histname = $paref->{histname};
   my $val      = $paref->{val};
 
+  my $hash  = $defs{$name};
   my $store = $hfspvh{$histname}{storname};
   my ($validkey, $validval);
 
@@ -15014,7 +14990,7 @@ sub listDataPool {
           $ret .= $key." => ";
           $ret .= "etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
           $ret .= "\n            ";
-          $ret .= "confc: $confc, con: $con, gcon: $gcons, conprice: $conprc";
+          $ret .= "confc: $confc, con: $con, gcons: $gcons, conprice: $conprc";
           $ret .= "\n            ";
           $ret .= "gfeedin: $gfeedin, feedprice: $feedprc";
           $ret .= "\n            ";
@@ -15628,14 +15604,14 @@ sub checkPlantConfig {
   my $resh;
 
   for my $step (1..$weatherDevMax) {
-      my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);
+      my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$step);
       next if(!$fcname && $step ne 1);
 
       if (!$valid) {
           $result->{'DWD Weather Properties'}{state} = $nok;
 
           if (!$fcname) {
-              $result->{'DWD Weather Properties'}{result} .= qq{No DWD device is defined in attribute "ctrlWeatherDev$step". <br>};
+              $result->{'DWD Weather Properties'}{result} .= qq{No DWD device is defined in attribute "setupWeatherDev$step". <br>};
           }
           else {
               $result->{'DWD Weather Properties'}{result} .= qq{The DWD device "$fcname" doesn't exist. <br>};
@@ -15661,7 +15637,7 @@ sub checkPlantConfig {
                       $result->{'DWD Weather Properties'}{info}    = 1;
                   }
 
-                  $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: ctrlWeatherDev$step)<br>";
+                  $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: setupWeatherDev$step)<br>";
               }
 
               $result->{'DWD Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
@@ -15669,14 +15645,14 @@ sub checkPlantConfig {
               $result->{'DWD Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
           }
           else {
-              $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: ctrlWeatherDev$step)<br>";
+              $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: setupWeatherDev$step)<br>";
           }
       }
   }
 
   ## Alter DWD Wetterdaten
   ##########################
-  ($err, $resh) = isWeatherAgeExceeded ( {hash => $hash, name => $name, lang => $lang} );
+  ($err, $resh) = isWeatherAgeExceeded ( {name => $name, lang => $lang} );
 
   if (!$err && $resh->{exceed}) {
       $result->{'DWD Weather Properties'}{state} = $warn;
@@ -15725,7 +15701,7 @@ sub checkPlantConfig {
 
       ## Alter DWD Radiation
       #######################
-      ($err, $resh) = isRad1hAgeExceeded ( {hash => $hash, name => $name, lang => $lang} );
+      ($err, $resh) = isRad1hAgeExceeded ( {name => $name, lang => $lang} );
 
       if (!$err && $resh->{exceed}) {
           $result->{'DWD Radiation Properties'}{state} = $warn;
@@ -16306,7 +16282,7 @@ sub createReadingsFromArray {
 
   readingsEndUpdate ($hash, $doevt);
 
-  undef @da;
+  @da = ();                                                      # completely empty @ARRAY
 
 return;
 }
@@ -16376,15 +16352,15 @@ sub createAssociatedWith {
       my (@cd, @nd);
       my ($afc, $ara, $ain, $ame, $aba, $h);
 
-      my $fcdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');                   # Weather forecast Device 1
+      my $fcdev1 = AttrVal ($name, 'setupWeatherDev1', '');                  # Weather forecast Device 1
       ($afc,$h)  = parseParams ($fcdev1);
       $fcdev1    = $afc->[0] // "";
 
-      my $fcdev2 = AttrVal ($name, 'ctrlWeatherDev2', '');                   # Weather forecast Device 2
+      my $fcdev2 = AttrVal ($name, 'setupWeatherDev2', '');                  # Weather forecast Device 2
       ($afc,$h)  = parseParams ($fcdev2);
       $fcdev2    = $afc->[0] // "";
 
-      my $fcdev3 = AttrVal ($name, 'ctrlWeatherDev3', '');                   # Weather forecast Device 3
+      my $fcdev3 = AttrVal ($name, 'setupWeatherDev3', '');                  # Weather forecast Device 3
       ($afc,$h)  = parseParams ($fcdev3);
       $fcdev3    = $afc->[0] // "";
 
@@ -16864,11 +16840,11 @@ return ConsumerVal ($hash, $c, 'isIntimeframe', 0);
 ################################################################
 sub isInLocktime {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};
 
+  my $hash = $defs{$name};
   my $iilt = 0;
   my $rlt  = 0;
   my $lt   = 0;
@@ -17155,7 +17131,7 @@ return ($err, $a->[0], $h);
 }
 
 #####################################################################
-#    Prüft ob das in ctrlWeatherDevX
+#    Prüft ob das in setupWeatherDevX
 #    übergebene Weather Device valide ist
 #    return - $valid -> ist die Angabe valide (1)
 #             $apiu  -> wird ein Device oder API verwendet
@@ -17188,10 +17164,10 @@ return ($valid, $fcname, $apiu);
 ###################################################################
 sub isWeatherAgeExceeded {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
 
+  my $hash   = $defs{$name};
   my $currts = int time;
   my $agets  = $currts;
 
@@ -17203,13 +17179,13 @@ sub isWeatherAgeExceeded {
   my ($newts, $th);
 
   for my $step (1..$weatherDevMax) {
-      my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'ctrlWeatherDev'.$step);
+      my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$step);
       next if(!$fcname && $step ne 1);
 
       if (!$apiu) {
           if (!$fcname || !$valid) {
               if (!$fcname) {
-                  return (qq{No DWD device is defined in attribute "ctrlWeatherDev$step"}, $resh);
+                  return (qq{No DWD device is defined in attribute "setupWeatherDev$step"}, $resh);
               }
               else {
                   return (qq{The DWD device "$fcname" doesn't exist}, $resh);
@@ -17262,10 +17238,10 @@ return ('', $resh);
 ###################################################################
 sub isRad1hAgeExceeded {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
 
+  my $hash   = $defs{$name};
   my $currts = int time;
   my $fcname = CurrentVal ($hash, 'dwdRad1hDev', '');
 
@@ -17742,8 +17718,8 @@ return $ret;
 ################################################################
 sub userExit {
   my $paref = shift;
-  my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $hash  = $defs{$name};
 
   my $uefn = AttrVal ($name, 'ctrlUserExitFn', '');
   return if(!$uefn);
@@ -18374,7 +18350,7 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>ctrlWeatherDevX</b>        </td><td>DWD_OpenData Device which provides meteorological data (e.g. cloud cover)     </td></tr>
+            <tr><td> <b>setupWeatherDevX</b>       </td><td>DWD_OpenData Device which provides meteorological data (e.g. cloud cover)     </td></tr>
             <tr><td> <b>setupRadiationAPI </b>     </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
             <tr><td> <b>setupInverterDev</b>       </td><td>Device which provides PV performance data                                     </td></tr>
             <tr><td> <b>setupMeterDev</b>          </td><td>Device which supplies network I/O data                                        </td></tr>
@@ -18919,7 +18895,7 @@ to ensure that the system configuration is correct.
 
        <ul>
         <b>Example: </b> <br>
-        get &lt;name&gt; dwdCatalog byName exportgpx lat=(48|49|50|51|52)\..* lon=([5-9]|10|11|12|13|14|15)\..* <br>
+        get &lt;name&gt; dwdCatalog byName name=ST.* exportgpx lat=(48|49|50|51|52)\..* lon=([5-9]|10|11|12|13|14|15)\..* <br>
         # filters the stations largely to German locations beginning with "ST" and exports the data in GPS Exchange format
        </ul>
 
@@ -19058,7 +19034,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
             <tr><td> <b>DoN</b>            </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                                           </td></tr>
             <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                                                     </td></tr>
-            <tr><td> <b>gcon</b>           </td><td>real power consumption (Wh) from the electricity grid                                                                    </td></tr>
+            <tr><td> <b>gcons</b>          </td><td>real power consumption (Wh) from the electricity grid                                                                    </td></tr>
             <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
             <tr><td> <b>feedprice</b>      </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the setupMeterDev.                      </td></tr>
             <tr><td> <b>hourscsmeXX</b>    </td><td>total active hours of the day from ConsumerXX                                                                            </td></tr>
@@ -19768,12 +19744,12 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlWeatherDev" data-pattern="ctrlWeatherDev.*"></a>
-       <li><b>ctrlWeatherDevX </b> <br><br>
+       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
+       <li><b>setupWeatherDevX </b> <br><br>
 
        Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
-       The attribute 'ctrlWeatherDev1' specifies the leading weather service and is mandatory.<br>
-       If an Open-Meteo API is selected in the 'ctrlWeatherDev1' attribute, this Open-Meteo service is automatically set as the
+       The attribute 'setupWeatherDev1' specifies the leading weather service and is mandatory.<br>
+       If an Open-Meteo API is selected in the 'setupWeatherDev1' attribute, this Open-Meteo service is automatically set as the
        source of the radiation data (Attribute setupRadiationAPI). <br><br>
 
        <b>OpenMeteoDWD-API</b> <br>
@@ -19819,9 +19795,9 @@ to ensure that the system configuration is correct.
        As an alternative to Open-Meteo, an FHEM 'DWD_OpenData' device can be used to supply the weather data.<br>
        If no device of this type exists, at least one DWD_OpenData device must first be defined.
        (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-       If more than one ctrlWeatherDevX is specified, the average of all weather stations is determined
+       If more than one setupWeatherDevX is specified, the average of all weather stations is determined
        if the respective value was supplied and is numerical. <br>
-       Otherwise, the data from 'ctrlWeatherDev1' is always used as the leading weather device.<br>
+       Otherwise, the data from 'setupWeatherDev1' is always used as the leading weather device.<br>
        At least these attributes must be set in the selected DWD_OpenData Device: <br><br>
 
        <ul>
@@ -19886,6 +19862,13 @@ to ensure that the system configuration is correct.
        <li><b>flowGraphicShowConsumer </b><br>
          Suppresses the display of loads in the energy flow graph when set to "0". <br>
          (default: 1)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-flowGraphicShift"></a>
+       <li><b>flowGraphicShift &lt;Pixel/10&gt; </b><br>
+         Horizontal shift of the energy flow graph. <br>
+         (default: 0)
        </li>
        <br>
 
@@ -20452,7 +20435,7 @@ to ensure that the system configuration is correct.
 
        Defines the source for the delivery of the solar radiation data. You can select a device of the type DWD_OpenData or
        an implemented API can be selected. <br>
-       <b>Note:</b> If OpenMeteoDWD-API is set in the 'ctrlWeatherDev1' attribute, no radiation data service other than
+       <b>Note:</b> If OpenMeteoDWD-API is set in the 'setupWeatherDev1' attribute, no radiation data service other than
        OpenMeteoDWD-API can be selected. <br><br>
 
        <b>OpenMeteoDWD-API</b> <br>
@@ -20650,7 +20633,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>ctrlWeatherDevX</b>        </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
+            <tr><td> <b>setupWeatherDevX</b>       </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
             <tr><td> <b>setupRadiationAPI </b>     </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
             <tr><td> <b>setupInverterDev</b>       </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
             <tr><td> <b>setupMeterDev</b>          </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
@@ -21202,7 +21185,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
         <b>Beispiel: </b> <br>
-        get &lt;name&gt; dwdCatalog byName exportgpx lat=(48|49|50|51|52)\..* lon=([5-9]|10|11|12|13|14|15)\..* <br>
+        get &lt;name&gt; dwdCatalog byName name=ST.* exportgpx lat=(48|49|50|51|52)\..* lon=([5-9]|10|11|12|13|14|15)\..* <br>
         # filtert die Stationen weitgehend auf deutsche Orte beginnend mit "ST" und exportiert die Daten im GPS Exchange Format
        </ul>
 
@@ -21342,7 +21325,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                      </td></tr>
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                               </td></tr>
             <tr><td> <b>etotal</b>          </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                                                    </td></tr>
-            <tr><td> <b>gcon</b>            </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                       </td></tr>
+            <tr><td> <b>gcons</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                       </td></tr>
             <tr><td> <b>gfeedin</b>         </td><td>reale Einspeisung (Wh) in das Stromnetz                                                            </td></tr>
             <tr><td> <b>feedprice</b>       </td><td>Vergütung für die Einpeisung einer kWh. Die Währung des Preises ist im setupMeterDev definiert.    </td></tr>
             <tr><td> <b>avgcycmntscsmXX</b> </td><td>durchschnittliche Dauer eines Einschaltzyklus des Tages von ConsumerXX in Minuten                  </td></tr>
@@ -22054,12 +22037,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlWeatherDev" data-pattern="ctrlWeatherDev.*"></a>
-       <li><b>ctrlWeatherDevX </b> <br><br>
+       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
+       <li><b>setupWeatherDevX </b> <br><br>
 
        Gibt das Gerät oder die API zur Lieferung der erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) an.<br>
-       Das Attribut 'ctrlWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
-       Ist eine Open-Meteo API im Attribut 'ctrlWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
+       Das Attribut 'setupWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
+       Ist eine Open-Meteo API im Attribut 'setupWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
        der Strahlungsdaten (Attribut setupRadiationAPI) eingestellt. <br><br>
 
        <b>OpenMeteoDWD-API</b> <br>
@@ -22105,9 +22088,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        Alternativ zu Open-Meteo kann ein FHEM 'DWD_OpenData'-Gerät zur Lieferung der Wetterdaten dienen.<br>
        Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData Gerät
        definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-       Sind mehr als ein ctrlWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt
+       Sind mehr als ein setupWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt
        sofern der jeweilige Wert geliefert wurde und numerisch ist. <br>
-       Anderenfalls werden immer die Daten von 'ctrlWeatherDev1' als führendes Wetterdevice genutzt. <br>
+       Anderenfalls werden immer die Daten von 'setupWeatherDev1' als führendes Wetterdevice genutzt. <br>
        Im ausgewählten DWD_OpenData Gerät müssen mindestens diese Attribute gesetzt sein: <br><br>
 
        <ul>
@@ -22172,6 +22155,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>flowGraphicShowConsumer </b><br>
          Unterdrückt die Anzeige der Verbraucher in der Energieflußgrafik wenn auf "0" gesetzt. <br>
          (default: 1)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-flowGraphicShift"></a>
+       <li><b>flowGraphicShift &lt;Pixel/10&gt; </b><br>
+         Horizontale Verschiebung der Energieflußgrafik. <br>
+         (default: 0)
        </li>
        <br>
 
@@ -22736,7 +22726,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       Legt die Quelle zur Lieferung der solaren Strahlungsdaten fest. Es kann ein Device vom Typ DWD_OpenData oder
       eine implementierte API eines Dienstes ausgewählt werden. <br>
-      <b>Hinweis:</b> Ist eine OpenMeteo API im Attribut 'ctrlWeatherDev1' gesetzt, kann kein anderer Strahlungsdatendienst als
+      <b>Hinweis:</b> Ist eine OpenMeteo API im Attribut 'setupWeatherDev1' gesetzt, kann kein anderer Strahlungsdatendienst als
       diese OpenMeteo API ausgewählt werden. <br><br>
 
       <b>OpenMeteoDWD-API</b> <br>
