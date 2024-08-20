@@ -32,7 +32,8 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
-  "2.25.3" => "16.08.2024  fix IDC2 bug 3MPP",
+  "2.26.0" => "18.08.2024  fix PW Lengs Bug (12 Char)",
+  "2.25.3" => "17.08.2024  fix IDC2 bug 3MPP",
   "2.25.2" => "16.08.2024  fix IDC3 bug",
   "2.25.1" => "21.04.2024  read Bat_Status",
   "2.25.0" => "23.03.2024  PW Lengs set so max 18",
@@ -402,7 +403,7 @@ sub SMAInverter_Define($$) {
  my $password = SMAInverter_SMAencrypt($Pass);
  $Pass = SMAInverter_SMAdecrypt( $password );
  
- return "passwort longer then 18 char" if(length $Pass > 18); #check 1-18 Chars
+ return "passwort longer then 18 char" if(length $Pass > 12); #check 1-12 Chars
  
  my $name                       = $hash->{NAME};
  $hash->{LASTUPDATE}            = 0;
@@ -2684,7 +2685,7 @@ sub SMAInverter_SMAlogon($$$) {
  # Parameters: host - passcode
  my ($host,$pass,$hash)  = @_;
  my $cmdheader           = "534D4100000402A00000000100";
- my $pktlength           = "42";                             # length = 66 for logon command (old 3A = 58)
+ my $pktlength           = "3A";                             # length = 58 for logon command (old 3A = 58)
  my $esignature          = "001060650EA0";
  my $name                = $hash->{NAME};
  my $mysusyid            = $hash->{HELPER}{MYSUSYID};
@@ -2701,8 +2702,8 @@ sub SMAInverter_SMAlogon($$$) {
 
  #Encode the password
  $pass = SMAInverter_SMAdecrypt( $pass );
- my $encpasswd = "8888888888888888888888888888888888888888"; # template for password
- for my $index (0..length $pass )        # encode password
+ my $encpasswd = "888888888888888888888888"; # template for password
+ for my $index (0..(length $pass) - 1 )        # encode password
  {
     if ( (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1))) < 256 ) {
         substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),0,2);
@@ -3592,7 +3593,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.25.3",
+  "version": "v2.26.0",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
