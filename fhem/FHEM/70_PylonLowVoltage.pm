@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.3.0"  => "22.08.2024 extend battery addresses up to 16 ",
   "0.2.6"  => "25.05.2024 replace Smartmatch Forum:#137776 ",
   "0.2.5"  => "02.04.2024 _callAnalogValue / _callAlarmInfo: integrate a Cell and Temperature Position counter ".
                           "add specific Alarm readings ",
@@ -210,7 +211,11 @@ my %halm = (                                                                  # 
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    0A      46    93     E0    02    0A      FD   0F
-# 7E  32 30  30 41  34 36 39 33  45 30 30 32  30 41  
+# 7E  32 30  30 41  34 36 39 33  45 30 30 32  30 41
+#  ~    20    10      46    93     E0    02    10      
+# 7E  32 30  31 30  34 36 39 33  45 30 30 32  31 30                  = 02D1H -> bitweise invert = 1111 1101 0010 1110 -> +1 = 1111 1101 0010 1111 -> FD2FH
+#  ~    20    11      46    93     E0    02    11      
+# 7E  32 30  31 31  34 36 39 33  45 30 30 32  31 31                  = 02D3H -> bitweise invert = 1111 1101 0010 1100 -> +1 = 1111 1101 0010 1101 -> FD2DH
 #
 my %hrsnb = (                                                        # Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring
   1 => { cmd => "~20024693E00202FD2D\x{0d}", mlen => 52 },
@@ -227,7 +232,8 @@ my %hrsnb = (                                                        # Codierung
  12 => { cmd => "~200D4693E0020DFD09\x{0d}", mlen => 52 },
  13 => { cmd => "~200E4693E0020EFD07\x{0d}", mlen => 52 },
  14 => { cmd => "~200F4693E0020FFD05\x{0d}", mlen => 52 },
- 
+ 15 => { cmd => "~20104693E00210FD2F\x{0d}", mlen => 52 },
+ 16 => { cmd => "~20114693E00211FD2D\x{0d}", mlen => 52 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -240,7 +246,11 @@ my %hrsnb = (                                                        # Codierung
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH    INFO     CHKSUM
 #  ~    20    0A      46    51     00    00   empty    FD  9D
-# 7E  32 30  30 41  34 36 35 31  30 30 30 30   - -   
+# 7E  32 30  30 41  34 36 35 31  30 30 30 30   - - 
+#  ~    20    10      46    51     00    00   empty    
+# 7E  32 20  31 30  34 36 35 31  30 30 30 30   - -     FD  BD        = 0243H -> bitweise invert = 1111 1101 1011 1100 -> +1 = 1111 1101 1011 1101 = FDBDH
+#  ~    20    11      46    51     00    00   empty 
+# 7E  32 20  31 31  34 36 35 31  30 30 30 30   - -     FD  BC
 #
 my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
   1 => { cmd => "~200246510000FDAC\x{0d}", mlen => 82 },
@@ -257,6 +267,8 @@ my %hrmfi = (                                                        # Codierung
  12 => { cmd => "~200D46510000FD9A\x{0d}", mlen => 82 },
  13 => { cmd => "~200E46510000FD8F\x{0d}", mlen => 82 },
  14 => { cmd => "~200F46510000FD8E\x{0d}", mlen => 82 },
+ 15 => { cmd => "~201046510000FDBD\x{0d}", mlen => 82 },
+ 16 => { cmd => "~201146510000FDBC\x{0d}", mlen => 82 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -269,7 +281,11 @@ my %hrmfi = (                                                        # Codierung
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
 #  ~    00    0A      46    4F      00    00   empty    FD  8B
-# 7E  30 30  30 41  34 36  34 46  30 30 30 30   - -   
+# 7E  30 30  30 41  34 36  34 46  30 30 30 30   - -  
+#  ~    00    10      46    4F      00    00   empty 
+# 7E  30 30  31 30  34 36  34 46  30 30 30 30   - -     FD  AB              1111 1101 1010 1011
+#  ~    00    11      46    4F      00    00   empty 
+# 7E  30 30  31 31  34 36  34 46  30 30 30 30   - -     FD  9A              1111 1101 1001 1001
 #
 my %hrprt = (                                                        # Codierung Abruf protocolVersion, mlen = Mindestlänge Antwortstring
   1 => { cmd => "~0002464F0000FD9A\x{0d}", mlen => 18 },
@@ -286,6 +302,8 @@ my %hrprt = (                                                        # Codierung
  12 => { cmd => "~000D464F0000FD88\x{0d}", mlen => 18 },
  13 => { cmd => "~000E464F0000FD87\x{0d}", mlen => 18 },
  14 => { cmd => "~000F464F0000FD86\x{0d}", mlen => 18 },
+ 15 => { cmd => "~0010464F0000FDAB\x{0d}", mlen => 18 },
+ 16 => { cmd => "~0011464F0000FD9A\x{0d}", mlen => 18 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+36+45+30+30+32+30+41 = 02F4H -> modulo 65536 = 02F4H -> bitweise invert = 1111 1101 0000 1011 -> +1 1111 1101 0000 1100 = FD0CH
@@ -293,6 +311,8 @@ my %hrprt = (                                                        # Codierung
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    0A      46    96     E0    02    0A      FD  0C
 # 7E  32 30  30 41  34 36 39 36  45 30 30 32  30 41  
+#  ~    20    11      46    96     E0    02    11      FD  2A             1111 1101 0010 1001
+# 7E  32 30  31 31  34 36 39 36  45 30 30 32  31 31    
 #
 
 my %hrswv = (                                                        # Codierung Abruf softwareVersion
@@ -310,13 +330,17 @@ my %hrswv = (                                                        # Codierung
  12 => { cmd => "~200D4696E0020DFD06\x{0d}", mlen => 30 },
  13 => { cmd => "~200E4696E0020EFD04\x{0d}", mlen => 30 },
  14 => { cmd => "~200F4696E0020FFD02\x{0d}", mlen => 30 },
+ 15 => { cmd => "~20104696E00210FD2C\x{0d}", mlen => 30 },
+ 16 => { cmd => "~20114696E00211FD2A\x{0d}", mlen => 30 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+34+45+30+30+32+30+41 = 02EDH -> modulo 65536 = 02EDH -> bitweise invert = 1111 1101 0001 0010 -> +1 1111 1101 0001 0011 = FD13H
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    0A      46    44     E0    02    0A      FD  13
-# 7E  32 30  30 41  34 36 34 34  45 30 30 32  30 41  
+# 7E  32 30  30 41  34 36 34 34  45 30 30 32  30 41
+#  ~    20    10      46    44     E0    02    10      FD  33
+# 7E  32 30  31 30  34 36 34 34  45 30 30 32  31 30                  1111 1101 0011 0010
 #
 
 my %hralm = (                                                        # Codierung Abruf alarmInfo
@@ -334,6 +358,8 @@ my %hralm = (                                                        # Codierung
  12 => { cmd => "~200D4644E0020DFD0D\x{0d}", mlen => 82 },
  13 => { cmd => "~200E4644E0020EFD0B\x{0d}", mlen => 82 },
  14 => { cmd => "~200F4644E0020FFCFE\x{0d}", mlen => 82 },
+ 15 => { cmd => "~20104644E00210FD33\x{0d}", mlen => 82 },
+ 16 => { cmd => "~20114644E00211FD31\x{0d}", mlen => 82 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+37+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
@@ -341,6 +367,8 @@ my %hralm = (                                                        # Codierung
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    0A      46    47     E0    02    0A      FD  10
 # 7E  32 30  30 41  34 36 34 37  45 30 30 32  30 41  
+#  ~    20    10      46    47     E0    02    10      FD  30 
+# 7E  32 30  31 30  34 36 34 37  45 30 30 32  31 30                 1111 1101 0010 1111
 #
 
 my %hrspm = (                                                        # Codierung Abruf Systemparameter
@@ -358,6 +386,8 @@ my %hrspm = (                                                        # Codierung
  12 => { cmd => "~200D4647E0020DFD0A\x{0d}", mlen => 68 },
  13 => { cmd => "~200E4647E0020EFD08\x{0d}", mlen => 68 },
  14 => { cmd => "~200F4647E0020FFD06\x{0d}", mlen => 68 },
+ 15 => { cmd => "~20104647E00210FD30\x{0d}", mlen => 68 },
+ 16 => { cmd => "~20114647E00211FD2E\x{0d}", mlen => 68 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+32+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
@@ -382,6 +412,8 @@ my %hrcmi = (                                                        # Codierung
  12 => { cmd => "~200D4692E0020DFD0A\x{0d}", mlen => 38 },
  13 => { cmd => "~200E4692E0020EFD08\x{0d}", mlen => 38 },
  14 => { cmd => "~200F4692E0020FFD06\x{0d}", mlen => 38 },
+ 15 => { cmd => "~20104692E00210FD30\x{0d}", mlen => 38 },
+ 16 => { cmd => "~20114692E00211FD2E\x{0d}", mlen => 38 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -394,7 +426,9 @@ my %hrcmi = (                                                        # Codierung
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
 #  ~    20    0A     46     42      E0    02    0A      FD  15
-# 7E  32 30  30 41  34 36  34 32  45 30 30 32  30 41  
+# 7E  32 30  30 41  34 36  34 32  45 30 30 32  30 41 
+#  ~    20    10     46     42      E0    02    10      FD  35             1111 1101 0011 0100
+# 7E  32 30  31 30  34 36  34 32  45 30 30 32  31 30              
 #
 my %hrcmn = (                                                        # Codierung Abruf analogValue
   1 => { cmd => "~20024642E00202FD33\x{0d}", mlen => 128 },
@@ -411,6 +445,8 @@ my %hrcmn = (                                                        # Codierung
  12 => { cmd => "~200D4642E0020DFD0F\x{0d}", mlen => 128 },
  13 => { cmd => "~200E4642E0020EFD0D\x{0d}", mlen => 128 },
  14 => { cmd => "~200F4642E0020FFD0B\x{0d}", mlen => 128 },
+ 15 => { cmd => "~20104642E0020EFD35\x{0d}", mlen => 128 },
+ 16 => { cmd => "~20114642E0020FFD33\x{0d}", mlen => 128 },
 );
 
 
@@ -466,8 +502,8 @@ sub Define {
   ($hash->{HOST}, $hash->{PORT}) = split ":", $args[2];
   $hash->{BATADDRESS}            = $args[3] // 1;
 
-  if ($hash->{BATADDRESS} !~ /^([1-9]{1}|1[0-4])$/xs) {
-      return "Define: bataddress must be a value between 1 and 14";
+  if ($hash->{BATADDRESS} !~ /^([1-9]{1}|1[0-6])$/xs) {
+      return "Define: bataddress must be a value between 1 and 16";
   }
 
   my $params = {
@@ -1658,7 +1694,7 @@ return;
 
  <b>Limitations</b>
  <br>
- The module currently supports a maximum of 14 batteries (master + 13 slaves) in one group.
+ The module currently supports a maximum of 16 batteries (1 master + 15 slaves) in one group.
  <br><br>
 
  <a id="PylonLowVoltage-define"></a>
@@ -1883,7 +1919,7 @@ return;
 
  <b>Einschränkungen</b>
  <br>
- Das Modul unterstützt zur Zeit maximal 14 Batterien (Master + 13 Slaves) in einer Gruppe.
+ Das Modul unterstützt zur Zeit maximal 16 Batterien (1 Master + 15 Slaves) in einer Gruppe.
  <br><br>
 
  <a id="PylonLowVoltage-define"></a>
