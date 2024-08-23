@@ -101,6 +101,7 @@
 #           new: attr timeout controls write out readings with response times
 # 6.00      fix some details in commandref (german only)
 # 6.00.1    fix: selection of readings for command 'set clear responsetimes' improved; Debug commands removed
+# 6.00.2    fix: reading ble (bluetooth) may be set to disabled
 
 # to do     roller: get maxtime open/close from shelly
 #           get status on stopp even when interval == 0
@@ -123,7 +124,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "6.00.1 18.08.2024";
+my $version = "6.00.2 24.08.2024";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -4423,7 +4424,7 @@ sub Shelly_settings2G {
 
         ### checking bluetooth ble
         my $ble  = $jhash->{ble}{enable};
-        $ble = defined($ble) ? "enabled" : " disabled";
+        $ble = defined($ble) ? ($ble == 1 ? "enabled" : "disabled"):"error";
         readingsBulkUpdateIfChanged($hash,"ble",$ble);
 
         ### Cloud
