@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "0.4.0"  => "23.08.2024 Log output for timeout changed, automatic calculation of checksum ",
   "0.3.0"  => "22.08.2024 extend battery addresses up to 16 ",
   "0.2.6"  => "25.05.2024 replace Smartmatch Forum:#137776 ",
   "0.2.5"  => "02.04.2024 _callAnalogValue / _callAlarmInfo: integrate a Cell and Temperature Position counter ".
@@ -153,6 +154,8 @@ my $definterval = 30;                                                # default A
 my $defto       = 0.5;                                               # default connection Timeout zum RS485 Gateway
 my @blackl      = qw(state nextCycletime);                           # Ausnahmeliste deleteReadingspec
 my $age1def     = 60;                                                # default Zyklus Abrufklasse statische Werte (s)
+my $pfx         = "~";                                               # KommandoPräfix
+my $sfx         = "\x{0d}";                                          # Kommandosuffix
 
 # Steuerhashes
 ###############
@@ -217,23 +220,24 @@ my %halm = (                                                                  # 
 #  ~    20    11      46    93     E0    02    11      
 # 7E  32 30  31 31  34 36 39 33  45 30 30 32  31 31                  = 02D3H -> bitweise invert = 1111 1101 0010 1100 -> +1 = 1111 1101 0010 1101 -> FD2DH
 #
+
 my %hrsnb = (                                                        # Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "~20024693E00202FD2D\x{0d}", mlen => 52 },
-  2 => { cmd => "~20034693E00203FD2B\x{0d}", mlen => 52 },
-  3 => { cmd => "~20044693E00204FD29\x{0d}", mlen => 52 },
-  4 => { cmd => "~20054693E00205FD27\x{0d}", mlen => 52 },
-  5 => { cmd => "~20064693E00206FD25\x{0d}", mlen => 52 },
-  6 => { cmd => "~20074693E00207FD23\x{0d}", mlen => 52 },
-  7 => { cmd => "~20084693E00208FD21\x{0d}", mlen => 52 },
-  8 => { cmd => "~20094693E00209FD1F\x{0d}", mlen => 52 },           
-  9 => { cmd => "~200A4693E0020AFD0F\x{0d}", mlen => 52 },
- 10 => { cmd => "~200B4693E0020BFD0D\x{0d}", mlen => 52 },
- 11 => { cmd => "~200C4693E0020CFD0B\x{0d}", mlen => 52 },
- 12 => { cmd => "~200D4693E0020DFD09\x{0d}", mlen => 52 },
- 13 => { cmd => "~200E4693E0020EFD07\x{0d}", mlen => 52 },
- 14 => { cmd => "~200F4693E0020FFD05\x{0d}", mlen => 52 },
- 15 => { cmd => "~20104693E00210FD2F\x{0d}", mlen => 52 },
- 16 => { cmd => "~20114693E00211FD2D\x{0d}", mlen => 52 },
+  1 => { cmd => "20024693E00202", mlen => 52 },
+  2 => { cmd => "20034693E00203", mlen => 52 },
+  3 => { cmd => "20044693E00204", mlen => 52 },
+  4 => { cmd => "20054693E00205", mlen => 52 },
+  5 => { cmd => "20064693E00206", mlen => 52 },
+  6 => { cmd => "20074693E00207", mlen => 52 },
+  7 => { cmd => "20084693E00208", mlen => 52 },
+  8 => { cmd => "20094693E00209", mlen => 52 },           
+  9 => { cmd => "200A4693E0020A", mlen => 52 },
+ 10 => { cmd => "200B4693E0020B", mlen => 52 },
+ 11 => { cmd => "200C4693E0020C", mlen => 52 },
+ 12 => { cmd => "200D4693E0020D", mlen => 52 },
+ 13 => { cmd => "200E4693E0020E", mlen => 52 },
+ 14 => { cmd => "200F4693E0020F", mlen => 52 },
+ 15 => { cmd => "20104693E00210", mlen => 52 },
+ 16 => { cmd => "20114693E00211", mlen => 52 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -245,30 +249,26 @@ my %hrsnb = (                                                        # Codierung
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+35+31+30+30+30+30 = 0263H -> modulo 65536 = 0263H -> bitweise invert = 1111 1101 1001 1100 -> +1 = 1111 1101 1001 1101  = FD9DH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH    INFO     CHKSUM
-#  ~    20    0A      46    51     00    00   empty    FD  9D
-# 7E  32 30  30 41  34 36 35 31  30 30 30 30   - - 
 #  ~    20    10      46    51     00    00   empty    
 # 7E  32 20  31 30  34 36 35 31  30 30 30 30   - -     FD  BD        = 0243H -> bitweise invert = 1111 1101 1011 1100 -> +1 = 1111 1101 1011 1101 = FDBDH
-#  ~    20    11      46    51     00    00   empty 
-# 7E  32 20  31 31  34 36 35 31  30 30 30 30   - -     FD  BC
 #
 my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "~200246510000FDAC\x{0d}", mlen => 82 },
-  2 => { cmd => "~200346510000FDAB\x{0d}", mlen => 82 },
-  3 => { cmd => "~200446510000FDAA\x{0d}", mlen => 82 },
-  4 => { cmd => "~200546510000FDA9\x{0d}", mlen => 82 },
-  5 => { cmd => "~200646510000FDA8\x{0d}", mlen => 82 },
-  6 => { cmd => "~200746510000FDA7\x{0d}", mlen => 82 },
-  7 => { cmd => "~200846510000FDA6\x{0d}", mlen => 82 },
-  8 => { cmd => "~200946510000FDA5\x{0d}", mlen => 82 },
-  9 => { cmd => "~200A46510000FD9D\x{0d}", mlen => 82 },
- 10 => { cmd => "~200B46510000FD9C\x{0d}", mlen => 82 },
- 11 => { cmd => "~200C46510000FD9B\x{0d}", mlen => 82 },
- 12 => { cmd => "~200D46510000FD9A\x{0d}", mlen => 82 },
- 13 => { cmd => "~200E46510000FD8F\x{0d}", mlen => 82 },
- 14 => { cmd => "~200F46510000FD8E\x{0d}", mlen => 82 },
- 15 => { cmd => "~201046510000FDBD\x{0d}", mlen => 82 },
- 16 => { cmd => "~201146510000FDBC\x{0d}", mlen => 82 },
+  1 => { cmd => "200246510000", mlen => 82 },
+  2 => { cmd => "200346510000", mlen => 82 },
+  3 => { cmd => "200446510000", mlen => 82 },
+  4 => { cmd => "200546510000", mlen => 82 },
+  5 => { cmd => "200646510000", mlen => 82 },
+  6 => { cmd => "200746510000", mlen => 82 },
+  7 => { cmd => "200846510000", mlen => 82 },
+  8 => { cmd => "200946510000", mlen => 82 },
+  9 => { cmd => "200A46510000", mlen => 82 },
+ 10 => { cmd => "200B46510000", mlen => 82 },
+ 11 => { cmd => "200C46510000", mlen => 82 },
+ 12 => { cmd => "200D46510000", mlen => 82 },
+ 13 => { cmd => "200E46510000", mlen => 82 },
+ 14 => { cmd => "200F46510000", mlen => 82 },
+ 15 => { cmd => "201046510000", mlen => 82 },
+ 16 => { cmd => "201146510000", mlen => 82 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -280,86 +280,77 @@ my %hrmfi = (                                                        # Codierung
 # CHKSUM (als HEX! addieren): 30+30+30+41+34+36+34+46+30+30+30+30 = 0275H -> modulo 65536 = 0275H -> bitweise invert = 1111 1101 1000 1010 -> +1 = 1111 1101 1000 1011 -> FD8BH
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
-#  ~    00    0A      46    4F      00    00   empty    FD  8B
-# 7E  30 30  30 41  34 36  34 46  30 30 30 30   - -  
-#  ~    00    10      46    4F      00    00   empty 
-# 7E  30 30  31 30  34 36  34 46  30 30 30 30   - -     FD  AB              1111 1101 1010 1011
-#  ~    00    11      46    4F      00    00   empty 
-# 7E  30 30  31 31  34 36  34 46  30 30 30 30   - -     FD  9A              1111 1101 1001 1001
+#  ~    00    0A      46    4F      00    00   empty    
 #
 my %hrprt = (                                                        # Codierung Abruf protocolVersion, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "~0002464F0000FD9A\x{0d}", mlen => 18 },
-  2 => { cmd => "~0003464F0000FD99\x{0d}", mlen => 18 },
-  3 => { cmd => "~0004464F0000FD98\x{0d}", mlen => 18 },
-  4 => { cmd => "~0005464F0000FD97\x{0d}", mlen => 18 },
-  5 => { cmd => "~0006464F0000FD96\x{0d}", mlen => 18 },
-  6 => { cmd => "~0007464F0000FD95\x{0d}", mlen => 18 },
-  7 => { cmd => "~0008464F0000FD94\x{0d}", mlen => 18 },
-  8 => { cmd => "~0009464F0000FD93\x{0d}", mlen => 18 },
-  9 => { cmd => "~000A464F0000FD8B\x{0d}", mlen => 18 },
- 10 => { cmd => "~000B464F0000FD8A\x{0d}", mlen => 18 },
- 11 => { cmd => "~000C464F0000FD89\x{0d}", mlen => 18 },
- 12 => { cmd => "~000D464F0000FD88\x{0d}", mlen => 18 },
- 13 => { cmd => "~000E464F0000FD87\x{0d}", mlen => 18 },
- 14 => { cmd => "~000F464F0000FD86\x{0d}", mlen => 18 },
- 15 => { cmd => "~0010464F0000FDAB\x{0d}", mlen => 18 },
- 16 => { cmd => "~0011464F0000FD9A\x{0d}", mlen => 18 },
+  1 => { cmd => "0002464F0000", mlen => 18 },
+  2 => { cmd => "0003464F0000", mlen => 18 },
+  3 => { cmd => "0004464F0000", mlen => 18 },
+  4 => { cmd => "0005464F0000", mlen => 18 },
+  5 => { cmd => "0006464F0000", mlen => 18 },
+  6 => { cmd => "0007464F0000", mlen => 18 },
+  7 => { cmd => "0008464F0000", mlen => 18 },
+  8 => { cmd => "0009464F0000", mlen => 18 },
+  9 => { cmd => "000A464F0000", mlen => 18 },
+ 10 => { cmd => "000B464F0000", mlen => 18 },
+ 11 => { cmd => "000C464F0000", mlen => 18 },
+ 12 => { cmd => "000D464F0000", mlen => 18 },
+ 13 => { cmd => "000E464F0000", mlen => 18 },
+ 14 => { cmd => "000F464F0000", mlen => 18 },
+ 15 => { cmd => "0010464F0000", mlen => 18 },
+ 16 => { cmd => "0011464F0000", mlen => 18 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+36+45+30+30+32+30+41 = 02F4H -> modulo 65536 = 02F4H -> bitweise invert = 1111 1101 0000 1011 -> +1 1111 1101 0000 1100 = FD0CH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    0A      46    96     E0    02    0A      FD  0C
-# 7E  32 30  30 41  34 36 39 36  45 30 30 32  30 41  
-#  ~    20    11      46    96     E0    02    11      FD  2A             1111 1101 0010 1001
+#  ~    20    11      46    96     E0    02    11     
 # 7E  32 30  31 31  34 36 39 36  45 30 30 32  31 31    
 #
 
 my %hrswv = (                                                        # Codierung Abruf softwareVersion
-  1 => { cmd => "~20024696E00202FD2A\x{0d}", mlen => 30 },
-  2 => { cmd => "~20034696E00203FD28\x{0d}", mlen => 30 },
-  3 => { cmd => "~20044696E00204FD26\x{0d}", mlen => 30 },
-  4 => { cmd => "~20054696E00205FD24\x{0d}", mlen => 30 },
-  5 => { cmd => "~20064696E00206FD22\x{0d}", mlen => 30 },
-  6 => { cmd => "~20074696E00207FD20\x{0d}", mlen => 30 },
-  7 => { cmd => "~20084696E00208FD1E\x{0d}", mlen => 30 },
-  8 => { cmd => "~20094696E00209FD1C\x{0d}", mlen => 30 },
-  9 => { cmd => "~200A4696E0020AFD0C\x{0d}", mlen => 30 },
- 10 => { cmd => "~200B4696E0020BFD0A\x{0d}", mlen => 30 },
- 11 => { cmd => "~200C4696E0020CFD08\x{0d}", mlen => 30 },
- 12 => { cmd => "~200D4696E0020DFD06\x{0d}", mlen => 30 },
- 13 => { cmd => "~200E4696E0020EFD04\x{0d}", mlen => 30 },
- 14 => { cmd => "~200F4696E0020FFD02\x{0d}", mlen => 30 },
- 15 => { cmd => "~20104696E00210FD2C\x{0d}", mlen => 30 },
- 16 => { cmd => "~20114696E00211FD2A\x{0d}", mlen => 30 },
+  1 => { cmd => "20024696E00202", mlen => 30 },
+  2 => { cmd => "20034696E00203", mlen => 30 },
+  3 => { cmd => "20044696E00204", mlen => 30 },
+  4 => { cmd => "20054696E00205", mlen => 30 },
+  5 => { cmd => "20064696E00206", mlen => 30 },
+  6 => { cmd => "20074696E00207", mlen => 30 },
+  7 => { cmd => "20084696E00208", mlen => 30 },
+  8 => { cmd => "20094696E00209", mlen => 30 },
+  9 => { cmd => "200A4696E0020A", mlen => 30 },
+ 10 => { cmd => "200B4696E0020B", mlen => 30 },
+ 11 => { cmd => "200C4696E0020C", mlen => 30 },
+ 12 => { cmd => "200D4696E0020D", mlen => 30 },
+ 13 => { cmd => "200E4696E0020E", mlen => 30 },
+ 14 => { cmd => "200F4696E0020F", mlen => 30 },
+ 15 => { cmd => "20104696E00210", mlen => 30 },
+ 16 => { cmd => "20114696E00211", mlen => 30 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+34+45+30+30+32+30+41 = 02EDH -> modulo 65536 = 02EDH -> bitweise invert = 1111 1101 0001 0010 -> +1 1111 1101 0001 0011 = FD13H
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    0A      46    44     E0    02    0A      FD  13
-# 7E  32 30  30 41  34 36 34 34  45 30 30 32  30 41
 #  ~    20    10      46    44     E0    02    10      FD  33
 # 7E  32 30  31 30  34 36 34 34  45 30 30 32  31 30                  1111 1101 0011 0010
 #
 
 my %hralm = (                                                        # Codierung Abruf alarmInfo
-  1 => { cmd => "~20024644E00202FD31\x{0d}", mlen => 82 },
-  2 => { cmd => "~20034644E00203FD2F\x{0d}", mlen => 82 },
-  3 => { cmd => "~20044644E00204FD2D\x{0d}", mlen => 82 },
-  4 => { cmd => "~20054644E00205FD2B\x{0d}", mlen => 82 },
-  5 => { cmd => "~20064644E00206FD29\x{0d}", mlen => 82 },
-  6 => { cmd => "~20074644E00207FD27\x{0d}", mlen => 82 },
-  7 => { cmd => "~20084644E00208FD25\x{0d}", mlen => 82 },
-  8 => { cmd => "~20094644E00209FD23\x{0d}", mlen => 82 },
-  9 => { cmd => "~200A4644E0020AFD13\x{0d}", mlen => 82 },
- 10 => { cmd => "~200B4644E0020BFD11\x{0d}", mlen => 82 },
- 11 => { cmd => "~200C4644E0020CFD0F\x{0d}", mlen => 82 },
- 12 => { cmd => "~200D4644E0020DFD0D\x{0d}", mlen => 82 },
- 13 => { cmd => "~200E4644E0020EFD0B\x{0d}", mlen => 82 },
- 14 => { cmd => "~200F4644E0020FFCFE\x{0d}", mlen => 82 },
- 15 => { cmd => "~20104644E00210FD33\x{0d}", mlen => 82 },
- 16 => { cmd => "~20114644E00211FD31\x{0d}", mlen => 82 },
+  1 => { cmd => "20024644E00202", mlen => 82 },
+  2 => { cmd => "20034644E00203", mlen => 82 },
+  3 => { cmd => "20044644E00204", mlen => 82 },
+  4 => { cmd => "20054644E00205", mlen => 82 },
+  5 => { cmd => "20064644E00206", mlen => 82 },
+  6 => { cmd => "20074644E00207", mlen => 82 },
+  7 => { cmd => "20084644E00208", mlen => 82 },
+  8 => { cmd => "20094644E00209", mlen => 82 },
+  9 => { cmd => "200A4644E0020A", mlen => 82 },
+ 10 => { cmd => "200B4644E0020B", mlen => 82 },
+ 11 => { cmd => "200C4644E0020C", mlen => 82 },
+ 12 => { cmd => "200D4644E0020D", mlen => 82 },
+ 13 => { cmd => "200E4644E0020E", mlen => 82 },
+ 14 => { cmd => "200F4644E0020F", mlen => 82 },
+ 15 => { cmd => "20104644E00210", mlen => 82 },
+ 16 => { cmd => "20114644E00211", mlen => 82 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+37+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
@@ -372,22 +363,22 @@ my %hralm = (                                                        # Codierung
 #
 
 my %hrspm = (                                                        # Codierung Abruf Systemparameter
-  1 => { cmd => "~20024647E00202FD2E\x{0d}", mlen => 68 },
-  2 => { cmd => "~20034647E00203FD2C\x{0d}", mlen => 68 },
-  3 => { cmd => "~20044647E00204FD2A\x{0d}", mlen => 68 },
-  4 => { cmd => "~20054647E00205FD28\x{0d}", mlen => 68 },
-  5 => { cmd => "~20064647E00206FD26\x{0d}", mlen => 68 },
-  6 => { cmd => "~20074647E00207FD24\x{0d}", mlen => 68 },
-  7 => { cmd => "~20084647E00208FD22\x{0d}", mlen => 68 },
-  8 => { cmd => "~20094647E00209FD20\x{0d}", mlen => 68 },
-  9 => { cmd => "~200A4647E0020AFD10\x{0d}", mlen => 68 },
- 10 => { cmd => "~200B4647E0020BFD0E\x{0d}", mlen => 68 },
- 11 => { cmd => "~200C4647E0020CFD0C\x{0d}", mlen => 68 },
- 12 => { cmd => "~200D4647E0020DFD0A\x{0d}", mlen => 68 },
- 13 => { cmd => "~200E4647E0020EFD08\x{0d}", mlen => 68 },
- 14 => { cmd => "~200F4647E0020FFD06\x{0d}", mlen => 68 },
- 15 => { cmd => "~20104647E00210FD30\x{0d}", mlen => 68 },
- 16 => { cmd => "~20114647E00211FD2E\x{0d}", mlen => 68 },
+  1 => { cmd => "20024647E00202", mlen => 68 },
+  2 => { cmd => "20034647E00203", mlen => 68 },
+  3 => { cmd => "20044647E00204", mlen => 68 },
+  4 => { cmd => "20054647E00205", mlen => 68 },
+  5 => { cmd => "20064647E00206", mlen => 68 },
+  6 => { cmd => "20074647E00207", mlen => 68 },
+  7 => { cmd => "20084647E00208", mlen => 68 },
+  8 => { cmd => "20094647E00209", mlen => 68 },
+  9 => { cmd => "200A4647E0020A", mlen => 68 },
+ 10 => { cmd => "200B4647E0020B", mlen => 68 },
+ 11 => { cmd => "200C4647E0020C", mlen => 68 },
+ 12 => { cmd => "200D4647E0020D", mlen => 68 },
+ 13 => { cmd => "200E4647E0020E", mlen => 68 },
+ 14 => { cmd => "200F4647E0020F", mlen => 68 },
+ 15 => { cmd => "20104647E00210", mlen => 68 },
+ 16 => { cmd => "20114647E00211", mlen => 68 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+32+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
@@ -398,22 +389,22 @@ my %hrspm = (                                                        # Codierung
 #
 
 my %hrcmi = (                                                        # Codierung Abruf chargeManagmentInfo
-  1 => { cmd => "~20024692E00202FD2E\x{0d}", mlen => 38 },
-  2 => { cmd => "~20034692E00203FD2C\x{0d}", mlen => 38 },
-  3 => { cmd => "~20044692E00204FD2A\x{0d}", mlen => 38 },
-  4 => { cmd => "~20054692E00205FD28\x{0d}", mlen => 38 },
-  5 => { cmd => "~20064692E00206FD26\x{0d}", mlen => 38 },
-  6 => { cmd => "~20074692E00207FD24\x{0d}", mlen => 38 },
-  7 => { cmd => "~20084692E00208FD22\x{0d}", mlen => 38 },
-  8 => { cmd => "~20094692E00209FD20\x{0d}", mlen => 38 },
-  9 => { cmd => "~200A4692E0020AFD10\x{0d}", mlen => 38 },
- 10 => { cmd => "~200B4692E0020BFD0E\x{0d}", mlen => 38 },
- 11 => { cmd => "~200C4692E0020CFD0C\x{0d}", mlen => 38 },
- 12 => { cmd => "~200D4692E0020DFD0A\x{0d}", mlen => 38 },
- 13 => { cmd => "~200E4692E0020EFD08\x{0d}", mlen => 38 },
- 14 => { cmd => "~200F4692E0020FFD06\x{0d}", mlen => 38 },
- 15 => { cmd => "~20104692E00210FD30\x{0d}", mlen => 38 },
- 16 => { cmd => "~20114692E00211FD2E\x{0d}", mlen => 38 },
+  1 => { cmd => "20024692E00202", mlen => 38 },
+  2 => { cmd => "20034692E00203", mlen => 38 },
+  3 => { cmd => "20044692E00204", mlen => 38 },
+  4 => { cmd => "20054692E00205", mlen => 38 },
+  5 => { cmd => "20064692E00206", mlen => 38 },
+  6 => { cmd => "20074692E00207", mlen => 38 },
+  7 => { cmd => "20084692E00208", mlen => 38 },
+  8 => { cmd => "20094692E00209", mlen => 38 },
+  9 => { cmd => "200A4692E0020A", mlen => 38 },
+ 10 => { cmd => "200B4692E0020B", mlen => 38 },
+ 11 => { cmd => "200C4692E0020C", mlen => 38 },
+ 12 => { cmd => "200D4692E0020D", mlen => 38 },
+ 13 => { cmd => "200E4692E0020E", mlen => 38 },
+ 14 => { cmd => "200F4692E0020F", mlen => 38 },
+ 15 => { cmd => "20104692E00210", mlen => 38 },
+ 16 => { cmd => "20114692E00211", mlen => 38 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -425,30 +416,27 @@ my %hrcmi = (                                                        # Codierung
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+32+45+30+30+32+30+41 = 02EBH -> modulo 65536 = 02EBH -> bitweise invert = 1111 1101 0001 0100 -> +1 1111 1101 0001 0101 = FD15H
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
-#  ~    20    0A     46     42      E0    02    0A      FD  15
-# 7E  32 30  30 41  34 36  34 32  45 30 30 32  30 41 
 #  ~    20    10     46     42      E0    02    10      FD  35             1111 1101 0011 0100
 # 7E  32 30  31 30  34 36  34 32  45 30 30 32  31 30              
 #
 my %hrcmn = (                                                        # Codierung Abruf analogValue
-  1 => { cmd => "~20024642E00202FD33\x{0d}", mlen => 128 },
-  2 => { cmd => "~20034642E00203FD31\x{0d}", mlen => 128 },
-  3 => { cmd => "~20044642E00204FD2F\x{0d}", mlen => 128 },
-  4 => { cmd => "~20054642E00205FD2D\x{0d}", mlen => 128 },
-  5 => { cmd => "~20064642E00206FD2B\x{0d}", mlen => 128 },
-  6 => { cmd => "~20074642E00207FD29\x{0d}", mlen => 128 },
-  7 => { cmd => "~20084642E00208FD27\x{0d}", mlen => 128 },
-  8 => { cmd => "~20094642E00209FD25\x{0d}", mlen => 128 },
-  9 => { cmd => "~200A4642E0020AFD15\x{0d}", mlen => 128 },
- 10 => { cmd => "~200B4642E0020BFD13\x{0d}", mlen => 128 },
- 11 => { cmd => "~200C4642E0020CFD11\x{0d}", mlen => 128 },
- 12 => { cmd => "~200D4642E0020DFD0F\x{0d}", mlen => 128 },
- 13 => { cmd => "~200E4642E0020EFD0D\x{0d}", mlen => 128 },
- 14 => { cmd => "~200F4642E0020FFD0B\x{0d}", mlen => 128 },
- 15 => { cmd => "~20104642E0020EFD35\x{0d}", mlen => 128 },
- 16 => { cmd => "~20114642E0020FFD33\x{0d}", mlen => 128 },
+  1 => { cmd => "20024642E00202", mlen => 128 },
+  2 => { cmd => "20034642E00203", mlen => 128 },
+  3 => { cmd => "20044642E00204", mlen => 128 },
+  4 => { cmd => "20054642E00205", mlen => 128 },
+  5 => { cmd => "20064642E00206", mlen => 128 },
+  6 => { cmd => "20074642E00207", mlen => 128 },
+  7 => { cmd => "20084642E00208", mlen => 128 },
+  8 => { cmd => "20094642E00209", mlen => 128 },
+  9 => { cmd => "200A4642E0020A", mlen => 128 },
+ 10 => { cmd => "200B4642E0020B", mlen => 128 },
+ 11 => { cmd => "200C4642E0020C", mlen => 128 },
+ 12 => { cmd => "200D4642E0020D", mlen => 128 },
+ 13 => { cmd => "200E4642E0020E", mlen => 128 },
+ 14 => { cmd => "200F4642E0020F", mlen => 128 },
+ 15 => { cmd => "20104642E0020E", mlen => 128 },
+ 16 => { cmd => "20114642E0020F", mlen => 128 },
 );
-
 
 ###############################################################
 #                  PylonLowVoltage Initialize
@@ -641,7 +629,7 @@ sub manageUpdate {
 
   if ($timeout < 1.0) {
       BlockingKill ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
-      Log3 ($name, 4, qq{$name - Cycle started in main process});
+      Log3 ($name, 4, qq{$name - Cycle started in main process with battery read timeout: >$timeout<});
       startUpdate  ({name => $name, timeout => $timeout, readings => $readings, age1 => $age1});
   }
   else {
@@ -667,7 +655,7 @@ sub manageUpdate {
      if (defined $hash->{HELPER}{BKRUNNING}) {
          $hash->{HELPER}{BKRUNNING}{loglevel} = 3;                                                       # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
 
-         Log3 ($name, 4, qq{$name - Cycle BlockingCall PID "$hash->{HELPER}{BKRUNNING}{pid}" with timeout "$blto" started});
+         Log3 ($name, 4, qq{$name - Cycle BlockingCall PID "$hash->{HELPER}{BKRUNNING}{pid}" started with battery read timeout: >$timeout<, blocking timeout >$blto<});
      }
   }
 
@@ -879,10 +867,10 @@ sub _callSerialNumber {
   my $hash     = shift;
   my $socket   = shift;
   my $readings = shift;                # Referenz auf das Hash der zu erstellenden Readings
-
+  
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => $hrsnb{$hash->{BATADDRESS}}{cmd},
+                       cmd    => getCmdString ($hrsnb{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'serialNumber'
                      }
                     );
@@ -918,7 +906,7 @@ sub _callManufacturerInfo {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => $hrmfi{$hash->{BATADDRESS}}{cmd},
+                       cmd    => getCmdString ($hrmfi{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'manufacturerInfo'
                      }
                     );
@@ -960,7 +948,7 @@ sub _callProtocolVersion {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => $hrprt{$hash->{BATADDRESS}}{cmd},
+                       cmd    => getCmdString ($hrprt{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'protocolVersion'
                      }
                     );
@@ -995,7 +983,7 @@ sub _callSoftwareVersion {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => $hrswv{$hash->{BATADDRESS}}{cmd},
+                       cmd    => getCmdString ($hrswv{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'softwareVersion'
                      }
                     );
@@ -1031,7 +1019,7 @@ sub _callSystemParameters {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => $hrspm{$hash->{BATADDRESS}}{cmd},
+                       cmd    => getCmdString ($hrspm{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'systemParameters'
                      }
                     );
@@ -1081,7 +1069,7 @@ sub _callAnalogValue {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => $hrcmn{$hash->{BATADDRESS}}{cmd},
+                       cmd    => getCmdString ($hrcmn{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'analogValue'
                      }
                     );
@@ -1201,7 +1189,7 @@ sub _callAlarmInfo {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => $hralm{$hash->{BATADDRESS}}{cmd},
+                       cmd    => getCmdString ($hralm{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'alarmInfo'
                      }
                     );
@@ -1304,7 +1292,7 @@ sub _callChargeManagmentInfo {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => $hrcmi{$hash->{BATADDRESS}}{cmd},
+                       cmd    => getCmdString ($hrcmi{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'chargeManagmentInfo'
                      }
                     );
@@ -1499,6 +1487,51 @@ sub pseudoHexToText {
    }
    
 return $text;
+}
+
+###############################################################
+#          Kommandostring zusammenstellen
+#          Teilstring aus Kommandohash wird übergeben
+###############################################################
+sub getCmdString {
+  my $cstr = shift;                        # Komamndoteilstring                 
+
+  my $cmd = $pfx.$cstr;
+  $cmd   .= _doChecksum ($cstr);
+  $cmd   .= $sfx;
+
+return $cmd;
+}
+
+###############################################################
+#  wandelt eine Zeichenkette aus HEX-Zahlen in eine 
+#  hexadecimal-ASCII Zeichenkette um und berechnet daraus die
+#  Checksumme (=Returnwert)
+###############################################################
+sub _doChecksum {
+   my $hstring = shift // return;
+   
+   my $dezsum    = 0;
+   my @asciivals = split //, $hstring;                           
+   
+   for my $v (@asciivals) {                                      # jedes einzelne Zeichen der HEX-Kette wird als ASCII Wert interpretiert 
+       my $hex  = unpack "H*", $v;                               # in einen HEX-Wert umgewandelt
+       $dezsum += hex $hex;                                      # und die Dezimalsumme gebildet
+   }
+   
+   my $bin = sprintf '%016b', $dezsum;
+
+   $bin    =~ s/1/x/g;                                           # invertieren
+   $bin    =~ s/0/1/g;  
+   $bin    =~ s/x/0/g;  
+   
+   $dezsum = oct("0b$bin");
+   $dezsum++;
+   $bin    = sprintf '%016b', $dezsum;
+
+   my $chksum = sprintf '%X', oct("0b$bin");
+   
+return $chksum;
 }
 
 ###############################################################
