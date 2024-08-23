@@ -873,7 +873,7 @@ sub _callSerialNumber {
   
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrsnb{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrsnb{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'serialNumber'
                      }
                     );
@@ -909,7 +909,7 @@ sub _callManufacturerInfo {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrmfi{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrmfi{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'manufacturerInfo'
                      }
                     );
@@ -951,7 +951,7 @@ sub _callProtocolVersion {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrprt{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrprt{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'protocolVersion'
                      }
                     );
@@ -986,7 +986,7 @@ sub _callSoftwareVersion {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrswv{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrswv{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'softwareVersion'
                      }
                     );
@@ -1022,7 +1022,7 @@ sub _callSystemParameters {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrspm{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrspm{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'systemParameters'
                      }
                     );
@@ -1072,7 +1072,7 @@ sub _callAnalogValue {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrcmn{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrcmn{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'analogValue'
                      }
                     );
@@ -1192,7 +1192,7 @@ sub _callAlarmInfo {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hralm{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hralm{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'alarmInfo'
                      }
                     );
@@ -1295,7 +1295,7 @@ sub _callChargeManagmentInfo {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrcmi{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrcmi{$hash->{BATADDRESS}}{cmd}),
                        cmdtxt => 'chargeManagmentInfo'
                      }
                     );
@@ -1517,6 +1517,7 @@ return $text;
 #          Teilstring aus Kommandohash wird übergeben
 ###############################################################
 sub getCmdString {
+  my $hash = shift;
   my $cstr = shift;                        # Komamndoteilstring                 
 
   my $cmd = $pfx.$cstr;
