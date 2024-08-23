@@ -65,7 +65,7 @@ eval "use IO::Socket::Timeout;1"       or my $iostAbsent    = 'IO::Socket::Timeo
 eval "use Storable qw(freeze thaw);1;" or my $storabs       = 'Storable';                    ## no critic 'eval'
 
 use FHEM::SynoModules::SMUtils qw(moduleVersion);                                            # Hilfsroutinen Modul
-#use Data::Dumper;
+# use Data::Dumper;
 
 # Run before module compilation
 BEGIN {
@@ -120,7 +120,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
-  "0.4.0"  => "23.08.2024 Log output for timeout changed, automatic calculation of checksum ",
+  "0.4.0"  => "23.08.2024 Log output for timeout changed, automatic calculation of checksum, preparation for pylon groups ",
   "0.3.0"  => "22.08.2024 extend battery addresses up to 16 ",
   "0.2.6"  => "25.05.2024 replace Smartmatch Forum:#137776 ",
   "0.2.5"  => "02.04.2024 _callAnalogValue / _callAlarmInfo: integrate a Cell and Temperature Position counter ".
@@ -487,8 +487,11 @@ sub Define {
   }
 
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                           # Modul Meta.pm nicht vorhanden
-  ($hash->{HOST}, $hash->{PORT}) = split ":", $args[2];
-  $hash->{BATADDRESS}            = $args[3] // 1;
+  
+  my ($a,$h)                     = parseParams (join ' ', @args);  
+  ($hash->{HOST}, $hash->{PORT}) = split ":", $$a[2];
+  $hash->{BATADDRESS}            = $$a[3]      // 1;
+  $hash->{GROUP}                 = $h->{group} // 0;
 
   if ($hash->{BATADDRESS} !~ /^([1-9]{1}|1[0-6])$/xs) {
       return "Define: bataddress must be a value between 1 and 16";
@@ -1404,8 +1407,28 @@ sub Reread {
 return $res;
 }
 
+################################################################
+# Die Undef-Funktion wird aufgerufen wenn ein Gerät mit delete
+# gelöscht wird oder bei der Abarbeitung des Befehls rereadcfg,
+# der ebenfalls alle Geräte löscht und danach das
+# Konfigurationsfile neu einliest. Entsprechend müssen in der
+# Funktion typische Aufräumarbeiten durchgeführt werden wie das
+# saubere Schließen von Verbindungen oder das Entfernen von
+# internen Timern.
+################################################################
+sub Undef {
+ my $hash = shift;
+ my $name = shift;
+
+ RemoveInternalTimer ($hash);
+  _closeSocket       ($hash);
+  BlockingKill       ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
+
+return;
+}
+
 ###############################################################
-#                  PylonLowVoltage Undef
+#                  PylonLowVoltage Shutdown
 ###############################################################
 sub Shutdown {
   my ($hash, $args) = @_;
