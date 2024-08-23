@@ -491,7 +491,7 @@ sub Define {
   my ($a,$h)                     = parseParams (join ' ', @args);  
   ($hash->{HOST}, $hash->{PORT}) = split ":", $$a[2];
   $hash->{BATADDRESS}            = $$a[3]      // 1;
-  $hash->{GROUP}                 = !$h->{group} ? 'no group' : $h->{group};
+  $hash->{GROUP}                 = $h->{group} // 0;
 
   if ($hash->{BATADDRESS} !~ /^([1-9]{1}|1[0-6])$/xs) {
       return "Define: bataddress must be a value between 1 and 16";
