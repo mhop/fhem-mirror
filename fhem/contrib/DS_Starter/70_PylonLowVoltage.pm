@@ -61,7 +61,7 @@ use Blocking;
 use MIME::Base64;
 
 eval "use FHEM::Meta;1"                or my $modMetaAbsent = 1;                             ## no critic 'eval'
-eval "use IO::Socket::Timeout;1"       or my $iostAbsent    = 'IO::Socket::Timeout';         ## no critic 'eval'
+eval "use IO::Socket::Timeout;1"       or my $iostabs       = 'IO::Socket::Timeout';         ## no critic 'eval'
 eval "use Storable qw(freeze thaw);1;" or my $storabs       = 'Storable';                    ## no critic 'eval'
 
 use FHEM::SynoModules::SMUtils qw(moduleVersion);                                            # Hilfsroutinen Modul
@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "1.0.0"  => "24.08.2024 implement pylon groups ",
   "0.4.0"  => "23.08.2024 Log output for timeout changed, automatic calculation of checksum, preparation for pylon groups ",
   "0.3.0"  => "22.08.2024 extend battery addresses up to 16 ",
   "0.2.6"  => "25.05.2024 replace Smartmatch Forum:#137776 ",
@@ -203,6 +204,8 @@ my %halm = (                                                                  # 
 # HEX-ASCII converter: https://www.rapidtables.com/convert/number/ascii-hex-bin-dec-converter.html
 # Modulo Rechner: https://miniwebtool.com/de/modulo-calculator/
 # Pylontech Dokus: https://github.com/Interster/PylonTechBattery
+#
+# '--'  -> Platzhalter für Batterieadresse, wird ersetzt durch berechnete Adresse (Bat + Group in _composeAddr)
 ##################################################################################################################################################################
 #
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -213,31 +216,11 @@ my %halm = (                                                                  # 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+33+45+30+30+32+30+41 = 02F1H -> modulo 65536 = 02F1H -> bitweise invert = 1111 1101 0000 1110 -> +1 = 1111 1101 0000 1111 -> FD0FH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    0A      46    93     E0    02    0A      FD   0F
-# 7E  32 30  30 41  34 36 39 33  45 30 30 32  30 41
 #  ~    20    10      46    93     E0    02    10      
 # 7E  32 30  31 30  34 36 39 33  45 30 30 32  31 30                  = 02D1H -> bitweise invert = 1111 1101 0010 1110 -> +1 = 1111 1101 0010 1111 -> FD2FH
-#  ~    20    11      46    93     E0    02    11      
-# 7E  32 30  31 31  34 36 39 33  45 30 30 32  31 31                  = 02D3H -> bitweise invert = 1111 1101 0010 1100 -> +1 = 1111 1101 0010 1101 -> FD2DH
-#
 
 my %hrsnb = (                                                        # Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "20024693E00202", mlen => 52 },
-  2 => { cmd => "20034693E00203", mlen => 52 },
-  3 => { cmd => "20044693E00204", mlen => 52 },
-  4 => { cmd => "20054693E00205", mlen => 52 },
-  5 => { cmd => "20064693E00206", mlen => 52 },
-  6 => { cmd => "20074693E00207", mlen => 52 },
-  7 => { cmd => "20084693E00208", mlen => 52 },
-  8 => { cmd => "20094693E00209", mlen => 52 },           
-  9 => { cmd => "200A4693E0020A", mlen => 52 },
- 10 => { cmd => "200B4693E0020B", mlen => 52 },
- 11 => { cmd => "200C4693E0020C", mlen => 52 },
- 12 => { cmd => "200D4693E0020D", mlen => 52 },
- 13 => { cmd => "200E4693E0020E", mlen => 52 },
- 14 => { cmd => "200F4693E0020F", mlen => 52 },
- 15 => { cmd => "20104693E00210", mlen => 52 },
- 16 => { cmd => "20114693E00211", mlen => 52 },
+  1 => { cmd => "20--4693E002--", mlen => 52 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -251,24 +234,9 @@ my %hrsnb = (                                                        # Codierung
 # SOI  VER    ADR   CID1  CID2      LENGTH    INFO     CHKSUM
 #  ~    20    10      46    51     00    00   empty    
 # 7E  32 20  31 30  34 36 35 31  30 30 30 30   - -     FD  BD        = 0243H -> bitweise invert = 1111 1101 1011 1100 -> +1 = 1111 1101 1011 1101 = FDBDH
-#
+
 my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "200246510000", mlen => 82 },
-  2 => { cmd => "200346510000", mlen => 82 },
-  3 => { cmd => "200446510000", mlen => 82 },
-  4 => { cmd => "200546510000", mlen => 82 },
-  5 => { cmd => "200646510000", mlen => 82 },
-  6 => { cmd => "200746510000", mlen => 82 },
-  7 => { cmd => "200846510000", mlen => 82 },
-  8 => { cmd => "200946510000", mlen => 82 },
-  9 => { cmd => "200A46510000", mlen => 82 },
- 10 => { cmd => "200B46510000", mlen => 82 },
- 11 => { cmd => "200C46510000", mlen => 82 },
- 12 => { cmd => "200D46510000", mlen => 82 },
- 13 => { cmd => "200E46510000", mlen => 82 },
- 14 => { cmd => "200F46510000", mlen => 82 },
- 15 => { cmd => "201046510000", mlen => 82 },
- 16 => { cmd => "201146510000", mlen => 82 },
+  1 => { cmd => "20--46510000", mlen => 82 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -281,24 +249,9 @@ my %hrmfi = (                                                        # Codierung
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
 #  ~    00    0A      46    4F      00    00   empty    
-#
+
 my %hrprt = (                                                        # Codierung Abruf protocolVersion, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "0002464F0000", mlen => 18 },
-  2 => { cmd => "0003464F0000", mlen => 18 },
-  3 => { cmd => "0004464F0000", mlen => 18 },
-  4 => { cmd => "0005464F0000", mlen => 18 },
-  5 => { cmd => "0006464F0000", mlen => 18 },
-  6 => { cmd => "0007464F0000", mlen => 18 },
-  7 => { cmd => "0008464F0000", mlen => 18 },
-  8 => { cmd => "0009464F0000", mlen => 18 },
-  9 => { cmd => "000A464F0000", mlen => 18 },
- 10 => { cmd => "000B464F0000", mlen => 18 },
- 11 => { cmd => "000C464F0000", mlen => 18 },
- 12 => { cmd => "000D464F0000", mlen => 18 },
- 13 => { cmd => "000E464F0000", mlen => 18 },
- 14 => { cmd => "000F464F0000", mlen => 18 },
- 15 => { cmd => "0010464F0000", mlen => 18 },
- 16 => { cmd => "0011464F0000", mlen => 18 },
+  1 => { cmd => "00--464F0000", mlen => 18 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+36+45+30+30+32+30+41 = 02F4H -> modulo 65536 = 02F4H -> bitweise invert = 1111 1101 0000 1011 -> +1 1111 1101 0000 1100 = FD0CH
@@ -306,25 +259,9 @@ my %hrprt = (                                                        # Codierung
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    11      46    96     E0    02    11     
 # 7E  32 30  31 31  34 36 39 36  45 30 30 32  31 31    
-#
 
 my %hrswv = (                                                        # Codierung Abruf softwareVersion
-  1 => { cmd => "20024696E00202", mlen => 30 },
-  2 => { cmd => "20034696E00203", mlen => 30 },
-  3 => { cmd => "20044696E00204", mlen => 30 },
-  4 => { cmd => "20054696E00205", mlen => 30 },
-  5 => { cmd => "20064696E00206", mlen => 30 },
-  6 => { cmd => "20074696E00207", mlen => 30 },
-  7 => { cmd => "20084696E00208", mlen => 30 },
-  8 => { cmd => "20094696E00209", mlen => 30 },
-  9 => { cmd => "200A4696E0020A", mlen => 30 },
- 10 => { cmd => "200B4696E0020B", mlen => 30 },
- 11 => { cmd => "200C4696E0020C", mlen => 30 },
- 12 => { cmd => "200D4696E0020D", mlen => 30 },
- 13 => { cmd => "200E4696E0020E", mlen => 30 },
- 14 => { cmd => "200F4696E0020F", mlen => 30 },
- 15 => { cmd => "20104696E00210", mlen => 30 },
- 16 => { cmd => "20114696E00211", mlen => 30 },
+  1 => { cmd => "20--4696E002--", mlen => 30 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+34+45+30+30+32+30+41 = 02EDH -> modulo 65536 = 02EDH -> bitweise invert = 1111 1101 0001 0010 -> +1 1111 1101 0001 0011 = FD13H
@@ -332,25 +269,9 @@ my %hrswv = (                                                        # Codierung
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    10      46    44     E0    02    10      FD  33
 # 7E  32 30  31 30  34 36 34 34  45 30 30 32  31 30                  1111 1101 0011 0010
-#
 
 my %hralm = (                                                        # Codierung Abruf alarmInfo
-  1 => { cmd => "20024644E00202", mlen => 82 },
-  2 => { cmd => "20034644E00203", mlen => 82 },
-  3 => { cmd => "20044644E00204", mlen => 82 },
-  4 => { cmd => "20054644E00205", mlen => 82 },
-  5 => { cmd => "20064644E00206", mlen => 82 },
-  6 => { cmd => "20074644E00207", mlen => 82 },
-  7 => { cmd => "20084644E00208", mlen => 82 },
-  8 => { cmd => "20094644E00209", mlen => 82 },
-  9 => { cmd => "200A4644E0020A", mlen => 82 },
- 10 => { cmd => "200B4644E0020B", mlen => 82 },
- 11 => { cmd => "200C4644E0020C", mlen => 82 },
- 12 => { cmd => "200D4644E0020D", mlen => 82 },
- 13 => { cmd => "200E4644E0020E", mlen => 82 },
- 14 => { cmd => "200F4644E0020F", mlen => 82 },
- 15 => { cmd => "20104644E00210", mlen => 82 },
- 16 => { cmd => "20114644E00211", mlen => 82 },
+  1 => { cmd => "20--4644E002--", mlen => 82 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+37+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
@@ -358,27 +279,9 @@ my %hralm = (                                                        # Codierung
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    0A      46    47     E0    02    0A      FD  10
 # 7E  32 30  30 41  34 36 34 37  45 30 30 32  30 41  
-#  ~    20    10      46    47     E0    02    10      FD  30 
-# 7E  32 30  31 30  34 36 34 37  45 30 30 32  31 30                 1111 1101 0010 1111
-#
 
 my %hrspm = (                                                        # Codierung Abruf Systemparameter
-  1 => { cmd => "20024647E00202", mlen => 68 },
-  2 => { cmd => "20034647E00203", mlen => 68 },
-  3 => { cmd => "20044647E00204", mlen => 68 },
-  4 => { cmd => "20054647E00205", mlen => 68 },
-  5 => { cmd => "20064647E00206", mlen => 68 },
-  6 => { cmd => "20074647E00207", mlen => 68 },
-  7 => { cmd => "20084647E00208", mlen => 68 },
-  8 => { cmd => "20094647E00209", mlen => 68 },
-  9 => { cmd => "200A4647E0020A", mlen => 68 },
- 10 => { cmd => "200B4647E0020B", mlen => 68 },
- 11 => { cmd => "200C4647E0020C", mlen => 68 },
- 12 => { cmd => "200D4647E0020D", mlen => 68 },
- 13 => { cmd => "200E4647E0020E", mlen => 68 },
- 14 => { cmd => "200F4647E0020F", mlen => 68 },
- 15 => { cmd => "20104647E00210", mlen => 68 },
- 16 => { cmd => "20114647E00211", mlen => 68 },
+  1 => { cmd => "20--4647E002--", mlen => 68 },
 );
 
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+32+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
@@ -386,25 +289,9 @@ my %hrspm = (                                                        # Codierung
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    0A      46    92     E0    02    0A      FD  10
 # 7E  32 30  30 41  34 36 39 32  45 30 30 32  30 41  
-#
 
 my %hrcmi = (                                                        # Codierung Abruf chargeManagmentInfo
-  1 => { cmd => "20024692E00202", mlen => 38 },
-  2 => { cmd => "20034692E00203", mlen => 38 },
-  3 => { cmd => "20044692E00204", mlen => 38 },
-  4 => { cmd => "20054692E00205", mlen => 38 },
-  5 => { cmd => "20064692E00206", mlen => 38 },
-  6 => { cmd => "20074692E00207", mlen => 38 },
-  7 => { cmd => "20084692E00208", mlen => 38 },
-  8 => { cmd => "20094692E00209", mlen => 38 },
-  9 => { cmd => "200A4692E0020A", mlen => 38 },
- 10 => { cmd => "200B4692E0020B", mlen => 38 },
- 11 => { cmd => "200C4692E0020C", mlen => 38 },
- 12 => { cmd => "200D4692E0020D", mlen => 38 },
- 13 => { cmd => "200E4692E0020E", mlen => 38 },
- 14 => { cmd => "200F4692E0020F", mlen => 38 },
- 15 => { cmd => "20104692E00210", mlen => 38 },
- 16 => { cmd => "20114692E00211", mlen => 38 },
+  1 => { cmd => "20--4692E002--", mlen => 38 },
 );
 
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
@@ -416,26 +303,11 @@ my %hrcmi = (                                                        # Codierung
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+32+45+30+30+32+30+41 = 02EBH -> modulo 65536 = 02EBH -> bitweise invert = 1111 1101 0001 0100 -> +1 1111 1101 0001 0101 = FD15H
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
-#  ~    20    10     46     42      E0    02    10      FD  35             1111 1101 0011 0100
+#  ~    20    10     46     42      E0    02    10      
 # 7E  32 30  31 30  34 36  34 32  45 30 30 32  31 30              
-#
+
 my %hrcmn = (                                                        # Codierung Abruf analogValue
-  1 => { cmd => "20024642E00202", mlen => 128 },
-  2 => { cmd => "20034642E00203", mlen => 128 },
-  3 => { cmd => "20044642E00204", mlen => 128 },
-  4 => { cmd => "20054642E00205", mlen => 128 },
-  5 => { cmd => "20064642E00206", mlen => 128 },
-  6 => { cmd => "20074642E00207", mlen => 128 },
-  7 => { cmd => "20084642E00208", mlen => 128 },
-  8 => { cmd => "20094642E00209", mlen => 128 },
-  9 => { cmd => "200A4642E0020A", mlen => 128 },
- 10 => { cmd => "200B4642E0020B", mlen => 128 },
- 11 => { cmd => "200C4642E0020C", mlen => 128 },
- 12 => { cmd => "200D4642E0020D", mlen => 128 },
- 13 => { cmd => "200E4642E0020E", mlen => 128 },
- 14 => { cmd => "200F4642E0020F", mlen => 128 },
- 15 => { cmd => "20104642E0020E", mlen => 128 },
- 16 => { cmd => "20114642E0020F", mlen => 128 },
+  1 => { cmd => "20--4642E002--", mlen => 128 },
 );
 
 ###############################################################
@@ -474,8 +346,8 @@ sub Define {
 
   my $name = $hash->{NAME};
 
-  if ($iostAbsent) {
-      my $err = "Perl module >$iostAbsent< is missing. You have to install this perl module.";
+  if ($iostabs) {
+      my $err = "Perl module >$iostabs< is missing. You have to install this perl module.";
       Log3 ($name, 1, "$name - ERROR - $err");
       return "Error: $err";
   }
@@ -490,12 +362,21 @@ sub Define {
   
   my ($a,$h)                     = parseParams (join ' ', @args);  
   ($hash->{HOST}, $hash->{PORT}) = split ":", $$a[2];
+  
+  if (!$hash->{HOST} || !$hash->{PORT}) {
+      return "The <hostname/ip>:<port> must be specified.";
+  }
+  
+  if (defined $$a[3] && $$a[3] !~ /^([1-9]{1}|1[0-6])$/xs) {
+      return "The bataddress must be an integer from 1 to 16";
+  }
+  
+  if (defined $h->{group} && $h->{group} !~ /^([0-7]{1})$/xs) {
+      return "The group number must be an integer from 0 to 7";
+  }
+  
   $hash->{BATADDRESS}            = $$a[3]      // 1;
   $hash->{GROUP}                 = $h->{group} // 0;
-
-  if ($hash->{BATADDRESS} !~ /^([1-9]{1}|1[0-6])$/xs) {
-      return "Define: bataddress must be a value between 1 and 16";
-  }
 
   my $params = {
       hash        => $hash,
@@ -628,7 +509,7 @@ sub manageUpdate {
       $readings->{nextCycletime} = FmtTime($new);
   }
 
-  Log3 ($name, 4, "$name - start request cycle to battery number >$hash->{BATADDRESS}< at host:port $hash->{HOST}:$hash->{PORT}");
+  Log3 ($name, 4, "$name - START request cycle to battery number >$hash->{BATADDRESS}<, group >$hash->{GROUP}< at host:port $hash->{HOST}:$hash->{PORT}");
 
   if ($timeout < 1.0) {
       BlockingKill ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
@@ -761,7 +642,7 @@ sub finishUpdate {
   delete($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
 
   if ($success) {
-      Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}< successfully");
+      Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}<, group >$hash->{GROUP}< successfully");
 
       additionalReadings ($readings);                                                 # zusätzliche eigene Readings erstellen
       $readings->{state} = 'connected';
@@ -873,12 +754,12 @@ sub _callSerialNumber {
   
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrsnb{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrsnb{1}{cmd}),
                        cmdtxt => 'serialNumber'
                      }
                     );
 
-  my $rtnerr = responseCheck ($res, $hrsnb{$hash->{BATADDRESS}}{mlen});
+  my $rtnerr = responseCheck ($res, $hrsnb{1}{mlen});
 
   if ($rtnerr) {
       doOnError ({ hash     => $hash,
@@ -909,12 +790,12 @@ sub _callManufacturerInfo {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrmfi{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrmfi{1}{cmd}),
                        cmdtxt => 'manufacturerInfo'
                      }
                     );
 
-  my $rtnerr = responseCheck ($res, $hrmfi{$hash->{BATADDRESS}}{mlen});
+  my $rtnerr = responseCheck ($res, $hrmfi{1}{mlen});
 
   if ($rtnerr) {
       doOnError ({ hash     => $hash,
@@ -951,12 +832,12 @@ sub _callProtocolVersion {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrprt{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrprt{1}{cmd}),
                        cmdtxt => 'protocolVersion'
                      }
                     );
 
-  my $rtnerr = responseCheck ($res, $hrprt{$hash->{BATADDRESS}}{mlen});
+  my $rtnerr = responseCheck ($res, $hrprt{1}{mlen});
 
   if ($rtnerr) {
       doOnError ({ hash     => $hash,
@@ -986,12 +867,12 @@ sub _callSoftwareVersion {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrswv{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrswv{1}{cmd}),
                        cmdtxt => 'softwareVersion'
                      }
                     );
 
-  my $rtnerr = responseCheck ($res, $hrswv{$hash->{BATADDRESS}}{mlen});
+  my $rtnerr = responseCheck ($res, $hrswv{1}{mlen});
 
   if ($rtnerr) {
       doOnError ({ hash     => $hash,
@@ -1022,12 +903,12 @@ sub _callSystemParameters {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrspm{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrspm{1}{cmd}),
                        cmdtxt => 'systemParameters'
                      }
                     );
 
-  my $rtnerr = responseCheck ($res, $hrspm{$hash->{BATADDRESS}}{mlen});
+  my $rtnerr = responseCheck ($res, $hrspm{1}{mlen});
 
   if ($rtnerr) {
       doOnError ({ hash     => $hash,
@@ -1072,12 +953,12 @@ sub _callAnalogValue {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrcmn{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrcmn{1}{cmd}),
                        cmdtxt => 'analogValue'
                      }
                     );
 
-  my $rtnerr = responseCheck ($res, $hrcmn{$hash->{BATADDRESS}}{mlen});
+  my $rtnerr = responseCheck ($res, $hrcmn{1}{mlen});
 
   if ($rtnerr) {
       doOnError ({ hash     => $hash,
@@ -1192,12 +1073,12 @@ sub _callAlarmInfo {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hralm{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hralm{1}{cmd}),
                        cmdtxt => 'alarmInfo'
                      }
                     );
 
-  my $rtnerr = responseCheck ($res, $hralm{$hash->{BATADDRESS}}{mlen});
+  my $rtnerr = responseCheck ($res, $hralm{1}{mlen});
 
   if ($rtnerr) {
       doOnError ({ hash     => $hash,
@@ -1295,12 +1176,12 @@ sub _callChargeManagmentInfo {
 
   my $res = Request ({ hash   => $hash,
                        socket => $socket,
-                       cmd    => getCmdString ($hrcmi{$hash->{BATADDRESS}}{cmd}),
+                       cmd    => getCmdString ($hash, $hrcmi{1}{cmd}),
                        cmdtxt => 'chargeManagmentInfo'
                      }
                     );
 
-  my $rtnerr = responseCheck ($res, $hrcmi{$hash->{BATADDRESS}}{mlen});
+  my $rtnerr = responseCheck ($res, $hrcmi{1}{mlen});
 
   if ($rtnerr) {
       doOnError ({ hash     => $hash,
@@ -1517,13 +1398,42 @@ return $text;
 #          Teilstring aus Kommandohash wird übergeben
 ###############################################################
 sub getCmdString {
+  my $hash = shift;
   my $cstr = shift;                        # Komamndoteilstring                 
 
-  my $cmd = $pfx.$cstr;
-  $cmd   .= _doChecksum ($cstr);
-  $cmd   .= $sfx;
+  my $addr = _composeAddr ($hash);         # effektive Batterieadresse berechnen
+  $cstr    =~ s/--/$addr/xg;               # Platzhalter Adresse ersetzen
+  
+  my $cmd  = $pfx;                         # Präfix
+  $cmd    .= $cstr;                        # Kommandostring
+  $cmd    .= _doChecksum ($cstr);          # Checksumme ergänzen
+  $cmd    .= $sfx;                         # Suffix 
 
 return $cmd;
+}
+
+###############################################################
+#  Adresse aus Batterie und Gruppe erstellen
+# 
+# 1) Single group battery 4:
+#    n = 5; m = 0
+#    ADR = 0x05 + 0x10*0 = 0x05; INFO of COMMAND = ADR = 0x05
+# 2) multi group, group 3, battery 6;
+#    n = 7; m = 3
+#    ADR = 0x07 + 0x10*3 = 0x37; INFO of COMMAND = ADR = 0x37
+###############################################################
+sub _composeAddr {
+   my $hash = shift;
+   
+   my $baddr = $hash->{BATADDRESS} + 1;                          # Master startet mit "02"
+   my $gaddr = $hash->{GROUP};                    
+   
+   my $addr  = sprintf "%02x", (hex $baddr + hex $gaddr * hex '0x10');
+   
+   #my $name = $hash->{NAME};
+   #Log3 ($name, 1, "$name - ADDRR: $addr");
+   
+return $addr;
 }
 
 ###############################################################
@@ -1750,7 +1660,9 @@ return;
 
  <b>Limitations</b>
  <br>
- The module currently supports a maximum of 16 batteries (1 master + 15 slaves) in one group.
+ The module currently supports a maximum of 16 batteries (1 master + 15 slaves) in up to 7 groups. <br>
+ The number of groups and batteries that can be realized depends on the products used. 
+ Please refer to the manufacturer's instructions.
  <br><br>
 
  <a id="PylonLowVoltage-define"></a>
@@ -1758,6 +1670,11 @@ return;
  <ul>
   <code><b>define &lt;name&gt; PylonLowVoltage &lt;hostname/ip&gt;:&lt;port&gt; [&lt;bataddress&gt;]</b></code><br>
   <br>
+  
+  <b>Example:</b> <br>
+  define Pylone1 PylonLowVoltage 192.168.2.86:9000 1 group=0 <br>
+  <br>
+  
   <li><b>hostname/ip:</b><br>
      Host name or IP address of the RS485/Ethernet gateway
   </li>
@@ -1772,6 +1689,11 @@ return;
      The master battery in the network (with open link port 0 or to which the RS485 connection is connected) has the
      address 1, the next battery then has address 2 and so on.
      If no device address is specified, address 1 is used.
+  </li>
+  
+  <li><b>group:</b><br>
+     Optional group number of the battery stack. If group=0 or is not specified, the default configuration 
+     “Single Group” is used. The group number can be 0 to 7.     
   </li>
   <br>
  </ul>
@@ -1975,14 +1897,21 @@ return;
 
  <b>Einschränkungen</b>
  <br>
- Das Modul unterstützt zur Zeit maximal 16 Batterien (1 Master + 15 Slaves) in einer Gruppe.
+ Das Modul unterstützt zur Zeit maximal 16 Batterien (1 Master + 15 Slaves) in bis zu 7 Gruppen. <br>
+ Die realisierbare Gruppen- und Batterieanzahl ist von den eingesetzen Produkten abhängig. Dazu bitte die Hinweise des 
+ Herstellers beachten.
  <br><br>
 
  <a id="PylonLowVoltage-define"></a>
  <b>Definition</b>
  <ul>
-  <code><b>define &lt;name&gt; PylonLowVoltage &lt;hostname/ip&gt;:&lt;port&gt; [&lt;bataddress&gt;]</b></code><br>
+  <code><b>define &lt;name&gt; PylonLowVoltage &lt;hostname/ip&gt;:&lt;port&gt; [&lt;bataddress&gt;] [group=&lt;N&gt;]</b></code><br>
   <br>
+  
+  <b>Beispiel:</b> <br>
+  define Pylone1 PylonLowVoltage 192.168.2.86:9000 1 group=0 <br>
+  <br>
+  
   <li><b>hostname/ip:</b><br>
      Hostname oder IP-Adresse des RS485/Ethernet-Gateways
   </li>
@@ -1992,11 +1921,16 @@ return;
   </li>
 
   <li><b>bataddress:</b><br>
-     Geräteadresse der Pylontech Batterie. Es können mehrere Pylontech Batterien über eine Pylontech-spezifische
+     Optionale Geräteadresse der Pylontech Batterie. Es können mehrere Pylontech Batterien über eine Pylontech-spezifische
      Link-Verbindung verbunden werden. Die zulässige Anzahl ist der jeweiligen Pylontech Dokumentation zu entnehmen. <br>
      Die Master Batterie im Verbund (mit offenem Link Port 0 bzw. an der die RS485-Verbindung angeschlossen ist) hat die
      Adresse 1, die nächste Batterie hat dann die Adresse 2 und so weiter.
      Ist keine Geräteadresse angegeben, wird die Adresse 1 verwendet.
+  </li>
+  
+  <li><b>group:</b><br>
+     Optionale Gruppennummer des Batteriestacks. Ist group=0 oder nicht angegeben, wird die Standardkonfiguration 
+     "Single Group" verwendet. Die Gruppennummer kann 0 bis 7 sein.     
   </li>
   <br>
  </ul>
