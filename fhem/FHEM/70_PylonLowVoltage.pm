@@ -472,23 +472,25 @@ sub Attr {
       }
   }
 
-  if ($aName eq 'interval') {
-      if (!looks_like_number($aVal)) {
-          return qq{The value for $aName is invalid, it must be numeric!};
-      }
+  if ($cmd eq 'set') {
+      if ($aName eq 'interval') {
+          if (!looks_like_number($aVal)) {
+              return qq{The value for $aName is invalid, it must be numeric!};
+          }
 
-      InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
+          InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
+      }
+      
+      if ($aName =~ /timeout|waitTimeBetweenRS485Cmd/xs) {
+          if (!looks_like_number($aVal)) {
+              return qq{The value for $aName is invalid, it must be numeric!};
+          }
+      }
   }
 
   if ($aName eq 'userBatterytype') {
       $hash->{HELPER}{AGE1} = 0;
       InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
-  }
-
-  if ($aName =~ /timeout|waitTimeBetweenRS485Cmd/xs) {
-      if (!looks_like_number($aVal)) {
-          return qq{The value for $aName is invalid, it must be numeric!};
-      }
   }
 
 return;
