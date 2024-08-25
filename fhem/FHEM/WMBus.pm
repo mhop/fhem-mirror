@@ -1647,17 +1647,21 @@ sub decodePayload($$) {
     } elsif ($dataBlock->{dataField} == DIF_INT24) {
       my @bytes = unpack('CCC', substr($payload, $offset, 3));
       $offset += 3;
-      $value = $bytes[0] + $bytes[1] << 8 + $bytes[2] << 16;
-      # two's complement
-      $value = ~$value + 1;
+      $value = $bytes[0] + ($bytes[1] << 8) + ($bytes[2] << 16);
+      if ($bytes[2] & 0x80) {
+        # two's complement
+        $value -= (1 << 24);
+      }
     } elsif ($dataBlock->{dataField} == DIF_INT32) {
       $value = unpack('l<', substr($payload, $offset, 4));
       $offset += 4;
     } elsif ($dataBlock->{dataField} == DIF_INT48) {
       my @words = unpack('vvv', substr($payload, $offset, 6));
       $value = $words[0] + ($words[1] << 16) + ($words[2] << 32);
-      # two's complement
-      $value = ~$value + 1;
+      if ($words[2] & 0x8000) {
+        # two's complement
+        $value -= (1 << 48);
+      }
       $offset += 6;
     } elsif ($dataBlock->{dataField} == DIF_INT64) {
       $value = unpack('q<', substr($payload, $offset, 8));
