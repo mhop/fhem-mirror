@@ -52,7 +52,7 @@ package FHEM::PylonLowVoltage;                                     ## no critic 
 use strict;
 use warnings;
 use GPUtils qw(GP_Import GP_Export);                               # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-use Time::HiRes qw(gettimeofday ualarm);
+use Time::HiRes qw(gettimeofday ualarm sleep);
 use IO::Socket::INET;
 use Errno qw(ETIMEDOUT EWOULDBLOCK);
 use Scalar::Util qw(looks_like_number);
@@ -76,6 +76,7 @@ BEGIN {
           AttrNum
           BlockingCall
           BlockingKill
+          devspec2array
           data
           defs
           fhemTimeLocal
@@ -120,6 +121,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "1.1.0"  => "25.08.2024 manage time shift for active gateway connections of all defined  devices ",
   "1.0.0"  => "24.08.2024 implement pylon groups ",
   "0.4.0"  => "23.08.2024 Log output for timeout changed, automatic calculation of checksum, preparation for pylon groups ",
   "0.3.0"  => "22.08.2024 extend battery addresses up to 16 ",
@@ -155,6 +157,7 @@ my $definterval = 30;                                                # default A
 my $defto       = 0.5;                                               # default connection Timeout zum RS485 Gateway
 my @blackl      = qw(state nextCycletime);                           # Ausnahmeliste deleteReadingspec
 my $age1def     = 60;                                                # default Zyklus Abrufklasse statische Werte (s)
+my $wtbRS485cmd = 0.1;                                               # default Wartezeit zwischen RS485 Kommandos
 my $pfx         = "~";                                               # KommandoPräfix
 my $sfx         = "\x{0d}";                                          # Kommandosuffix
 
@@ -325,6 +328,7 @@ sub Initialize {
                         "interval ".
                         "timeout ".
                         "userBatterytype ".
+                        "waitTimeBetweenRS485Cmd:slider,0.1,0.1,2.0,1 ".
                         $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -467,7 +471,7 @@ sub Attr {
       InternalTimer(gettimeofday()+1.0, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
   }
 
-  if ($aName eq 'timeout') {
+  if ($aName =~ /timeout|waitTimeBetweenRS485Cmd/xs) {
       if (!looks_like_number($aVal)) {
           return qq{The value for $aName is invalid, it must be numeric!};
       }
@@ -495,37 +499,54 @@ sub manageUpdate {
 
   my $interval = AttrVal ($name, 'interval', $definterval);                                 # 0 -> manuell gesteuert
   my $timeout  = AttrVal ($name, 'timeout',        $defto);
-  my $readings;
+  my ($readings, $new);
 
   if (!$interval) {
       $hash->{OPMODE}            = 'Manual';
       $readings->{nextCycletime} = 'Manual';
   }
   else {
-      my $new = gettimeofday() + $interval;
+      $new = gettimeofday() + $interval;
       InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);                # Wiederholungsintervall
 
       $hash->{OPMODE}            = 'Automatic';
       $readings->{nextCycletime} = FmtTime($new);
   }
+  
+  delete $hash->{HELPER}{BKRUNNING} if(defined $hash->{HELPER}{BKRUNNING} && $hash->{HELPER}{BKRUNNING}{pid} =~ /DEAD/xs);
+ 
+  for my $dev ( devspec2array ('TYPE=PylonLowVoltage') ) {
+      if (defined $defs{$dev}->{HELPER}{BKRUNNING} || defined $defs{$dev}->{HELPER}{GWSESSION}) {
+          $hash->{POSTPONED} += 1;
+          
+          RemoveInternalTimer ($hash);
+          $new = gettimeofday() + 1;
+          InternalTimer (gettimeofday() + 1, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0); 
+          
+          $readings->{nextCycletime} = FmtTime ($new);
+          $readings->{state}         = "cycle postponed due to active gateway connection of $dev";
+          createReadings ($hash, 1, $readings);                                             
+          
+          if (defined $defs{$dev}->{HELPER}{BKRUNNING}) {
+              Log3 ($name, 4, qq{$name - another Gateway Call from $dev with PID "$defs{$dev}->{HELPER}{BKRUNNING}{pid}" is already running ... start Update postponed});
+          }
+          else {
+              Log3 ($name, 4, qq{$name - another Gateway Call from $dev is already running ... start Update postponed});
+          }
+          
+          return;
+      }
+  }
 
   Log3 ($name, 4, "$name - START request cycle to battery number >$hash->{BATADDRESS}<, group >$hash->{GROUP}< at host:port $hash->{HOST}:$hash->{PORT}");
 
   if ($timeout < 1.0) {
-      BlockingKill ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
+      $hash->{HELPER}{GWSESSION} = 1;
       Log3 ($name, 4, qq{$name - Cycle started in main process with battery read timeout: >$timeout<});
       startUpdate  ({name => $name, timeout => $timeout, readings => $readings, age1 => $age1});
   }
   else {
-     delete $hash->{HELPER}{BKRUNNING} if(defined $hash->{HELPER}{BKRUNNING} && $hash->{HELPER}{BKRUNNING}{pid} =~ /DEAD/xs);
-
-     if (defined $hash->{HELPER}{BKRUNNING}) {
-         Log3 ($name, 3, qq{$name - another BlockingCall PID "$hash->{HELPER}{BKRUNNING}{pid}" is already running ... start Update aborted});
-
-         return;
-     }
-
-     my $blto = sprintf "%.0f", ($timeout + 10);
+     my $blto = sprintf "%.0f", ($timeout + (AttrVal ($name, 'waitTimeBetweenRS485Cmd', $wtbRS485cmd) * 15));
 
      $hash->{HELPER}{BKRUNNING} = BlockingCall ( "FHEM::PylonLowVoltage::startUpdate",
                                                  {name => $name, timeout => $timeout, readings => $readings, age1 => $age1, block => 1},
@@ -560,12 +581,16 @@ sub startUpdate {
 
   my $hash     = $defs{$name};
   my $success  = 0;
+  my $wtb      = AttrVal ($name, 'waitTimeBetweenRS485Cmd', $wtbRS485cmd);                            # Wartezeit zwischen RS485 Kommandos
+  my $uat      = $block ? $timeout * 1000000 + $wtb * 1000000 : $timeout * 1000000; 
+
+  Log3 ($name, 4, "$name - used wait time between RS485 commands: ".($block ? $wtb : 0)." seconds");  
 
   my ($socket, $serial);
 
   eval {                                                                                              ## no critic 'eval'
       local $SIG{ALRM} = sub { croak 'gatewaytimeout' };
-      ualarm ($timeout * 1000000);                                                                    # ualarm in Mikrosekunden
+      ualarm ($timeout * 1000000);                                                                    # ualarm in Mikrosekunden -> 1s
 
       $socket = _openSocket ($hash, $timeout, $readings);
 
@@ -573,21 +598,33 @@ sub startUpdate {
           $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
           $block ? return ($serial) : return \&finishUpdate ($serial);
       }
+      
+      local $SIG{ALRM} = sub { croak 'batterytimeout' };
 
       if (ReadingsAge ($name, "serialNumber", 6000) >= $age1) {                                       # Abrufklasse statische Werte
+          ualarm ($uat);  
+          
           for my $idx (sort keys %fns1) {
               if (&{$fns1{$idx}{fn}} ($hash, $socket, $readings)) {
                   $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
                   $block ? return ($serial) : return \&finishUpdate ($serial);
               }
           }
+          
+          ualarm(0);
+          sleep $wtb if($block); 
       }
 
       for my $idx (sort keys %fns2) {                                                                 # Abrufklasse dynamische Werte
+          ualarm ($uat);   
+          
           if (&{$fns2{$idx}{fn}} ($hash, $socket, $readings)) {
               $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
               $block ? return ($serial) : return \&finishUpdate ($serial);
           }
+          
+          ualarm(0);
+          sleep $wtb if($block); 
       }
 
       $success = 1;
@@ -596,7 +633,10 @@ sub startUpdate {
   if ($@) {
       my $errtxt;
       if ($@ =~ /gatewaytimeout/xs) {
-          $errtxt = 'Timeout in communication to RS485 gateway';
+          $errtxt = 'Timeout while establish RS485 gateway connection';
+      }
+      elsif ($@ =~ /batterytimeout/xs) {
+          $errtxt = 'Timeout reading battery';
       }
       else {
           $errtxt = $@;
@@ -639,7 +679,8 @@ sub finishUpdate {
   my $readings = $paref->{readings};
   my $hash     = $defs{$name};
 
-  delete($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
+  delete $hash->{HELPER}{BKRUNNING};
+  delete $hash->{HELPER}{GWSESSION};
 
   if ($success) {
       Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}<, group >$hash->{GROUP}< successfully");
@@ -651,7 +692,7 @@ sub finishUpdate {
       deleteReadingspec ($hash);
   }
 
-  createReadings ($hash, $success, $readings);                                                  # Readings erstellen
+  createReadings ($hash, $success, $readings);                                        # Readings erstellen
 
 return;
 }
@@ -666,7 +707,8 @@ sub abortUpdate {
 
   Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{BKRUNNING}{fn} pid:$hash->{HELPER}{BKRUNNING}{pid} aborted: $cause");
 
-  delete($hash->{HELPER}{BKRUNNING});
+  delete $hash->{HELPER}{BKRUNNING};
+  delete $hash->{HELPER}{GWSESSION};
 
   deleteReadingspec    ($hash);
   readingsSingleUpdate ($hash, 'state', 'Update (Child) process timed out', 1);
@@ -1750,6 +1792,15 @@ return;
      The automatically determined battery type (Reading batteryType) is replaced by the specified string.
    </li>
    <br>
+   
+   <a id="PylonLowVoltage-attr-waitTimeBetweenRS485Cmd"></a>
+   <li><b>waitTimeBetweenRS485Cmd &lt;Sekunden&gt;</b><br>
+     Waiting time between the execution of RS485 commands in seconds. <br>
+     This parameter only has an effect if the “timeout” attribute is set to a value >= 1. <br>
+     (default: 0.1)
+   </li>
+   <br>
+   
  </ul>
 
  <a id="PylonLowVoltage-readings"></a>
@@ -1988,6 +2039,15 @@ return;
      Der automatisch ermittelte Batterietyp (Reading batteryType) wird durch die angegebene Zeichenfolge ersetzt.
    </li>
    <br>
+   
+   <a id="PylonLowVoltage-attr-waitTimeBetweenRS485Cmd"></a>
+   <li><b>waitTimeBetweenRS485Cmd &lt;Sekunden&gt;</b><br>
+     Wartezeit zwischen der Ausführung von RS485 Befehlen in Sekunden. <br>
+     Dieser Parameter hat nur Auswirkung wenn das Attribut "timeout" auf einen Wert >= 1 gesetzt ist. <br>
+     (default: 0.1)
+   </li>
+   <br>
+   
  </ul>
 
  <a id="PylonLowVoltage-readings"></a>
