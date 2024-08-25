@@ -177,18 +177,15 @@ my %hrtnc = (                                                        # RTN Codes
   '99' => { desc => 'invalid data received ... discarded'                                                },
 );
 
-my %fns1 = (                                                                  # Abrufklasse statische Werte:
-  1 => { fn => \&_callSerialNumber     },                                     #   serialNumber
-  2 => { fn => \&_callManufacturerInfo },                                     #   manufacturerInfo
-  3 => { fn => \&_callProtocolVersion  },                                     #   protocolVersion
-  4 => { fn => \&_callSoftwareVersion  },                                     #   softwareVersion
-  5 => { fn => \&_callSystemParameters },                                     #   systemParameters
-);
-
-my %fns2 = (                                                                  # Abrufklasse dynamische Werte:
-  1 => { fn => \&_callAnalogValue         },                                  #   analogValue
-  2 => { fn => \&_callAlarmInfo           },                                  #   alarmInfo
-  3 => { fn => \&_callChargeManagmentInfo },                                  #   chargeManagmentInfo  
+my %fncls = (                                                                 # Funktionsklassen
+  1 => { class => 'sta', fn => \&_callSerialNumber        },                  #   statisch - serialNumber
+  2 => { class => 'sta', fn => \&_callManufacturerInfo    },                  #   statisch - manufacturerInfo
+  3 => { class => 'sta', fn => \&_callProtocolVersion     },                  #   statisch - protocolVersion
+  4 => { class => 'sta', fn => \&_callSoftwareVersion     },                  #   statisch - softwareVersion
+  5 => { class => 'sta', fn => \&_callSystemParameters    },                  #   statisch - systemParameters
+  6 => { class => 'dyn', fn => \&_callAnalogValue         },                  #   dynamisch - analogValue
+  7 => { class => 'dyn', fn => \&_callAlarmInfo           },                  #   dynamisch - alarmInfo
+  8 => { class => 'dyn', fn => \&_callChargeManagmentInfo },                  #   dynamisch - chargeManagmentInfo  
 );
 
 my %halm = (                                                                  # Codierung Alarme
@@ -210,7 +207,7 @@ my %halm = (                                                                  # 
 #
 # '--'  -> Platzhalter für Batterieadresse, wird ersetzt durch berechnete Adresse (Bat + Group in _composeAddr)
 ##################################################################################################################################################################
-#
+# Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
 # CID1: Kommando spezifisch, hier 46H
 # CID2: Kommando spezifisch, hier 93H
@@ -221,11 +218,13 @@ my %halm = (                                                                  # 
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    10      46    93     E0    02    10      
 # 7E  32 30  31 30  34 36 39 33  45 30 30 32  31 30                  = 02D1H -> bitweise invert = 1111 1101 0010 1110 -> +1 = 1111 1101 0010 1111 -> FD2FH
-
-my %hrsnb = (                                                        # Codierung Abruf serialNumber, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "20--4693E002--", mlen => 52 },
+##################################################################################################################################################################
+my %hrsnb = (                                                              
+  1 => { cmd => '20--4693E002--', fnclsnr => 1, fn => 'serialNumber', mlen => 52 },
 );
 
+##################################################################################################################################################################
+# Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
 # CID1: Kommando spezifisch, hier 46H
 # CID2: Kommando spezifisch, hier 51H
@@ -237,11 +236,13 @@ my %hrsnb = (                                                        # Codierung
 # SOI  VER    ADR   CID1  CID2      LENGTH    INFO     CHKSUM
 #  ~    20    10      46    51     00    00   empty    
 # 7E  32 20  31 30  34 36 35 31  30 30 30 30   - -     FD  BD        = 0243H -> bitweise invert = 1111 1101 1011 1100 -> +1 = 1111 1101 1011 1101 = FDBDH
-
-my %hrmfi = (                                                        # Codierung Abruf manufacturerInfo, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "20--46510000", mlen => 82 },
+##################################################################################################################################################################
+my %hrmfi = (                                                                    
+  1 => { cmd => '20--46510000', fnclsnr => 2, fn => 'manufacturerInfo', mlen => 82 },
 );
 
+##################################################################################################################################################################
+# Codierung Abruf protocolVersion, mlen = Mindestlänge Antwortstring
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
 # CID1: Kommando spezifisch, hier 46H
 # CID2: Kommando spezifisch, hier 4FH
@@ -252,51 +253,37 @@ my %hrmfi = (                                                        # Codierung
 #
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
 #  ~    00    0A      46    4F      00    00   empty    
-
-my %hrprt = (                                                        # Codierung Abruf protocolVersion, mlen = Mindestlänge Antwortstring
-  1 => { cmd => "00--464F0000", mlen => 18 },
+##################################################################################################################################################################
+my %hrprt = (                                                        
+  1 => { cmd => '00--464F0000', fnclsnr => 3, fn => 'protocolVersion', mlen => 18 },
 );
 
+##################################################################################################################################################################
+# Codierung Abruf softwareVersion
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+36+45+30+30+32+30+41 = 02F4H -> modulo 65536 = 02F4H -> bitweise invert = 1111 1101 0000 1011 -> +1 1111 1101 0000 1100 = FD0CH
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    11      46    96     E0    02    11     
 # 7E  32 30  31 31  34 36 39 36  45 30 30 32  31 31    
-
-my %hrswv = (                                                        # Codierung Abruf softwareVersion
-  1 => { cmd => "20--4696E002--", mlen => 30 },
+##################################################################################################################################################################
+my %hrswv = (                                                        
+  1 => { cmd => '20--4696E002--', fnclsnr => 4, fn => 'softwareVersion', mlen => 30 },
 );
 
-# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+34+45+30+30+32+30+41 = 02EDH -> modulo 65536 = 02EDH -> bitweise invert = 1111 1101 0001 0010 -> +1 1111 1101 0001 0011 = FD13H
-#
-# SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    10      46    44     E0    02    10      FD  33
-# 7E  32 30  31 30  34 36 34 34  45 30 30 32  31 30                  1111 1101 0011 0010
-
-my %hralm = (                                                        # Codierung Abruf alarmInfo
-  1 => { cmd => "20--4644E002--", mlen => 82 },
-);
-
+##################################################################################################################################################################
+# Codierung Abruf Systemparameter
 # CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+37+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
 #
 # SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
 #  ~    20    0A      46    47     E0    02    0A      FD  10
 # 7E  32 30  30 41  34 36 34 37  45 30 30 32  30 41  
-
-my %hrspm = (                                                        # Codierung Abruf Systemparameter
-  1 => { cmd => "20--4647E002--", mlen => 68 },
+##################################################################################################################################################################
+my %hrspm = (                                                        
+  1 => { cmd => '20--4647E002--', fnclsnr => 5, fn => 'systemParameter', mlen => 68 },
 );
 
-# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+32+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
-#
-# SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
-#  ~    20    0A      46    92     E0    02    0A      FD  10
-# 7E  32 30  30 41  34 36 39 32  45 30 30 32  30 41  
-
-my %hrcmi = (                                                        # Codierung Abruf chargeManagmentInfo
-  1 => { cmd => "20--4692E002--", mlen => 38 },
-);
-
+##################################################################################################################################################################
+# Codierung Abruf analogValue
 # ADR: n=Batterienummer (2-x), m=Group Nr. (0-8), ADR = 0x0n + (0x10 * m) -> f. Batterie 1 = 0x02 + (0x10 * 0) = 0x02
 # CID1: Kommando spezifisch, hier 46H
 # CID2: Kommando spezifisch, hier 42H                                                                                                              LCHK|    LENID
@@ -308,10 +295,36 @@ my %hrcmi = (                                                        # Codierung
 # SOI  VER    ADR   CID1   CID2      LENGTH    INFO     CHKSUM
 #  ~    20    10     46     42      E0    02    10      
 # 7E  32 30  31 30  34 36  34 32  45 30 30 32  31 30              
-
-my %hrcmn = (                                                        # Codierung Abruf analogValue
-  1 => { cmd => "20--4642E002--", mlen => 128 },
+##################################################################################################################################################################
+my %hrcmn = (                                                       
+  1 => { cmd => '20--4642E002--', fnclsnr => 6, fn => 'analogValue', mlen => 128 },
 );
+
+##################################################################################################################################################################
+# Codierung Abruf alarmInfo
+# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+34+34+45+30+30+32+30+41 = 02EDH -> modulo 65536 = 02EDH -> bitweise invert = 1111 1101 0001 0010 -> +1 1111 1101 0001 0011 = FD13H
+#
+# SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
+#  ~    20    10      46    44     E0    02    10      FD  33
+# 7E  32 30  31 30  34 36 34 34  45 30 30 32  31 30                  1111 1101 0011 0010
+##################################################################################################################################################################
+my %hralm = (                                                        
+  1 => { cmd => '20--4644E002--', fnclsnr => 7, fn => 'alarmInfo', mlen => 82 },
+);
+
+##################################################################################################################################################################
+# Codierung Abruf chargeManagmentInfo
+# CHKSUM (als HEX! addieren): 32+30+30+41+34+36+39+32+45+30+30+32+30+41 = 02F0H -> modulo 65536 = 02F0H -> bitweise invert = 1111 1101 0000 1111 -> +1 1111 1101 0001 0000 = FD10H
+#
+# SOI  VER    ADR   CID1  CID2      LENGTH     INFO    CHKSUM
+#  ~    20    0A      46    92     E0    02    0A      FD  10
+# 7E  32 30  30 41  34 36 39 32  45 30 30 32  30 41  
+##################################################################################################################################################################
+my %hrcmi = (                                                        
+  1 => { cmd => '20--4692E002--', fnclsnr => 8, fn => 'chargeManagmentInfo', mlen => 38 },
+);
+
+
 
 ###############################################################
 #                  PylonLowVoltage Initialize
@@ -379,8 +392,9 @@ sub Define {
       return "The group number must be an integer from 0 to 7";
   }
   
-  $hash->{BATADDRESS}            = $$a[3]      // 1;
-  $hash->{GROUP}                 = $h->{group} // 0;
+  $hash->{BATADDRESS}   = $$a[3]      // 1;
+  $hash->{GROUP}        = $h->{group} // 0;
+  $hash->{HELPER}{AGE1} = 0;
 
   my $params = {
       hash        => $hash,
@@ -600,25 +614,13 @@ sub startUpdate {
       }
       
       local $SIG{ALRM} = sub { croak 'batterytimeout' };
-
-      if (ReadingsAge ($name, "serialNumber", 6000) >= $age1) {                                       # Abrufklasse statische Werte
-          ualarm ($uat);  
+      
+      for my $idx (sort keys %fncls) {                                                                 
+          next if($fncls{$idx}{class} eq 'sta' && ReadingsAge ($name, "serialNumber", 6000) < $age1);    # Funktionsklasse statische Werte seltener abrufen
           
-          for my $idx (sort keys %fns1) {
-              if (&{$fns1{$idx}{fn}} ($hash, $socket, $readings)) {
-                  $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
-                  $block ? return ($serial) : return \&finishUpdate ($serial);
-              }
-          }
-          
-          ualarm(0);
-          sleep $wtb if($block); 
-      }
-
-      for my $idx (sort keys %fns2) {                                                                 # Abrufklasse dynamische Werte
           ualarm ($uat);   
           
-          if (&{$fns2{$idx}{fn}} ($hash, $socket, $readings)) {
+          if (&{$fncls{$idx}{fn}} ($hash, $socket, $readings)) {
               $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
               $block ? return ($serial) : return \&finishUpdate ($serial);
           }
