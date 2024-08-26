@@ -2043,11 +2043,13 @@ sub _setreset {                          ## no critic "not used"
 
               $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
               $paref->{reorgday} = $dday;
+              $paref->{histname} = '';
 
               setPVhistory ($paref);
 
               delete $paref->{reorg};
               delete $paref->{reorgday};
+              delete $paref->{histname};
           }
           else {
               delete $data{$type}{$name}{pvhist}{$dday};
@@ -2073,11 +2075,13 @@ sub _setreset {                          ## no critic "not used"
 
               $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
               $paref->{reorgday} = $dday;
+              $paref->{histname} = '';
 
               setPVhistory ($paref);
 
               delete $paref->{reorg};
               delete $paref->{reorgday};
+              delete $paref->{histname};
           }
           else {
               for my $hr (sort keys %{$data{$type}{$name}{pvhist}{$dday}}) {
@@ -10612,7 +10616,7 @@ sub _estConsumptionForecast {
                   $pre = 'DEBUG> - WARNING -';
               }
 
-              Log3 ($name, $vl, "$name $pre The stored Energy consumption of day/hour $m/$nhhr is negative. This appears to be an error and this hour is taken into account in the consumption forecast with the value '0'.");
+              Log3 ($name, $vl, "$name $pre The stored Energy consumption of day/hour $m/$nhhr is negative. This appears to be an error and this hour is taken into account in the consumption forecast with value '0'.");
           }     
 
           for my $c (sort{$a<=>$b} keys %{$acref}) {                                                # historischen Verbrauch aller registrierten Verbraucher aufaddieren
