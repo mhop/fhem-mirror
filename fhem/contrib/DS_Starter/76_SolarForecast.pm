@@ -10612,7 +10612,7 @@ sub _estConsumptionForecast {
                   $pre = 'DEBUG> - WARNING -';
               }
 
-              Log3 ($name, $vl, "$name $pre The stored Energy consumption of hour >$nhhr< is negative. This appears to be an error and this hour is taken into account in the consumption forecast with the value '0'..");
+              Log3 ($name, $vl, "$name $pre The stored Energy consumption of day/hour $m/$nhhr is negative. This appears to be an error and this hour is taken into account in the consumption forecast with the value '0'.");
           }     
 
           for my $c (sort{$a<=>$b} keys %{$acref}) {                                                # historischen Verbrauch aller registrierten Verbraucher aufaddieren
