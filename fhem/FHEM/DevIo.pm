@@ -634,40 +634,54 @@ DevIo_OpenDev($$$;$)
       $selectlist{"$name.$dev"} = $hash;
     }
 
-    if($baudrate) {
-      $po->reset_error();
+    DevIo_writeBaudrate($hash, $baudrate, $databits, $parity, $stopbits);
+  }
+
+  return &$doCb(&$doTailWork());
+}
+
+#139055
+sub
+DevIo_writeBaudrate($$;$$$)
+{
+  my ($hash, $baudrate, $databits, $parity, $stopbits) = @_;
+  my $po = $hash->{USBDev};
+  my $name= $hash->{NAME};
+  
+  if ($baudrate) {
+    $po->reset_error();
+    if (defined($databits)) {
       my $p = ($parity eq "none" ? "N" : ($parity eq "odd" ? "O" : "E"));
       Log3 $name, 3, "Setting $name serial parameters to ".
                     "$baudrate,$databits,$p,$stopbits" if(!$hash->{DevioText});
-      $po->baudrate($baudrate);
       $po->databits($databits);
       $po->parity($parity);
       $po->stopbits($stopbits);
       $po->handshake('none');
-
-      # This part is for some Linux kernel versions whih has strange default
-      # settings.  Device::SerialPort is nice: if the flag is not defined for
-      # your OS then it will be ignored.
-
-      $po->stty_icanon(0);
-      #$po->stty_parmrk(0); # The debian standard install does not have it
-      $po->stty_icrnl(0);
-      $po->stty_echoe(0);
-      $po->stty_echok(0);
-      $po->stty_echoctl(0);
-
-      # Needed for some strange distros
-      $po->stty_echo(0);
-      $po->stty_icanon(0);
-      $po->stty_isig(0);
-      $po->stty_opost(0);
-      $po->stty_icrnl(0);
+    } else {
+      Log3 $name, 3, "Setting $name serial baudrate to ".
+                    "$baudrate" if(!$hash->{DevioText});
     }
-
-    $po->write_settings;
+    $po->baudrate($baudrate);
+    # This part is for some Linux kernel versions which has strange default
+    # settings.  Device::SerialPort is nice: if the flag is not defined for
+    # your OS then it will be ignored.
+    
+    $po->stty_icanon(0);
+    #$po->stty_parmrk(0); # The debian standard install does not have it
+    $po->stty_icrnl(0);
+    $po->stty_echoe(0);
+    $po->stty_echok(0);
+    $po->stty_echoctl(0);
+    
+    # Needed for some strange distros
+    $po->stty_echo(0);
+    $po->stty_icanon(0);
+    $po->stty_isig(0);
+    $po->stty_opost(0);
+    $po->stty_icrnl(0);
   }
-
-  return &$doCb(&$doTailWork());
+  $po->write_settings;
 }
 
 sub
