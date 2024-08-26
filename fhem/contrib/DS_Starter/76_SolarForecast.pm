@@ -155,6 +155,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.32.0" => "26.08.2024  vermeide Kalkulation und Speicherung negativer Verbrauchswerte ".
+                           "Forum: https://forum.fhem.de/index.php?msg=1319083 ",
   "1.31.0" => "20.08.2024  rename attributes ctrlWeatherDevX to setupWeatherDevX ",
   "1.30.0" => "18.08.2024  new attribute flowGraphicShift, Forum:https://forum.fhem.de/index.php?msg=1318597 ",
   "1.29.4" => "03.08.2024  delete writeCacheToFile from _getRoofTopData, _specialActivities: avoid loop caused by \@widgetreadings ",
@@ -8987,6 +8989,19 @@ sub _manageConsumerData {
               my $consumerco  = $etot - $ehist;
               $consumerco    += HistoryVal ($hash, $day, sprintf("%02d",$nhour), "csme${c}", 0);
 
+              if ($consumerco < 0) {                                                              # V1.32.0
+                  $consumerco = 0;
+                  my $vl      = 3;
+                  my $pre     = '- WARNING -';
+
+                  if ($paref->{debug} =~ /consumption/xs) {
+                      $vl  = 1;
+                      $pre = 'DEBUG> - WARNING -';
+                  }
+
+                  Log3 ($name, $vl, "$name $pre The calculated Energy consumption of >$consumer< is negative. This appears to be an error and the energy consumption of the consumer for the current hour is set to '0'.");
+              }
+
               $paref->{val}      = $consumerco;                                                   # Verbrauch des Consumers aktuelle Stunde
               $paref->{histname} = "csme${c}";
 
@@ -10584,23 +10599,34 @@ sub _estConsumptionForecast {
               next if(!$hdn || $hdn ne $nhday);
           }
 
-          my $hcon = HistoryVal ($hash, $m, $nhhr, "con", 0);
+          my $hcon = HistoryVal ($hash, $m, $nhhr, "con", 0);                                       # historische Verbrauchswerte
           next if(!$hcon);
+          
+          if ($hcon < 0) {                                                                           # V1.32.0
+              $hcon   = 0;
+              my $vl  = 3;
+              my $pre = '- WARNING -';
 
-          for my $c (sort{$a<=>$b} keys %{$acref}) {                                                # historischer Verbrauch aller registrierten Verbraucher aufaddieren
-              $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                     # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
-              $csme    = HistoryVal ($hash, $m, $nhhr, "csme${c}", 0);
+              if ($paref->{debug} =~ /consumption/xs) {
+                  $vl  = 1;
+                  $pre = 'DEBUG> - WARNING -';
+              }
+
+              Log3 ($name, $vl, "$name $pre The stored Energy consumption of hour >$nhhr< is negative. This appears to be an error and this hour is taken into account in the consumption forecast with the value '0'..");
+          }     
+
+          for my $c (sort{$a<=>$b} keys %{$acref}) {                                                # historischen Verbrauch aller registrierten Verbraucher aufaddieren
+              $exconfc     = ConsumerVal ($hash, $c, 'exconfc', 0);                                 # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+              $csme        = HistoryVal  ($hash, $m, $nhhr, "csme${c}", 0);
+              $consumerco += $csme;
               
               if ($exconfc) {
                   debugLog ($paref, 'consumption', "Consumer '$c' values excluded from forecast calc by 'exconfc' - day: $m, hour: $nhhr, csme: $csme");
-                  $hcon -= $csme;
-                  next;
+                  $consumerco -= $csme;                                                             # V1.32.0
               }
-
-              $consumerco += $csme;
           }
 
-          $conhex->{$nhhr} += $hcon - $consumerco if($hcon >= $consumerco);                         # prognostizierter Verbrauch Ex registrierter Verbraucher
+          $conhex->{$nhhr} += ($hcon - $consumerco) if($hcon >= $consumerco);                       # prognostizierter Verbrauch Ex registrierter Verbraucher
           $conh->{$nhhr}   += $hcon;
           $dnum++;
       }
@@ -11133,6 +11159,19 @@ sub saveEnergyConsumption {
   my $batin   = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_BatIn",           0);
   my $batout  = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_BatOut",          0);
   my $con     = $pvrl - $gfeedin + $gcon - $batin + $batout;
+  
+  if ($con < 0) {                                                                             # V1.32.0
+      $con    = 0;
+      my $vl  = 3;
+      my $pre = '- WARNING -';
+
+      if ($paref->{debug} =~ /consumption/xs) {
+          $vl  = 1;
+          $pre = 'DEBUG> - WARNING -';
+      }
+
+      Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error and the energy consumption for the current hour is set to '0'.");
+  }
 
   writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $shr } );
 
