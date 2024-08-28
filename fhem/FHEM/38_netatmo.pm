@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 31 / 2024-06-17
+# Release 32 / 2024-08-27
 
 package main;
 
@@ -824,7 +824,7 @@ netatmo_refreshToken($;$)
   return undef if($hash->{helper}{last_refresh} > (gettimeofday()-30));
   $hash->{helper}{last_refresh} = int(gettimeofday());
 
-  if( defined($hash->{access_token}) && defined($hash->{expires_at}) ) {
+  if( $nonblocking && defined($hash->{access_token}) && defined($hash->{expires_at}) ) {
     my ($seconds) = gettimeofday();
     return undef if( $seconds < $hash->{expires_at} - 600 );
   }
@@ -1051,7 +1051,12 @@ netatmo_connect($)
 
   return undef if(IsDisabled($name) || !defined($name));
 
-  netatmo_getToken($hash);
+  if(defined(ReadingsVal($name, ".refreshtoken", undef))){
+    $hash->{helper}{refresh_token} = ReadingsVal($name, ".refreshtoken", undef);
+    $hash->{refresh_token} = ReadingsVal($name, ".refreshtoken", undef);
+  }
+
+  netatmo_refreshToken($hash);
   #netatmo_getAppToken($hash);
 
   InternalTimer(gettimeofday()+60+int(rand(60)), "netatmo_poll", $hash);
