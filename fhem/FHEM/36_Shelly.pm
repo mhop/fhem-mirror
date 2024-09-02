@@ -102,6 +102,7 @@
 # 6.00      fix some details in commandref (german only)
 # 6.00.1    fix: selection of readings for command 'set clear responsetimes' improved; Debug commands removed
 # 6.00.2    fix: reading ble (bluetooth) may be set to disabled
+# 6.00.3    fix: use Sub::Util added
 
 # to do     roller: get maxtime open/close from shelly
 #           get status on stopp even when interval == 0
@@ -124,7 +125,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "6.00.2 24.08.2024";
+my $version = "6.00.3 02.09.2024";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -6489,7 +6490,7 @@ sub Shelly_HttpResponse($){
             <code>define &lt;name&gt; Shelly &lt;IP address&gt;[:port] [[user:]password]</code>
             <br />Defines the Shelly device. </p>
         Notes: <ul>
-         <li>This module needs the JSON and the HttpUtils package</li>
+         <li>This module needs the JSON, the HttpUtils and the Sub::Util package</li>
          <li>In Shelly button, switch, roller or dimmer devices one may set URL values that are "hit" when the input or output status changes.
          This is useful to transmit status changes arising from locally pressed buttons directly to FHEM by setting
          <ul>
@@ -7064,7 +7065,7 @@ sub Shelly_HttpResponse($){
             Benutzername:  nur bei Gen1:
             Passwort: -->
         Hinweise: <ul>
-        <li>Dieses Modul benötigt die Pakete JSON und HttpUtils</li>
+        <li>Dieses Modul benötigt die Pakete JSON, HttpUtils und Sub::Util</li>
 
         <li>Das Attribut <code>model</code> wird automatisch gesetzt.
            Für Shelly Geräte, welche nicht von diesem Modul unterstützt werden, wird das Attribut zu <i>generic</i> gesetzt.
