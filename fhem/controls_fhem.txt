@@ -1,4 +1,4 @@
-REV 29123
+REV 29125
 DIR unused
 UPD 2024-09-03_07:45:03 430881 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -767,8 +767,8 @@ UPD 2024-09-03_07:45:09 5208876 docs/commandref.html
 UPD 2024-09-03_07:45:13 3241437 docs/commandref_DE.html
 UPD 2024-03-06_07:45:03 86454 docs/commandref_frame.html
 UPD 2024-03-06_07:45:03 97189 docs/commandref_frame_DE.html
-UPD 2024-09-04_07:45:14 319075 docs/commandref_modular.html
-UPD 2024-09-04_07:45:15 330987 docs/commandref_modular_DE.html
+UPD 2024-09-05_07:45:14 319075 docs/commandref_modular.html
+UPD 2024-09-05_07:45:15 330987 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1941,6 +1941,8 @@ UPD 2019-05-30_07:45:03 5071 www/images/fhemSVG/weather_rain_snow.svg
 UPD 2019-05-30_07:45:03 8697 www/images/fhemSVG/weather_rain_snow_heavy.svg
 UPD 2019-05-30_07:45:03 4173 www/images/fhemSVG/weather_rain_snow_light.svg
 UPD 2019-02-14_07:45:03 4752 www/images/fhemSVG/well.svg
+UPD 2024-09-05_07:45:03 10078 www/images/fhemSVG/wifi_offline.svg
+UPD 2024-09-05_07:45:03 2422 www/images/fhemSVG/wifi_online.svg
 UPD 2022-04-07_07:45:02 16834 www/images/fhemSVG/wintergarten_icon.svg
 UPD 2017-03-18_07:45:02 7396 www/images/fhemSVG/wuerfel.svg
 UPD 2019-02-19_07:45:03 5808 www/images/fhemSVG/xiaomi_multi.svg
