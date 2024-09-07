@@ -20669,6 +20669,36 @@ to ensure that the system configuration is correct.
        <b>Note:</b> Deleting the attribute also removes the internally corresponding data.
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-setupOtherProducer" data-pattern="setupOtherProducer.*"></a>
+       <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt;  </b> <br><br>
+
+       Defines any device and its readings for the delivery of other generation values 
+	   (e.g. CHP, wind generation, emergency generator). 
+       It can also be a dummy device with corresponding readings.
+       <br><br>
+
+       <ul>
+        <table>
+        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>pcurr</b>    </td><td>Reading which returns the current generation as a positive value                                  </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading which supplies the total energy generated (a continuously ascending counter)              </td></tr>
+           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                       </td></tr>
+           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation that has occurred with a log entry.    </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                 </td></tr>
+         </table>
+       </ul>
+       <br>
+
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh
+       </ul>
+       <br>
+
+       <b>Note:</b> Deleting the attribute also removes the internally corresponding data.
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-setupRadiationAPI"></a>
        <li><b>setupRadiationAPI </b> <br><br>
@@ -22964,35 +22994,35 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </li>
       <br>
       
-       <a id="SolarForecast-attr-setupOtherProducer" data-pattern="setupOtherProducer.*"></a>
-       <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt;  </b> <br><br>
+      <a id="SolarForecast-attr-setupOtherProducer" data-pattern="setupOtherProducer.*"></a>
+      <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt;  </b> <br><br>
 
-       Legt ein beliebiges Device und dessen Readings zur Lieferung sonstiger Erzeugungswerte fest 
-	   (z.B. BHKW, Winderzeugung, Notstromaggregat). 
-       Es kann auch ein Dummy Device mit entsprechenden Readings sein.
-       <br><br>
+      Legt ein beliebiges Device und dessen Readings zur Lieferung sonstiger Erzeugungswerte fest 
+	  (z.B. BHKW, Winderzeugung, Notstromaggregat). 
+      Es kann auch ein Dummy Device mit entsprechenden Readings sein.
+      <br><br>
 
-       <ul>
-        <table>
-        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pcurr</b>    </td><td>Reading welches die aktuelle Erzeugung als positiven Wert liefert                            </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte Energie liefert (ein stetig aufsteigender Zähler)       </td></tr>
-           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
-           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.    </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
-         </table>
-       </ul>
-       <br>
+      <ul>
+       <table>
+       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+          <tr><td> <b>pcurr</b>    </td><td>Reading welches die aktuelle Erzeugung als positiven Wert liefert                            </td></tr>
+          <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte Energie liefert (ein stetig aufsteigender Zähler)       </td></tr>
+          <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
+          <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.    </td></tr>
+          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
+        </table>
+      </ul>
+      <br>
 
-       <ul>
-         <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupOtherProducer01 windwheel p=total_pac:kW etotal=etotal:kWh
-       </ul>
-       <br>
+      <ul>
+        <b>Beispiel: </b> <br>
+        attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh
+      </ul>
+      <br>
 
-       <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
-       </li>
-       <br>
+      <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
+      </li>
+      <br>
 
       <a id="SolarForecast-attr-setupRadiationAPI"></a>
       <li><b>setupRadiationAPI </b> <br><br>
