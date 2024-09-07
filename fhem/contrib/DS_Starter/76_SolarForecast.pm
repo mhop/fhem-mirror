@@ -155,7 +155,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.32.0" => "26.08.2024  vermeide Kalkulation und Speicherung negativer Verbrauchswerte ".
+  "1.32.0" => "02.09.2024  new attr setupOtherProducerXX, report calculation and storage of negative consumption values ".
                            "Forum: https://forum.fhem.de/index.php?msg=1319083 ",
   "1.31.0" => "20.08.2024  rename attributes ctrlWeatherDevX to setupWeatherDevX ",
   "1.30.0" => "18.08.2024  new attribute flowGraphicShift, Forum:https://forum.fhem.de/index.php?msg=1318597 ",
@@ -439,6 +439,7 @@ my $tempmodinc     = 25;                                                        
 my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
 
 my $maxconsumer    = 16;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
+my $maxproducer    = 3;                                                             # maximale Anzahl der möglichen anderen Produzenten (Attribut)
 my $epiecMaxCycles = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
@@ -548,6 +549,11 @@ for my $cinit (1..$maxconsumer) {
   push @dd,       "consumerSwitching${cinit}";                # ctrlDebug: add specific Consumer
 }
 
+for my $prn (1..$maxproducer) {
+  $prn = sprintf "%02d", $prn;
+  push @aconfigs, "setupOtherProducer${prn}";                 # Anlagenkonfiguration: add Producer Attribute
+}
+
 my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
 
 # Steuerhashes
@@ -623,6 +629,11 @@ my %hattr = (                                                                # H
   setupStringPeak           => { fn => \&_attrStringPeak          },
   setupRoofTops             => { fn => \&_attrRoofTops            },
 );
+
+  for my $prn (1..$maxproducer) {
+      $prn = sprintf "%02d", $prn;
+      $hattr{'setupOtherProducer'.$prn}{fn} = \&_attrOtherProducer;
+  }
 
 my %htr = (                                                                  # Hash even/odd für <tr>
   0 => { cl => 'even' },
@@ -1106,7 +1117,13 @@ my %hfspvh = (
   gcons             => { fn => \&_storeVal, storname => 'gcons',        validkey => undef,    fpar => 'comp99' },    # bezogene Energie
   gfeedin           => { fn => \&_storeVal, storname => 'gfeedin',      validkey => undef,    fpar => 'comp99' },    # eingespeiste Energie
   con               => { fn => \&_storeVal, storname => 'con',          validkey => undef,    fpar => 'comp99' },    # realer Hausverbrauch Energie
-  pvrl              => { fn => \&_storeVal, storname => 'pvrl',         validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag
+  pvrl              => { fn => \&_storeVal, storname => 'pvrl',         validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag PV
+  pprl01            => { fn => \&_storeVal, storname => 'pprl01',       validkey => undef,    fpar => 'comp99' },    # realer Energieertrag sonstiger Erzeuger 01
+  pprl02            => { fn => \&_storeVal, storname => 'pprl02',       validkey => undef,    fpar => 'comp99' },    # realer Energieertrag sonstiger Erzeuger 02
+  pprl03            => { fn => \&_storeVal, storname => 'pprl03',       validkey => undef,    fpar => 'comp99' },    # realer Energieertrag sonstiger Erzeuger 03
+  etotalp01         => { fn => \&_storeVal, storname => 'etotalp01',    validkey => undef,    fpar => undef    },    # etotal sonstiger Erzeuger 01
+  etotalp02         => { fn => \&_storeVal, storname => 'etotalp02',    validkey => undef,    fpar => undef    },    # etotal sonstiger Erzeuger 02
+  etotalp03         => { fn => \&_storeVal, storname => 'etotalp03',    validkey => undef,    fpar => undef    },    # etotal sonstiger Erzeuger 03
 );
 
 
@@ -1138,11 +1155,16 @@ sub Initialize {
   my $srd = join ",", sort keys (%hcsr);
   my $gbc = 'pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,gridfeedin,feedincome';
 
-  my ($consumer,@allc);
+  my ($consumer, $setupprod, @allc);
   for my $c (1..$maxconsumer) {
       $c         = sprintf "%02d", $c;
       $consumer .= "consumer${c}:textField-long ";
       push @allc, $c;
+  }
+  
+  for my $prn (1..$maxproducer) {
+      $prn        = sprintf "%02d", $prn;
+      $setupprod .= "setupOtherProducer${prn}:textField-long ";
   }
 
   my $allcs = join ",", @allc;
@@ -1239,6 +1261,7 @@ sub Initialize {
                                 "setupBatteryDev:textField-long ".
                                 "setupRadiationAPI ".
                                 "setupStringPeak ".
+                                $setupprod.
                                 $consumer.
                                 $readingFnAttributes;
 
@@ -2027,7 +2050,6 @@ sub _setreset {                          ## no critic "not used"
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no source specified for reset};
   my $type  = $paref->{type};
-  
   my $hash  = $defs{$name};
 
   if ($prop eq 'pvHistory') {
@@ -5459,6 +5481,72 @@ return;
 }
 
 ################################################################
+#                      Attr setupOtherProducer
+################################################################
+sub _attrOtherProducer {                 ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $aName = $paref->{aName};
+  my $type  = $paref->{type};
+
+  return if(!$init_done);
+  
+  my $hash = $defs{$name};
+  my $prn  = (split 'Producer', $aName)[1];
+
+  if ($paref->{cmd} eq 'set') {
+      my ($err, $dev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
+      return $err if($err);
+
+      if (!$h->{pcurr} || !$h->{etotal}) {
+          return qq{The syntax of '$aName' is not correct. Please consider the commandref.};
+      }
+  }
+  elsif ($paref->{cmd} eq 'del') {
+      $paref->{prn} = $prn;
+      __delProducerValues ($paref);
+      delete $paref->{prn};
+  }
+
+  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+
+return;
+}
+
+################################################################   
+#    löschen Werte eines Producers aus Speicherhashes              
+################################################################
+sub __delProducerValues {                         
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $prn   = $paref->{prn} // return 'The producer number is empty';      # Producernummer (01, 02, 03)
+  my $type  = $paref->{type};
+  my $hash  = $defs{$name};
+
+  deleteReadingspec ($hash, ".*_PPreal".$prn);
+  readingsDelete    ($hash, 'Current_PP'.$prn);
+  delete $data{$type}{$name}{current}{'generationp'.$prn};
+  delete $data{$type}{$name}{current}{'etotalp'.$prn};
+  
+  for my $hod (keys %{$data{$type}{$name}{circular}}) {
+      delete $data{$type}{$name}{circular}{$hod}{'pprl'.$prn};
+  }
+  
+  for my $dy (sort keys %{$data{$type}{$name}{pvhist}}) {
+      for my $hr (sort keys %{$data{$type}{$name}{pvhist}{$dy}}) {
+          delete $data{$type}{$name}{pvhist}{$dy}{$hr}{'pprl'.$prn};
+          delete $data{$type}{$name}{pvhist}{$dy}{$hr}{'etotalp'.$prn};
+      }
+  }
+
+  Log3 ($name, 3, qq{$name - all stored data from producer $prn has been deleted});
+
+return;
+}
+
+################################################################
 #                      Attr setupInverterDev
 ################################################################
 sub _attrInverterDev {                   ## no critic "not used"
@@ -6593,6 +6681,7 @@ sub centralTask {
   _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen
   _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
   _transferInverterValues     ($centpars);                                            # WR Werte übertragen
+  _transferProducerValues     ($centpars);                                            # Werte anderer Erzeuger übertragen
   _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
   _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
@@ -7125,8 +7214,7 @@ sub _specialActivities {
           $gcon = ReadingsNum ($name, "Today_Hour24_GridConsumption", 0);
           storeReading ('LastHourGridconsumptionReal', "$gcon Wh", $ts);
 
-          deleteReadingspec ($hash, '(Today_Hour(.*_Grid.*|.*_PV.*|.*_Bat.*)|powerTrigger_.*|Today_MaxPVforecast.*)');
-
+          deleteReadingspec ($hash, '(Today_Hour(.*_Grid.*|.*_PV.*|.*_PPreal.*|.*_Bat.*)|powerTrigger_.*|Today_MaxPVforecast.*)');
           readingsDelete    ($hash, 'Today_PVdeviation');
           readingsDelete    ($hash, 'Today_PVreal');
 
@@ -8232,6 +8320,83 @@ sub _transferInverterValues {
 
   writeToHistory ( { paref => $paref, key => 'pvrl', val => $ethishour, hour => $nhour, valid => $aln } );       # valid=1: beim Learning berücksichtigen, 0: nicht
 
+return;
+}
+
+################################################################
+#    Werte anderer Erzeuger ermitteln und übertragen
+################################################################
+sub _transferProducerValues {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};                                                                    # aktuelle Unix-Zeit
+  my $chour = $paref->{chour};
+  my $day   = $paref->{day};
+  
+  my $hash  = $defs{$name};
+  
+  for my $prn (1..$maxproducer) {
+      $prn = sprintf "%02d", $prn;
+      my ($err, $prdev, $h) = isDeviceValid ( { name => $name, obj => 'setupOtherProducer'.$prn, method => 'attr' } );
+      next if($err);
+
+      my $type = $paref->{type};
+
+      my ($pcread, $pcunit) = split ":", $h->{pcurr};                                                         # Readingname/Unit für aktuelle Erzeugung
+      my ($edread, $etunit) = split ":", $h->{etotal};                                                        # Readingname/Unit für Energie total (Erzeugung)
+
+      next if(!$pcread || !$edread);
+
+      my $pu = $pcunit =~ /^kW$/xi ? 1000 : 1;
+      my $p  = ReadingsNum ($prdev, $pcread, 0) * $pu;                                                        # aktuelle Erzeugung (W)
+      $p     = $p < 0 ? 0 : sprintf("%.0f", $p);                                              
+
+      storeReading ('Current_PP'.$prn, $p.' W');
+      $data{$type}{$name}{current}{'generationp'.$prn} = $p;                               
+
+      my $etu    = $etunit =~ /^kWh$/xi ? 1000 : 1;
+      my $etotal = ReadingsNum ($prdev, $edread, 0) * $etu;                                                   # Erzeugung total (Wh)
+
+      debugLog ($paref, "collectData", "collect Producer$prn data - device: $prdev =>");
+      debugLog ($paref, "collectData", "pcurr: $p W, etotalp$prn: $etotal Wh");
+
+      my $nhour    = $chour + 1;
+      my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'etotalp'.$prn, 0);                     # etotal zu Beginn einer Stunde
+      my $warn     = '';
+      my ($ethishour, $etotsvd);
+
+      if (!$histetot) {                                                                                       # etotal der aktuelle Stunde gesetzt ?
+          writeToHistory ( { paref => $paref, key => 'etotalp'.$prn, val => $etotal, hour => $nhour } );
+
+          $etotsvd   = CurrentVal ($hash, 'etotalp'.$prn, $etotal);
+          $ethishour = int ($etotal - $etotsvd);
+      }
+      else {
+          $ethishour = int ($etotal - $histetot);
+      }
+
+      $data{$type}{$name}{current}{'etotalp'.$prn} = $etotal;                                                # aktuellen etotal des WR speichern
+
+      if ($ethishour < 0) {
+          $ethishour = 0;
+          my $vl     = 3;
+          my $pre    = '- WARNING -';
+
+          if ($paref->{debug} =~ /collectData/xs) {                                                 
+              $vl  = 1;
+              $pre = 'DEBUG> - WARNING -';
+          }
+
+          Log3 ($name, $vl, "$name $pre The Total Energy of Producer$prn '$prdev' is lower than the value saved before. This situation is unexpected and the Energy generated of current hour is set to '0'.");
+          $warn = ' (WARNING $prdev invalid real produced energy occured - see Logfile)';
+      }
+
+      storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PPreal'.$prn, $ethishour.' Wh'.$warn);
+      $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{'pprl'.$prn} = $ethishour;                        # Ringspeicher P real 
+
+      writeToHistory ( { paref => $paref, key => 'pprl'.$prn, val => $ethishour, hour => $nhour } );       
+  }
+  
 return;
 }
 
@@ -10599,15 +10764,15 @@ sub _estConsumptionForecast {
           next if($m eq $day);                                                                      # next wenn gleicher Tag (Datum) wie heute
 
           if ($swdfcfc) {                                                                           # nur gleiche Tage (Mo...So) einbeziehen
-              my $hdn = HistoryVal ($hash, $m, 99, "dayname", undef);
+              my $hdn = HistoryVal ($hash, $m, 99, 'dayname', undef);
               next if(!$hdn || $hdn ne $nhday);
           }
 
-          my $hcon = HistoryVal ($hash, $m, $nhhr, "con", 0);                                       # historische Verbrauchswerte
+          my $hcon = HistoryVal ($hash, $m, $nhhr, 'con', 0);                                       # historische Verbrauchswerte
           next if(!$hcon);
           
           if ($hcon < 0) {                                                                           # V1.32.0
-              $hcon   = 0;
+              #$hcon   = 0;
               my $vl  = 3;
               my $pre = '- WARNING -';
 
@@ -10616,7 +10781,7 @@ sub _estConsumptionForecast {
                   $pre = 'DEBUG> - WARNING -';
               }
 
-              Log3 ($name, $vl, "$name $pre The stored Energy consumption of day/hour $m/$nhhr is negative. This appears to be an error and this hour is taken into account in the consumption forecast with value '0'.");
+              Log3 ($name, $vl, "$name $pre The stored Energy consumption of day/hour $m/$nhhr is negative. This appears to be an error. The incorrect value can be deleted with 'set $name reset consumption $m $nhhr'.");
           }     
 
           for my $c (sort{$a<=>$b} keys %{$acref}) {                                                # historischen Verbrauch aller registrierten Verbraucher aufaddieren
@@ -11152,20 +11317,25 @@ return ($val1,$val2);
 #     Energieverbrauch des Hauses in History speichern
 ################################################################
 sub saveEnergyConsumption {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $chour = $paref->{chour};
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $chour  = $paref->{chour};
 
-  my $shr     = $chour + 1;
-  my $pvrl    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_PVreal",          0);
-  my $gfeedin = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_GridFeedIn",      0);
-  my $gcon    = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_GridConsumption", 0);
-  my $batin   = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_BatIn",           0);
-  my $batout  = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$shr)."_BatOut",          0);
+  my $shr     = sprintf "%02d", ($chour + 1);
+  my $pvrl    = ReadingsNum ($name, "Today_Hour".$shr."_PVreal",          0);
+  my $gfeedin = ReadingsNum ($name, "Today_Hour".$shr."_GridFeedIn",      0);
+  my $gcon    = ReadingsNum ($name, "Today_Hour".$shr."_GridConsumption", 0);
+  my $batin   = ReadingsNum ($name, "Today_Hour".$shr."_BatIn",           0);
+  my $batout  = ReadingsNum ($name, "Today_Hour".$shr."_BatOut",          0);
+  
   my $con     = $pvrl - $gfeedin + $gcon - $batin + $batout;
   
-  if ($con < 0) {                                                                             # V1.32.0
-      $con    = 0;
+  for my $prn (1..$maxproducer) {                                         # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
+      $prn  = sprintf "%02d", $prn;
+      $con += ReadingsNum ($name, "Today_Hour".$shr."_PPreal".$prn, 0);
+  }
+      
+  if (int $paref->{minute} > 30 && $con < 0) {                            # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
       my $vl  = 3;
       my $pre = '- WARNING -';
 
@@ -11174,7 +11344,7 @@ sub saveEnergyConsumption {
           $pre = 'DEBUG> - WARNING -';
       }
 
-      Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error and the energy consumption for the current hour is set to '0'.");
+      Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error. Check Readings _PVreal, _GridFeedIn, _GridConsumption, _BatIn, _BatOut of hour >$shr<");
   }
 
   writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $shr } );
@@ -11712,15 +11882,6 @@ sub _checkSetupNotComplete {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################  
-  my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                         # 16.06.2024
-  if ($dir) {
-      readingsSingleUpdate ($hash, 'setupStringAzimuth', $dir, 0);
-  }
-  
-  my $dec = ReadingsVal ($name, 'moduleDeclination', '');                         # 16.06.2024
-  if ($dec) {
-      readingsSingleUpdate ($hash, 'setupStringDeclination', $dec, 0);
-  }
   
   ##########################################################################################
 
@@ -14998,7 +15159,13 @@ sub listDataPool {
           my $don     = HistoryVal ($hash, $day, $key, 'DoN',         '-');
           my $conprc  = HistoryVal ($hash, $day, $key, 'conprice',    '-');
           my $feedprc = HistoryVal ($hash, $day, $key, 'feedprice',   '-');
-
+          my $etotp01 = HistoryVal ($hash, $day, $key, 'etotalp01',   '-');
+          my $etotp02 = HistoryVal ($hash, $day, $key, 'etotalp02',   '-');
+          my $etotp03 = HistoryVal ($hash, $day, $key, 'etotalp03',   '-');
+          my $pprl01  = HistoryVal ($hash, $day, $key, 'pprl01',      '-');
+          my $pprl02  = HistoryVal ($hash, $day, $key, 'pprl02',      '-');
+          my $pprl03  = HistoryVal ($hash, $day, $key, 'pprl03',      '-');
+          
           if ($export eq 'csv') {
               $hexp->{$day}{$key}{PVreal}             = $pvrl;
               $hexp->{$day}{$key}{PVrealValid}        = $pvrlvd;
@@ -15027,28 +15194,44 @@ sub listDataPool {
               $hexp->{$day}{$key}{DayOrNight}         = $don;
               $hexp->{$day}{$key}{PurchasePrice}      = $conprc;
               $hexp->{$day}{$key}{FeedInPrice}        = $feedprc;
+              $hexp->{$day}{$key}{etotalp01}          = $etotp01;
+              $hexp->{$day}{$key}{etotalp02}          = $etotp02;
+              $hexp->{$day}{$key}{etotalp03}          = $etotp03;
+              $hexp->{$day}{$key}{pprl01}             = $pprl01;
+              $hexp->{$day}{$key}{pprl02}             = $pprl02;
+              $hexp->{$day}{$key}{pprl03}             = $pprl03;
           }
 
           $ret .= "\n      " if($ret);
           $ret .= $key." => ";
-          $ret .= "etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
+          $ret .= "etotal: $etotal, " if($key ne '99');
+          $ret .= "pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
           $ret .= "\n            ";
+          $ret .= "etotalp01: $etotp01, etotalp02: $etotp02, etotalp03: $etotp03" if($key ne '99');
+          $ret .= "\n            "    if($key ne '99');
+          $ret .= "pprl01: $pprl01, pprl02: $pprl02, pprl03: $pprl03";
+          $ret .= "\n            ";             
           $ret .= "confc: $confc, con: $con, gcons: $gcons, conprice: $conprc";
           $ret .= "\n            ";
           $ret .= "gfeedin: $gfeedin, feedprice: $feedprc";
           $ret .= "\n            ";
           $ret .= "DoN: $don, sunaz: $sunaz, sunalt: $sunalt";
           $ret .= "\n            ";
-          $ret .= "batintotal: $btotin, batin: $batin, batouttotal: $btotout, batout: $batout";
-          $ret .= "\n            " if($key eq '99');
-          $ret .= "batmaxsoc: $batmsoc, batsetsoc: $batssoc" if($key eq '99');
+          $ret .= "batintotal: $btotin, batouttotal: $btotout, " if($key ne '99');
+          $ret .= "batin: $batin, batout: $batout";
+          $ret .= "\n            "    if($key eq '99');
+          $ret .= "batmaxsoc: $batmsoc, batsetsoc: $batssoc"     if($key eq '99');
           $ret .= "\n            ";
-          $ret .= "wid: $wid";
-          $ret .= ", wcc: $wcc";
-          $ret .= ", rr1c: $rr1c";
-          $ret .= ", temp: $temp"       if($temp);
-          $ret .= ", pvcorrf: $pvcorrf";
-          $ret .= ", dayname: $dayname" if($dayname);
+          
+          if ($key ne '99') {
+              $ret .= "wid: $wid, ";
+              $ret .= "wcc: $wcc, ";
+              $ret .= "rr1c: $rr1c, ";
+              $ret .= "pvcorrf: $pvcorrf";
+          }
+          
+          $ret .= "temp: $temp, "       if($temp);
+          $ret .= "dayname: $dayname, " if($dayname);
 
           my $csm;
           for my $c (1..$maxconsumer) {
@@ -15193,31 +15376,34 @@ sub listDataPool {
           my $confc    = CircularVal ($hash, $idx, 'confc',               '-');
           my $gcons    = CircularVal ($hash, $idx, 'gcons',               '-');
           my $gfeedin  = CircularVal ($hash, $idx, 'gfeedin',             '-');
-          my $wid      = CircularVal ($hash, $idx, "weatherid",           '-');
-          my $wtxt     = CircularVal ($hash, $idx, "weathertxt",          '-');
-          my $wccv     = CircularVal ($hash, $idx, "wcc",                 '-');
-          my $rr1c     = CircularVal ($hash, $idx, "rr1c",                '-');
-          my $temp     = CircularVal ($hash, $idx, "temp",                '-');
-          my $pvcorrf  = CircularVal ($hash, $idx, "pvcorrf",             '-');
-          my $quality  = CircularVal ($hash, $idx, "quality",             '-');
-          my $batin    = CircularVal ($hash, $idx, "batin",               '-');
-          my $batout   = CircularVal ($hash, $idx, "batout",              '-');
-          my $tdayDvtn = CircularVal ($hash, $idx, "tdayDvtn",            '-');
-          my $ydayDvtn = CircularVal ($hash, $idx, "ydayDvtn",            '-');
+          my $wid      = CircularVal ($hash, $idx, 'weatherid',           '-');
+          my $wtxt     = CircularVal ($hash, $idx, 'weathertxt',          '-');
+          my $wccv     = CircularVal ($hash, $idx, 'wcc',                 '-');
+          my $rr1c     = CircularVal ($hash, $idx, 'rr1c',                '-');
+          my $temp     = CircularVal ($hash, $idx, 'temp',                '-');
+          my $pvcorrf  = CircularVal ($hash, $idx, 'pvcorrf',             '-');
+          my $quality  = CircularVal ($hash, $idx, 'quality',             '-');
+          my $batin    = CircularVal ($hash, $idx, 'batin',               '-');
+          my $batout   = CircularVal ($hash, $idx, 'batout',              '-');
+          my $tdayDvtn = CircularVal ($hash, $idx, 'tdayDvtn',            '-');
+          my $ydayDvtn = CircularVal ($hash, $idx, 'ydayDvtn',            '-');
           my $ltsmsr   = CircularVal ($hash, $idx, 'lastTsMaxSocRchd',    '-');
           my $ntsmsc   = CircularVal ($hash, $idx, 'nextTsMaxSocChge',    '-');
           my $dtocare  = CircularVal ($hash, $idx, 'days2care',           '-');
-          my $fitot    = CircularVal ($hash, $idx, "feedintotal",         '-');
-          my $idfi     = CircularVal ($hash, $idx, "initdayfeedin",       '-');
-          my $gcontot  = CircularVal ($hash, $idx, "gridcontotal",        '-');
-          my $idgcon   = CircularVal ($hash, $idx, "initdaygcon",         '-');
-          my $idbitot  = CircularVal ($hash, $idx, "initdaybatintot",     '-');
-          my $bitot    = CircularVal ($hash, $idx, "batintot",            '-');
-          my $idbotot  = CircularVal ($hash, $idx, "initdaybatouttot",    '-');
-          my $botot    = CircularVal ($hash, $idx, "batouttot",           '-');
-          my $rtaitr   = CircularVal ($hash, $idx, "runTimeTrainAI",      '-');
-          my $fsaitr   = CircularVal ($hash, $idx, "aitrainLastFinishTs", '-');
-          my $aicts    = CircularVal ($hash, $idx, "attrInvChangedTs",    '-');
+          my $fitot    = CircularVal ($hash, $idx, 'feedintotal',         '-');
+          my $idfi     = CircularVal ($hash, $idx, 'initdayfeedin',       '-');
+          my $gcontot  = CircularVal ($hash, $idx, 'gridcontotal',        '-');
+          my $idgcon   = CircularVal ($hash, $idx, 'initdaygcon',         '-');
+          my $idbitot  = CircularVal ($hash, $idx, 'initdaybatintot',     '-');
+          my $bitot    = CircularVal ($hash, $idx, 'batintot',            '-');
+          my $idbotot  = CircularVal ($hash, $idx, 'initdaybatouttot',    '-');
+          my $botot    = CircularVal ($hash, $idx, 'batouttot',           '-');
+          my $rtaitr   = CircularVal ($hash, $idx, 'runTimeTrainAI',      '-');
+          my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
+          my $aicts    = CircularVal ($hash, $idx, 'attrInvChangedTs',    '-');
+          my $pprl01   = CircularVal ($hash, $idx, 'pprl01',              '-');
+          my $pprl02   = CircularVal ($hash, $idx, 'pprl02',              '-');
+          my $pprl03   = CircularVal ($hash, $idx, 'pprl03',              '-');
 
           my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
           my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
@@ -15231,6 +15417,7 @@ sub listDataPool {
               $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl\n";
               $sq .= "      batin: $batin, batout: $batout, confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c\n";
               $sq .= "      temp: $temp, wid: $wid, wtxt: $wtxt\n";
+              $sq .= "      pprl01: $pprl01, pprl02: $pprl02, pprl03: $pprl03\n";
               $sq .= "      pvcorrf: $pvcf\n";
               $sq .= "      quality: $cfq\n";
               $sq .= "      pvrlsum: $pvrs\n";
@@ -16422,7 +16609,7 @@ sub createAssociatedWith {
       my $badev = AttrVal ($name, 'setupBatteryDev', '');                    # Battery Device
       ($aba,$h) = parseParams ($badev);
       $badev    = $aba->[0] // "";
-
+      
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {     # Consumer Devices
           my $consumer = AttrVal ($name, "consumer${c}", "");
           my ($ac,$hc) = parseParams ($consumer);
@@ -16441,6 +16628,13 @@ sub createAssociatedWith {
       push @nd, $indev;
       push @nd, $medev;
       push @nd, $badev;
+      
+      for my $prn (1..$maxproducer) {
+          $prn      = sprintf "%02d", $prn;
+          my $pdc   = AttrVal ($name, "setupOtherProducer${prn}", "");
+          my ($prd) = parseParams ($pdc);
+          push @nd, $prd->[0] if($prd->[0]);        
+      }
 
       my @ndn = ();
 
@@ -19076,12 +19270,14 @@ to ensure that the system configuration is correct.
             <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)                             </td></tr>
             <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
             <tr><td> <b>DoN</b>            </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                                           </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>total energy yield (Wh) at the beginning of the hour                                                                     </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>PV meter reading “Total energy yield” (Wh) at the beginning of the hour                                                  </td></tr>
+            <tr><td> <b>etotalpXX</b>      </td><td>Meter reading “Total energy yield” (Wh) of producer XX at the beginning of the hour                                      </td></tr>
             <tr><td> <b>gcons</b>          </td><td>real power consumption (Wh) from the electricity grid                                                                    </td></tr>
             <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
             <tr><td> <b>feedprice</b>      </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the setupMeterDev.                      </td></tr>
             <tr><td> <b>hourscsmeXX</b>    </td><td>total active hours of the day from ConsumerXX                                                                            </td></tr>
             <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                                           </td></tr>
+            <tr><td> <b>pprlXX</b>         </td><td>Energy generation of producer XX (see attribute setupOtherProducerXX) in the hour (Wh)                                   </td></tr>
             <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                                              </td></tr>
             <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                                                  </td></tr>
             <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as abnormal                    </td></tr>
@@ -19138,6 +19334,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvfcsum</b>             </td><td>summary PV forecast per cloud area over the entire term                                                               </td></tr>
             <tr><td> <b>pvrl</b>                </td><td>real PV generation of the last 24h (Attention: pvforecast and pvreal do not refer to the same period!)                </td></tr>
             <tr><td> <b>pvrlsum</b>             </td><td>summary real PV generation per cloud area over the entire term                                                        </td></tr>
+            <tr><td> <b>pprlXX</b>              </td><td>Energy generation of producer XX (see attribute setupOtherProducerXX) in the last 24 hours (Wh)                       </td></tr>
             <tr><td> <b>quality</b>             </td><td>Quality of the autocorrection factors (0..1), where 'simple' is the quality of the simple correction factor.          </td></tr>
             <tr><td> <b>runTimeTrainAI</b>      </td><td>Duration of the last AI training                                                                                      </td></tr>
             <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp of the last successful AI training                                                                          </td></tr>
@@ -20380,7 +20577,7 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation                                         </td></tr>
+           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                     </td></tr>
            <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).    </td></tr>
            <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,              </td></tr>
            <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.    </td></tr>
@@ -21367,13 +21564,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im setupMeterDev definiert.             </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                      </td></tr>
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                               </td></tr>
-            <tr><td> <b>etotal</b>          </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                                                    </td></tr>
+            <tr><td> <b>etotal</b>          </td><td>PV Zählerstand "Energieertrag total" (Wh) zu Beginn der Stunde                                     </td></tr>
+            <tr><td> <b>etotalpXX</b>       </td><td>Zählerstand "Energieertrag total" (Wh) des Produzenten XX zu Beginn der Stunde                     </td></tr>
             <tr><td> <b>gcons</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                       </td></tr>
             <tr><td> <b>gfeedin</b>         </td><td>reale Einspeisung (Wh) in das Stromnetz                                                            </td></tr>
             <tr><td> <b>feedprice</b>       </td><td>Vergütung für die Einpeisung einer kWh. Die Währung des Preises ist im setupMeterDev definiert.    </td></tr>
             <tr><td> <b>avgcycmntscsmXX</b> </td><td>durchschnittliche Dauer eines Einschaltzyklus des Tages von ConsumerXX in Minuten                  </td></tr>
             <tr><td> <b>hourscsmeXX</b>     </td><td>Summe Aktivstunden des Tages von ConsumerXX                                                        </td></tr>
             <tr><td> <b>minutescsmXX</b>    </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                    </td></tr>
+            <tr><td> <b>pprlXX</b>          </td><td>Energieerzeugung des Produzenten XX (siehe Attribut setupOtherProducerXX) in der Stunde (Wh)       </td></tr>
             <tr><td> <b>pvfc</b>            </td><td>der prognostizierte PV Ertrag (Wh)                                                                 </td></tr>
             <tr><td> <b>pvrl</b>            </td><td>reale PV Erzeugung (Wh)                                                                            </td></tr>
             <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet     </td></tr>
@@ -21431,6 +21630,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvfcsum</b>             </td><td>Summe PV Prognose pro Bewölkungsbereich über die gesamte Laufzeit                                                         </td></tr>
             <tr><td> <b>pvrl</b>                </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>
             <tr><td> <b>pvrlsum</b>             </td><td>Summe reale PV Erzeugung pro Bewölkungsbereich über die gesamte Laufzeit                                                  </td></tr>
+            <tr><td> <b>pprlXX</b>              </td><td>Energieerzeugung des Produzenten XX (siehe Attribut setupOtherProducerXX) der letzten 24 Stunden (Wh)                     </td></tr>
             <tr><td> <b>quality</b>             </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei 'simple' die Qualität des einfach berechneten Korrekturfaktors ist.      </td></tr>
             <tr><td> <b>runTimeTrainAI</b>      </td><td>Laufzeit des letzten KI Trainings                                                                                         </td></tr>
             <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp des letzten erfolgreichen KI Trainings                                                                          </td></tr>
@@ -22671,10 +22871,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung liefert                                            </td></tr>
+           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                         </td></tr>
            <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)    </td></tr>
            <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
-           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch eine Logmeldung.     </td></tr>
+           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.    </td></tr>
            <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
            <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt  </td></tr>
            <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                            </td></tr>
@@ -22763,6 +22963,36 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
       </li>
       <br>
+      
+       <a id="SolarForecast-attr-setupOtherProducer" data-pattern="setupOtherProducer.*"></a>
+       <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt;  </b> <br><br>
+
+       Legt ein beliebiges Device und dessen Readings zur Lieferung sonstiger Erzeugungswerte fest 
+	   (z.B. BHKW, Winderzeugung, Notstromaggregat). 
+       Es kann auch ein Dummy Device mit entsprechenden Readings sein.
+       <br><br>
+
+       <ul>
+        <table>
+        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>pcurr</b>    </td><td>Reading welches die aktuelle Erzeugung als positiven Wert liefert                            </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte Energie liefert (ein stetig aufsteigender Zähler)       </td></tr>
+           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
+           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.    </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
+         </table>
+       </ul>
+       <br>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; setupOtherProducer01 windwheel p=total_pac:kW etotal=etotal:kWh
+       </ul>
+       <br>
+
+       <b>Hinweis:</b> Durch Löschen des Attributes werden ebenfalls die intern korrespondierenden Daten entfernt.
+       </li>
+       <br>
 
       <a id="SolarForecast-attr-setupRadiationAPI"></a>
       <li><b>setupRadiationAPI </b> <br><br>
