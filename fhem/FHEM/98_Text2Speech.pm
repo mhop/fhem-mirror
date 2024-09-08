@@ -1369,7 +1369,7 @@ sub Text2Speech_AddExtension(@) {
 }
 
 #########################
-sub Text2SpeechRemoveExtension(@) {
+sub Text2Speech_RemoveExtension(@) {
     my ($link) = @_;
     my $url  = "/$link";
     my $name = $::data{FWEXT}{$url}{deviceName};
