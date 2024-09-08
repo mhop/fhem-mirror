@@ -20682,11 +20682,11 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pcurr</b>    </td><td>Reading which returns the current generation as a positive value                                  </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading which supplies the total energy generated (a continuously ascending counter)              </td></tr>
-           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                       </td></tr>
-           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation that has occurred with a log entry.    </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                 </td></tr>
+           <tr><td> <b>pcurr</b>    </td><td>Reading which returns the current generation as a positive value or a self-consumption (special case) as a negative value  </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading which supplies the total energy generated (a continuously ascending counter)                                       </td></tr>
+           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                                                </td></tr>
+           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation that has occurred with a log entry.                             </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                                          </td></tr>
          </table>
        </ul>
        <br>
@@ -23006,11 +23006,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>pcurr</b>    </td><td>Reading welches die aktuelle Erzeugung als positiven Wert liefert                            </td></tr>
-          <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte Energie liefert (ein stetig aufsteigender Zähler)       </td></tr>
-          <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
-          <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.    </td></tr>
-          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
+          <tr><td> <b>pcurr</b>    </td><td>Reading welches die aktuelle Erzeugung als positiven Wert oder einen Eigenverbrauch (Sonderfall) als negativen Wert liefert  </td></tr>
+          <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte Energie liefert (ein stetig aufsteigender Zähler)                                       </td></tr>
+          <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                                       </td></tr>
+          <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                                    </td></tr>
+          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                          </td></tr>
         </table>
       </ul>
       <br>
