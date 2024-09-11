@@ -104,6 +104,7 @@
 # 6.00.2    fix: reading ble (bluetooth) may be set to disabled
 # 6.00.3    fix: use Sub::Util added
 # 6.00.4    fix: removed the use of Sub::Util
+# 6.00.5    fix: removed irrelevant log-entries for dimmer
 
 # to do     roller: get maxtime open/close from shelly
 #           get status on stopp even when interval == 0
@@ -126,7 +127,7 @@ sub Log($$);
 sub Shelly_Set ($@);
 
 #-- globals on start
-my $version = "6.00.4 06.09.2024";
+my $version = "6.00.5 11.09.2024";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -134,7 +135,7 @@ my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
 my %shelly_firmware = (  # latest known versions  # as of 14.08.2024
     "gen1"        => "v1.14.0",
     "shelly4"     => "v1.6.6",
-    "gen2"        => "v1.4.0",
+    "gen2"        => "v1.3.3",
     "walldisplay" => "v2.1.0"
     );
 
@@ -5358,6 +5359,7 @@ sub Shelly_response {
         my $msg = "Successfull, device $name was $oldState ";
         $msg .= ", device switched with timer of $onofftimer seconds" if( $onofftimer );
         Log3 $name,4,"[Shelly_response:onoff] $msg";
+      }elsif( defined($jhash->{cover}) && $jhash->{cover} eq "successfull" ){  # skip this here
       }else{
         my $ison        = $jhash->{ison};
         my $hastimer    = undef;
