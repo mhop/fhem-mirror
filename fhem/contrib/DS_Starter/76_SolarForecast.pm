@@ -13817,7 +13817,7 @@ sub _flowGraphic {
 
   my $cgc_direction = 'M490,305 L670,510';                                                     # Batterientladung ins Netz
 
-  if($batout) {
+  if ($batout) {
       my $cgfo = $cgfi - $cpv;
 
       if($cgfo > 1) {
@@ -13909,7 +13909,7 @@ END0
   my @consumers;
 
   if ($flowgcons) {
-      my $type       = $paref->{type};
+      my $type = $paref->{type};
 
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {                            # definierte Verbraucher ermitteln
           next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                                      # ausgeblendete Consumer nicht berücksichtigen
@@ -14014,7 +14014,6 @@ END3
 
           my $p              = $currentPower;
           $p                 = (($currentPower / $power) * 100) if ($power > 0);
-
           my $consumer_style = 'flowg inactive_out';
           $consumer_style    = 'flowg active_out' if($p > $defpopercent);
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
