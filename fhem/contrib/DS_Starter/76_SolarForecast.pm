@@ -9054,11 +9054,18 @@ sub _createSummaries {
   my $batin   = CurrentVal ($hash, "powerbatin",              0);                                       # aktuelle Batterieladung
   my $batout  = CurrentVal ($hash, "powerbatout",             0);                                       # aktuelle Batterieentladung
 
-  my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
+  my $othprod = 0;                                                                                      # Summe Otherproducer
+  
+  for my $prn (1..$maxproducer) {                                                                       # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
+      $prn      = sprintf "%02d", $prn;
+      $othprod += CurrentVal ($hash, 'generationp'.$prn, 0);
+  }
+  
+  my $consumption         = int ($pvgen + $othprod - $gfeedin + $gcon - $batin + $batout);
   my $selfconsumption     = int ($pvgen - $gfeedin - $batin);
   $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
 
-  my $surplus             = int ($pvgen - $consumption);                                                # aktueller Überschuß
+  my $surplus             = int ($pvgen + $othprod - $consumption);                                     # aktueller Überschuß
   $surplus                = 0 if($surplus < 0);                                                         # wegen Vergleich nompower vs. surplus
 
   my $selfconsumptionrate = 0;
@@ -13779,6 +13786,9 @@ sub _flowGraphic {
   my $cgfi       = ReadingsNum ($name, 'Current_GridFeedIn',      0);
   my $csc        = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
+  my $gp01       = CurrentVal  ($hash, 'generationp01',           0);
+  my $gp02       = CurrentVal  ($hash, 'generationp02',           0);
+  my $gp03       = CurrentVal  ($hash, 'generationp03',           0);
   my $cc_dummy   = $cc;
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
@@ -19216,7 +19226,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="10%"> <col width="90%"> </colgroup>
             <tr><td> <b>aihit</b>     </td><td>delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)       </td></tr>
             <tr><td> <b>confc</b>     </td><td>expected energy consumption including the shares of registered consumers        </td></tr>
-            <tr><td> <b>confcEx</b>   </td><td>expected energy consumption without the shares of registered consumers          </td></tr>
+            <tr><td> <b>confcEx</b>   </td><td>expected energy consumption without consumer shares with set key exconfc=1      </td></tr>
             <tr><td> <b>crange</b>    </td><td>calculated cloud area                                                           </td></tr>
             <tr><td> <b>correff</b>   </td><td>correction factor/quality used                                                  </td></tr>
             <tr><td>                  </td><td>factor/- -> no quality defined                                                  </td></tr>
@@ -21538,28 +21548,28 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-            <tr><td> <b>aihit</b>     </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)         </td></tr>
-            <tr><td> <b>confc</b>     </td><td>erwarteter Energieverbrauch inklusive der Anteile registrierter Verbraucher        </td></tr>
-            <tr><td> <b>confcEx</b>   </td><td>erwarteter Energieverbrauch ohne der Anteile registrierter Verbraucher             </td></tr>
-            <tr><td> <b>crange</b>    </td><td>berechneter Bewölkungsbereich                                                      </td></tr>
-            <tr><td> <b>correff</b>   </td><td>verwendeter Korrekturfaktor/Qualität                                               </td></tr>
-            <tr><td>                  </td><td>Faktor/- -> keine Qualität definiert                                               </td></tr>
-            <tr><td>                  </td><td>Faktor/0..1 - Qualität der PV Prognose (1 = beste Qualität)                        </td></tr>
-            <tr><td> <b>DoN</b>       </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                               </td></tr>
-            <tr><td> <b>hourofday</b> </td><td>laufende Stunde des Tages                                                          </td></tr>
-            <tr><td> <b>pvapifc</b>   </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur  </td></tr>
-            <tr><td> <b>pvaifc</b>    </td><td>erwartete PV Erzeugung der KI (Wh)                                                 </td></tr>
-            <tr><td> <b>pvfc</b>      </td><td>verwendete PV Erzeugungsprognose (Wh)                                              </td></tr>
-            <tr><td> <b>rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
-            <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                          </td></tr>
-            <tr><td> <b>sunaz</b>     </td><td>Azimuth der Sonne (in Dezimalgrad)                                                 </td></tr>
-            <tr><td> <b>sunalt</b>    </td><td>Höhe der Sonne (in Dezimalgrad)                                                    </td></tr>
-            <tr><td> <b>temp</b>      </td><td>vorhergesagte Außentemperatur                                                      </td></tr>
-            <tr><td> <b>today</b>     </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                      </td></tr>
-            <tr><td> <b>rr1c</b>      </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                     </td></tr>
-            <tr><td> <b>rrange</b>    </td><td>Bereich des Gesamtniederschlags                                                    </td></tr>
-            <tr><td> <b>wid</b>       </td><td>ID des vorhergesagten Wetters                                                      </td></tr>
-            <tr><td> <b>wcc</b>       </td><td>vorhergesagter Grad der Bewölkung                                                  </td></tr>
+            <tr><td> <b>aihit</b>     </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)               </td></tr>
+            <tr><td> <b>confc</b>     </td><td>erwarteter Energieverbrauch inklusive der Anteile registrierter Verbraucher              </td></tr>
+            <tr><td> <b>confcEx</b>   </td><td>erwarteter Energieverbrauch ohne Anteile Verbraucher mit gesetztem Schlüssel exconfc=1   </td></tr>
+            <tr><td> <b>crange</b>    </td><td>berechneter Bewölkungsbereich                                                            </td></tr>
+            <tr><td> <b>correff</b>   </td><td>verwendeter Korrekturfaktor/Qualität                                                     </td></tr>
+            <tr><td>                  </td><td>Faktor/- -> keine Qualität definiert                                                     </td></tr>
+            <tr><td>                  </td><td>Faktor/0..1 - Qualität der PV Prognose (1 = beste Qualität)                              </td></tr>
+            <tr><td> <b>DoN</b>       </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                     </td></tr>
+            <tr><td> <b>hourofday</b> </td><td>laufende Stunde des Tages                                                                </td></tr>
+            <tr><td> <b>pvapifc</b>   </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur        </td></tr>
+            <tr><td> <b>pvaifc</b>    </td><td>erwartete PV Erzeugung der KI (Wh)                                                       </td></tr>
+            <tr><td> <b>pvfc</b>      </td><td>verwendete PV Erzeugungsprognose (Wh)                                                    </td></tr>
+            <tr><td> <b>rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                            </td></tr>
+            <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                                </td></tr>
+            <tr><td> <b>sunaz</b>     </td><td>Azimuth der Sonne (in Dezimalgrad)                                                       </td></tr>
+            <tr><td> <b>sunalt</b>    </td><td>Höhe der Sonne (in Dezimalgrad)                                                          </td></tr>
+            <tr><td> <b>temp</b>      </td><td>vorhergesagte Außentemperatur                                                            </td></tr>
+            <tr><td> <b>today</b>     </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                            </td></tr>
+            <tr><td> <b>rr1c</b>      </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                           </td></tr>
+            <tr><td> <b>rrange</b>    </td><td>Bereich des Gesamtniederschlags                                                          </td></tr>
+            <tr><td> <b>wid</b>       </td><td>ID des vorhergesagten Wetters                                                            </td></tr>
+            <tr><td> <b>wcc</b>       </td><td>vorhergesagter Grad der Bewölkung                                                        </td></tr>
          </table>
       </ul>
       </li>
