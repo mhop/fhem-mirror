@@ -742,14 +742,29 @@ MQTT2_DEVICE_nlData($)
   #my $pref = "https://koenkk.github.io/zigbee2mqtt/images/devices/";
   my $pref = "https://www.zigbee2mqtt.io/images/devices/";
 
-  # Needed for the image links {
+  # Needed for the image links
   my $dv = ReadingsVal($d, ".devices", ReadingsVal($d, "devices", ""));
-  $dv =~ s@ieeeAddr":"([^"]+)"[^}]+model":"([^"]+)"@
+  if($dv =~ m/ieeeAddr":/) { # {
+    $dv =~ s@ieeeAddr":"([^"]+)"[^}]+model":"([^"]+)"@
             my $ieeeAddr = $1;
             my $img = $2;
             $img =~ s+[/: ]+-+g; # Forum #91394: supported-devices.js
             $img{$ieeeAddr} = "$img.jpg";
           @xeg;
+
+  } elsif($dv =~ m/^\[\{/) { #139205
+    my $h = json2nameValue($dv);
+    my $dm;
+    foreach my $key (sort keys %{$h}) {
+      $dm = urlEncode($h->{$key}).".jpg"
+        if($key =~ m/^\d+_definition_model$/);
+      if($key =~ m/^\d+_ieee_address$/ && $dm && $dm !~ m,%2F,) {
+        $img{$h->{$key}} = $dm;
+        $dm = "";
+      }
+    }
+
+  }
 
   # Name translation
   for my $n (devspec2array("TYPE=MQTT2_DEVICE")) {
@@ -763,7 +778,7 @@ MQTT2_DEVICE_nlData($)
     }
   }
 
-  my $div = ($FW_userAgent =~ m/WebKit/ ? "<br>" : " ");
+  my $div = ($FW_userAgent =~ m/WebKit/ ? "&#xA;" : " ");
   my $gv = ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", ""));
   $gv =~ s/\\n/\n/g; #126970
   $gv =~ s/\\"/"/g;
@@ -779,18 +794,23 @@ MQTT2_DEVICE_nlData($)
         my ($x1,$x2,$x3,$x4) = ($1,$2,$3,$4);
         $nv = $n2n{$x1} if($n2n{$x1});
         if($img{$n}) {
-          my $fn = $attr{global}{modpath}."/www/deviceimages/mqtt2/$img{$n}";
+          my $fn = $attr{global}{modpath}."/www/deviceimages/mqtt2/"
+                        . urlDecode($img{$n});
           if(!-f $fn) {      # Cache the picture
             my $url = "$pref/$img{$n}";
             Log 3, "MQTT2_DEVICE: downloading $url to $fn";
             my $data = GetFileFromURL($url);
             if($data && open(FH,">$fn")) {
               binmode(FH);
+              $data = "" if($data =~ m/<html/); # error page is html
               print FH $data;
               close(FH)
             }
+          } elsif(-z $fn) { # got error page for the request
+            $img{$n} = 0;
           }
-          $h{$n}{img} = "$FW_ME/deviceimages/mqtt2/$img{$n}";
+
+          $h{$n}{img} = "$FW_ME/deviceimages/mqtt2/$img{$n}" if($img{$n});
         }
         if($img{$n} && $n2n{$x1} && !AttrVal($n2n{$x1}, "imageLink", "")) {
           CommandAttr(undef, "$nv imageLink $h{$n}{img}");
