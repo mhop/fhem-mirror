@@ -156,7 +156,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.32.0" => "02.09.2024  new attr setupOtherProducerXX, report calculation and storage of negative consumption values ".
-                           "Forum: https://forum.fhem.de/index.php?msg=1319083 ",
+                           "Forum: https://forum.fhem.de/index.php?msg=1319083 ".
+                           "bugfix in _estConsumptionForecast, new ctrlDebug consumption_long ",
   "1.31.0" => "20.08.2024  rename attributes ctrlWeatherDevX to setupWeatherDevX ",
   "1.30.0" => "18.08.2024  new attribute flowGraphicShift, Forum:https://forum.fhem.de/index.php?msg=1318597 ",
   "1.29.4" => "03.08.2024  delete writeCacheToFile from _getRoofTopData, _specialActivities: avoid loop caused by \@widgetreadings ",
@@ -485,6 +486,17 @@ my $cssdef = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60p
              qq{.flowg.active_bat_in  { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
              qq{.flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
              ;
+             
+# initiale Hashes für Stunden Consumption Forecast inkl. und exkl. Verbraucher             
+my $conhfc = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
+               "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
+               "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
+             };
+
+my $conhfcex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
+                 "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
+                 "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
+               };
 
                                                                                   # mögliche Debug-Module
 my @dd = qw( aiProcess
@@ -495,6 +507,7 @@ my @dd = qw( aiProcess
              collectData
              consumerPlanning
              consumption
+             consumption_long
              dwdComm
              epiecesCalc
              graphic
@@ -10694,7 +10707,7 @@ sub _estConsumptionForecast {
   my $totcon   = 0;
   my $dnum     = 0;
 
-  debugLog ($paref, 'consumption', "################### Consumption forecast for the next day ###################");
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day ###################");
 
   for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
       next if ($n eq $day);                                                                             # aktuellen (unvollständigen) Tag nicht berücksichtigen
@@ -10707,7 +10720,7 @@ sub _estConsumptionForecast {
       my $dcon = HistoryVal ($hash, $n, 99, 'con', 0);
       
       if(!$dcon) {
-          debugLog ($paref, 'consumption', "Day >$n< has no registered consumption, ignore it.");
+          debugLog ($paref, 'consumption|consumption_long', "Day >$n< has no registered consumption, ignore it.");
           next;
       }
       
@@ -10717,11 +10730,11 @@ sub _estConsumptionForecast {
           
           if ($exconfc) {
               $dcon -= $csme;
-              debugLog ($paref, 'consumption', "Consumer '$c' values excluded from forecast calc by 'exconfc' - day: $n, csme: $csme");
+              debugLog ($paref, 'consumption|consumption_long', "Consumer '$c' values excluded from forecast calc by 'exconfc' - day: $n, csme: $csme");
           }
       }
       
-      debugLog ($paref, 'consumption', "History Consumption day >$n< considering possible exclusions: $dcon");
+      debugLog ($paref, 'consumption|consumption_long', "History Consumption day >$n< considering possible exclusions: $dcon");
       
       $totcon += $dcon;
       $dnum++;
@@ -10731,7 +10744,7 @@ sub _estConsumptionForecast {
        my $tomavg                                        = int ($totcon / $dnum);
        $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # prognostizierter Durchschnittsverbrauch aller (gleicher) Wochentage
 
-       debugLog ($paref, 'consumption', "estimated Consumption for tomorrow: $tomavg, days for avg: $dnum");
+       debugLog ($paref, 'consumption|consumption_long', "estimated Consumption for tomorrow: $tomavg, days for avg: $dnum");
   }
   else {
       my $lang = $paref->{lang};
@@ -10740,27 +10753,21 @@ sub _estConsumptionForecast {
 
   ## Verbrauchsvorhersage für die nächsten Stunden
   ##################################################
-  my $conh = { "01" => 0, "02" => 0, "03" => 0, "04" => 0,
-               "05" => 0, "06" => 0, "07" => 0, "08" => 0,
-               "09" => 0, "10" => 0, "11" => 0, "12" => 0,
-               "13" => 0, "14" => 0, "15" => 0, "16" => 0,
-               "17" => 0, "18" => 0, "19" => 0, "20" => 0,
-               "21" => 0, "22" => 0, "23" => 0, "24" => 0,
-             };
-
-  my $conhex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0,
-                 "05" => 0, "06" => 0, "07" => 0, "08" => 0,
-                 "09" => 0, "10" => 0, "11" => 0, "12" => 0,
-                 "13" => 0, "14" => 0, "15" => 0, "16" => 0,
-                 "17" => 0, "18" => 0, "19" => 0, "20" => 0,
-                 "21" => 0, "22" => 0, "23" => 0, "24" => 0,
-               };
-
-  debugLog ($paref, 'consumption', "################### Consumption forecast for the next hours ###################");
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next hours ###################");
 
   for my $k (sort keys %{$data{$type}{$name}{nexthours}}) {
       my $nhtime = NexthoursVal ($hash, $k, "starttime", undef);                                    # Startzeit
       next if(!$nhtime);
+      
+      $conhfc = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
+                  "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
+                  "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
+                };
+
+      $conhfcex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
+                    "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
+                    "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
+                  };
 
       $dnum          = 0;
       my $consumerco = 0;
@@ -10779,8 +10786,9 @@ sub _estConsumptionForecast {
           my $hcon = HistoryVal ($hash, $m, $nhhr, 'con', 0);                                       # historische Verbrauchswerte
           next if(!$hcon);
           
+          debugLog ($paref, 'consumption_long', "    historical Consumption added for $nhday -> date: $m, hod: $nhhr -> $hcon Wh");
+          
           if ($hcon < 0) {                                                                           # V1.32.0
-              #$hcon   = 0;
               my $vl  = 3;
               my $pre = '- WARNING -';
 
@@ -10798,19 +10806,21 @@ sub _estConsumptionForecast {
               $consumerco += $csme;
               
               if ($exconfc) {
-                  debugLog ($paref, 'consumption', "Consumer '$c' values excluded from forecast calc by 'exconfc' - day: $m, hour: $nhhr, csme: $csme");
+                  debugLog ($paref, 'consumption_long', "Consumer '$c' values excluded from forecast calc by 'exconfc' - day: $m, hour: $nhhr, csme: $csme");
                   $consumerco -= $csme;                                                             # V1.32.0
+                  $hcon       -= $csme;                                                             # V1.32.0, excludierte Verbraucherconsumption von Forecast ausschließen
               }
           }
 
-          $conhex->{$nhhr} += ($hcon - $consumerco) if($hcon >= $consumerco);                       # prognostizierter Verbrauch Ex registrierter Verbraucher
-          $conh->{$nhhr}   += $hcon;
+          $conhfcex->{$nhhr} += ($hcon - $consumerco) if($hcon >= $consumerco);                     # prognostizierter Verbrauch Ex registrierter Verbraucher
+          $conhfc->{$nhhr}   += $hcon;
           $dnum++;
       }
 
       if ($dnum) {
-           $data{$type}{$name}{nexthours}{$k}{confcEx} = int ($conhex->{$nhhr} / $dnum);
-           my $conavg                                  = int ($conh->{$nhhr}   / $dnum);
+           my $conavgex                                = int ($conhfcex->{$nhhr} / $dnum);
+           $data{$type}{$name}{nexthours}{$k}{confcEx} = $conavgex;
+           my $conavg                                  = int ($conhfc->{$nhhr}   / $dnum);
            $data{$type}{$name}{nexthours}{$k}{confc}   = $conavg;                                   # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
 
            if (NexthoursVal ($hash, $k, "today", 0)) {                                              # nur Werte des aktuellen Tag speichern
@@ -10818,7 +10828,7 @@ sub _estConsumptionForecast {
                writeToHistory ( { paref => $paref, key => 'confc', val => $conavg, hour => $nhhr } );
            }
 
-           debugLog ($paref, 'consumption', "estimated Consumption for $nhday -> starttime: $nhtime, confc: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
+           debugLog ($paref, 'consumption|consumption_long', "estimated Consumption for $nhday -> starttime: $nhtime, confc: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
       }
   }
 
@@ -19837,6 +19847,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer scheduling processes                                                    </td></tr>
             <tr><td> <b>consumerSwitchingXX</b>  </td><td>Operations of the internal consumer switching module of consumer XX              </td></tr>
             <tr><td> <b>consumption</b>          </td><td>Consumption calculation, consumption forecasting and utilization                 </td></tr>
+            <tr><td> <b>consumption_long</b>     </td><td>extended output of the consumption forecast Determination                        </td></tr>
             <tr><td> <b>dwdComm</b>              </td><td>Communication with the website or server of the German Weather Service (DWD)     </td></tr>
             <tr><td> <b>epiecesCalc</b>          </td><td>Calculation of specific energy consumption per operating hour and consumer       </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Module graphic information                                                       </td></tr>
@@ -22163,6 +22174,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer Einplanungsprozesse                                                     </td></tr>
             <tr><td> <b>consumerSwitchingXX</b>  </td><td>Operationen des internen Consumer Schaltmodul für Verbraucher XX                 </td></tr>
             <tr><td> <b>consumption</b>          </td><td>Verbrauchskalkulation, Verbrauchsvorhersage und -nutzung                         </td></tr>
+            <tr><td> <b>consumption_long</b>     </td><td>erweiterte Ausgabe der Verbrauchsvorhersage Ermittlung                           </td></tr>
             <tr><td> <b>dwdComm</b>              </td><td>Kommunikation mit Webseite oder Server des Deutschen Wetterdienst (DWD)          </td></tr>
             <tr><td> <b>epiecesCalc</b>          </td><td>Berechnung des spezifischen Energieverbrauchs je Betriebsstunde und Verbraucher  </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Informationen der Modulgrafik                                                    </td></tr>

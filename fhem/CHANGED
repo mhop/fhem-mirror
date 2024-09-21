@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  76_SolarForecast: calculation of consumption forecast
  - bugfix:  36_Shelly: removed irrelevant log-entries for dimmer
  - bugfix:  36_Shelly: removed package command: use Sub::Util
  - bugfix:  36_Shelly: added package command: use Sub::Util
