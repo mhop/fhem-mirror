@@ -61,7 +61,7 @@ use warnings;
 use GPUtils         qw(:all);
 use Time::HiRes     qw(gettimeofday);    
 use Encode          qw(decode encode);
-use SetExtensions   qw(:all);
+use SetExtensions;
 use HttpUtils;
 use FHEM::HTTPMOD::Utils  qw(:all);
 use POSIX;
