@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bufgix:  72_FRITZBOX: Blockade des Intervall-Timers durch 
+                         nonBlocking set/get Befehle
+ - feature: 72_FRITZBOX:
+            attr <device> enableLogReadings <liste>, Achtung das
+                 standardmäßige Abholen wurde deaktiviert
+            set <device> wlanGuestParams <param:value> [<param:value> ...]
  - bugfix:  76_SolarForecast: calculation of consumption forecast
  - bugfix:  36_Shelly: removed irrelevant log-entries for dimmer
  - bugfix:  36_Shelly: removed package command: use Sub::Util
