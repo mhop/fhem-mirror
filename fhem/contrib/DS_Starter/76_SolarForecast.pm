@@ -155,6 +155,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorPV function ",
   "1.32.0" => "02.09.2024  new attr setupOtherProducerXX, report calculation and storage of negative consumption values ".
                            "Forum: https://forum.fhem.de/index.php?msg=1319083 ".
                            "bugfix in _estConsumptionForecast, new ctrlDebug consumption_long ",
@@ -652,28 +653,6 @@ my %hattr = (                                                                # H
 my %htr = (                                                                  # Hash even/odd für <tr>
   0 => { cl => 'even' },
   1 => { cl => 'odd' },
-);
-
-my %hff = (                                                                                           # Flächenfaktoren
-  "0"  => { N => 100, NE => 100, E => 100, SE => 100, S => 100, SW => 100, W => 100, NW => 100 },     # http://www.ing-büro-junge.de/html/photovoltaik.html
-  "5"  => { N => 95,  NE => 96,  E => 100, SE => 103, S => 105, SW => 103, W => 100, NW => 96  },
-  "10" => { N => 90,  NE => 93,  E => 100, SE => 105, S => 107, SW => 105, W => 100, NW => 93  },
-  "15" => { N => 85,  NE => 90,  E => 99,  SE => 107, S => 111, SW => 107, W => 99,  NW => 90  },
-  "20" => { N => 80,  NE => 84,  E => 97,  SE => 108, S => 114, SW => 108, W => 97,  NW => 84  },
-  "25" => { N => 75,  NE => 80,  E => 95,  SE => 109, S => 115, SW => 109, W => 95,  NW => 80  },
-  "30" => { N => 69,  NE => 76,  E => 94,  SE => 110, S => 117, SW => 110, W => 94,  NW => 76  },
-  "35" => { N => 65,  NE => 71,  E => 92,  SE => 110, S => 118, SW => 110, W => 92,  NW => 71  },
-  "40" => { N => 59,  NE => 68,  E => 90,  SE => 109, S => 117, SW => 109, W => 90,  NW => 68  },
-  "45" => { N => 55,  NE => 65,  E => 87,  SE => 108, S => 115, SW => 108, W => 87,  NW => 65  },
-  "50" => { N => 49,  NE => 62,  E => 85,  SE => 107, S => 113, SW => 107, W => 85,  NW => 62  },
-  "55" => { N => 45,  NE => 58,  E => 83,  SE => 105, S => 112, SW => 105, W => 83,  NW => 58  },
-  "60" => { N => 42,  NE => 55,  E => 80,  SE => 102, S => 111, SW => 102, W => 80,  NW => 55  },
-  "65" => { N => 39,  NE => 53,  E => 77,  SE => 99,  S => 108, SW => 99,  W => 77,  NW => 53  },
-  "70" => { N => 37,  NE => 50,  E => 74,  SE => 95,  S => 104, SW => 95,  W => 74,  NW => 50  },
-  "75" => { N => 36,  NE => 48,  E => 70,  SE => 90,  S => 100, SW => 90,  W => 70,  NW => 48  },
-  "80" => { N => 35,  NE => 46,  E => 67,  SE => 86,  S => 95,  SW => 86,  W => 67,  NW => 46  },
-  "85" => { N => 34,  NE => 44,  E => 64,  SE => 82,  S => 90,  SW => 82,  W => 64,  NW => 44  },
-  "90" => { N => 33,  NE => 43,  E => 62,  SE => 78,  S => 85,  SW => 78,  W => 62,  NW => 43  },
 );
 
 my %hqtxt = (                                                                                                 # Hash (Setup) Texte
@@ -1832,7 +1811,8 @@ sub _setstringDeclination {              ## no critic "not used"
   my $name  = $paref->{name};
   my $arg   = $paref->{arg} // return qq{no tilt angle was provided};
 
-  my $tilt  = join "|", sort keys %hff;
+  # my $tilt  = join "|", sort keys %hff;
+  my $atilt = '0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90';
 
   my ($a,$h) = parseParams ($arg);
 
@@ -1841,7 +1821,7 @@ sub _setstringDeclination {              ## no critic "not used"
   }
 
   while (my ($key, $value) = each %$h) {
-      if ($value !~ /^(?:$tilt)$/x) {
+      if ($value !~ /^(?:$atilt)$/x) {
           return qq{The inclination angle of "$key" is incorrect};
       }
   }
@@ -3410,13 +3390,14 @@ sub __getDWDSolarData {
       for my $string (@strings) {                                                              # für jeden String der Config ..
           my $peak = $data{$type}{$name}{strings}{$string}{peak};                              # String Peak (kWp)
           $peak   *= 1000;                                                                     # kWp in Wp umrechnen
-          my $ta   = $data{$type}{$name}{strings}{$string}{tilt};                              # Neigungswinkel Solarmodule
-          my $dir  = $data{$type}{$name}{strings}{$string}{dir};                               # Ausrichtung der Solarmodule
+          my $ti   = $data{$type}{$name}{strings}{$string}{tilt};                              # Neigungswinkel Solarmodule
+          my $az   = $data{$type}{$name}{strings}{$string}{azimut};                            # Ausrichtung der Solarmodule
 
-          my $af = $hff{$ta}{$dir} / 100;                                                      # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
+          my $af = ___areaFactorPV ($ti, $az);                                                 # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
+          
           my $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);                   # Rad wird in kW/m2 erwartet
 
-          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $pv Wh");
+          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $pv Wh, Area factor: $af");
 
           $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;            # Startzeit wird verwendet, nicht laufende Stunde
       }
@@ -3425,6 +3406,33 @@ sub __getDWDSolarData {
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success' if(!$ret);
 
 return;
+}
+
+##################################################################################################
+#  Flächenfaktor Photovoltaik
+#  Prof. Dr. Peter A. Henning, September 2024
+#  ersetzt die Tabelle auf Basis http://www.ing-büro-junge.de/html/photovoltaik.html
+#  siehe Wiki: https://wiki.fhem.de/wiki/Ertragsprognose_PV
+##################################################################################################
+sub ___areaFactorPV {                  
+  my $tilt   = shift;
+  my $azimut = shift;
+  
+  my $pi180  = 0.0174532918889;                                                                               # Grad in Radiant Umrechnungsfaktor
+   
+  my $x  = $tilt * sin ($azimut * $pi180);
+  my $y  = $tilt * cos ($azimut * $pi180);
+  my $x2 = $x**2;
+  my $x4 = $x2**2;
+ 
+  my $af = 3.808301895960147E-7 - 8.650170178954599E-11 * $x2 + 5.50016483344622E-15 * $x4;
+  $af    = $af * $y + 0.00007319316326291892 - 3.604294916743569E-9   * $x2 - 2.343747951073022E-13 * $x4;
+  $af    = $af * $y - 0.00785953342909065    + 1.1197340251684106E-6  * $x2 - 8.99915952119488E-11  * $x4;
+  $af    = $af * $y - 0.8432627150525525     + 0.00010392051567819936 * $x2 - 3.979206287671085E-9  * $x4;
+  $af    = $af * $y + 99.49627151067648      - 0.006340200119196879   * $x2 + 2.052575360270524E-7  * $x4;
+  $af    = sprintf "%.2f", ($af / 100);                                                                       # Prozenz in Faktor
+ 
+return $af;
 }
 
 ####################################################################################################
@@ -6808,7 +6816,6 @@ sub createStringConfig {                 ## no critic "not used"
 
       while (my ($key, $value) = each %$hd) {
           if (grep /^$key$/, @istrings) {
-              $data{$type}{$name}{strings}{$key}{dir}    = _azimuth2ident ($value) // return $iwrong;
               $data{$type}{$name}{strings}{$key}{azimut} = _ident2azimuth ($value) // return $iwrong;
           }
           else {
@@ -6841,52 +6848,11 @@ return;
 }
 
 ################################################################
-#  formt die Azimut Angabe in Azimut-Bezeichner um
-#  Azimut-Bezeichner werden direkt zurück gegeben
-################################################################
-sub _azimuth2ident {
-  my $az = shift;
-
-  return $az if($az =~ /^[A-Za-z]*$/xs);
-
-  my $id = $az == -180 ? 'N'  :
-           $az <= -158 ? 'N'  :
-           $az <= -134 ? 'NE' :
-           $az == -135 ? 'NE' :
-           $az <= -113 ? 'NE' :
-           $az <= -89  ? 'E'  :
-           $az == -90  ? 'E'  :
-           $az <= -68  ? 'E'  :
-           $az <= -44  ? 'SE' :
-           $az == -45  ? 'SE' :
-           $az <= -23  ? 'SE' :
-           $az <= -1   ? 'S'  :
-           $az == 0    ? 'S'  :
-           $az <= 23   ? 'S'  :
-           $az <= 44   ? 'SW' :
-           $az == 45   ? 'SW' :
-           $az <= 67   ? 'SW' :
-           $az <= 89   ? 'W'  :
-           $az == 90   ? 'W'  :
-           $az <= 112  ? 'W'  :
-           $az <= 134  ? 'NW' :
-           $az == 135  ? 'NW' :
-           $az <= 157  ? 'NW' :
-           $az <= 179  ? 'N'  :
-           $az == 180  ? 'N'  :
-           undef;
-
-return $id;
-}
-
-################################################################
 #  formt einen Azimut-Bezeichner in ein Azimut um
 #  numerische  werden direkt zurück gegeben
 ################################################################
 sub _ident2azimuth {
   my $id = shift;
-
-  return $id if(isNumeric ($id));
 
   my $az = $id eq 'N'  ? -180 :
            $id eq 'NE' ? -135 :
@@ -6896,7 +6862,9 @@ sub _ident2azimuth {
            $id eq 'SW' ? 45   :
            $id eq 'W'  ? 90   :
            $id eq 'NW' ? 135  :
-		   undef;
+		   $id;
+           
+  $az += 180;                                        # Umsetzung -180 - 180 in 0 - 360          
 
 return $az;
 }
@@ -18766,7 +18734,7 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-set-setupStringAzimuth"></a>
       <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
-      (only model DWD, ForecastSolarAPI) <br><br>
+      (only model DWD, OpenMeteo*, ForecastSolarAPI) <br><br>
 
       Alignment &lt;dir&gt; of the solar modules in the string "StringnameX". The string name is a key value of the
       <b>setupInverterStrings</b> attribute. <br>
@@ -18788,15 +18756,14 @@ to ensure that the system configuration is correct.
       </ul>
       <br>
 
-      Azimuth values are integers in the range -180 to 180. Azimuth intermediate values that do not exactly match an
-      identifier are abstracted to the nearest identifier if the selected API works with identifiers only.
-      The module uses the more accurate azimuth value if the API supports its use, e.g. the
-      ForecastSolar API.
+      Azimuth values are integers in the range -180 to 180. Although the specified identifiers can be used,
+      it is recommended to specify the exact azimuth value in the attribute. This allows any intermediate values such 
+      as 83, 48 etc. to be specified.
       <br><br>
 
       <ul>
         <b>Example: </b> <br>
-        set &lt;name&gt; setupStringAzimuth eastroof=-90 southgarage=S S3=NW <br>
+        set &lt;name&gt; setupStringAzimuth Ostdach=-85 Südgarage=S S3=132 <br>
       </ul>
       </li>
     </ul>
@@ -21083,7 +21050,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-set-setupStringAzimuth"></a>
       <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
-      (nur Model DWD, ForecastSolarAPI) <br><br>
+      (nur Model DWD, OpenMeteo*, ForecastSolarAPI) <br><br>
 
       Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des
       Attributs <b>setupInverterStrings</b>. <br>
@@ -21105,15 +21072,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </ul>
       <br>
 
-      Azimut Werte sind Ganzzahlen im Bereich von -180 bis 180. Azimut Zwischenwerte, die nicht exakt auf eine
-      Kennung passen, werden auf die nächstgelegene Kennung abstrahiert wenn die gewählte API nur mit Kennungen
-      arbeitet. Das Modul verwendet den genaueren Azimut Wert sofern die API die Verwendung unterstützt, z.B. die
-      ForecastSolar-API.
+      Azimut Werte sind Ganzzahlen im Bereich von -180 bis 180. Obwohl die genannten Kennungen verwendet werden können,
+      wird empfohlen den genauen Azimut Wert im Attribut anzugeben. Dadurch können beliebige Zwischenwerte wie 83, 48 etc.
+      angeben werden.
       <br><br>
 
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; setupStringAzimuth Ostdach=-90 Südgarage=S S3=NW <br>
+        set &lt;name&gt; setupStringAzimuth Ostdach=-85 Südgarage=S S3=132 <br>
       </ul>
       </li>
     </ul>

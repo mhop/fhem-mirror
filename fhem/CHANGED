@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  76_SolarForecast: internal code change
  - bufgix:  72_FRITZBOX: Blockade des Intervall-Timers durch 
                          nonBlocking set/get Befehle
  - feature: 72_FRITZBOX:
