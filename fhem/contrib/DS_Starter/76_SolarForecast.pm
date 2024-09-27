@@ -36,6 +36,7 @@ use warnings;
 use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
+use Math::Trig;
 
 eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
 eval "use FHEM::Utility::CTZ qw(:all);1;" or my $ctzAbsent     = 1;                  ## no critic 'eval'
@@ -155,7 +156,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.33.1" => "27.09.2024  bugfix of 1.33.0 ",
+  "1.33.1" => "27.09.2024  bugfix of 1.33.0, add aiRulesNumber to pvCircular, limits of AI trained datasets for ".
+                           "AI use (aiAccTRNLim, aiSpreadTRNLim)",
   "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorPV function ",
   "1.32.0" => "02.09.2024  new attr setupOtherProducerXX, report calculation and storage of negative consumption values ".
                            "Forum: https://forum.fhem.de/index.php?msg=1319083 ".
@@ -421,6 +423,8 @@ my $aiSpreadUpLim  = 120;                                                       
 my $aiSpreadLowLim = 80;                                                            # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
 my $aiAccUpLim     = 130;                                                           # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
 my $aiAccLowLim    = 70;                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+my $aiAccTRNLim    = 1500;                                                          # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate" 
+my $aiSpreadTRNLim = 3500;                                                          # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
 
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -2031,8 +2035,8 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
           }
       }    
   }
-
-   writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                    # Anlagenkonfiguration sichern
+  
+  writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                    # Anlagenkonfiguration sichern
 
 return;
 }
@@ -3393,7 +3397,7 @@ sub __getDWDSolarData {
           $peak   *= 1000;                                                                     # kWp in Wp umrechnen
           my $ti   = $data{$type}{$name}{strings}{$string}{tilt};                              # Neigungswinkel Solarmodule
           my $az   = $data{$type}{$name}{strings}{$string}{azimut};                            # Ausrichtung der Solarmodule
-          $az      += 180;                                                                     # Umsetzung -180 - 180 in 0 - 360
+          $az     += 180;                                                                      # Umsetzung -180 - 180 in 0 - 360
           
           my $af = ___areaFactorPV ($ti, $az);                                                 # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
           
@@ -5480,10 +5484,10 @@ sub _attrMeterDev {                    ## no critic "not used"
   elsif ($paref->{cmd} eq 'del') {
       readingsDelete ($hash, "Current_GridConsumption");
       readingsDelete ($hash, "Current_GridFeedIn");
-      delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
-      delete $data{$type}{$name}{circular}{'99'}{gridcontotal};
-      delete $data{$type}{$name}{circular}{'99'}{initdaygcon};
-      delete $data{$type}{$name}{circular}{'99'}{feedintotal};
+      delete $data{$type}{$name}{circular}{99}{initdayfeedin};
+      delete $data{$type}{$name}{circular}{99}{gridcontotal};
+      delete $data{$type}{$name}{circular}{99}{initdaygcon};
+      delete $data{$type}{$name}{circular}{99}{feedintotal};
       delete $data{$type}{$name}{current}{gridconsumption};
       delete $data{$type}{$name}{current}{tomorrowconsumption};
       delete $data{$type}{$name}{current}{gridfeedin};
@@ -5772,12 +5776,12 @@ sub _attrBatteryDev {                    ## no critic "not used"
       readingsDelete    ($hash, 'Current_BatCharge');
       deleteReadingspec ($hash, 'Battery_.*');
       undef @{$data{$type}{$name}{current}{socslidereg}};
-      delete $data{$type}{$name}{circular}{'99'}{lastTsMaxSocRchd};
-      delete $data{$type}{$name}{circular}{'99'}{nextTsMaxSocChge};
-      delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
-      delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
-      delete $data{$type}{$name}{circular}{'99'}{batintot};
-      delete $data{$type}{$name}{circular}{'99'}{batouttot};
+      delete $data{$type}{$name}{circular}{99}{lastTsMaxSocRchd};
+      delete $data{$type}{$name}{circular}{99}{nextTsMaxSocChge};
+      delete $data{$type}{$name}{circular}{99}{initdaybatintot};
+      delete $data{$type}{$name}{circular}{99}{initdaybatouttot};
+      delete $data{$type}{$name}{circular}{99}{batintot};
+      delete $data{$type}{$name}{circular}{99}{batouttot};
       delete $data{$type}{$name}{current}{powerbatout};
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
@@ -7222,17 +7226,17 @@ sub _specialActivities {
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{token};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{verification_mode};
 
-          delete $data{$type}{$name}{circular}{'99'}{initdayfeedin};
-          delete $data{$type}{$name}{circular}{'99'}{initdaygcon};
-          delete $data{$type}{$name}{circular}{'99'}{initdaybatintot};
-          delete $data{$type}{$name}{circular}{'99'}{initdaybatouttot};
+          delete $data{$type}{$name}{circular}{99}{initdayfeedin};
+          delete $data{$type}{$name}{circular}{99}{initdaygcon};
+          delete $data{$type}{$name}{circular}{99}{initdaybatintot};
+          delete $data{$type}{$name}{circular}{99}{initdaybatouttot};
           delete $data{$type}{$name}{current}{sunriseToday};
           delete $data{$type}{$name}{current}{sunriseTodayTs};
           delete $data{$type}{$name}{current}{sunsetToday};
           delete $data{$type}{$name}{current}{sunsetTodayTs};
 
           $data{$type}{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
-          delete $data{$type}{$name}{circular}{'99'}{tdayDvtn};
+          delete $data{$type}{$name}{circular}{99}{tdayDvtn};
 
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
 
@@ -7842,23 +7846,27 @@ sub _transferAPIRadiationValues {
       my $pvfc;
 
       if ($msg eq 'accurate' || $msg eq 'spreaded') {
+          my $airn  = CircularVal ($hash, 99, 'aiRulesNumber', 0);
           my $aivar = 100;
-          $aivar    = 100 * $pvaifc / $est if($est);
+          $aivar    = sprintf "%.0f", (100 * $pvaifc / $est) if($est);                        # Übereinstimmungsgrad KI Forecast zu API Forecast in % 
 
-          if ($msg eq 'accurate' && $aivar >= $aiAccLowLim && $aivar <= $aiAccUpLim) {        # KI liefert 'accurate' Treffer -> verwenden
-              $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
-              $pvfc  = $pvaifc;
-              $useai = 1;
+          if ($msg eq 'accurate') {                                                           # KI liefert 'accurate' Treffer -> verwenden
+              if ($airn >= $aiAccTRNLim || ($aivar >= $aiAccLowLim && $aivar <= $aiAccUpLim)) {    
+                  $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
+                  $pvfc  = $pvaifc;
+                  $useai = 1;
 
-              debugLog ($paref, 'aiData', qq{AI Hit - accurate result found -> variance $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
+                  debugLog ($paref, 'aiData', qq{AI Hit - accurate result used -> aiRulesNum: $airn, variance: $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
+              }
           }
+          elsif ($msg eq 'spreaded') {                                                        # Abweichung AI von Standardvorhersage begrenzen
+              if ($airn >= $aiSpreadTRNLim || ($aivar >= $aiSpreadLowLim && $aivar <= $aiSpreadUpLim)) {
+                  $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
+                  $pvfc  = $pvaifc;
+                  $useai = 1;
 
-          if ($msg eq 'spreaded' && $aivar >= $aiSpreadLowLim && $aivar <= $aiSpreadUpLim) {  # Abweichung AI von Standardvorhersage begrenzen
-              $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
-              $pvfc  = $pvaifc;
-              $useai = 1;
-
-              debugLog ($paref, 'aiData', qq{AI Hit - spreaded result found and is in tolerance -> hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
+                  debugLog ($paref, 'aiData', qq{AI Hit - spreaded result used -> aiRulesNum: $airn, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
+              }
           }
       }
       else {
@@ -14325,7 +14333,6 @@ return $hdv;
 sub manageTrain {
   my $paref = shift;
   my $name  = $paref->{name};
-  
   my $hash  = $defs{$name};
 
   if (CircularVal ($hash, 99, 'runTimeTrainAI', 0) < $aibcthhld) {
@@ -14378,6 +14385,9 @@ sub finishTrain {
   my $runTimeTrainAI  = $paref->{runTimeTrainAI};
   my $aiinitstate     = $paref->{aiinitstate};
   my $aitrainFinishTs = $paref->{aitrainLastFinishTs};
+  my $aiRulesNumber   = $paref->{aiRulesNumber};
+  
+  delete $data{$type}{$name}{circular}{99}{aiRulesNumber};
 
   $data{$type}{$name}{current}{aiAddedToTrain}           = 0;
   $data{$type}{$name}{current}{aicanuse}                 = $aicanuse;
@@ -14385,7 +14395,8 @@ sub finishTrain {
   $data{$type}{$name}{current}{aiinitstate}              = $aiinitstate     if(defined $aiinitstate);
   $data{$type}{$name}{circular}{99}{runTimeTrainAI}      = $runTimeTrainAI  if(defined $runTimeTrainAI);  # !! in Circular speichern um zu persistieren, setTimeTracking speichert zunächst in Current !!
   $data{$type}{$name}{circular}{99}{aitrainLastFinishTs} = $aitrainFinishTs if(defined $aitrainFinishTs);
-
+  $data{$type}{$name}{circular}{99}{aiRulesNumber}       = $aiRulesNumber   if(defined $aiRulesNumber);
+  
   if ($aitrainstate eq 'ok') {
       _readCacheFile ({ name      => $name,
                         type      => $type,
@@ -14534,7 +14545,7 @@ sub aiTrain {                            ## no critic "not used"
                                          ), "");
       $block ? return ($serial) : return \&finishTrain ($serial);
   }
-
+  
   eval { $dtree->train();
          1;
        }
@@ -14559,11 +14570,12 @@ sub aiTrain {                            ## no critic "not used"
   }
 
   setTimeTracking ($hash, $cst, 'runTimeTrainAI');                                                     # Zyklus-Laufzeit ermitteln
-
+  
   $serial = encode_base64 (Serialize ( {name                => $name,
                                         aitrainstate        => 'ok',
                                         runTimeTrainAI      => CurrentVal ($hash, 'runTimeTrainAI', ''),
                                         aitrainLastFinishTs => int time,
+                                        aiRulesNumber       => scalar $dtree->rule_statements(),       # Returns a list of strings that describe the tree in rule-form
                                         aicanuse            => 'ok'
                                        }
                                      )
@@ -14747,10 +14759,14 @@ sub aiInit {                   ## no critic "not used"
   my $hash  = $defs{$name};
 
   if (!isPrepared4AI ($hash)) {
+      delete $data{$type}{$name}{circular}{99}{aiRulesNumber};
+      delete $data{$type}{$name}{circular}{99}{runTimeTrainAI};
+      delete $data{$type}{$name}{circular}{99}{aitrainLastFinishTs};      
+      
       my $err = CurrentVal ($hash, 'aicanuse', '');
 
       debugLog ($paref, 'aiProcess', $err);
-
+      
       $data{$type}{$name}{current}{aiinitstate} = $err;
       return $err;
   }
@@ -15390,6 +15406,7 @@ sub listDataPool {
           my $botot    = CircularVal ($hash, $idx, 'batouttot',           '-');
           my $rtaitr   = CircularVal ($hash, $idx, 'runTimeTrainAI',      '-');
           my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
+          my $airn     = CircularVal ($hash, $idx, 'aiRulesNumber',       '-');
           my $aicts    = CircularVal ($hash, $idx, 'attrInvChangedTs',    '-');
           my $pprl01   = CircularVal ($hash, $idx, 'pprl01',              '-');
           my $pprl02   = CircularVal ($hash, $idx, 'pprl02',              '-');
@@ -15421,7 +15438,8 @@ sub listDataPool {
               $sq .= "      batintot: $bitot, initdaybatintot: $idbitot \n";
               $sq .= "      batouttot: $botot, initdaybatouttot: $idbotot \n";
               $sq .= "      lastTsMaxSocRchd: $ltsmsr, nextTsMaxSocChge: $ntsmsc, days2care: $dtocare \n";
-              $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, attrInvChangedTs: $aicts \n";
+              $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, aiRulesNumber: $airn \n";
+              $sq .= "      attrInvChangedTs: $aicts \n";
           }
       }
   }
@@ -18059,6 +18077,7 @@ return $def;
 #             initdaybatouttot - initialer Wert für Batterie outtotal zu Beginn des Tages (Wh)
 #             batouttot        - Batterie outtotal (Wh)
 #             gridcontotal     - Netzbezug total (Wh)
+#             aiRulesNumber    - Anzahl der Regeln in der trainierten KI-Instanz
 #
 #    $def: Defaultwert
 #
@@ -19327,6 +19346,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>quality</b>             </td><td>Quality of the autocorrection factors (0..1), where 'simple' is the quality of the simple correction factor.          </td></tr>
             <tr><td> <b>runTimeTrainAI</b>      </td><td>Duration of the last AI training                                                                                      </td></tr>
             <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp of the last successful AI training                                                                          </td></tr>
+            <tr><td> <b>aiRulesNumber</b>       </td><td>Number of rules in the trained AI instance                                                                            </td></tr>
             <tr><td> <b>tdayDvtn</b>            </td><td>Today's deviation PV forecast/generation in %                                                                         </td></tr>
             <tr><td> <b>temp</b>                </td><td>Outdoor temperature                                                                                                   </td></tr>
             <tr><td> <b>wcc</b>                 </td><td>Degree of cloud cover                                                                                                 </td></tr>
@@ -21653,6 +21673,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>quality</b>             </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei 'simple' die Qualität des einfach berechneten Korrekturfaktors ist.      </td></tr>
             <tr><td> <b>runTimeTrainAI</b>      </td><td>Laufzeit des letzten KI Trainings                                                                                         </td></tr>
             <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp des letzten erfolgreichen KI Trainings                                                                          </td></tr>
+            <tr><td> <b>aiRulesNumber</b>       </td><td>Anzahl der Regeln in der trainierten KI Instanz                                                                           </td></tr>
             <tr><td> <b>tdayDvtn</b>            </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
             <tr><td> <b>temp</b>                </td><td>Außentemperatur                                                                                                           </td></tr>
             <tr><td> <b>wcc</b>                 </td><td>Grad der Wolkenüberdeckung                                                                                                </td></tr>
@@ -23203,6 +23224,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "FHEM::SynoModules::SMUtils": 1.0270,
         "Time::HiRes": 0,
         "MIME::Base64": 0,
+        "Math::Trig": 0,
         "Storable": 0
       },
       "recommends": {
