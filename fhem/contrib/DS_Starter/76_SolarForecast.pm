@@ -15805,6 +15805,7 @@ sub checkPlantConfig {
 
   for my $sn (sort keys %{$data{$type}{$name}{strings}}) {
       my $sp = $sn." => ".$sub->($sn)."<br>";
+      Log3 ($name, 1, "$name - sp: $sp");
       $result->{'String Configuration'}{note} .= $sn." => ".$sub->($sn)."<br>";
 
       if ($data{$type}{$name}{strings}{$sn}{peak} >= 500) {
@@ -15815,7 +15816,7 @@ sub checkPlantConfig {
       }
 
       if (!isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {
-          if ($sp !~ /dir.*?peak.*?tilt/x) {
+          if ($sp !~ /azimut.*?peak.*?tilt/x) {
               $result->{'String Configuration'}{state}  = $nok;
               $result->{'String Configuration'}{fault}  = 1;                                    # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
           }
