@@ -155,6 +155,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.33.1" => "27.09.2024  bugfix of 1.33.0 ",
   "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorPV function ",
   "1.32.0" => "02.09.2024  new attr setupOtherProducerXX, report calculation and storage of negative consumption values ".
                            "Forum: https://forum.fhem.de/index.php?msg=1319083 ".
@@ -3392,7 +3393,8 @@ sub __getDWDSolarData {
           $peak   *= 1000;                                                                     # kWp in Wp umrechnen
           my $ti   = $data{$type}{$name}{strings}{$string}{tilt};                              # Neigungswinkel Solarmodule
           my $az   = $data{$type}{$name}{strings}{$string}{azimut};                            # Ausrichtung der Solarmodule
-
+          $az      += 180;                                                                     # Umsetzung -180 - 180 in 0 - 360
+          
           my $af = ___areaFactorPV ($ti, $az);                                                 # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
           
           my $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);                   # Rad wird in kW/m2 erwartet
@@ -6854,6 +6856,8 @@ return;
 sub _ident2azimuth {
   my $id = shift;
 
+  return $id if(isNumeric ($id));
+
   my $az = $id eq 'N'  ? -180 :
            $id eq 'NE' ? -135 :
 		   $id eq 'E'  ? -90  :
@@ -6862,9 +6866,7 @@ sub _ident2azimuth {
            $id eq 'SW' ? 45   :
            $id eq 'W'  ? 90   :
            $id eq 'NW' ? 135  :
-		   $id;
-           
-  $az += 180;                                        # Umsetzung -180 - 180 in 0 - 360          
+		   undef;
 
 return $az;
 }
