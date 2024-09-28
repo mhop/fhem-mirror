@@ -158,7 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.34.0" => "28.09.2024  ___areaShareFactor ",
+  "1.34.0" => "28.09.2024  implement ___areaShareFactor for calculation of direct area factor and share of direct radiation ",
   "1.33.1" => "27.09.2024  bugfix of 1.33.0, add aiRulesNumber to pvCircular, limits of AI trained datasets for ".
                            "AI use (aiAccTRNLim, aiSpreadTRNLim)",
   "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorFix function ",
@@ -3521,7 +3521,7 @@ sub ___areaShareFactor {
   
   ## Schätzung Anteil Direktstrahlung an Globalstrahlung
   ########################################################
-  my $drif = 0.0105;                                                           # Faktor Zunahme Direktstrahlung pro Grad sunalt von 10° bis 50°
+  my $drif = 0.0105;                                                                        # Faktor Zunahme Direktstrahlung pro Grad sunalt von 10° bis 50°
   my $sdr  = $sunalt <= 10                  ? 0.33                             :
              $sunalt >  10 && $sunalt <= 50 ? (($sunalt - 10) * 0.0105) + 0.33 :
              0.75;
@@ -6711,23 +6711,7 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################  
-  my $dir = ReadingsVal ($name, 'moduleAzimuth', '');                         # 16.06.2024
-  if ($dir) {
-      readingsSingleUpdate ($hash, 'setupStringAzimuth', $dir, 0);
-      readingsDelete ($hash, 'moduleAzimuth');
-  }
-  
-  my $dec = ReadingsVal ($name, 'moduleDeclination', '');                         # 16.06.2024
-  if ($dec) {
-      readingsSingleUpdate ($hash, 'setupStringDeclination', $dec, 0);
-      readingsDelete ($hash, 'moduleDeclination');
-  }
-  
-  my $val6 = ReadingsVal ($name, 'moduleRoofTops', '');                    # 16.06.2024
-  if ($val6) {
-      CommandAttr (undef, "$name setupRoofTops $val6");
-      readingsDelete ($hash, 'moduleRoofTops');
-  }
+
   ##########################################################################################################################
 
   setModel ($hash);                                                                            # Model setzen
