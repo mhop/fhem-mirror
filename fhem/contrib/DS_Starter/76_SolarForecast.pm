@@ -4,6 +4,7 @@
 #       76_SolarForecast.pm
 #
 #       (c) 2020-2024 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
+#       with credits to: kask, Prof. Dr. Peter Henning, Wzut (and much more FHEM users)
 #
 #       This script is part of fhem.
 #
@@ -37,6 +38,7 @@ use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
 use Math::Trig;
+use List::Util qw(max);
 
 eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
 eval "use FHEM::Utility::CTZ qw(:all);1;" or my $ctzAbsent     = 1;                  ## no critic 'eval'
@@ -156,9 +158,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.34.0" => "28.09.2024  ___areaShareFactor ",
   "1.33.1" => "27.09.2024  bugfix of 1.33.0, add aiRulesNumber to pvCircular, limits of AI trained datasets for ".
                            "AI use (aiAccTRNLim, aiSpreadTRNLim)",
-  "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorPV function ",
+  "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorFix function ",
   "1.32.0" => "02.09.2024  new attr setupOtherProducerXX, report calculation and storage of negative consumption values ".
                            "Forum: https://forum.fhem.de/index.php?msg=1319083 ".
                            "bugfix in _estConsumptionForecast, new ctrlDebug consumption_long ",
@@ -3378,7 +3381,8 @@ sub __getDWDSolarData {
 
       next if($fh == 24);
 
-      my $rad = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                        # kJ/m2
+      my $dtday = (split '-', $date)[2];                                                       # Tag: 01, 02 ... 31
+      my $rad   = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                      # kJ/m2
 
       if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
@@ -3399,13 +3403,34 @@ sub __getDWDSolarData {
           my $az   = $data{$type}{$name}{strings}{$string}{azimut};                            # Ausrichtung der Solarmodule
           $az     += 180;                                                                      # Umsetzung -180 - 180 in 0 - 360
           
-          my $af = ___areaFactorPV ($ti, $az);                                                 # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
+          my $af = ___areaFactorFix ($ti, $az);                                                # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
           
-          my $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);                   # Rad wird in kW/m2 erwartet
+          ## Flächenfaktor Direktstrahlung
+          ##################################
+          my $hod          = sprintf "%02d", $runh;
+          my ($afds, $sdr) = ___areaShareFactor ( { name   => $name,        
+                                                    dtday  => $dtday,
+                                                    hod    => $hod,
+                                                    tilt   => $ti,
+                                                    azimut => $az
+                                                  }
+                                                );
+                                              
+          my $dirrad = $rad * $sdr;                                                                # Anteil Direktstrahlung an Globalstrahlung                                                          
+          my $difrad = $rad - $dirrad;                                                             # Anteil Diffusstrahlung an Globalstrahlung 
+          
+          my $pvds = sprintf "%.1f", (($difrad + $dirrad * $afds) * $kJtokWh * $peak * $prdef);    # Rad wird in kW/m2 erwartet
 
-          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $pv Wh, Area factor: $af");
+          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, hod: $hod, $pvds Wh, Area factor: $afds");
+          
+          ###################################
+          
+          # my $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);                   # Rad wird in kW/m2 erwartet
 
-          $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;            # Startzeit wird verwendet, nicht laufende Stunde
+          # debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, Area factor: $af");
+
+          # $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;            # Startzeit wird verwendet, nicht laufende Stunde
+          $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pvds;            # Startzeit wird verwendet, nicht laufende Stunde
       }
   }
 
@@ -3420,7 +3445,7 @@ return;
 #  ersetzt die Tabelle auf Basis http://www.ing-büro-junge.de/html/photovoltaik.html
 #  siehe Wiki: https://wiki.fhem.de/wiki/Ertragsprognose_PV
 ##################################################################################################
-sub ___areaFactorPV {                  
+sub ___areaFactorFix {                  
   my $tilt   = shift;
   my $azimut = shift;
   
@@ -3439,6 +3464,69 @@ sub ___areaFactorPV {
   $af    = sprintf "%.2f", ($af / 100);                                                                       # Prozenz in Faktor
  
 return $af;
+}
+
+##########################################################################################################
+#  Flächenfaktor Photovoltaik und Direktstrahlungsanteilsfaktor in Abhängigkeit des Sonnenstandes
+#
+#  Die Globalstrahlung  (Summe aus diffuser und direkter Sonnenstrahlung)
+#  ----------------------------------------------------------------------
+#  Die Globalstrahlung ist die am Boden von einer horizontalen Ebene empfangene Sonnenstrahlung 
+#  und setzt sich aus der direkten Strahlung (der Schatten werfenden Strahlung) und der 
+#  gestreuten Sonnenstrahlung (diffuse Himmelsstrahlung) aus der Himmelshalbkugel zusammen. 
+#  Bei Sonnenhöhen von mehr als 50° und wolkenlosem Himmel besteht die Globalstrahlung zu ca. 3/4 
+#  aus direkter Sonnenstrahlung, bei tiefen Sonnenständen (bis etwa 10°) nur noch zu ca. 1/3.
+#  
+#  Direktstrahlung = Globalstrahlung * 0.75   (bei >  50° sunalt)
+#  Direktstrahlung = Globalstrahlung * 0.33   (bei <= 10° sunalt)
+#
+#  Quelle: https://www.dwd.de/DE/leistungen/solarenergie/globalstrahlung.html?nn=16102&lsbId=416798
+#
+#  Return:
+#  $daf - direct Area Faktor für den Anteil Direktstrahlung der Globalstrahlung
+#  $sdr - Share of direct radiation = Faktor Anteil Direktstrahlung an Globalstrahlung (0.33 .. 0.75)
+#
+##########################################################################################################
+sub ___areaShareFactor {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $dtday  = $paref->{dtday};                                                 # Tag: 01, 02 ... 31
+  my $hod    = $paref->{hod};                                                   # Stunde des Tages 01, 02 ... 24
+  my $tilt   = $paref->{tilt};                                                  # String Anstellwinkel / Neigung
+  my $azimut = $paref->{azimut};                                                # String Ausrichtung / Azimut                              
+  
+  my $hash   = $defs{$name};
+                       
+  my $sunalt = HistoryVal ($hash, $dtday, $hod, 'sunalt', undef);               # Sonne Höhe (Altitude)
+  my $sunaz  = HistoryVal ($hash, $dtday, $hod, 'sunaz',  undef);               # Sonne Azimuth
+  
+  return (0, 0) if(!defined $sunalt || !defined $sunaz);
+  
+  my $pi180 = 0.0174532918889;                                                  # PI/180
+
+  #-- Normale der Anlage (Nordrichtung = y-Achse, Ostrichtung = x-Achse)
+  my $nz = cos ($tilt * $pi180);
+  my $ny = sin ($tilt * $pi180) * cos ($azimut * $pi180);
+  my $nx = sin ($tilt * $pi180) * sin ($azimut * $pi180);
+ 
+  #-- Vektor zur Sonne
+  my $sz = sin ($sunalt * $pi180);
+  my $sy = cos ($sunalt * $pi180) * cos ($sunaz * $pi180);
+  my $sx = cos ($sunalt * $pi180) * sin ($sunaz * $pi180);
+ 
+  #-- Normale N = ($nx,$ny,$nz) Richtung Sonne S = ($sx,$sy,$sz)
+  my $daf = sprintf "%.2f", ($nx * $sx + $ny * $sy + $nz * $sz);
+  $daf    = max ($daf, 0);
+  $daf   += 1 if($daf);
+  
+  ## Schätzung Anteil Direktstrahlung an Globalstrahlung
+  ########################################################
+  my $drif = 0.0105;                                                           # Faktor Zunahme Direktstrahlung pro Grad sunalt von 10° bis 50°
+  my $sdr  = $sunalt <= 10                  ? 0.33                             :
+             $sunalt >  10 && $sunalt <= 50 ? (($sunalt - 10) * 0.0105) + 0.33 :
+             0.75;
+ 
+return ($daf, $sdr);
 }
 
 ####################################################################################################
@@ -23226,6 +23314,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "Time::HiRes": 0,
         "MIME::Base64": 0,
         "Math::Trig": 0,
+        "List::Util": 0,
         "Storable": 0
       },
       "recommends": {
