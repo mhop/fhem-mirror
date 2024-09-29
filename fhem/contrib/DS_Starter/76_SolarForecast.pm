@@ -158,7 +158,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.34.0" => "28.09.2024  implement ___areaShareFactor for calculation of direct area factor and share of direct radiation ",
+  "1.34.0" => "28.09.2024  implement ___areaShareFactor for calculation of direct area factor and share of direct radiation ".
+                           "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
+                           "minor fix in ___readCandQ ",
   "1.33.1" => "27.09.2024  bugfix of 1.33.0, add aiRulesNumber to pvCircular, limits of AI trained datasets for ".
                            "AI use (aiAccTRNLim, aiSpreadTRNLim)",
   "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorFix function ",
@@ -8183,9 +8185,11 @@ sub ___readCandQ {
   }
   else {                                                                                              # keine Autokorrektur
       ($hc, $hq) = CircularSunCloudkorrVal ($hash, sprintf("%02d",$fh1), $sabin, 'simple', undef);    # Korrekturfaktor/Qualität der Stunde des Tages (simple)
+      $hc        = 1;
   }
 
   $hq //= '-';                                                                                        # keine Qualität definiert
+  $hq   = sprintf "%.2f", $hq if(isNumeric ($hq));
   $hc //= $hcraw;                                                                                     # Korrekturfaktor Voreinstellung
   $hc   = 1 if(1 * $hc == 0);                                                                         # 0.0-Werte ignorieren (Schleifengefahr)
   $hc   = sprintf "%.2f", $hc;
@@ -11086,8 +11090,9 @@ sub calcValueImproves {
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
       
-      $paref->{cpcf} = ReadingsVal ($name, 'pvCorrectionFactor_'.sprintf("%02d",$h), '');         # aktuelles pvCorf-Reading
-      $paref->{h}    = $h;
+      $paref->{cpcf}  = ReadingsVal ($name, 'pvCorrectionFactor_'.sprintf("%02d",$h), '');        # aktuelles pvCorf-Reading
+      $paref->{aihit} = CircularVal ($hash, sprintf("%02d",$h), 'aihit',  0);                     # AI verwendet?
+      $paref->{h}     = $h;
 
       _calcCaQcomplex   ($paref);                                                                 # Korrekturberechnung mit Bewölkung duchführen/speichern
       _calcCaQsimple    ($paref);                                                                 # einfache Korrekturberechnung duchführen/speichern
@@ -11095,6 +11100,7 @@ sub calcValueImproves {
 
       delete $paref->{h};
       delete $paref->{cpcf};
+      delete $paref->{aihit};
   }
 
   delete $paref->{aln};
@@ -11115,6 +11121,7 @@ sub _calcCaQcomplex {
   my $aln   = $paref->{aln};                                                                          # Autolearning
   my $h     = $paref->{h};
   my $day   = $paref->{day};                                                                          # aktueller Tag
+  my $aihit = $paref->{aihit};
 
   my $hash = $defs{$name};
   my $sr   = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', '');
@@ -11130,8 +11137,8 @@ sub _calcCaQcomplex {
       return;
   }
 
-  my $pvrl = CircularVal ($hash, sprintf("%02d",$h), 'pvrl',    0);
-  my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
+  my $pvrl  = CircularVal ($hash, sprintf("%02d",$h), 'pvrl',    0);
+  my $pvfc  = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
 
   if (!$pvrl || !$pvfc) {
       storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
@@ -11158,13 +11165,15 @@ sub _calcCaQcomplex {
   delete $paref->{calc};
 
   storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
+  
+  $aihit = $aihit ? ' AI result used,' : '';
 
   if ($acu =~ /on_complex/xs) {
       if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
-          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac,$aihit Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
       }
       else {
-          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum");
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin,$aihit Cloud range: $crang, Days in range: $dnum");
       }
       
       storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
@@ -11185,6 +11194,7 @@ sub _calcCaQsimple {
   my $aln   = $paref->{aln};                                                                          # Autolearning
   my $h     = $paref->{h};
   my $day   = $paref->{day};                                                                          # aktueller Tag
+  my $aihit = $paref->{aihit};
 
   my $hash = $defs{$name};
   my $sr   = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', '');
@@ -11226,13 +11236,15 @@ sub _calcCaQsimple {
   delete $paref->{calc};
 
   storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
+  
+  $aihit = $aihit ? ' AI result used,' : '';
 
   if ($acu =~ /on_simple/xs) {
       if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
-          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac, Days in range: $dnum)");
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac,$aihit Days in range: $dnum)");
       }
       else {
-          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor, Days in range: $dnum");
+          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor,$aihit Days in range: $dnum");
       }
       
       storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
@@ -15305,7 +15317,7 @@ sub listDataPool {
               $ret .= "wid: $wid, ";
               $ret .= "wcc: $wcc, ";
               $ret .= "rr1c: $rr1c, ";
-              $ret .= "pvcorrf: $pvcorrf";
+              $ret .= "pvcorrf: $pvcorrf ";
           }
           
           $ret .= "temp: $temp, "       if($temp);
@@ -15372,6 +15384,9 @@ sub listDataPool {
           if ($csm) {
               $ret .= "\n            ";
               $ret .= $csm;
+          }
+          else {
+              $ret .= "\n            ";
           }
       }
       return $ret;
@@ -19299,8 +19314,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>confcEx</b>   </td><td>expected energy consumption without consumer shares with set key exconfc=1      </td></tr>
             <tr><td> <b>crange</b>    </td><td>calculated cloud area                                                           </td></tr>
             <tr><td> <b>correff</b>   </td><td>correction factor/quality used                                                  </td></tr>
-            <tr><td>                  </td><td>factor/- -> no quality defined                                                  </td></tr>
-            <tr><td>                  </td><td>factor/0..1 - quality of the PV forecast (1 = best quality)                     </td></tr>
+            <tr><td>                  </td><td>&lt;factor&gt;/- -> no quality defined                                          </td></tr>
+            <tr><td>                  </td><td>&lt;factor&gt;/0..1 - quality of the PV forecast (1 = best quality)             </td></tr>
             <tr><td> <b>DoN</b>       </td><td>sunrise and sunset status (0 - night, 1 - day)                                  </td></tr>
             <tr><td> <b>hourofday</b> </td><td>current hour of the day                                                         </td></tr>
             <tr><td> <b>pvapifc</b>   </td><td>expected PV generation (Wh) of the used API incl. a possible correction         </td></tr>
@@ -21624,8 +21639,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>confcEx</b>   </td><td>erwarteter Energieverbrauch ohne Anteile Verbraucher mit gesetztem Schlüssel exconfc=1   </td></tr>
             <tr><td> <b>crange</b>    </td><td>berechneter Bewölkungsbereich                                                            </td></tr>
             <tr><td> <b>correff</b>   </td><td>verwendeter Korrekturfaktor/Qualität                                                     </td></tr>
-            <tr><td>                  </td><td>Faktor/- -> keine Qualität definiert                                                     </td></tr>
-            <tr><td>                  </td><td>Faktor/0..1 - Qualität der PV Prognose (1 = beste Qualität)                              </td></tr>
+            <tr><td>                  </td><td>&lt;Faktor&gt;/- -> keine Qualität definiert                                             </td></tr>
+            <tr><td>                  </td><td>&lt;Faktor&gt;/0..1 - Qualität der PV Prognose (1 = beste Qualität)                      </td></tr>
             <tr><td> <b>DoN</b>       </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                     </td></tr>
             <tr><td> <b>hourofday</b> </td><td>laufende Stunde des Tages                                                                </td></tr>
             <tr><td> <b>pvapifc</b>   </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur        </td></tr>
