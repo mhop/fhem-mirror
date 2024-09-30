@@ -3544,9 +3544,10 @@ sub ___areaFactorTrack {
   my $sx = cos ($sunalt * $pi180) * sin ($sunaz * $pi180);
  
   #-- Normale N = ($nx,$ny,$nz) Richtung Sonne S = ($sx,$sy,$sz)
-  my $daf = sprintf "%.2f", ($nx * $sx + $ny * $sy + $nz * $sz);
+  my $daf = $nx * $sx + $ny * $sy + $nz * $sz;
   $daf    = max ($daf, 0);
   $daf   += 1 if($daf);
+  $daf    = sprintf "%.2f", $daf;
   
   ## Schätzung Anteil Direktstrahlung an Globalstrahlung
   ########################################################
