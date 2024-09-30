@@ -158,11 +158,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.34.0" => "28.09.2024  implement ___areaShareFactor for calculation of direct area factor and share of direct radiation ".
+  "1.34.0" => "30.09.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
-                           "minor fix in ___readCandQ ",
+                           "AI usage depending either of available number of rules or difference to api forecast ".
+                           "minor fix in ___readCandQ, new experimental attribute ctrlAreaFactorUsage ",
   "1.33.1" => "27.09.2024  bugfix of 1.33.0, add aiRulesNumber to pvCircular, limits of AI trained datasets for ".
-                           "AI use (aiAccTRNLim, aiSpreadTRNLim)",
+                           "AI use (aiAccTRNMin, aiSpreadTRNMin)",
   "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorFix function ",
   "1.32.0" => "02.09.2024  new attr setupOtherProducerXX, report calculation and storage of negative consumption values ".
                            "Forum: https://forum.fhem.de/index.php?msg=1319083 ".
@@ -423,13 +424,13 @@ my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";         
 my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
 my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
 my $aitrstartdef   = 2;                                                             # default Stunde f. Start AI-Training
-my $aistdudef      = 1095;                                                          # default Haltezeit KI Raw Daten (Tage)
+my $aistdudef      = 1825;                                                          # default Haltezeit KI Raw Daten (Tage)
 my $aiSpreadUpLim  = 120;                                                           # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
 my $aiSpreadLowLim = 80;                                                            # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
 my $aiAccUpLim     = 130;                                                           # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
 my $aiAccLowLim    = 70;                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-my $aiAccTRNLim    = 1500;                                                          # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate" 
-my $aiSpreadTRNLim = 3500;                                                          # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
+my $aiAccTRNMin    = 5500;                                                          # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate" 
+my $aiSpreadTRNMin = 7000;                                                          # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
 
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -1201,6 +1202,7 @@ sub Initialize {
                                 "ctrlBatSocManagement:textField-long ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#14 ".
+                                "ctrlAreaFactorUsage:fix,flex,flexShared ".
                                 "ctrlGenPVdeviation:daily,continuously ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
@@ -2465,6 +2467,7 @@ sub Get {
       t     => $t,
       chour => (strftime "%H",       localtime($t)),                                            # aktuelle Stunde in 24h format (00-23)
       date  => (strftime "%Y-%m-%d", localtime($t)),
+      day   => (strftime "%d",       localtime($t)),                                            # aktueller Tag (range 01 .. 31)
       debug => getDebug ($hash),
       lang  => getLang  ($hash)
   };
@@ -3351,7 +3354,8 @@ sub __getDWDSolarData {
   my $paref = shift;
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $date  = $paref->{date};                                                                  # aktueller Tag "YYYY-MM-DD"
+  my $date  = $paref->{date};                                                                  # aktuelles Datum "YYYY-MM-DD"
+  my $day   = $paref->{day};                                                                   # aktuelles Tagesdatum 01 .. 31
   my $t     = $paref->{t}     // time;
   my $lang  = $paref->{lang};
   
@@ -3360,6 +3364,7 @@ sub __getDWDSolarData {
   my $raname = AttrVal ($name, 'setupRadiationAPI', '');                                       # Radiation Forecast API
   return if(!$raname || !$defs{$raname});
 
+  my $cafd    = AttrVal ($name, 'ctrlAreaFactorUsage', 'fix');                                 # Art der Flächenfaktor Berechnung
   my $stime   = $date.' 00:00:00';                                                             # Startzeit Soll Übernahmedaten
   my $sts     = timestringToTimestamp ($stime);
   my @strings = sort keys %{$data{$type}{$name}{strings}};
@@ -3377,14 +3382,12 @@ sub __getDWDSolarData {
   debugLog ($paref, "apiCall", "DWD API - collect DWD Radiation data with start >$stime<- device: $raname =>");
 
   for my $num (0..47) {
-      my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # laufendes Datum ' ' Zeit
-      my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # Stunde in 24h format (00-23), Rad1h = Absolute Globalstrahlung letzte 1 Stunde
       my ($fd,$fh) = calcDayHourMove (0, $num);
-
       next if($fh == 24);
-
-      my $dtday = (split '-', $date)[2];                                                       # Tag: 01, 02 ... 31
-      my $rad   = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                      # kJ/m2
+  
+      my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # abzurufendes Datum ' ' Zeit
+      my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # Stunde in 24h format (00-23), Rad1h = Absolute Globalstrahlung letzte 1 Stunde
+      my $rad      = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                   # kJ/m2
 
       if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
@@ -3397,6 +3400,10 @@ sub __getDWDSolarData {
       }
 
       $data{$type}{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = sprintf "%.0f", $rad;
+      
+      my ($ddate, $dtime) = split ' ', $dateTime;                                              # abzurufendes Datum + Zeit
+      my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                      # abzurufende Zeit
+      my $dday            = (split '-', $ddate)[2];                                            # abzurufender Tag: 01, 02 ... 31
 
       for my $string (@strings) {                                                              # für jeden String der Config ..
           my $peak = $data{$type}{$name}{strings}{$string}{peak};                              # String Peak (kWp)
@@ -3404,35 +3411,44 @@ sub __getDWDSolarData {
           my $ti   = $data{$type}{$name}{strings}{$string}{tilt};                              # Neigungswinkel Solarmodule
           my $az   = $data{$type}{$name}{strings}{$string}{azimut};                            # Ausrichtung der Solarmodule
           $az     += 180;                                                                      # Umsetzung -180 - 180 in 0 - 360
-          
-          my $af = ___areaFactorFix ($ti, $az);                                                # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
-          
-          ## Flächenfaktor Direktstrahlung
-          ##################################
-          my $hod          = sprintf "%02d", $runh;
-          my ($afds, $sdr) = ___areaShareFactor ( { name   => $name,        
-                                                    dtday  => $dtday,
-                                                    hod    => $hod,
-                                                    tilt   => $ti,
-                                                    azimut => $az
-                                                  }
-                                                );
-                                              
-          my $dirrad = $rad * $sdr;                                                                # Anteil Direktstrahlung an Globalstrahlung                                                          
-          my $difrad = $rad - $dirrad;                                                             # Anteil Diffusstrahlung an Globalstrahlung 
-          
-          my $pvds = sprintf "%.1f", (($difrad + $dirrad * $afds) * $kJtokWh * $peak * $prdef);    # Rad wird in kW/m2 erwartet
 
-          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, hod: $hod, $pvds Wh, Area factor: $afds");
+          my ($af, $pv, $sdr);
           
-          ###################################
+          if ($cafd =~ /flex/xs) {                                                                  # Flächenfaktor Sonnenstand geführt
+              ($af, $sdr) = ___areaFactorTrack ( { name   => $name, 
+                                                   day    => $day,              
+                                                   dday   => $dday,
+                                                   chour  => $paref->{chour},
+                                                   hod    => $hod,
+                                                   tilt   => $ti,
+                                                   azimut => $az
+                                                 }
+                                               );
+              
+              debugLog ($paref, "apiProcess", "DWD API - Value of sunaz/sunalt not stored in pvHistory, workaround using 1.00/0.75")
+                        if(!isNumeric($af));
+              
+              $af  = 1.00 if(!isNumeric($af));
+              $sdr = 0.75 if(!isNumeric($sdr));
+               
+              if ($cafd eq 'flexShared') {                                                          # Direktstrahlung + Diffusstrahlung                                                                                                                          
+                  my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung                                                          
+                  my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung 
+              
+                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * $kJtokWh * $peak * $prdef);  # Rad wird in kW/m2 erwartet
+              }
+              else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
+                  $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);
+              }
+          }
+          else {                                                                                    # Flächenfaktor Fix
+              $af = ___areaFactorFix ($ti, $az);                                                    # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
+              $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);                       # Rad wird in kW/m2 erwartet
+          }
+      
+          $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                 # Startzeit wird verwendet, nicht laufende Stunde
           
-          # my $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);                   # Rad wird in kW/m2 erwartet
-
-          # debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, Area factor: $af");
-
-          # $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;            # Startzeit wird verwendet, nicht laufende Stunde
-          $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pvds;            # Startzeit wird verwendet, nicht laufende Stunde
+          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, Afactor: $af ($cafd)");
       }
   }
 
@@ -3489,20 +3505,31 @@ return $af;
 #  $sdr - Share of direct radiation = Faktor Anteil Direktstrahlung an Globalstrahlung (0.33 .. 0.75)
 #
 ##########################################################################################################
-sub ___areaShareFactor {
+sub ___areaFactorTrack {
   my $paref  = shift;
   my $name   = $paref->{name};
-  my $dtday  = $paref->{dtday};                                                 # Tag: 01, 02 ... 31
-  my $hod    = $paref->{hod};                                                   # Stunde des Tages 01, 02 ... 24
+  my $day    = $paref->{day};                                                   # aktueller Tag 01 .. 31
+  my $dday   = $paref->{dday};                                                  # abzufragender Tag: 01 .. 31
+  my $chour  = $paref->{chour};                                                 # aktuelle Stunde (00 .. 23)
+  my $hod    = $paref->{hod};                                                   # abzufragende Stunde des Tages 01, 02 ... 24
   my $tilt   = $paref->{tilt};                                                  # String Anstellwinkel / Neigung
   my $azimut = $paref->{azimut};                                                # String Ausrichtung / Azimut                              
   
   my $hash   = $defs{$name};
-                       
-  my $sunalt = HistoryVal ($hash, $dtday, $hod, 'sunalt', undef);               # Sonne Höhe (Altitude)
-  my $sunaz  = HistoryVal ($hash, $dtday, $hod, 'sunaz',  undef);               # Sonne Azimuth
   
-  return (0, 0) if(!defined $sunalt || !defined $sunaz);
+  my ($sunalt, $sunaz);
+  
+  if ($dday eq $day) {
+      $sunalt = HistoryVal ($hash, $dday, $hod, 'sunalt', undef);               # Sonne Höhe (Altitude)
+      $sunaz  = HistoryVal ($hash, $dday, $hod, 'sunaz',  undef);               # Sonne Azimuth
+  }
+  else {
+      my $nhtstr = 'NextHour'.sprintf "%02d",  (23 - (int $chour) + $hod);
+      $sunalt    = NexthoursVal ($hash, $nhtstr, 'sunalt', undef);
+      $sunaz     = NexthoursVal ($hash, $nhtstr, 'sunaz',  undef);
+  }
+  
+  return ('-', '-') if(!defined $sunalt || !defined $sunaz);
   
   my $pi180 = 0.0174532918889;                                                  # PI/180
 
@@ -6740,7 +6767,7 @@ sub centralTask {
   my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
   my $chour   = strftime "%H",       localtime($t);                                            # aktuelle Stunde in 24h format (00-23)
   my $minute  = strftime "%M",       localtime($t);                                            # aktuelle Minute (00-59)
-  my $day     = strftime "%d",       localtime($t);                                            # aktueller Tag  (range 01 to 31)
+  my $day     = strftime "%d",       localtime($t);                                            # aktueller Tag (range 01 .. 31)
   my $dayname = strftime "%a",       localtime($t);                                            # aktueller Wochentagsname
   my $debug   = getDebug ($hash);                                                              # Debug Module
 
@@ -7850,18 +7877,18 @@ sub _transferAPIRadiationValues {
   for my $num (0..47) {
       my ($fd,$fh) = calcDayHourMove ($chour, $num);
 
-      if ($fd > 1) {                                                                          # überhängende Werte löschen
+      if ($fd > 1) {                                                                                       # überhängende Werte löschen
           delete $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
           next;
       }
 
-      my $fh1    = $fh + 1;
-      my $wantts = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
-      my $wantdt = (timestampToTimestring ($wantts, $lang))[1];
-      my $nhtstr = 'NextHour'.sprintf "%02d", $num;
-      my ($wtday, $hod) = $wantdt =~ /(\d{2})\s(\d{2}):/xs;
-      $hod       = sprintf "%02d", int $hod + 1;                                              # Stunde des Tages
-      my $rad1h  = SolCastAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
+      my $fh1              = $fh + 1;
+      my $wantts           = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
+      my $wantdt           = (timestampToTimestring ($wantts, $lang))[1];
+      my $nhtstr           = 'NextHour'.sprintf "%02d", $num;
+      my ($wtday, $wthour) = $wantdt =~ /(\d{2})\s(\d{2}):/xs;
+      my $hod              = sprintf "%02d", int $wthour + 1;                                              # Stunde des Tages
+      my $rad1h            = SolCastAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
 
       $paref->{wantdt} = $wantdt;
       $paref->{wantts} = $wantts;
@@ -7925,7 +7952,7 @@ sub _transferAPIRadiationValues {
           $aivar    = sprintf "%.0f", (100 * $pvaifc / $est) if($est);                        # Übereinstimmungsgrad KI Forecast zu API Forecast in % 
 
           if ($msg eq 'accurate') {                                                           # KI liefert 'accurate' Treffer -> verwenden
-              if ($airn >= $aiAccTRNLim || ($aivar >= $aiAccLowLim && $aivar <= $aiAccUpLim)) {    
+              if ($airn >= $aiAccTRNMin || ($aivar >= $aiAccLowLim && $aivar <= $aiAccUpLim)) {    
                   $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
                   $pvfc  = $pvaifc;
                   $useai = 1;
@@ -7934,7 +7961,7 @@ sub _transferAPIRadiationValues {
               }
           }
           elsif ($msg eq 'spreaded') {                                                        # Abweichung AI von Standardvorhersage begrenzen
-              if ($airn >= $aiSpreadTRNLim || ($aivar >= $aiSpreadLowLim && $aivar <= $aiSpreadUpLim)) {
+              if ($airn >= $aiSpreadTRNMin || ($aivar >= $aiSpreadLowLim && $aivar <= $aiSpreadUpLim)) {
                   $data{$type}{$name}{nexthours}{$nhtstr}{aihit} = 1;
                   $pvfc  = $pvaifc;
                   $useai = 1;
@@ -13497,10 +13524,10 @@ sub _beamGraphic {
   $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                                 # Neue Zeile mit freiem Platz am Anfang
 
   my $ii = 0;
-
-  for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben
+  
+  for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben 
       next if(!$show_night && $hfcg->{$i}{weather} > 99
-                           && !$hfcg->{$i}{beam1}
+                           && !$hfcg->{$i}{beam1}                                     
                            && !$hfcg->{$i}{beam2});
       $ii++;
       last if($ii > $maxhours);
@@ -19812,7 +19839,7 @@ to ensure that the system configuration is correct.
          If the corresponding prerequisites are met, training data is collected and stored for the
          module-internal AI. <br>
          The data is deleted when it has exceeded the specified holding period (days).<br>
-         (default: 1095)
+         (default: 1825)
        </li>
        <br>
 
@@ -19822,6 +19849,26 @@ to ensure that the system configuration is correct.
          Training begins approx. 15 minutes after the hour specified in the attribute. <br>
          For example, with a set value of '3', training would start at around 03:15. <br>
          (default: 2)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlAreaFactorUsage"></a>
+       <li><b>ctrlAreaFactorUsage</b>   <br>
+	   (DWD model only, experimental)   <br><br>
+
+       When using the DWD model, an area factor of the solar modules is taken into account to calculate the 
+       expected generation. This experimental attribute determines the method for determining the area factor.
+       <br><br>
+
+       <ul>
+        <table>
+        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>fix</b>         </td><td>a uniquely determined factor is used (default)                                      </td></tr>
+           <tr><td> <b>flex</b>        </td><td>the factor is determined continuously on the basis of the sun's orbit               </td></tr>
+           <tr><td> <b>flexShared</b>  </td><td>as 'flex', additionally the proportion of direct radiation in the global radiation  </td></tr>
+		   <tr><td> <b>                </td><td>is approximated and the area factor is only applied to this proportion              </td></tr>
+         </table>
+       </ul>
        </li>
        <br>
 
@@ -22137,7 +22184,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Sind die entsprechenden Voraussetzungen gegeben, werden Trainingsdaten für die modulinterne KI gesammelt und
          gespeichert. <br>
          Die Daten werden gelöscht wenn sie die angegebene Haltedauer (Tage) überschritten haben.<br>
-         (default: 1095)
+         (default: 1825)
        </li>
        <br>
 
@@ -22147,6 +22194,27 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Der Start des Trainings erfolgt ca. 15 Minuten nach der im Attribut festgelegten vollen Stunde. <br>
          Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten. <br>
          (default: 2)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlAreaFactorUsage"></a>
+       <li><b>ctrlAreaFactorUsage</b>   <br>
+	   (nur Model DWD, experimentell)   <br><br>
+
+       Bei Verwendung des Model DWD wird zur Berechnung der voraussichtlichen Erzeugung ein Flächenfaktor der 
+	   Solarmodule berücksichtigt. Dieses experimentelle Attribut bestimmt das Verfahren zur Ermittlung des 
+       Flächenfaktors.
+       <br><br>
+
+       <ul>
+        <table>
+        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>fix</b>         </td><td>es wird ein einmalig ermittelter Faktor verwendet (default)                          </td></tr>
+           <tr><td> <b>flex</b>        </td><td>der Faktor wird auf Grundlage der Sonnenlaufbahn kontinuierlich ermittelt            </td></tr>
+           <tr><td> <b>flexShared</b>  </td><td>wie 'flex', zusätzlich wird der Antei der Direktstrahlung an der Globalstrahlung     </td></tr>
+		   <tr><td> <b>                </td><td>approximiert und der Flächenfaktor nur auf diesen Anteil angewendet                  </td></tr>
+         </table>
+       </ul>
        </li>
        <br>
 
