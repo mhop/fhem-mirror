@@ -161,7 +161,8 @@ my %vNotesIntern = (
   "1.34.0" => "30.09.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
                            "AI usage depending either of available number of rules or difference to api forecast ".
-                           "minor fix in ___readCandQ, new experimental attribute ctrlAreaFactorUsage ",
+                           "minor fix in ___readCandQ, new experimental attribute ctrlAreaFactorUsage ".
+                           "optional icon in attr setupOtherProducerXX ",
   "1.33.1" => "27.09.2024  bugfix of 1.33.0, add aiRulesNumber to pvCircular, limits of AI trained datasets for ".
                            "AI use (aiAccTRNMin, aiSpreadTRNMin)",
   "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorFix function ",
@@ -246,7 +247,7 @@ my %vNotesIntern = (
                            "delete CircularCloudkorrVal, show sun position in beamgrafic weather mouse over ".
                            "split pvCorrection into pvCorrectionRead and pvCorrectionWrite ".
                            "_checkSetupNotComplete: improve setup Wizzard for ForecastSolar-API ",
-  "1.16.2" => "22.02.2024  minor changes, R101 -> RR1c, totalrain instead of weatherrainprob, delete wrp r101 ".
+  "1.16.2" => "22.02.2024  minor changes, R101 -> RR1c, rr1c instead of weatherrainprob, delete wrp r101 ".
                            "delete wrp from circular & airaw, remove rain2bin, __getDWDSolarData: change \$runh, ".
                            "fix  Illegal division by zero Forum: https://forum.fhem.de/index.php?msg=1304009 ".
                            "DWD API: check age of Rad1h data, store pvcorrf of sunalt with value 200+x in pvCircular ",
@@ -476,6 +477,8 @@ my $b3fontcoldef   = '000000';                                                  
 my $b4coldef       = 'DBDBD0';                                                      # default Farbe Beam 4
 my $b4fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 4
 my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
+
+my $prodicondef    = 'sani_garden_pump';                                            # default Producer-Icon
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
 my $pPath = '?format=txt';                                                          # Download Format
@@ -1109,7 +1112,7 @@ my %hfspvh = (
   batouttotal       => { fn => \&_storeVal, storname => 'batouttotal',  validkey => undef,    fpar => undef    },    # totale Batterieentladung
   weatherid         => { fn => \&_storeVal, storname => 'weatherid',    validkey => undef,    fpar => undef    },    # Wetter ID
   weathercloudcover => { fn => \&_storeVal, storname => 'wcc',          validkey => undef,    fpar => undef    },    # Wolkenbedeckung
-  totalrain         => { fn => \&_storeVal, storname => 'rr1c',         validkey => undef,    fpar => undef    },    # Gesamtniederschlag (1-stündig) letzte 1 Stunde
+  rr1c              => { fn => \&_storeVal, storname => 'rr1c',         validkey => undef,    fpar => undef    },    # Gesamtniederschlag (1-stündig) letzte 1 Stunde
   pvcorrfactor      => { fn => \&_storeVal, storname => 'pvcorrf',      validkey => undef,    fpar => undef    },    # pvCorrectionFactor
   temperature       => { fn => \&_storeVal, storname => 'temp',         validkey => undef,    fpar => undef    },    # Außentemperatur
   conprice          => { fn => \&_storeVal, storname => 'conprice',     validkey => undef,    fpar => undef    },    # Bezugspreis pro kWh der Stunde
@@ -3412,18 +3415,20 @@ sub __getDWDSolarData {
           my $az   = $data{$type}{$name}{strings}{$string}{azimut};                            # Ausrichtung der Solarmodule
           $az     += 180;                                                                      # Umsetzung -180 - 180 in 0 - 360
 
-          my ($af, $pv, $sdr);
+          my ($af, $pv, $sdr, $wcc);
           
           if ($cafd =~ /flex/xs) {                                                                  # Flächenfaktor Sonnenstand geführt
-              ($af, $sdr) = ___areaFactorTrack ( { name   => $name, 
-                                                   day    => $day,              
-                                                   dday   => $dday,
-                                                   chour  => $paref->{chour},
-                                                   hod    => $hod,
-                                                   tilt   => $ti,
-                                                   azimut => $az
-                                                 }
-                                               );
+              ($af, $sdr, $wcc) = ___areaFactorTrack ( { name   => $name, 
+                                                         day    => $day,              
+                                                         dday   => $dday,
+                                                         chour  => $paref->{chour},
+                                                         hod    => $hod,
+                                                         tilt   => $ti,
+                                                         azimut => $az
+                                                       }
+                                                     );
+                                               
+              $wcc = 0 if(!isNumeric($wcc));
               
               debugLog ($paref, "apiProcess", "DWD API - Value of sunaz/sunalt not stored in pvHistory, workaround using 1.00/0.75")
                         if(!isNumeric($af));
@@ -3517,19 +3522,21 @@ sub ___areaFactorTrack {
   
   my $hash   = $defs{$name};
   
-  my ($sunalt, $sunaz);
+  my ($sunalt, $sunaz, $wcc);
   
   if ($dday eq $day) {
       $sunalt = HistoryVal ($hash, $dday, $hod, 'sunalt', undef);               # Sonne Höhe (Altitude)
       $sunaz  = HistoryVal ($hash, $dday, $hod, 'sunaz',  undef);               # Sonne Azimuth
+      $wcc    = HistoryVal ($hash, $dday, $hod, 'wcc',        0);               # Bewölkung
   }
   else {
       my $nhtstr = 'NextHour'.sprintf "%02d",  (23 - (int $chour) + $hod);
       $sunalt    = NexthoursVal ($hash, $nhtstr, 'sunalt', undef);
       $sunaz     = NexthoursVal ($hash, $nhtstr, 'sunaz',  undef);
+      $wcc       = NexthoursVal ($hash, $nhtstr, 'wcc',        0);
   }
   
-  return ('-', '-') if(!defined $sunalt || !defined $sunaz);
+  return ('-', '-', '-') if(!defined $sunalt || !defined $sunaz);
   
   my $pi180 = 0.0174532918889;                                                  # PI/180
 
@@ -3556,7 +3563,7 @@ sub ___areaFactorTrack {
              $sunalt >  10 && $sunalt <= 50 ? (($sunalt - 10) * 0.0105) + 0.33 :
              0.75;
  
-return ($daf, $sdr);
+return ($daf, $sdr, $wcc);
 }
 
 ####################################################################################################
@@ -5655,6 +5662,7 @@ sub _attrOtherProducer {                 ## no critic "not used"
       delete $paref->{prn};
   }
 
+  InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
   InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
@@ -6741,7 +6749,7 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################  
-
+  
   ##########################################################################################################################
 
   setModel ($hash);                                                                            # Model setzen
@@ -7580,25 +7588,25 @@ sub _transferWeatherValues {
 
       my $wid   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ww};               # signifikantes Wetter = Wetter ID
       my $wwd   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{wwd};              # Wetter Beschreibung
-      my $neff  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{neff};             # Effektive Wolkendecke
+      my $wcc   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{neff};             # Effektive Wolkendecke
       my $rr1c  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{rr1c};             # Gesamtniederschlag (1-stündig) letzte 1 Stunde
       my $temp  = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ttt};              # Außentemperatur
       my $don   = $data{$type}{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{don};              # Tag/Nacht-Grenze
 
-      my $nhtstr                                          = "NextHour".sprintf "%02d", $num;
-      $data{$type}{$name}{nexthours}{$nhtstr}{weatherid}  = $wid;
-      $data{$type}{$name}{nexthours}{$nhtstr}{cloudcover} = $neff;
-      $data{$type}{$name}{nexthours}{$nhtstr}{totalrain}  = $rr1c;
-      $data{$type}{$name}{nexthours}{$nhtstr}{rainrange}  = $rr1c;
-      $data{$type}{$name}{nexthours}{$nhtstr}{temp}       = $temp;
-      $data{$type}{$name}{nexthours}{$nhtstr}{DoN}        = $don;
+      my $nhtstr                                         = "NextHour".sprintf "%02d", $num;
+      $data{$type}{$name}{nexthours}{$nhtstr}{weatherid} = $wid;
+      $data{$type}{$name}{nexthours}{$nhtstr}{wcc}       = $wcc;
+      $data{$type}{$name}{nexthours}{$nhtstr}{rr1c}      = $rr1c;
+      $data{$type}{$name}{nexthours}{$nhtstr}{rainrange} = $rr1c;
+      $data{$type}{$name}{nexthours}{$nhtstr}{temp}      = $temp;
+      $data{$type}{$name}{nexthours}{$nhtstr}{DoN}       = $don;
 
       my $fh1 = $fh + 1;                                                                       # = hod
 
       if ($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}  = $wid;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt} = $wwd;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}        = $neff;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}        = $wcc;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{rr1c}       = $rr1c;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{temp}       = $temp;
 
@@ -7608,11 +7616,11 @@ sub _transferWeatherValues {
       }
 
       if ($fd == 0 && $fh1) {                                                                  # Weather in pvHistory speichern
-          writeToHistory ( { paref => $paref, key => 'weatherid',         val => $wid,       hour => $fh1 } );
-          writeToHistory ( { paref => $paref, key => 'weathercloudcover', val => $neff // 0, hour => $fh1 } );
-          writeToHistory ( { paref => $paref, key => 'totalrain',         val => $rr1c,      hour => $fh1 } );
-          writeToHistory ( { paref => $paref, key => 'temperature',       val => $temp,      hour => $fh1 } );
-          writeToHistory ( { paref => $paref, key => 'DoN',               val => $don,       hour => $fh1 } );
+          writeToHistory ( { paref => $paref, key => 'weatherid',         val => $wid,      hour => $fh1 } );
+          writeToHistory ( { paref => $paref, key => 'weathercloudcover', val => $wcc // 0, hour => $fh1 } );
+          writeToHistory ( { paref => $paref, key => 'rr1c',              val => $rr1c,     hour => $fh1 } );
+          writeToHistory ( { paref => $paref, key => 'temperature',       val => $temp,     hour => $fh1 } );
+          writeToHistory ( { paref => $paref, key => 'DoN',               val => $don,      hour => $fh1 } );
       }
   }
 
@@ -8075,14 +8083,14 @@ sub __calcPVestimates {
   my $hash    = $defs{$name};
 
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
-  my $totalrain   = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "totalrain",  0);          # Gesamtniederschlag während der letzten Stunde kg/m2
-  my $cloudcover  = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "cloudcover", 0);          # effektive Wolkendecke nächste Stunde X
+  my $rr1c        = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",            0);     # Gesamtniederschlag während der letzten Stunde kg/m2
+  my $wcc         = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "wcc",             0);     # effektive Wolkendecke nächste Stunde X
   my $temp        = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "temp", $tempbasedef);     # vorhergesagte Temperatur Stunde X
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
-  $paref->{cloudcover}  = $cloudcover;
-  my ($hc, $hq)         = ___readCandQ ($paref);                                                      # liest den anzuwendenden Korrekturfaktor
-  delete $paref->{cloudcover};
+  $paref->{wcc}  = $wcc;
+  my ($hc, $hq)  = ___readCandQ ($paref);                                                      # liest den anzuwendenden Korrekturfaktor
+  delete $paref->{wcc};
 
   my ($lh,$sq,$peakloss, $modtemp);
   my $pvsum   = 0;
@@ -8092,15 +8100,15 @@ sub __calcPVestimates {
       my $peak = StringVal ($hash, $string, 'peak', 0);                                               # String Peak (kWp)
 
       if ($acu =~ /on_complex/xs) {
-          $paref->{peak}        = $peak;
-          $paref->{cloudcover}  = $cloudcover;
-          $paref->{temp}        = $temp;
+          $paref->{peak} = $peak;
+          $paref->{wcc}  = $wcc;
+          $paref->{temp} = $temp;
 
           ($peakloss, $modtemp) = ___calcPeaklossByTemp ($paref);                                     # Reduktion Peakleistung durch Temperaturkoeffizienten der Module (vorzeichengehaftet)
           $peak                += $peakloss;
 
           delete $paref->{peak};
-          delete $paref->{cloudcover};
+          delete $paref->{wcc};
           delete $paref->{temp};
       }
 
@@ -8155,8 +8163,8 @@ sub __calcPVestimates {
       $lh = {                                                                                        # Log-Hash zur Ausgabe
           "Starttime"                => $wantdt,
           "Forecasted temperature"   => $temp." &deg;C",
-          "Cloudcover"               => $cloudcover,
-          "Total Rain last hour"     => $totalrain." kg/m2",
+          "Cloudcover"               => $wcc,
+          "Total Rain last hour"     => $rr1c." kg/m2",
           "PV Correction mode"       => ($acu ? $acu : 'no'),
           "PV generation forecast"   => $pvsum." Wh ".$logao,
       };
@@ -8188,7 +8196,7 @@ sub ___readCandQ {
   my $num   = $paref->{num};
   my $fh1   = $paref->{fh1};
   my $fd    = $paref->{fd};
-  my $cc    = $paref->{cloudcover};
+  my $wcc   = $paref->{wcc};
   my $sabin = $paref->{sabin};
   my $hash  = $defs{$name};
 
@@ -8203,7 +8211,7 @@ sub ___readCandQ {
   delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange};
 
   if ($acu =~ /on_complex/xs) {                                                                       # Autokorrektur complex soll genutzt werden
-      $crang     = cloud2bin ($cc);                                                                   # Range errechnen
+      $crang     = cloud2bin ($wcc);                                                                  # Range errechnen
       ($hc, $hq) = CircularSunCloudkorrVal ($hash, sprintf("%02d",$fh1), $sabin, $crang, undef);      # Korrekturfaktor/Qualität der Stunde des Tages (complex)                                                                                                 
       
       $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange} = $crang;
@@ -8260,13 +8268,13 @@ return ($hc, $hq);
 #
 ###################################################################
 sub ___calcPeaklossByTemp {
-  my $paref      = shift;
-  my $name       = $paref->{name};
-  my $peak       = $paref->{peak}       // return (0,0);
-  my $cloudcover = $paref->{cloudcover} // return (0,0);                                    # vorhergesagte Wolkendecke Stunde X
-  my $temp       = $paref->{temp}       // return (0,0);                                    # vorhergesagte Temperatur Stunde X
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $peak  = $paref->{peak} // return (0,0);
+  my $wcc   = $paref->{wcc}  // return (0,0);                                               # vorhergesagte Wolkendecke Stunde X
+  my $temp  = $paref->{temp} // return (0,0);                                               # vorhergesagte Temperatur Stunde X
   
-  my $modtemp  = $temp + ($tempmodinc * (1 - ($cloudcover/100)));                           # kalkulierte Modultemperatur
+  my $modtemp  = $temp + ($tempmodinc * (1 - ($wcc/100)));                                  # kalkulierte Modultemperatur
   my $peakloss = sprintf "%.2f", $tempcoeffdef * ($modtemp - $tempbasedef) * $peak / 100;
 
 return ($peakloss, $modtemp);
@@ -8442,6 +8450,8 @@ sub _transferProducerValues {
       my ($edread, $etunit) = split ":", $h->{etotal};                                                        # Readingname/Unit für Energie total (Erzeugung)
 
       next if(!$pcread || !$edread);
+      
+      $data{$type}{$name}{current}{'iconp'.$prn} = $h->{icon} ? $h->{icon} : $prodicondef;                    # Icon des Producers 
 
       my $pu = $pcunit =~ /^kW$/xi ? 1000 : 1;
       my $p  = ReadingsNum ($prdev, $pcread, 0) * $pu;                                                        # aktuelle Erzeugung (W)
@@ -13412,7 +13422,7 @@ sub _beamGraphicRemainingHours {
           $val1                = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',         0);
           $val4                = NexthoursVal ($hash, 'NextHour'.$nh, 'confc',        0);
           $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, 'weatherid',  999);
-          $hfcg->{$i}{wcc}     = NexthoursVal ($hash, 'NextHour'.$nh, 'cloudcover', '-');
+          $hfcg->{$i}{wcc}     = NexthoursVal ($hash, 'NextHour'.$nh, 'wcc',        '-');
           $hfcg->{$i}{sunalt}  = NexthoursVal ($hash, 'NextHour'.$nh, 'sunalt',     '-');
           $hfcg->{$i}{sunaz}   = NexthoursVal ($hash, 'NextHour'.$nh, 'sunaz',      '-');
       }
@@ -14725,11 +14735,11 @@ sub aiGetResult {
 
   debugLog ($paref, 'aiData', "Start AI result check for hod: $hod");
 
-  my $wcc    = NexthoursVal ($hash, $nhtstr, 'cloudcover', 0);
-  my $rr1c   = NexthoursVal ($hash, $nhtstr, 'totalrain',  0);
-  my $temp   = NexthoursVal ($hash, $nhtstr, 'temp',      20);
-  my $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt',     0);
-  my $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',      0);
+  my $wcc    = NexthoursVal ($hash, $nhtstr, 'wcc',     0);
+  my $rr1c   = NexthoursVal ($hash, $nhtstr, 'rr1c',    0);
+  my $temp   = NexthoursVal ($hash, $nhtstr, 'temp',   20);
+  my $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt',  0);
+  my $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',   0);
 
   my $tbin  = temp2bin   ($temp);
   my $cbin  = cloud2bin  ($wcc);
@@ -15574,9 +15584,9 @@ sub listDataPool {
           my $pvaifc  = NexthoursVal ($hash, $idx, 'pvaifc',     '-');             # PV Forecast der KI
           my $aihit   = NexthoursVal ($hash, $idx, 'aihit',      '-');             # KI ForeCast Treffer Status
           my $wid     = NexthoursVal ($hash, $idx, 'weatherid',  '-');
-          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover', '-');
+          my $wcc     = NexthoursVal ($hash, $idx, 'wcc',        '-');
           my $crang   = NexthoursVal ($hash, $idx, 'cloudrange', '-');
-          my $rr1c    = NexthoursVal ($hash, $idx, 'totalrain',  '-');
+          my $rr1c    = NexthoursVal ($hash, $idx, 'rr1c',       '-');
           my $rrange  = NexthoursVal ($hash, $idx, 'rainrange',  '-');
           my $rad1h   = NexthoursVal ($hash, $idx, 'rad1h',      '-');
           my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',    '-');
@@ -15593,7 +15603,7 @@ sub listDataPool {
           $sq        .= "\n              ";
           $sq        .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc";
           $sq        .= "\n              ";
-          $sq        .= "confcEx: $confcex, DoN: $don, wid: $wid, wcc: $neff, rr1c: $rr1c, temp=$temp";
+          $sq        .= "confcEx: $confcex, DoN: $don, wid: $wid, wcc: $wcc, rr1c: $rr1c, temp=$temp";
           $sq        .= "\n              ";
           $sq        .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt";
           $sq        .= "\n              ";
@@ -15614,12 +15624,12 @@ sub listDataPool {
           my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',  '-/-');
           my $aihit   = NexthoursVal ($hash, $idx, 'aihit',      '-');
           my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',       '-');
-          my $neff    = NexthoursVal ($hash, $idx, 'cloudcover', '-');
+          my $wcc     = NexthoursVal ($hash, $idx, 'wcc',        '-');
           my $sunalt  = NexthoursVal ($hash, $idx, 'sunalt',     '-');
 
           my ($f,$q)  = split "/", $pvcorrf;
           $sq        .= "\n" if($sq);
-          $sq        .= "Start: $nhts, Quality: $q, Factor: $f, AI usage: $aihit, PV expect: $pvfc Wh, Sun Alt: $sunalt, Cloud: $neff";
+          $sq        .= "Start: $nhts, Quality: $q, Factor: $f, AI usage: $aihit, PV expect: $pvfc Wh, Sun Alt: $sunalt, Cloud: $wcc";
       }
   }
 
@@ -18332,13 +18342,13 @@ return ($pvrlsum, $pvfcsum, $dnumsum);
 # $nhr: nächste Stunde (NextHour00, NextHour01,...)
 # $key: starttime  - Startzeit der abgefragten nächsten Stunde
 #       hourofday  - Stunde des Tages
-#       pvfc - PV Vorhersage in Wh
+#       pvfc       - PV Vorhersage in Wh
 #       pvaifc 	   - erwartete PV Erzeugung der KI (Wh)
 #       aihit      - Trefferstatus KI
 #       weatherid  - DWD Wetter id
-#       cloudcover - DWD Wolkendichte
+#       wcc        - DWD Wolkendichte
 #       cloudrange - berechnete Bewölkungsrange
-#       totalrain  - Gesamtniederschlag während der letzten Stunde kg/m2
+#       rr1c       - Gesamtniederschlag während der letzten Stunde kg/m2
 #       rad1h      - Globalstrahlung (kJ/m2)
 #       confc      - prognostizierter Hausverbrauch (Wh)
 #       confcEx    - prognostizierter Hausverbrauch ohne registrierte Consumer (Wh)
@@ -19407,11 +19417,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as abnormal                    </td></tr>
             <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                                   </td></tr>
             <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                                                 </td></tr>
+            <tr><td> <b>rr1c</b>           </td><td>Total precipitation during the last hour kg/m2                                                                           </td></tr>
             <tr><td> <b>sunalt</b>         </td><td>Altitude of the sun (in decimal degrees)                                                                                 </td></tr>
             <tr><td> <b>sunaz</b>          </td><td>Azimuth of the sun (in decimal degrees)                                                                                  </td></tr>
             <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                                            </td></tr>
             <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                                                    </td></tr>
-            <tr><td> <b>rr1c</b>           </td><td>Total precipitation during the last hour kg/m2                                                                           </td></tr>
          </table>
       </ul>
       </li>
@@ -20817,7 +20827,7 @@ to ensure that the system configuration is correct.
        <br>
        
        <a id="SolarForecast-attr-setupOtherProducer" data-pattern="setupOtherProducer.*"></a>
-       <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt;  </b> <br><br>
+       <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; [icon=&lt;Icon&gt;] </b> <br><br>
 
        Defines any device and its readings for the delivery of other generation values 
 	   (e.g. CHP, wind generation, emergency generator). 
@@ -20827,6 +20837,7 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>icon</b>     </td><td>Icon for displaying the producer in the flow chart (optional)                                                              </td></tr>
            <tr><td> <b>pcurr</b>    </td><td>Reading which returns the current generation as a positive value or a self-consumption (special case) as a negative value  </td></tr>
            <tr><td> <b>etotal</b>   </td><td>Reading which supplies the total energy generated (a continuously ascending counter)                                       </td></tr>
            <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                                                </td></tr>
@@ -20838,7 +20849,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh
+         attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh icon=Ventilator_wind
        </ul>
        <br>
 
@@ -21753,12 +21764,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet     </td></tr>
             <tr><td> <b>pvcorrf</b>         </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                       </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>Globalstrahlung (kJ/m2)                                                                            </td></tr>
+            <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                     </td></tr>
             <tr><td> <b>sunalt</b>          </td><td>Höhe der Sonne (in Dezimalgrad)                                                                    </td></tr>
             <tr><td> <b>sunaz</b>           </td><td>Azimuth der Sonne (in Dezimalgrad)                                                                 </td></tr>
             <tr><td> <b>wid</b>             </td><td>Identifikationsnummer des Wetters                                                                  </td></tr>
             <tr><td> <b>wcc</b>             </td><td>effektive Wolkenbedeckung                                                                          </td></tr>
-            <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                     </td></tr>
-
          </table>
       </ul>
       </li>
@@ -23163,7 +23173,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <br>
       
       <a id="SolarForecast-attr-setupOtherProducer" data-pattern="setupOtherProducer.*"></a>
-      <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt;  </b> <br><br>
+      <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; [icon=&lt;Icon&gt;] </b> <br><br>
 
       Legt ein beliebiges Device und dessen Readings zur Lieferung sonstiger Erzeugungswerte fest 
 	  (z.B. BHKW, Winderzeugung, Notstromaggregat). 
@@ -23173,6 +23183,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+          <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Producers in der Flowgrafik (optional)                                                              </td></tr>
           <tr><td> <b>pcurr</b>    </td><td>Reading welches die aktuelle Erzeugung als positiven Wert oder einen Eigenverbrauch (Sonderfall) als negativen Wert liefert  </td></tr>
           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte Energie liefert (ein stetig aufsteigender Zähler)                                       </td></tr>
           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                                       </td></tr>
@@ -23184,7 +23195,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
         <b>Beispiel: </b> <br>
-        attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh
+        attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh icon=Ventilator_wind
       </ul>
       <br>
 
