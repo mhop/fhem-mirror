@@ -50,14 +50,13 @@ use HttpUtils;
 eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # Debian: sudo apt-get install libjson-perl
 eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval'
 
-use FHEM::SynoModules::SMUtils qw(
-                                   checkModVer
+use FHEM::SynoModules::SMUtils qw (checkModVer
                                    evaljson
                                    getClHash
                                    delClHash
                                    moduleVersion
                                    trim
-                                 );                                                  # Hilfsroutinen Modul
+                                  );                                                 # Hilfsroutinen Modul
 
 use Data::Dumper;
 use Blocking;
@@ -68,8 +67,7 @@ use MIME::Base64;
 BEGIN {
   # Import from main::
   GP_Import(
-      qw(
-          attr
+      qw (attr
           asyncOutput
           AnalyzePerlCommand
           AnalyzeCommandChain
@@ -137,7 +135,7 @@ BEGIN {
           FW_widgetOverride
           FW_wname
           readyfnlist
-        )
+         )
   );
 
   # Export to main context with different name
@@ -162,7 +160,9 @@ my %vNotesIntern = (
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
                            "AI usage depending either of available number of rules or difference to api forecast ".
                            "minor fix in ___readCandQ, new experimental attribute ctrlAreaFactorUsage ".
-                           "optional icon in attr setupOtherProducerXX ",
+                           "optional icon in attr setupOtherProducerXX, integrate Producer to _flowGraphic (kask) ".
+                           "don't show Consumer or Producer if it isn't defined any kind of it ".
+                           "Optimization of space in the flow chart above generators and below consumers ",
   "1.33.1" => "27.09.2024  bugfix of 1.33.0, add aiRulesNumber to pvCircular, limits of AI trained datasets for ".
                            "AI use (aiAccTRNMin, aiSpreadTRNMin)",
   "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorFix function ",
@@ -1205,7 +1205,7 @@ sub Initialize {
                                 "ctrlBatSocManagement:textField-long ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#14 ".
-                                "ctrlAreaFactorUsage:fix,flex,flexShared ".
+                                "ctrlAreaFactorUsage:fix,trackFull,trackShared ".
                                 "ctrlGenPVdeviation:daily,continuously ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
@@ -3314,14 +3314,10 @@ return;
 }
 
 ##################################################################################################
-#   Abruf DWD Strahlungsdaten und Rohdaten ohne Korrektur
-#   speichern in solcastapi Hash
+# Abruf DWD Strahlungsdaten und Rohdaten ohne Korrektur
 #
-#                   !!!! NACHFOLGENDE INFO GILT NUR BEI DWD RAD1H VERWENDUNG !!!!
-#                   #############################################################
-#
-#            PV Forecast Rad1h in kWh / Wh
-# Berechnung nach Formel 1 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
+# Berechnung nach Formel 1 aus http://www.ing-büro-junge.de/html/photovoltaik.html 
+# als Jahreserträge:
 #
 #    * Faktor für Umwandlung kJ in kWh:   0.00027778
 #    * Eigene Modulfläche in qm z.B.:     31,04
@@ -3329,8 +3325,8 @@ return;
 #    * Wirkungsgrad WR in % z.B.:         98,3
 #    * Korrekturwerte wegen Ausrichtung/Verschattung etc.
 #
-# Die Formel wäre dann:
-# Ertrag in Wh = Rad1h * 0.00027778 * 31,04 qm * 16,52% * 98,3% * 100% * 1000
+#    Die Formel wäre dann:
+#    Ertrag in Wh = Rad1h * 0.00027778 * 31,04 qm * 16,52% * 98,3% * 100% * 1000
 #
 # Berechnung nach Formel 2 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
 #
@@ -3348,7 +3344,7 @@ return;
 # hier beschrieben:
 # https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 #
-# !!! PV Berechnungsgrundlagen !!!
+# PV Berechnungsgrundlagen
 # https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/ertrag
 # http://www.ing-büro-junge.de/html/photovoltaik.html
 #
@@ -3417,7 +3413,7 @@ sub __getDWDSolarData {
 
           my ($af, $pv, $sdr, $wcc);
           
-          if ($cafd =~ /flex/xs) {                                                                  # Flächenfaktor Sonnenstand geführt
+          if ($cafd =~ /track/xs) {                                                                  # Flächenfaktor Sonnenstand geführt
               ($af, $sdr, $wcc) = ___areaFactorTrack ( { name   => $name, 
                                                          day    => $day,              
                                                          dday   => $dday,
@@ -3429,6 +3425,7 @@ sub __getDWDSolarData {
                                                      );
                                                
               $wcc = 0 if(!isNumeric($wcc));
+              $wcc = cloud2bin($wcc);
               
               debugLog ($paref, "apiProcess", "DWD API - Value of sunaz/sunalt not stored in pvHistory, workaround using 1.00/0.75")
                         if(!isNumeric($af));
@@ -3436,7 +3433,7 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
                
-              if ($cafd eq 'flexShared') {                                                          # Direktstrahlung + Diffusstrahlung                                                                                                                          
+              if ($cafd eq 'trackShared') {                                                         # Direktstrahlung + Diffusstrahlung                                                                                                                          
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung                                                          
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung 
               
@@ -5682,7 +5679,10 @@ sub __delProducerValues {
   deleteReadingspec ($hash, ".*_PPreal".$prn);
   readingsDelete    ($hash, 'Current_PP'.$prn);
   delete $data{$type}{$name}{current}{'generationp'.$prn};
-  delete $data{$type}{$name}{current}{'etotalp'.$prn};
+  delete $data{$type}{$name}{current}{'etotalp'    .$prn};
+  delete $data{$type}{$name}{current}{'iconp'      .$prn};
+  delete $data{$type}{$name}{current}{'namep'      .$prn};
+  delete $data{$type}{$name}{current}{'aliasp'     .$prn};
   
   for my $hod (keys %{$data{$type}{$name}{circular}}) {
       delete $data{$type}{$name}{circular}{$hod}{'pprl'.$prn};
@@ -5690,7 +5690,7 @@ sub __delProducerValues {
   
   for my $dy (sort keys %{$data{$type}{$name}{pvhist}}) {
       for my $hr (sort keys %{$data{$type}{$name}{pvhist}{$dy}}) {
-          delete $data{$type}{$name}{pvhist}{$dy}{$hr}{'pprl'.$prn};
+          delete $data{$type}{$name}{pvhist}{$dy}{$hr}{'pprl'   .$prn};
           delete $data{$type}{$name}{pvhist}{$dy}{$hr}{'etotalp'.$prn};
       }
   }
@@ -8455,9 +8455,9 @@ sub _transferProducerValues {
 
       my $pu = $pcunit =~ /^kW$/xi ? 1000 : 1;
       my $p  = ReadingsNum ($prdev, $pcread, 0) * $pu;                                                        # aktuelle Erzeugung (W)
-      $p     = $p < 0 ? 0 : sprintf("%.0f", $p);                                              
+      $p     = $p < 0 ? 0 : $p;                                              
 
-      storeReading ('Current_PP'.$prn, $p.' W');
+      storeReading ('Current_PP'.$prn, sprintf("%.1f", $p).' W');
       $data{$type}{$name}{current}{'generationp'.$prn} = $p;                               
 
       my $etu    = $etunit =~ /^kWh$/xi ? 1000 : 1;
@@ -8482,7 +8482,9 @@ sub _transferProducerValues {
       }
 
       $data{$type}{$name}{current}{'etotalp'.$prn} = $etotal;                                                # aktuellen etotal des WR speichern
-
+      $data{$type}{$name}{current}{'namep'  .$prn} = $prdev;                                                 # Name des Producerdevices
+      $data{$type}{$name}{current}{'aliasp' .$prn} = AttrVal ($prdev, 'alias', $prdev);                      # Alias Producer
+      
       if ($ethishour < 0) {
           $ethishour = 0;
           my $vl     = 3;
@@ -13878,6 +13880,7 @@ return $ret;
 sub _flowGraphic {
   my $paref         = shift;
   my $name          = $paref->{name};
+  my $type          = $paref->{type};
   my $flowgsize     = $paref->{flowgsize};
   my $flowgani      = $paref->{flowgani};
   my $flowgshift    = $paref->{flowgshift};                   # Verschiebung der Flußgrafikbox (muß negiert werden)
@@ -13888,27 +13891,60 @@ sub _flowGraphic {
   my $consDist      = $paref->{flowgconsDist};
   my $css           = $paref->{css};
   
+  my $hasbat     = 1;                                         # initial Batterie vorhanden
+  my $flowgprods = 1;                                         # Producer in der Energieflußgrafik anzeigen per default
+  
   my $hash       = $defs{$name};
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
-  my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
-  my $cpv        = ReadingsNum ($name, 'Current_PV',              0);
+  my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';  # Animation Ja/Nein
   my $cgc        = ReadingsNum ($name, 'Current_GridConsumption', 0);
   my $cgfi       = ReadingsNum ($name, 'Current_GridFeedIn',      0);
   my $csc        = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
-  my $gp01       = CurrentVal  ($hash, 'generationp01',           0);
-  my $gp02       = CurrentVal  ($hash, 'generationp02',           0);
-  my $gp03       = CurrentVal  ($hash, 'generationp03',           0);
-  my $cc_dummy   = $cc;
+  my $cpv        = ReadingsNum ($name, 'Current_PV',              0);
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
+  my $cc_dummy   = $cc;
+  
+  ## definierte Producer ermitteln und deren 
+  ## aktuelle Leistung bestimmen
+  ############################################
+  my $producercount = 0;
+  my $ppall         = 0;                                                       # Summe Erzeugung alle Poducer
+  my @producers;
+  
+  for my $i (1..$maxproducer) {
+      my $p = CurrentVal ($hash, 'generationp'.(sprintf "%02d", ($i)), undef);
 
-  my $bat_color  = $soc < 26 ? 'flowg bat25' :
-                   $soc < 76 ? 'flowg bat50' :
-                   'flowg bat75';
+      if (defined $p) {
+          push @producers, sprintf "%02d", $i;
+          $producercount += 1;
+          $ppall         += $p;
+      }
+  }
+  
+  $ppall      = sprintf("%.0f", $ppall);
+  $flowgprods = 0 if(!$producercount);                                         # Producer Anzeige ausschalten wenn keine Producer definiert
+  
+  ## definierte Verbraucher ermitteln
+  #####################################
+  my $consumercount = 0;
+  my @consumers;
+  
+  for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {           # definierte Verbraucher ermitteln
+      next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                     # auszublendende Consumer nicht berücksichtigen
+      push @consumers, $c;
+      $consumercount += 1;
+  }
 
-  my $hasbat     = 1;
+  $flowgcons = 0 if(!$consumercount);                                          # Consumer Anzeige ausschalten wenn keine Consumer definiert
+
+  ## Batterie + Werte festlegen
+  ###############################  
+  my $bat_color = $soc < 26 ? 'flowg bat25' :
+                  $soc < 76 ? 'flowg bat50' :
+                  'flowg bat75';
 
   if (!defined($batin) && !defined($batout)) {
       $hasbat = 0;
@@ -13916,55 +13952,56 @@ sub _flowGraphic {
       $batout = 0;
       $soc    = 0;
   }
-  else {
-      #$csc -= $batout;
-  }
 
   my $grid_color    = $cgfi   ? 'flowg grid_color1'               : 'flowg grid_color2';
-  $grid_color       = 'flowg grid_color3'  if (!$cgfi && !$cgc && $batout);                    # dritte Farbe
   my $cgc_style     = $cgc    ? 'flowg active_in'                 : 'flowg inactive_in';
   my $batout_style  = $batout ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
+  $grid_color       = 'flowg grid_color3'  if(!$cgfi && !$cgc && $batout);                     # dritte Farbe
+  my $cgc_direction = 'M490,515 L670,590';                                                     # Batterientladung ins Netz
 
-  my $cgc_direction = 'M490,305 L670,510';                                                     # Batterientladung ins Netz
-
-  if ($batout) {
+  if ($batout) {                                                      # Batterie wird entladen
       my $cgfo = $cgfi - $cpv;
 
-      if($cgfo > 1) {
-        $cgc_style     = 'flowg active_out';
-        $cgc_direction = 'M670,510 L490,305';
-        $cgfi         -= $cgfo;
-        $cgc           = $cgfo;
+      if ($cgfo > 1) {
+          $cgc_style     = 'flowg active_out';
+          $cgc_direction = 'M670,590 L490,515';
+          $cgfi         -= $cgfo;
+          $cgc           = $cgfo;
       }
   }
 
-  my $batout_direction = 'M902,305 L730,510';                                                  # Batterientladung aus Netz
+  my $batout_direction = 'M902,515 L730,590';                                                  
 
-  if ($batin) {
+  if ($batin) {                                                       # Batterie wird geladen
       my $gbi = $batin - $cpv;
 
-      if ($gbi > 1) {
+      if ($gbi > 1) {                                                 # Batterieladung anteilig aus Hausnetz geladen                      
           $batin            -= $gbi;
           $batout_style      = 'flowg active_in';
-          $batout_direction  = 'M730,510 L902,305';
+          $batout_direction  = 'M730,590 L902,515';
           $batout            = $gbi;
       }
   }
 
-  my $sun_color    = $cpv          ? 'flowg sun_active'              : 'flowg sun_inactive';
-  my $batin_style  = $batin        ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
-  my $csc_style    = $csc && $cpv  ? 'flowg active_out'              : 'flowg inactive_out';
-  my $cgfi_style   = $cgfi         ? 'flowg active_out'              : 'flowg inactive_out';
+  ## SVG Box initialisieren
+  ###########################
+  my $sun_color   = $cpv                     ? 'flowg sun_active'              : 'flowg sun_inactive';
+  my $batin_style = $batin                   ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
+  my $csc_style   = $csc && ($cpv || $ppall) ? 'flowg active_out'              : 'flowg inactive_out';
+  my $cgfi_style  = $cgfi                    ? 'flowg active_out'              : 'flowg inactive_out';
 
-  my $vbminx       = -10 * $flowgshift;                                                          # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
-  my $vbminy       = -25;
-  my $vbwidth      = 800;                                                                        # width and height specify the viewBox size
-  my $vbhight      = !$flowgcons   ? 480 :                      
-                     $flowgconTime ? 700 :
-                     680;
-  
+  my $vbwidth = 800;                                                                        # width and height specify the viewBox size
+  my $vbminx  = -10 * $flowgshift;                                                          # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbminy  = $flowgprods ? -25 : 100;
+
+  my $vbhight = !$flowgcons    ? 380 :                      
+                !$flowgconTime ? 590 :
+                610; 
+                
+  $vbhight += 100 if($flowgprods);
+
   my $vbox = "$vbminx $vbminy $vbwidth $vbhight";
-
+  
   my $ret = << "END0";
       <style>
       $css
@@ -13973,7 +14010,7 @@ sub _flowGraphic {
 
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$style" id="SVGPLOT">
 
-      <g transform="translate(400,50)">
+      <g transform="translate(400,200)">
         <g>
             <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
@@ -14001,33 +14038,50 @@ sub _flowGraphic {
         <circle cx="0" cy="0" class="$sun_color" r="16" stroke-width="2"/>
       </g>
 
-      <g id="home" fill="grey" transform="translate(352,310),scale(4)">
+      <g id="home" fill="grey" transform="translate(352,340),scale(4)">
           <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
       </g>
 
-      <g id="grid" class="$grid_color" transform="translate(215,150),scale(3.0)">
+      <g id="grid" class="$grid_color" transform="translate(215,260),scale(3.0)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
       </g>
 END0
 
-  ## get consumer list and display in Graphics
-  ##############################################
+  ## Producer Liste und Icons in Grafik anzeigen
+  ################################################
   my $pos_left       = 0;
-  my $consumercount  = 0;
-  my $consumer_start = 0;
-  my $currentPower   = 0;
-  my @consumers;
-
-  if ($flowgcons) {
-      my $type = $paref->{type};
-
-      for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {                            # definierte Verbraucher ermitteln
-          next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                                      # ausgeblendete Consumer nicht berücksichtigen
-          push @consumers, $c;
+  my $producer_start = 0;
+  my $producerPower  = 0;
+    
+  if ($flowgprods) {
+      if ($producercount % 2) {
+          $producer_start = 350 - ($consDist  * (($producercount -1) / 2));
+      }
+      else {
+          $producer_start = 350 - (($consDist / 2) * ($producercount-1));
       }
 
-      $consumercount = scalar @consumers;
+      $pos_left = $producer_start + 25;
+      
+      for my $prnxnum (@producers) {
+          my $palias = CurrentVal ($hash, 'aliasp'.$prnxnum, 'Producer'.$prnxnum);
+          my $picon  = CurrentVal ($hash, 'iconp'.$prnxnum,  $prodicondef);                         # Icon des Producerdevices
+          
+          $ret .= '<g id="producer_'.$prnxnum.'" fill="grey" transform="translate('.$pos_left.',0),scale(0.15)">';
+          $ret .= "<title>$palias</title>".FW_makeImage($picon, '');
+          $ret .= '</g> ';
 
+          $pos_left += $consDist;
+      }
+  }
+  
+  ## Consumer Liste und Icons in Grafik anzeigen
+  ###############################################
+  $pos_left          = 0;
+  my $consumer_start = 0;
+  my $currentPower   = 0;
+    
+  if ($flowgcons) {
       if ($consumercount % 2) {
           $consumer_start = 350 - ($consDist  * (($consumercount -1) / 2));
       }
@@ -14050,10 +14104,13 @@ END0
           $pos_left += $consDist;
       }
   }
+  
+  ## Batterie, PV, Netz Laufketten
+  ##################################
 
   if ($hasbat) {
       $ret .= << "END1";
-      <g class="$bat_color" transform="translate(610,135),scale(.30) rotate (90)">
+      <g class="$bat_color" transform="translate(610,245),scale(.30) rotate (90)">
       <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
       <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
 END1
@@ -14067,37 +14124,70 @@ END1
 
   if ($flowgconX) {                                                                                # Dummy Consumer
       my $dumcol = $cc_dummy <= 0 ? '@grey' : q{};                                                 # Einfärbung Consumer Dummy
-      $ret      .= '<g id="consumer_X" fill="grey" transform="translate(520,325),scale(0.09)">';
+      $ret      .= '<g id="consumer_X" fill="grey" transform="translate(520,360),scale(0.09)">';
       $ret      .= "<title>consumer_X</title>".FW_makeImage('light_light_dim_100'.$dumcol, '');
       $ret      .= '</g> ';
-   }
+  }
 
-    $ret .= << "END2";
-    <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-    <path id="pv-home"   class="$csc_style"  d="M700,100 L700,510" />
-    <path id="pv-grid"   class="$cgfi_style" d="M670,100 L490,270" />
-    <path id="grid-home" class="$cgc_style"  d="$cgc_direction" />
+  $ret .= << "END2";
+  <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
+  <path id="pv-home"   class="$csc_style"  d="M700,400 L700,580" />
+  <path id="pv-grid"   class="$cgfi_style" d="M670,400 L490,480" />
+  <path id="grid-home" class="$cgc_style"  d="$cgc_direction" />
 END2
 
   if ($hasbat) {
       $ret .= << "END3";
       <path id="bat-home" class="$batout_style" d="$batout_direction" />
-      <path id="pv-bat"   class="$batin_style"  d="M730,100 L910,270" />
+      <path id="pv-bat"   class="$batin_style"  d="M730,400 L910,480" /> 
 END3
   }
 
-   if ($flowgconX) {                                                                              # Dummy Consumer
+  ## Dummy Consumer Laufketten
+  ##############################
+   if ($flowgconX) {                                                                            
       my $consumer_style = 'flowg inactive_out';
       $consumer_style    = 'flowg active_in' if($cc_dummy > 1);
-
-      my $chain_color = "";                                                                       # Farbe der Laufkette Consumer-Dummy
+      my $chain_color    = "";                                                        # Farbe der Laufkette Consumer-Dummy
+      
       if ($cc_dummy > 0.5) {
           $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
           #$chain_color  = 'style="stroke: #DF0101;"';
       }
 
-      $ret .= qq{<path id="home-consumer_X" class="$consumer_style" $chain_color d="M790,620 L930,620" />};
+      $ret .= qq{<path id="home-consumer_X" class="$consumer_style" $chain_color d="M790,690 L930,690" />};
    }
+
+  ## Producer Laufketten
+  ########################
+  if ($flowgprods) {
+      $pos_left              = $producer_start * 2;
+      my $pos_left_start_con = 0;
+      my $distance_con       = 25;
+
+      if ($producercount % 2) {
+          $pos_left_start_con = 700 - ($distance_con  * (($producercount -1) / 2));
+      }
+      else {
+          $pos_left_start_con = 700 - ((($distance_con ) / 2) * ($producercount-1));
+      }
+
+      for my $producer (@producers) {
+          my $power          = CurrentVal ($hash, 'generationp'.$producer, 0);
+          my $consumer_style = 'flowg inactive_out';
+             $consumer_style = 'flowg active_out' if($power > 0);
+          my $chain_color    = "";                                                            # Farbe der Laufkette des Producers
+
+          if ($power > 0) {
+              #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$power,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+              $chain_color  = 'style="stroke: darkorange;"';
+          }
+
+          $ret                .= qq{<path id="genproducer_$producer " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_con,200" />};   # Design Consumer Laufkette
+          $pos_left           += ($consDist * 2);
+          $pos_left_start_con += $distance_con;
+      }
+  }
 
   ## Consumer Laufketten
   ########################
@@ -14129,32 +14219,80 @@ END3
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
           if ($p > 0.5) {
-              $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+              $chain_color = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
               #$chain_color  = 'style="stroke: #DF0101;"';
           }
 
-          $ret            .= qq{<path id="home-consumer_$c" class="$consumer_style" $chain_color d="M$pos_left_start,700 L$pos_left,850" />};   # Design Consumer Laufkette
+          $ret            .= qq{<path id="home-consumer_$c" class="$consumer_style" $chain_color d="M$pos_left_start,780 L$pos_left,850" />};   # Design Consumer Laufkette
           $pos_left       += ($consDist * 2);
           $pos_left_start += $distance;
       }
   }
 
-  ## Angaben Dummy-Verbraucher
-  #############################
-  $cc_dummy = sprintf("%.0f",$cc_dummy);
-
   ## Textangaben an Grafikelementen
   ###################################
-  $ret .= qq{<text class="flowg text" id="pv-txt"        x="800"  y="15"  style="text-anchor: start;">$cpv</text>}        if ($cpv);
-  $ret .= qq{<text class="flowg text" id="bat-txt"       x="1110" y="300" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Ladungs Text
-  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730"  y="300" style="text-anchor: start;">$csc</text>}        if ($csc && $cpv);
-  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525"  y="200" style="text-anchor: end;">$cgfi</text>}         if ($cgfi);
-  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="515"  y="420" style="text-anchor: end;">$cgc</text>}          if ($cgc);
-  $ret .= qq{<text class="flowg text" id="batout-txt"    x="880"  y="420" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
-  $ret .= qq{<text class="flowg text" id="batin-txt"     x="880"  y="200" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat);
-  $ret .= qq{<text class="flowg text" id="home-txt"      x="600"  y="640" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
-  $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1085" y="640" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
+  $cc_dummy     = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
+  my $csc_ppall = $csc + $ppall;
+  $ret .= qq{<text class="flowg text" id="pv-txt"        x="800"  y="320" style="text-anchor: start;">$cpv</text>}        if ($cpv);
+  $ret .= qq{<text class="flowg text" id="bat-txt"       x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
+  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730"  y="520" style="text-anchor: start;">$csc_ppall</text>}  if ($csc_ppall); 
+  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525"  y="420" style="text-anchor: end;">$cgfi</text>}         if ($cgfi); 
+  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc); 
+  $ret .= qq{<text class="flowg text" id="batout-txt"    x="880"  y="610" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat); 
+  $ret .= qq{<text class="flowg text" id="batin-txt"     x="880"  y="420" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat); 
+  $ret .= qq{<text class="flowg text" id="home-txt"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
+  $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy 
+  
+  ## Textangabe Producer
+  ########################
+  if ($flowgprods) {
+      $pos_left = ($producer_start * 2) - 50;                                                         # -XX -> Start Lage producer Beschriftung
 
+      for my $prnxnum (@producers) {
+          $currentPower = sprintf "%.0f", CurrentVal ($hash, 'generationp'.$prnxnum, 0);
+
+          # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
+          ###############################################################################
+          if (length($currentPower) >= 5) {
+               $pos_left -= 40;
+          }
+          elsif (length($currentPower) >= 4) {
+              $pos_left -= 25;
+          }
+          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
+              $pos_left -= 5;
+          }
+          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
+              $pos_left += 7;
+          }
+          elsif (length($currentPower) == 1) {
+              $pos_left += 25;
+          }
+
+          $ret .= qq{<text class="flowg text" id="producer-txt_$prnxnum" x="$pos_left" y="80">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
+
+          # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse wieder zurück an den Ursprungspunkt
+          #######################################################################################################
+          if (length($currentPower) >= 5) {
+              $pos_left += 40;
+          }
+          elsif (length($currentPower) >= 4) {
+              $pos_left += 25;
+          }
+          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
+              $pos_left += 5;
+          }
+          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
+              $pos_left -= 7;
+          }
+          elsif (length($currentPower) == 1) {
+              $pos_left -= 25;
+          }
+
+          $pos_left  += ($consDist * 2);
+      }
+  } 
+  
   ## Consumer Anzeige
   #####################
   if ($flowgcons) {
@@ -19873,11 +20011,11 @@ to ensure that the system configuration is correct.
 
        <ul>
         <table>
-        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>fix</b>         </td><td>a uniquely determined factor is used (default)                                      </td></tr>
-           <tr><td> <b>flex</b>        </td><td>the factor is determined continuously on the basis of the sun's orbit               </td></tr>
-           <tr><td> <b>flexShared</b>  </td><td>as 'flex', additionally the proportion of direct radiation in the global radiation  </td></tr>
-		   <tr><td> <b>                </td><td>is approximated and the area factor is only applied to this proportion              </td></tr>
+        <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+           <tr><td> <b>fix</b>         </td><td>a uniquely determined area factor is used (default)                                                                        </td></tr>
+           <tr><td> <b>trackFull</b>   </td><td>the area factor is calculated continuously depending on the position of the sun and applied to the total global radiation  </td></tr>
+           <tr><td> <b>trackShared</b> </td><td>the area factor is calculated continuously depending on the position of the sun and applied to an approximated             </td></tr>
+		   <tr><td> <b>                </td><td>proportion of the direct radiation in the global radiation                                                                 </td></tr>
          </table>
        </ul>
        </li>
@@ -22219,11 +22357,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
         <table>
-        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>fix</b>         </td><td>es wird ein einmalig ermittelter Faktor verwendet (default)                          </td></tr>
-           <tr><td> <b>flex</b>        </td><td>der Faktor wird auf Grundlage der Sonnenlaufbahn kontinuierlich ermittelt            </td></tr>
-           <tr><td> <b>flexShared</b>  </td><td>wie 'flex', zusätzlich wird der Antei der Direktstrahlung an der Globalstrahlung     </td></tr>
-		   <tr><td> <b>                </td><td>approximiert und der Flächenfaktor nur auf diesen Anteil angewendet                  </td></tr>
+        <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+           <tr><td> <b>fix</b>         </td><td>es wird ein einmalig ermittelter Flächenfaktor verwendet (default)                                                          </td></tr>
+           <tr><td> <b>trackFull</b>   </td><td>der Flächenfaktor wird kontinuierlich abhängig vom Sonnenstand berechnet und auf die gesamte Globalstrahlung angewendet     </td></tr>
+           <tr><td> <b>trackShared</b> </td><td>der Flächenfaktor wird kontinuierlich abhängig vom Sonnenstand berechnet und auf einen approximierten Anteil der            </td></tr>
+		   <tr><td> <b>                </td><td>Direktstrahlung an der Globalstrahlung angewendet                                                                           </td></tr>
          </table>
        </ul>
        </li>
