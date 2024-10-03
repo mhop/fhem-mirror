@@ -156,7 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.34.0" => "30.09.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
+  "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
                            "AI usage depending either of available number of rules or difference to api forecast ".
                            "minor fix in ___readCandQ, new experimental attribute ctrlAreaFactorUsage ".
@@ -1205,7 +1205,7 @@ sub Initialize {
                                 "ctrlBatSocManagement:textField-long ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#14 ".
-                                "ctrlAreaFactorUsage:fix,trackFull,trackShared ".
+                                "ctrlAreaFactorUsage:fix,trackFull,trackShared,trackFlex ".
                                 "ctrlGenPVdeviation:daily,continuously ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
@@ -3433,7 +3433,7 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
                
-              if ($cafd eq 'trackShared') {                                                         # Direktstrahlung + Diffusstrahlung                                                                                                                          
+              if ($cafd eq 'trackShared'|| ($cafd eq 'trackFlex' && $wcc >= 80)) {                  # Direktstrahlung + Diffusstrahlung                                                                                                                          
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung                                                          
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung 
               
@@ -20016,6 +20016,8 @@ to ensure that the system configuration is correct.
            <tr><td> <b>trackFull</b>   </td><td>the area factor is calculated continuously depending on the position of the sun and applied to the total global radiation  </td></tr>
            <tr><td> <b>trackShared</b> </td><td>the area factor is calculated continuously depending on the position of the sun and applied to an approximated             </td></tr>
 		   <tr><td> <b>                </td><td>proportion of the direct radiation in the global radiation                                                                 </td></tr>
+           <tr><td> <b>trackFlex</b>   </td><td>combines the 'trackFull' and 'trackShared' methods. The system switches from 'trackFull' to 'trackShared'                  </td></tr>
+           <tr><td> <b>                </td><td>at a cloud cover of &gt;=80%.                                                                                              </td></tr>         
          </table>
        </ul>
        </li>
@@ -21057,7 +21059,8 @@ to ensure that the system configuration is correct.
        Free use of the <a href='https://doc.forecast.solar/start' target='_blank'>Forecast.Solar API</a>.
        does not require registration. API requests are limited to 12 within one hour in the free version.
        There is no daily limit. The module automatically determines the optimal query interval
-       depending on the configured strings.
+       depending on the configured strings. <br>
+       Note: Based on previous experience, unreliable and not recommended.
        <br><br>
 
        <b>VictronKI-API</b> <br>
@@ -22362,6 +22365,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>trackFull</b>   </td><td>der Flächenfaktor wird kontinuierlich abhängig vom Sonnenstand berechnet und auf die gesamte Globalstrahlung angewendet     </td></tr>
            <tr><td> <b>trackShared</b> </td><td>der Flächenfaktor wird kontinuierlich abhängig vom Sonnenstand berechnet und auf einen approximierten Anteil der            </td></tr>
 		   <tr><td> <b>                </td><td>Direktstrahlung an der Globalstrahlung angewendet                                                                           </td></tr>
+           <tr><td> <b>trackFlex</b>   </td><td>kombiniert die Verfahren 'trackFull' und 'trackShared'. Es erfolgt eine Umschaltung von 'trackFull' auf 'trackShared'       </td></tr>
+           <tr><td> <b>                </td><td>bei einer Bewölkung von &gt;=80%.                                                                                           </td></tr>
          </table>
        </ul>
        </li>
@@ -23404,7 +23409,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Die kostenfreie Nutzung der <a href='https://doc.forecast.solar/start' target='_blank'>Forecast.Solar API</a>
       erfordert keine Registrierung. Die API-Anfragen sind in der kostenfreien Version auf 12 innerhalb einer Stunde
       begrenzt. Ein Tageslimit gibt es dabei nicht. Das Modul ermittelt automatisch das optimale Abfrageintervall
-      in Abhängigkeit der konfigurierten Strings.
+      in Abhängigkeit der konfigurierten Strings. <br>
+      Hinweis: Nach den bisherigen Erfahrungen unzuverlässig und nicht zu empfehlen.
       <br><br>
 
       <b>VictronKI-API</b> <br>
