@@ -13905,7 +13905,7 @@ sub _flowGraphic {
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
-  my $cc_dummy   = $cc;
+  my $cc_dummy   = $cc;  
   
   ## definierte Producer ermitteln und deren 
   ## aktuelle Leistung bestimmen
@@ -13985,10 +13985,11 @@ sub _flowGraphic {
 
   ## SVG Box initialisieren
   ###########################
-  my $sun_color   = $cpv                     ? 'flowg sun_active'              : 'flowg sun_inactive';
-  my $batin_style = $batin                   ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
-  my $csc_style   = $csc && ($cpv || $ppall) ? 'flowg active_out'              : 'flowg inactive_out';
-  my $cgfi_style  = $cgfi                    ? 'flowg active_out'              : 'flowg inactive_out';
+  my $p2home      = $csc + $ppall;
+  my $sun_color   = $cpv    ? 'flowg sun_active'              : 'flowg sun_inactive';
+  my $batin_style = $batin  ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
+  my $csc_style   = $p2home ? 'flowg active_out'              : 'flowg inactive_out';
+  my $cgfi_style  = $cgfi   ? 'flowg active_out'              : 'flowg inactive_out';
 
   my $vbwidth = 800;                                                                        # width and height specify the viewBox size
   my $vbminx  = -10 * $flowgshift;                                                          # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
@@ -19804,7 +19805,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                             <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                             <br>
                          [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]                   <br>
                          [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                   <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Unit&gt;[:&lt;Threshold&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Threshold&gt]] <br>
@@ -19873,7 +19874,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The load is started even if there is insufficient PV surplus, provided that
                                                     a set "swoncond" condition is met and "swoffcond" is not met.                                                                                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>icon</b>           </td><td>Icon to represent the consumer in the overview graphic (optional)                                                                              </td></tr>
+            <tr><td> <b>icon</b>           </td><td>Icon and, if applicable, its color for displaying the consumer in the overview graphic (optional)                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                               </td></tr>
             <tr><td> <b>mintime</b>        </td><td>Scheduling duration (minutes or "SunPath") of the consumer. (optional)                                                                         </td></tr>
             <tr><td>                       </td><td>By specifying <b>SunPath</b>, planning is done according to sunrise and sunset.                                                                </td></tr>
@@ -19975,7 +19976,7 @@ to ensure that the system configuration is correct.
          <b>attr &lt;name&gt; consumer01</b> wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
          <b>attr &lt;name&gt; consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
          <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:100 <br>
-         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
+         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@ed type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                       <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:05 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                              <br>
          <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=noShow                                                                                   <br>
@@ -22153,7 +22154,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                                                <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                                                <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]                                    <br>
                          [notbefore=&lt;Ausdruck&gt;] [notafter=&lt;Ausdruck&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                          <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]]         <br>
@@ -22221,7 +22222,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß sofern eine
                                                     gesetzte "swoncond" Bedingung erfüllt und "swoffcond" nicht erfüllt ist.                                                                           </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                           </td></tr>
+            <tr><td> <b>icon</b>           </td><td>Icon und ggf. dessen Farbe zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>mintime</b>        </td><td>Einplanungsdauer (Minuten oder "SunPath") des Verbrauchers. (optional)                                                                             </td></tr>
             <tr><td>                       </td><td>Mit der Angabe von <b>SunPath</b> erfolgt die Planung entsprechend des Sonnenauf- und untergangs.                                                  </td></tr>
@@ -22323,7 +22324,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer01</b> wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
          <b>attr &lt;name&gt; consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
          <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:100 <br>
-         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
+         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@red type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                       <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                              <br>
          <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=noShow                                                                                   <br>
