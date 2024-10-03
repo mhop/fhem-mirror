@@ -354,7 +354,7 @@ my %vNotesIntern = (
   "0.80.16"=> "26.07.2023  new consumer type noSchedule, expand maxconsumer to 16, minor changes/fixes ",
   "0.80.15"=> "24.07.2023  new sub getDebug, new key switchdev in consumer attributes, change Debug consumtion ".
                            "reorg data in pvHistory when a hour of day was deleted ",
-  "0.80.14"=> "21.07.2023  __substConsumerIcon: use isConsumerLogOn instead of isConsumerPhysOn ",
+  "0.80.14"=> "21.07.2023  __substituteIcon: use isConsumerLogOn instead of isConsumerPhysOn ",
   "0.80.13"=> "18.07.2023  include parameter DoN in nextHours hash, new KPI's todayConForecastTillSunset, currentRunMtsConsumer_XX ".
                            "minor fixes and improvements ",
   "0.80.12"=> "16.07.2023  preparation for alternative switch device in consumer attribute, revise CommandRef ".
@@ -479,6 +479,7 @@ my $b4fontcoldef   = '000000';                                                  
 my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
 my $prodicondef    = 'sani_garden_pump';                                            # default Producer-Icon
+my $consicondef    = 'light_light_dim_100';                                         # default Consumer-Icon
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
 my $pPath = '?format=txt';                                                          # Download Format
@@ -5658,6 +5659,8 @@ sub _attrOtherProducer {                 ## no critic "not used"
       __delProducerValues ($paref);
       delete $paref->{prn};
   }
+  
+  delete $data{$type}{$name}{current}{'iconp'.$prn};
 
   InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
@@ -7173,9 +7176,7 @@ sub _collectAllRegConsumers {
           $interruptable         = $hc->{interruptable};
           ($interruptable,$hyst) = $interruptable =~ /(.*):(.*)$/xs if($interruptable ne '1');
       }
-
-      delete $data{$type}{$name}{consumers}{$c}{sunriseshift};
-      delete $data{$type}{$name}{consumers}{$c}{sunsetshift};
+      
       my ($riseshift, $setshift);
 
       if (exists $hc->{mintime}) {                                                                # Check Regex
@@ -7193,6 +7194,10 @@ sub _collectAllRegConsumers {
           $clt = $hc->{locktime};
       }
 
+      delete $data{$type}{$name}{consumers}{$c}{sunriseshift};
+      delete $data{$type}{$name}{consumers}{$c}{sunsetshift};
+      delete $data{$type}{$name}{consumers}{$c}{icon};
+      
       my $rauto = $hc->{auto} // q{};
       my $ctype = $hc->{type} // $defctype;
 
@@ -7203,7 +7208,6 @@ sub _collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
       $data{$type}{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
       $data{$type}{$name}{consumers}{$c}{mode}              = $hc->{mode}         // $defcmode;         # Planungsmode des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{icon}              = $hc->{icon}         // q{};               # Icon für den Verbraucher
       $data{$type}{$name}{consumers}{$c}{oncom}             = $hc->{on}           // q{};               # Setter Einschaltkommando
       $data{$type}{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};               # Setter Ausschaltkommando
       $data{$type}{$name}{consumers}{$c}{dswitch}           = $dswitch;                                 # Switchdevice zur Kommandoausführung
@@ -7234,8 +7238,9 @@ sub _collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{spignorecondregex} = $spignorecondregex  // q{};               # Regex der Ignore Bedingung
       $data{$type}{$name}{consumers}{$c}{interruptable}     = $interruptable;                           # Ein-Zustand des Verbrauchers ist unterbrechbar
       $data{$type}{$name}{consumers}{$c}{hysteresis}        = $hyst               // $defhyst;          # Hysterese
-      $data{$type}{$name}{consumers}{$c}{sunriseshift}      = $riseshift if(defined $riseshift);        # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
-      $data{$type}{$name}{consumers}{$c}{sunsetshift}       = $setshift  if(defined $setshift);         # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+      $data{$type}{$name}{consumers}{$c}{sunriseshift}      = $riseshift  if(defined $riseshift);       # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
+      $data{$type}{$name}{consumers}{$c}{sunsetshift}       = $setshift   if(defined $setshift);        # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+      $data{$type}{$name}{consumers}{$c}{icon}              = $hc->{icon} if(defined $hc->{icon});      # Icon für den Verbraucher
   }
 
   $data{$type}{$name}{current}{consumerCollected} = 1;
@@ -8451,7 +8456,7 @@ sub _transferProducerValues {
 
       next if(!$pcread || !$edread);
       
-      $data{$type}{$name}{current}{'iconp'.$prn} = $h->{icon} ? $h->{icon} : $prodicondef;                    # Icon des Producers 
+      $data{$type}{$name}{current}{'iconp'.$prn} = $h->{icon} if($h->{icon});                                 # Icon des Producers 
 
       my $pu = $pcunit =~ /^kW$/xi ? 1000 : 1;
       my $p  = ReadingsNum ($prdev, $pcread, 0) * $pu;                                                        # aktuelle Erzeugung (W)
@@ -11794,6 +11799,7 @@ sub entryGraphic {
 
   my $paref = {
       name           => $name,
+      hash           => $hash,
       type           => $hash->{TYPE},
       ftui           => $ftui,
       pah            => $pah,
@@ -13879,6 +13885,7 @@ return $ret;
 ################################################################
 sub _flowGraphic {
   my $paref         = shift;
+  my $hash          = $paref->{hash};
   my $name          = $paref->{name};
   my $type          = $paref->{type};
   my $flowgsize     = $paref->{flowgsize};
@@ -13894,7 +13901,6 @@ sub _flowGraphic {
   my $hasbat     = 1;                                         # initial Batterie vorhanden
   my $flowgprods = 1;                                         # Producer in der Energieflußgrafik anzeigen per default
   
-  my $hash       = $defs{$name};
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';  # Animation Ja/Nein
   my $cgc        = ReadingsNum ($name, 'Current_GridConsumption', 0);
@@ -13924,9 +13930,6 @@ sub _flowGraphic {
       }
   }
   
-  $ppall      = sprintf("%.0f", $ppall);
-  $flowgprods = 0 if(!$producercount);                                         # Producer Anzeige ausschalten wenn keine Producer definiert
-  
   ## definierte Verbraucher ermitteln
   #####################################
   my $consumercount = 0;
@@ -13937,9 +13940,7 @@ sub _flowGraphic {
       push @consumers, $c;
       $consumercount += 1;
   }
-
-  $flowgcons = 0 if(!$consumercount);                                          # Consumer Anzeige ausschalten wenn keine Consumer definiert
-
+  
   ## Batterie + Werte festlegen
   ###############################  
   my $bat_color = $soc < 26 ? 'flowg bat25' :
@@ -13959,7 +13960,7 @@ sub _flowGraphic {
   $grid_color       = 'flowg grid_color3'  if(!$cgfi && !$cgc && $batout);                     # dritte Farbe
   my $cgc_direction = 'M490,515 L670,590';                                                     # Batterientladung ins Netz
 
-  if ($batout) {                                                      # Batterie wird entladen
+  if ($batout) {                                                                               # Batterie wird entladen
       my $cgfo = $cgfi - $cpv;
 
       if ($cgfo > 1) {
@@ -13982,10 +13983,16 @@ sub _flowGraphic {
           $batout            = $gbi;
       }
   }
+  
+  ## Werte / SteuerungVars anpassen
+  ###################################
+  $flowgcons  = 0 if(!$consumercount);                                # Consumer Anzeige ausschalten wenn keine Consumer definiert
+  $flowgprods = 0 if(!$producercount);                                # Producer Anzeige ausschalten wenn keine Producer definiert
+  my $p2home  = sprintf "%.1f", ($csc + $ppall);                      # Energiefluß von Sonne zum Haus: Selbstverbrauch + alle Producer
+  $p2home     = sprintf "%.0f", $p2home if($p2home > 10);
 
   ## SVG Box initialisieren
   ###########################
-  my $p2home      = $csc + $ppall;
   my $sun_color   = $cpv    ? 'flowg sun_active'              : 'flowg sun_inactive';
   my $batin_style = $batin  ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
   my $csc_style   = $p2home ? 'flowg active_out'              : 'flowg inactive_out';
@@ -14065,8 +14072,9 @@ END0
       $pos_left = $producer_start + 25;
       
       for my $prnxnum (@producers) {
-          my $palias = CurrentVal ($hash, 'aliasp'.$prnxnum, 'Producer'.$prnxnum);
-          my $picon  = CurrentVal ($hash, 'iconp'.$prnxnum,  $prodicondef);                         # Icon des Producerdevices
+          my $palias = CurrentVal       ($hash, 'aliasp'.$prnxnum, 'Producer'.$prnxnum);
+          my $pcurr  = CurrentVal       ($hash, 'generationp'.$prnxnum, 0);
+          my $picon  = __substituteIcon ({hash => $hash, name => $name, pn => $prnxnum, pcurr => $pcurr});   # Icon des Producerdevices
           
           $ret .= '<g id="producer_'.$prnxnum.'" fill="grey" transform="translate('.$pos_left.',0),scale(0.15)">';
           $ret .= "<title>$palias</title>".FW_makeImage($picon, '');
@@ -14093,9 +14101,9 @@ END0
       $pos_left = $consumer_start + 15;
 
       for my $c (@consumers) {
-          my $calias     = ConsumerVal         ($hash, $c, "alias", "");                           # Name des Consumerdevices
-          $currentPower  = ReadingsNum         ($name, "consumer${c}_currentPower", 0);
-          my $cicon      = __substConsumerIcon ($hash, $c, $currentPower);                         # Icon des Consumerdevices
+          my $calias     = ConsumerVal      ($hash, $c, "alias", "");                                              # Name des Consumerdevices
+          $currentPower  = ReadingsNum      ($name, "consumer${c}_currentPower", 0);
+          my $cicon      = __substituteIcon ({hash => $hash, name => $name, cn => $c, pcurr => $currentPower});    # Icon des Consumerdevices
           $cc_dummy     -= $currentPower;
 
           $ret .= '<g id="consumer_'.$c.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
@@ -14126,7 +14134,7 @@ END1
   if ($flowgconX) {                                                                                # Dummy Consumer
       my $dumcol = $cc_dummy <= 0 ? '@grey' : q{};                                                 # Einfärbung Consumer Dummy
       $ret      .= '<g id="consumer_X" fill="grey" transform="translate(520,360),scale(0.09)">';
-      $ret      .= "<title>consumer_X</title>".FW_makeImage('light_light_dim_100'.$dumcol, '');
+      $ret      .= "<title>consumer_X</title>".FW_makeImage($consicondef.$dumcol, '');
       $ret      .= '</g> ';
   }
 
@@ -14174,13 +14182,13 @@ END3
       }
 
       for my $producer (@producers) {
-          my $power          = CurrentVal ($hash, 'generationp'.$producer, 0);
+          my $ppcurr         = CurrentVal ($hash, 'generationp'.$producer, 0);
           my $consumer_style = 'flowg inactive_out';
-             $consumer_style = 'flowg active_out' if($power > 0);
+             $consumer_style = 'flowg active_out' if($ppcurr > 0);
           my $chain_color    = "";                                                            # Farbe der Laufkette des Producers
 
-          if ($power > 0) {
-              #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$power,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+          if ($ppcurr) {
+              #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$ppcurr,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
               $chain_color  = 'style="stroke: darkorange;"';
           }
 
@@ -14232,11 +14240,10 @@ END3
 
   ## Textangaben an Grafikelementen
   ###################################
-  $cc_dummy     = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
-  my $csc_ppall = $csc + $ppall;
+  $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
   $ret .= qq{<text class="flowg text" id="pv-txt"        x="800"  y="320" style="text-anchor: start;">$cpv</text>}        if ($cpv);
   $ret .= qq{<text class="flowg text" id="bat-txt"       x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
-  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730"  y="520" style="text-anchor: start;">$csc_ppall</text>}  if ($csc_ppall); 
+  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730"  y="520" style="text-anchor: start;">$p2home</text>}     if ($p2home); 
   $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525"  y="420" style="text-anchor: end;">$cgfi</text>}         if ($cgfi); 
   $ret .= qq{<text class="flowg text" id="grid-home-txt" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc); 
   $ret .= qq{<text class="flowg text" id="batout-txt"    x="880"  y="610" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat); 
@@ -14250,7 +14257,8 @@ END3
       $pos_left = ($producer_start * 2) - 50;                                                         # -XX -> Start Lage producer Beschriftung
 
       for my $prnxnum (@producers) {
-          $currentPower = sprintf "%.0f", CurrentVal ($hash, 'generationp'.$prnxnum, 0);
+          $currentPower = sprintf "%.2f", CurrentVal ($hash, 'generationp'.$prnxnum, 0);
+          $currentPower = sprintf "%.0f", $currentPower if($currentPower > 10);
 
           # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ###############################################################################
@@ -14301,7 +14309,7 @@ END3
 
       for my $c (@consumers) {
           $currentPower    = sprintf "%.1f", ReadingsNum($name, "consumer${c}_currentPower", 0);
-          $currentPower    =~ s/\.0$// if (int($currentPower) > 0);                                   # .0 am Ende interessiert nicht
+          $currentPower    = sprintf "%.0f", $currentPower if($currentPower > 10);
           my $consumerTime = ConsumerVal ($hash, $c, "remainTime", "");                               # Restlaufzeit
           my $rpcurr       = ConsumerVal ($hash, $c, "rpcurr",     "");                               # Readingname f. current Power
 
@@ -14361,32 +14369,45 @@ return $ret;
 }
 
 ################################################################
-#       prüfe ob Verbrauchericon + Farbe angegeben ist
+#       prüfe ob Icon + Farbe angegeben ist
 #       und setze ggf. Ersatzwerte
-#       $c     - Consumer Nummer
+#       $cn     - Consumernummer (01...max)
+#       $pn     - Producernummer (01...max)
+#       $pcurr  - aktuelle Leistung / Verbrauch                          
 ################################################################
-sub __substConsumerIcon {
-  my $hash  = shift;
-  my $c     = shift;
-  my $pcurr = shift;
-
-  my $name  = $hash->{NAME};
-  my $cicon = ConsumerVal ($hash, $c, "icon", "");                           # Icon des Consumerdevices angegeben ?
-
-  if (!$cicon) {
-      $cicon = 'light_light_dim_100';
+sub __substituteIcon {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $cn    = $paref->{cn};                            
+  my $pn    = $paref->{pn};                            
+  my $pcurr = $paref->{pcurr};
+  
+  my ($color, $icon);
+  
+  if ($cn) {                                                                           # Icon Consumer
+      $icon = ConsumerVal ($hash, $cn, 'icon', $consicondef);                 
+  }
+  elsif ($pn) {
+      $icon = CurrentVal ($hash, 'iconp'.$pn, $prodicondef);                           # Icon Producer
   }
 
-  my $color;
-  ($cicon,$color) = split '@', $cicon;
+  ($icon, $color) = split '@', $icon;
 
-  if (!$color) {
-      $color = isConsumerLogOn ($hash, $c, $pcurr) ? 'darkorange' : '';
+  if ($cn) {
+      if (!$color) {
+          $color = isConsumerLogOn ($hash, $cn, $pcurr) ? 'darkorange' : '';
+      }
+  }
+  elsif ($pn) {
+      if (!$pcurr) {
+          $color = 'grey';
+      }
   }
 
-  $cicon .= '@'.$color if($color);
+  $icon .= '@'.$color if($color);
 
-return $cicon;
+return $icon;
 }
 
 ################################################################
@@ -20968,17 +20989,17 @@ to ensure that the system configuration is correct.
        <br>
        
        <a id="SolarForecast-attr-setupOtherProducer" data-pattern="setupOtherProducer.*"></a>
-       <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; [icon=&lt;Icon&gt;] </b> <br><br>
+       <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; [icon=&lt;Icon&gt;[@&lt;Color&gt;]] </b> <br><br>
 
        Defines any device and its readings for the delivery of other generation values 
-	   (e.g. CHP, wind generation, emergency generator). 
+	   (e.g. CHP, wind generation, emergency generator). This device is not intended for PV generation.
        It can also be a dummy device with corresponding readings.
        <br><br>
 
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>icon</b>     </td><td>Icon for displaying the producer in the flow chart (optional)                                                              </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon and, if applicable, color for displaying the producer in the flow chart (optional)                                    </td></tr>
            <tr><td> <b>pcurr</b>    </td><td>Reading which returns the current generation as a positive value or a self-consumption (special case) as a negative value  </td></tr>
            <tr><td> <b>etotal</b>   </td><td>Reading which supplies the total energy generated (a continuously ascending counter)                                       </td></tr>
            <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                                                </td></tr>
@@ -20990,7 +21011,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh icon=Ventilator_wind
+         attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh icon=Ventilator_wind@darkorange
        </ul>
        <br>
 
@@ -23317,17 +23338,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <br>
       
       <a id="SolarForecast-attr-setupOtherProducer" data-pattern="setupOtherProducer.*"></a>
-      <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; [icon=&lt;Icon&gt;] </b> <br><br>
+      <li><b>setupOtherProducerXX &lt;Device Name&gt; pcurr=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] </b> <br><br>
 
       Legt ein beliebiges Device und dessen Readings zur Lieferung sonstiger Erzeugungswerte fest 
-	  (z.B. BHKW, Winderzeugung, Notstromaggregat). 
+	  (z.B. BHKW, Winderzeugung, Notstromaggregat). Dieses Device ist nicht für PV-Erzeugung vorgsehen.
       Es kann auch ein Dummy Device mit entsprechenden Readings sein.
       <br><br>
 
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Producers in der Flowgrafik (optional)                                                              </td></tr>
+          <tr><td> <b>icon</b>     </td><td>Icon und ggf. Farbe zur Darstellung des Producers in der Flowgrafik (optional)                                               </td></tr>
           <tr><td> <b>pcurr</b>    </td><td>Reading welches die aktuelle Erzeugung als positiven Wert oder einen Eigenverbrauch (Sonderfall) als negativen Wert liefert  </td></tr>
           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte Energie liefert (ein stetig aufsteigender Zähler)                                       </td></tr>
           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                                       </td></tr>
@@ -23339,7 +23360,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
         <b>Beispiel: </b> <br>
-        attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh icon=Ventilator_wind
+        attr &lt;name&gt; setupOtherProducer01 windwheel pcurr=total_pac:kW etotal=etotal:kWh icon=Ventilator_wind@darkorange
       </ul>
       <br>
 
