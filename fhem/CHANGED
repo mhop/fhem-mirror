@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  74_AutomowerConnect: convert model to upper case due to changed
+            spelling
  - bugfix:  76_SolarForecast: internal code change
  - change:  76_SolarForecast: internal code change
  - bufgix:  72_FRITZBOX: Blockade des Intervall-Timers durch 
@@ -60,7 +62,7 @@
  - bugfix:  98_CDCOpenData:  entfernt BlockingCall loglevel = GetVerbose($name)
  - bufgix:  72_FRITZBOX:   entfernt BlockingCall loglevel = GetVerbose($name)
  - change:  76_SolarForecast: set currentBatteryDev to attr setupBatteryDev
-                              !NOTE! save FHEM config after restart,
+                              !NOTE! save FHEM configs after restart,
                               minor other changes
  - change:  76_SolarForecast: change set currentMeterDev to attr setupMeterDev
  - feature: 76_SolarForecast: ctrlStatisticReadings: new runTimeAvgDayConsumer
