@@ -133,7 +133,7 @@ par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC
 attr DEVICE bridgeRegexp\
-  BASE_TOPIC/([A-Za-z0-9._]+)[/]?.*:.* "zigbee_$1"
+  BASE_TOPIC/((?!bridge)[A-Za-z0-9._]+)/?.*:.* "zigbee_$1"
 attr DEVICE getList\
   networkmap_raw:noArg raw $\DEVICETOPIC/bridge/request/networkmap raw\
   networkmap_graphviz:noArg graphviz $\DEVICETOPIC/bridge/request/networkmap graphviz
@@ -180,7 +180,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20240627
+setreading DEVICE attrTemplateVersion 20240628
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371
 
 
@@ -3729,7 +3729,7 @@ setreading DEVICE attrTemplateVersion 20220404
 name:shellyPlus_1
 filter:TYPE=MQTT2_DEVICE
 desc:Early version of a base template for second generation shelly devices (names with "plus", without power measurement). NOTE: requires to activate generic status update in firmware settings (if not available: reset device to factory defaults).<br>NOTE: Please wait some seconds to allow Shelly device to complete reboot.
-par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shelly(plus|pro4pm|1pmmini)[^/:_]{4,}+)> ? $1 : undef }
+par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shelly(plus|pro4pm|1pmmini-)[^/:_]{4,}+)> ? $1 : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal('DEVICE','icon','message_socket') }
