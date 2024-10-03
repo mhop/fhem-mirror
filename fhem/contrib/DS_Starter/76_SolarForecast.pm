@@ -13897,10 +13897,7 @@ sub _flowGraphic {
   my $flowgconPower = $paref->{flowgconsPower};
   my $consDist      = $paref->{flowgconsDist};
   my $css           = $paref->{css};
-  
-  my $hasbat     = 1;                                         # initial Batterie vorhanden
-  my $flowgprods = 1;                                         # Producer in der Energieflußgrafik anzeigen per default
-  
+    
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';  # Animation Ja/Nein
   my $cgc        = ReadingsNum ($name, 'Current_GridConsumption', 0);
@@ -13913,6 +13910,11 @@ sub _flowGraphic {
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
   my $cc_dummy   = $cc;  
   
+  my $hasbat     = 1;                                         # initial Batterie vorhanden
+  my $flowgprods = 1;                                         # Producer in der Energieflußgrafik anzeigen per default
+  my $ppcurr     = {};                                        # Hashref Producer current power 
+  my $cpcurr     = {};                                        # Hashref Consumer current power 
+  
   ## definierte Producer ermitteln und deren 
   ## aktuelle Leistung bestimmen
   ############################################
@@ -13921,10 +13923,12 @@ sub _flowGraphic {
   my @producers;
   
   for my $i (1..$maxproducer) {
-      my $p = CurrentVal ($hash, 'generationp'.(sprintf "%02d", ($i)), undef);
+      my $pn = sprintf "%02d", $i;
+      my $p  = CurrentVal ($hash, 'generationp'.$pn, undef);
 
       if (defined $p) {
           push @producers, sprintf "%02d", $i;
+          $ppcurr->{$pn}  = $p;
           $producercount += 1;
           $ppall         += $p;
       }
@@ -13938,6 +13942,7 @@ sub _flowGraphic {
   for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {           # definierte Verbraucher ermitteln
       next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                     # auszublendende Consumer nicht berücksichtigen
       push @consumers, $c;
+      $cpcurr->{$c}   = ReadingsNum ($name, "consumer${c}_currentPower", 0);
       $consumercount += 1;
   }
   
@@ -14072,9 +14077,13 @@ END0
       $pos_left = $producer_start + 25;
       
       for my $prnxnum (@producers) {
-          my $palias = CurrentVal       ($hash, 'aliasp'.$prnxnum, 'Producer'.$prnxnum);
-          my $pcurr  = CurrentVal       ($hash, 'generationp'.$prnxnum, 0);
-          my $picon  = __substituteIcon ({hash => $hash, name => $name, pn => $prnxnum, pcurr => $pcurr});   # Icon des Producerdevices
+          my $palias = CurrentVal ($hash, 'aliasp'.$prnxnum, 'Producer'.$prnxnum);
+          my $picon  = __substituteIcon ( { hash  => $hash,                                    # Icon des Producerdevices
+                                            name  => $name, 
+                                            pn    => $prnxnum, 
+                                            pcurr => $ppcurr->{$prnxnum}
+                                          } 
+                                        );
           
           $ret .= '<g id="producer_'.$prnxnum.'" fill="grey" transform="translate('.$pos_left.',0),scale(0.15)">';
           $ret .= "<title>$palias</title>".FW_makeImage($picon, '');
@@ -14102,7 +14111,8 @@ END0
 
       for my $c (@consumers) {
           my $calias     = ConsumerVal      ($hash, $c, "alias", "");                                              # Name des Consumerdevices
-          $currentPower  = ReadingsNum      ($name, "consumer${c}_currentPower", 0);
+          #$currentPower  = ReadingsNum      ($name, "consumer${c}_currentPower", 0);
+          $currentPower  = $cpcurr->{$c};
           my $cicon      = __substituteIcon ({hash => $hash, name => $name, cn => $c, pcurr => $currentPower});    # Icon des Consumerdevices
           $cc_dummy     -= $currentPower;
 
@@ -14181,18 +14191,18 @@ END3
           $pos_left_start_con = 700 - ((($distance_con ) / 2) * ($producercount-1));
       }
 
-      for my $producer (@producers) {
-          my $ppcurr         = CurrentVal ($hash, 'generationp'.$producer, 0);
+      for my $prnxnum (@producers) {
+          my $p              = $ppcurr->{$prnxnum};
           my $consumer_style = 'flowg inactive_out';
-             $consumer_style = 'flowg active_out' if($ppcurr > 0);
-          my $chain_color    = "";                                                            # Farbe der Laufkette des Producers
+             $consumer_style = 'flowg active_out' if($p > 0);
+          my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
 
-          if ($ppcurr) {
-              #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$ppcurr,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+          if ($p) {
+              #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
               $chain_color  = 'style="stroke: darkorange;"';
           }
 
-          $ret                .= qq{<path id="genproducer_$producer " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_con,200" />};   # Design Consumer Laufkette
+          $ret                .= qq{<path id="genproducer_$prnxnum " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_con,200" />};   # Design Consumer Laufkette
           $pos_left           += ($consDist * 2);
           $pos_left_start_con += $distance_con;
       }
@@ -14215,7 +14225,8 @@ END3
       for my $c (@consumers) {
           my $power     = ConsumerVal ($hash, $c, "power",   0);
           my $rpcurr    = ConsumerVal ($hash, $c, "rpcurr", "");                                   # Reading für akt. Verbrauch angegeben ?
-          $currentPower = ReadingsNum ($name, "consumer${c}_currentPower", 0);
+          #$currentPower = ReadingsNum ($name, "consumer${c}_currentPower", 0);
+          $currentPower = $cpcurr->{$c};
 
           if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = $power;
@@ -14257,7 +14268,7 @@ END3
       $pos_left = ($producer_start * 2) - 50;                                                         # -XX -> Start Lage producer Beschriftung
 
       for my $prnxnum (@producers) {
-          $currentPower = sprintf "%.2f", CurrentVal ($hash, 'generationp'.$prnxnum, 0);
+          $currentPower = sprintf "%.2f", $ppcurr->{$prnxnum};
           $currentPower = sprintf "%.0f", $currentPower if($currentPower > 10);
 
           # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
@@ -14308,7 +14319,8 @@ END3
       $pos_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
 
       for my $c (@consumers) {
-          $currentPower    = sprintf "%.1f", ReadingsNum($name, "consumer${c}_currentPower", 0);
+          #$currentPower    = sprintf "%.1f", ReadingsNum($name, "consumer${c}_currentPower", 0);
+          $currentPower    = sprintf "%.1f", $cpcurr->{$c};
           $currentPower    = sprintf "%.0f", $currentPower if($currentPower > 10);
           my $consumerTime = ConsumerVal ($hash, $c, "remainTime", "");                               # Restlaufzeit
           my $rpcurr       = ConsumerVal ($hash, $c, "rpcurr",     "");                               # Readingname f. current Power
