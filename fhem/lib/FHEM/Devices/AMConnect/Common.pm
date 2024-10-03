@@ -2415,7 +2415,7 @@ sub fillReadings {
 
   $pref = 'system';
   readingsBulkUpdateIfChanged( $hash, $pref."_name", $hash->{helper}{mower}{attributes}{$pref}{name} );
-  my $model = $hash->{helper}{mower}{attributes}{$pref}{model};
+  my $model = uc $hash->{helper}{mower}{attributes}{$pref}{model};
   $model =~ s/AUTOMOWER./AM/;
   readingsBulkUpdateIfChanged( $hash, "model", $model );
   $pref = 'planner';
