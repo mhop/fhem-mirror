@@ -676,14 +676,14 @@ my %htr = (                                                                  # H
 
                                                                              # Hash Mondphasen
 my %hmoon = (                                                               
-  1 => 'weather_moon_phases_1_new',
-  2 => 'weather_moon_phases_2',
-  3 => 'weather_moon_phases_3_half',
-  4 => 'weather_moon_phases_4',
-  5 => 'weather_moon_phases_5_full',
-  6 => 'weather_moon_phases_6',
-  7 => 'weather_moon_phases_7_half',
-  8 => 'weather_moon_phases_8'      
+  0 => { icon => 'weather_moon_phases_1_new',  DE => 'Neumond',           EN => 'new moon'            },
+  1 => { icon => 'weather_moon_phases_2',      DE => 'zunehmende Sichel', EN => 'increasing crescent' },
+  2 => { icon => 'weather_moon_phases_3_half', DE => 'erstes Viertel',    EN => 'first quarter'       },
+  3 => { icon => 'weather_moon_phases_4',      DE => 'zunehmender Mond',  EN => 'waxing moon'         },
+  4 => { icon => 'weather_moon_phases_5_full', DE => 'Vollmond',          EN => 'full moon'           },
+  5 => { icon => 'weather_moon_phases_6',      DE => 'abnehmender Mond',  EN => 'waning moon'         },
+  6 => { icon => 'weather_moon_phases_7_half', DE => 'letztes Viertel',   EN => 'last quarter'        },
+  7 => { icon => 'weather_moon_phases_8',      DE => 'abnehmende Sichel', EN => 'decreasing crescent' },
 );
 
 my %hqtxt = (                                                                                                 # Hash (Setup) Texte
@@ -14150,8 +14150,8 @@ END0
   }
   else {
       my $moonPhaseI = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
-      $smicon        = $hmoon{$moonPhaseI}.'@lightblue';
-      $smtxt         = 'die Sonne ist untergegangen';
+      $smicon        = $hmoon{$moonPhaseI}{icon}.'@lightblue';
+      $smtxt         = $hmoon{$moonPhaseI}{$lang};
   }
   
   $ret .= '<g id="Sonne" fill="grey" transform="translate(355,165),scale(0.12)">';                          # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
