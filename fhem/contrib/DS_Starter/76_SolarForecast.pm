@@ -156,7 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.34.2" => "04.10.2024  _flowGraphic: replace sun by FHEM SVG-Icon ",
+  "1.34.2" => "04.10.2024  _flowGraphic: replace sun by FHEM SVG-Icon, sun or icon of moon phases according day/night ",
   "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
@@ -486,6 +486,7 @@ my $prodicondef    = 'sani_garden_pump';                                        
 my $consicondef    = 'light_light_dim_100';                                         # default Consumer-Icon
 my $homeicondef    = 'control_building_control@grey';                               # default Home-Icon
 my $sunicondef     = 'weather_sun';                                                 # default Sonne-icon
+my $moonicondef    = 2;                                                             # default Mond-Phase (aus %hmoon)
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
 my $pPath = '?format=txt';                                                          # Download Format
@@ -517,7 +518,6 @@ my $conhfcex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 
                  "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
                  "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
                };
-
                                                                                   # mögliche Debug-Module
 my @dd = qw( aiProcess
              aiData
@@ -672,6 +672,18 @@ my %hattr = (                                                                # H
 my %htr = (                                                                  # Hash even/odd für <tr>
   0 => { cl => 'even' },
   1 => { cl => 'odd' },
+);
+
+                                                                             # Hash Mondphasen
+my %hmoon = (                                                               
+  1 => 'weather_moon_phases_1_new',
+  2 => 'weather_moon_phases_2',
+  3 => 'weather_moon_phases_3_half',
+  4 => 'weather_moon_phases_4',
+  5 => 'weather_moon_phases_5_full',
+  6 => 'weather_moon_phases_6',
+  7 => 'weather_moon_phases_7_half',
+  8 => 'weather_moon_phases_8'      
 );
 
 my %hqtxt = (                                                                                                 # Hash (Setup) Texte
@@ -6818,6 +6830,7 @@ sub centralTask {
   $centpars->{state} = 'updated';                                                     # kann durch Subs überschrieben werden!
 
   # _composeRemoteObj           ($centpars);                                            # Remote Objekte identifizieren und zusammenstellen
+  _getMoonPhase               ($centpars);                                            # aktuelle Mondphase ermittteln und speichern
   _collectAllRegConsumers     ($centpars);                                            # alle Verbraucher Infos laden
   _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
   _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
@@ -7090,6 +7103,31 @@ sub __remoteMeterObj {
   elsif (scalar(@afp) == 3) {                                                            # feedprice wird durch weiteres Device / Reading geliefert
       $data{$type}{$name}{current}{x_remote}{$afp[0]}{readings}{$afp[1]} = undef;
   }
+
+return;
+}
+
+################################################################
+#            Ermittlung der Mondphase
+################################################################
+sub _getMoonPhase {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $t     = $paref->{t};                                          # Epoche Zeit
+
+  my $moonphasei;
+  my $tstr = (timestampToTimestring ($t))[2];
+
+  eval {
+      $moonphasei = FHEM::Astro::Get (undef, 'global', 'text', 'MoonPhaseI', $tstr);
+      1;
+  }
+  or do { Log3 ($name, 1, "$name - ERROR - $@");
+          return;
+        };
+        
+  $data{$type}{$name}{current}{moonPhaseI} = $moonphasei;
 
 return;
 }
@@ -14099,12 +14137,26 @@ END0
       }
   }
   
-  ## Sonne Icon
-  ##############
-  my $suncolor = $cpv ? 'orange' : 'grey';
-  $ret        .= '<g id="Sonne" fill="grey" transform="translate(355,165),scale(0.12)">';           # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
-  $ret        .= "<title>Sonne</title>".FW_makeImage($sunicondef.'@'.$suncolor, '');
-  $ret        .= '</g> ';
+  ## Sonne / Mond Icon
+  ###################### 
+  my ($smicon, $smtxt);
+  
+  my $don = NexthoursVal ($hash, 'NextHour00', 'DoN', 1);                                                    # Tag oder Nacht
+  
+  if ($don) {
+      my $suncolor = $cpv ? 'orange' : 'grey';
+      $smicon      = $sunicondef.'@'.$suncolor;
+      $smtxt       = 'die Sonne ist aufgegangen';
+  }
+  else {
+      my $moonPhaseI = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
+      $smicon        = $hmoon{$moonPhaseI}.'@lightblue';
+      $smtxt         = 'die Sonne ist untergegangen';
+  }
+  
+  $ret .= '<g id="Sonne" fill="grey" transform="translate(355,165),scale(0.12)">';                          # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= "<title>$smtxt</title>".FW_makeImage($smicon, '');
+  $ret .= '</g> ';
 
   ## Batterie Icon
   ##################
@@ -18559,6 +18611,7 @@ return $def;
 #       dwdRad1hAgeTS        - Alter des Rad1h Wertes als Unix Timestamp
 #       genslidereg          - Schieberegister PV Erzeugung (Array)
 #       h4fcslidereg         - Schieberegister 4h PV Forecast (Array)
+#       moonPhaseI           - aktuelle Mondphase (1 .. 8)
 #       socslidereg          - Schieberegister Batterie SOC (Array)
 #       consumption          - aktueller Verbrauch (W)
 #       consumerdevs         - alle registrierten Consumerdevices (Array)
