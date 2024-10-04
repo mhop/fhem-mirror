@@ -14141,7 +14141,7 @@ END0
   ###################### 
   my ($smicon, $smtxt);
   
-  my $don = NexthoursVal ($hash, 'NextHour00', 'DoN', 1);                                                    # Tag oder Nacht
+  my $don = NexthoursVal ($hash, 'NextHour00', 'DoN', 0);                                                    # Tag oder Nacht
   
   if ($don) {
       my $suncolor = $cpv ? 'orange' : 'grey';
