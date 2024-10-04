@@ -156,6 +156,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.34.2" => "04.10.2024  _flowGraphic: replace sun by FHEM SVG-Icon ",
+  "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
                            "AI usage depending either of available number of rules or difference to api forecast ".
@@ -482,6 +484,8 @@ my $fgCDdef        = 130;                                                       
 
 my $prodicondef    = 'sani_garden_pump';                                            # default Producer-Icon
 my $consicondef    = 'light_light_dim_100';                                         # default Consumer-Icon
+my $homeicondef    = 'control_building_control@grey';                               # default Home-Icon
+my $sunicondef     = 'weather_sun';                                                 # default Sonne-icon
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
 my $pPath = '?format=txt';                                                          # Download Format
@@ -489,8 +493,6 @@ my $cfile = 'controls_solarforecast.txt';                                       
 
                                                                                     # default CSS-Style
 my $cssdef = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     \n}.
-             qq{.flowg.sun_active     { stroke: orange; fill: orange; }                                                  \n}.
-             qq{.flowg.sun_inactive   { stroke: gray; fill: gray; }                                                      \n}.
              qq{.flowg.bat25          { stroke: red; fill: red; }                                                        \n}.
              qq{.flowg.bat50          { stroke: darkorange; fill: darkorange; }                                          \n}.
              qq{.flowg.bat75          { stroke: green; fill: green; }                                                    \n}.
@@ -920,6 +922,8 @@ my %htitles = (                                                                 
                 DE => qq{nicht bewertet}                                                                           },
   aimstt   => { EN => qq{Perl module AI::DecisionTree is missing},
                 DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                          },
+  dumtxt   => { EN => qq{Consumption that cannot be allocated to registered consumers},
+                DE => qq{Verbrauch der den registrierten Verbrauchern nicht zugeordnet werden kann}                }, 
   pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
                 DE => qq{Planungsstatus:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                      },
   ainuse   => { EN => qq{AI Perl module is installed, but the AI support is not used.\nRun 'set <NAME> plantConfiguration check' for hints.},
@@ -13904,6 +13908,7 @@ sub _flowGraphic {
   my $flowgconPower = $paref->{flowgconsPower};
   my $consDist      = $paref->{flowgconsDist};
   my $css           = $paref->{css};
+  my $lang          = $paref->{lang};
 
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';  # Animation Ja/Nein
@@ -14004,20 +14009,15 @@ sub _flowGraphic {
   $p2home     = sprintf "%.0f", $p2home if($p2home > 10);
   $p2home     = 0 if($p2home == 0);                                   # 0.0 eliminieren wenn keine Leistung zum Haus
 
-  ## SVG Box initialisieren
-  ###########################
-  my $sun_color   = $cpv    ? 'flowg sun_active'              : 'flowg sun_inactive';
-  my $batin_style = $batin  ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
-  my $csc_style   = $p2home ? 'flowg active_out'              : 'flowg inactive_out';
-  my $cgfi_style  = $cgfi   ? 'flowg active_out'              : 'flowg inactive_out';
+  ## SVG Box initialisieren mit Grid-Icon
+  #########################################
+  my $vbwidth   = 800;                                                # width and height specify the viewBox size
+  my $vbminx    = -10 * $flowgshift;                                  # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbminy    = $flowgprods ? -25 : 100;
 
-  my $vbwidth = 800;                                                                        # width and height specify the viewBox size
-  my $vbminx  = -10 * $flowgshift;                                                          # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
-  my $vbminy  = $flowgprods ? -25 : 100;
-
-  my $vbhight = !$flowgcons    ? 380 :
-                !$flowgconTime ? 590 :
-                610;
+  my $vbhight   = !$flowgcons    ? 380 :
+                  !$flowgconTime ? 590 :
+                  610;
 
   $vbhight += 100 if($flowgprods);
 
@@ -14030,38 +14030,6 @@ sub _flowGraphic {
       </style>
 
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$style" id="SVGPLOT">
-
-      <g transform="translate(400,200)">
-        <g>
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(45)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(90)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(135)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(180)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(225)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(270)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(315)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <circle cx="0" cy="0" class="$sun_color" r="16" stroke-width="2"/>
-      </g>
-
-      <g id="home" fill="grey" transform="translate(352,340),scale(4)">
-          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-      </g>
 
       <g id="grid" class="$grid_color" transform="translate(215,260),scale(3.0)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
@@ -14130,11 +14098,17 @@ END0
           $pos_left += $consDist;
       }
   }
+  
+  ## Sonne Icon
+  ##############
+  my $suncolor = $cpv ? 'orange' : 'grey';
+  $ret        .= '<g id="Sonne" fill="grey" transform="translate(355,165),scale(0.12)">';           # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret        .= "<title>Sonne</title>".FW_makeImage($sunicondef.'@'.$suncolor, '');
+  $ret        .= '</g> ';
 
-  ## Batterie, PV, Netz Laufketten
-  ##################################
-
-  if ($hasbat) {
+  ## Batterie Icon
+  ##################
+  if ($hasbat) {                                                                                   
       $ret .= << "END1";
       <g class="$bat_color" transform="translate(610,245),scale(.30) rotate (90)">
       <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
@@ -14147,23 +14121,39 @@ END1
       $ret .= '<path d="m 221.141,120 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -26 c 0,-3.313 2.687,-6 6,-6 h 65.5 c 3.313,0 6,2.687 6,6 v 6 z"/>'          if ($soc > 88);
       $ret .= '</g>';
   }
+  
+  ## Home Icon
+  ##############
+  $ret .= '<g id="Home" fill="grey" transform="translate(368,360),scale(0.10)">';                  # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= "<title>Home</title>".FW_makeImage($homeicondef, '');
+  $ret .= '</g> ';  
 
-  if ($flowgconX) {                                                                                # Dummy Consumer
+  ## Dummy Consumer Icon
+  ########################
+  if ($flowgconX) {   
+      my $dumtxt = $htitles{dumtxt}{$lang};  
       my $dumcol = $cc_dummy <= 0 ? '@grey' : q{};                                                 # Einfärbung Consumer Dummy
       $ret      .= '<g id="consumer_X" fill="grey" transform="translate(520,360),scale(0.09)">';
-      $ret      .= "<title>consumer_X</title>".FW_makeImage($consicondef.$dumcol, '');
+      $ret      .= "<title>$dumtxt</title>".FW_makeImage($consicondef.$dumcol, '');
       $ret      .= '</g> ';
   }
 
-  $ret .= << "END2";
+  ## Laufketten PV->Home, PV->Grid, Grid->Home
+  ##############################################
+  my $csc_style  = $p2home ? 'flowg active_out' : 'flowg inactive_out';
+  my $cgfi_style = $cgfi   ? 'flowg active_out' : 'flowg inactive_out';
+  $ret          .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
   <path id="pv-home"   class="$csc_style"  d="M700,400 L700,580" />
   <path id="pv-grid"   class="$cgfi_style" d="M670,400 L490,480" />
   <path id="grid-home" class="$cgc_style"  d="$cgc_direction" />
 END2
 
+  ## Laufketten PV->Batterie, Batterie->Home
+  ##############################################
   if ($hasbat) {
-      $ret .= << "END3";
+      my $batin_style = $batin ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
+      $ret           .= << "END3";
       <path id="bat-home" class="$batout_style" d="$batout_direction" />
       <path id="pv-bat"   class="$batin_style"  d="M730,400 L910,480" />
 END3
@@ -20054,9 +20044,9 @@ to ensure that the system configuration is correct.
            <tr><td> <b>fix</b>         </td><td>a uniquely determined area factor is used (default)                                                                        </td></tr>
            <tr><td> <b>trackFull</b>   </td><td>the area factor is calculated continuously depending on the position of the sun and applied to the total global radiation  </td></tr>
            <tr><td> <b>trackShared</b> </td><td>the area factor is calculated continuously depending on the position of the sun and applied to an approximated             </td></tr>
-		   <tr><td> <b>                </td><td>proportion of the direct radiation in the global radiation                                                                 </td></tr>
+		   <tr><td>                    </td><td>proportion of the direct radiation in the global radiation                                                                 </td></tr>
            <tr><td> <b>trackFlex</b>   </td><td>combines the 'trackFull' and 'trackShared' methods. The system switches from 'trackFull' to 'trackShared'                  </td></tr>
-           <tr><td> <b>                </td><td>at a cloud cover of &gt;=80%.                                                                                              </td></tr>
+           <tr><td>                    </td><td>at a cloud cover of &gt;=80%.                                                                                              </td></tr>
          </table>
        </ul>
        </li>
@@ -20398,8 +20388,6 @@ to ensure that the system configuration is correct.
 
          <ul>
            .flowg.text           { stroke: none; fill: gray; font-size: 60px; } <br>
-           .flowg.sun_active     { stroke: orange; fill: orange; }              <br>
-           .flowg.sun_inactive   { stroke: gray; fill: gray; }                  <br>
            .flowg.bat25          { stroke: red; fill: red; }                    <br>
            .flowg.bat50          { stroke: darkorange; fill: darkorange; }      <br>
            .flowg.bat75          { stroke: green; fill: green; }                <br>
@@ -22403,9 +22391,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>fix</b>         </td><td>es wird ein einmalig ermittelter Flächenfaktor verwendet (default)                                                          </td></tr>
            <tr><td> <b>trackFull</b>   </td><td>der Flächenfaktor wird kontinuierlich abhängig vom Sonnenstand berechnet und auf die gesamte Globalstrahlung angewendet     </td></tr>
            <tr><td> <b>trackShared</b> </td><td>der Flächenfaktor wird kontinuierlich abhängig vom Sonnenstand berechnet und auf einen approximierten Anteil der            </td></tr>
-		   <tr><td> <b>                </td><td>Direktstrahlung an der Globalstrahlung angewendet                                                                           </td></tr>
+		   <tr><td>                    </td><td>Direktstrahlung an der Globalstrahlung angewendet                                                                           </td></tr>
            <tr><td> <b>trackFlex</b>   </td><td>kombiniert die Verfahren 'trackFull' und 'trackShared'. Es erfolgt eine Umschaltung von 'trackFull' auf 'trackShared'       </td></tr>
-           <tr><td> <b>                </td><td>bei einer Bewölkung von &gt;=80%.                                                                                           </td></tr>
+           <tr><td>                    </td><td>bei einer Bewölkung von &gt;=80%.                                                                                           </td></tr>
          </table>
        </ul>
        </li>
@@ -22749,8 +22737,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
            .flowg.text           { stroke: none; fill: gray; font-size: 60px; } <br>
-           .flowg.sun_active     { stroke: orange; fill: orange; }              <br>
-           .flowg.sun_inactive   { stroke: gray; fill: gray; }                  <br>
            .flowg.bat25          { stroke: red; fill: red; }                    <br>
            .flowg.bat50          { stroke: darkorange; fill: darkorange; }      <br>
            .flowg.bat75          { stroke: green; fill: green; }                <br>
