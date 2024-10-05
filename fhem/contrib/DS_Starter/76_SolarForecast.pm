@@ -156,7 +156,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.34.2" => "04.10.2024  _flowGraphic: replace sun by FHEM SVG-Icon, sun or icon of moon phases according day/night ",
+  "1.34.2" => "05.10.2024  _flowGraphic: replace sun by FHEM SVG-Icon, sun or icon of moon phases according day/night ".
+                           "new optional key 'icon' in attr setupInverterDev ",
   "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
@@ -396,7 +397,7 @@ my %vNotesIntern = (
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
-## default Variablen
+## Standardvariablen
 ######################
 my @da;                                                                             # Readings-Store
 my $deflang        = 'EN';                                                          # default Sprache wenn nicht konfiguriert
@@ -483,10 +484,14 @@ my $b4fontcoldef   = '000000';                                                  
 my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
 my $prodicondef    = 'sani_garden_pump';                                            # default Producer-Icon
-my $consicondef    = 'light_light_dim_100';                                         # default Consumer-Icon
+my $cicondef       = 'light_light_dim_100';                                         # default Consumer-Icon
+my $ciconcoldef    = 'darkorange';                                                  # default Consumer-Icon Färbung
 my $homeicondef    = 'control_building_control@grey';                               # default Home-Icon
-my $sunicondef     = 'weather_sun';                                                 # default Sonne-icon
+my $invicondef     = 'weather_sun';                                                 # default Inverter-icon
+my $inviconcoldef  = 'orange';                                                      # default Inverter Färbung wenn aktiv
 my $moonicondef    = 2;                                                             # default Mond-Phase (aus %hmoon)
+my $mooncoldef     = 'lightblue';                                                   # default Mond Färbung
+my $inactcoldef    = 'grey';                                                        # default Färbung Icon wenn inaktiv
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
 my $pPath = '?format=txt';                                                          # Download Format
@@ -5755,7 +5760,11 @@ sub _attrInverterDev {                   ## no critic "not used"
       undef @{$data{$type}{$name}{current}{genslidereg}};
       delete $data{$type}{$name}{circular}{99}{attrInvChangedTs};
   }
+  
+  delete $data{$type}{$name}{current}{invertercapi01};
+  delete $data{$type}{$name}{current}{iconi01};
 
+  InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
   InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
@@ -8195,10 +8204,10 @@ sub __calcPVestimates {
 
   $pvsum  = $peaksum if($peaksum && $pvsum > $peaksum);                                              # Vorhersage nicht größer als die Summe aller PV-Strings Peak
 
-  my $invcapacity = CurrentVal ($hash, 'invertercapacity', 0);                                       # Max. Leistung des Invertrs
+  my $invcap = CurrentVal ($hash, 'invertercapi01', 0);                                              # Max. Leistung des Invertrs
 
-  if ($invcapacity && $pvsum > $invcapacity) {
-      $pvsum = $invcapacity;                                                                         # PV Vorhersage auf WR Kapazität begrenzen
+  if ($invcap && $pvsum > $invcap) {
+      $pvsum = $invcap;                                                                              # PV Vorhersage auf WR Kapazität begrenzen
 
       debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $pvsum Watt due to inverter capacity");
   }
@@ -8406,8 +8415,6 @@ sub _transferInverterValues {
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
   my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
 
-  $data{$type}{$name}{current}{invertercapacity} = $h->{capacity} if(defined $h->{capacity}); # optionale Angabe max. WR-Leistung
-
   return if(!$pvread || !$edread);
 
   my $pvuf = $pvunit =~ /^kW$/xi ? 1000 : 1;
@@ -8415,7 +8422,7 @@ sub _transferInverterValues {
   $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                              # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
 
   storeReading ('Current_PV', $pv.' W');
-  $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  $data{$type}{$name}{current}{generationi01} = $pv;                                          # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
 
   push @{$data{$type}{$name}{current}{genslidereg}}, $pv;                                     # Schieberegister PV Erzeugung
   limitArray ($data{$type}{$name}{current}{genslidereg}, $slidenumdef);
@@ -8434,7 +8441,7 @@ sub _transferInverterValues {
   if (!$histetot) {                                                                           # etotal der aktuelle Stunde gesetzt ?
       writeToHistory ( { paref => $paref, key => 'etotal', val => $etotal, hour => $nhour } );
 
-      $etotsvd   = CurrentVal ($hash, 'etotal', $etotal);
+      $etotsvd   = CurrentVal ($hash, 'etotali01', $etotal);
       $ethishour = int ($etotal - $etotsvd);
   }
   else {
@@ -8445,19 +8452,22 @@ sub _transferInverterValues {
 
           writeToHistory ( { paref => $paref, key => 'etotal', val => $etotal, hour => $nhour } );
 
-          $etotsvd   = CurrentVal ($hash, 'etotal', $etotal);
+          $etotsvd   = CurrentVal ($hash, 'etotali01', $etotal);
           $ethishour = int ($etotal - $etotsvd);
       }
   }
 
-  $data{$type}{$name}{current}{etotal} = $etotal;                                             # aktuellen etotal des WR speichern
+  $data{$type}{$name}{current}{etotali01}      = $etotal;                                       # aktuellen etotal des WR speichern
+  $data{$type}{$name}{current}{namei01}        = $indev;                                        # Name des Inverterdevices
+  $data{$type}{$name}{current}{invertercapi01} = $h->{capacity} if(defined $h->{capacity});     # optionale Angabe max. WR-Leistung
+  $data{$type}{$name}{current}{iconi01}        = $h->{icon}     if($h->{icon});                 # Icon des Inverters
 
   if ($ethishour < 0) {
       $ethishour = 0;
       my $vl     = 3;
       my $pre    = '- WARNING -';
 
-      if ($paref->{debug} =~ /collectData/xs) {                                               # V 1.23.0 Forum: https://forum.fhem.de/index.php?msg=1314453
+      if ($paref->{debug} =~ /collectData/xs) {                                                 # V 1.23.0 Forum: https://forum.fhem.de/index.php?msg=1314453
           $vl  = 1;
           $pre = 'DEBUG> - WARNING -';
       }
@@ -8500,8 +8510,6 @@ sub _transferProducerValues {
 
       next if(!$pcread || !$edread);
 
-      $data{$type}{$name}{current}{'iconp'.$prn} = $h->{icon} if($h->{icon});                                 # Icon des Producers
-
       my $pu = $pcunit =~ /^kW$/xi ? 1000 : 1;
       my $p  = ReadingsNum ($prdev, $pcread, 0) * $pu;                                                        # aktuelle Erzeugung (W)
       $p     = $p < 0 ? 0 : $p;
@@ -8531,8 +8539,9 @@ sub _transferProducerValues {
       }
 
       $data{$type}{$name}{current}{'etotalp'.$prn} = $etotal;                                                # aktuellen etotal des WR speichern
-      $data{$type}{$name}{current}{'namep'  .$prn} = $prdev;                                                 # Name des Producerdevices
-      $data{$type}{$name}{current}{'aliasp' .$prn} = AttrVal ($prdev, 'alias', $prdev);                      # Alias Producer
+      $data{$type}{$name}{current}{'namep'.  $prn} = $prdev;                                                 # Name des Producerdevices
+      $data{$type}{$name}{current}{'aliasp'. $prn} = AttrVal ($prdev, 'alias', $prdev);                      # Alias Producer
+      $data{$type}{$name}{current}{'iconp'.  $prn} = $h->{icon} if($h->{icon});                              # Icon des Producers
 
       if ($ethishour < 0) {
           $ethishour = 0;
@@ -9203,12 +9212,12 @@ sub _createSummaries {
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
   limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $slidenumdef);
 
-  my $gcon    = CurrentVal ($hash, "gridconsumption",         0);                                       # aktueller Netzbezug
-  my $tconsum = CurrentVal ($hash, "tomorrowconsumption", undef);                                       # Verbrauchsprognose für folgenden Tag
-  my $pvgen   = CurrentVal ($hash, "generation",              0);
-  my $gfeedin = CurrentVal ($hash, "gridfeedin",              0);
-  my $batin   = CurrentVal ($hash, "powerbatin",              0);                                       # aktuelle Batterieladung
-  my $batout  = CurrentVal ($hash, "powerbatout",             0);                                       # aktuelle Batterieentladung
+  my $gcon    = CurrentVal ($hash, 'gridconsumption',         0);                                       # aktueller Netzbezug
+  my $tconsum = CurrentVal ($hash, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
+  my $pvgen   = CurrentVal ($hash, 'generationi01',           0);
+  my $gfeedin = CurrentVal ($hash, 'gridfeedin',              0);
+  my $batin   = CurrentVal ($hash, 'powerbatin',              0);                                       # aktuelle Batterieladung
+  my $batout  = CurrentVal ($hash, 'powerbatout',             0);                                       # aktuelle Batterieentladung
 
   my $othprod = 0;                                                                                      # Summe Otherproducer
 
@@ -13954,7 +13963,7 @@ sub _flowGraphic {
   my $cgfi       = ReadingsNum ($name, 'Current_GridFeedIn',      0);
   my $csc        = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
-  my $cpv        = ReadingsNum ($name, 'Current_PV',              0);
+  my $cpv        = CurrentVal  ($hash, 'generationi01',           0);
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
@@ -14091,13 +14100,13 @@ END0
       $pos_left = $producer_start + 25;
 
       for my $prnxnum (@producers) {
-          my $palias = CurrentVal ($hash, 'aliasp'.$prnxnum, 'Producer'.$prnxnum);
-          my $picon  = __substituteIcon ( { hash  => $hash,                                    # Icon des Producerdevices
-                                            name  => $name,
-                                            pn    => $prnxnum,
-                                            pcurr => $ppcurr->{$prnxnum}
-                                          }
-                                        );
+          my $palias  = CurrentVal ($hash, 'aliasp'.$prnxnum, 'Producer'.$prnxnum);
+          my ($picon) = __substituteIcon ( { hash  => $hash,                                    # Icon des Producerdevices
+                                             name  => $name,
+                                             pn    => $prnxnum,
+                                             pcurr => $ppcurr->{$prnxnum}
+                                           }
+                                         );
 
           $ret .= '<g id="producer_'.$prnxnum.'" fill="grey" transform="translate('.$pos_left.',0),scale(0.15)">';
           $ret .= "<title>$palias</title>".FW_makeImage($picon, '');
@@ -14126,7 +14135,7 @@ END0
       for my $c (@consumers) {
           my $calias     = ConsumerVal      ($hash, $c, "alias", "");                                              # Name des Consumerdevices
           $currentPower  = $cpcurr->{$c};
-          my $cicon      = __substituteIcon ({hash => $hash, name => $name, cn => $c, pcurr => $currentPower});    # Icon des Consumerdevices
+          my ($cicon)    = __substituteIcon ({hash => $hash, name => $name, cn => $c, pcurr => $currentPower});    # Icon des Consumerdevices
           $cc_dummy     -= $currentPower;
 
           $ret .= '<g id="consumer_'.$c.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
@@ -14138,23 +14147,16 @@ END0
   }
   
   ## Sonne / Mond Icon
-  ###################### 
-  my ($smicon, $smtxt);
+  ######################                                                 
+  my ($smicon, $smtxt) = __substituteIcon ( { hash  => $hash,
+                                              name  => $name,
+                                              in    => '01',
+                                              don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),        # Tag oder Nacht
+                                              pcurr => $cpv
+                                            }
+                                          );
   
-  my $don = NexthoursVal ($hash, 'NextHour00', 'DoN', 0);                                                    # Tag oder Nacht
-  
-  if ($don) {
-      my $suncolor = $cpv ? 'orange' : 'grey';
-      $smicon      = $sunicondef.'@'.$suncolor;
-      $smtxt       = 'die Sonne ist aufgegangen';
-  }
-  else {
-      my $moonPhaseI = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
-      $smicon        = $hmoon{$moonPhaseI}{icon}.'@lightblue';
-      $smtxt         = $hmoon{$moonPhaseI}{$lang};
-  }
-  
-  $ret .= '<g id="Sonne" fill="grey" transform="translate(355,165),scale(0.12)">';                          # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= '<g id="Sonne" fill="grey" transform="translate(360,165),scale(0.10)">';                          # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret .= "<title>$smtxt</title>".FW_makeImage($smicon, '');
   $ret .= '</g> ';
 
@@ -14186,7 +14188,7 @@ END1
       my $dumtxt = $htitles{dumtxt}{$lang};  
       my $dumcol = $cc_dummy <= 0 ? '@grey' : q{};                                                 # Einfärbung Consumer Dummy
       $ret      .= '<g id="consumer_X" fill="grey" transform="translate(520,360),scale(0.09)">';
-      $ret      .= "<title>$dumtxt</title>".FW_makeImage($consicondef.$dumcol, '');
+      $ret      .= "<title>$dumtxt</title>".FW_makeImage($cicondef.$dumcol, '');
       $ret      .= '</g> ';
   }
 
@@ -14432,6 +14434,8 @@ return $ret;
 #       und setze ggf. Ersatzwerte
 #       $cn     - Consumernummer (01...max)
 #       $pn     - Producernummer (01...max)
+#       $in     - Inverter, Smartloader (01..max)
+#       $don    - Day or Night
 #       $pcurr  - aktuelle Leistung / Verbrauch
 ################################################################
 sub __substituteIcon {
@@ -14440,33 +14444,44 @@ sub __substituteIcon {
   my $name  = $paref->{name};
   my $cn    = $paref->{cn};
   my $pn    = $paref->{pn};
+  my $in    = $paref->{in};
+  my $don   = $paref->{don};
   my $pcurr = $paref->{pcurr};
+  my $lang  = $paref->{lang};
 
   my ($color, $icon);
+  my $txt = '';
 
-  if ($cn) {                                                                           # Icon Consumer
-      $icon = ConsumerVal ($hash, $cn, 'icon', $consicondef);
-  }
-  elsif ($pn) {
-      $icon = CurrentVal ($hash, 'iconp'.$pn, $prodicondef);                           # Icon Producer
-  }
-
-  ($icon, $color) = split '@', $icon;
-
-  if ($cn) {
+  if ($cn) {                                                                           # Icon Consumer 
+      ($icon, $color) = split '@', ConsumerVal ($hash, $cn, 'icon', $cicondef);
+      
       if (!$color) {
-          $color = isConsumerLogOn ($hash, $cn, $pcurr) ? 'darkorange' : '';
+          $color = isConsumerLogOn ($hash, $cn, $pcurr) ? $ciconcoldef : '';
       }
   }
-  elsif ($pn) {
+  elsif ($pn) {                                                                        # Icon Producer
+      ($icon, $color) = split '@', CurrentVal ($hash, 'iconp'.$pn, $prodicondef);
+      
       if (!$pcurr) {
           $color = 'grey';
+      }      
+  }
+  elsif ($in) {                                                                        # Inverter, Smartloader      
+      if ($don || $pcurr) {                                                            # Tag
+          ($icon, $color) = split '@', CurrentVal ($hash, 'iconi'.$in, $invicondef);
+          $color          = $pcurr ? ($color ? $color : $inviconcoldef) : $inactcoldef;
+      }
+      else {                                                                           # Nacht -> Mondphase
+          my $mpi         = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
+          $icon           = $hmoon{$mpi}{icon}.'@'.$mooncoldef;
+          ($icon, $color) = split '@', $icon;
+          $txt            = $hmoon{$mpi}{$lang};
       }
   }
 
   $icon .= '@'.$color if($color);
 
-return $icon;
+return ($icon, $txt);
 }
 
 ################################################################
@@ -18600,7 +18615,8 @@ return $def;
 # Usage:
 # CurrentVal ($hash, $key, $def)
 #
-# $key: generation           - aktuelle PV Erzeugung
+# $key: generationiXX        - aktuelle PV Erzeugung Inverter XX
+#       generationpXX        - aktuelle Erzeugung Producer XX
 #       aiinitstate          - Initialisierungsstatus der KI
 #       aitrainstate         - Traisningsstatus der KI
 #       aiaddistate          - Add Instanz Status der KI
@@ -18622,7 +18638,7 @@ return $def;
 #       temp                 - aktuelle Außentemperatur
 #       surplus              - aktueller PV Überschuß
 #       tomorrowconsumption  - Verbrauch des kommenden Tages
-#       invertercapacity     - Bemessungsleistung der Wechselrichters (max. W)
+#       invertercapXX        - Bemessungsleistung der Wechselrichters XX (max. W)
 #       allstringspeak       - Peakleistung aller Strings nach temperaturabhängiger Korrektur
 #       allstringscount      - aktuelle Anzahl der Anlagenstrings
 #       tomorrowconsumption  - erwarteter Gesamtverbrauch am morgigen Tag
@@ -20941,7 +20957,8 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev"></a>
-       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; [capacity=&lt;max. WR-Leistung&gt;] </b> <br><br>
+       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; 
+                               [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] </b> <br><br>
 
        Specifies any Device and its Readings to deliver the current PV generation values.
        It can also be a dummy device with appropriate readings.
@@ -20953,20 +20970,21 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                     </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).    </td></tr>
-           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,              </td></tr>
-           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.    </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                        </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts  </td></tr>
-           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                     </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon and, if applicable, color for activity to display the inverter in the flow chart (optional) </td></tr>
+           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                             </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).            </td></tr>
+           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                      </td></tr>
+           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.            </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                </td></tr>
+           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts          </td></tr>
+           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                             </td></tr>
         </table>
        </ul>
        <br>
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=solar@red
        </ul>
        <br>
 
@@ -21057,7 +21075,7 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>icon</b>     </td><td>Icon and, if applicable, color for displaying the producer in the flow chart (optional)                                    </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon and, if applicable, color for activity to display the producer in the flow chart (optional)                           </td></tr>
            <tr><td> <b>pcurr</b>    </td><td>Reading which returns the current generation as a positive value or a self-consumption (special case) as a negative value  </td></tr>
            <tr><td> <b>etotal</b>   </td><td>Reading which supplies the total energy generated (a continuously ascending counter)                                       </td></tr>
            <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                                                </td></tr>
@@ -23288,7 +23306,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev"></a>
-       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; [capacity=&lt;max. WR-Leistung&gt;] </b> <br><br>
+       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
+                              [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] </b> <br><br>
 
        Legt ein beliebiges Device und dessen Readings zur Lieferung der aktuellen PV Erzeugungswerte fest.
        Es kann auch ein Dummy Device mit entsprechenden Readings sein.
@@ -23300,6 +23319,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>icon</b>     </td><td>Icon und ggf. Farbe bei Aktivität zur Darstellung des Inverters in der Flowgrafik (optional) </td></tr>
            <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                         </td></tr>
            <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)    </td></tr>
            <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
@@ -23313,7 +23333,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=solar@red
        </ul>
        <br>
 
@@ -23404,7 +23424,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>icon</b>     </td><td>Icon und ggf. Farbe zur Darstellung des Producers in der Flowgrafik (optional)                                               </td></tr>
+          <tr><td> <b>icon</b>     </td><td>Icon und ggf. Farbe bei Aktivität zur Darstellung des Producers in der Flowgrafik (optional)                                 </td></tr>
           <tr><td> <b>pcurr</b>    </td><td>Reading welches die aktuelle Erzeugung als positiven Wert oder einen Eigenverbrauch (Sonderfall) als negativen Wert liefert  </td></tr>
           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte Energie liefert (ein stetig aufsteigender Zähler)                                       </td></tr>
           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                                       </td></tr>
