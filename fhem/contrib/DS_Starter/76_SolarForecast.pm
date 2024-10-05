@@ -157,7 +157,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.34.2" => "05.10.2024  _flowGraphic: replace sun by FHEM SVG-Icon, sun or icon of moon phases according day/night ".
-                           "new optional key 'icon' in attr setupInverterDev ",
+                           "new optional key 'icon' in attr setupInverterDev, resize all icons to a standard scaling ",
   "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
@@ -13969,6 +13969,7 @@ sub _flowGraphic {
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
   my $cc_dummy   = $cc;
 
+  my $scale      = 0.10;                                      # default Scale
   my $hasbat     = 1;                                         # initial Batterie vorhanden
   my $flowgprods = 1;                                         # Producer in der Energieflußgrafik anzeigen per default
   my $ppcurr     = {};                                        # Hashref Producer current power
@@ -14104,12 +14105,15 @@ END0
           my ($picon) = __substituteIcon ( { hash  => $hash,                                    # Icon des Producerdevices
                                              name  => $name,
                                              pn    => $prnxnum,
-                                             pcurr => $ppcurr->{$prnxnum}
+                                             pcurr => $ppcurr->{$prnxnum},
+                                             lang  => $lang
                                            }
                                          );
 
-          $ret .= '<g id="producer_'.$prnxnum.'" fill="grey" transform="translate('.$pos_left.',0),scale(0.15)">';
-          $ret .= "<title>$palias</title>".FW_makeImage($picon, '');
+          $picon  = FW_makeImage    ($picon, '');
+          $scale  = __normIconScale ($name, $picon);
+          $ret .= qq{<g id="producer_$prnxnum" fill="grey" transform="translate($pos_left,0),scale($scale)">};
+          $ret .= "<title>$palias</title>".$picon;
           $ret .= '</g> ';
 
           $pos_left += $consDist;
@@ -14133,14 +14137,22 @@ END0
       $pos_left = $consumer_start + 15;
 
       for my $c (@consumers) {
-          my $calias     = ConsumerVal      ($hash, $c, "alias", "");                                              # Name des Consumerdevices
+          my $calias     = ConsumerVal      ($hash, $c, "alias", "");                                      # Name des Consumerdevices
           $currentPower  = $cpcurr->{$c};
-          my ($cicon)    = __substituteIcon ({hash => $hash, name => $name, cn => $c, pcurr => $currentPower});    # Icon des Consumerdevices
+          my ($cicon)    = __substituteIcon ( { hash => $hash,                                             # Icon des Consumerdevices
+                                                name => $name, 
+                                                cn    => $c, 
+                                                pcurr => $currentPower,
+                                                lang  => $lang
+                                              }
+                                            );   
           $cc_dummy     -= $currentPower;
 
-          $ret .= '<g id="consumer_'.$c.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
-          $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
-          $ret .= '</g> ';
+          $cicon  = FW_makeImage    ($cicon, '');
+          $scale  = __normIconScale ($name, $cicon);
+          $ret   .= qq{<g id="consumer_$c" transform="translate($pos_left,485),scale($scale)">};
+          $ret   .= "<title>$calias</title>".$cicon;
+          $ret   .= '</g> ';
 
           $pos_left += $consDist;
       }
@@ -14151,14 +14163,17 @@ END0
   my ($smicon, $smtxt) = __substituteIcon ( { hash  => $hash,
                                               name  => $name,
                                               in    => '01',
-                                              don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),        # Tag oder Nacht
-                                              pcurr => $cpv
+                                              don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),         # Tag oder Nacht
+                                              pcurr => $cpv,
+                                              lang  => $lang
                                             }
                                           );
   
-  $ret .= '<g id="Sonne" fill="grey" transform="translate(360,165),scale(0.10)">';                          # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
-  $ret .= "<title>$smtxt</title>".FW_makeImage($smicon, '');
-  $ret .= '</g> ';
+  $smicon = FW_makeImage    ($smicon, '');
+  $scale  = __normIconScale ($name, $smicon);
+  $ret   .= qq{<g id="Inverter" transform="translate(360,165),scale($scale)">};                               # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret   .= "<title>$smtxt</title>".$smicon;
+  $ret   .= '</g> ';
 
   ## Batterie Icon
   ##################
@@ -14178,8 +14193,10 @@ END1
   
   ## Home Icon
   ##############
-  $ret .= '<g id="Home" fill="grey" transform="translate(368,360),scale(0.10)">';                  # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
-  $ret .= "<title>Home</title>".FW_makeImage($homeicondef, '');
+  my $hicon = FW_makeImage    ($homeicondef, '');
+  $scale    = __normIconScale ($name, $hicon);
+  $ret .= qq{<g id="Home" transform="translate(368,360),scale($scale)">};                         # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= "<title>Home</title>".$hicon;
   $ret .= '</g> ';  
 
   ## Dummy Consumer Icon
@@ -14187,8 +14204,10 @@ END1
   if ($flowgconX) {   
       my $dumtxt = $htitles{dumtxt}{$lang};  
       my $dumcol = $cc_dummy <= 0 ? '@grey' : q{};                                                 # Einfärbung Consumer Dummy
-      $ret      .= '<g id="consumer_X" fill="grey" transform="translate(520,360),scale(0.09)">';
-      $ret      .= "<title>$dumtxt</title>".FW_makeImage($cicondef.$dumcol, '');
+      my $dicon  = FW_makeImage    ($cicondef.$dumcol, '');
+      $scale     = __normIconScale ($name, $dicon);
+      $ret      .= qq{<g id="consumer_X" transform="translate(520,360),scale($scale)">};
+      $ret      .= "<title>$dumtxt</title>".$dicon;
       $ret      .= '</g> ';
   }
 
@@ -14482,6 +14501,31 @@ sub __substituteIcon {
   $icon .= '@'.$color if($color);
 
 return ($icon, $txt);
+}
+
+################################################################
+#    berechne Icon Scale auf Bezugsnorm 
+#    widht:   470pt
+#    height:  470pt
+#    scale:   0.10
+################################################################
+sub __normIconScale {                
+  my $name  = shift;
+  my $icon  = shift;
+  
+  my $scale = 0.10;                                                 # default Scale
+  my ($height, $unit) = $icon =~ /height="(\d+\.\d+|\d+)(.*?)"/xs;
+  
+  return $scale if(!$height);
+  
+  my $scale = $unit eq 'pt' ? 470 * $scale /$height             :
+              $unit eq 'px' ? 470 * $scale /$height * 0.96      :
+              $unit eq 'in' ? 470 * $scale /$height * 0.0138889 :
+              $scale;
+  
+  $scale = sprintf "%.2f", $scale;
+
+return $scale;
 }
 
 ################################################################
