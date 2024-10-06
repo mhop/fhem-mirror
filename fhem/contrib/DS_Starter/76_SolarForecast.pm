@@ -483,6 +483,7 @@ my $b4coldef       = 'DBDBD0';                                                  
 my $b4fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 4
 my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
+my $fgscaledef     = 0.10;                                                          # Scale Normativ Icons in Flowgreafik
 my $prodicondef    = 'sani_garden_pump';                                            # default Producer-Icon
 my $cicondef       = 'light_light_dim_100';                                         # default Consumer-Icon
 my $ciconcoldef    = 'darkorange';                                                  # default Consumer-Icon Färbung
@@ -13969,7 +13970,7 @@ sub _flowGraphic {
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
   my $cc_dummy   = $cc;
 
-  my $scale      = 0.10;                                      # default Scale
+  my $scale      = $fgscaledef;
   my $hasbat     = 1;                                         # initial Batterie vorhanden
   my $flowgprods = 1;                                         # Producer in der Energieflußgrafik anzeigen per default
   my $ppcurr     = {};                                        # Hashref Producer current power
@@ -14110,8 +14111,9 @@ END0
                                            }
                                          );
 
-          $picon  = FW_makeImage    ($picon, '');
-          $scale  = __normIconScale ($name, $picon);
+          $picon           = FW_makeImage    ($picon, '');
+          ($scale, $picon) = __normIconScale ($name, $picon);
+          
           $ret .= qq{<g id="producer_$prnxnum" fill="grey" transform="translate($pos_left,0),scale($scale)">};
           $ret .= "<title>$palias</title>".$picon;
           $ret .= '</g> ';
@@ -14148,32 +14150,34 @@ END0
                                             );   
           $cc_dummy     -= $currentPower;
 
-          $cicon  = FW_makeImage    ($cicon, '');
-          $scale  = __normIconScale ($name, $cicon);
-          $ret   .= qq{<g id="consumer_$c" transform="translate($pos_left,485),scale($scale)">};
-          $ret   .= "<title>$calias</title>".$cicon;
-          $ret   .= '</g> ';
+          $cicon           = FW_makeImage    ($cicon, '');
+          ($scale, $cicon) = __normIconScale ($name, $cicon);
+          
+          $ret .= qq{<g id="consumer_$c" transform="translate($pos_left,485),scale($scale)">};
+          $ret .= "<title>$calias</title>".$cicon;
+          $ret .= '</g> ';
 
           $pos_left += $consDist;
       }
   }
   
-  ## Sonne / Mond Icon
+  ## Inverter Icon
   ######################                                                 
-  my ($smicon, $smtxt) = __substituteIcon ( { hash  => $hash,
-                                              name  => $name,
-                                              in    => '01',
-                                              don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),         # Tag oder Nacht
-                                              pcurr => $cpv,
-                                              lang  => $lang
+  my ($iicon, $smtxt) = __substituteIcon ( { hash  => $hash,
+                                             name  => $name,
+                                             in    => '01',
+                                             don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
+                                             pcurr => $cpv,
+                                             lang  => $lang
                                             }
                                           );
   
-  $smicon = FW_makeImage    ($smicon, '');
-  $scale  = __normIconScale ($name, $smicon);
-  $ret   .= qq{<g id="Inverter" transform="translate(360,165),scale($scale)">};                               # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
-  $ret   .= "<title>$smtxt</title>".$smicon;
-  $ret   .= '</g> ';
+  $iicon           = FW_makeImage    ($iicon, '');
+  ($scale, $iicon) = __normIconScale ($name, $iicon);
+  
+  $ret .= qq{<g id="Inverter" transform="translate(360,165),scale($scale)">};                                # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= "<title>$smtxt</title>".$iicon;
+  $ret .= '</g> ';
 
   ## Batterie Icon
   ##################
@@ -14193,8 +14197,9 @@ END1
   
   ## Home Icon
   ##############
-  my $hicon = FW_makeImage    ($homeicondef, '');
-  $scale    = __normIconScale ($name, $hicon);
+  my $hicon        = FW_makeImage    ($homeicondef, '');
+  ($scale, $hicon) = __normIconScale ($name, $hicon);
+  
   $ret .= qq{<g id="Home" transform="translate(368,360),scale($scale)">};                         # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret .= "<title>Home</title>".$hicon;
   $ret .= '</g> ';  
@@ -14202,13 +14207,14 @@ END1
   ## Dummy Consumer Icon
   ########################
   if ($flowgconX) {   
-      my $dumtxt = $htitles{dumtxt}{$lang};  
-      my $dumcol = $cc_dummy <= 0 ? '@grey' : q{};                                                 # Einfärbung Consumer Dummy
-      my $dicon  = FW_makeImage    ($cicondef.$dumcol, '');
-      $scale     = __normIconScale ($name, $dicon);
-      $ret      .= qq{<g id="consumer_X" transform="translate(520,360),scale($scale)">};
-      $ret      .= "<title>$dumtxt</title>".$dicon;
-      $ret      .= '</g> ';
+      my $dumtxt       = $htitles{dumtxt}{$lang};  
+      my $dumcol       = $cc_dummy <= 0 ? '@grey' : q{};                                          # Einfärbung Consumer Dummy
+      my $dicon        = FW_makeImage    ($cicondef.$dumcol, '');
+      ($scale, $dicon) = __normIconScale ($name, $dicon);
+      
+      $ret .= qq{<g id="consumer_X" transform="translate(520,360),scale($scale)">};
+      $ret .= "<title>$dumtxt</title>".$dicon;
+      $ret .= '</g> ';
   }
 
   ## Laufketten PV->Home, PV->Grid, Grid->Home
@@ -14504,28 +14510,50 @@ return ($icon, $txt);
 }
 
 ################################################################
-#    berechne Icon Scale auf Bezugsnorm 
-#    widht:   470pt
+#    berechne Icon width, height auf Sollnormativ
+#    width:   470pt
 #    height:  470pt
-#    scale:   0.10
+#    scale:   0.10   Normativ $fgscaledef
 ################################################################
 sub __normIconScale {                
   my $name  = shift;
   my $icon  = shift;
   
-  my $scale = 0.10;                                                 # default Scale
-  my ($height, $unit) = $icon =~ /height="(\d+\.\d+|\d+)(.*?)"/xs;
+  my $hscale           = $fgscaledef;                                          # Scale Normativ
+  my $wscale           = $fgscaledef;
+  my ($width,  $wunit) = $icon =~ /width="(\d+\.\d+|\d+)(.*?)"/xs;
+  my ($height, $hunit) = $icon =~ /height="(\d+\.\d+|\d+)(.*?)"/xs;
   
-  return $scale if(!$height);
+  return ($hscale, $icon) if(!$width || !$height);
   
-  my $scale = $unit eq 'pt' ? 470 * $scale /$height             :
-              $unit eq 'px' ? 470 * $scale /$height * 0.96      :
-              $unit eq 'in' ? 470 * $scale /$height * 0.0138889 :
-              $scale;
+  $wscale = $hunit eq 'pt' ? 470 * $wscale / $width             :
+            $hunit eq 'px' ? 470 * $wscale / $width * 0.96      :
+            $hunit eq 'in' ? 470 * $wscale / $width * 0.0138889 :
+            $hunit eq 'mm' ? 470 * $wscale / $width * 0.352778  :
+            $hunit eq 'cm' ? 470 * $wscale / $width * 0.0352778 :
+            $hunit eq 'pc' ? 470 * $wscale / $width * 12        :
+            $wscale;
+            
+  $hscale = $hunit eq 'pt' ? 470 * $hscale / $height             :
+            $hunit eq 'px' ? 470 * $hscale / $height * 0.96      :
+            $hunit eq 'in' ? 470 * $hscale / $height * 0.0138889 :
+            $hunit eq 'mm' ? 470 * $hscale / $height * 0.352778  :
+            $hunit eq 'cm' ? 470 * $hscale / $height * 28.346    :
+            $hunit eq 'pc' ? 470 * $hscale / $height * 12        :
+            $hscale;
+           
+  $wscale = sprintf "%.2f", $wscale;
+  $hscale = sprintf "%.2f", $hscale;
   
-  $scale = sprintf "%.2f", $scale;
-
-return $scale;
+  my $widthnormpt  = (sprintf "%.0f", (470 * (1 + $wscale))).'pt';          # Breite auf Normativ in pt skaliert          
+  my $heightnormpt = (sprintf "%.0f", (470 * (1 + $hscale))).'pt';          # Höhe auf Normativ in pt skaliert
+  
+  $icon =~ s/width="(.*?)"/width="$widthnormpt"/;
+  $icon =~ s/height="(.*?)"/height="$heightnormpt"/;
+  
+  # Log3 ($name, 2, "$name - widthnormpt: $widthnormpt, heightnormpt: $heightnormpt");
+  
+return ($fgscaledef, $icon);
 }
 
 ################################################################
