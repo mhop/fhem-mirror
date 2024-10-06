@@ -156,8 +156,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.34.2" => "05.10.2024  _flowGraphic: replace sun by FHEM SVG-Icon, sun or icon of moon phases according day/night ".
-                           "new optional key 'icon' in attr setupInverterDev, resize all icons to a standard scaling ",
+  "1.34.2" => "06.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
+                           "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard scaling ",
   "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
@@ -14030,10 +14030,10 @@ sub _flowGraphic {
       my $cgfo = $cgfi - $cpv;
 
       if ($cgfo > 1) {
-          $cgc_style     = 'flowg active_out';
-          $cgc_direction = 'M670,590 L490,515';
-          $cgfi         -= $cgfo;
-          $cgc           = $cgfo;
+          $cgc_style      = 'flowg active_out';
+          $cgc_direction  = 'M670,590 L490,515';
+          $cgfi          -= $cgfo;
+          $cgc            = $cgfo;
       }
   }
 
@@ -14102,7 +14102,7 @@ END0
       $pos_left = $producer_start + 25;
 
       for my $prnxnum (@producers) {
-          my $palias  = CurrentVal ($hash, 'aliasp'.$prnxnum, 'Producer'.$prnxnum);
+          my $palias  = CurrentVal ($hash, 'aliasp'.$prnxnum, 'namep'.$prnxnum);
           my ($picon) = __substituteIcon ( { hash  => $hash,                                    # Icon des Producerdevices
                                              name  => $name,
                                              pn    => $prnxnum,
@@ -14139,7 +14139,7 @@ END0
       $pos_left = $consumer_start + 15;
 
       for my $c (@consumers) {
-          my $calias     = ConsumerVal      ($hash, $c, "alias", "");                                      # Name des Consumerdevices
+          my $calias     = ConsumerVal ($hash, $c, 'alias', '');                                           # Name des Consumerdevices
           $currentPower  = $cpcurr->{$c};
           my ($cicon)    = __substituteIcon ( { hash => $hash,                                             # Icon des Consumerdevices
                                                 name => $name, 
@@ -14299,8 +14299,8 @@ END3
       }
 
       for my $c (@consumers) {
-          my $power     = ConsumerVal ($hash, $c, "power",   0);
-          my $rpcurr    = ConsumerVal ($hash, $c, "rpcurr", "");                                   # Reading für akt. Verbrauch angegeben ?
+          my $power     = ConsumerVal ($hash, $c, 'power',   0);
+          my $rpcurr    = ConsumerVal ($hash, $c, 'rpcurr', '');                                   # Reading für akt. Verbrauch angegeben ?
           $currentPower = $cpcurr->{$c};
 
           if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
@@ -14337,6 +14337,8 @@ END3
   $ret .= qq{<text class="flowg text" id="home-txt"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
   $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
 
+  my $lcp;
+  
   ## Textangabe Producer
   ########################
   if ($flowgprods) {
@@ -14345,45 +14347,29 @@ END3
       for my $prnxnum (@producers) {
           $currentPower = sprintf "%.2f", $ppcurr->{$prnxnum};
           $currentPower = sprintf "%.0f", $currentPower if($currentPower > 10);
+          $currentPower = 0 if(1 * $currentPower == 0);
+          $lcp          = length $currentPower;
 
           # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
-          ###############################################################################
-          if (length($currentPower) >= 5) {
-               $pos_left -= 40;
-          }
-          elsif (length($currentPower) >= 4) {
-              $pos_left -= 25;
-          }
-          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
-              $pos_left -= 5;
-          }
-          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
-              $pos_left += 7;
-          }
-          elsif (length($currentPower) == 1) {
-              $pos_left += 25;
-          }
+          ###############################################################################          
+          $lcp >= 5 ? $pos_left -= 10 :
+          $lcp == 4 ? $pos_left += 10 :
+          $lcp == 3 ? $pos_left += 15 :
+          $lcp == 2 ? $pos_left += 20 :
+          $lcp == 1 ? $pos_left += 40 :
+          $pos_left;
 
           $ret .= qq{<text class="flowg text" id="producer-txt_$prnxnum" x="$pos_left" y="80">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
 
-          # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse wieder zurück an den Ursprungspunkt
-          #######################################################################################################
-          if (length($currentPower) >= 5) {
-              $pos_left += 40;
-          }
-          elsif (length($currentPower) >= 4) {
-              $pos_left += 25;
-          }
-          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
-              $pos_left += 5;
-          }
-          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
-              $pos_left -= 7;
-          }
-          elsif (length($currentPower) == 1) {
-              $pos_left -= 25;
-          }
-
+          # Leistungszahl wieder zurück an den Ursprungspunkt
+          ####################################################          
+          $lcp >= 5 ? $pos_left += 10 :
+          $lcp == 4 ? $pos_left -= 10 :
+          $lcp == 3 ? $pos_left -= 15 :
+          $lcp == 2 ? $pos_left -= 20 :
+          $lcp == 1 ? $pos_left -= 40 :
+          $pos_left;       
+          
           $pos_left  += ($consDist * 2);
       }
   }
@@ -14396,54 +14382,38 @@ END3
       for my $c (@consumers) {
           $currentPower    = sprintf "%.1f", $cpcurr->{$c};
           $currentPower    = sprintf "%.0f", $currentPower if($currentPower > 10);
-          my $consumerTime = ConsumerVal ($hash, $c, "remainTime", "");                               # Restlaufzeit
-          my $rpcurr       = ConsumerVal ($hash, $c, "rpcurr",     "");                               # Readingname f. current Power
+          my $consumerTime = ConsumerVal ($hash, $c, 'remainTime', '');                               # Restlaufzeit
+          my $rpcurr       = ConsumerVal ($hash, $c, 'rpcurr',     '');                               # Readingname f. current Power
 
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = isConsumerPhysOn($hash, $c) ? 'on' : 'off';
           }
+          
+          $lcp = length $currentPower;
 
           #$ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$pos_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
           #$ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$pos_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ##################################################################################
-          if (length($currentPower) >= 5) {
-               $pos_left -= 40;
-          }
-          elsif (length($currentPower) >= 4) {
-              $pos_left -= 25;
-          }
-          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
-              $pos_left -= 5;
-          }
-          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
-              $pos_left += 7;
-          }
-          elsif (length($currentPower) == 1) {
-              $pos_left += 25;
-          }
+          $lcp >= 5 ? $pos_left -= 40 :
+          $lcp == 4 ? $pos_left -= 25 :
+          $lcp == 3 ? $pos_left -= 5  :
+          $lcp == 2 ? $pos_left += 7  :
+          $lcp == 1 ? $pos_left += 25 :
+          $pos_left;
 
           $ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$pos_left" y="1110">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
           $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$pos_left" y="1170">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
 
-          # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse wieder zurück an den Ursprungspunkt
-          #########################################################################################################
-          if (length($currentPower) >= 5) {
-              $pos_left += 40;
-          }
-          elsif (length($currentPower) >= 4) {
-              $pos_left += 25;
-          }
-          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
-              $pos_left += 5;
-          }
-          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
-              $pos_left -= 7;
-          }
-          elsif (length($currentPower) == 1) {
-              $pos_left -= 25;
-          }
+          # Verbrauchszahl wieder zurück an den Ursprungspunkt
+          ######################################################          
+          $lcp >= 5 ? $pos_left += 40 :
+          $lcp == 4 ? $pos_left += 25 :
+          $lcp == 3 ? $pos_left += 5  :
+          $lcp == 2 ? $pos_left -= 7  :
+          $lcp == 1 ? $pos_left -= 25 :
+          $pos_left;
 
           $pos_left  += ($consDist * 2);
       }
