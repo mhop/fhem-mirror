@@ -14112,7 +14112,7 @@ END0
                                          );
 
           $picon           = FW_makeImage    ($picon, '');
-          ($scale, $picon) = __normIconScale ($name, $picon);
+          ($scale, $picon) = __normIconScale ($picon, $name);
           
           $ret .= qq{<g id="producer_$prnxnum" fill="grey" transform="translate($pos_left,0),scale($scale)">};
           $ret .= "<title>$palias</title>".$picon;
@@ -14151,7 +14151,7 @@ END0
           $cc_dummy     -= $currentPower;
 
           $cicon           = FW_makeImage    ($cicon, '');
-          ($scale, $cicon) = __normIconScale ($name, $cicon);
+          ($scale, $cicon) = __normIconScale ($cicon, $name);
           
           $ret .= qq{<g id="consumer_$c" transform="translate($pos_left,485),scale($scale)">};
           $ret .= "<title>$calias</title>".$cicon;
@@ -14173,7 +14173,7 @@ END0
                                           );
   
   $iicon           = FW_makeImage    ($iicon, '');
-  ($scale, $iicon) = __normIconScale ($name, $iicon);
+  ($scale, $iicon) = __normIconScale ($iicon, $name);
   
   $ret .= qq{<g id="Inverter" transform="translate(360,165),scale($scale)">};                                # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret .= "<title>$smtxt</title>".$iicon;
@@ -14198,7 +14198,7 @@ END1
   ## Home Icon
   ##############
   my $hicon        = FW_makeImage    ($homeicondef, '');
-  ($scale, $hicon) = __normIconScale ($name, $hicon);
+  ($scale, $hicon) = __normIconScale ($hicon, $name);
   
   $ret .= qq{<g id="Home" transform="translate(368,360),scale($scale)">};                         # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret .= "<title>Home</title>".$hicon;
@@ -14210,7 +14210,7 @@ END1
       my $dumtxt       = $htitles{dumtxt}{$lang};  
       my $dumcol       = $cc_dummy <= 0 ? '@grey' : q{};                                          # Einfärbung Consumer Dummy
       my $dicon        = FW_makeImage    ($cicondef.$dumcol, '');
-      ($scale, $dicon) = __normIconScale ($name, $dicon);
+      ($scale, $dicon) = __normIconScale ($dicon, $name);
       
       $ret .= qq{<g id="consumer_X" transform="translate(520,360),scale($scale)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
@@ -14515,9 +14515,9 @@ return ($icon, $txt);
 #    height:  470pt
 #    scale:   0.10   Normativ $fgscaledef
 ################################################################
-sub __normIconScale {                
-  my $name  = shift;
-  my $icon  = shift;
+sub __normIconScale {
+  my $icon = shift;
+  my $name = shift;
   
   my $hscale           = $fgscaledef;                                          # Scale Normativ
   my $wscale           = $fgscaledef;
@@ -14531,7 +14531,7 @@ sub __normIconScale {
             $hunit eq 'in' ? 470 * $wscale / $width * 0.0138889 :
             $hunit eq 'mm' ? 470 * $wscale / $width * 0.352778  :
             $hunit eq 'cm' ? 470 * $wscale / $width * 0.0352778 :
-            $hunit eq 'pc' ? 470 * $wscale / $width * 12        :
+            $hunit eq 'pc' ? 470 * $wscale / $width * 0.0833333 :
             $wscale;
             
   $hscale = $hunit eq 'pt' ? 470 * $hscale / $height             :
@@ -14539,7 +14539,7 @@ sub __normIconScale {
             $hunit eq 'in' ? 470 * $hscale / $height * 0.0138889 :
             $hunit eq 'mm' ? 470 * $hscale / $height * 0.352778  :
             $hunit eq 'cm' ? 470 * $hscale / $height * 0.0352778 :
-            $hunit eq 'pc' ? 470 * $hscale / $height * 12        :
+            $hunit eq 'pc' ? 470 * $hscale / $height * 0.0833333 :
             $hscale;
            
   $wscale = sprintf "%.2f", $wscale;
