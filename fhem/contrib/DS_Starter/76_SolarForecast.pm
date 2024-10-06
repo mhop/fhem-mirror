@@ -14538,7 +14538,7 @@ sub __normIconScale {
             $hunit eq 'px' ? 470 * $hscale / $height * 0.96      :
             $hunit eq 'in' ? 470 * $hscale / $height * 0.0138889 :
             $hunit eq 'mm' ? 470 * $hscale / $height * 0.352778  :
-            $hunit eq 'cm' ? 470 * $hscale / $height * 28.346    :
+            $hunit eq 'cm' ? 470 * $hscale / $height * 0.0352778 :
             $hunit eq 'pc' ? 470 * $hscale / $height * 12        :
             $hscale;
            
