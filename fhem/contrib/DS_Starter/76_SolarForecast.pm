@@ -14461,16 +14461,28 @@ sub __substituteIcon {
           $color = 'grey';
       }      
   }
-  elsif ($in) {                                                                        # Inverter, Smartloader      
-      if ($don || $pcurr) {                                                            # Tag
-          ($icon, $color) = split '@', CurrentVal ($hash, 'iconi'.$in, $invicondef);
-          $color          = $pcurr ? ($color ? $color : $inviconcoldef) : $inactcoldef;
+  elsif ($in) {                                                                        # Inverter, Smartloader
+      my ($iday, $inight) = split ':', CurrentVal ($hash, 'iconi'.$in, $invicondef);
+      
+      if ($don || $pcurr) {                                                            # Tag -> eigenes Icon oder Standard
+          $iday           = $iday ? $iday : $invicondef;
+          ($icon, $color) = split '@', $iday;
+          $color          = !$pcurr ? $inactcoldef :
+                            $color  ? $color       : 
+                            $inviconcoldef;
       }
-      else {                                                                           # Nacht -> Mondphase
-          my $mpi         = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
-          $icon           = $hmoon{$mpi}{icon}.'@'.$mooncoldef;
-          ($icon, $color) = split '@', $icon;
-          $txt            = $hmoon{$mpi}{$lang};
+      else {                                                                           # Nacht -> eigenes Icon oder Mondphase
+          my $mpi = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
+          
+          if ($inight) {                                                               # eigenes Icon + ggf. Farbe
+              ($icon, $color) = split '@', $inight;
+              $color          = $color ? $color : $inactcoldef;
+          }
+          else {
+              $icon           = $hmoon{$mpi}{icon}.'@'.$mooncoldef;
+              $txt            = $hmoon{$mpi}{$lang};
+              ($icon, $color) = split '@', $icon;
+          }
       }
   }
 
@@ -20420,78 +20432,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
-       <li><b>setupWeatherDevX </b> <br><br>
-
-       Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
-       The attribute 'setupWeatherDev1' specifies the leading weather service and is mandatory.<br>
-       If an Open-Meteo API is selected in the 'setupWeatherDev1' attribute, this Open-Meteo service is automatically set as the
-       source of the radiation data (Attribute setupRadiationAPI). <br><br>
-
-       <b>OpenMeteoDWD-API</b> <br>
-
-       Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
-       No API key is required.
-       Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
-       national weather services.
-       This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
-       15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
-       The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
-       models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a
-       seamless forecast.
-       The comprehensive and clearly laid out
-       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
-       the service's website.
-       <br><br>
-
-      <b>OpenMeteoDWDEnsemble-API</b> <br>
-
-      This Open-Meteo API variant provides access to the DWD's global
-      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
-      <br>
-      The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are
-      a special type of forecasting method that takes into account the uncertainties in weather forecasting.
-      They do this by running several simulations or models with slight differences in the starting conditions or settings.
-      Each simulation, known as an ensemble member, represents a possible outcome of the weather.
-      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used.
-      <br><br>
-
-       <b>OpenMeteoWorld-API</b> <br>
-
-       As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
-       The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric
-       Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
-       The providers' models are combined for each location worldwide to produce the best possible forecast.
-       The services and weather models are used automatically based on the location coordinates contained in the API call.
-       <br><br>
-
-       <b>DWD Device</b> <br>
-
-       As an alternative to Open-Meteo, an FHEM 'DWD_OpenData' device can be used to supply the weather data.<br>
-       If no device of this type exists, at least one DWD_OpenData device must first be defined.
-       (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-       If more than one setupWeatherDevX is specified, the average of all weather stations is determined
-       if the respective value was supplied and is numerical. <br>
-       Otherwise, the data from 'setupWeatherDev1' is always used as the leading weather device.<br>
-       At least these attributes must be set in the selected DWD_OpenData Device: <br><br>
-
-       <ul>
-         <table>
-         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
-            <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
-            <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
-            <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;   </td></tr>
-         </table>
-       </ul>
-       <br>
-
-       <b>Note:</b> If the latitude and longitude attributes are set in the global device, the sunrise and sunset
-                    result from this information.
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-flowGraphicCss"></a>
        <li><b>flowGraphicCss </b><br>
          Defines the style for the energy flow graph. The attribute is automatically preset.
@@ -21000,7 +20940,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-setupInverterDev"></a>
        <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; 
-                               [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] </b> <br><br>
+                               [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
        Specifies any Device and its Readings to deliver the current PV generation values.
        It can also be a dummy device with appropriate readings.
@@ -21012,21 +20952,23 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>icon</b>     </td><td>Icon and, if applicable, color for activity to display the inverter in the flow chart (optional) </td></tr>
-           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                             </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).            </td></tr>
-           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                      </td></tr>
-           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.            </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts          </td></tr>
-           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                             </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon for displaying the inverter in the flow chart (optional)                                           </td></tr>
+           <tr><td>                 </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                 </td></tr>
+           <tr><td>                 </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed      </td></tr>           
+           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                                    </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                   </td></tr>
+           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                             </td></tr>
+           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.                   </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                       </td></tr>
+           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                 </td></tr>
+           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                                    </td></tr>
         </table>
        </ul>
        <br>
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=solar@red
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
        </ul>
        <br>
 
@@ -21272,6 +21214,78 @@ to ensure that the system configuration is correct.
       </ul>
       </li>
       <br>
+      
+       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
+       <li><b>setupWeatherDevX </b> <br><br>
+
+       Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
+       The attribute 'setupWeatherDev1' specifies the leading weather service and is mandatory.<br>
+       If an Open-Meteo API is selected in the 'setupWeatherDev1' attribute, this Open-Meteo service is automatically set as the
+       source of the radiation data (Attribute setupRadiationAPI). <br><br>
+
+       <b>OpenMeteoDWD-API</b> <br>
+
+       Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
+       No API key is required.
+       Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
+       national weather services.
+       This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
+       15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
+       The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
+       models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a
+       seamless forecast.
+       The comprehensive and clearly laid out
+       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
+       the service's website.
+       <br><br>
+
+      <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+      This Open-Meteo API variant provides access to the DWD's global
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
+      <br>
+      The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are
+      a special type of forecasting method that takes into account the uncertainties in weather forecasting.
+      They do this by running several simulations or models with slight differences in the starting conditions or settings.
+      Each simulation, known as an ensemble member, represents a possible outcome of the weather.
+      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used.
+      <br><br>
+
+       <b>OpenMeteoWorld-API</b> <br>
+
+       As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
+       The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric
+       Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
+       The providers' models are combined for each location worldwide to produce the best possible forecast.
+       The services and weather models are used automatically based on the location coordinates contained in the API call.
+       <br><br>
+
+       <b>DWD Device</b> <br>
+
+       As an alternative to Open-Meteo, an FHEM 'DWD_OpenData' device can be used to supply the weather data.<br>
+       If no device of this type exists, at least one DWD_OpenData device must first be defined.
+       (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+       If more than one setupWeatherDevX is specified, the average of all weather stations is determined
+       if the respective value was supplied and is numerical. <br>
+       Otherwise, the data from 'setupWeatherDev1' is always used as the leading weather device.<br>
+       At least these attributes must be set in the selected DWD_OpenData Device: <br><br>
+
+       <ul>
+         <table>
+         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+            <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
+            <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
+            <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
+            <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;   </td></tr>
+         </table>
+       </ul>
+       <br>
+
+       <b>Note:</b> If the latitude and longitude attributes are set in the global device, the sunrise and sunset
+                    result from this information.
+       </li>
+       <br>
 
      </ul>
   </ul>
@@ -22771,78 +22785,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
-       <li><b>setupWeatherDevX </b> <br><br>
-
-       Gibt das Gerät oder die API zur Lieferung der erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) an.<br>
-       Das Attribut 'setupWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
-       Ist eine Open-Meteo API im Attribut 'setupWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
-       der Strahlungsdaten (Attribut setupRadiationAPI) eingestellt. <br><br>
-
-       <b>OpenMeteoDWD-API</b> <br>
-
-       Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
-       Es ist kein API-Schlüssel erforderlich.
-       Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
-       von angesehenen nationalen Wetterdiensten.
-       Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
-       15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
-       von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
-       anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU
-       und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
-       Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
-       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
-       <br><br>
-
-      <b>OpenMeteoDWDEnsemble-API</b> <br>
-
-      Diese Open-Meteo API Variante bietet Zugang zum globalen
-      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
-      des DWD. <br>
-      Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind
-      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt.
-      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen
-      oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
-      In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
-      Ergbnis verwendet.
-      <br><br>
-
-       <b>OpenMeteoWorld-API</b> <br>
-
-       Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
-       Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric
-       Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
-       Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
-       Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
-       <br><br>
-
-       <b>DWD Gerät</b> <br>
-
-       Alternativ zu Open-Meteo kann ein FHEM 'DWD_OpenData'-Gerät zur Lieferung der Wetterdaten dienen.<br>
-       Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData Gerät
-       definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-       Sind mehr als ein setupWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt
-       sofern der jeweilige Wert geliefert wurde und numerisch ist. <br>
-       Anderenfalls werden immer die Daten von 'setupWeatherDev1' als führendes Wetterdevice genutzt. <br>
-       Im ausgewählten DWD_OpenData Gerät müssen mindestens diese Attribute gesetzt sein: <br><br>
-
-       <ul>
-          <table>
-          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-             <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
-             <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
-             <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
-             <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;  </td></tr>
-          </table>
-       </ul>
-       <br>
-
-       <b>Hinweis:</b> Sind die Attribute latitude und longitude im global Device gesetzt, ergibt sich der
-                       Sonnenauf- und Sonnenuntergang aus diesen Angaben.
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-flowGraphicCss"></a>
        <li><b>flowGraphicCss </b><br>
          Definiert den Style für die Energieflußgrafik. Das Attribut wird automatisch vorbelegt.
@@ -23349,7 +23291,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-setupInverterDev"></a>
        <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
-                              [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] </b> <br><br>
+                              [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
        Legt ein beliebiges Device und dessen Readings zur Lieferung der aktuellen PV Erzeugungswerte fest.
        Es kann auch ein Dummy Device mit entsprechenden Readings sein.
@@ -23361,21 +23303,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>icon</b>     </td><td>Icon und ggf. Farbe bei Aktivität zur Darstellung des Inverters in der Flowgrafik (optional) </td></tr>
-           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                         </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)    </td></tr>
-           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
-           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.    </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt  </td></tr>
-           <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                            </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                      </td></tr>
+           <tr><td>                 </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                            </td></tr>
+           <tr><td>                 </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt  </td></tr>
+           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                                 </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)            </td></tr>
+           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt               </td></tr>
+           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.            </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                  </td></tr>
+           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt          </td></tr>
+           <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                                    </td></tr>
          </table>
        </ul>
        <br>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=solar@red
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
        </ul>
        <br>
 
@@ -23623,6 +23567,78 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </ul>
       </li>
       <br>
+      
+       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
+       <li><b>setupWeatherDevX </b> <br><br>
+
+       Gibt das Gerät oder die API zur Lieferung der erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) an.<br>
+       Das Attribut 'setupWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
+       Ist eine Open-Meteo API im Attribut 'setupWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
+       der Strahlungsdaten (Attribut setupRadiationAPI) eingestellt. <br><br>
+
+       <b>OpenMeteoDWD-API</b> <br>
+
+       Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
+       Es ist kein API-Schlüssel erforderlich.
+       Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
+       von angesehenen nationalen Wetterdiensten.
+       Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
+       15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
+       von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
+       anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU
+       und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
+       Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
+       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
+       <br><br>
+
+      <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+      Diese Open-Meteo API Variante bietet Zugang zum globalen
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
+      des DWD. <br>
+      Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind
+      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt.
+      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen
+      oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
+      In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
+      Ergbnis verwendet.
+      <br><br>
+
+       <b>OpenMeteoWorld-API</b> <br>
+
+       Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
+       Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric
+       Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
+       Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
+       Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
+       <br><br>
+
+       <b>DWD Gerät</b> <br>
+
+       Alternativ zu Open-Meteo kann ein FHEM 'DWD_OpenData'-Gerät zur Lieferung der Wetterdaten dienen.<br>
+       Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData Gerät
+       definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+       Sind mehr als ein setupWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt
+       sofern der jeweilige Wert geliefert wurde und numerisch ist. <br>
+       Anderenfalls werden immer die Daten von 'setupWeatherDev1' als führendes Wetterdevice genutzt. <br>
+       Im ausgewählten DWD_OpenData Gerät müssen mindestens diese Attribute gesetzt sein: <br><br>
+
+       <ul>
+          <table>
+          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+             <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
+             <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
+             <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
+             <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;  </td></tr>
+          </table>
+       </ul>
+       <br>
+
+       <b>Hinweis:</b> Sind die Attribute latitude und longitude im global Device gesetzt, ergibt sich der
+                       Sonnenauf- und Sonnenuntergang aus diesen Angaben.
+       </li>
+       <br>
 
      </ul>
   </ul>
