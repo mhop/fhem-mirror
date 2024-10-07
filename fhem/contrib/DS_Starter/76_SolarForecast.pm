@@ -10302,7 +10302,10 @@ sub __switchConsumer {
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
   }
 
+  $paref->{scss} = 1;
   $state = ___setConsumerSwitchingState ($paref);                                 # Consumer Schaltzustände ermitteln & setzen
+  delete $paref->{scss};
+  
   $state = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen
   $state = ___switchConsumerOff         ($paref);                                 # Verbraucher Ausschaltbedingung prüfen + auslösen
   $state = ___setConsumerSwitchingState ($paref);                                 # Consumer Schaltzustände nach Switching ermitteln & setzen
@@ -10528,6 +10531,7 @@ sub ___setConsumerSwitchingState {
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};
   my $state = $paref->{state};
+  my $fscss = $paref->{scss};                                                                      # erster Subaufruf: 1
 
   my $hash      = $defs{$name};
   my $simpCstat = simplifyCstate (ConsumerVal ($hash, $c, 'planstate', ''));
@@ -10622,7 +10626,7 @@ sub ___setConsumerSwitchingState {
       $dowri = 1;
   }
 
-  if ($dowri) {
+  if (!$fscss && $dowri) {
       writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
       Log3 ($name, 2, "$name - $state");
   }
