@@ -157,7 +157,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.34.2" => "06.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
-                           "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard scaling ",
+                           "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard ".
+                           "scaling, __switchConsumer: add ___setConsumerSwitchingState before switch subs ",
   "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
@@ -10292,11 +10293,19 @@ return;
 ################################################################
 sub __switchConsumer {
   my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  my $debug = $paref->{debug};
   my $state = $paref->{state};
+  
+  if ($debug =~ /consumerSwitching${c}/x) {                                                       
+      Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
+  }
 
-  $state    = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen
-  $state    = ___switchConsumerOff         ($paref);                                 # Verbraucher Ausschaltbedingung prüfen + auslösen
-  $state    = ___setConsumerSwitchingState ($paref);                                 # Consumer aktuelle Schaltzustände ermitteln & setzen
+  $state = ___setConsumerSwitchingState ($paref);                                 # Consumer Schaltzustände ermitteln & setzen
+  $state = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen
+  $state = ___switchConsumerOff         ($paref);                                 # Verbraucher Ausschaltbedingung prüfen + auslösen
+  $state = ___setConsumerSwitchingState ($paref);                                 # Consumer Schaltzustände nach Switching ermitteln & setzen
 
   $paref->{state} = $state;
 
@@ -10347,7 +10356,7 @@ sub ___switchConsumerOn {
       my $nompow = ConsumerVal ($hash, $c, 'power',  '-');
       my $sp     = CurrentVal  ($hash, 'surplus',      0);
 
-      Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
+      #Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
                       qq{auto mode: $auto, Current household consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
                       qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($startts, $lang))[0] : "undef")
@@ -14352,23 +14361,21 @@ END3
 
           # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ###############################################################################          
-          $lcp >= 5 ? $pos_left -= 10 :
-          $lcp == 4 ? $pos_left += 10 :
-          $lcp == 3 ? $pos_left += 15 :
-          $lcp == 2 ? $pos_left += 20 :
-          $lcp == 1 ? $pos_left += 40 :
-          $pos_left;
+          if    ($lcp >= 5) {$pos_left -= 10}
+          elsif ($lcp == 4) {$pos_left += 10}
+          elsif ($lcp == 3) {$pos_left += 15}
+          elsif ($lcp == 2) {$pos_left += 20}
+          elsif ($lcp == 1) {$pos_left += 40}
 
           $ret .= qq{<text class="flowg text" id="producer-txt_$prnxnum" x="$pos_left" y="80">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
 
           # Leistungszahl wieder zurück an den Ursprungspunkt
           ####################################################          
-          $lcp >= 5 ? $pos_left += 10 :
-          $lcp == 4 ? $pos_left -= 10 :
-          $lcp == 3 ? $pos_left -= 15 :
-          $lcp == 2 ? $pos_left -= 20 :
-          $lcp == 1 ? $pos_left -= 40 :
-          $pos_left;       
+          if    ($lcp >= 5) {$pos_left += 10}
+          elsif ($lcp == 4) {$pos_left -= 10}
+          elsif ($lcp == 3) {$pos_left -= 15}
+          elsif ($lcp == 2) {$pos_left -= 20}
+          elsif ($lcp == 1) {$pos_left -= 40}       
           
           $pos_left  += ($consDist * 2);
       }
@@ -14396,24 +14403,22 @@ END3
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ##################################################################################
-          $lcp >= 5 ? $pos_left -= 40 :
-          $lcp == 4 ? $pos_left -= 25 :
-          $lcp == 3 ? $pos_left -= 5  :
-          $lcp == 2 ? $pos_left += 7  :
-          $lcp == 1 ? $pos_left += 25 :
-          $pos_left;
+          if    ($lcp >= 5) {$pos_left -= 40}
+          elsif ($lcp == 4) {$pos_left -= 25}
+          elsif ($lcp == 3) {$pos_left -= 5 }
+          elsif ($lcp == 2) {$pos_left += 7 }
+          elsif ($lcp == 1) {$pos_left += 25}
 
           $ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$pos_left" y="1110">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
           $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$pos_left" y="1170">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl wieder zurück an den Ursprungspunkt
           ######################################################          
-          $lcp >= 5 ? $pos_left += 40 :
-          $lcp == 4 ? $pos_left += 25 :
-          $lcp == 3 ? $pos_left += 5  :
-          $lcp == 2 ? $pos_left -= 7  :
-          $lcp == 1 ? $pos_left -= 25 :
-          $pos_left;
+          if    ($lcp >= 5) {$pos_left += 40}
+          elsif ($lcp == 4) {$pos_left += 25}
+          elsif ($lcp == 3) {$pos_left += 5 }
+          elsif ($lcp == 2) {$pos_left -= 7 }
+          elsif ($lcp == 1) {$pos_left -= 25}
 
           $pos_left  += ($consDist * 2);
       }
