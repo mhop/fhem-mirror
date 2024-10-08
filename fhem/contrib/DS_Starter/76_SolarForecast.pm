@@ -156,9 +156,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.34.2" => "06.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
+  "1.35.0" => "08.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
                            "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard ".
-                           "scaling, __switchConsumer: add ___setConsumerSwitchingState before switch subs ",
+                           "scaling, __switchConsumer: run ___setConsumerSwitchingState before switch subs ".
+                           "no Readings pvCorrectionFactor_XX_autocalc are written anymore ",
   "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
@@ -2017,11 +2018,7 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   my $mode        = $acu =~ /on/xs ? 'manual flex' : 'manual fix';
 
   readingsSingleUpdate ($hash, $opt, $prop." ($mode)", 1);
-
-  my $cfnum = (split "_", $opt)[1];
-  readingsDelete ($hash, "pvCorrectionFactor_${cfnum}_autocalc");
-
-  centralTask ($hash, 0);
+  centralTask          ($hash, 0);
 
 return;
 }
@@ -2057,8 +2054,6 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
               readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $rv, 0);
           }
       }
-
-      deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
   }
   elsif ($prop =~ /on/xs) {
       for my $n (1..24) {
@@ -6781,7 +6776,10 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-
+  for my $n (1..24) {                                                  # 08.10.2024
+      $n = sprintf "%02d", $n;
+      readingsDelete ($hash, "pvCorrectionFactor_${n}_autocalc");
+  }
   ##########################################################################################################################
 
   setModel ($hash);                                                                            # Model setzen
@@ -7526,7 +7524,6 @@ sub __deletePvCorffReadings  {
           }
           else {
               readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $pcf, 0);
-              deleteReadingspec    ($hash, "pvCorrectionFactor_${n}_autocalc");
           }
       }
   }
@@ -10302,9 +10299,9 @@ sub __switchConsumer {
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
   }
 
-  $paref->{scss} = 1;
-  $state = ___setConsumerSwitchingState ($paref);                                 # Consumer Schaltzustände ermitteln & setzen
-  delete $paref->{scss};
+  $paref->{fscss} = 1;                                                            # erster Subaufruf Consumer Schaltzustände ermitteln & setzen
+  $state = ___setConsumerSwitchingState ($paref);                                 
+  delete $paref->{fscss};
   
   $state = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen
   $state = ___switchConsumerOff         ($paref);                                 # Verbraucher Ausschaltbedingung prüfen + auslösen
@@ -10359,7 +10356,6 @@ sub ___switchConsumerOn {
       my $nompow = ConsumerVal ($hash, $c, 'power',  '-');
       my $sp     = CurrentVal  ($hash, 'surplus',      0);
 
-      #Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
                       qq{auto mode: $auto, Current household consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
                       qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($startts, $lang))[0] : "undef")
@@ -10395,7 +10391,7 @@ sub ___switchConsumerOn {
       my $mode   = ConsumerVal ($hash, $c, "mode", $defcmode);                                    # Consumer Planungsmode
       my $enable = ___enableSwitchByBatPrioCharge ($paref);                                       # Vorrangladung Batterie ?
 
-      debugLog ($paref, "consumerSwitching${c}", qq{$name DEBUG> Consumer switch enable by battery state: $enable});
+      debugLog ($paref, "consumerSwitching${c}", qq{Consumer switch enable by battery state: $enable});
 
       if ($mode eq "can" && !$enable) {                                                           # Batterieladung - keine Verbraucher "Einschalten" Freigabe
           $paref->{ps} = "priority charging battery";
@@ -10407,8 +10403,13 @@ sub ___switchConsumerOn {
       elsif ($mode eq "must" || $isConsRcmd) {                                                    # "Muss"-Planung oder Überschuß > Leistungsaufnahme (can)
           $state = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom"};
 
-          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
-
+          if ($debug =~ /consumerSwitching${c}/x) {
+              Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
+          }
+          else {
+              Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+          }
+          
           CommandSet (undef, "$dswname $oncom");
 
           $paref->{ps} = "switching on:";
@@ -10426,8 +10427,13 @@ sub ___switchConsumerOn {
       my $cause = $isintable == 3 ? 'interrupt condition no longer present' : 'existing surplus';
       $state    = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom", cause: $cause};
 
-      Log3 ($name, 2, "$name - $state");
-
+      if ($debug =~ /consumerSwitching${c}/x) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
+      }
+      else {
+          Log3 ($name, 2, "$name - $state");
+      }
+      
       CommandSet (undef, "$dswname $oncom");
 
       $paref->{ps} = "continuing:";
@@ -10490,8 +10496,13 @@ sub ___switchConsumerOff {
       $cause = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
       $state = qq{switching Consumer '$calias' to '$offcom', command: "set $dswname $offcom", cause: $cause};
 
-      Log3 ($name, 2, "$name - $state (Automatic = $auto)");
-
+      if ($debug =~ /consumerSwitching${c}/x) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $offcom"});
+      }
+      else {
+          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+      }
+      
       CommandSet (undef,"$dswname $offcom");
 
       $paref->{ps} = "switching off:";
@@ -10506,8 +10517,13 @@ sub ___switchConsumerOff {
       $cause = $isintable == 2 ? 'interrupt condition' : 'surplus shortage';
       $state = qq{switching Consumer '$calias' to '$offcom', command: "set $dswname $offcom", cause: $cause};
 
-      Log3 ($name, 2, "$name - $state");
-
+      if ($debug =~ /consumerSwitching${c}/x) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $offcom"});
+      }
+      else {
+          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+      }
+      
       CommandSet (undef,"$dswname $offcom");
 
       $paref->{ps} = "interrupting:";
@@ -10531,7 +10547,7 @@ sub ___setConsumerSwitchingState {
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};
   my $state = $paref->{state};
-  my $fscss = $paref->{scss};                                                                      # erster Subaufruf: 1
+  my $fscss = $paref->{fscss};                                                                     # erster Subaufruf: 1
 
   my $hash      = $defs{$name};
   my $simpCstat = simplifyCstate (ConsumerVal ($hash, $c, 'planstate', ''));
@@ -10626,7 +10642,7 @@ sub ___setConsumerSwitchingState {
       $dowri = 1;
   }
 
-  if (!$fscss && $dowri) {
+  if ($dowri && !$fscss) {
       writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
       Log3 ($name, 2, "$name - $state");
   }
@@ -11287,8 +11303,6 @@ sub _calcCaQcomplex {
       else {
           storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin,$aihit Cloud range: $crang, Days in range: $dnum");
       }
-
-      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
 
 return;
@@ -11358,8 +11372,6 @@ sub _calcCaQsimple {
       else {
           storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor,$aihit Days in range: $dnum");
       }
-
-      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
 
 return;
