@@ -159,7 +159,8 @@ my %vNotesIntern = (
   "1.35.0" => "08.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
                            "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard ".
                            "scaling, __switchConsumer: run ___setConsumerSwitchingState before switch subs ".
-                           "no Readings pvCorrectionFactor_XX_autocalc are written anymore ",
+                           "no Readings pvCorrectionFactor_XX_autocalc are written anymore ".
+                           "__switchConsumer: change Debug info and process ",
   "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
@@ -9363,17 +9364,17 @@ sub _manageConsumerData {
 
       readingsDelete ($hash, "consumer${c}_currentPower") if(!$etotread && !$paread);
 
+      $paref->{pcurr} = $pcurr;
+
       __getAutomaticState     ($paref);                                                                           # Automatic Status des Consumers abfragen
       __calcEnergyPieces      ($paref);                                                                           # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
       __planInitialSwitchTime ($paref);                                                                           # Consumer Switch Zeiten planen
       __setTimeframeState     ($paref);                                                                           # Timeframe Status ermitteln
       __setConsRcmdState      ($paref);                                                                           # Consumption Recommended Status setzen
+      
       __switchConsumer        ($paref);                                                                           # Consumer schalten
-
-      $paref->{pcurr} = $pcurr;
-
+      
       __getCyclesAndRuntime   ($paref);                                                                           # Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro Stunde ermitteln
-      __setPhysLogSwState     ($paref);                                                                           # physischen / logischen Schaltzustand festhalten
       __reviewSwitchTime      ($paref);                                                                           # Planungsdaten überprüfen und ggf. neu planen
       __remainConsumerTime    ($paref);                                                                           # Restlaufzeit Verbraucher ermitteln
 
@@ -10295,7 +10296,7 @@ sub __switchConsumer {
   my $debug = $paref->{debug};
   my $state = $paref->{state};
   
-  if ($debug =~ /consumerSwitching${c}/x) {                                                       
+  if ($debug =~ /consumerSwitching${c}/x) {      
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
   }
 
@@ -10303,10 +10304,17 @@ sub __switchConsumer {
   $state = ___setConsumerSwitchingState ($paref);                                 
   delete $paref->{fscss};
   
+  $paref->{befsw} = 1;                                                            # Status vor Switching
+  __setPhysLogSwState ($paref);                                                   # physischen / logischen Schaltzustand festhalten
+  
   $state = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen
   $state = ___switchConsumerOff         ($paref);                                 # Verbraucher Ausschaltbedingung prüfen + auslösen
   $state = ___setConsumerSwitchingState ($paref);                                 # Consumer Schaltzustände nach Switching ermitteln & setzen
-
+  
+  $paref->{befsw} = 0;                                                            # Status nach Switching
+  __setPhysLogSwState ($paref);                                                   # physischen / logischen Schaltzustand festhalten
+  delete $paref->{befsw};
+  
   $paref->{state} = $state;
 
 return;
@@ -10642,8 +10650,11 @@ sub ___setConsumerSwitchingState {
       $dowri = 1;
   }
 
-  if ($dowri && !$fscss) {
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
+  if ($dowri) {
+      if (!$fscss) {
+          writeCacheToFile ($hash, "consumers", $csmcache.$name);                           # Cache File Consumer schreiben
+      }
+      
       Log3 ($name, 2, "$name - $state");
   }
 
@@ -10738,7 +10749,7 @@ sub __getCyclesAndRuntime {
 
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - cycleDayNum: }.ConsumerVal ($hash, $c, 'cycleDayNum', 0));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle start time: $cst});
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle end time: $son});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle end time: $son \n});
   }
 
   ## History schreiben
@@ -10790,6 +10801,7 @@ sub  __setPhysLogSwState {
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $pcurr = $paref->{pcurr};
+  my $befsw = $paref->{befsw};                      # Status vor Switching:1, danach 0 | undef
   my $debug = $paref->{debug};
 
   my $hash = $defs{$name};
@@ -10800,8 +10812,9 @@ sub  __setPhysLogSwState {
   $data{$type}{$name}{consumers}{$c}{logoffon}  = $clo;
 
   if ($debug =~ /consumerSwitching${c}/xs) {
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - physical Switchstate: $cpo});
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - logical Switchstate: $clo \n});
+      my $ao = $befsw ? 'before switching' : 'after switching';
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - physical Switchstate $ao: $cpo});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - logical Switchstate $ao: $clo});
   }
 
 return;
