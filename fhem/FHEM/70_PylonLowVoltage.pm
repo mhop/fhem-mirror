@@ -121,6 +121,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "1.2.0"  => "05.10.2024 _composeAddr: bugfix of effective battaery addressing ",
   "1.1.0"  => "25.08.2024 manage time shift for active gateway connections of all defined  devices ",
   "1.0.0"  => "24.08.2024 implement pylon groups ",
   "0.4.0"  => "23.08.2024 Log output for timeout changed, automatic calculation of checksum, preparation for pylon groups ",
@@ -392,9 +393,9 @@ sub Define {
       return "The group number must be an integer from 0 to 7";
   }
   
-  $hash->{BATADDRESS}   = $$a[3]      // 1;
-  $hash->{GROUP}        = $h->{group} // 0;
-  $hash->{HELPER}{AGE1} = 0;
+  $hash->{HELPER}{BATADDRESS} = $$a[3]      // 1;
+  $hash->{HELPER}{GROUP}      = $h->{group} // 0;
+  $hash->{HELPER}{AGE1}       = 0;
 
   my $params = {
       hash        => $hash,
@@ -554,7 +555,7 @@ sub manageUpdate {
       }
   }
 
-  Log3 ($name, 4, "$name - START request cycle to battery number >$hash->{BATADDRESS}<, group >$hash->{GROUP}< at host:port $hash->{HOST}:$hash->{PORT}");
+  Log3 ($name, 4, "$name - START request cycle to battery number >$hash->{HELPER}{BATADDRESS}<, group >$hash->{HELPER}{GROUP}< at host:port $hash->{HOST}:$hash->{PORT}");
 
   if ($timeout < 1.0) {
       $hash->{HELPER}{GWSESSION} = 1;
@@ -687,7 +688,7 @@ sub finishUpdate {
   delete $hash->{HELPER}{GWSESSION};
 
   if ($success) {
-      Log3 ($name, 4, "$name - got data from battery number >$hash->{BATADDRESS}<, group >$hash->{GROUP}< successfully");
+      Log3 ($name, 4, "$name - got data from battery number >$hash->{HELPER}{BATADDRESS}<, group >$hash->{HELPER}{GROUP}< successfully");
 
       additionalReadings ($readings);                                                 # zusätzliche eigene Readings erstellen
       $readings->{state} = 'connected';
@@ -1471,15 +1472,14 @@ return $cmd;
 sub _composeAddr {
    my $hash = shift;
    
-   my $baddr = $hash->{BATADDRESS} + 1;                          # Master startet mit "02"
-   my $gaddr = $hash->{GROUP};                    
+   my $ba = sprintf "%02x", ($hash->{HELPER}{BATADDRESS} + 1);                          # Master startet mit "02"
+   my $ga = sprintf "%02x", $hash->{HELPER}{GROUP};                    
+   my $ad = sprintf "%02x", (hex ($ga) * hex (10) + hex ($ba));
    
-   my $addr  = sprintf "%02x", (hex $baddr + hex $gaddr * hex '0x10');
+   my $name  = $hash->{NAME};
+   Log3 ($name, 5, "$name - Addressing (HEX) - Bat: $ba, Group: $ga, effective Bat address: $ad");
    
-   #my $name = $hash->{NAME};
-   #Log3 ($name, 1, "$name - ADDRR: $addr");
-   
-return $addr;
+return $ad;
 }
 
 ###############################################################
