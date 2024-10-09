@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 76_SolarForecast: FlowGrafic-some improvements and changes
  - bugfix:  70_PylonLowVoltage: group/bat addr calc when higher addr is used
  - feature: 76_SolarForecast: features and changes, see 
                               https://forum.fhem.de/index.php?msg=1321556

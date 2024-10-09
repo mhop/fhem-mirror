@@ -156,6 +156,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.35.0" => "09.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
+                           "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard ".
+                           "scaling, __switchConsumer: run ___setConsumerSwitchingState before switch subs ".
+                           "no Readings pvCorrectionFactor_XX_autocalc are written anymore ".
+                           "__switchConsumer: change Debug info and process, ___doPlanning: fix Log Output and use replanning or planning ",
+  "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
                            "AI usage depending either of available number of rules or difference to api forecast ".
@@ -362,39 +368,10 @@ my %vNotesIntern = (
   "0.80.12"=> "16.07.2023  preparation for alternative switch device in consumer attribute, revise CommandRef ".
                            "fix/improve sub ___readCandQ and much more, get pvHistory -> one specific day selectable ".
                            "get valConsumerMaster -> one specific consumer selectable, enhance consumer key locktime by on-locktime ",
-  "0.80.11"=> "14.07.2023  minor fixes and improvements ",
-  "0.80.10"=> "13.07.2023  new key spignorecond in consumer attributes ",
-  "0.80.9" => "13.07.2023  new method of prediction quality calculation -> sub __calcFcQuality, minor bug fixes ",
-  "0.80.8" => "12.07.2023  store battery values initdaybatintot, initdaybatouttot, batintot, batouttot in circular hash ".
-                           "new Attr ctrlStatisticReadings parameter todayBatIn, todayBatOut ",
-  "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 72h (old 48), create statistic reading dayAfterTomorrowPVforecast if possible ",
-  "0.80.6" => "09.07.2023  get ... html has some possible arguments now ",
-  "0.80.5" => "07.07.2023  calculate _calcCaQcomplex, _calcCaQsimple both at every time, change setter pvCorrectionFactor_Auto: on_simple, on_complex, off ",
-  "0.80.4" => "06.07.2023  new transferprocess for DWD data from solcastapi-Hash to estimate calculation, consolidated ".
-                           "the autocorrection model ",
-  "0.80.3" => "03.06.2023  preparation for get DWD radiation data to solcastapi-Hash, fix sub isConsumerLogOn (use powerthreshold) ",
-  "0.80.2" => "02.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption with graphic Adjustment, moduleAzimuth ".
-                           "accepts azimut values -180 .. 0 .. 180 as well as azimut identifier (S, SE ..) ",
-  "0.80.1" => "31.05.2023  adapt _calcCaQsimple to calculate corrfactor like _calcCaQcomplex ",
-  "0.80.0" => "28.05.2023  Support for Forecast.Solar-API (https://doc.forecast.solar/api), rename Getter solCastData to solApiData ".
-                           "rename ctrlDebug keys: solcastProcess -> apiProcess, solcastAPIcall -> apiCall ".
-                           "calculate cloudiness correction factors proactively and store it in circular hash ".
-                           "new reading Current_Surplus, ___noPlanRelease -> only one call releases the consumer planning ",
-  "0.79.3" => "21.05.2023  new CircularVal initdayfeedin, deactivate \$hash->{HELPER}{INITFEEDTOTAL}, \$hash->{HELPER}{INITCONTOTAL} ".
-                           "new statistic Readings statistic_todayGridFeedIn, statistic_todayGridConsumption ",
-  "0.79.2" => "21.05.2023  change process to calculate solCastAPIcallMultiplier, todayMaxAPIcalls ",
-  "0.79.1" => "19.05.2023  extend debug apiProcess, new key apiCall ",
-  "0.79.0" => "13.05.2023  new consumer key locktime ",
-  "0.78.2" => "11.05.2023  extend debug radiationProcess ",
-  "0.78.1" => "08.05.2023  change default icon it_ups_on_battery to batterie ",
-  "0.78.0" => "07.05.2023  activate NotifyFn Forum:https://forum.fhem.de/index.php?msg=1275005, new Consumerkey asynchron ",
-  "0.77.1" => "07.05.2023  rewrite function pageRefresh ",
-  "0.77.0" => "03.05.2023  new attribute ctrlUserExitFn ",
-  "0.76.0" => "01.05.2023  new ctrlStatisticReadings SunMinutes_Remain, SunHours_Remain ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
-## default Variablen
+## Standardvariablen
 ######################
 my @da;                                                                             # Readings-Store
 my $deflang        = 'EN';                                                          # default Sprache wenn nicht konfiguriert
@@ -480,8 +457,16 @@ my $b4coldef       = 'DBDBD0';                                                  
 my $b4fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 4
 my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
+my $fgscaledef     = 0.10;                                                          # Scale Normativ Icons in Flowgreafik
 my $prodicondef    = 'sani_garden_pump';                                            # default Producer-Icon
-my $consicondef    = 'light_light_dim_100';                                         # default Consumer-Icon
+my $cicondef       = 'light_light_dim_100';                                         # default Consumer-Icon
+my $ciconcoldef    = 'darkorange';                                                  # default Consumer-Icon Färbung
+my $homeicondef    = 'control_building_control@grey';                               # default Home-Icon
+my $invicondef     = 'weather_sun';                                                 # default Inverter-icon
+my $inviconcoldef  = 'orange';                                                      # default Inverter Färbung wenn aktiv
+my $moonicondef    = 2;                                                             # default Mond-Phase (aus %hmoon)
+my $mooncoldef     = 'lightblue';                                                   # default Mond Färbung
+my $inactcoldef    = 'grey';                                                        # default Färbung Icon wenn inaktiv
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
 my $pPath = '?format=txt';                                                          # Download Format
@@ -489,8 +474,6 @@ my $cfile = 'controls_solarforecast.txt';                                       
 
                                                                                     # default CSS-Style
 my $cssdef = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     \n}.
-             qq{.flowg.sun_active     { stroke: orange; fill: orange; }                                                  \n}.
-             qq{.flowg.sun_inactive   { stroke: gray; fill: gray; }                                                      \n}.
              qq{.flowg.bat25          { stroke: red; fill: red; }                                                        \n}.
              qq{.flowg.bat50          { stroke: darkorange; fill: darkorange; }                                          \n}.
              qq{.flowg.bat75          { stroke: green; fill: green; }                                                    \n}.
@@ -515,7 +498,6 @@ my $conhfcex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 
                  "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
                  "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
                };
-
                                                                                   # mögliche Debug-Module
 my @dd = qw( aiProcess
              aiData
@@ -670,6 +652,18 @@ my %hattr = (                                                                # H
 my %htr = (                                                                  # Hash even/odd für <tr>
   0 => { cl => 'even' },
   1 => { cl => 'odd' },
+);
+
+                                                                             # Hash Mondphasen
+my %hmoon = (                                                               
+  0 => { icon => 'weather_moon_phases_1_new',  DE => 'Neumond',           EN => 'new moon'            },
+  1 => { icon => 'weather_moon_phases_2',      DE => 'zunehmende Sichel', EN => 'increasing crescent' },
+  2 => { icon => 'weather_moon_phases_3_half', DE => 'erstes Viertel',    EN => 'first quarter'       },
+  3 => { icon => 'weather_moon_phases_4',      DE => 'zunehmender Mond',  EN => 'waxing moon'         },
+  4 => { icon => 'weather_moon_phases_5_full', DE => 'Vollmond',          EN => 'full moon'           },
+  5 => { icon => 'weather_moon_phases_6',      DE => 'abnehmender Mond',  EN => 'waning moon'         },
+  6 => { icon => 'weather_moon_phases_7_half', DE => 'letztes Viertel',   EN => 'last quarter'        },
+  7 => { icon => 'weather_moon_phases_8',      DE => 'abnehmende Sichel', EN => 'decreasing crescent' },
 );
 
 my %hqtxt = (                                                                                                 # Hash (Setup) Texte
@@ -920,6 +914,8 @@ my %htitles = (                                                                 
                 DE => qq{nicht bewertet}                                                                           },
   aimstt   => { EN => qq{Perl module AI::DecisionTree is missing},
                 DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                          },
+  dumtxt   => { EN => qq{Consumption that cannot be allocated to registered consumers},
+                DE => qq{Verbrauch der den registrierten Verbrauchern nicht zugeordnet werden kann}                }, 
   pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
                 DE => qq{Planungsstatus:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                      },
   ainuse   => { EN => qq{AI Perl module is installed, but the AI support is not used.\nRun 'set <NAME> plantConfiguration check' for hints.},
@@ -1636,7 +1632,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $stopts   = $startts + $stopdiff;
 
   $paref->{consumer} = $c;
-  $paref->{ps}       = "planned:";
+  $paref->{ps}       = 'planned:';
   $paref->{startts}  = $startts;                                                               # Unix Timestamp für geplanten Switch on
   $paref->{stopts}   = $stopts;                                                                # Unix Timestamp für geplanten Switch off
 
@@ -1994,11 +1990,7 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   my $mode        = $acu =~ /on/xs ? 'manual flex' : 'manual fix';
 
   readingsSingleUpdate ($hash, $opt, $prop." ($mode)", 1);
-
-  my $cfnum = (split "_", $opt)[1];
-  readingsDelete ($hash, "pvCorrectionFactor_${cfnum}_autocalc");
-
-  centralTask ($hash, 0);
+  centralTask          ($hash, 0);
 
 return;
 }
@@ -2034,8 +2026,6 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
               readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $rv, 0);
           }
       }
-
-      deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
   }
   elsif ($prop =~ /on/xs) {
       for my $n (1..24) {
@@ -5739,7 +5729,11 @@ sub _attrInverterDev {                   ## no critic "not used"
       undef @{$data{$type}{$name}{current}{genslidereg}};
       delete $data{$type}{$name}{circular}{99}{attrInvChangedTs};
   }
+  
+  delete $data{$type}{$name}{current}{invertercapi01};
+  delete $data{$type}{$name}{current}{iconi01};
 
+  InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
   InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
@@ -6754,7 +6748,10 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-
+  for my $n (1..24) {                                                  # 08.10.2024
+      $n = sprintf "%02d", $n;
+      readingsDelete ($hash, "pvCorrectionFactor_${n}_autocalc");
+  }
   ##########################################################################################################################
 
   setModel ($hash);                                                                            # Model setzen
@@ -6814,6 +6811,7 @@ sub centralTask {
   $centpars->{state} = 'updated';                                                     # kann durch Subs überschrieben werden!
 
   # _composeRemoteObj           ($centpars);                                            # Remote Objekte identifizieren und zusammenstellen
+  _getMoonPhase               ($centpars);                                            # aktuelle Mondphase ermittteln und speichern
   _collectAllRegConsumers     ($centpars);                                            # alle Verbraucher Infos laden
   _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
   _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
@@ -7086,6 +7084,31 @@ sub __remoteMeterObj {
   elsif (scalar(@afp) == 3) {                                                            # feedprice wird durch weiteres Device / Reading geliefert
       $data{$type}{$name}{current}{x_remote}{$afp[0]}{readings}{$afp[1]} = undef;
   }
+
+return;
+}
+
+################################################################
+#            Ermittlung der Mondphase
+################################################################
+sub _getMoonPhase {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $t     = $paref->{t};                                          # Epoche Zeit
+
+  my $moonphasei;
+  my $tstr = (timestampToTimestring ($t))[2];
+
+  eval {
+      $moonphasei = FHEM::Astro::Get (undef, 'global', 'text', 'MoonPhaseI', $tstr);
+      1;
+  }
+  or do { Log3 ($name, 1, "$name - ERROR - $@");
+          return;
+        };
+        
+  $data{$type}{$name}{current}{moonPhaseI} = $moonphasei;
 
 return;
 }
@@ -7473,7 +7496,6 @@ sub __deletePvCorffReadings  {
           }
           else {
               readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $pcf, 0);
-              deleteReadingspec    ($hash, "pvCorrectionFactor_${n}_autocalc");
           }
       }
   }
@@ -8153,10 +8175,10 @@ sub __calcPVestimates {
 
   $pvsum  = $peaksum if($peaksum && $pvsum > $peaksum);                                              # Vorhersage nicht größer als die Summe aller PV-Strings Peak
 
-  my $invcapacity = CurrentVal ($hash, 'invertercapacity', 0);                                       # Max. Leistung des Invertrs
+  my $invcap = CurrentVal ($hash, 'invertercapi01', 0);                                              # Max. Leistung des Invertrs
 
-  if ($invcapacity && $pvsum > $invcapacity) {
-      $pvsum = $invcapacity;                                                                         # PV Vorhersage auf WR Kapazität begrenzen
+  if ($invcap && $pvsum > $invcap) {
+      $pvsum = $invcap;                                                                              # PV Vorhersage auf WR Kapazität begrenzen
 
       debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $pvsum Watt due to inverter capacity");
   }
@@ -8364,16 +8386,11 @@ sub _transferInverterValues {
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
   my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
 
-  $data{$type}{$name}{current}{invertercapacity} = $h->{capacity} if(defined $h->{capacity}); # optionale Angabe max. WR-Leistung
-
   return if(!$pvread || !$edread);
 
   my $pvuf = $pvunit =~ /^kW$/xi ? 1000 : 1;
   my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                        # aktuelle Erzeugung (W)
   $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                              # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
-
-  storeReading ('Current_PV', $pv.' W');
-  $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
 
   push @{$data{$type}{$name}{current}{genslidereg}}, $pv;                                     # Schieberegister PV Erzeugung
   limitArray ($data{$type}{$name}{current}{genslidereg}, $slidenumdef);
@@ -8392,7 +8409,7 @@ sub _transferInverterValues {
   if (!$histetot) {                                                                           # etotal der aktuelle Stunde gesetzt ?
       writeToHistory ( { paref => $paref, key => 'etotal', val => $etotal, hour => $nhour } );
 
-      $etotsvd   = CurrentVal ($hash, 'etotal', $etotal);
+      $etotsvd   = CurrentVal ($hash, 'etotali01', $etotal);
       $ethishour = int ($etotal - $etotsvd);
   }
   else {
@@ -8403,19 +8420,23 @@ sub _transferInverterValues {
 
           writeToHistory ( { paref => $paref, key => 'etotal', val => $etotal, hour => $nhour } );
 
-          $etotsvd   = CurrentVal ($hash, 'etotal', $etotal);
+          $etotsvd   = CurrentVal ($hash, 'etotali01', $etotal);
           $ethishour = int ($etotal - $etotsvd);
       }
   }
 
-  $data{$type}{$name}{current}{etotal} = $etotal;                                             # aktuellen etotal des WR speichern
+  $data{$type}{$name}{current}{generationi01}  = $pv;                                           # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  $data{$type}{$name}{current}{etotali01}      = $etotal;                                       # aktuellen etotal des WR speichern
+  $data{$type}{$name}{current}{namei01}        = $indev;                                        # Name des Inverterdevices
+  $data{$type}{$name}{current}{invertercapi01} = $h->{capacity} if(defined $h->{capacity});     # optionale Angabe max. WR-Leistung
+  $data{$type}{$name}{current}{iconi01}        = $h->{icon}     if($h->{icon});                 # Icon des Inverters
 
   if ($ethishour < 0) {
       $ethishour = 0;
       my $vl     = 3;
       my $pre    = '- WARNING -';
 
-      if ($paref->{debug} =~ /collectData/xs) {                                               # V 1.23.0 Forum: https://forum.fhem.de/index.php?msg=1314453
+      if ($paref->{debug} =~ /collectData/xs) {                                                 # V 1.23.0 Forum: https://forum.fhem.de/index.php?msg=1314453
           $vl  = 1;
           $pre = 'DEBUG> - WARNING -';
       }
@@ -8425,6 +8446,8 @@ sub _transferInverterValues {
   }
 
   storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PVreal', $ethishour.' Wh'.$warn);
+  storeReading ('Current_PV', $pv.' W');
+  
   $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
   my ($acu, $aln) = isAutoCorrUsed ($name);
@@ -8458,8 +8481,6 @@ sub _transferProducerValues {
 
       next if(!$pcread || !$edread);
 
-      $data{$type}{$name}{current}{'iconp'.$prn} = $h->{icon} if($h->{icon});                                 # Icon des Producers
-
       my $pu = $pcunit =~ /^kW$/xi ? 1000 : 1;
       my $p  = ReadingsNum ($prdev, $pcread, 0) * $pu;                                                        # aktuelle Erzeugung (W)
       $p     = $p < 0 ? 0 : $p;
@@ -8489,8 +8510,9 @@ sub _transferProducerValues {
       }
 
       $data{$type}{$name}{current}{'etotalp'.$prn} = $etotal;                                                # aktuellen etotal des WR speichern
-      $data{$type}{$name}{current}{'namep'  .$prn} = $prdev;                                                 # Name des Producerdevices
-      $data{$type}{$name}{current}{'aliasp' .$prn} = AttrVal ($prdev, 'alias', $prdev);                      # Alias Producer
+      $data{$type}{$name}{current}{'namep'.  $prn} = $prdev;                                                 # Name des Producerdevices
+      $data{$type}{$name}{current}{'aliasp'. $prn} = AttrVal ($prdev, 'alias', $prdev);                      # Alias Producer
+      $data{$type}{$name}{current}{'iconp'.  $prn} = $h->{icon} if($h->{icon});                              # Icon des Producers
 
       if ($ethishour < 0) {
           $ethishour = 0;
@@ -9161,12 +9183,12 @@ sub _createSummaries {
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
   limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $slidenumdef);
 
-  my $gcon    = CurrentVal ($hash, "gridconsumption",         0);                                       # aktueller Netzbezug
-  my $tconsum = CurrentVal ($hash, "tomorrowconsumption", undef);                                       # Verbrauchsprognose für folgenden Tag
-  my $pvgen   = CurrentVal ($hash, "generation",              0);
-  my $gfeedin = CurrentVal ($hash, "gridfeedin",              0);
-  my $batin   = CurrentVal ($hash, "powerbatin",              0);                                       # aktuelle Batterieladung
-  my $batout  = CurrentVal ($hash, "powerbatout",             0);                                       # aktuelle Batterieentladung
+  my $gcon    = CurrentVal ($hash, 'gridconsumption',         0);                                       # aktueller Netzbezug
+  my $tconsum = CurrentVal ($hash, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
+  my $pvgen   = CurrentVal ($hash, 'generationi01',           0);
+  my $gfeedin = CurrentVal ($hash, 'gridfeedin',              0);
+  my $batin   = CurrentVal ($hash, 'powerbatin',              0);                                       # aktuelle Batterieladung
+  my $batout  = CurrentVal ($hash, 'powerbatout',             0);                                       # aktuelle Batterieentladung
 
   my $othprod = 0;                                                                                      # Summe Otherproducer
 
@@ -9313,17 +9335,15 @@ sub _manageConsumerData {
 
       readingsDelete ($hash, "consumer${c}_currentPower") if(!$etotread && !$paread);
 
+      $paref->{pcurr} = $pcurr;
+
       __getAutomaticState     ($paref);                                                                           # Automatic Status des Consumers abfragen
       __calcEnergyPieces      ($paref);                                                                           # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
       __planInitialSwitchTime ($paref);                                                                           # Consumer Switch Zeiten planen
       __setTimeframeState     ($paref);                                                                           # Timeframe Status ermitteln
       __setConsRcmdState      ($paref);                                                                           # Consumption Recommended Status setzen
-      __switchConsumer        ($paref);                                                                           # Consumer schalten
-
-      $paref->{pcurr} = $pcurr;
-
+      __switchConsumer        ($paref);                                                                           # Consumer schalten  
       __getCyclesAndRuntime   ($paref);                                                                           # Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro Stunde ermitteln
-      __setPhysLogSwState     ($paref);                                                                           # physischen / logischen Schaltzustand festhalten
       __reviewSwitchTime      ($paref);                                                                           # Planungsdaten überprüfen und ggf. neu planen
       __remainConsumerTime    ($paref);                                                                           # Restlaufzeit Verbraucher ermitteln
 
@@ -9669,7 +9689,7 @@ sub ___noPlanRelease {
   my $c     = $paref->{consumer};
 
   my $hash = $defs{$name};
-  my $dnp  = 0;                                                                           # 0 -> Planung, 1 -> keine Planung
+  my $dnp  = 0;                                                                            # 0 -> Planung, 1 -> keine Planung
 
   if (ConsumerVal ($hash, $c, 'planstate', undef)) {                                       # Verbraucher ist schon geplant/gestartet/fertig
       $dnp = qq{consumer is already planned};
@@ -9721,7 +9741,9 @@ sub __reviewSwitchTime {
                       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Review switch time planning name: }.ConsumerVal ($hash, $c, 'name', '').
                                                             qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
 
+                      $paref->{replan} = 1;                                           # V 1.35.0
                       ___doPlanning ($paref);
+                      delete $paref->{replan};
                   }
               }
               else {
@@ -9804,10 +9826,11 @@ sub ___doPlanning {
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - epiece1: $epiece1});
 
-  my $mode     = ConsumerVal ($hash, $c, 'mode',          'can');
-  my $calias   = ConsumerVal ($hash, $c, 'alias',            '');
-  my $mintime  = ConsumerVal ($hash, $c, 'mintime', $defmintime);                                      # Einplanungsdauer
-
+  my $mode         = ConsumerVal ($hash, $c, 'mode',          'can');
+  my $calias       = ConsumerVal ($hash, $c, 'alias',            '');
+  my $mintime      = ConsumerVal ($hash, $c, 'mintime', $defmintime);                                  # Einplanungsdauer
+  my $oldplanstate = ConsumerVal ($hash, $c, 'planstate',        '');                                  # V. 1.35.0
+  
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
 
   if (isSunPath ($hash, $c)) {                                                                         # SunPath ist in mintime gesetzt
@@ -9847,7 +9870,7 @@ sub ___doPlanning {
 
               my $startts       = timestringToTimestamp ($starttime);                                  # Unix Timestamp für geplanten Switch on
 
-              $paref->{ps}      = 'planned:';
+              $paref->{ps}      = $paref->{replan} ? 'replanned:' : 'planned:';                        # V 1.35.0
               $paref->{startts} = $startts;
               $paref->{stopts}  = $startts + $stopdiff;
 
@@ -9908,7 +9931,7 @@ sub ___doPlanning {
   my $planstate = ConsumerVal ($hash, $c, 'planstate',      '');
   my $planspmlt = ConsumerVal ($hash, $c, 'planSupplement', '');
 
-  if ($planstate) {
+  if ($planstate && ($planstate ne $oldplanstate)) {                                                   # V 1.35.0
       Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate $planspmlt});
   }
 
@@ -10034,7 +10057,7 @@ sub ___planMust {
   $startts   = timestringToTimestamp ($starttime);
   my $stopts = $startts + $stopdiff;
 
-  $paref->{ps}      = "planned:";
+  $paref->{ps}      = 'planned:';
   $paref->{startts} = $startts;                                                        # Unix Timestamp für geplanten Switch on
   $paref->{stopts}  = $stopts;                                                         # Unix Timestamp für geplanten Switch off
 
@@ -10240,12 +10263,30 @@ return;
 ################################################################
 sub __switchConsumer {
   my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  my $debug = $paref->{debug};
   my $state = $paref->{state};
+  
+  if ($debug =~ /consumerSwitching${c}/x) {      
+      Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
+  }
 
-  $state    = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen
-  $state    = ___switchConsumerOff         ($paref);                                 # Verbraucher Ausschaltbedingung prüfen + auslösen
-  $state    = ___setConsumerSwitchingState ($paref);                                 # Consumer aktuelle Schaltzustände ermitteln & setzen
-
+  $paref->{fscss} = 1;                                                            # erster Subaufruf Consumer Schaltzustände ermitteln & setzen
+  $state = ___setConsumerSwitchingState ($paref);                                 
+  delete $paref->{fscss};
+  
+  $paref->{befsw} = 1;                                                            # Status vor Switching
+  __setPhysLogSwState ($paref);                                                   # physischen / logischen Schaltzustand festhalten
+  
+  $state = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen
+  $state = ___switchConsumerOff         ($paref);                                 # Verbraucher Ausschaltbedingung prüfen + auslösen
+  $state = ___setConsumerSwitchingState ($paref);                                 # Consumer Schaltzustände nach Switching ermitteln & setzen
+  
+  $paref->{befsw} = 0;                                                            # Status nach Switching
+  __setPhysLogSwState ($paref);                                                   # physischen / logischen Schaltzustand festhalten
+  delete $paref->{befsw};
+  
   $paref->{state} = $state;
 
 return;
@@ -10295,7 +10336,6 @@ sub ___switchConsumerOn {
       my $nompow = ConsumerVal ($hash, $c, 'power',  '-');
       my $sp     = CurrentVal  ($hash, 'surplus',      0);
 
-      Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
                       qq{auto mode: $auto, Current household consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
                       qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($startts, $lang))[0] : "undef")
@@ -10331,7 +10371,7 @@ sub ___switchConsumerOn {
       my $mode   = ConsumerVal ($hash, $c, "mode", $defcmode);                                    # Consumer Planungsmode
       my $enable = ___enableSwitchByBatPrioCharge ($paref);                                       # Vorrangladung Batterie ?
 
-      debugLog ($paref, "consumerSwitching${c}", qq{$name DEBUG> Consumer switch enable by battery state: $enable});
+      debugLog ($paref, "consumerSwitching${c}", qq{Consumer switch enable by battery state: $enable});
 
       if ($mode eq "can" && !$enable) {                                                           # Batterieladung - keine Verbraucher "Einschalten" Freigabe
           $paref->{ps} = "priority charging battery";
@@ -10343,8 +10383,13 @@ sub ___switchConsumerOn {
       elsif ($mode eq "must" || $isConsRcmd) {                                                    # "Muss"-Planung oder Überschuß > Leistungsaufnahme (can)
           $state = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom"};
 
-          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
-
+          if ($debug =~ /consumerSwitching${c}/x) {
+              Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
+          }
+          else {
+              Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+          }
+          
           CommandSet (undef, "$dswname $oncom");
 
           $paref->{ps} = "switching on:";
@@ -10362,8 +10407,13 @@ sub ___switchConsumerOn {
       my $cause = $isintable == 3 ? 'interrupt condition no longer present' : 'existing surplus';
       $state    = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom", cause: $cause};
 
-      Log3 ($name, 2, "$name - $state");
-
+      if ($debug =~ /consumerSwitching${c}/x) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
+      }
+      else {
+          Log3 ($name, 2, "$name - $state");
+      }
+      
       CommandSet (undef, "$dswname $oncom");
 
       $paref->{ps} = "continuing:";
@@ -10426,8 +10476,13 @@ sub ___switchConsumerOff {
       $cause = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
       $state = qq{switching Consumer '$calias' to '$offcom', command: "set $dswname $offcom", cause: $cause};
 
-      Log3 ($name, 2, "$name - $state (Automatic = $auto)");
-
+      if ($debug =~ /consumerSwitching${c}/x) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $offcom"});
+      }
+      else {
+          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+      }
+      
       CommandSet (undef,"$dswname $offcom");
 
       $paref->{ps} = "switching off:";
@@ -10442,8 +10497,13 @@ sub ___switchConsumerOff {
       $cause = $isintable == 2 ? 'interrupt condition' : 'surplus shortage';
       $state = qq{switching Consumer '$calias' to '$offcom', command: "set $dswname $offcom", cause: $cause};
 
-      Log3 ($name, 2, "$name - $state");
-
+      if ($debug =~ /consumerSwitching${c}/x) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $offcom"});
+      }
+      else {
+          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+      }
+      
       CommandSet (undef,"$dswname $offcom");
 
       $paref->{ps} = "interrupting:";
@@ -10467,6 +10527,7 @@ sub ___setConsumerSwitchingState {
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};
   my $state = $paref->{state};
+  my $fscss = $paref->{fscss};                                                                     # erster Subaufruf: 1
 
   my $hash      = $defs{$name};
   my $simpCstat = simplifyCstate (ConsumerVal ($hash, $c, 'planstate', ''));
@@ -10562,7 +10623,10 @@ sub ___setConsumerSwitchingState {
   }
 
   if ($dowri) {
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
+      if (!$fscss) {
+          writeCacheToFile ($hash, "consumers", $csmcache.$name);                           # Cache File Consumer schreiben
+      }
+      
       Log3 ($name, 2, "$name - $state");
   }
 
@@ -10657,7 +10721,7 @@ sub __getCyclesAndRuntime {
 
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - cycleDayNum: }.ConsumerVal ($hash, $c, 'cycleDayNum', 0));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle start time: $cst});
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle end time: $son});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle end time: $son \n});
   }
 
   ## History schreiben
@@ -10709,6 +10773,7 @@ sub  __setPhysLogSwState {
   my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $pcurr = $paref->{pcurr};
+  my $befsw = $paref->{befsw};                      # Status vor Switching:1, danach 0 | undef
   my $debug = $paref->{debug};
 
   my $hash = $defs{$name};
@@ -10719,8 +10784,9 @@ sub  __setPhysLogSwState {
   $data{$type}{$name}{consumers}{$c}{logoffon}  = $clo;
 
   if ($debug =~ /consumerSwitching${c}/xs) {
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - physical Switchstate: $cpo});
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - logical Switchstate: $clo \n});
+      my $ao = $befsw ? 'before switching' : 'after switching';
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - physical Switchstate $ao: $cpo});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - logical Switchstate $ao: $clo});
   }
 
 return;
@@ -11222,8 +11288,6 @@ sub _calcCaQcomplex {
       else {
           storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin,$aihit Cloud range: $crang, Days in range: $dnum");
       }
-
-      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
 
 return;
@@ -11293,8 +11357,6 @@ sub _calcCaQsimple {
       else {
           storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor,$aihit Days in range: $dnum");
       }
-
-      storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h).'_autocalc', 'done');
   }
 
 return;
@@ -13904,6 +13966,7 @@ sub _flowGraphic {
   my $flowgconPower = $paref->{flowgconsPower};
   my $consDist      = $paref->{flowgconsDist};
   my $css           = $paref->{css};
+  my $lang          = $paref->{lang};
 
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';  # Animation Ja/Nein
@@ -13911,12 +13974,13 @@ sub _flowGraphic {
   my $cgfi       = ReadingsNum ($name, 'Current_GridFeedIn',      0);
   my $csc        = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
-  my $cpv        = ReadingsNum ($name, 'Current_PV',              0);
+  my $cpv        = CurrentVal  ($hash, 'generationi01',           0);
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
   my $cc_dummy   = $cc;
 
+  my $scale      = $fgscaledef;
   my $hasbat     = 1;                                         # initial Batterie vorhanden
   my $flowgprods = 1;                                         # Producer in der Energieflußgrafik anzeigen per default
   my $ppcurr     = {};                                        # Hashref Producer current power
@@ -13976,10 +14040,10 @@ sub _flowGraphic {
       my $cgfo = $cgfi - $cpv;
 
       if ($cgfo > 1) {
-          $cgc_style     = 'flowg active_out';
-          $cgc_direction = 'M670,590 L490,515';
-          $cgfi         -= $cgfo;
-          $cgc           = $cgfo;
+          $cgc_style      = 'flowg active_out';
+          $cgc_direction  = 'M670,590 L490,515';
+          $cgfi          -= $cgfo;
+          $cgc            = $cgfo;
       }
   }
 
@@ -14004,20 +14068,15 @@ sub _flowGraphic {
   $p2home     = sprintf "%.0f", $p2home if($p2home > 10);
   $p2home     = 0 if($p2home == 0);                                   # 0.0 eliminieren wenn keine Leistung zum Haus
 
-  ## SVG Box initialisieren
-  ###########################
-  my $sun_color   = $cpv    ? 'flowg sun_active'              : 'flowg sun_inactive';
-  my $batin_style = $batin  ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
-  my $csc_style   = $p2home ? 'flowg active_out'              : 'flowg inactive_out';
-  my $cgfi_style  = $cgfi   ? 'flowg active_out'              : 'flowg inactive_out';
+  ## SVG Box initialisieren mit Grid-Icon
+  #########################################
+  my $vbwidth   = 800;                                                # width and height specify the viewBox size
+  my $vbminx    = -10 * $flowgshift;                                  # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbminy    = $flowgprods ? -25 : 100;
 
-  my $vbwidth = 800;                                                                        # width and height specify the viewBox size
-  my $vbminx  = -10 * $flowgshift;                                                          # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
-  my $vbminy  = $flowgprods ? -25 : 100;
-
-  my $vbhight = !$flowgcons    ? 380 :
-                !$flowgconTime ? 590 :
-                610;
+  my $vbhight   = !$flowgcons    ? 380 :
+                  !$flowgconTime ? 590 :
+                  610;
 
   $vbhight += 100 if($flowgprods);
 
@@ -14030,38 +14089,6 @@ sub _flowGraphic {
       </style>
 
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$style" id="SVGPLOT">
-
-      <g transform="translate(400,200)">
-        <g>
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(45)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(90)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(135)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(180)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(225)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(270)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <g transform="rotate(315)">
-            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
-        </g>
-        <circle cx="0" cy="0" class="$sun_color" r="16" stroke-width="2"/>
-      </g>
-
-      <g id="home" fill="grey" transform="translate(352,340),scale(4)">
-          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-      </g>
 
       <g id="grid" class="$grid_color" transform="translate(215,260),scale(3.0)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
@@ -14085,16 +14112,20 @@ END0
       $pos_left = $producer_start + 25;
 
       for my $prnxnum (@producers) {
-          my $palias = CurrentVal ($hash, 'aliasp'.$prnxnum, 'Producer'.$prnxnum);
-          my $picon  = __substituteIcon ( { hash  => $hash,                                    # Icon des Producerdevices
-                                            name  => $name,
-                                            pn    => $prnxnum,
-                                            pcurr => $ppcurr->{$prnxnum}
-                                          }
-                                        );
+          my $palias  = CurrentVal ($hash, 'aliasp'.$prnxnum, 'namep'.$prnxnum);
+          my ($picon) = __substituteIcon ( { hash  => $hash,                                    # Icon des Producerdevices
+                                             name  => $name,
+                                             pn    => $prnxnum,
+                                             pcurr => $ppcurr->{$prnxnum},
+                                             lang  => $lang
+                                           }
+                                         );
 
-          $ret .= '<g id="producer_'.$prnxnum.'" fill="grey" transform="translate('.$pos_left.',0),scale(0.15)">';
-          $ret .= "<title>$palias</title>".FW_makeImage($picon, '');
+          $picon           = FW_makeImage    ($picon, '');
+          ($scale, $picon) = __normIconScale ($picon, $name);
+          
+          $ret .= qq{<g id="producer_$prnxnum" fill="grey" transform="translate($pos_left,0),scale($scale)">};
+          $ret .= "<title>$palias</title>".$picon;
           $ret .= '</g> ';
 
           $pos_left += $consDist;
@@ -14118,23 +14149,49 @@ END0
       $pos_left = $consumer_start + 15;
 
       for my $c (@consumers) {
-          my $calias     = ConsumerVal      ($hash, $c, "alias", "");                                              # Name des Consumerdevices
+          my $calias     = ConsumerVal ($hash, $c, 'alias', '');                                           # Name des Consumerdevices
           $currentPower  = $cpcurr->{$c};
-          my $cicon      = __substituteIcon ({hash => $hash, name => $name, cn => $c, pcurr => $currentPower});    # Icon des Consumerdevices
+          my ($cicon)    = __substituteIcon ( { hash => $hash,                                             # Icon des Consumerdevices
+                                                name => $name, 
+                                                cn    => $c, 
+                                                pcurr => $currentPower,
+                                                lang  => $lang
+                                              }
+                                            );   
           $cc_dummy     -= $currentPower;
 
-          $ret .= '<g id="consumer_'.$c.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
-          $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
+          $cicon           = FW_makeImage    ($cicon, '');
+          ($scale, $cicon) = __normIconScale ($cicon, $name);
+          
+          $ret .= qq{<g id="consumer_$c" transform="translate($pos_left,485),scale($scale)">};
+          $ret .= "<title>$calias</title>".$cicon;
           $ret .= '</g> ';
 
           $pos_left += $consDist;
       }
   }
+  
+  ## Inverter Icon
+  ######################                                                 
+  my ($iicon, $smtxt) = __substituteIcon ( { hash  => $hash,
+                                             name  => $name,
+                                             in    => '01',
+                                             don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
+                                             pcurr => $cpv,
+                                             lang  => $lang
+                                            }
+                                          );
+  
+  $iicon           = FW_makeImage    ($iicon, '');
+  ($scale, $iicon) = __normIconScale ($iicon, $name);
+  
+  $ret .= qq{<g id="Inverter" transform="translate(360,165),scale($scale)">};                                # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= "<title>$smtxt</title>".$iicon;
+  $ret .= '</g> ';
 
-  ## Batterie, PV, Netz Laufketten
-  ##################################
-
-  if ($hasbat) {
+  ## Batterie Icon
+  ##################
+  if ($hasbat) {                                                                                   
       $ret .= << "END1";
       <g class="$bat_color" transform="translate(610,245),scale(.30) rotate (90)">
       <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
@@ -14147,23 +14204,45 @@ END1
       $ret .= '<path d="m 221.141,120 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -26 c 0,-3.313 2.687,-6 6,-6 h 65.5 c 3.313,0 6,2.687 6,6 v 6 z"/>'          if ($soc > 88);
       $ret .= '</g>';
   }
+  
+  ## Home Icon
+  ##############
+  my $hicon        = FW_makeImage    ($homeicondef, '');
+  ($scale, $hicon) = __normIconScale ($hicon, $name);
+  
+  $ret .= qq{<g id="Home" transform="translate(368,360),scale($scale)">};                         # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= "<title>Home</title>".$hicon;
+  $ret .= '</g> ';  
 
-  if ($flowgconX) {                                                                                # Dummy Consumer
-      my $dumcol = $cc_dummy <= 0 ? '@grey' : q{};                                                 # Einfärbung Consumer Dummy
-      $ret      .= '<g id="consumer_X" fill="grey" transform="translate(520,360),scale(0.09)">';
-      $ret      .= "<title>consumer_X</title>".FW_makeImage($consicondef.$dumcol, '');
-      $ret      .= '</g> ';
+  ## Dummy Consumer Icon
+  ########################
+  if ($flowgconX) {   
+      my $dumtxt       = $htitles{dumtxt}{$lang};  
+      my $dumcol       = $cc_dummy <= 0 ? '@grey' : q{};                                          # Einfärbung Consumer Dummy
+      my $dicon        = FW_makeImage    ($cicondef.$dumcol, '');
+      ($scale, $dicon) = __normIconScale ($dicon, $name);
+      
+      $ret .= qq{<g id="consumer_X" transform="translate(520,360),scale($scale)">};
+      $ret .= "<title>$dumtxt</title>".$dicon;
+      $ret .= '</g> ';
   }
 
-  $ret .= << "END2";
+  ## Laufketten PV->Home, PV->Grid, Grid->Home
+  ##############################################
+  my $csc_style  = $p2home ? 'flowg active_out' : 'flowg inactive_out';
+  my $cgfi_style = $cgfi   ? 'flowg active_out' : 'flowg inactive_out';
+  $ret          .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
   <path id="pv-home"   class="$csc_style"  d="M700,400 L700,580" />
   <path id="pv-grid"   class="$cgfi_style" d="M670,400 L490,480" />
   <path id="grid-home" class="$cgc_style"  d="$cgc_direction" />
 END2
 
+  ## Laufketten PV->Batterie, Batterie->Home
+  ##############################################
   if ($hasbat) {
-      $ret .= << "END3";
+      my $batin_style = $batin ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
+      $ret           .= << "END3";
       <path id="bat-home" class="$batout_style" d="$batout_direction" />
       <path id="pv-bat"   class="$batin_style"  d="M730,400 L910,480" />
 END3
@@ -14230,8 +14309,8 @@ END3
       }
 
       for my $c (@consumers) {
-          my $power     = ConsumerVal ($hash, $c, "power",   0);
-          my $rpcurr    = ConsumerVal ($hash, $c, "rpcurr", "");                                   # Reading für akt. Verbrauch angegeben ?
+          my $power     = ConsumerVal ($hash, $c, 'power',   0);
+          my $rpcurr    = ConsumerVal ($hash, $c, 'rpcurr', '');                                   # Reading für akt. Verbrauch angegeben ?
           $currentPower = $cpcurr->{$c};
 
           if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
@@ -14268,6 +14347,8 @@ END3
   $ret .= qq{<text class="flowg text" id="home-txt"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
   $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
 
+  my $lcp;
+  
   ## Textangabe Producer
   ########################
   if ($flowgprods) {
@@ -14276,45 +14357,27 @@ END3
       for my $prnxnum (@producers) {
           $currentPower = sprintf "%.2f", $ppcurr->{$prnxnum};
           $currentPower = sprintf "%.0f", $currentPower if($currentPower > 10);
+          $currentPower = 0 if(1 * $currentPower == 0);
+          $lcp          = length $currentPower;
 
           # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
-          ###############################################################################
-          if (length($currentPower) >= 5) {
-               $pos_left -= 40;
-          }
-          elsif (length($currentPower) >= 4) {
-              $pos_left -= 25;
-          }
-          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
-              $pos_left -= 5;
-          }
-          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
-              $pos_left += 7;
-          }
-          elsif (length($currentPower) == 1) {
-              $pos_left += 25;
-          }
+          ###############################################################################          
+          if    ($lcp >= 5) {$pos_left -= 10}
+          elsif ($lcp == 4) {$pos_left += 10}
+          elsif ($lcp == 3) {$pos_left += 15}
+          elsif ($lcp == 2) {$pos_left += 20}
+          elsif ($lcp == 1) {$pos_left += 40}
 
           $ret .= qq{<text class="flowg text" id="producer-txt_$prnxnum" x="$pos_left" y="80">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
 
-          # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse wieder zurück an den Ursprungspunkt
-          #######################################################################################################
-          if (length($currentPower) >= 5) {
-              $pos_left += 40;
-          }
-          elsif (length($currentPower) >= 4) {
-              $pos_left += 25;
-          }
-          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
-              $pos_left += 5;
-          }
-          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
-              $pos_left -= 7;
-          }
-          elsif (length($currentPower) == 1) {
-              $pos_left -= 25;
-          }
-
+          # Leistungszahl wieder zurück an den Ursprungspunkt
+          ####################################################          
+          if    ($lcp >= 5) {$pos_left += 10}
+          elsif ($lcp == 4) {$pos_left -= 10}
+          elsif ($lcp == 3) {$pos_left -= 15}
+          elsif ($lcp == 2) {$pos_left -= 20}
+          elsif ($lcp == 1) {$pos_left -= 40}       
+          
           $pos_left  += ($consDist * 2);
       }
   }
@@ -14327,54 +14390,36 @@ END3
       for my $c (@consumers) {
           $currentPower    = sprintf "%.1f", $cpcurr->{$c};
           $currentPower    = sprintf "%.0f", $currentPower if($currentPower > 10);
-          my $consumerTime = ConsumerVal ($hash, $c, "remainTime", "");                               # Restlaufzeit
-          my $rpcurr       = ConsumerVal ($hash, $c, "rpcurr",     "");                               # Readingname f. current Power
+          my $consumerTime = ConsumerVal ($hash, $c, 'remainTime', '');                               # Restlaufzeit
+          my $rpcurr       = ConsumerVal ($hash, $c, 'rpcurr',     '');                               # Readingname f. current Power
 
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = isConsumerPhysOn($hash, $c) ? 'on' : 'off';
           }
+          
+          $lcp = length $currentPower;
 
           #$ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$pos_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
           #$ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$pos_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ##################################################################################
-          if (length($currentPower) >= 5) {
-               $pos_left -= 40;
-          }
-          elsif (length($currentPower) >= 4) {
-              $pos_left -= 25;
-          }
-          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
-              $pos_left -= 5;
-          }
-          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
-              $pos_left += 7;
-          }
-          elsif (length($currentPower) == 1) {
-              $pos_left += 25;
-          }
+          if    ($lcp >= 5) {$pos_left -= 40}
+          elsif ($lcp == 4) {$pos_left -= 25}
+          elsif ($lcp == 3) {$pos_left -= 5 }
+          elsif ($lcp == 2) {$pos_left += 7 }
+          elsif ($lcp == 1) {$pos_left += 25}
 
           $ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$pos_left" y="1110">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
           $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$pos_left" y="1170">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
 
-          # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse wieder zurück an den Ursprungspunkt
-          #########################################################################################################
-          if (length($currentPower) >= 5) {
-              $pos_left += 40;
-          }
-          elsif (length($currentPower) >= 4) {
-              $pos_left += 25;
-          }
-          elsif (length($currentPower) >= 3 and $currentPower ne "0.0") {
-              $pos_left += 5;
-          }
-          elsif (length($currentPower) >= 2 and $currentPower ne "0.0") {
-              $pos_left -= 7;
-          }
-          elsif (length($currentPower) == 1) {
-              $pos_left -= 25;
-          }
+          # Verbrauchszahl wieder zurück an den Ursprungspunkt
+          ######################################################          
+          if    ($lcp >= 5) {$pos_left += 40}
+          elsif ($lcp == 4) {$pos_left += 25}
+          elsif ($lcp == 3) {$pos_left += 5 }
+          elsif ($lcp == 2) {$pos_left -= 7 }
+          elsif ($lcp == 1) {$pos_left -= 25}
 
           $pos_left  += ($consDist * 2);
       }
@@ -14390,6 +14435,8 @@ return $ret;
 #       und setze ggf. Ersatzwerte
 #       $cn     - Consumernummer (01...max)
 #       $pn     - Producernummer (01...max)
+#       $in     - Inverter, Smartloader (01..max)
+#       $don    - Day or Night
 #       $pcurr  - aktuelle Leistung / Verbrauch
 ################################################################
 sub __substituteIcon {
@@ -14398,33 +14445,103 @@ sub __substituteIcon {
   my $name  = $paref->{name};
   my $cn    = $paref->{cn};
   my $pn    = $paref->{pn};
+  my $in    = $paref->{in};
+  my $don   = $paref->{don};
   my $pcurr = $paref->{pcurr};
+  my $lang  = $paref->{lang};
 
   my ($color, $icon);
+  my $txt = '';
 
-  if ($cn) {                                                                           # Icon Consumer
-      $icon = ConsumerVal ($hash, $cn, 'icon', $consicondef);
-  }
-  elsif ($pn) {
-      $icon = CurrentVal ($hash, 'iconp'.$pn, $prodicondef);                           # Icon Producer
-  }
-
-  ($icon, $color) = split '@', $icon;
-
-  if ($cn) {
+  if ($cn) {                                                                           # Icon Consumer 
+      ($icon, $color) = split '@', ConsumerVal ($hash, $cn, 'icon', $cicondef);
+      
       if (!$color) {
-          $color = isConsumerLogOn ($hash, $cn, $pcurr) ? 'darkorange' : '';
+          $color = isConsumerLogOn ($hash, $cn, $pcurr) ? $ciconcoldef : '';
       }
   }
-  elsif ($pn) {
+  elsif ($pn) {                                                                        # Icon Producer
+      ($icon, $color) = split '@', CurrentVal ($hash, 'iconp'.$pn, $prodicondef);
+      
       if (!$pcurr) {
           $color = 'grey';
+      }      
+  }
+  elsif ($in) {                                                                        # Inverter, Smartloader
+      my ($iday, $inight) = split ':', CurrentVal ($hash, 'iconi'.$in, $invicondef);
+      
+      if ($don || $pcurr) {                                                            # Tag -> eigenes Icon oder Standard
+          $iday           = $iday ? $iday : $invicondef;
+          ($icon, $color) = split '@', $iday;
+          $color          = !$pcurr ? $inactcoldef :
+                            $color  ? $color       : 
+                            $inviconcoldef;
+      }
+      else {                                                                           # Nacht -> eigenes Icon oder Mondphase
+          my $mpi = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
+          
+          if ($inight) {                                                               # eigenes Icon + ggf. Farbe
+              ($icon, $color) = split '@', $inight;
+              $color          = $color ? $color : $inactcoldef;
+          }
+          else {
+              $icon           = $hmoon{$mpi}{icon}.'@'.$mooncoldef;
+              $txt            = $hmoon{$mpi}{$lang};
+              ($icon, $color) = split '@', $icon;
+          }
       }
   }
 
   $icon .= '@'.$color if($color);
 
-return $icon;
+return ($icon, $txt);
+}
+
+################################################################
+#    berechne Icon width, height auf Sollnormativ
+#    width:   470pt
+#    height:  470pt
+#    scale:   0.10   Normativ $fgscaledef
+################################################################
+sub __normIconScale {
+  my $icon = shift;
+  my $name = shift;
+  
+  my $hscale           = $fgscaledef;                                          # Scale Normativ
+  my $wscale           = $fgscaledef;
+  my ($width,  $wunit) = $icon =~ /width="(\d+\.\d+|\d+)(.*?)"/xs;
+  my ($height, $hunit) = $icon =~ /height="(\d+\.\d+|\d+)(.*?)"/xs;
+  
+  return ($hscale, $icon) if(!$width || !$height);
+  
+  $wscale = $hunit eq 'pt' ? 470 * $wscale / $width             :
+            $hunit eq 'px' ? 470 * $wscale / $width * 0.96      :
+            $hunit eq 'in' ? 470 * $wscale / $width * 0.0138889 :
+            $hunit eq 'mm' ? 470 * $wscale / $width * 0.352778  :
+            $hunit eq 'cm' ? 470 * $wscale / $width * 0.0352778 :
+            $hunit eq 'pc' ? 470 * $wscale / $width * 0.0833333 :
+            $wscale;
+            
+  $hscale = $hunit eq 'pt' ? 470 * $hscale / $height             :
+            $hunit eq 'px' ? 470 * $hscale / $height * 0.96      :
+            $hunit eq 'in' ? 470 * $hscale / $height * 0.0138889 :
+            $hunit eq 'mm' ? 470 * $hscale / $height * 0.352778  :
+            $hunit eq 'cm' ? 470 * $hscale / $height * 0.0352778 :
+            $hunit eq 'pc' ? 470 * $hscale / $height * 0.0833333 :
+            $hscale;
+           
+  $wscale = sprintf "%.2f", $wscale;
+  $hscale = sprintf "%.2f", $hscale;
+  
+  my $widthnormpt  = (sprintf "%.0f", (470 * (1 + $wscale))).'pt';          # Breite auf Normativ in pt skaliert          
+  my $heightnormpt = (sprintf "%.0f", (470 * (1 + $hscale))).'pt';          # Höhe auf Normativ in pt skaliert
+  
+  $icon =~ s/width="(.*?)"/width="$widthnormpt"/;
+  $icon =~ s/height="(.*?)"/height="$heightnormpt"/;
+  
+  # Log3 ($name, 2, "$name - widthnormpt: $widthnormpt, heightnormpt: $heightnormpt");
+  
+return ($fgscaledef, $icon);
 }
 
 ################################################################
@@ -18558,7 +18675,8 @@ return $def;
 # Usage:
 # CurrentVal ($hash, $key, $def)
 #
-# $key: generation           - aktuelle PV Erzeugung
+# $key: generationiXX        - aktuelle PV Erzeugung Inverter XX
+#       generationpXX        - aktuelle Erzeugung Producer XX
 #       aiinitstate          - Initialisierungsstatus der KI
 #       aitrainstate         - Traisningsstatus der KI
 #       aiaddistate          - Add Instanz Status der KI
@@ -18569,6 +18687,7 @@ return $def;
 #       dwdRad1hAgeTS        - Alter des Rad1h Wertes als Unix Timestamp
 #       genslidereg          - Schieberegister PV Erzeugung (Array)
 #       h4fcslidereg         - Schieberegister 4h PV Forecast (Array)
+#       moonPhaseI           - aktuelle Mondphase (1 .. 8)
 #       socslidereg          - Schieberegister Batterie SOC (Array)
 #       consumption          - aktueller Verbrauch (W)
 #       consumerdevs         - alle registrierten Consumerdevices (Array)
@@ -18579,7 +18698,7 @@ return $def;
 #       temp                 - aktuelle Außentemperatur
 #       surplus              - aktueller PV Überschuß
 #       tomorrowconsumption  - Verbrauch des kommenden Tages
-#       invertercapacity     - Bemessungsleistung der Wechselrichters (max. W)
+#       invertercapXX        - Bemessungsleistung der Wechselrichters XX (max. W)
 #       allstringspeak       - Peakleistung aller Strings nach temperaturabhängiger Korrektur
 #       allstringscount      - aktuelle Anzahl der Anlagenstrings
 #       tomorrowconsumption  - erwarteter Gesamtverbrauch am morgigen Tag
@@ -20319,78 +20438,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
-       <li><b>setupWeatherDevX </b> <br><br>
-
-       Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
-       The attribute 'setupWeatherDev1' specifies the leading weather service and is mandatory.<br>
-       If an Open-Meteo API is selected in the 'setupWeatherDev1' attribute, this Open-Meteo service is automatically set as the
-       source of the radiation data (Attribute setupRadiationAPI). <br><br>
-
-       <b>OpenMeteoDWD-API</b> <br>
-
-       Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
-       No API key is required.
-       Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
-       national weather services.
-       This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
-       15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
-       The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
-       models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a
-       seamless forecast.
-       The comprehensive and clearly laid out
-       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
-       the service's website.
-       <br><br>
-
-      <b>OpenMeteoDWDEnsemble-API</b> <br>
-
-      This Open-Meteo API variant provides access to the DWD's global
-      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
-      <br>
-      The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are
-      a special type of forecasting method that takes into account the uncertainties in weather forecasting.
-      They do this by running several simulations or models with slight differences in the starting conditions or settings.
-      Each simulation, known as an ensemble member, represents a possible outcome of the weather.
-      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used.
-      <br><br>
-
-       <b>OpenMeteoWorld-API</b> <br>
-
-       As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
-       The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric
-       Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
-       The providers' models are combined for each location worldwide to produce the best possible forecast.
-       The services and weather models are used automatically based on the location coordinates contained in the API call.
-       <br><br>
-
-       <b>DWD Device</b> <br>
-
-       As an alternative to Open-Meteo, an FHEM 'DWD_OpenData' device can be used to supply the weather data.<br>
-       If no device of this type exists, at least one DWD_OpenData device must first be defined.
-       (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-       If more than one setupWeatherDevX is specified, the average of all weather stations is determined
-       if the respective value was supplied and is numerical. <br>
-       Otherwise, the data from 'setupWeatherDev1' is always used as the leading weather device.<br>
-       At least these attributes must be set in the selected DWD_OpenData Device: <br><br>
-
-       <ul>
-         <table>
-         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
-            <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
-            <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
-            <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;   </td></tr>
-         </table>
-       </ul>
-       <br>
-
-       <b>Note:</b> If the latitude and longitude attributes are set in the global device, the sunrise and sunset
-                    result from this information.
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-flowGraphicCss"></a>
        <li><b>flowGraphicCss </b><br>
          Defines the style for the energy flow graph. The attribute is automatically preset.
@@ -20398,8 +20445,6 @@ to ensure that the system configuration is correct.
 
          <ul>
            .flowg.text           { stroke: none; fill: gray; font-size: 60px; } <br>
-           .flowg.sun_active     { stroke: orange; fill: orange; }              <br>
-           .flowg.sun_inactive   { stroke: gray; fill: gray; }                  <br>
            .flowg.bat25          { stroke: red; fill: red; }                    <br>
            .flowg.bat50          { stroke: darkorange; fill: darkorange; }      <br>
            .flowg.bat75          { stroke: green; fill: green; }                <br>
@@ -20900,7 +20945,8 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev"></a>
-       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; [capacity=&lt;max. WR-Leistung&gt;] </b> <br><br>
+       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; 
+                               [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
        Specifies any Device and its Readings to deliver the current PV generation values.
        It can also be a dummy device with appropriate readings.
@@ -20912,20 +20958,23 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                     </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).    </td></tr>
-           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,              </td></tr>
-           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.    </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                        </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts  </td></tr>
-           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                     </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon for displaying the inverter in the flow chart (optional)                                           </td></tr>
+           <tr><td>                 </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                 </td></tr>
+           <tr><td>                 </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed      </td></tr>           
+           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                                    </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                   </td></tr>
+           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                             </td></tr>
+           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.                   </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                       </td></tr>
+           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                 </td></tr>
+           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                                    </td></tr>
         </table>
        </ul>
        <br>
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
        </ul>
        <br>
 
@@ -21016,7 +21065,7 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>icon</b>     </td><td>Icon and, if applicable, color for displaying the producer in the flow chart (optional)                                    </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon and, if applicable, color for activity to display the producer in the flow chart (optional)                           </td></tr>
            <tr><td> <b>pcurr</b>    </td><td>Reading which returns the current generation as a positive value or a self-consumption (special case) as a negative value  </td></tr>
            <tr><td> <b>etotal</b>   </td><td>Reading which supplies the total energy generated (a continuously ascending counter)                                       </td></tr>
            <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                                                </td></tr>
@@ -21171,6 +21220,78 @@ to ensure that the system configuration is correct.
       </ul>
       </li>
       <br>
+      
+       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
+       <li><b>setupWeatherDevX </b> <br><br>
+
+       Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
+       The attribute 'setupWeatherDev1' specifies the leading weather service and is mandatory.<br>
+       If an Open-Meteo API is selected in the 'setupWeatherDev1' attribute, this Open-Meteo service is automatically set as the
+       source of the radiation data (Attribute setupRadiationAPI). <br><br>
+
+       <b>OpenMeteoDWD-API</b> <br>
+
+       Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
+       No API key is required.
+       Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
+       national weather services.
+       This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
+       15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
+       The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
+       models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a
+       seamless forecast.
+       The comprehensive and clearly laid out
+       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
+       the service's website.
+       <br><br>
+
+      <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+      This Open-Meteo API variant provides access to the DWD's global
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
+      <br>
+      The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are
+      a special type of forecasting method that takes into account the uncertainties in weather forecasting.
+      They do this by running several simulations or models with slight differences in the starting conditions or settings.
+      Each simulation, known as an ensemble member, represents a possible outcome of the weather.
+      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used.
+      <br><br>
+
+       <b>OpenMeteoWorld-API</b> <br>
+
+       As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
+       The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric
+       Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
+       The providers' models are combined for each location worldwide to produce the best possible forecast.
+       The services and weather models are used automatically based on the location coordinates contained in the API call.
+       <br><br>
+
+       <b>DWD Device</b> <br>
+
+       As an alternative to Open-Meteo, an FHEM 'DWD_OpenData' device can be used to supply the weather data.<br>
+       If no device of this type exists, at least one DWD_OpenData device must first be defined.
+       (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+       If more than one setupWeatherDevX is specified, the average of all weather stations is determined
+       if the respective value was supplied and is numerical. <br>
+       Otherwise, the data from 'setupWeatherDev1' is always used as the leading weather device.<br>
+       At least these attributes must be set in the selected DWD_OpenData Device: <br><br>
+
+       <ul>
+         <table>
+         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+            <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
+            <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
+            <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
+            <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;   </td></tr>
+         </table>
+       </ul>
+       <br>
+
+       <b>Note:</b> If the latitude and longitude attributes are set in the global device, the sunrise and sunset
+                    result from this information.
+       </li>
+       <br>
 
      </ul>
   </ul>
@@ -22670,78 +22791,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
-       <li><b>setupWeatherDevX </b> <br><br>
-
-       Gibt das Gerät oder die API zur Lieferung der erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) an.<br>
-       Das Attribut 'setupWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
-       Ist eine Open-Meteo API im Attribut 'setupWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
-       der Strahlungsdaten (Attribut setupRadiationAPI) eingestellt. <br><br>
-
-       <b>OpenMeteoDWD-API</b> <br>
-
-       Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
-       Es ist kein API-Schlüssel erforderlich.
-       Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
-       von angesehenen nationalen Wetterdiensten.
-       Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
-       15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
-       von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
-       anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU
-       und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
-       Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
-       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
-       <br><br>
-
-      <b>OpenMeteoDWDEnsemble-API</b> <br>
-
-      Diese Open-Meteo API Variante bietet Zugang zum globalen
-      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
-      des DWD. <br>
-      Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind
-      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt.
-      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen
-      oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
-      In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
-      Ergbnis verwendet.
-      <br><br>
-
-       <b>OpenMeteoWorld-API</b> <br>
-
-       Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
-       Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric
-       Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
-       Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
-       Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
-       <br><br>
-
-       <b>DWD Gerät</b> <br>
-
-       Alternativ zu Open-Meteo kann ein FHEM 'DWD_OpenData'-Gerät zur Lieferung der Wetterdaten dienen.<br>
-       Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData Gerät
-       definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
-       Sind mehr als ein setupWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt
-       sofern der jeweilige Wert geliefert wurde und numerisch ist. <br>
-       Anderenfalls werden immer die Daten von 'setupWeatherDev1' als führendes Wetterdevice genutzt. <br>
-       Im ausgewählten DWD_OpenData Gerät müssen mindestens diese Attribute gesetzt sein: <br><br>
-
-       <ul>
-          <table>
-          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-             <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
-             <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
-             <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
-             <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;  </td></tr>
-          </table>
-       </ul>
-       <br>
-
-       <b>Hinweis:</b> Sind die Attribute latitude und longitude im global Device gesetzt, ergibt sich der
-                       Sonnenauf- und Sonnenuntergang aus diesen Angaben.
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-flowGraphicCss"></a>
        <li><b>flowGraphicCss </b><br>
          Definiert den Style für die Energieflußgrafik. Das Attribut wird automatisch vorbelegt.
@@ -22749,8 +22798,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
            .flowg.text           { stroke: none; fill: gray; font-size: 60px; } <br>
-           .flowg.sun_active     { stroke: orange; fill: orange; }              <br>
-           .flowg.sun_inactive   { stroke: gray; fill: gray; }                  <br>
            .flowg.bat25          { stroke: red; fill: red; }                    <br>
            .flowg.bat50          { stroke: darkorange; fill: darkorange; }      <br>
            .flowg.bat75          { stroke: green; fill: green; }                <br>
@@ -23249,7 +23296,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev"></a>
-       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; [capacity=&lt;max. WR-Leistung&gt;] </b> <br><br>
+       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
+                              [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
        Legt ein beliebiges Device und dessen Readings zur Lieferung der aktuellen PV Erzeugungswerte fest.
        Es kann auch ein Dummy Device mit entsprechenden Readings sein.
@@ -23261,20 +23309,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                         </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)    </td></tr>
-           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt       </td></tr>
-           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.    </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                          </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt  </td></tr>
-           <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                            </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                      </td></tr>
+           <tr><td>                 </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                            </td></tr>
+           <tr><td>                 </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt  </td></tr>
+           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                                 </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)            </td></tr>
+           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt               </td></tr>
+           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.            </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                  </td></tr>
+           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt          </td></tr>
+           <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                                    </td></tr>
          </table>
        </ul>
        <br>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000
+         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
        </ul>
        <br>
 
@@ -23365,7 +23416,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>icon</b>     </td><td>Icon und ggf. Farbe zur Darstellung des Producers in der Flowgrafik (optional)                                               </td></tr>
+          <tr><td> <b>icon</b>     </td><td>Icon und ggf. Farbe bei Aktivität zur Darstellung des Producers in der Flowgrafik (optional)                                 </td></tr>
           <tr><td> <b>pcurr</b>    </td><td>Reading welches die aktuelle Erzeugung als positiven Wert oder einen Eigenverbrauch (Sonderfall) als negativen Wert liefert  </td></tr>
           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte Energie liefert (ein stetig aufsteigender Zähler)                                       </td></tr>
           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                                       </td></tr>
@@ -23522,6 +23573,78 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </ul>
       </li>
       <br>
+      
+       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
+       <li><b>setupWeatherDevX </b> <br><br>
+
+       Gibt das Gerät oder die API zur Lieferung der erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) an.<br>
+       Das Attribut 'setupWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
+       Ist eine Open-Meteo API im Attribut 'setupWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
+       der Strahlungsdaten (Attribut setupRadiationAPI) eingestellt. <br><br>
+
+       <b>OpenMeteoDWD-API</b> <br>
+
+       Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
+       Es ist kein API-Schlüssel erforderlich.
+       Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
+       von angesehenen nationalen Wetterdiensten.
+       Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
+       15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
+       von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
+       anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU
+       und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
+       Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
+       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
+       <br><br>
+
+      <b>OpenMeteoDWDEnsemble-API</b> <br>
+
+      Diese Open-Meteo API Variante bietet Zugang zum globalen
+      <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
+      des DWD. <br>
+      Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind
+      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt.
+      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen
+      oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
+      In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
+      Ergbnis verwendet.
+      <br><br>
+
+       <b>OpenMeteoWorld-API</b> <br>
+
+       Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
+       Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric
+       Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
+       Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
+       Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
+       <br><br>
+
+       <b>DWD Gerät</b> <br>
+
+       Alternativ zu Open-Meteo kann ein FHEM 'DWD_OpenData'-Gerät zur Lieferung der Wetterdaten dienen.<br>
+       Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData Gerät
+       definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+       Sind mehr als ein setupWeatherDevX angegeben, wird der Durchschnitt aller Wetterstationen ermittelt
+       sofern der jeweilige Wert geliefert wurde und numerisch ist. <br>
+       Anderenfalls werden immer die Daten von 'setupWeatherDev1' als führendes Wetterdevice genutzt. <br>
+       Im ausgewählten DWD_OpenData Gerät müssen mindestens diese Attribute gesetzt sein: <br><br>
+
+       <ul>
+          <table>
+          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+             <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
+             <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
+             <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
+             <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;  </td></tr>
+          </table>
+       </ul>
+       <br>
+
+       <b>Hinweis:</b> Sind die Attribute latitude und longitude im global Device gesetzt, ergibt sich der
+                       Sonnenauf- und Sonnenuntergang aus diesen Angaben.
+       </li>
+       <br>
 
      </ul>
   </ul>

@@ -156,11 +156,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.35.0" => "08.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
+  "1.35.0" => "09.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
                            "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard ".
                            "scaling, __switchConsumer: run ___setConsumerSwitchingState before switch subs ".
                            "no Readings pvCorrectionFactor_XX_autocalc are written anymore ".
-                           "__switchConsumer: change Debug info and process ",
+                           "__switchConsumer: change Debug info and process, ___doPlanning: fix Log Output and use replanning or planning ",
   "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
   "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
                            "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
@@ -368,35 +368,6 @@ my %vNotesIntern = (
   "0.80.12"=> "16.07.2023  preparation for alternative switch device in consumer attribute, revise CommandRef ".
                            "fix/improve sub ___readCandQ and much more, get pvHistory -> one specific day selectable ".
                            "get valConsumerMaster -> one specific consumer selectable, enhance consumer key locktime by on-locktime ",
-  "0.80.11"=> "14.07.2023  minor fixes and improvements ",
-  "0.80.10"=> "13.07.2023  new key spignorecond in consumer attributes ",
-  "0.80.9" => "13.07.2023  new method of prediction quality calculation -> sub __calcFcQuality, minor bug fixes ",
-  "0.80.8" => "12.07.2023  store battery values initdaybatintot, initdaybatouttot, batintot, batouttot in circular hash ".
-                           "new Attr ctrlStatisticReadings parameter todayBatIn, todayBatOut ",
-  "0.80.7" => "10.07.2023  Model SolCastAPI: retrieve forecast data of 72h (old 48), create statistic reading dayAfterTomorrowPVforecast if possible ",
-  "0.80.6" => "09.07.2023  get ... html has some possible arguments now ",
-  "0.80.5" => "07.07.2023  calculate _calcCaQcomplex, _calcCaQsimple both at every time, change setter pvCorrectionFactor_Auto: on_simple, on_complex, off ",
-  "0.80.4" => "06.07.2023  new transferprocess for DWD data from solcastapi-Hash to estimate calculation, consolidated ".
-                           "the autocorrection model ",
-  "0.80.3" => "03.06.2023  preparation for get DWD radiation data to solcastapi-Hash, fix sub isConsumerLogOn (use powerthreshold) ",
-  "0.80.2" => "02.06.2023  new ctrlDebug keys epiecesCalc, change selfconsumption with graphic Adjustment, moduleAzimuth ".
-                           "accepts azimut values -180 .. 0 .. 180 as well as azimut identifier (S, SE ..) ",
-  "0.80.1" => "31.05.2023  adapt _calcCaQsimple to calculate corrfactor like _calcCaQcomplex ",
-  "0.80.0" => "28.05.2023  Support for Forecast.Solar-API (https://doc.forecast.solar/api), rename Getter solCastData to solApiData ".
-                           "rename ctrlDebug keys: solcastProcess -> apiProcess, solcastAPIcall -> apiCall ".
-                           "calculate cloudiness correction factors proactively and store it in circular hash ".
-                           "new reading Current_Surplus, ___noPlanRelease -> only one call releases the consumer planning ",
-  "0.79.3" => "21.05.2023  new CircularVal initdayfeedin, deactivate \$hash->{HELPER}{INITFEEDTOTAL}, \$hash->{HELPER}{INITCONTOTAL} ".
-                           "new statistic Readings statistic_todayGridFeedIn, statistic_todayGridConsumption ",
-  "0.79.2" => "21.05.2023  change process to calculate solCastAPIcallMultiplier, todayMaxAPIcalls ",
-  "0.79.1" => "19.05.2023  extend debug apiProcess, new key apiCall ",
-  "0.79.0" => "13.05.2023  new consumer key locktime ",
-  "0.78.2" => "11.05.2023  extend debug radiationProcess ",
-  "0.78.1" => "08.05.2023  change default icon it_ups_on_battery to batterie ",
-  "0.78.0" => "07.05.2023  activate NotifyFn Forum:https://forum.fhem.de/index.php?msg=1275005, new Consumerkey asynchron ",
-  "0.77.1" => "07.05.2023  rewrite function pageRefresh ",
-  "0.77.0" => "03.05.2023  new attribute ctrlUserExitFn ",
-  "0.76.0" => "01.05.2023  new ctrlStatisticReadings SunMinutes_Remain, SunHours_Remain ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -1661,7 +1632,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $stopts   = $startts + $stopdiff;
 
   $paref->{consumer} = $c;
-  $paref->{ps}       = "planned:";
+  $paref->{ps}       = 'planned:';
   $paref->{startts}  = $startts;                                                               # Unix Timestamp für geplanten Switch on
   $paref->{stopts}   = $stopts;                                                                # Unix Timestamp für geplanten Switch off
 
@@ -8421,9 +8392,6 @@ sub _transferInverterValues {
   my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                        # aktuelle Erzeugung (W)
   $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                              # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
 
-  storeReading ('Current_PV', $pv.' W');
-  $data{$type}{$name}{current}{generationi01} = $pv;                                          # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-
   push @{$data{$type}{$name}{current}{genslidereg}}, $pv;                                     # Schieberegister PV Erzeugung
   limitArray ($data{$type}{$name}{current}{genslidereg}, $slidenumdef);
 
@@ -8457,6 +8425,7 @@ sub _transferInverterValues {
       }
   }
 
+  $data{$type}{$name}{current}{generationi01}  = $pv;                                           # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
   $data{$type}{$name}{current}{etotali01}      = $etotal;                                       # aktuellen etotal des WR speichern
   $data{$type}{$name}{current}{namei01}        = $indev;                                        # Name des Inverterdevices
   $data{$type}{$name}{current}{invertercapi01} = $h->{capacity} if(defined $h->{capacity});     # optionale Angabe max. WR-Leistung
@@ -8477,6 +8446,8 @@ sub _transferInverterValues {
   }
 
   storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PVreal', $ethishour.' Wh'.$warn);
+  storeReading ('Current_PV', $pv.' W');
+  
   $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
   my ($acu, $aln) = isAutoCorrUsed ($name);
@@ -9371,9 +9342,7 @@ sub _manageConsumerData {
       __planInitialSwitchTime ($paref);                                                                           # Consumer Switch Zeiten planen
       __setTimeframeState     ($paref);                                                                           # Timeframe Status ermitteln
       __setConsRcmdState      ($paref);                                                                           # Consumption Recommended Status setzen
-      
-      __switchConsumer        ($paref);                                                                           # Consumer schalten
-      
+      __switchConsumer        ($paref);                                                                           # Consumer schalten  
       __getCyclesAndRuntime   ($paref);                                                                           # Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro Stunde ermitteln
       __reviewSwitchTime      ($paref);                                                                           # Planungsdaten überprüfen und ggf. neu planen
       __remainConsumerTime    ($paref);                                                                           # Restlaufzeit Verbraucher ermitteln
@@ -9720,7 +9689,7 @@ sub ___noPlanRelease {
   my $c     = $paref->{consumer};
 
   my $hash = $defs{$name};
-  my $dnp  = 0;                                                                           # 0 -> Planung, 1 -> keine Planung
+  my $dnp  = 0;                                                                            # 0 -> Planung, 1 -> keine Planung
 
   if (ConsumerVal ($hash, $c, 'planstate', undef)) {                                       # Verbraucher ist schon geplant/gestartet/fertig
       $dnp = qq{consumer is already planned};
@@ -9772,7 +9741,9 @@ sub __reviewSwitchTime {
                       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Review switch time planning name: }.ConsumerVal ($hash, $c, 'name', '').
                                                             qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
 
+                      $paref->{replan} = 1;                                           # V 1.35.0
                       ___doPlanning ($paref);
+                      delete $paref->{replan};
                   }
               }
               else {
@@ -9855,10 +9826,11 @@ sub ___doPlanning {
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - epiece1: $epiece1});
 
-  my $mode     = ConsumerVal ($hash, $c, 'mode',          'can');
-  my $calias   = ConsumerVal ($hash, $c, 'alias',            '');
-  my $mintime  = ConsumerVal ($hash, $c, 'mintime', $defmintime);                                      # Einplanungsdauer
-
+  my $mode         = ConsumerVal ($hash, $c, 'mode',          'can');
+  my $calias       = ConsumerVal ($hash, $c, 'alias',            '');
+  my $mintime      = ConsumerVal ($hash, $c, 'mintime', $defmintime);                                  # Einplanungsdauer
+  my $oldplanstate = ConsumerVal ($hash, $c, 'planstate',        '');                                  # V. 1.35.0
+  
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
 
   if (isSunPath ($hash, $c)) {                                                                         # SunPath ist in mintime gesetzt
@@ -9898,7 +9870,7 @@ sub ___doPlanning {
 
               my $startts       = timestringToTimestamp ($starttime);                                  # Unix Timestamp für geplanten Switch on
 
-              $paref->{ps}      = 'planned:';
+              $paref->{ps}      = $paref->{replan} ? 'replanned:' : 'planned:';                        # V 1.35.0
               $paref->{startts} = $startts;
               $paref->{stopts}  = $startts + $stopdiff;
 
@@ -9959,7 +9931,7 @@ sub ___doPlanning {
   my $planstate = ConsumerVal ($hash, $c, 'planstate',      '');
   my $planspmlt = ConsumerVal ($hash, $c, 'planSupplement', '');
 
-  if ($planstate) {
+  if ($planstate && ($planstate ne $oldplanstate)) {                                                   # V 1.35.0
       Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate $planspmlt});
   }
 
@@ -10085,7 +10057,7 @@ sub ___planMust {
   $startts   = timestringToTimestamp ($starttime);
   my $stopts = $startts + $stopdiff;
 
-  $paref->{ps}      = "planned:";
+  $paref->{ps}      = 'planned:';
   $paref->{startts} = $startts;                                                        # Unix Timestamp für geplanten Switch on
   $paref->{stopts}  = $stopts;                                                         # Unix Timestamp für geplanten Switch off
 
