@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bufgix:  72_FRITZBOX: kleinere Fehler bei zu alten FritzOS Versionen 
+ - feature: 72_FRITZBOX: Neue Readings box_pwr_...
+            Aktivierbar über Attribut enableBoxReadings
+            nicht für Cable mit aktueller Labor oder FritzOS 8.00
  - feature: 76_SolarForecast: FlowGrafic-some improvements and changes
  - bugfix:  70_PylonLowVoltage: group/bat addr calc when higher addr is used
  - feature: 76_SolarForecast: features and changes, see 
