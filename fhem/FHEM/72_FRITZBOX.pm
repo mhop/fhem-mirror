@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "08.00.00";
+my $ModulVersion = "08.00.01";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -629,7 +629,7 @@ sub FRITZBOX_Initialize($)
                                 ."shdeviceID_model,shdeviceID_status,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_type,"
                                 ."shdeviceID_voltage,shdeviceID_power,shdeviceID_current,shdeviceID_consumtion,shdeviceSD_ledState,shdeviceSH_state "
                 ."enableBoxReadings:multiple-strict,"
-                                ."box_energyMode,box_globalFilter,box_led,box_vdsl,box_dns_Srv "
+                                ."box_energyMode,box_globalFilter,box_led,box_vdsl,box_dns_Srv,box_pwr,box_guestWlan "
                 ."enableLogReadings:multiple-strict,"
                                 ."box_sys_Log,box_wlan_Log,box_fon_Log "
                 ."disableBoxReadings:multiple-strict,"
@@ -818,6 +818,7 @@ sub FRITZBOX_Attr($@)
       # aName and aVal are Attribute name and value
 
    my $hash = $defs{$name};
+   my $avmModel = InternalVal($name, "MODEL", "FRITZ!Box");
 
    if ($aName eq "verbose") {
      FRITZBOX_dbgLogInit($hash, $cmd, $aName, $aVal) if !$hash->{helper}{FhemLog3Std};
@@ -904,7 +905,7 @@ sub FRITZBOX_Attr($@)
 
    if ($aName eq "enableBoxReadings") {
      my $inList = AttrVal($name, "enableBoxReadings", "");
-     my @reading_list = split(/\,/, "box_led,box_energyMode,box_globalFilter,box_vdsl,box_dns_Srv");
+     my @reading_list = split(/\,/, "box_led,box_energyMode,box_globalFilter,box_vdsl,box_dns_Srv,box_pwr,box_guestWlan");
      if ($cmd eq "set") {
        if ( ("box_dns_Srv" =~ /$aVal/) && $hash->{fhem}{fwVersion} <= 731 ) {
          return "box_dns_Srv not available for Fritz!OS: $hash->{fhem}{fwVersionStr}";
@@ -920,6 +921,15 @@ sub FRITZBOX_Attr($@)
        }
        if ( ("box_vdsl" =~ /$aVal/) && $hash->{fhem}{fwVersion} < 680 ) {
          return "box_vdsl not available for Fritz!OS: $hash->{fhem}{fwVersionStr}";
+       }
+       if ( ("box_pwr" =~ /$aVal/) && $hash->{fhem}{fwVersion} < 700 ) {
+         return "box_pwr not available for Fritz!OS: $hash->{fhem}{fwVersionStr}";
+       }
+       if ( ("box_pwr" =~ /$aVal/) && $hash->{fhem}{fwVersion} >= 790 && $avmModel =~ /Cable/) {
+         return "box_pwr not available for FiritzBox Cable with Fritz!OS: $hash->{fhem}{fwVersionStr}";
+       }
+       if ( ("box_guestWlan" =~ /$aVal/) && $hash->{fhem}{fwVersion} < 700 ) {
+         return "box_guestWlan not available for Fritz!OS: $hash->{fhem}{fwVersionStr}";
        }
 
        foreach ( @reading_list ) {
@@ -4128,6 +4138,14 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
    my $tmpData;
 
    #-------------------------------------------------------------------------------------
+   # getting energy monitor
+   # xhr 1 lang de page energy xhrId all
+
+   #-------------------------------------------------------------------------------------
+   # getting ...
+   # xhr 1 lang de page ... xhrId all
+
+   #-------------------------------------------------------------------------------------
    # getting Mesh Role
 
    FRITZBOX_Log $hash, 4, "mesh_role - start getting data";
@@ -4322,7 +4340,7 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
          for(my $i = 0; $i <= $nbViews - 1; $i++) {
            my $dName = $resultData->{data}->{scanlist}->[$i]->{ssid};
            $dName   .= " (Kanal: " . $resultData->{data}->{scanlist}->[$i]->{channel};
-           if ($hash->{fhem}{fwVersion} < 750) {
+           if ($hash->{fhem}{fwVersion} >= 750) {
              $dName   .= ", Band: " . $resultData->{data}->{scanlist}->[$i]->{bandId};
              $dName   =~ s/24ghz/2.4 GHz/;
              $dName   =~ s/5ghz/5 GHz/;
@@ -4556,8 +4574,109 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
    # end info about LED settings
 
 
+   if ( $avmModel =~ /Smart/) {
+   #-------------------------------------------------------------------------------------
+
+     #-------------------------------------------------------------------------------------
+     # getting matter network
+     # xhr 1 lang de page sh_matter xhrId all
+
+     if ( $hash->{fhem}{fwVersion} >= 762) {
+
+       FRITZBOX_Log $hash, 4, "Matter detailed info - start getting data";
+
+       @webCmdArray = ();
+       push @webCmdArray, "xhr"         => "1";
+       push @webCmdArray, "lang"        => "de";
+       push @webCmdArray, "page"        => "sh_matter";
+       push @webCmdArray, "xhrId"       => "all";
+
+       $resultData = FRITZBOX_read_LuaData($hash, "data", \@webCmdArray) ;
+
+       # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
+       return FRITZBOX_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+       $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
+
+       $nbViews = 0;
+
+       if (defined $resultData->{data}->{fabrics}) {
+         $views = $resultData->{data}->{fabrics};
+         $nbViews = scalar @$views;
+       }
+
+       if ($nbViews > 0) {
+
+         for(my $i = 0; $i <= $nbViews - 1; $i++) {
+           my $id = $resultData->{data}->{fabrics}->[$i]->{UID};
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "matter_" . $id . "_vendor", $resultData->{data}->{fabrics}->[$i]->{vendor};
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "matter_" . $id . "_node", $resultData->{data}->{fabrics}->[$i]->{_node};
+         }
+       }
+
+       FRITZBOX_Log $hash, 4, "Matter detailed info - end getting data";
+     } else {
+
+       FRITZBOX_Log $hash, 4, "wrong Fritz!OS for Matter detailed informations: $hash->{fhem}{fwVersionStr}";
+
+     }
+
+   }
+
    if ( $avmModel !~ /Smart/) {
    #-------------------------------------------------------------------------------------
+
+     #-------------------------------------------------------------------------------------
+     # getting energy monitor
+     # xhr 1 lang de page energy xhrId all
+
+     if ( ($enableBoxReading =~ /box_pwr/) && (($hash->{fhem}{fwVersion} >= 680 && $avmModel !~ /Cable/) || ($hash->{fhem}{fwVersion} >= 680 && $hash->{fhem}{fwVersion} < 790 && $avmModel =~ /Cable/)) ) {
+
+       FRITZBOX_Log $hash, 4, "Energy detailed info - start getting data";
+
+       @webCmdArray = ();
+       push @webCmdArray, "xhr"         => "1";
+       push @webCmdArray, "lang"        => "de";
+       push @webCmdArray, "page"        => "energy";
+       push @webCmdArray, "xhrId"       => "all";
+
+       $resultData = FRITZBOX_read_LuaData($hash, "data", \@webCmdArray) ;
+
+       # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
+       return FRITZBOX_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+       $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
+
+       $nbViews = 0;
+
+       if (defined $resultData->{data}->{drain}) {
+         $views = $resultData->{data}->{drain};
+         $nbViews = scalar @$views;
+       }
+
+       if ($nbViews > 0) {
+
+         for(my $i = 0; $i <= $nbViews - 1; $i++) {
+           my $id = $resultData->{data}->{drain}->[$i]->{id};
+           if ( $resultData->{data}->{drain}->[$i]->{name} =~ /Gesamtsystem/) {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_pwr_Rate_Act", $resultData->{data}->{drain}->[$i]->{actPerc};
+           } elsif ( $resultData->{data}->{drain}->[$i]->{name} =~ /Hauptprozessor/) {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_pwr_mainCPU_Act", $resultData->{data}->{drain}->[$i]->{actPerc};
+           } elsif ( $resultData->{data}->{drain}->[$i]->{name} =~ /WLAN/) {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_pwr_WLAN_Act", $resultData->{data}->{drain}->[$i]->{actPerc};
+           } elsif ( $resultData->{data}->{drain}->[$i]->{name} =~ /DSL/) {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_pwr_DSL_Act", $resultData->{data}->{drain}->[$i]->{actPerc};
+           }
+
+         }
+       }
+
+       FRITZBOX_Log $hash, 4, "Energy detailed info - end getting data";
+     } else {
+
+       FRITZBOX_Log $hash, 4, "wrong Fritz!OS for Energy detailed informations: $hash->{fhem}{fwVersionStr}";
+
+     }
 
      #-------------------------------------------------------------------------------------
      # WLAN Gastzugang
@@ -4568,7 +4687,7 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
      # xhrId all
      # xhr 1 lang de page wGuest xhrId all
 
-     if ( $hash->{fhem}{fwVersion} >= 680) {
+     if ( ($hash->{fhem}{fwVersion} >= 700) && ($enableBoxReading =~ /box_guestWlan/)) {
 
        FRITZBOX_Log $hash, 4, "WLAN detailed info - start getting data";
 
@@ -5838,7 +5957,7 @@ sub FRITZBOX_Readout_Response($$$@)
   }
 
   FRITZBOX_Log $hash, 4, "Captured " . @{$roReadings} . " values";
-  FRITZBOX_Log $hash, 3, "Handover to main process (" . length ($returnStr) . "): \n" . $returnStr;
+  FRITZBOX_Log $hash, 4, "Handover to main process (" . length ($returnStr) . "): \n" . $returnStr;
 
   return $returnStr;
 
@@ -6024,7 +6143,7 @@ sub FRITZBOX_Readout_Process($$)
                                 ."shdeviceID_model,shdeviceID_status,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_type,"
                                 ."shdeviceID_voltage,shdeviceID_power,shdeviceID_current,shdeviceID_consumtion,shdeviceID_ledState,shdeviceID_state "
                   ."enableBoxReadings:multiple-strict,"
-                                ."box_energyMode,box_globalFilter,box_led,box_dns_Srv "
+                                ."box_energyMode,box_globalFilter,box_led,box_dns_Srv,box_pwr,box_guestWlan "
                   ."enableLogReadings:multiple-strict,"
                                 ."box_sys_Log,box_wlan_Log,box_fon_Log "
                   ."disableBoxReadings:multiple-strict,"
@@ -6598,6 +6717,10 @@ sub FRITZBOX_Set_check_APIs($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
          FRITZBOX_Log $hash, 4-$myVerbose, "API luaQuery call responded with: " . $response->status_line;
       }
+      elsif ($response->code eq "303") {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
+         FRITZBOX_Log $hash, 4-$myVerbose, "API luaQuery call responded with: " . $response->status_line;
+      }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
          FRITZBOX_Log $hash, 4-$myVerbose, "API luaQuery does not exist (" . $response->status_line . ")";
@@ -6618,6 +6741,10 @@ sub FRITZBOX_Set_check_APIs($)
          FRITZBOX_Log $hash, 4-$myVerbose, "API luaData call responded with: " . $response->status_line;
       }
       elsif ($response->code eq "500") {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 0;
+         FRITZBOX_Log $hash, 4-$myVerbose, "API luaData call responded with: " . $response->status_line;
+      }
+      elsif ($response->code eq "303") {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 0;
          FRITZBOX_Log $hash, 4-$myVerbose, "API luaData call responded with: " . $response->status_line;
       }
@@ -6770,7 +6897,7 @@ sub FRITZBOX_Set_check_APIs($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
 
-   if ($apiError =~ /500/) {
+   if ($apiError =~ /303|500/) {
 
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
@@ -12119,6 +12246,8 @@ sub FRITZBOX_Helper_Url_Regex {
          <b>box_led</b> -&gt; activates all readings <b>box_led</b><i>.*</i> FritzOS >= 6.00<br>
          <b>box_vdsl</b> -&gt; activates all readings <b>box_vdsl</b><i>.*</i> FritzOS >= 7.80<br>
          <b>box_dns_Srv</b> -&gt; activates all readings <b>box_dns_Srv</b><i>n</i> FritzOS > 7.31<br>
+         <b>box_pwr</b> -&gt; activates all readings <b>box_pwr</b><i>...</i> FritzOS >= 7.00. ! not available for Cable with FritzOS 8.00<br>
+         <b>box_guestWlan</b> -&gt; activates all readings <b>box_guestWlan</b><i>...</i> FritzOS >= 7.00<br>
       </li><br>
 
       <li><a name="enableLogReadings"></a>
@@ -12301,6 +12430,10 @@ sub FRITZBOX_Helper_Url_Regex {
       <li><b>box_upnp_control_activated</b> - state if control via UPNP is enabled</li>
       <li><b>box_uptime</b> - uptime since last reboot</li>
       <li><b>box_uptimeConnect</b> - connect uptime since last reconnect</li>
+      <li><b>box_DSL_Act</b> - DSL: current power in percent of maximal power</li>
+      <li><b>box_Rate_Act</b> - over all: current power in percent of maximal power</li>
+      <li><b>box_WLAN_Act</b> - WLAN: current power in percent of maximal power</li>
+      <li><b>box_mainCPU_Act</b> - CPU: current power in percent of maximal power</li>
       <li><b>box_powerRate</b> - current power in percent of maximal power</li>
       <li><b>box_powerLine</b> - powerline active</li>
       <li><b>box_rateDown</b> - average download rate in the last update interval</li>
@@ -12375,6 +12508,9 @@ sub FRITZBOX_Helper_Url_Regex {
       <li><b>gsm_rssi</b> - received signal strength indication (0-100)</li>
       <li><b>gsm_state</b> - state of the connection to the GSM network</li>
       <li><b>gsm_technology</b> - GSM technology used for data transfer (GPRS, EDGE, UMTS, HSPA)</li>
+      <br>
+      <li><b>matter_</b><i>...</i><b>_node</b> - matter node (SmartGateWay or FB with matter).</li>
+      <li><b>matter_</b><i>...</i><b>_vendor</b> - matter vendor/fabric (SmartGateWay or FB with matter).</li>
       <br>
       <li><b>mobileInfo_</b><i>...</i> - Mobile radio readings (USB mobile radio stick or FritzBox LTE).</li>
       <br>
@@ -13062,6 +13198,8 @@ sub FRITZBOX_Helper_Url_Regex {
          <b>box_led</b> -&gt; aktiviert alle Readings <b>box_led</b><i>.*</i> FritzOS >= 6.00<br>
          <b>box_vdsl</b> -&gt; aktiviert alle Readings <b>box_vdsl</b><i>.*</i> FritzOS >= 7.80<br>
          <b>box_dns_Srv</b> -&gt; aktiviert alle Readings <b>box_dns_Srv</b><i>n</i> FritzOS > 7.31<br>
+         <b>box_pwr</b> -&gt; aktiviert alle Readings <b>box_pwr</b><i>...</i> FritzOS >= 7.00. Nicht verfügbar für Cable mit FritzOS 8.00<br>
+         <b>box_guestWlan</b> -&gt; aktiviert alle Readings <b>box_guestWlan</b><i>...</i> FritzOS > 7.00<br>
       </li><br>
 
       <li><a name="enableLogReadings"></a>
@@ -13241,6 +13379,10 @@ sub FRITZBOX_Helper_Url_Regex {
       <li><b>box_upnp_control_activated</b> - Status Kontrolle &uuml;ber UPNP</li>
       <li><b>box_uptime</b> - Laufzeit seit letztem Neustart</li>
       <li><b>box_uptimeConnect</b> - Verbindungsdauer seit letztem Neuverbinden</li>
+      <li><b>box_DSL_Act</b> - DSL: aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
+      <li><b>box_Rate_Act</b> - Gesamt: aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
+      <li><b>box_WLAN_Act</b> - WLAN: aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
+      <li><b>box_mainCPU_Act</b> - CPU: aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
       <li><b>box_powerRate</b> - aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
       <li><b>box_powerLine</b> - verbindung über Powerline aktiv</li>
       <li><b>box_rateDown</b> - Download-Geschwindigkeit des letzten Intervals in kByte/s</li>
@@ -13311,6 +13453,9 @@ sub FRITZBOX_Helper_Url_Regex {
       <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalst&auml;rke (0-100)</li>
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
       <li><b>gsm_technology</b> - GSM-Technologie, die f&uuml;r die Daten&uuml;bertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
+      <br>
+      <li><b>matter_</b><i>...</i><b>_node</b> - matter node (SmartGateWay oder FB mit Matter).</li>
+      <li><b>matter_</b><i>...</i><b>_vendor</b> - matter vendor/fabric (SmartGateWay oder FB mit Matter).</li>
       <br>
       <li><b>mobileInfo_</b><i>...</i> - Mobilfunk Readings (USB-Mobilfunk-Stick oder FritzBox LTE).</li>
       <br>
