@@ -5492,7 +5492,7 @@ json2nameValue($;$$$$)
       setVal($ret, $prefix, $name, $1);
       $in = $2;
 
-    } elsif($val =~ m/^(null)(.*)$/s) {
+    } elsif($val =~ m/^(null|none)(.*)$/is) { # 139411
       setVal($ret, $prefix, $name, undef);
       $in = $2;
 
