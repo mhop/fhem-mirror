@@ -1170,6 +1170,8 @@ sub Set {
   my $type = $hash->{TYPE};
   my $name = $hash->{NAME};
   my $iam = "$type $name Set:";
+  my @ti = localtime();
+  my $tcorr = ($ti[8] ? '2,1,0' : '1,2,0 ');
 
   return "$iam: needs at least one argument" if ( @val < 2 );
   return "Unknown argument, $iam is disabled, choose one of none:noArg" if ( IsDisabled( $name ) );
@@ -1305,7 +1307,7 @@ sub Set {
   return undef;
 
   ##########
-  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName eq "sendJsonScheduleToMower" ) {
+  } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /defined|initialized|authentification|authenticated|update/ && $setName =~ /sendJsonScheduleToMower|dateTime/ ) {
 
     CMD($hash,$setName,$setVal);
     return undef;
@@ -1353,7 +1355,7 @@ sub Set {
 
   }
   ##########
-  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,30,30,600,0,lin Park:selectnumbers,30,30,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret ";
+  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,30,30,600,0,lin Park:selectnumbers,30,30,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret dateTime:$tcorr ";
   $ret .= "mowerScheduleToAttribute:noArg sendScheduleFromAttributeToMower:noArg ";
   $ret .= "cuttingHeight:1,2,3,4,5,6,7,8,9 " if ( defined $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} );
   $ret .= "defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg chargingStationPositionToAttribute:noArg " if ( $hash->{helper}{mower}{attributes}{capabilities}{position} );
@@ -1412,7 +1414,6 @@ sub CMD {
 
   my $json = '';
   my $post = '';
-    
 
 my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nAuthorization: Bearer " . $token . "\r\nAuthorization-Provider: " . $provider . "\r\nContent-Type: application/vnd.api+json";
 
@@ -1429,6 +1430,7 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
   elsif ($cmd[0] eq "StartInWorkArea" && !$cmd[2])
                                        { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"workAreaId":'.$cmd[1].'}}}'; $post = 'actions' }
   elsif ($cmd[0] eq "headlight")       { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": {"mode": "'.$cmd[1].'"}}}}'; $post = 'settings' }
+  elsif ($cmd[0] eq "dateTime")        { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.int(time + $cmd[1] * 3600).'}}}'; $post = 'settings' }
   elsif ($cmd[0] eq "cuttingHeight")   { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.$cmd[1].'}}}'; $post = 'settings' }
   elsif ($cmd[0] eq "stayOutZone")     { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": '.$cmd[2].'}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
   elsif ($cmd[0] eq "confirmError")    { $json = '{}'; $post = 'errors/confirm' }

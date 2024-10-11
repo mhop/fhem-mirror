@@ -191,6 +191,10 @@ __END__
       <code>set &lt;name&gt; Start &lt;number of minutes&gt;</code><br>
       Starts immediately for &lt;number of minutes&gt;</li>
 
+    <li><a id='AutomowerConnect-set-dateTime'>dateTime</a><br>
+      <code>set &lt;name&gt; dateTime &lt;RTC and DST time corretion / h &gt;</code><br>
+      Syncronize the mower time. The proposal is for RTC = UTC and DST for CET(MEZ) </li>
+
     <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
       <code>set &lt;name&gt; confirmError</code><br>
       Testing: Confirm current error on the mower. Will only work if current error is considered confirmable by the mower. Available for models 405X, 415X, 435X AWD and 535 AWD. Also available on all Ceora, EPOS and NERA models.</li>
@@ -714,6 +718,10 @@ __END__
       <code>set &lt;name&gt; stayOutZone &lt;Id|name&gt; &lt;enable|disable&gt;</code><br>
       Testing: Schaltet stayOutZone ein oder aus, für die Id oder den Namen der Zone.<br>
       Der Zonenname darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
+
+    <li><a id='AutomowerConnect-set-dateTime'>dateTime</a><br>
+      <code>set &lt;name&gt; dateTime &lt;RTC and DST time corretion / h &gt;</code><br>
+      Synchronisiert die Zeit im Mäher. Der im Auswahlfeld vorgeschlagene Korrekturwert geht davon aus, dass die RTC auf UTC eingestellt ist und berücksichtigt DST für CET(MEZ).</li>
 
     <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
       <code>set &lt;name&gt; confirmError</code><br>

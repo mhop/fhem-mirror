@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 74_AutomowerConnect: new setter for synchronizing mower timestamp
  - bufgix:  72_FRITZBOX: kleinere Fehler bei zu alten FritzOS Versionen 
  - feature: 72_FRITZBOX: Neue Readings box_pwr_...
             Aktivierbar über Attribut enableBoxReadings
