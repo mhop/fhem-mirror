@@ -2,12 +2,13 @@
 ##############################################################################
 #
 #     59_Weather.pm
-#     (c) 2009-2023 Copyright by Dr. Boris Neubert
+#     (c) 2009-2024 Copyright by Dr. Boris Neubert
 #     e-mail: omega at online dot de
 #
 #       Contributors:
 #         - Marko Oldenburg (CoolTux)
 #         - Lippie
+#         - stefanru (wundergroundAPI)
 #
 #
 #     This file is part of fhem.

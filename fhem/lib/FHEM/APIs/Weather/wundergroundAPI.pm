@@ -15,9 +15,9 @@ return "$@" if ($@);
 return $ret if ($ret);
 $::packages{wundergroundAPI}{META} = $META;
 
-use version 0.77; our $VERSION = $META->{version};
+use version 0.80; our $VERSION = $META->{version};
 
-# use Data::Dumper;
+use Data::Dumper;
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -103,10 +103,11 @@ sub new {
             ? $argsRef->{apikey}
             : 'none'
         ),
-        lang      => $argsRef->{language},
-        lat       => ( split( ',', $argsRef->{location} ) )[0],
-        long      => ( split( ',', $argsRef->{location} ) )[1],
-        fetchTime => 0,
+        lang              => $argsRef->{language},
+        lat               => ( split( ',', $argsRef->{location} ) )[0],
+        long              => ( split( ',', $argsRef->{location} ) )[1],
+        fetchTime         => 0,
+        forecastFetchTime => 0,
     };
 
     $self->{cachemaxage} = (
@@ -210,29 +211,66 @@ sub _RetrieveDataFromWU {
     return 0 unless ( __PACKAGE__ eq caller(0) );
 
     my $self = shift;
-
-    # retrieve data from cache
-    if (    ( time() - $self->{fetchTime} ) < $self->{cachemaxage}
-        and $self->{cached}->{lat} == $self->{lat}
-        and $self->{cached}->{long} == $self->{long} )
-    {
-        return _CallWeatherCallbackFn($self);
-    }
+    my $paramRef;
+    my $options;
 
     $self->{cached}->{lat} = $self->{lat}
       unless ( $self->{cached}->{lat} == $self->{lat} );
     $self->{cached}->{long} = $self->{long}
       unless ( $self->{cached}->{long} == $self->{long} );
 
-    my $paramRef = {
-        timeout  => 15,
-        self     => $self,
-        callback => (
-            $self->{stationId}
-            ? \&_RetrieveDataFromPWS
-            : \&_RetrieveDataFinished
-        ),
-    };
+    # retrieve forecast data from cache
+    if (    ( time() - $self->{forecastFetchTime} ) < $self->{cachemaxage}
+        and $self->{cached}->{lat} == $self->{lat}
+        and $self->{cached}->{long} == $self->{long} )
+    {
+        # old: return _CallWeatherCallbackFn($self);
+        # Do not just return but get PWS data without forecast
+        $paramRef = {
+            timeout  => 15,
+            self     => $self,
+            callback => \&_RetrieveDataFinished,
+        };
+
+        #Build station URL
+        $options = 'stationId=' . $self->{stationId};
+        $options .= '&format=json';
+        $options .= '&units=' . $self->{units};
+        $options .= '&numericPrecision=decimal';
+        $options .= '&apiKey=' . $self->{key};
+
+        $paramRef->{url} = $URL . 'v2/pws/observations/current?' . $options;
+    }
+    else {
+        # Get the complete data station and forecast
+        $paramRef = {
+            timeout  => 15,
+            self     => $self,
+            callback => (
+                $self->{stationId}
+                ? \&_RetrieveDataFromPWS
+                : \&_RetrieveDataFinished
+            ),
+        };
+
+        # Build forecast URL
+        $options = 'geocode=' . $self->{lat} . ',' . $self->{long};
+        $options .= '&format=json';
+        $options .= '&units=' . $self->{units};
+        $options .= '&language='
+          . (
+            $self->{lang} eq 'en'
+            ? 'en-US'
+            : $self->{lang} . '-' . uc( $self->{lang} )
+          );
+        $options .= '&apiKey=' . $self->{key};
+
+        $paramRef->{url} =
+            $URL
+          . 'v3/wx/forecast/daily/'
+          . $self->{days} . 'day' . '?'
+          . $options;
+    }
 
     if (   $self->{lat} eq 'error'
         or $self->{long} eq 'error'
@@ -250,23 +288,6 @@ sub _RetrieveDataFromWU {
           if ( $self->{key} eq 'none' );
     }
     else {
-        my $options = 'geocode=' . $self->{lat} . ',' . $self->{long};
-        $options .= '&format=json';
-        $options .= '&units=' . $self->{units};
-        $options .= '&language='
-          . (
-            $self->{lang} eq 'en'
-            ? 'en-US'
-            : $self->{lang} . '-' . uc( $self->{lang} )
-          );
-        $options .= '&apiKey=' . $self->{key};
-
-        $paramRef->{url} =
-            $URL
-          . 'v3/wx/forecast/daily/'
-          . $self->{days} . 'day' . '?'
-          . $options;
-
         if ( lc( $self->{key} ) eq 'demo' ) {
             _RetrieveDataFinished( $paramRef, undef, 'DEMODATA' . $DEMODATA );
         }
@@ -352,10 +373,20 @@ sub _RetrieveDataFinished {
         $self->{cached}{status}   = 'ok';
         $self->{cached}{validity} = 'up-to-date';
         $self->{fetchTime}        = time();
+
+        #print Dumper $response; ## for debugging
+        #print Dumper $data;     ## for debugging
+        #if (exists( $response->{daily} )) {
+        if ( $response =~ /{"daily":/ ) {
+            $self->{forecastFetchTime} = time();
+        }
         _ProcessingRetrieveData( $self, $response );
     }
     else {
         $self->{fetchTime} = time() if ( not defined( $self->{fetchTime} ) );
+        $self->{forecastFetchTime} = time()
+          if ( not defined( $self->{forecastFetchTime} ) );
+
         _ErrorHandling( $self, $err );
         _ProcessingRetrieveData( $self, $response );
     }
@@ -389,12 +420,15 @@ sub _ProcessingRetrieveData {
             #         'Code: ' . $data->{code} . ' Error: ' . $data->{error} );
             # }
             else {
-                # print Dumper $response;    ## für Debugging
-                # print Dumper $data;    ## für Debugging
+                # print Dumper $response; ## for debugging
+                # print Dumper $data;     ## for debugging
 
                 $self->{cached}{current_date_time} =
                   _strftimeWrapper( "%a, %e %b %Y %H:%M",
                     localtime( $self->{fetchTime} ) );
+                $self->{cached}{current_forecast_date_time} =
+                  _strftimeWrapper( "%a, %e %b %Y %H:%M",
+                    localtime( $self->{forecastFetchTime} ) );
 
                 # $self->{cached}{timezone} = $data->{timezone};
                 $self->{cached}{license}{text} =
@@ -423,34 +457,22 @@ sub _ProcessingRetrieveData {
                     );
 
                     $self->{cached}{current} = {
-                        'dewPoint' =>
-                          int( sprintf( "%.1f", $data->{$unit}{dewpt} ) + 0.5 ),
-                        'heatIndex'   => $data->{$unit}{heatIndex},
+                        'dewPoint'  => sprintf( "%.1f", $data->{$unit}{dewpt} ),
+                        'heatIndex' => $data->{$unit}{heatIndex},
                         'precipRate'  => $data->{$unit}{precipRate},
                         'precipTotal' => $data->{$unit}{precipTotal},
-                        'pressure'    => int(
-                            sprintf( "%.1f", $data->{$unit}{pressure} ) + 0.5
-                        ),
+                        'pressure'    =>
+                          sprintf( "%.1f", $data->{$unit}{pressure} ),
                         'temperature' =>
-                          int( sprintf( "%.1f", $data->{$unit}{temp} ) + 0.5 ),
-                        'temp_c' =>
-                          int( sprintf( "%.1f", $data->{$unit}{temp} ) + 0.5 ),
-                        'wind_chill' => int(
-                            sprintf( "%.1f", ( $data->{$unit}{windChill} ) ) +
-                              0.5
-                        ),
-                        'windGust' => int(
-                            sprintf( "%.1f", ( $data->{$unit}{windGust} ) ) +
-                              0.5
-                        ),
-                        'wind' => int(
-                            sprintf( "%.1f", ( $data->{$unit}{windSpeed} ) ) +
-                              0.5
-                        ),
-                        'wind_speed' => int(
-                            sprintf( "%.1f", ( $data->{$unit}{windSpeed} ) ) +
-                              0.5
-                        ),
+                          sprintf( "%.1f", $data->{$unit}{temp} ),
+                        'temp_c'     => sprintf( "%.1f", $data->{$unit}{temp} ),
+                        'wind_chill' =>
+                          sprintf( "%.1f", $data->{$unit}{windChill} ),
+                        'windGust' =>
+                          sprintf( "%.1f", $data->{$unit}{windGust} ),
+                        'wind' => sprintf( "%.1f", $data->{$unit}{windSpeed} ),
+                        'wind_speed' =>
+                          sprintf( "%.1f", $data->{$unit}{windSpeed} ),
                         'wind_direction' => $data->{winddir},
                         'solarRadiation' => $data->{solarRadiation},
                         'uvIndex'        => $data->{uv},
@@ -742,7 +764,7 @@ sub _CallWeatherCallbackFn {
 
     my $self = shift;
 
-    #     ## Aufruf der callbackFn
+    ## Aufruf der callbackFn
     return FHEM::Core::Weather::RetrieveCallbackFn( $self->{devName} );
 }
 
@@ -754,6 +776,9 @@ sub _ErrorHandling {
 
     $self->{cached}{current_date_time} =
       _strftimeWrapper( "%a, %e %b %Y %H:%M", localtime( $self->{fetchTime} ) );
+    $self->{cached}{current_forecast_date_time} =
+      _strftimeWrapper( "%a, %e %b %Y %H:%M",
+        localtime( $self->{forecastFetchTime} ) );
     $self->{cached}{status}   = $err;
     $self->{cached}{validity} = 'stale';
 
@@ -815,7 +840,7 @@ sub _strftimeWrapper {
       "abstract": "Wetter API für Weather Underground"
     }
   },
-  "version": "v1.2.0",
+  "version": "v1.3.0",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
   ],
