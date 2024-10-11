@@ -156,6 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.36.0" => "11.10.2024  new Getter valInverter, preparation for multiple inverters ",
   "1.35.0" => "09.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
                            "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard ".
                            "scaling, __switchConsumer: run ___setConsumerSwitchingState before switch subs ".
@@ -433,6 +434,8 @@ my $tempbasedef    = 25;                                                        
 
 my $maxconsumer    = 16;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
 my $maxproducer    = 3;                                                             # maximale Anzahl der möglichen anderen Produzenten (Attribut)
+my $maxinverter    = 1;                                                             # maximale Anzahl der möglichen Inverter
+
 my $epiecMaxCycles = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
@@ -540,7 +543,6 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    ctrlLanguage ctrlNextDayForecastReadings ctrlShowLink ctrlSolCastAPImaxReq
                    ctrlSolCastAPIoptimizeReq ctrlStatisticReadings ctrlUserExitFn
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
-                   setupOtherProducer01 setupOtherProducer02 setupOtherProducer03
                    disable
                    flowGraphicSize flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer
                    flowGraphicShowConsumerDummy flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime
@@ -553,7 +555,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicStartHtml graphicEndHtml graphicWeatherColor graphicWeatherColorNight
-                   setupMeterDev setupBatteryDev setupInverterDev setupInverterStrings setupRadiationAPI setupStringPeak
+                   setupMeterDev setupBatteryDev setupInverterStrings setupRadiationAPI setupStringPeak
                    setupRoofTops
                  );
 
@@ -561,6 +563,11 @@ for my $cinit (1..$maxconsumer) {
   $cinit = sprintf "%02d", $cinit;
   push @aconfigs, "consumer${cinit}";                         # Anlagenkonfiguration: add Consumer Attribute
   push @dd,       "consumerSwitching${cinit}";                # ctrlDebug: add specific Consumer
+}
+
+for my $in (1..$maxinverter) {
+  $in = sprintf "%02d", $in;
+  push @aconfigs, "setupInverterDev${in}";                    # Anlagenkonfiguration: add Inverter Attribute
 }
 
 for my $prn (1..$maxproducer) {
@@ -614,6 +621,7 @@ my %hget = (                                                                # Ha
   html               => { fn => \&_gethtml,                     needcred => 0 },
   ftui               => { fn => \&_getftui,                     needcred => 0 },
   valCurrent         => { fn => \&_getlistCurrent,              needcred => 0 },
+  valInverter        => { fn => \&_getlistvalInverter,          needcred => 0 },
   valConsumerMaster  => { fn => \&_getlistvalConsumerMaster,    needcred => 0 },
   plantConfigCheck   => { fn => \&_setplantConfiguration,       needcred => 0 },
   pvHistory          => { fn => \&_getlistPVHistory,            needcred => 0 },
@@ -644,6 +652,11 @@ my %hattr = (                                                                # H
   setupRoofTops             => { fn => \&_attrRoofTops            },
 );
 
+  for my $in (1..$maxinverter) {
+      $in = sprintf "%02d", $in;
+      $hattr{'setupInverterDev'.$in}{fn} = \&_attrInverterDev;
+  }
+  
   for my $prn (1..$maxproducer) {
       $prn = sprintf "%02d", $prn;
       $hattr{'setupOtherProducer'.$prn}{fn} = \&_attrOtherProducer;
@@ -683,8 +696,8 @@ my %hqtxt = (                                                                   
               DE => qq{Bitte geben sie mindestens ein Wettervorhersage Device mit "attr LINK setupWeatherDev1" an}          },
   crd    => { EN => qq{Please select the radiation forecast service with "attr LINK setupRadiationAPI"},
               DE => qq{Bitte geben sie den Strahlungsvorhersage Dienst mit "attr LINK setupRadiationAPI" an}                },
-  cid    => { EN => qq{Please specify the Inverter device with "attr LINK setupInverterDev"},
-              DE => qq{Bitte geben sie das Wechselrichter Device mit "attr LINK setupInverterDev" an}                       },
+  cid    => { EN => qq{Please specify the Inverter device with "attr LINK setupInverterDev01"},
+              DE => qq{Bitte geben sie das Wechselrichter Device mit "attr LINK setupInverterDev01" an}                       },
   mid    => { EN => qq{Please specify the device for energy measurement with "attr LINK setupMeterDev"},
               DE => qq{Bitte geben sie das Device zur Energiemessung mit "attr LINK setupMeterDev" an}                      },
   ist    => { EN => qq{Please define all of your used string names with "attr LINK setupInverterStrings"},
@@ -1124,13 +1137,33 @@ my %hfspvh = (
   gfeedin           => { fn => \&_storeVal, storname => 'gfeedin',      validkey => undef,    fpar => 'comp99' },    # eingespeiste Energie
   con               => { fn => \&_storeVal, storname => 'con',          validkey => undef,    fpar => 'comp99' },    # realer Hausverbrauch Energie
   pvrl              => { fn => \&_storeVal, storname => 'pvrl',         validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag PV
-  pprl01            => { fn => \&_storeVal, storname => 'pprl01',       validkey => undef,    fpar => 'comp99' },    # realer Energieertrag sonstiger Erzeuger 01
-  pprl02            => { fn => \&_storeVal, storname => 'pprl02',       validkey => undef,    fpar => 'comp99' },    # realer Energieertrag sonstiger Erzeuger 02
-  pprl03            => { fn => \&_storeVal, storname => 'pprl03',       validkey => undef,    fpar => 'comp99' },    # realer Energieertrag sonstiger Erzeuger 03
-  etotalp01         => { fn => \&_storeVal, storname => 'etotalp01',    validkey => undef,    fpar => undef    },    # etotal sonstiger Erzeuger 01
-  etotalp02         => { fn => \&_storeVal, storname => 'etotalp02',    validkey => undef,    fpar => undef    },    # etotal sonstiger Erzeuger 02
-  etotalp03         => { fn => \&_storeVal, storname => 'etotalp03',    validkey => undef,    fpar => undef    },    # etotal sonstiger Erzeuger 03
 );
+
+  for my $in (1..$maxinverter) {
+      $in                           = sprintf "%02d", $in;
+      $hfspvh{'pvrl'.$in}{fn}       = \&_storeVal;                         # realer Energieertrag Inverter
+      $hfspvh{'pvrl'.$in}{storname} = 'pvrl'.$in;
+      $hfspvh{'pvrl'.$in}{validkey} = undef;
+      $hfspvh{'pvrl'.$in}{fpar}     = 'comp99';
+
+      $hfspvh{'etotali'.$in}{fn}       = \&_storeVal;                      # etotal Inverter
+      $hfspvh{'etotali'.$in}{storname} = 'etotali'.$in;
+      $hfspvh{'etotali'.$in}{validkey} = undef;
+      $hfspvh{'etotali'.$in}{fpar}     = undef;
+  }
+  
+  for my $pn (1..$maxproducer) {
+      $pn                           = sprintf "%02d", $pn;
+      $hfspvh{'pprl'.$pn}{fn}       = \&_storeVal;                         # realer Energieertrag sonstiger Erzeuger
+      $hfspvh{'pprl'.$pn}{storname} = 'pprl'.$pn;
+      $hfspvh{'pprl'.$pn}{validkey} = undef;
+      $hfspvh{'pprl'.$pn}{fpar}     = 'comp99';
+
+      $hfspvh{'etotalp'.$pn}{fn}       = \&_storeVal;                      # etotal sonstiger Erzeuger
+      $hfspvh{'etotalp'.$pn}{storname} = 'etotalp'.$pn;
+      $hfspvh{'etotalp'.$pn}{validkey} = undef;
+      $hfspvh{'etotalp'.$pn}{fpar}     = undef;
+  }
 
 
 # Information zu verwendeten internen Datenhashes
@@ -1140,6 +1173,7 @@ my %hfspvh = (
 # $data{$type}{$name}{pvhist}                                                    # historische Werte
 # $data{$type}{$name}{nexthours}                                                 # NextHours Werte
 # $data{$type}{$name}{consumers}                                                 # Consumer Hash
+# $data{$type}{$name}{inverters}                                                 # Inverter Hash
 # $data{$type}{$name}{strings}                                                   # Stringkonfiguration Hash
 # $data{$type}{$name}{solcastapi}                                                # Zwischenspeicher API-Daten
 # $data{$type}{$name}{aidectree}{object}                                         # AI Decision Tree Object
@@ -1161,13 +1195,18 @@ sub Initialize {
   my $srd = join ",", sort keys (%hcsr);
   my $gbc = 'pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,gridfeedin,feedincome';
 
-  my ($consumer, $setupprod, @allc);
+  my ($consumer, $setupprod, $setupinv, @allc);
   for my $c (1..$maxconsumer) {
       $c         = sprintf "%02d", $c;
       $consumer .= "consumer${c}:textField-long ";
       push @allc, $c;
   }
 
+  for my $in (1..$maxinverter) {
+      $in        = sprintf "%02d", $in;
+      $setupinv .= "setupInverterDev${in}:textField-long ";
+  }
+  
   for my $prn (1..$maxproducer) {
       $prn        = sprintf "%02d", $prn;
       $setupprod .= "setupOtherProducer${prn}:textField-long ";
@@ -1258,7 +1297,6 @@ sub Initialize {
                                 "graphicEndHtml ".
                                 "graphicWeatherColor:colorpicker,RGB ".
                                 "graphicWeatherColorNight:colorpicker,RGB ".
-                                "setupInverterDev:textField-long ".
                                 "setupInverterStrings ".
                                 "setupMeterDev:textField-long ".
                                 "setupWeatherDev1 ".
@@ -1268,6 +1306,7 @@ sub Initialize {
                                 "setupBatteryDev:textField-long ".
                                 "setupRadiationAPI ".
                                 "setupStringPeak ".
+                                $setupinv.
                                 $setupprod.
                                 $consumer.
                                 $readingFnAttributes;
@@ -1281,6 +1320,7 @@ sub Initialize {
                               "ctrlWeatherDev1"    => "setupWeatherDev1",            # 20.08.24
                               "ctrlWeatherDev2"    => "setupWeatherDev2",
                               "ctrlWeatherDev3"    => "setupWeatherDev3",
+                              "setupInverterDev"   => "setupInverterDev01",          # 11.10.24
                             };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -2425,13 +2465,16 @@ sub Get {
 
   my @pha  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{pvhist}};
   my @vcm  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{consumers}};
+  my @vin  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{inverters}};
 
   my $hol  = join ",", @ho;
   my $pvl  = join ",", @pha;
   my $cml  = join ",", @vcm;
+  my $inl  = join ",", @vin;
 
   my $getlist = "Unknown argument $opt, choose one of ".
                 "valConsumerMaster:#,$cml ".
+                "valInverter:#,$inl ".
                 "data:noArg ".
                 "dwdCatalog ".
                 "forecastQualities:noArg ".
@@ -4573,8 +4616,23 @@ sub _getlistvalConsumerMaster {
   my $arg   = $paref->{arg};
   my $hash  = $defs{$name};
 
-  my $ret = listDataPool   ($hash, 'consumer', $arg);
+  my $ret = listDataPool   ($hash, 'consumers', $arg);
   $ret   .= lineFromSpaces ($ret, 10);
+
+return $ret;
+}
+
+###############################################################
+#                       Getter valInverter
+###############################################################
+sub _getlistvalInverter {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $arg   = $paref->{arg};
+  my $hash  = $defs{$name};
+
+  my $ret = listDataPool   ($hash, 'inverters', $arg);
+  $ret   .= lineFromSpaces ($ret, 30);
 
 return $ret;
 }
@@ -5708,6 +5766,7 @@ sub _attrInverterDev {                   ## no critic "not used"
   return if(!$init_done);
 
   my $hash = $defs{$name};
+  my $in   = (split 'setupInverterDev', $aName)[1];
 
   if ($paref->{cmd} eq 'set') {
       my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
@@ -5725,13 +5784,16 @@ sub _attrInverterDev {                   ## no critic "not used"
   }
   elsif ($paref->{cmd} eq 'del') {
       readingsDelete    ($hash, "Current_PV");
-      deleteReadingspec ($hash, ".*_PVreal" );
       undef @{$data{$type}{$name}{current}{genslidereg}};
-      delete $data{$type}{$name}{circular}{99}{attrInvChangedTs};
+      
+      if ($in eq '01') {                                                        # wenn der letzte Inverter gelöscht wurde
+          deleteReadingspec ($hash, ".*_PVreal" );                               
+          delete $data{$type}{$name}{circular}{99}{attrInvChangedTs};
+      }
   }
   
-  delete $data{$type}{$name}{current}{invertercapi01};
-  delete $data{$type}{$name}{current}{iconi01};
+  delete $data{$type}{$name}{inverters}{$in}{invertercap};
+  delete $data{$type}{$name}{inverters}{$in}{iicon};
 
   InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
@@ -8175,7 +8237,7 @@ sub __calcPVestimates {
 
   $pvsum  = $peaksum if($peaksum && $pvsum > $peaksum);                                              # Vorhersage nicht größer als die Summe aller PV-Strings Peak
 
-  my $invcap = CurrentVal ($hash, 'invertercapi01', 0);                                              # Max. Leistung des Invertrs
+  my $invcap = InverterVal ($hash, '01', 'invertercap', 0);                                          # Max. Leistung des Invertrs
 
   if ($invcap && $pvsum > $invcap) {
       $pvsum = $invcap;                                                                              # PV Vorhersage auf WR Kapazität begrenzen
@@ -8373,87 +8435,107 @@ return;
 sub _transferInverterValues {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $t     = $paref->{t};                                                                    # aktuelle Unix-Zeit
+  my $type  = $paref->{type};
+  my $t     = $paref->{t};                                              # aktuelle Unix-Zeit
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
 
-  my $hash              = $defs{$name};
-  my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => 'setupInverterDev', method => 'attr' } );
-  return if($err);
+  my $hash         = $defs{$name};
+  my ($acu, $aln)  = isAutoCorrUsed ($name);
+  my $nhour        = $chour + 1;
+  my $warn         = '';
+  my $pvsum        = 0;                                                 # Summe aktuelle PV aller Inverter
+  my $ethishoursum = 0;                                                 # Summe Erzeugung akt. Stunde aller Inverter
+  
+  for my $in (1..$maxinverter) {
+      $in = sprintf "%02d", $in;
+      
+      my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
+      next if($err);
 
-  my $type = $paref->{type};
+      my ($pvread,$pvunit) = split ":", $h->{pv};                                                      # Readingname/Unit für aktuelle PV Erzeugung
+      my ($edread,$etunit) = split ":", $h->{etotal};                                                  # Readingname/Unit für Energie total (PV Erzeugung)
 
-  my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
-  my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
+      next if(!$pvread || !$edread);
 
-  return if(!$pvread || !$edread);
+      my $pvuf = $pvunit =~ /^kW$/xi ? 1000 : 1;
+      my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                             # aktuelle Erzeugung (W)
+      $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                                   # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
 
-  my $pvuf = $pvunit =~ /^kW$/xi ? 1000 : 1;
-  my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                        # aktuelle Erzeugung (W)
-  $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                              # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
+      my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
+      my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                           # Erzeugung total (Wh)
 
-  push @{$data{$type}{$name}{current}{genslidereg}}, $pv;                                     # Schieberegister PV Erzeugung
-  limitArray ($data{$type}{$name}{current}{genslidereg}, $slidenumdef);
+      my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'etotali'.$in, 0);               # etotal zu Beginn einer Stunde
+      
+      my ($ethishour, $etotsvd);
 
-  my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
-  my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                      # Erzeugung total (Wh)
+      if (!$histetot) {                                                                                # etotal der aktuelle Stunde gesetzt ?
+          writeToHistory ( { paref => $paref, key => 'etotali'.$in, val => $etotal, hour => $nhour } );
 
-  debugLog ($paref, "collectData", "collect Inverter data - device: $indev =>");
-  debugLog ($paref, "collectData", "pv: $pv W, etotal: $etotal Wh");
-
-  my $nhour    = $chour + 1;
-  my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'etotal', 0);               # etotal zu Beginn einer Stunde
-  my $warn     = '';
-  my ($ethishour, $etotsvd);
-
-  if (!$histetot) {                                                                           # etotal der aktuelle Stunde gesetzt ?
-      writeToHistory ( { paref => $paref, key => 'etotal', val => $etotal, hour => $nhour } );
-
-      $etotsvd   = CurrentVal ($hash, 'etotali01', $etotal);
-      $ethishour = int ($etotal - $etotsvd);
-  }
-  else {
-      $ethishour = int ($etotal - $histetot);
-      if (defined $h->{capacity} && $ethishour > 2 x $h->{capacity}) {                        # Schutz vor plötzlichem Anstieg von 0 auf mehr als doppelte WR-Kapazität
-          Log3 ($name, 1, "$name - WARNING - The generated PV of Inverter '$indev' is much more higher than inverter capacity. It seems to be a failure and Energy Total is reinitialized.");
-          $warn = ' (WARNING: too much generated PV was registered - see log file)';
-
-          writeToHistory ( { paref => $paref, key => 'etotal', val => $etotal, hour => $nhour } );
-
-          $etotsvd   = CurrentVal ($hash, 'etotali01', $etotal);
+          $etotsvd   = InverterVal ($hash, $in, 'ietotal', $etotal);
           $ethishour = int ($etotal - $etotsvd);
       }
-  }
+      else {
+          $ethishour = int ($etotal - $histetot);
+          
+          if (defined $h->{capacity} && $ethishour > 2 * $h->{capacity}) {                             # Schutz vor plötzlichem Anstieg von 0 auf mehr als doppelte WR-Kapazität
+              Log3 ($name, 1, "$name - WARNING - The generated PV of Inverter '$indev' is much more higher than inverter capacity. It seems to be a failure and Energy Total is reinitialized.");
+              $warn = ' (WARNING: too much generated PV was registered - see log file)';
 
-  $data{$type}{$name}{current}{generationi01}  = $pv;                                           # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-  $data{$type}{$name}{current}{etotali01}      = $etotal;                                       # aktuellen etotal des WR speichern
-  $data{$type}{$name}{current}{namei01}        = $indev;                                        # Name des Inverterdevices
-  $data{$type}{$name}{current}{invertercapi01} = $h->{capacity} if(defined $h->{capacity});     # optionale Angabe max. WR-Leistung
-  $data{$type}{$name}{current}{iconi01}        = $h->{icon}     if($h->{icon});                 # Icon des Inverters
+              writeToHistory ( { paref => $paref, key => 'etotali'.$in, val => $etotal, hour => $nhour } );
 
-  if ($ethishour < 0) {
-      $ethishour = 0;
-      my $vl     = 3;
-      my $pre    = '- WARNING -';
+              $etotsvd   = InverterVal ($hash, $in, 'ietotal', $etotal);
+              $ethishour = int ($etotal - $etotsvd);
+          }
+      }
+      
+      if ($ethishour < 0) {
+          $ethishour = 0;
+          my $vl     = 3;
+          my $pre    = '- WARNING -';
 
-      if ($paref->{debug} =~ /collectData/xs) {                                                 # V 1.23.0 Forum: https://forum.fhem.de/index.php?msg=1314453
-          $vl  = 1;
-          $pre = 'DEBUG> - WARNING -';
+          if ($paref->{debug} =~ /collectData/xs) {                                                 # V 1.23.0 Forum: https://forum.fhem.de/index.php?msg=1314453
+              $vl  = 1;
+              $pre = 'DEBUG> - WARNING -';
+          }
+
+          Log3 ($name, $vl, "$name $pre The Total Energy of Inverter '$indev' is lower than the value saved before. This situation is unexpected and the Energy generated of current hour of this inverter is set to '0'.");
+          $warn = ' (WARNING invalid real PV occured - see Logfile)';
       }
 
-      Log3 ($name, $vl, "$name $pre The Total Energy of Inverter '$indev' is lower than the value saved before. This situation is unexpected and the Energy generated of current hour is set to '0'.");
-      $warn = ' (WARNING invalid real PV occured - see Logfile)';
+      #$data{$type}{$name}{current}{generationi01}  = $pv;                                           # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      #$data{$type}{$name}{current}{etotali01}      = $etotal;                                       # aktuellen etotal des WR speichern
+      #$data{$type}{$name}{current}{namei01}        = $indev;                                        # Name des Inverterdevices
+      #$data{$type}{$name}{current}{invertercapi01} = $h->{capacity} if(defined $h->{capacity});     # optionale Angabe max. WR-Leistung
+      #$data{$type}{$name}{current}{iconi01}        = $h->{icon}     if($h->{icon});                 # Icon des Inverters
+      
+      $data{$type}{$name}{inverters}{$in}{igeneration} = $pv;                                          # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      $data{$type}{$name}{inverters}{$in}{ietotal}     = $etotal;                                      # aktuellen etotal des WR speichern
+      $data{$type}{$name}{inverters}{$in}{iname}       = $indev;                                       # Name des Inverterdevices
+      $data{$type}{$name}{inverters}{$in}{invertercap} = $h->{capacity} if(defined $h->{capacity});    # optionale Angabe max. WR-Leistung
+      $data{$type}{$name}{inverters}{$in}{iicon}       = $h->{icon}     if($h->{icon});                # Icon des Inverters
+
+      $pvsum        += $pv;
+      $ethishoursum += $ethishour;
+      
+      writeToHistory ( { paref => $paref, key => 'pvrl'.$in, val => $ethishour, hour => $nhour } );
+      
+      debugLog ($paref, "collectData", "collect Inverter $in data - device: $indev =>");
+      debugLog ($paref, "collectData", "pv: $pv W, etotal: $etotal Wh");
   }
-
-  storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PVreal', $ethishour.' Wh'.$warn);
-  storeReading ('Current_PV', $pv.' W');
   
-  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+  storeReading ('Current_PV', $pvsum.' W');
+  storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PVreal', $ethishoursum.' Wh'.$warn);
+  
+  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishoursum;                                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+  
+  push @{$data{$type}{$name}{current}{genslidereg}}, $pvsum;                                                     # Schieberegister PV Erzeugung
+  limitArray ($data{$type}{$name}{current}{genslidereg}, $slidenumdef);
 
-  my ($acu, $aln) = isAutoCorrUsed ($name);
+  writeToHistory ( { paref => $paref, key => 'pvrl', val => $ethishoursum, hour => $nhour, valid => $aln } );    # valid=1: beim Learning berücksichtigen, 0: nicht
 
-  writeToHistory ( { paref => $paref, key => 'pvrl', val => $ethishour, hour => $nhour, valid => $aln } );       # valid=1: beim Learning berücksichtigen, 0: nicht
-
+  debugLog ($paref, "collectData", "summary data of all Inverters - pv: $pvsum W, this hour Generation: $ethishoursum Wh");
+  
 return;
 }
 
@@ -8491,7 +8573,7 @@ sub _transferProducerValues {
       my $etu    = $etunit =~ /^kWh$/xi ? 1000 : 1;
       my $etotal = ReadingsNum ($prdev, $edread, 0) * $etu;                                                   # Erzeugung total (Wh)
 
-      debugLog ($paref, "collectData", "collect Producer$prn data - device: $prdev =>");
+      debugLog ($paref, "collectData", "collect Producer $prn data - device: $prdev =>");
       debugLog ($paref, "collectData", "pcurr: $p W, etotalp$prn: $etotal Wh");
 
       my $nhour    = $chour + 1;
@@ -9183,13 +9265,19 @@ sub _createSummaries {
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
   limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $slidenumdef);
 
-  my $gcon    = CurrentVal ($hash, 'gridconsumption',         0);                                       # aktueller Netzbezug
-  my $tconsum = CurrentVal ($hash, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
-  my $pvgen   = CurrentVal ($hash, 'generationi01',           0);
-  my $gfeedin = CurrentVal ($hash, 'gridfeedin',              0);
-  my $batin   = CurrentVal ($hash, 'powerbatin',              0);                                       # aktuelle Batterieladung
-  my $batout  = CurrentVal ($hash, 'powerbatout',             0);                                       # aktuelle Batterieentladung
+  my $gcon    = CurrentVal  ($hash, 'gridconsumption',         0);                                      # aktueller Netzbezug
+  my $tconsum = CurrentVal  ($hash, 'tomorrowconsumption', undef);                                      # Verbrauchsprognose für folgenden Tag
+  my $gfeedin = CurrentVal  ($hash, 'gridfeedin',              0);
+  my $batin   = CurrentVal  ($hash, 'powerbatin',              0);                                      # aktuelle Batterieladung
+  my $batout  = CurrentVal  ($hash, 'powerbatout',             0);                                      # aktuelle Batterieentladung
+  
+  my $pvgen   = 0;
 
+  for my $in (1..$maxinverter) {                                                                        # Summe alle Inverter
+      $in     = sprintf "%02d", $in;
+      $pvgen += InverterVal ($hash, $in, 'igeneration', 0);
+  }
+  
   my $othprod = 0;                                                                                      # Summe Otherproducer
 
   for my $prn (1..$maxproducer) {                                                                       # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
@@ -11171,7 +11259,7 @@ sub calcValueImproves {
   my $t     = $paref->{t};                                                            # aktuelle Unix-Zeit
 
   my $hash = $defs{$name};
-  my $idts = CircularVal ($hash, 99, "attrInvChangedTs", '');                         # Definitionstimestamp des Attr setupInverterDev
+  my $idts = CircularVal ($hash, 99, "attrInvChangedTs", '');                         # Definitionstimestamp des Attr setupInverterDev01
 
   return if(!$idts);
 
@@ -12080,7 +12168,7 @@ sub _checkSetupNotComplete {
   my $is    = AttrVal     ($name, 'setupInverterStrings',   undef);                       # String Konfig
   my $wedev = AttrVal     ($name, 'setupWeatherDev1',       undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
   my $radev = AttrVal     ($name, 'setupRadiationAPI',      undef);                       # Device Strahlungsdaten Vorhersage
-  my $indev = AttrVal     ($name, 'setupInverterDev',       undef);                       # Inverter Device
+  my $indev = AttrVal     ($name, 'setupInverterDev01',     undef);                       # Inverter Device
   my $medev = AttrVal     ($name, 'setupMeterDev',          undef);                       # Meter Device
   my $peaks = AttrVal     ($name, 'setupStringPeak',        undef);                       # String Peak
   my $maz   = ReadingsVal ($name, 'setupStringAzimuth',     undef);                       # Modulausrichtung Konfig (Azimut)
@@ -13974,7 +14062,6 @@ sub _flowGraphic {
   my $cgfi       = ReadingsNum ($name, 'Current_GridFeedIn',      0);
   my $csc        = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
-  my $cpv        = CurrentVal  ($hash, 'generationi01',           0);
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
@@ -13986,6 +14073,25 @@ sub _flowGraphic {
   my $ppcurr     = {};                                        # Hashref Producer current power
   my $cpcurr     = {};                                        # Hashref Consumer current power
 
+  ## definierte Inverter ermitteln und deren
+  ## aktuelle Leistung bestimmen
+  ############################################
+  my $invertercount = 0;
+  my $pvall         = 0;                                                       # Summe Erzeugung alle Inverter
+  my @inverters;
+
+  for my $in (1..$maxinverter) {
+      $in   = sprintf "%02d", $in;
+      my $p = InverterVal ($hash, $in, 'igeneration', 0);
+
+      if (defined $p) {
+          push @inverters, $in;
+          $ppcurr->{$in}  = $p;
+          $invertercount += 1;
+          $pvall         += $p;
+      }
+  }
+  
   ## definierte Producer ermitteln und deren
   ## aktuelle Leistung bestimmen
   ############################################
@@ -13993,12 +14099,12 @@ sub _flowGraphic {
   my $ppall         = 0;                                                       # Summe Erzeugung alle Poducer
   my @producers;
 
-  for my $i (1..$maxproducer) {
-      my $pn = sprintf "%02d", $i;
-      my $p  = CurrentVal ($hash, 'generationp'.$pn, undef);
+  for my $pn (1..$maxproducer) {
+      $pn   = sprintf "%02d", $pn;
+      my $p = CurrentVal ($hash, 'generationp'.$pn, undef);
 
       if (defined $p) {
-          push @producers, sprintf "%02d", $i;
+          push @producers, $pn;
           $ppcurr->{$pn}  = $p;
           $producercount += 1;
           $ppall         += $p;
@@ -14037,7 +14143,7 @@ sub _flowGraphic {
   my $cgc_direction = 'M490,515 L670,590';                                                     # Batterientladung ins Netz
 
   if ($batout) {                                                                               # Batterie wird entladen
-      my $cgfo = $cgfi - $cpv;
+      my $cgfo = $cgfi - $pvall;
 
       if ($cgfo > 1) {
           $cgc_style      = 'flowg active_out';
@@ -14050,7 +14156,7 @@ sub _flowGraphic {
   my $batout_direction = 'M902,515 L730,590';
 
   if ($batin) {                                                       # Batterie wird geladen
-      my $gbi = $batin - $cpv;
+      my $gbi = $batin - $pvall;
 
       if ($gbi > 1) {                                                 # Batterieladung anteilig aus Hausnetz geladen
           $batin            -= $gbi;
@@ -14063,7 +14169,7 @@ sub _flowGraphic {
   ## Werte / SteuerungVars anpassen
   ###################################
   $flowgcons  = 0 if(!$consumercount);                                # Consumer Anzeige ausschalten wenn keine Consumer definiert
-  $flowgprods = 0 if(!$producercount);                                # Producer Anzeige ausschalten wenn keine Producer definiert
+  $flowgprods = 0 if(!$producercount && !$invertercount);             # Producer Anzeige ausschalten wenn keine Producer / Inverter definiert
   my $p2home  = sprintf "%.1f", ($csc + $ppall);                      # Energiefluß von Sonne zum Haus: Selbstverbrauch + alle Producer
   $p2home     = sprintf "%.0f", $p2home if($p2home > 10);
   $p2home     = 0 if($p2home == 0);                                   # 0.0 eliminieren wenn keine Leistung zum Haus
@@ -14111,12 +14217,12 @@ END0
 
       $pos_left = $producer_start + 25;
 
-      for my $prnxnum (@producers) {
-          my $palias  = CurrentVal ($hash, 'aliasp'.$prnxnum, 'namep'.$prnxnum);
+      for my $prn (@producers) {
+          my $palias  = CurrentVal ($hash, 'aliasp'.$prn, 'namep'.$prn);
           my ($picon) = __substituteIcon ( { hash  => $hash,                                    # Icon des Producerdevices
                                              name  => $name,
-                                             pn    => $prnxnum,
-                                             pcurr => $ppcurr->{$prnxnum},
+                                             pn    => $prn,
+                                             pcurr => $ppcurr->{$prn},
                                              lang  => $lang
                                            }
                                          );
@@ -14124,13 +14230,31 @@ END0
           $picon           = FW_makeImage    ($picon, '');
           ($scale, $picon) = __normIconScale ($picon, $name);
           
-          $ret .= qq{<g id="producer_$prnxnum" fill="grey" transform="translate($pos_left,0),scale($scale)">};
+          $ret .= qq{<g id="producer_$prn" fill="grey" transform="translate($pos_left,0),scale($scale)">};
           $ret .= "<title>$palias</title>".$picon;
           $ret .= '</g> ';
 
           $pos_left += $consDist;
       }
   }
+  
+  ## Inverter Icon
+  ######################                                                 
+  my ($iicon, $smtxt) = __substituteIcon ( { hash  => $hash,
+                                             name  => $name,
+                                             in    => '01',
+                                             don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
+                                             pcurr => $pvall,
+                                             lang  => $lang
+                                            }
+                                          );
+  
+  $iicon           = FW_makeImage    ($iicon, '');
+  ($scale, $iicon) = __normIconScale ($iicon, $name);
+  
+  $ret .= qq{<g id="Inverter" transform="translate(360,165),scale($scale)">};                                # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= "<title>$smtxt</title>".$iicon;
+  $ret .= '</g> ';
 
   ## Consumer Liste und Icons in Grafik anzeigen
   ###############################################
@@ -14171,24 +14295,6 @@ END0
       }
   }
   
-  ## Inverter Icon
-  ######################                                                 
-  my ($iicon, $smtxt) = __substituteIcon ( { hash  => $hash,
-                                             name  => $name,
-                                             in    => '01',
-                                             don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
-                                             pcurr => $cpv,
-                                             lang  => $lang
-                                            }
-                                          );
-  
-  $iicon           = FW_makeImage    ($iicon, '');
-  ($scale, $iicon) = __normIconScale ($iicon, $name);
-  
-  $ret .= qq{<g id="Inverter" transform="translate(360,165),scale($scale)">};                                # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
-  $ret .= "<title>$smtxt</title>".$iicon;
-  $ret .= '</g> ';
-
   ## Batterie Icon
   ##################
   if ($hasbat) {                                                                                   
@@ -14277,8 +14383,8 @@ END3
           $pos_left_start_con = 700 - ((($distance_con ) / 2) * ($producercount-1));
       }
 
-      for my $prnxnum (@producers) {
-          my $p              = $ppcurr->{$prnxnum};
+      for my $prn (@producers) {
+          my $p              = $ppcurr->{$prn};
           my $consumer_style = 'flowg inactive_out';
              $consumer_style = 'flowg active_out' if($p > 0);
           my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
@@ -14288,7 +14394,7 @@ END3
               $chain_color  = 'style="stroke: darkorange;"';
           }
 
-          $ret                .= qq{<path id="genproducer_$prnxnum " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_con,200" />};   # Design Consumer Laufkette
+          $ret                .= qq{<path id="genproducer_$prn " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_con,200" />};   # Design Consumer Laufkette
           $pos_left           += ($consDist * 2);
           $pos_left_start_con += $distance_con;
       }
@@ -14337,7 +14443,7 @@ END3
   ## Textangaben an Grafikelementen
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
-  $ret .= qq{<text class="flowg text" id="pv-txt"        x="800"  y="320" style="text-anchor: start;">$cpv</text>}        if ($cpv);
+  $ret .= qq{<text class="flowg text" id="pv-txt"        x="800"  y="320" style="text-anchor: start;">$pvall</text>}      if ($pvall);
   $ret .= qq{<text class="flowg text" id="bat-txt"       x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
   $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730"  y="520" style="text-anchor: start;">$p2home</text>}     if ($p2home);
   $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525"  y="420" style="text-anchor: end;">$cgfi</text>}         if ($cgfi);
@@ -14354,8 +14460,8 @@ END3
   if ($flowgprods) {
       $pos_left = ($producer_start * 2) - 50;                                                         # -XX -> Start Lage producer Beschriftung
 
-      for my $prnxnum (@producers) {
-          $currentPower = sprintf "%.2f", $ppcurr->{$prnxnum};
+      for my $prn (@producers) {
+          $currentPower = sprintf "%.2f", $ppcurr->{$prn};
           $currentPower = sprintf "%.0f", $currentPower if($currentPower > 10);
           $currentPower = 0 if(1 * $currentPower == 0);
           $lcp          = length $currentPower;
@@ -14368,7 +14474,7 @@ END3
           elsif ($lcp == 2) {$pos_left += 20}
           elsif ($lcp == 1) {$pos_left += 40}
 
-          $ret .= qq{<text class="flowg text" id="producer-txt_$prnxnum" x="$pos_left" y="80">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
+          $ret .= qq{<text class="flowg text" id="producer-txt_$prn" x="$pos_left" y="80">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
 
           # Leistungszahl wieder zurück an den Ursprungspunkt
           ####################################################          
@@ -14468,7 +14574,7 @@ sub __substituteIcon {
       }      
   }
   elsif ($in) {                                                                        # Inverter, Smartloader
-      my ($iday, $inight) = split ':', CurrentVal ($hash, 'iconi'.$in, $invicondef);
+      my ($iday, $inight) = split ':', InverterVal ($hash, $in, 'iicon', $invicondef);
       
       if ($don || $pcurr) {                                                            # Tag -> eigenes Icon oder Standard
           $iday           = $iday ? $iday : $invicondef;
@@ -15581,12 +15687,6 @@ sub listDataPool {
           my $don     = HistoryVal ($hash, $day, $key, 'DoN',         '-');
           my $conprc  = HistoryVal ($hash, $day, $key, 'conprice',    '-');
           my $feedprc = HistoryVal ($hash, $day, $key, 'feedprice',   '-');
-          my $etotp01 = HistoryVal ($hash, $day, $key, 'etotalp01',   '-');
-          my $etotp02 = HistoryVal ($hash, $day, $key, 'etotalp02',   '-');
-          my $etotp03 = HistoryVal ($hash, $day, $key, 'etotalp03',   '-');
-          my $pprl01  = HistoryVal ($hash, $day, $key, 'pprl01',      '-');
-          my $pprl02  = HistoryVal ($hash, $day, $key, 'pprl02',      '-');
-          my $pprl03  = HistoryVal ($hash, $day, $key, 'pprl03',      '-');
 
           if ($export eq 'csv') {
               $hexp->{$day}{$key}{PVreal}             = $pvrl;
@@ -15603,7 +15703,6 @@ sub listDataPool {
               $hexp->{$day}{$key}{PVCorrectionFactor} = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
               $hexp->{$day}{$key}{Quality}            = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
               $hexp->{$day}{$key}{DayName}            = $dayname // '';
-              $hexp->{$day}{$key}{Etotal}             = $etotal;
               $hexp->{$day}{$key}{BatteryInTotal}     = $btotin;
               $hexp->{$day}{$key}{BatteryIn}          = $batin;
               $hexp->{$day}{$key}{BatteryOutTotal}    = $btotout;
@@ -15616,12 +15715,6 @@ sub listDataPool {
               $hexp->{$day}{$key}{DayOrNight}         = $don;
               $hexp->{$day}{$key}{PurchasePrice}      = $conprc;
               $hexp->{$day}{$key}{FeedInPrice}        = $feedprc;
-              $hexp->{$day}{$key}{etotalp01}          = $etotp01;
-              $hexp->{$day}{$key}{etotalp02}          = $etotp02;
-              $hexp->{$day}{$key}{etotalp03}          = $etotp03;
-              $hexp->{$day}{$key}{pprl01}             = $pprl01;
-              $hexp->{$day}{$key}{pprl02}             = $pprl02;
-              $hexp->{$day}{$key}{pprl03}             = $pprl03;
           }
 
           $ret .= "\n      " if($ret);
@@ -15629,10 +15722,61 @@ sub listDataPool {
           $ret .= "etotal: $etotal, " if($key ne '99');
           $ret .= "pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
           $ret .= "\n            ";
-          $ret .= "etotalp01: $etotp01, etotalp02: $etotp02, etotalp03: $etotp03" if($key ne '99');
-          $ret .= "\n            "    if($key ne '99');
-          $ret .= "pprl01: $pprl01, pprl02: $pprl02, pprl03: $pprl03";
-          $ret .= "\n            ";
+          
+          my ($inve, $invl);
+          for my $in (1..$maxinverter) {                                          # + alle Inverter
+              $in       = sprintf "%02d", $in;
+              my $etoti = HistoryVal ($hash, $day, $key, 'etotali'.$in, '-');
+              my $pvrli = HistoryVal ($hash, $day, $key, 'pvrl'.$in,    '-');
+              
+              if ($export eq 'csv') {
+                  $hexp->{$day}{$key}{"Etotal${in}"} = $etoti;
+                  $hexp->{$day}{$key}{"PVreal${in}"} = $pvrli;
+              }
+              
+              if (defined $etoti) {
+                  $inve .= ', ' if($inve);
+                  $inve .= "etotali${in}: $etoti";
+              }
+              
+              if (defined $pvrli) {
+                  $invl .= ', ' if($invl);
+                  $invl .= "pvrl${in}: $pvrli";
+              }
+          }
+          
+          $ret .= $inve            if($inve && $key ne '99');
+          $ret .= "\n            " if($inve && $key ne '99');
+          $ret .= $invl            if($invl);
+          $ret .= "\n            " if($invl); 
+
+          my ($prde, $prdl);
+          for my $pn (1..$maxproducer) {                                              # + alle Producer
+              $pn       = sprintf "%02d", $pn;
+              my $etotp = HistoryVal ($hash, $day, $key, 'etotalp'.$pn, '-');
+              my $pprl  = HistoryVal ($hash, $day, $key, 'pprl'.$pn,    '-');
+              
+              if ($export eq 'csv') {
+                  $hexp->{$day}{$key}{"Etotal${pn}"} = $etotp;
+                  $hexp->{$day}{$key}{"PPreal${pn}"} = $pprl;
+              }
+              
+              if (defined $etotp) {
+                  $prde .= ', ' if($prde);
+                  $prde .= "etotalp${pn}: $etotp";
+              }
+              
+              if (defined $pprl) {
+                  $prdl .= ', ' if($prdl);
+                  $prdl .= "pprl${pn}: $pprl";
+              }
+          }
+          
+          $ret .= $prde            if($prde && $key ne '99');
+          $ret .= "\n            " if($prde && $key ne '99');
+          $ret .= $prdl            if($prdl);
+          $ret .= "\n            " if($prdl);          
+          
           $ret .= "confc: $confc, con: $con, gcons: $gcons, conprice: $conprc";
           $ret .= "\n            ";
           $ret .= "gfeedin: $gfeedin, feedprice: $feedprc";
@@ -15656,7 +15800,7 @@ sub listDataPool {
           $ret .= "dayname: $dayname, " if($dayname);
 
           my $csm;
-          for my $c (1..$maxconsumer) {
+          for my $c (1..$maxconsumer) {                                                      # + alle Consumer
               $c       = sprintf "%02d", $c;
               my $nl   = 0;
               my $csmc = HistoryVal ($hash, $day, $key, "cyclescsm${c}",      undef);
@@ -15748,16 +15892,21 @@ sub listDataPool {
       }
   }
 
-  if ($htol eq "consumer") {
-      $h = $data{$type}{$name}{consumers};
+  if ($htol =~ /consumers|inverters/xs) {
+      my $sub = $htol eq 'consumers' ? \&ConsumerVal :
+                $htol eq 'inverters' ? \&InverterVal :
+                '';
+      
+      $h = $data{$type}{$name}{$htol};
+      
       if (!keys %{$h}) {
-          return qq{Consumer cache is empty.};
+          return ucfirst($htol).qq{ cache is empty.};
       }
 
       for my $i (keys %{$h}) {
-          if ($i !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige consumer, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
-              delete $data{$type}{$name}{consumers}{$i};
-              Log3 ($name, 2, qq{$name - INFO - invalid consumer key "$i" was deleted from consumer storage});
+          if ($i !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige Position, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
+              delete $data{$type}{$name}{$htol}{$i};
+              Log3 ($name, 2, qq{$name - INFO - invalid key "$i" was deleted from }.ucfirst($htol).qq{ storage});
           }
       }
 
@@ -15775,7 +15924,7 @@ sub listDataPool {
                   $cret .= $ckey." => ".$hk."\n      ";
               }
               else {
-                  $cret .= $ckey." => ".ConsumerVal ($hash, $idx, $ckey, "")."\n      ";
+                  $cret .= $ckey." => ". &{$sub} ($hash, $idx, $ckey, "")."\n      ";
               }
           }
 
@@ -17026,10 +17175,6 @@ sub createAssociatedWith {
       ($ara,$h) = parseParams ($radev);
       $radev    = $ara->[0] // "";
 
-      my $indev = AttrVal ($name, 'setupInverterDev', '');                   # Inverter Device
-      ($ain,$h) = parseParams ($indev);
-      $indev    = $ain->[0] // "";
-
       my $medev = AttrVal ($name, 'setupMeterDev', '');                      # Meter Device
       ($ame,$h) = parseParams ($medev);
       $medev    = $ame->[0] // "";
@@ -17053,15 +17198,21 @@ sub createAssociatedWith {
       push @nd, $fcdev2 if($fcdev2 && $fcdev2 !~ /-API/xs);
       push @nd, $fcdev3 if($fcdev3 && $fcdev3 !~ /-API/xs);
       push @nd, $radev  if($radev  && $radev  !~ /-API/xs);
-      push @nd, $indev;
       push @nd, $medev;
       push @nd, $badev;
 
-      for my $prn (1..$maxproducer) {
+      for my $prn (1..$maxproducer) {                                       # Producer Devices
           $prn      = sprintf "%02d", $prn;
           my $pdc   = AttrVal ($name, "setupOtherProducer${prn}", "");
           my ($prd) = parseParams ($pdc);
           push @nd, $prd->[0] if($prd->[0]);
+      }
+      
+      for my $in (1..$maxinverter) {                                        # Inverter Devices
+          $in      = sprintf "%02d", $in;
+          my $inc   = AttrVal ($name, "setupInverterDev${in}", "");
+          my ($ind) = parseParams ($inc);
+          push @nd, $ind->[0] if($ind->[0]);
       }
 
       my @ndn = ();
@@ -18675,8 +18826,7 @@ return $def;
 # Usage:
 # CurrentVal ($hash, $key, $def)
 #
-# $key: generationiXX        - aktuelle PV Erzeugung Inverter XX
-#       generationpXX        - aktuelle Erzeugung Producer XX
+# $key: generationpXX        - aktuelle Erzeugung Producer XX
 #       aiinitstate          - Initialisierungsstatus der KI
 #       aitrainstate         - Traisningsstatus der KI
 #       aiaddistate          - Add Instanz Status der KI
@@ -18698,7 +18848,6 @@ return $def;
 #       temp                 - aktuelle Außentemperatur
 #       surplus              - aktueller PV Überschuß
 #       tomorrowconsumption  - Verbrauch des kommenden Tages
-#       invertercapXX        - Bemessungsleistung der Wechselrichters XX (max. W)
 #       allstringspeak       - Peakleistung aller Strings nach temperaturabhängiger Korrektur
 #       allstringscount      - aktuelle Anzahl der Anlagenstrings
 #       tomorrowconsumption  - erwarteter Gesamtverbrauch am morgigen Tag
@@ -18898,6 +19047,39 @@ sub ConsumerVal {
 return $def;
 }
 
+###################################################################################################
+# Wert des Inverter-Hash zurückliefern
+# Usage:
+# InverterVal ($hash, $in, $key, $def)
+#
+# $in:  Inverter Nummer (01,02,03,...)
+# $key: etotal             - Stand etotal des WR
+#       generation         - aktuelle PV Erzeugung Inverter
+#       invertercap        - Bemessungsleistung der Wechselrichters (max. W)
+#       name               - Name des Inverterdevices
+#       icon               - Icon des Inverters
+#
+# $def: Defaultwert
+#
+###################################################################################################
+sub InverterVal {
+  my $hash = shift;
+  my $in   = shift;
+  my $key  = shift;
+  my $def  = shift;
+
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+
+  if (defined($data{$type}{$name}{inverters})             &&
+      defined($data{$type}{$name}{inverters}{$in}{$key})  &&
+      defined($data{$type}{$name}{inverters}{$in}{$key})) {
+      return  $data{$type}{$name}{inverters}{$in}{$key};
+  }
+
+return $def;
+}
+
 ##########################################################################################################################################################
 # Wert des solcastapi-Hash zurückliefern
 # Usage:
@@ -19020,7 +19202,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>setupWeatherDevX</b>       </td><td>DWD_OpenData Device which provides meteorological data (e.g. cloud cover)     </td></tr>
             <tr><td> <b>setupRadiationAPI </b>     </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
-            <tr><td> <b>setupInverterDev</b>       </td><td>Device which provides PV performance data                                     </td></tr>
+            <tr><td> <b>setupInverterDevXX</b>     </td><td>Device which provides PV performance data                                     </td></tr>
             <tr><td> <b>setupMeterDev</b>          </td><td>Device which supplies network I/O data                                        </td></tr>
             <tr><td> <b>setupBatteryDev</b>        </td><td>Device which provides battery performance data (if available)                 </td></tr>
             <tr><td> <b>setupInverterStrings</b>   </td><td>Identifier of the existing plant strings                                      </td></tr>
@@ -20944,9 +21126,9 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-setupInverterDev"></a>
-       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; 
-                               [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
+       <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
+       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; 
+                                 [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
        Specifies any Device and its Readings to deliver the current PV generation values.
        It can also be a dummy device with appropriate readings.
@@ -20974,7 +21156,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
+         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
        </ul>
        <br>
 
@@ -21363,7 +21545,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>setupWeatherDevX</b>       </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
             <tr><td> <b>setupRadiationAPI </b>     </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
-            <tr><td> <b>setupInverterDev</b>       </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
+            <tr><td> <b>setupInverterDevXX</b>     </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
             <tr><td> <b>setupMeterDev</b>          </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
             <tr><td> <b>setupBatteryDev</b>        </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
             <tr><td> <b>setupInverterStrings</b>   </td><td>Bezeichner der vorhandenen Anlagenstrings                                      </td></tr>
@@ -23295,9 +23477,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-setupInverterDev"></a>
-       <li><b>setupInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
-                              [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
+       <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
+       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
+                                 [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
        Legt ein beliebiges Device und dessen Readings zur Lieferung der aktuellen PV Erzeugungswerte fest.
        Es kann auch ein Dummy Device mit entsprechenden Readings sein.
@@ -23325,7 +23507,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
+         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
        </ul>
        <br>
 
