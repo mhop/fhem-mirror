@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin.
 #
-#  (c) 2017-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2017-2025 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #  Special thanks goes to:
@@ -39,7 +39,8 @@ package FHEM::XiaomiBTLESens;
 
 use strict;
 use warnings;
-use experimental qw /switch/;
+
+# use experimental qw /switch/;  deprecated
 
 use POSIX;
 use FHEM::Meta;
@@ -279,76 +280,71 @@ sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
 
-    given ($attrName) {
-        when ('disable') {
-            if ( $cmd eq 'set' && $attrVal == 1 ) {
-                RemoveInternalTimer($hash);
-
-                readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
-                Log3( $name, 3, "XiaomiBTLESens ($name) - disabled" );
-            }
-
-            elsif ( $cmd eq 'del' ) {
-                Log3( $name, 3, "XiaomiBTLESens ($name) - enabled" );
-            }
-        }
-        when ('disabledForIntervals') {
-            if ( $cmd eq 'set' ) {
-                ## no critic (Only use a capturing group if you plan to use the captured value)
-                return
-'check disabledForIntervals Syntax HH:MM-HH:MM or HH:MM-HH:MM HH:MM-HH:MM ...'
-                  if ( $attrVal !~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/x );
-                ## use critic
-                Log3( $name, 3,
-                    "XiaomiBTLESens ($name) - disabledForIntervals" );
-                stateRequest($hash);
-            }
-
-            elsif ( $cmd eq 'del' ) {
-                Log3( $name, 3, "XiaomiBTLESens ($name) - enabled" );
-                readingsSingleUpdate( $hash, 'state', 'active', 1 );
-            }
-        }
-
-        when ('interval') {
+    if ( $attrName eq 'disable' ) {
+        if ( $cmd eq 'set' && $attrVal == 1 ) {
             RemoveInternalTimer($hash);
 
-            if ( $cmd eq 'set' ) {
-                if ( $attrVal < 120 ) {
-                    Log3( $name, 3,
-"XiaomiBTLESens ($name) - interval too small, please use something >= 120 (sec), default is 300 (sec)"
-                    );
-                    return
-'interval too small, please use something >= 120 (sec), default is 300 (sec)';
-                }
-                else {
-                    $hash->{INTERVAL} = $attrVal;
-                    Log3( $name, 3,
-                        "XiaomiBTLESens ($name) - set interval to $attrVal" );
-                }
-            }
+            readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
+            Log3( $name, 3, "XiaomiBTLESens ($name) - disabled" );
+        }
 
-            elsif ( $cmd eq 'del' ) {
-                $hash->{INTERVAL} = 300;
+        elsif ( $cmd eq 'del' ) {
+            Log3( $name, 3, "XiaomiBTLESens ($name) - enabled" );
+        }
+    }
+    elsif ( $attrName eq 'disabledForIntervals' ) {
+        if ( $cmd eq 'set' ) {
+            ## no critic (Only use a capturing group if you plan to use the captured value)
+            return
+'check disabledForIntervals Syntax HH:MM-HH:MM or HH:MM-HH:MM HH:MM-HH:MM ...'
+              if ( $attrVal !~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/x );
+            ## use critic
+            Log3( $name, 3, "XiaomiBTLESens ($name) - disabledForIntervals" );
+            stateRequest($hash);
+        }
+
+        elsif ( $cmd eq 'del' ) {
+            Log3( $name, 3, "XiaomiBTLESens ($name) - enabled" );
+            readingsSingleUpdate( $hash, 'state', 'active', 1 );
+        }
+    }
+    elsif ( $attrName eq 'interval' ) {
+        RemoveInternalTimer($hash);
+
+        if ( $cmd eq 'set' ) {
+            if ( $attrVal < 120 ) {
                 Log3( $name, 3,
-                    "XiaomiBTLESens ($name) - set interval to default" );
+"XiaomiBTLESens ($name) - interval too small, please use something >= 120 (sec), default is 300 (sec)"
+                );
+                return
+'interval too small, please use something >= 120 (sec), default is 300 (sec)';
+            }
+            else {
+                $hash->{INTERVAL} = $attrVal;
+                Log3( $name, 3,
+                    "XiaomiBTLESens ($name) - set interval to $attrVal" );
             }
         }
 
-        when ('blockingCallLoglevel') {
-            if ( $cmd eq 'set' ) {
-                $hash->{loglevel} = $attrVal;
-                Log3( $name, 3,
-"XiaomiBTLESens ($name) - set blockingCallLoglevel to $attrVal"
-                );
-            }
+        elsif ( $cmd eq 'del' ) {
+            $hash->{INTERVAL} = 300;
+            Log3( $name, 3,
+                "XiaomiBTLESens ($name) - set interval to default" );
+        }
+    }
+    elsif ( $attrName eq 'blockingCallLoglevel' ) {
+        if ( $cmd eq 'set' ) {
+            $hash->{loglevel} = $attrVal;
+            Log3( $name, 3,
+                "XiaomiBTLESens ($name) - set blockingCallLoglevel to $attrVal"
+            );
+        }
 
-            elsif ( $cmd eq 'del' ) {
-                $hash->{loglevel} = 4;
-                Log3( $name, 3,
-"XiaomiBTLESens ($name) - set blockingCallLoglevel to default"
-                );
-            }
+        elsif ( $cmd eq 'del' ) {
+            $hash->{loglevel} = 4;
+            Log3( $name, 3,
+                "XiaomiBTLESens ($name) - set blockingCallLoglevel to default"
+            );
         }
     }
 
@@ -400,7 +396,8 @@ sub Notify {
       if (
         (
                AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
-            || AttrVal( $name, 'model', 'mijiaLYWSD03MMC' ) eq 'mijiaLYWSD03MMC'
+            || AttrVal( $name, 'model', 'mijiaLYWSD03MMC' ) eq
+            'mijiaLYWSD03MMC'
         )
         && $devname eq $name
         && grep { /^$name.firmware.+/x } @{$events}
@@ -427,8 +424,9 @@ sub stateRequest {
               if (
                 CallBattery_IsUpdateTimeAgeToOld(
                     $hash,
-                    $CallBatteryAge{ AttrVal( $name, 'BatteryFirmwareAge',
-                            '24h' ) }
+                    $CallBatteryAge{
+                        AttrVal( $name, 'BatteryFirmwareAge', '24h' )
+                    }
                 )
               );
 
@@ -506,13 +504,15 @@ sub Set {
     if ( $cmd eq 'devicename' ) {
         return 'usage: devicename <name>' if ( scalar( @{$arg_ref} ) < 1 );
 
-        $mod    = 'write';
-        $handle = $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename};
-        $value  = CreateDevicenameHEX( makeDeviceName( $arg_ref->[0] ) );
+        $mod = 'write';
+        $handle =
+          $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename};
+        $value = CreateDevicenameHEX( makeDeviceName( $arg_ref->[0] ) );
 
     }
     elsif ( $cmd eq 'resetBatteryTimestamp' ) {
-        return 'usage: resetBatteryTimestamp' if ( scalar( @{$arg_ref} ) != 0 );
+        return 'usage: resetBatteryTimestamp'
+          if ( scalar( @{$arg_ref} ) != 0 );
 
         $hash->{helper}{updateTimeCallBattery} = 0;
         return;
@@ -567,8 +567,9 @@ sub Get {
     elsif ( $cmd eq 'devicename' ) {
         return "usage: devicename" if ( scalar( @{$arg_ref} ) != 0 );
 
-        $mod    = 'read';
-        $handle = $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename};
+        $mod = 'read';
+        $handle =
+          $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename};
 
     }
     else {
@@ -748,7 +749,8 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
               if ( !defined( $gtResult[0] ) );
 
             $loop++;
-        } while ( $loop < 5 && ( $returnCode != 0 && $returnCode != 124 ) );
+          } while ( $loop < 5
+            && ( $returnCode != 0 && $returnCode != 124 ) );
         Log3( $name, 3,
 "XiaomiBTLESens ($name) - ExecGatttool_Run: errorcode: \"$returnCode\", ErrorString: \"$returnString\""
         ) if ( $returnCode != 0 && $returnCode != 124 );
@@ -903,120 +905,111 @@ sub ProcessingNotification {
 
     }
     elsif ( AttrVal( $name, 'model', 'none' ) eq 'thermoHygroSens' ) {
-        given ($handle) {
-            when ('0x18') {
-                ### Thermo/Hygro Sens - Read Battery Data
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x18"
-                );
+        if ( $handle eq '0x18' ) {
+            ### Thermo/Hygro Sens - Read Battery Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x18"
+            );
 
-                $readings = ThermoHygroSensHandle0x18( $hash, $notification );
-            }
-            when ('0x10') {
-                ### Thermo/Hygro Sens - Read Sensor Data
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x10"
-                );
+            $readings = ThermoHygroSensHandle0x18( $hash, $notification );
+        }
+        elsif ( $handle eq '0x10' ) {
+            ### Thermo/Hygro Sens - Read Sensor Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x10"
+            );
 
-                $readings = ThermoHygroSensHandle0x10( $hash, $notification );
-            }
-            when ('0x24') {
-                ### Thermo/Hygro Sens - Read Firmware Data
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x24"
-                );
+            $readings = ThermoHygroSensHandle0x10( $hash, $notification );
+        }
+        elsif ( $handle eq '0x24' ) {
+            ### Thermo/Hygro Sens - Read Firmware Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x24"
+            );
 
-                $readings = ThermoHygroSensHandle0x24( $hash, $notification );
-            }
-            when ('0x3') {
-                ### Thermo/Hygro Sens - Read and Write Devicename
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3"
-                );
+            $readings = ThermoHygroSensHandle0x24( $hash, $notification );
+        }
+        elsif ( $handle eq '0x3' ) {
+            ### Thermo/Hygro Sens - Read and Write Devicename
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3" );
 
-                return CreateParamGatttool( $hash, 'read',
-                    $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
-                  if ( $gattCmd ne 'read' );
-                $readings = ThermoHygroSensHandle0x3( $hash, $notification );
-            }
+            return CreateParamGatttool( $hash, 'read',
+                $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
+              if ( $gattCmd ne 'read' );
+            $readings = ThermoHygroSensHandle0x3( $hash, $notification );
         }
     }
     elsif ( AttrVal( $name, 'model', 'none' ) eq 'mijiaLYWSD03MMC' ) {
-        given ($handle) {
-            when ('0x1b') {
-                ### mijiaLYWSD03MMC - Read Battery Data
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x1b"
-                );
+        if ( $handle eq '0x1b' ) {
+            ### mijiaLYWSD03MMC - Read Battery Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x1b"
+            );
 
-                $readings = mijiaLYWSD03MMC_Handle0x1b( $hash, $notification );
-            }
-            when ('0x38') {
-                ### mijiaLYWSD03MMC - Read Sensor Data
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x38"
-                );
+            $readings = mijiaLYWSD03MMC_Handle0x1b( $hash, $notification );
+        }
+        elsif ( $handle eq '0x38' ) {
+            ### mijiaLYWSD03MMC - Read Sensor Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x38"
+            );
 
-                $readings = mijiaLYWSD03MMC_Handle0x38( $hash, $notification );
-            }
-            when ('0x12') {
-                ### mijiaLYWSD03MMC - Read Firmware Data
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x12"
-                );
+            $readings = mijiaLYWSD03MMC_Handle0x38( $hash, $notification );
+        }
+        elsif ( $handle eq '0x12' ) {
+            ### mijiaLYWSD03MMC - Read Firmware Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x12"
+            );
 
-                $readings = mijiaLYWSD03MMC_Handle0x12( $hash, $notification );
-            }
-            when ('0x3') {
-                ### mijiaLYWSD03MMC - Read and Write Devicename
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3"
-                );
+            $readings = mijiaLYWSD03MMC_Handle0x12( $hash, $notification );
+        }
+        elsif ( $handle eq '0x3' ) {
+            ### mijiaLYWSD03MMC - Read and Write Devicename
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3" );
 
-                return CreateParamGatttool( $hash, 'read',
-                    $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
-                  unless ( $gattCmd eq 'read' );
-                $readings = mijiaLYWSD03MMC_Handle0x3( $hash, $notification );
-            }
+            return CreateParamGatttool( $hash, 'read',
+                $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
+              unless ( $gattCmd eq 'read' );
+            $readings = mijiaLYWSD03MMC_Handle0x3( $hash, $notification );
         }
     }
     elsif ( AttrVal( $name, 'model', 'none' ) eq 'clearGrassSens' ) {
-        given ($handle) {
-            when ('0x3b') {
-                ### Clear Grass Sens - Read Battery Data
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3b"
-                );
+        if ( $handle eq '0x3b' ) {
+            ### Clear Grass Sens - Read Battery Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3b"
+            );
 
-                $readings = ClearGrassSensHandle0x3b( $hash, $notification );
-            }
-            when ('0x1e') {
-                ### Clear Grass Sens - Read Sensor Data
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x1e"
-                );
+            $readings = ClearGrassSensHandle0x3b( $hash, $notification );
+        }
+        elsif ( $handle eq '0x1e' ) {
+            ### Clear Grass Sens - Read Sensor Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x1e"
+            );
 
-                $readings = ClearGrassSensHandle0x1e( $hash, $notification );
-            }
-            when ('0x2a') {
-                ### Clear Grass Sens - Read Firmware Data
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x2a"
-                );
+            $readings = ClearGrassSensHandle0x1e( $hash, $notification );
+        }
+        elsif ( $handle eq '0x2a' ) {
+            ### Clear Grass Sens - Read Firmware Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x2a"
+            );
 
-                $readings = ClearGrassSensHandle0x2a( $hash, $notification );
-            }
-            when ('0x3') {
-                ### Clear Grass Sens - Read and Write Devicename
-                Log3( $name, 4,
-"XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3"
-                );
+            $readings = ClearGrassSensHandle0x2a( $hash, $notification );
+        }
+        elsif ( $handle eq '0x3' ) {
+            ### Clear Grass Sens - Read and Write Devicename
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3" );
 
-                return CreateParamGatttool( $hash, 'read',
-                    $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
-                  if ( $gattCmd ne 'read' );
-                $readings = ClearGrassSensHandle0x3( $hash, $notification );
-            }
+            return CreateParamGatttool( $hash, 'read',
+                $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
+              if ( $gattCmd ne 'read' );
+            $readings = ClearGrassSensHandle0x3( $hash, $notification );
         }
     }
 
@@ -1755,7 +1748,7 @@ sub BTLE_CmdlinePreventGrepFalsePositive {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.0.1",
+  "version": "v3.1.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
