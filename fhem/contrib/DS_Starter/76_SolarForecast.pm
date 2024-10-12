@@ -156,7 +156,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.36.0" => "11.10.2024  new Getter valInverter, preparation for multiple inverters ",
+  "1.36.0" => "11.10.2024  new Getter valInverter, preparation for multiple inverters, rename setupInverterDev to setupInverterDev01 ".
+                           "Model DWD: dayAfterTomorrowPVforecast now available ",
   "1.35.0" => "09.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
                            "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard ".
                            "scaling, __switchConsumer: run ___setConsumerSwitchingState before switch subs ".
@@ -3399,6 +3400,7 @@ sub __getDWDSolarData {
   my $raname = AttrVal ($name, 'setupRadiationAPI', '');                                       # Radiation Forecast API
   return if(!$raname || !$defs{$raname});
 
+  my $fcdays  = AttrVal ($raname, 'forecastDays', 1);                                          # Anzahl Forecast Days in DWD Device
   my $cafd    = AttrVal ($name, 'ctrlAreaFactorUsage', 'fix');                                 # Art der Flächenfaktor Berechnung
   my $stime   = $date.' 00:00:00';                                                             # Startzeit Soll Übernahmedaten
   my $sts     = timestringToTimestamp ($stime);
@@ -3416,7 +3418,9 @@ sub __getDWDSolarData {
 
   debugLog ($paref, "apiCall", "DWD API - collect DWD Radiation data with start >$stime<- device: $raname =>");
 
-  for my $num (0..47) {
+  my $end = (24 + $fcdays * 24) - 1;                                                           # default 47
+  
+  for my $num (0..$end) {                                                                      # V 1.36.0
       my ($fd,$fh) = calcDayHourMove (0, $num);
       next if($fh == 24);
 
@@ -4541,6 +4545,8 @@ sub _getlistPVHistory {
   my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'pvhist', $arg);
+  return if(!$ret);
+  
   $ret   .= lineFromSpaces ($ret, 20);
   $ret    =~ s/\n/<br>/g;
 
@@ -15553,6 +15559,8 @@ sub setPVhistory {
       }
 
       my ($r1, $r2, $r3, $r4, $r5, $r6, $r7, $r8) = (0,0,0,0,0,0,0,0);
+      my $ien = {};                                                                               # Hashref Inverter energy
+      my $pen = {};                                                                               # Hashref Producer energy
 
       for my $k (keys %{$data{$type}{$name}{pvhist}{$reorgday}}) {
           next if($k eq "99");
@@ -15565,6 +15573,22 @@ sub setPVhistory {
           $r6 += HistoryVal ($hash, $reorgday, $k, 'gcons',   0);
           $r7 += HistoryVal ($hash, $reorgday, $k, 'gfeedin', 0);
           $r8 += HistoryVal ($hash, $reorgday, $k, 'con',     0);
+          
+          ## Reorg Inverter 
+          ##################           
+          for my $in (1..$maxinverter) {
+              $in   = sprintf "%02d", $in;
+              my $e = HistoryVal ($hash, $reorgday, $k, 'pvrl'.$in, undef);
+              $ien->{$in} += $e if(defined $e);
+          }
+          
+          ## Reorg Producer
+          ##################           
+          for my $pn (1..$maxproducer) {
+              $pn   = sprintf "%02d", $pn;
+              my $e = HistoryVal ($hash, $reorgday, $k, 'pprl'.$pn, undef);
+              $pen->{$pn} += $e if(defined $e);
+          }
       }
 
       $data{$type}{$name}{pvhist}{$reorgday}{99}{batin}   = $r1;
@@ -15575,8 +15599,16 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$reorgday}{99}{gcons}   = $r6;
       $data{$type}{$name}{pvhist}{$reorgday}{99}{gfeedin} = $r7;
       $data{$type}{$name}{pvhist}{$reorgday}{99}{con}     = $r8;
+      
+      for my $in (keys %{$ien}) {
+          $data{$type}{$name}{pvhist}{$reorgday}{99}{'pvrl'.$in} = $ien->{$in};
+      }
+      
+      for my $pn (keys %{$pen}) {
+          $data{$type}{$name}{pvhist}{$reorgday}{99}{'pprl'.$pn} = $pen->{$pn};
+      }
 
-      debugLog ($paref, 'saveData2Cache', "setPVhistory -> Day >$reorgday< reorganized keys: batin, batout, pvrl, pvfc, con, confc, gcons, gfeedin");
+      debugLog ($paref, 'saveData2Cache', "setPVhistory -> Day >$reorgday< reorganized keys: batin, batout, pvrl, pvfc, con, confc, gcons, gfeedin, pvrlXX, pprlXX");
   }
 
   if ($histname) {
@@ -15976,9 +16008,6 @@ sub listDataPool {
           my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
           my $airn     = CircularVal ($hash, $idx, 'aiRulesNumber',       '-');
           my $aicts    = CircularVal ($hash, $idx, 'attrInvChangedTs',    '-');
-          my $pprl01   = CircularVal ($hash, $idx, 'pprl01',              '-');
-          my $pprl02   = CircularVal ($hash, $idx, 'pprl02',              '-');
-          my $pprl03   = CircularVal ($hash, $idx, 'pprl03',              '-');
 
           my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
           my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
@@ -15992,7 +16021,20 @@ sub listDataPool {
               $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl\n";
               $sq .= "      batin: $batin, batout: $batout, confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c\n";
               $sq .= "      temp: $temp, wid: $wid, wtxt: $wtxt\n";
-              $sq .= "      pprl01: $pprl01, pprl02: $pprl02, pprl03: $pprl03\n";
+              
+              my $prdl;
+              for my $pn (1..$maxproducer) {                                              # + alle Producer
+                  $pn       = sprintf "%02d", $pn;
+                  my $pprl  = CircularVal ($hash, $idx, 'pprl'.$pn, '-');
+                  
+                  if (defined $pprl) {
+                      $prdl .= ', ' if($prdl);
+                      $prdl .= "pprl${pn}: $pprl";
+                  }
+              }
+              
+              $sq .= "      $prdl\n" if($prdl);
+
               $sq .= "      pvcorrf: $pvcf\n";
               $sq .= "      quality: $cfq\n";
               $sq .= "      pvrlsum: $pvrs\n";
@@ -19882,7 +19924,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)                             </td></tr>
             <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
             <tr><td> <b>DoN</b>            </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                                           </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>PV meter reading “Total energy yield” (Wh) at the beginning of the hour                                                  </td></tr>
+            <tr><td> <b>etotaliXX</b>      </td><td>PV meter reading “Total energy yield” (Wh) of inverter XX at the beginning of the hour                                   </td></tr>
             <tr><td> <b>etotalpXX</b>      </td><td>Meter reading “Total energy yield” (Wh) of producer XX at the beginning of the hour                                      </td></tr>
             <tr><td> <b>gcons</b>          </td><td>real power consumption (Wh) from the electricity grid                                                                    </td></tr>
             <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
@@ -19891,7 +19933,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                                           </td></tr>
             <tr><td> <b>pprlXX</b>         </td><td>Energy generation of producer XX (see attribute setupOtherProducerXX) in the hour (Wh)                                   </td></tr>
             <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                                              </td></tr>
-            <tr><td> <b>pvrl</b>           </td><td>real PV generation (Wh)                                                                                                  </td></tr>
+            <tr><td> <b>pvrlXX</b>         </td><td>real PV generation (Wh) of inverter XX                                                                                   </td></tr>
+            <tr><td> <b>pvrl</b>           </td><td>Sum real PV generation (Wh) of all inverters                                                                             </td></tr>
             <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as abnormal                    </td></tr>
             <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                                   </td></tr>
             <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                                                 </td></tr>
@@ -21359,7 +21402,7 @@ to ensure that the system configuration is correct.
        <ul>
           <table>
           <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-             <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
+             <tr><td> <b>forecastDays</b>            </td><td>1  (set it to &gt;= 2 if you want longer prediction)                                          </td></tr>
              <tr><td> <b>forecastProperties</b>      </td><td>Rad1h                                                                                         </td></tr>
              <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>
              <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;                                             </td></tr>
@@ -21462,10 +21505,10 @@ to ensure that the system configuration is correct.
        <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
-            <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
-            <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
-            <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;   </td></tr>
+            <tr><td> <b>forecastDays</b>            </td><td>1                                                                  </td></tr>
+            <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet                              </td></tr>
+            <tr><td> <b>forecastResolution</b>      </td><td>1                                                                  </td></tr>
+            <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;                  </td></tr>
          </table>
        </ul>
        <br>
@@ -22233,7 +22276,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im setupMeterDev definiert.             </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                      </td></tr>
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                               </td></tr>
-            <tr><td> <b>etotal</b>          </td><td>PV Zählerstand "Energieertrag total" (Wh) zu Beginn der Stunde                                     </td></tr>
+            <tr><td> <b>etotaliXX</b>       </td><td>PV Zählerstand "Energieertrag total" (Wh) von Inverter XX zu Beginn der Stunde                     </td></tr>
             <tr><td> <b>etotalpXX</b>       </td><td>Zählerstand "Energieertrag total" (Wh) des Produzenten XX zu Beginn der Stunde                     </td></tr>
             <tr><td> <b>gcons</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                       </td></tr>
             <tr><td> <b>gfeedin</b>         </td><td>reale Einspeisung (Wh) in das Stromnetz                                                            </td></tr>
@@ -22243,7 +22286,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>minutescsmXX</b>    </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                    </td></tr>
             <tr><td> <b>pprlXX</b>          </td><td>Energieerzeugung des Produzenten XX (siehe Attribut setupOtherProducerXX) in der Stunde (Wh)       </td></tr>
             <tr><td> <b>pvfc</b>            </td><td>der prognostizierte PV Ertrag (Wh)                                                                 </td></tr>
-            <tr><td> <b>pvrl</b>            </td><td>reale PV Erzeugung (Wh)                                                                            </td></tr>
+            <tr><td> <b>pvrlXX</b>          </td><td>reale PV Erzeugung (Wh) von Inverter XX                                                            </td></tr>
+            <tr><td> <b>pvrl</b>            </td><td>Summe reale PV Erzeugung (Wh) aller Inverter                                                       </td></tr>
             <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als abnormal bewertet     </td></tr>
             <tr><td> <b>pvcorrf</b>         </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                       </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>Globalstrahlung (kJ/m2)                                                                            </td></tr>
@@ -23712,7 +23756,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
+            <tr><td> <b>forecastDays</b>            </td><td>1  (auf &gt;= 2 setzen wenn eine längere Vorhersage gewünscht ist)                            </td></tr>
             <tr><td> <b>forecastProperties</b>      </td><td>Rad1h                                                                                         </td></tr>
             <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>
             <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;                                            </td></tr>
