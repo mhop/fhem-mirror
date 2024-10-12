@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2023 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2018-2025 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -72,7 +72,8 @@ use FHEM::Meta;
 use GPUtils qw(GP_Import GP_Export);
 use Data::Dumper;    #only for Debugging
 use Date::Parse;
-use experimental qw( switch );
+
+# use experimental qw( switch );   deprecated
 
 use FHEM::Automation::ShuttersControl::Shutters;
 use FHEM::Automation::ShuttersControl::Dev;
@@ -526,107 +527,103 @@ sub Set {
     my $cmd  = shift @$aArg
       // return qq{"set $name" needs at least one argument};
 
-    given ($cmd) {
-        when ('renewAllTimer') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
-            RenewSunRiseSetShuttersTimer($hash);
-        }
-        when ('renewTimer') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-            CreateSunRiseSetShuttersTimer( $hash, $aArg->[0] );
-        }
-        when ('scanForShutters') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
-            ShuttersDeviceScan($hash);
-        }
-        when ('createNewNotifyDev') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
-            CreateNewNotifyDev($hash);
-        }
-        when ('partyMode') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 )
-              if ( $aArg->[0] ne ::ReadingsVal( $name, 'partyMode', 0 ) );
-        }
-        when ('hardLockOut') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
-            HardewareBlockForShutters( $hash, $aArg->[0] );
-        }
-        when ('sunriseTimeWeHoliday') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
-        }
-        when ('controlShading') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+    if ( $cmd eq 'renewAllTimer' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+        RenewSunRiseSetShuttersTimer($hash);
+    }
+    elsif ( $cmd eq 'renewTimer' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+        CreateSunRiseSetShuttersTimer( $hash, $aArg->[0] );
+    }
+    elsif ( $cmd eq 'scanForShutters' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+        ShuttersDeviceScan($hash);
+    }
+    elsif ( $cmd eq 'createNewNotifyDev' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+        CreateNewNotifyDev($hash);
+    }
+    elsif ( $cmd eq 'partyMode' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+        ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 )
+          if ( $aArg->[0] ne ::ReadingsVal( $name, 'partyMode', 0 ) );
+    }
+    elsif ( $cmd eq 'hardLockOut' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+        ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
+        HardewareBlockForShutters( $hash, $aArg->[0] );
+    }
+    elsif ( $cmd eq 'sunriseTimeWeHoliday' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+        ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
+    }
+    elsif ( $cmd eq 'controlShading' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
 
-            my $response = CheckASC_ConditionsForShadingFn( $hash, $aArg->[0] );
-            ::readingsSingleUpdate(
-                $hash, $cmd,
-                (
-                    $aArg->[0] eq 'off' ? $aArg->[0]
-                    : (
-                          $response eq 'none' ? $aArg->[0]
-                        : $response
-                    )
-                ),
-                1
-            );
-        }
-        when ('selfDefense') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
-        }
-        when ('ascEnable') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
-        }
-        when ('advDriveDown') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
-            EventProcessingAdvShuttersClose($hash);
-        }
-        when ('shutterASCenableToggle') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-            ::readingsSingleUpdate(
-                $defs{ $aArg->[0] },
-                'ASC_Enable',
-                (
-                    ::ReadingsVal( $aArg->[0], 'ASC_Enable', 'off' ) eq 'on'
-                    ? 'off'
-                    : 'on'
-                ),
-                1
-            );
-        }
-        when ('wiggle') {
-            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-
+        my $response = CheckASC_ConditionsForShadingFn( $hash, $aArg->[0] );
+        ::readingsSingleUpdate(
+            $hash, $cmd,
             (
-                $aArg->[0] eq 'all'
-                ? wiggleAll($hash)
-                : wiggle( $hash, $aArg->[0] )
-            );
-        }
-        default {
-            my $list = 'scanForShutters:noArg';
-            $list .=
-' renewAllTimer:noArg advDriveDown:noArg partyMode:on,off hardLockOut:on,off sunriseTimeWeHoliday:on,off controlShading:on,off selfDefense:on,off ascEnable:on,off wiggle:all,'
-              . join( ',', @{ $hash->{helper}{shuttersList} } )
-              . ' shutterASCenableToggle:'
-              . join( ',', @{ $hash->{helper}{shuttersList} } )
-              . ' renewTimer:'
-              . join( ',', @{ $hash->{helper}{shuttersList} } )
-              if (
-                ::ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
-                && defined( $hash->{helper}{shuttersList} )
-                && scalar( @{ $hash->{helper}{shuttersList} } ) > 0 );
-            $list .= ' createNewNotifyDev:noArg'
-              if (
-                ::ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
-                && ::AttrVal( $name, 'ASC_expert', 0 ) == 1 );
+                $aArg->[0] eq 'off' ? $aArg->[0]
+                : (
+                      $response eq 'none' ? $aArg->[0]
+                    : $response
+                )
+            ),
+            1
+        );
+    }
+    elsif ( $cmd eq 'selfDefense' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+        ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
+    }
+    elsif ( $cmd eq 'ascEnable' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+        ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
+    }
+    elsif ( $cmd eq 'advDriveDown' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+        EventProcessingAdvShuttersClose($hash);
+    }
+    elsif ( $cmd eq 'shutterASCenableToggle' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+        ::readingsSingleUpdate(
+            $defs{ $aArg->[0] },
+            'ASC_Enable',
+            (
+                ::ReadingsVal( $aArg->[0], 'ASC_Enable', 'off' ) eq 'on'
+                ? 'off'
+                : 'on'
+            ),
+            1
+        );
+    }
+    elsif ( $cmd eq 'wiggle' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
 
-            return "Unknown argument $cmd,choose one of $list";
-        }
+        (
+            $aArg->[0] eq 'all'
+            ? wiggleAll($hash)
+            : wiggle( $hash, $aArg->[0] )
+        );
+    }
+    else {
+        my $list = 'scanForShutters:noArg';
+        $list .=
+' renewAllTimer:noArg advDriveDown:noArg partyMode:on,off hardLockOut:on,off sunriseTimeWeHoliday:on,off controlShading:on,off selfDefense:on,off ascEnable:on,off wiggle:all,'
+          . join( ',', @{ $hash->{helper}{shuttersList} } )
+          . ' shutterASCenableToggle:'
+          . join( ',', @{ $hash->{helper}{shuttersList} } )
+          . ' renewTimer:'
+          . join( ',', @{ $hash->{helper}{shuttersList} } )
+          if ( ::ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
+            && defined( $hash->{helper}{shuttersList} )
+            && scalar( @{ $hash->{helper}{shuttersList} } ) > 0 );
+        $list .= ' createNewNotifyDev:noArg'
+          if ( ::ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
+            && ::AttrVal( $name, 'ASC_expert', 0 ) == 1 );
+
+        return "Unknown argument $cmd,choose one of $list";
     }
 
     return;
