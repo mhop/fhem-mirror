@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  82_LGTV_WebOS: remove experimental switch
  - change:  73_AutoShuttersControl: remove experimental switch
  - bugfix:  59_Weather: fix forcast intervall, safe token count
  - feature: 74_AutomowerConnect: new setter for synchronizing mower timestamp
