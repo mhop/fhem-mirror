@@ -156,7 +156,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.36.0" => "13.10.2024  new Getter valInverter, preparation for multiple inverters, rename setupInverterDev to setupInverterDev01 ".
+  "1.36.0" => "13.10.2024  new Getter valInverter and valProducer, preparation for multiple inverters ".
+                           "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
                            "Model DWD: dayAfterTomorrowPVforecast now available ".
                            "delete etotal from HistoryVal, _flowGraphic: move PV Icon up to the producers row ".
                            "change sequence of _createSummaries in centraltask - Forum: https://forum.fhem.de/index.php?msg=1322425 ",
@@ -626,6 +627,7 @@ my %hget = (                                                                # Ha
   ftui               => { fn => \&_getftui,                     needcred => 0 },
   valCurrent         => { fn => \&_getlistCurrent,              needcred => 0 },
   valInverter        => { fn => \&_getlistvalInverter,          needcred => 0 },
+  valProducer        => { fn => \&_getlistvalProducer,          needcred => 0 },
   valConsumerMaster  => { fn => \&_getlistvalConsumerMaster,    needcred => 0 },
   plantConfigCheck   => { fn => \&_setplantConfiguration,       needcred => 0 },
   pvHistory          => { fn => \&_getlistPVHistory,            needcred => 0 },
@@ -663,7 +665,7 @@ my %hattr = (                                                                # H
   
   for my $prn (1..$maxproducer) {
       $prn = sprintf "%02d", $prn;
-      $hattr{'setupOtherProducer'.$prn}{fn} = \&_attrOtherProducer;
+      $hattr{'setupOtherProducer'.$prn}{fn} = \&_attrProducerDev;
   }
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -1236,6 +1238,7 @@ sub Initialize {
                                 "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
+                                "affectConsForecastLastDays:slider,1,1,31 ".
                                 "affectSolCastPercentile:select,10,50,90 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
@@ -2471,15 +2474,18 @@ sub Get {
   my @pha  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{pvhist}};
   my @vcm  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{consumers}};
   my @vin  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{inverters}};
+  my @vpn  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{producers}};
 
   my $hol  = join ",", @ho;
   my $pvl  = join ",", @pha;
   my $cml  = join ",", @vcm;
   my $inl  = join ",", @vin;
+  my $pnl  = join ",", @vpn;
 
   my $getlist = "Unknown argument $opt, choose one of ".
                 "valConsumerMaster:#,$cml ".
                 "valInverter:#,$inl ".
+                "valProducer:#,$pnl ".
                 "data:noArg ".
                 "dwdCatalog ".
                 "forecastQualities:noArg ".
@@ -4648,6 +4654,21 @@ return $ret;
 }
 
 ###############################################################
+#                       Getter valProducer
+###############################################################
+sub _getlistvalProducer {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $arg   = $paref->{arg};
+  my $hash  = $defs{$name};
+
+  my $ret = listDataPool   ($hash, 'producers', $arg);
+  $ret   .= lineFromSpaces ($ret, 30);
+
+return $ret;
+}
+
+###############################################################
 #                       Getter solApiData
 ###############################################################
 sub _getlistSolCastData {
@@ -5694,7 +5715,7 @@ return;
 ################################################################
 #                      Attr setupOtherProducer
 ################################################################
-sub _attrOtherProducer {                 ## no critic "not used"
+sub _attrProducerDev {                   ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
@@ -5704,7 +5725,7 @@ sub _attrOtherProducer {                 ## no critic "not used"
   return if(!$init_done);
 
   my $hash = $defs{$name};
-  my $prn  = (split 'Producer', $aName)[1];
+  my $pn   = (split 'Producer', $aName)[1];
 
   if ($paref->{cmd} eq 'set') {
       my ($err, $dev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
@@ -5714,51 +5735,24 @@ sub _attrOtherProducer {                 ## no critic "not used"
           return qq{The syntax of '$aName' is not correct. Please consider the commandref.};
       }
       
-      delete $data{$type}{$name}{current}{'iconp'.$prn};
+      delete $data{$type}{$name}{producers}{$pn}{picon};
   }
   elsif ($paref->{cmd} eq 'del') {
-      $paref->{prn} = $prn;
-      __delProducerValues ($paref);
-      delete $paref->{prn};
+      for my $k (keys %{$data{$type}{$name}{producers}}) {
+          delete $data{$type}{$name}{producers}{$k} if($k eq $pn);
+      }
+      
+      readingsDelete    ($hash, 'Current_PP'.$pn);
+      deleteReadingspec ($hash, ".*_PPreal".$pn);
+
+      for my $hod (keys %{$data{$type}{$name}{circular}}) {
+          delete $data{$type}{$name}{circular}{$hod}{'pprl'.$pn};
+      }
   }
 
   InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
   InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
-
-return;
-}
-
-################################################################
-#    löschen Werte eines Producers aus Speicherhashes
-################################################################
-sub __delProducerValues {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $prn   = $paref->{prn} // return 'The producer number is empty';      # Producernummer (01, 02, 03)
-  my $type  = $paref->{type};
-  my $hash  = $defs{$name};
-
-  deleteReadingspec ($hash, ".*_PPreal".$prn);
-  readingsDelete    ($hash, 'Current_PP'.$prn);
-  delete $data{$type}{$name}{current}{'pgeneration'.$prn};
-  delete $data{$type}{$name}{current}{'etotalp'    .$prn};
-  delete $data{$type}{$name}{current}{'iconp'      .$prn};
-  delete $data{$type}{$name}{current}{'namep'      .$prn};
-  delete $data{$type}{$name}{current}{'aliasp'     .$prn};
-
-  for my $hod (keys %{$data{$type}{$name}{circular}}) {
-      delete $data{$type}{$name}{circular}{$hod}{'pprl'.$prn};
-  }
-
-  for my $dy (sort keys %{$data{$type}{$name}{pvhist}}) {
-      for my $hr (sort keys %{$data{$type}{$name}{pvhist}{$dy}}) {
-          delete $data{$type}{$name}{pvhist}{$dy}{$hr}{'pprl'   .$prn};
-          delete $data{$type}{$name}{pvhist}{$dy}{$hr}{'etotalp'.$prn};
-      }
-  }
-
-  Log3 ($name, 3, qq{$name - all stored data from producer $prn has been deleted});
 
 return;
 }
@@ -5799,11 +5793,11 @@ sub _attrInverterDev {                   ## no critic "not used"
           delete $data{$type}{$name}{inverters}{$k} if($k eq $in);
       }
       
-      readingsDelete ($hash, "Current_PV");
+      readingsDelete ($hash, 'Current_PV');
       undef @{$data{$type}{$name}{current}{genslidereg}};
       
       if ($in eq '01') {                                                        # wenn der letzte Inverter gelöscht wurde
-          deleteReadingspec ($hash, ".*_PVreal" );                               
+          deleteReadingspec ($hash, '.*_PVreal' );                               
           delete $data{$type}{$name}{circular}{99}{attrInvChangedTs};
       }
   }
@@ -6759,6 +6753,7 @@ sub _addDynAttr {
   my $adwds  = '';
   my @alldwd = devspec2array ("TYPE=DWD_OpenData");
   $adwds     = join ",", @alldwd if(@alldwd);
+  
   my @fcdevs = qw( OpenMeteoDWD-API
                    OpenMeteoDWDEnsemble-API
                    OpenMeteoWorld-API
@@ -6766,6 +6761,7 @@ sub _addDynAttr {
                    ForecastSolar-API
                    VictronKI-API
                  );
+                 
   push @fcdevs, @alldwd if(@alldwd);
   my $rdd = join ",", @fcdevs;
 
@@ -8476,9 +8472,8 @@ sub _transferInverterValues {
       my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                             # aktuelle Erzeugung (W)
       $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                                   # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
 
-      my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
-      my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                           # Erzeugung total (Wh)
-
+      my $etuf     = $etunit =~ /^kWh$/xi ? 1000 : 1;
+      my $etotal   = ReadingsNum ($indev, $edread, 0) * $etuf;                                         # Erzeugung total (Wh)
       my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'etotali'.$in, 0);               # etotal zu Beginn einer Stunde
       
       my ($ethishour, $etotsvd);
@@ -8516,12 +8511,6 @@ sub _transferInverterValues {
           Log3 ($name, $vl, "$name $pre The Total Energy of Inverter '$indev' is lower than the value saved before. This situation is unexpected and the Energy generated of current hour of this inverter is set to '0'.");
           $warn = ' (WARNING invalid real PV occured - see Logfile)';
       }
-
-      #$data{$type}{$name}{current}{generationi01}  = $pv;                                           # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-      #$data{$type}{$name}{current}{etotali01}      = $etotal;                                       # aktuellen etotal des WR speichern
-      #$data{$type}{$name}{current}{namei01}        = $indev;                                        # Name des Inverterdevices
-      #$data{$type}{$name}{current}{invertercapi01} = $h->{capacity} if(defined $h->{capacity});     # optionale Angabe max. WR-Leistung
-      #$data{$type}{$name}{current}{iconi01}        = $h->{icon}     if($h->{icon});                 # Icon des Inverters
       
       $data{$type}{$name}{inverters}{$in}{igeneration} = $pv;                                          # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
       $data{$type}{$name}{inverters}{$in}{ietotal}     = $etotal;                                      # aktuellen etotal des WR speichern
@@ -8588,23 +8577,24 @@ sub _transferProducerValues {
       my $nhour    = $chour + 1;
       my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'etotalp'.$pn, 0);                      # etotal zu Beginn einer Stunde
       my $warn     = '';
+      
       my ($ethishour, $etotsvd);
 
       if (!$histetot) {                                                                                       # etotal der aktuelle Stunde gesetzt ?
           writeToHistory ( { paref => $paref, key => 'etotalp'.$pn, val => $etotal, hour => $nhour } );
-
-          $etotsvd   = CurrentVal ($hash, 'etotalp'.$pn, $etotal);
+ 
+          $etotsvd   = ProducerVal ($hash, $pn, 'petotal', $etotal);
           $ethishour = int ($etotal - $etotsvd);
       }
       else {
           $ethishour = int ($etotal - $histetot);
       }
-
-      $data{$type}{$name}{current}{'pgeneration'.$pn} = $p;                                                  # aktuelle Erzeugung  
-      $data{$type}{$name}{current}{'etotalp'.$pn}     = $etotal;                                             # aktuellen etotal des WR speichern
-      $data{$type}{$name}{current}{'namep'.  $pn}     = $prdev;                                              # Name des Producerdevices
-      $data{$type}{$name}{current}{'aliasp'. $pn}     = AttrVal ($prdev, 'alias', $prdev);                   # Alias Producer
-      $data{$type}{$name}{current}{'iconp'.  $pn}     = $h->{icon} if($h->{icon});                           # Icon des Producers
+      
+      $data{$type}{$name}{producers}{$pn}{pgeneration} = $p;
+      $data{$type}{$name}{producers}{$pn}{petotal}     = $etotal;                                            # aktuellen etotal des WR speichern
+      $data{$type}{$name}{producers}{$pn}{pname}       = $prdev;                                             # Name des Producerdevices
+      $data{$type}{$name}{producers}{$pn}{palias}      = AttrVal ($prdev, 'alias', $prdev);                  # Alias Producer
+      $data{$type}{$name}{producers}{$pn}{picon}       = $h->{icon} if($h->{icon});                          # Icon des Producers 
 
       if ($ethishour < 0) {
           $ethishour = 0;
@@ -8628,7 +8618,7 @@ sub _transferProducerValues {
       writeToHistory ( { paref => $paref, key => 'pprl'.$pn, val => $ethishour, hour => $nhour } );
       
       debugLog ($paref, "collectData", "collect Producer $pn data - device: $prdev =>");
-      debugLog ($paref, "collectData", "pcurr: $p W, etotalp$pn: $etotal Wh");
+      debugLog ($paref, "collectData", "pcurr: $p W, etotal: $etotal Wh");
   }
 
 return;
@@ -9295,9 +9285,9 @@ sub _createSummaries {
   
   my $othprod = 0;                                                                                      # Summe Otherproducer
 
-  for my $prn (1..$maxproducer) {                                                                       # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
-      $prn      = sprintf "%02d", $prn;
-      $othprod += CurrentVal ($hash, 'pgeneration'.$prn, 0);
+  for my $pn (1..$maxproducer) {                                                                       # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
+      $pn       = sprintf "%02d", $pn;
+      $othprod += ProducerVal ($hash, $pn, 'pgeneration', 0);
   }
 
   my $consumption         = int ($pvgen + $othprod - $gfeedin + $gcon - $batin + $batout);
@@ -10947,40 +10937,52 @@ return ($simpCstat, $starttime, $stoptime, $supplmnt);
 sub _estConsumptionForecast {
   my $paref   = shift;
   my $name    = $paref->{name};
+  my $type    = $paref->{type};
   my $chour   = $paref->{chour};
   my $t       = $paref->{t};
   my $day     = $paref->{day};                                                                          # aktuelles Tagdatum (01...31)
   my $dayname = $paref->{dayname};                                                                      # aktueller Tagname
 
-  my $hash              = $defs{$name};
-  my ($err, $medev, $h) = isDeviceValid ( { name   => $name,
-                                            obj    => 'setupMeterDev',
-                                            method => 'attr',
-                                          }
-                                        );                                                              # aktuelles Meter device
-  return if($err);
+  my $hash    = $defs{$name};
+  my $acref   = $data{$type}{$name}{consumers};
+  my $swdfcfc = AttrVal ($name, 'affectConsForecastIdentWeekdays', 0);                                  # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
+    
+  ## Beachtung der letzten X Tage falls gesetzt
+  ###############################################
+  my $acld = AttrVal ($name, 'affectConsForecastLastDays', 0);                                          
+  my @dtn;                                                                                              # Array der zu beachtenden Tage
+  
+  if ($acld) {                                                                                                                                                         
+      for my $l (1..$acld) {
+          my $dday = strftime "%d", localtime($t - $l * 86400);                                         # resultierender Tag (range 01..)
+          push @dtn, $dday;
+      }
+  }
 
-  my $swdfcfc   = AttrVal     ($name, "affectConsForecastIdentWeekdays", 0);                            # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
-  my ($am, $hm) = parseParams ($medev);
-  my $type      = $paref->{type};
-  my $acref     = $data{$type}{$name}{consumers};
-
-  my ($exconfc, $csme);
-
-  ## Verbrauchsvorhersage für den nächsten Tag
+  ## Verbrauchsvorhersage für den kommenden Tag
   ##############################################
   my $tomorrow = strftime "%a", localtime($t+86400);                                                    # Wochentagsname kommender Tag
   my $totcon   = 0;
   my $dnum     = 0;
+  
+  my ($exconfc, $csme);
 
   debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day ###################");
-
+  debugLog ($paref, 'consumption|consumption_long', "Date(s) to take note: ".join ',', @dtn) if(@dtn);
+      
   for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
       next if ($n eq $day);                                                                             # aktuellen (unvollständigen) Tag nicht berücksichtigen
 
       if ($swdfcfc) {                                                                                   # nur gleiche Tage (Mo...So) einbeziehen
           my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
           next if(!$hdn || $hdn ne $tomorrow);
+      }
+      
+      if (@dtn) {
+          if (!grep /^$n$/, @dtn) {
+              debugLog ($paref, 'consumption|consumption_long', "Day >$n< should not be observed, ignore it.");
+              next;
+          }
       }
 
       my $dcon = HistoryVal ($hash, $n, 99, 'con', 0);
@@ -11017,10 +11019,11 @@ sub _estConsumptionForecast {
       $data{$type}{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};
   }
 
-  ## Verbrauchsvorhersage für die nächsten Stunden
+  ## Verbrauchsvorhersage für die kommenden Stunden
   ##################################################
   debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next hours ###################");
-
+  debugLog ($paref, 'consumption|consumption_long', "Date(s) to take note: ".join ',', @dtn) if(@dtn);
+  
   for my $k (sort keys %{$data{$type}{$name}{nexthours}}) {
       my $nhtime = NexthoursVal ($hash, $k, "starttime", undef);                                    # Startzeit
       next if(!$nhtime);
@@ -11048,13 +11051,20 @@ sub _estConsumptionForecast {
               my $hdn = HistoryVal ($hash, $m, 99, 'dayname', undef);
               next if(!$hdn || $hdn ne $nhday);
           }
+          
+          if (@dtn) {
+              if (!grep /^$m$/, @dtn) {
+                  debugLog ($paref, 'consumption|consumption_long', "Day >$m< should not be observed, ignore it.");
+                  next;
+              }
+          }
 
           my $hcon = HistoryVal ($hash, $m, $nhhr, 'con', 0);                                       # historische Verbrauchswerte
           next if(!$hcon);
 
           debugLog ($paref, 'consumption_long', "    historical Consumption added for $nhday -> date: $m, hod: $nhhr -> $hcon Wh");
 
-          if ($hcon < 0) {                                                                           # V1.32.0
+          if ($hcon < 0) {                                                                          # V1.32.0
               my $vl  = 3;
               my $pre = '- WARNING -';
 
@@ -14089,7 +14099,7 @@ sub _flowGraphic {
 
   for my $pn (1..$maxproducer) {
       $pn   = sprintf "%02d", $pn;
-      my $p = CurrentVal ($hash, 'pgeneration'.$pn, undef);
+      my $p = ProducerVal ($hash, $pn, 'pgeneration', undef);
 
       if (defined $p) {
           $p                  = sprintf "%.2f", $p;
@@ -14577,8 +14587,8 @@ sub __substituteIcon {
       }
   }
   elsif ($ptyp eq 'producer') {                                                        # Icon Producer
-      ($icon, $color) = split '@', CurrentVal ($hash, 'iconp'.$pn, $prodicondef);
-      $txt            = CurrentVal ($hash, 'aliasp'.$pn, 'namep'.$pn);
+      ($icon, $color) = split '@', ProducerVal ($hash, $pn, 'picon', $prodicondef); 
+      $txt            = ProducerVal ($hash, $pn, 'palias', ''); 
       
       if (!$pcurr) {
           $color = 'grey';
@@ -15934,9 +15944,10 @@ sub listDataPool {
       }
   }
 
-  if ($htol =~ /consumers|inverters/xs) {
+  if ($htol =~ /consumers|inverters|producers/xs) {
       my $sub = $htol eq 'consumers' ? \&ConsumerVal :
                 $htol eq 'inverters' ? \&InverterVal :
+                $htol eq 'producers' ? \&ProducerVal :
                 '';
       
       $h = $data{$type}{$name}{$htol};
@@ -18880,8 +18891,7 @@ return $def;
 # Usage:
 # CurrentVal ($hash, $key, $def)
 #
-# $key: pgenerationXX        - aktuelle Erzeugung Producer XX
-#       aiinitstate          - Initialisierungsstatus der KI
+# $key: aiinitstate          - Initialisierungsstatus der KI
 #       aitrainstate         - Traisningsstatus der KI
 #       aiaddistate          - Add Instanz Status der KI
 #       batcharge            - Bat SOC in %
@@ -19112,6 +19122,7 @@ return $def;
 #       invertercap        - Bemessungsleistung der Wechselrichters (max. W)
 #       iname              - Name des Inverterdevices
 #       iicon              - Icon des Inverters
+#       ialias             - Alias des Inverters
 #
 # $def: Defaultwert
 #
@@ -19144,6 +19155,7 @@ return $def;
 #       pgeneration         - aktuelle Erzeugung Producers
 #       pname               - Name des Producersdevices
 #       picon               - Icon des Producers
+#       palias              - Alias des Producers
 #
 # $def: Defaultwert
 #
@@ -20197,7 +20209,21 @@ to ensure that the system configuration is correct.
        <li><b>affectConsForecastIdentWeekdays </b><br>
          If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast. <br>
          Otherwise, all weekdays are used equally for calculation. <br>
+         Any additional attribute 
+		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>
+		 is also taken into account. <br>
          (default: 0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-affectConsForecastLastDays"></a>
+       <li><b>affectConsForecastLastDays </b><br>
+         The specified past days (1..31) are included in the calculation of the consumption forecast. <br>
+         For example, with the attribute value “1” only the previous day is taken into account, with the value “14” the previous 14 days. <br>
+         Any additional attribute
+		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
+		 is also taken into account. <br>
+         (default: all days available in pvHistory)
        </li>
        <br>
 
@@ -22569,7 +22595,21 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>affectConsForecastIdentWeekdays </b><br>
          Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
          Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet. <br>
+         Ein eventuell zusätzlich gesetztes Attribut 
+		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>
+		 wird gleichfalls berücksichtigt. <br>      
          (default: 0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-affectConsForecastLastDays"></a>
+       <li><b>affectConsForecastLastDays </b><br>
+         Es werden die angegebenen vergangenen Tage (1..31) bei der Berechnung der Verbrauchsprognose einbezogen. <br>
+         So wird z.B. mit dem Attributwert "1" nur der vorangegangene Tag berücksichtigt, mit dem Wert "14" die vergangenen 14 Tage. <br>
+         Ein eventuell zusätzlich gesetztes Attribut 
+		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
+		 wird gleichfalls berücksichtigt. <br>
+         (default: alle in pvHistory vorhandenen Tage)
        </li>
        <br>
 
