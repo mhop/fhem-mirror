@@ -156,7 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.36.0" => "13.10.2024  new Getter valInverter and valProducer, preparation for multiple inverters ".
+  "1.36.0" => "13.10.2024  new Getter valInverter, valStrings and valProducer, preparation for multiple inverters ".
                            "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
                            "Model DWD: dayAfterTomorrowPVforecast now available ".
                            "delete etotal from HistoryVal, _flowGraphic: move PV Icon up to the producers row ".
@@ -628,6 +628,7 @@ my %hget = (                                                                # Ha
   valCurrent         => { fn => \&_getlistCurrent,              needcred => 0 },
   valInverter        => { fn => \&_getlistvalInverter,          needcred => 0 },
   valProducer        => { fn => \&_getlistvalProducer,          needcred => 0 },
+  valStrings         => { fn => \&_getlistvalStrings,           needcred => 0 },
   valConsumerMaster  => { fn => \&_getlistvalConsumerMaster,    needcred => 0 },
   plantConfigCheck   => { fn => \&_setplantConfiguration,       needcred => 0 },
   pvHistory          => { fn => \&_getlistPVHistory,            needcred => 0 },
@@ -2475,17 +2476,20 @@ sub Get {
   my @vcm  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{consumers}};
   my @vin  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{inverters}};
   my @vpn  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$type}{$name}{producers}};
+  my @vst  = sort keys %{$data{$type}{$name}{strings}};
 
   my $hol  = join ",", @ho;
   my $pvl  = join ",", @pha;
   my $cml  = join ",", @vcm;
   my $inl  = join ",", @vin;
   my $pnl  = join ",", @vpn;
+  my $str  = join ",", @vst;
 
   my $getlist = "Unknown argument $opt, choose one of ".
                 "valConsumerMaster:#,$cml ".
                 "valInverter:#,$inl ".
                 "valProducer:#,$pnl ".
+                "valStrings:#,$str ".
                 "data:noArg ".
                 "dwdCatalog ".
                 "forecastQualities:noArg ".
@@ -4663,6 +4667,21 @@ sub _getlistvalProducer {
   my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'producers', $arg);
+  $ret   .= lineFromSpaces ($ret, 30);
+
+return $ret;
+}
+
+###############################################################
+#                       Getter valStrings
+###############################################################
+sub _getlistvalStrings {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $arg   = $paref->{arg};
+  my $hash  = $defs{$name};
+
+  my $ret = listDataPool   ($hash, 'strings', $arg);
   $ret   .= lineFromSpaces ($ret, 30);
 
 return $ret;
@@ -15944,10 +15963,11 @@ sub listDataPool {
       }
   }
 
-  if ($htol =~ /consumers|inverters|producers/xs) {
+  if ($htol =~ /consumers|inverters|producers|strings/xs) {
       my $sub = $htol eq 'consumers' ? \&ConsumerVal :
                 $htol eq 'inverters' ? \&InverterVal :
                 $htol eq 'producers' ? \&ProducerVal :
+                $htol eq 'strings'   ? \&StringVal   :
                 '';
       
       $h = $data{$type}{$name}{$htol};
@@ -15957,7 +15977,7 @@ sub listDataPool {
       }
 
       for my $i (keys %{$h}) {
-          if ($i !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige Position, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
+          if ($i !~ /^[0-9]{2}$/ix && $htol ne 'strings') {                       # bereinigen ungültige Position, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
               delete $data{$type}{$name}{$htol}{$i};
               Log3 ($name, 2, qq{$name - INFO - invalid key "$i" was deleted from }.ucfirst($htol).qq{ storage});
           }
@@ -15965,7 +15985,8 @@ sub listDataPool {
 
       for my $idx (sort{$a<=>$b} keys %{$h}) {
           next if($par && $idx ne $par);
-          my $cret;
+          my ($cret, $s1);
+          my $sp1 = _ldpspaces ($idx, q{});
 
           for my $ckey (sort keys %{$h->{$idx}}) {
               if (ref $h->{$idx}{$ckey} eq 'HASH') {
@@ -15974,13 +15995,13 @@ sub listDataPool {
                       $hk .= " " if($hk);
                       $hk .= "$f=".$h->{$idx}{$ckey}{$f};
                   }
-                  $cret .= $ckey." => ".$hk."\n      ";
+                  $cret .= ($s1 ? $sp1 : "").$ckey." => ".$hk."\n";
               }
               else {
-                  $cret .= $ckey." => ". &{$sub} ($hash, $idx, $ckey, "")."\n      ";
+                  $cret .= ($s1 ? $sp1 : "").$ckey." => ". &{$sub} ($hash, $idx, $ckey, "")."\n";
               }
+              $s1  = 1;
           }
-
           $sq .= $idx." => ".$cret."\n";
       }
   }
@@ -20154,10 +20175,40 @@ to ensure that the system configuration is correct.
             <tr><td> <b>ietotal </b>        </td><td>total energy generated by the inverter to date (Wh)              </td></tr>
             <tr><td> <b>igeneration </b>    </td><td>current PV generation (W)                                        </td></tr>
             <tr><td> <b>iicon </b>          </td><td>any icons defined for displaying the device in the graphic       </td></tr>
-            <tr><td> <b>iname </b>          </td><td>name of the device                                               </td></tr>
+            <tr><td> <b>ialias </b>         </td><td>Alias of the device                                              </td></tr>
+            <tr><td> <b>iname </b>          </td><td>Name of the device                                               </td></tr>
             <tr><td> <b>invertercap </b>    </td><td>the nominal power (W) of the inverter (if defined)               </td></tr>
 		 </table>
       </ul>
+
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-valProducer"></a>
+      <li><b>valProducer </b> <br><br>
+      Shows the operating values determined for the selected non-PV generator or all defined non-PV generators.  <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>petotal </b>        </td><td>total energy generated by the producer to date (Wh)             </td></tr>
+            <tr><td> <b>pgeneration </b>    </td><td>current power (W)                                               </td></tr>
+            <tr><td> <b>picon </b>          </td><td>any icons defined for displaying the device in the graphic      </td></tr>
+            <tr><td> <b>palias </b>         </td><td>Alias of the device                                             </td></tr>
+            <tr><td> <b>pname </b>          </td><td>Name of the device                                              </td></tr>
+		 </table>
+      </ul>
+
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-valStrings"></a>
+      <li><b>valStrings </b> <br><br>
+      Lists the parameters of the selected or all defined strings.
 
       </li>
     </ul>
@@ -22540,10 +22591,40 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>ietotal </b>        </td><td>Stand gesamte bisher erzeugte Energie des Wechselrichters (Wh)              </td></tr>
             <tr><td> <b>igeneration </b>    </td><td>aktuelle PV Erzeugung (W)                                                   </td></tr>
             <tr><td> <b>iicon </b>          </td><td>die evtl. festgelegten Icons zur Darstellung des Gerätes in der Grafik      </td></tr>
+            <tr><td> <b>ialias </b>         </td><td>Alias des Devices                                                           </td></tr>
             <tr><td> <b>iname </b>          </td><td>Name des Devices                                                            </td></tr>
             <tr><td> <b>invertercap </b>    </td><td>die nominale Leistung (W) des Wechselrichters (falls definiert)             </td></tr>
 		 </table>
       </ul>
+
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-valProducer"></a>
+      <li><b>valProducer </b> <br><br>
+      Zeigt die ermittelten Betriebswerte des ausgewählten nicht PV-Erzeugers oder aller definierten nicht PV-Erzeuger.  <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>petotal </b>        </td><td>Stand gesamte bisher erzeugte Energie des Erzeugers (Wh)                    </td></tr>
+            <tr><td> <b>pgeneration </b>    </td><td>aktuelle Leistung (W)                                                       </td></tr>
+            <tr><td> <b>picon </b>          </td><td>die evtl. festgelegten Icons zur Darstellung des Gerätes in der Grafik      </td></tr>
+            <tr><td> <b>palias </b>         </td><td>Alias des Devices                                                           </td></tr>
+            <tr><td> <b>pname </b>          </td><td>Name des Devices                                                            </td></tr>
+		 </table>
+      </ul>
+
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-valStrings"></a>
+      <li><b>valStrings </b> <br><br>
+      Listet die Parameter des ausgewählten oder aller definierten Strings auf.
 
       </li>
     </ul>
