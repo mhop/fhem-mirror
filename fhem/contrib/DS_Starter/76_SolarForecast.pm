@@ -15983,7 +15983,7 @@ sub listDataPool {
           }
       }
 
-      for my $idx (sort{$a<=>$b} keys %{$h}) {
+      for my $idx (sort keys %{$h}) {
           next if($par && $idx ne $par);
           my ($cret, $s1);
           my $sp1 = _ldpspaces ($idx, q{});
