@@ -467,10 +467,11 @@ my $prodicondef    = 'sani_garden_pump';                                        
 my $cicondef       = 'light_light_dim_100';                                         # default Consumer-Icon
 my $ciconcoldef    = 'darkorange';                                                  # default Consumer-Icon Färbung
 my $homeicondef    = 'control_building_control@grey';                               # default Home-Icon
+my $nodeicondef    = 'virtualbox';                                                  # default Knoten-Icon
 my $invicondef     = 'weather_sun';                                                 # default Inverter-icon
-my $inviconcoldef  = 'orange';                                                      # default Inverter Färbung wenn aktiv
 my $moonicondef    = 2;                                                             # default Mond-Phase (aus %hmoon)
 my $mooncoldef     = 'lightblue';                                                   # default Mond Färbung
+my $actcoldef      = 'orange';                                                      # default Färbung Icon wenn aktiv
 my $inactcoldef    = 'grey';                                                        # default Färbung Icon wenn inaktiv
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
@@ -5738,7 +5739,7 @@ sub __delProducerValues {
 
   deleteReadingspec ($hash, ".*_PPreal".$prn);
   readingsDelete    ($hash, 'Current_PP'.$prn);
-  delete $data{$type}{$name}{current}{'generationp'.$prn};
+  delete $data{$type}{$name}{current}{'pgeneration'.$prn};
   delete $data{$type}{$name}{current}{'etotalp'    .$prn};
   delete $data{$type}{$name}{current}{'iconp'      .$prn};
   delete $data{$type}{$name}{current}{'namep'      .$prn};
@@ -8519,6 +8520,7 @@ sub _transferInverterValues {
       $data{$type}{$name}{inverters}{$in}{igeneration} = $pv;                                          # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
       $data{$type}{$name}{inverters}{$in}{ietotal}     = $etotal;                                      # aktuellen etotal des WR speichern
       $data{$type}{$name}{inverters}{$in}{iname}       = $indev;                                       # Name des Inverterdevices
+      $data{$type}{$name}{inverters}{$in}{ialias}      = AttrVal ($indev, 'alias', $indev);            # Alias Inverter
       $data{$type}{$name}{inverters}{$in}{invertercap} = $h->{capacity} if(defined $h->{capacity});    # optionale Angabe max. WR-Leistung
       $data{$type}{$name}{inverters}{$in}{iicon}       = $h->{icon}     if($h->{icon});                # Icon des Inverters
 
@@ -8575,7 +8577,7 @@ sub _transferProducerValues {
       $p     = $p < 0 ? 0 : $p;
 
       storeReading ('Current_PP'.$prn, sprintf("%.1f", $p).' W');
-      $data{$type}{$name}{current}{'generationp'.$prn} = $p;
+      $data{$type}{$name}{current}{'pgeneration'.$prn} = $p;
 
       my $etu    = $etunit =~ /^kWh$/xi ? 1000 : 1;
       my $etotal = ReadingsNum ($prdev, $edread, 0) * $etu;                                                   # Erzeugung total (Wh)
@@ -9289,7 +9291,7 @@ sub _createSummaries {
 
   for my $prn (1..$maxproducer) {                                                                       # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
       $prn      = sprintf "%02d", $prn;
-      $othprod += CurrentVal ($hash, 'generationp'.$prn, 0);
+      $othprod += CurrentVal ($hash, 'pgeneration'.$prn, 0);
   }
 
   my $consumption         = int ($pvgen + $othprod - $gfeedin + $gcon - $batin + $batout);
@@ -13145,8 +13147,7 @@ sub _showConsumerInGraphicBeam {
 
       # check if listed device is planned
       ####################################
-      if (ReadingsVal($name, $itemName."_Planned", "no") eq "yes") {
-          #get start and end hour
+      if (ReadingsVal($name, $itemName."_Planned", "no") eq "yes") {                             # get start and end hour
           my ($start, $end);                                                                     # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
 
           if($lang eq "DE") {
@@ -14076,59 +14077,63 @@ sub _flowGraphic {
 
   my $scale      = $fgscaledef;
   my $hasbat     = 1;                                         # initial Batterie vorhanden
-  my $flowgprods = 1;                                         # Producer in der Energieflußgrafik anzeigen per default
-  my $ppcurr     = {};                                        # Hashref Producer current power
-  my $cpcurr     = {};                                        # Hashref Consumer current power
-
-  ## definierte Inverter ermitteln und deren
-  ## aktuelle Leistung bestimmen
-  ############################################
-  my $invertercount = 0;
-  my $pvall         = 0;                                                       # Summe Erzeugung alle Inverter
-  my @inverters;
-
-  for my $in (1..$maxinverter) {
-      $in   = sprintf "%02d", $in;
-      my $p = InverterVal ($hash, $in, 'igeneration', 0);
-
-      if (defined $p) {
-          push @inverters, $in;
-          $ppcurr->{$in}  = $p;
-          $invertercount += 1;
-          $pvall         += $p;
-      }
-  }
   
-  ## definierte Producer ermitteln und deren
-  ## aktuelle Leistung bestimmen
-  ############################################
-  my $producercount = 0;
-  my $ppall         = 0;                                                       # Summe Erzeugung alle Poducer
-  my @producers;
+  ## definierte Producer + Inverter ermitteln und zusammenfassen
+  ################################################################
+  my $pdcr  = {};                                                             # Hashref Producer
+  my $ppall = 0;                                                              # Summe Erzeugung alle nicht PV-Producer
+  my $pvall = 0;                                                              # Summe Erzeugung alle Inverter
+  my $lfn   = 0;
 
   for my $pn (1..$maxproducer) {
       $pn   = sprintf "%02d", $pn;
-      my $p = CurrentVal ($hash, 'generationp'.$pn, undef);
+      my $p = CurrentVal ($hash, 'pgeneration'.$pn, undef);
 
       if (defined $p) {
-          push @producers, $pn;
-          $ppcurr->{$pn}  = $p;
-          $producercount += 1;
-          $ppall         += $p;
+          $p                  = sprintf "%.2f", $p;
+          $p                  = sprintf "%.0f", $p if($p > 10);
+          $pdcr->{$lfn}{p}    = $p;                                           # aktuelle Erzeugung nicht PV-Producer 
+          $pdcr->{$lfn}{pn}   = $pn;                                          # Producernummer
+          $pdcr->{$lfn}{ptyp} = 'producer';                                   # Typ des Producers
+          $ppall             += $p;                                           # aktuelle Erzeuguung aller nicht PV-Producer
+          
+          $lfn++;
       }
   }
+      
+  for my $in (1..$maxinverter) {
+      $in   = sprintf "%02d", $in;
+      my $p = InverterVal ($hash, $in, 'igeneration', undef);
+
+      if (defined $p) {
+          $p                  = sprintf "%.2f", $p;
+          $p                  = sprintf "%.0f", $p if($p > 10);
+          $pdcr->{$lfn}{p}    = $p;                                           # aktuelle Erzeugung Inverter
+          $pdcr->{$lfn}{pn}   = $in;                                          # Inverternummer
+          $pdcr->{$lfn}{ptyp} = 'inverter';                                   # Typ des Producers
+          $pvall             += $p;
+          
+          $lfn++;
+      }
+  }
+  
+  my $pallsum       = $ppall + $pvall;
+  $pallsum          = sprintf "%.0f", $pallsum if($pallsum > 10);
+  my $producercount = keys %{$pdcr};
+  my @producers     = sort{$a<=>$b} keys %{$pdcr};
 
   ## definierte Verbraucher ermitteln
   #####################################
-  my $consumercount = 0;
-  my @consumers;
-
+  my $cnsmr = {};                                                              # Hashref Consumer current power
+  
   for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {           # definierte Verbraucher ermitteln
       next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                     # auszublendende Consumer nicht berücksichtigen
-      push @consumers, $c;
-      $cpcurr->{$c}   = ReadingsNum ($name, "consumer${c}_currentPower", 0);
-      $consumercount += 1;
+      $cnsmr->{$c}{p}    = ReadingsNum ($name, "consumer${c}_currentPower", 0);
+      $cnsmr->{$c}{ptyp} = 'consumer';
   }
+  
+  my $consumercount = keys %{$cnsmr};
+  my @consumers     = sort{$a<=>$b} keys %{$cnsmr};
 
   ## Batterie + Werte festlegen
   ###############################
@@ -14176,8 +14181,7 @@ sub _flowGraphic {
   ## Werte / SteuerungVars anpassen
   ###################################
   $flowgcons  = 0 if(!$consumercount);                                # Consumer Anzeige ausschalten wenn keine Consumer definiert
-  $flowgprods = 0 if(!$producercount && !$invertercount);             # Producer Anzeige ausschalten wenn keine Producer / Inverter definiert
-  my $p2home  = sprintf "%.1f", ($csc + $ppall);                      # Energiefluß von Sonne zum Haus: Selbstverbrauch + alle Producer
+  my $p2home  = sprintf "%.1f", ($csc + $ppall);                      # Energiefluß von Knoten zum Haus: Selbstverbrauch + alle Producer
   $p2home     = sprintf "%.0f", $p2home if($p2home > 10);
   $p2home     = 0 if($p2home == 0);                                   # 0.0 eliminieren wenn keine Leistung zum Haus
 
@@ -14185,13 +14189,13 @@ sub _flowGraphic {
   #########################################
   my $vbwidth   = 800;                                                # width and height specify the viewBox size
   my $vbminx    = -10 * $flowgshift;                                  # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
-  my $vbminy    = $flowgprods ? -25 : 100;
+  my $vbminy    = -25;
 
   my $vbhight   = !$flowgcons    ? 380 :
                   !$flowgconTime ? 590 :
                   610;
 
-  $vbhight += 100 if($flowgprods);
+  $vbhight += 100;
 
   my $vbox = "$vbminx $vbminy $vbwidth $vbhight";
 
@@ -14214,57 +14218,56 @@ END0
   my $producer_start = 0;
   my $producerPower  = 0;
 
-  if ($flowgprods) {
-      if ($producercount % 2) {
-          $producer_start = 350 - ($consDist  * (($producercount -1) / 2));
-      }
-      else {
-          $producer_start = 350 - (($consDist / 2) * ($producercount-1));
-      }
+  if ($producercount % 2) {
+      $producer_start = 350 - ($consDist  * (($producercount -1) / 2));
+  }
+  else {
+      $producer_start = 350 - (($consDist / 2) * ($producercount-1));
+  }
 
-      $pos_left = $producer_start + 25;
+  $pos_left = $producer_start + 5;
 
-      for my $prn (@producers) {
-          my $palias  = CurrentVal ($hash, 'aliasp'.$prn, 'namep'.$prn);
-          my ($picon) = __substituteIcon ( { hash  => $hash,                                    # Icon des Producerdevices
-                                             name  => $name,
-                                             pn    => $prn,
-                                             pcurr => $ppcurr->{$prn},
-                                             lang  => $lang
-                                           }
-                                         );
+  for my $lfn (@producers) {
+      my $pn      = $pdcr->{$lfn}{pn};
+      my ($picon, $ptxt) = __substituteIcon ( { hash  => $hash,                                                 # Icon des Producerdevices
+                                                name  => $name,
+                                                pn    => $pn,
+                                                ptyp  => $pdcr->{$lfn}{ptyp},
+                                                don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
+                                                pcurr => $pdcr->{$lfn}{p},
+                                                lang  => $lang
+                                              }
+                                            );
 
-          $picon           = FW_makeImage    ($picon, '');
-          ($scale, $picon) = __normIconScale ($picon, $name);
-          
-          $ret .= qq{<g id="producer_$prn" fill="grey" transform="translate($pos_left,0),scale($scale)">};
-          $ret .= "<title>$palias</title>".$picon;
-          $ret .= '</g> ';
+      $picon           = FW_makeImage    ($picon, '');
+      ($scale, $picon) = __normIconScale ($picon, $name);
+      
+      $ret .= qq{<g id="producer_$pn" fill="grey" transform="translate($pos_left,0),scale($scale)">};
+      $ret .= "<title>$ptxt</title>".$picon;
+      $ret .= '</g> ';
 
-          $pos_left += $consDist;
-      }
+      $pos_left += $consDist;
   }
   
-  ## Inverter Icon
-  ######################                                                 
-  my ($iicon, $smtxt) = __substituteIcon ( { hash  => $hash,
-                                             name  => $name,
-                                             in    => '01',
-                                             don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
-                                             pcurr => $pvall,
-                                             lang  => $lang
-                                            }
-                                          );
+  ## Knoten Icon
+  ################                                       
+  my ($nicon, $ntxt) = __substituteIcon ( { hash  => $hash,
+                                            name  => $name,
+                                            ptyp  => 'node',
+                                            pcurr => $pallsum,
+                                            lang  => $lang
+                                           }
+                                         );
   
-  $iicon           = FW_makeImage    ($iicon, '');
-  ($scale, $iicon) = __normIconScale ($iicon, $name);
+  $nicon           = FW_makeImage    ($nicon, '');
+  ($scale, $nicon) = __normIconScale ($nicon, $name);
   
-  $ret .= qq{<g id="Inverter" transform="translate(360,165),scale($scale)">};                                # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
-  $ret .= "<title>$smtxt</title>".$iicon;
+  $ret .= qq{<g id="Node" transform="translate(360,165),scale($scale)">};                                # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= "<title>$ntxt</title>".$nicon;
   $ret .= '</g> ';
 
   ## Consumer Liste und Icons in Grafik anzeigen
-  ###############################################
+  ################################################
   $pos_left          = 0;
   my $consumer_start = 0;
   my $currentPower   = 0;
@@ -14281,16 +14284,18 @@ END0
 
       for my $c (@consumers) {
           my $calias     = ConsumerVal ($hash, $c, 'alias', '');                                           # Name des Consumerdevices
-          $currentPower  = $cpcurr->{$c};
+          $currentPower  = $cnsmr->{$c}{p};
+          
           my ($cicon)    = __substituteIcon ( { hash => $hash,                                             # Icon des Consumerdevices
-                                                name => $name, 
-                                                cn    => $c, 
+                                                name => $name,
+                                                pn    => $c,
+                                                ptyp  => $cnsmr->{$c}{ptyp},                                                
                                                 pcurr => $currentPower,
                                                 lang  => $lang
                                               }
-                                            );   
-          $cc_dummy     -= $currentPower;
-
+                                            ); 
+                                            
+          $cc_dummy       -= $currentPower;
           $cicon           = FW_makeImage    ($cicon, '');
           ($scale, $cicon) = __normIconScale ($cicon, $name);
           
@@ -14378,33 +14383,32 @@ END3
 
   ## Producer Laufketten
   ########################
-  if ($flowgprods) {
-      $pos_left              = $producer_start * 2;
-      my $pos_left_start_con = 0;
-      my $distance_con       = 25;
+  $pos_left              = $producer_start * 2;
+  my $pos_left_start_con = 0;
+  my $distance_con       = 25;
 
-      if ($producercount % 2) {
-          $pos_left_start_con = 700 - ($distance_con  * (($producercount -1) / 2));
+  if ($producercount % 2) {
+      $pos_left_start_con = 700 - ($distance_con  * (($producercount -1) / 2));
+  }
+  else {
+      $pos_left_start_con = 700 - ((($distance_con ) / 2) * ($producercount-1));
+  }
+
+  for my $lfn (@producers) {
+      my $pn             = $pdcr->{$lfn}{pn};
+      my $p              = $pdcr->{$lfn}{p};
+      my $consumer_style = 'flowg inactive_out';
+         $consumer_style = 'flowg active_out' if($p > 0);
+      my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
+
+      if ($p) {
+          #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+          $chain_color  = 'style="stroke: darkorange;"';
       }
-      else {
-          $pos_left_start_con = 700 - ((($distance_con ) / 2) * ($producercount-1));
-      }
 
-      for my $prn (@producers) {
-          my $p              = $ppcurr->{$prn};
-          my $consumer_style = 'flowg inactive_out';
-             $consumer_style = 'flowg active_out' if($p > 0);
-          my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
-
-          if ($p) {
-              #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
-              $chain_color  = 'style="stroke: darkorange;"';
-          }
-
-          $ret                .= qq{<path id="genproducer_$prn " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_con,200" />};   # Design Consumer Laufkette
-          $pos_left           += ($consDist * 2);
-          $pos_left_start_con += $distance_con;
-      }
+      $ret                .= qq{<path id="genproducer_$pn " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_con,200" />};   # Design Consumer Laufkette
+      $pos_left           += ($consDist * 2);
+      $pos_left_start_con += $distance_con;
   }
 
   ## Consumer Laufketten
@@ -14424,7 +14428,7 @@ END3
       for my $c (@consumers) {
           my $power     = ConsumerVal ($hash, $c, 'power',   0);
           my $rpcurr    = ConsumerVal ($hash, $c, 'rpcurr', '');                                   # Reading für akt. Verbrauch angegeben ?
-          $currentPower = $cpcurr->{$c};
+          $currentPower = $cnsmr->{$c}{p};
 
           if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = $power;
@@ -14450,10 +14454,10 @@ END3
   ## Textangaben an Grafikelementen
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
-  $ret .= qq{<text class="flowg text" id="pv-txt"        x="800"  y="320" style="text-anchor: start;">$pvall</text>}      if ($pvall);
+  $ret .= qq{<text class="flowg text" id="node-txt"      x="800"  y="320" style="text-anchor: start;">$pallsum</text>}    if ($pallsum);
   $ret .= qq{<text class="flowg text" id="bat-txt"       x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
-  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730"  y="520" style="text-anchor: start;">$p2home</text>}     if ($p2home);
-  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525"  y="420" style="text-anchor: end;">$cgfi</text>}         if ($cgfi);
+  $ret .= qq{<text class="flowg text" id="node_home-txt" x="730"  y="520" style="text-anchor: start;">$p2home</text>}     if ($p2home);
+  $ret .= qq{<text class="flowg text" id="node-grid-txt" x="525"  y="420" style="text-anchor: end;">$cgfi</text>}         if ($cgfi);
   $ret .= qq{<text class="flowg text" id="grid-home-txt" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
   $ret .= qq{<text class="flowg text" id="batout-txt"    x="880"  y="610" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
   $ret .= qq{<text class="flowg text" id="batin-txt"     x="880"  y="420" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat);
@@ -14463,36 +14467,34 @@ END3
   my $lcp;
   
   ## Textangabe Producer
-  ########################
-  if ($flowgprods) {
-      $pos_left = ($producer_start * 2) - 50;                                                         # -XX -> Start Lage producer Beschriftung
+  ########################                                                        
+  $pos_left = $producer_start * 2 - 70;                                                       # -XX -> Start Lage Producer Beschriftung
 
-      for my $prn (@producers) {
-          $currentPower = sprintf "%.2f", $ppcurr->{$prn};
-          $currentPower = sprintf "%.0f", $currentPower if($currentPower > 10);
-          $currentPower = 0 if(1 * $currentPower == 0);
-          $lcp          = length $currentPower;
+  for my $lfn (@producers) {
+      my $pn        = $pdcr->{$lfn}{pn};
+      $currentPower = $pdcr->{$lfn}{p};
+      $currentPower = 0 if(1 * $currentPower == 0);
+      $lcp          = length $currentPower;
 
-          # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
-          ###############################################################################          
-          if    ($lcp >= 5) {$pos_left -= 10}
-          elsif ($lcp == 4) {$pos_left += 10}
-          elsif ($lcp == 3) {$pos_left += 15}
-          elsif ($lcp == 2) {$pos_left += 20}
-          elsif ($lcp == 1) {$pos_left += 40}
+      # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
+      ###############################################################################          
+      if    ($lcp >= 5) {$pos_left -= 10}
+      elsif ($lcp == 4) {$pos_left += 10}
+      elsif ($lcp == 3) {$pos_left += 15}
+      elsif ($lcp == 2) {$pos_left += 20}
+      elsif ($lcp == 1) {$pos_left += 40}
 
-          $ret .= qq{<text class="flowg text" id="producer-txt_$prn" x="$pos_left" y="80">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
+      $ret .= qq{<text class="flowg text" id="producer-txt_$pn" x="$pos_left" y="100">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
 
-          # Leistungszahl wieder zurück an den Ursprungspunkt
-          ####################################################          
-          if    ($lcp >= 5) {$pos_left += 10}
-          elsif ($lcp == 4) {$pos_left -= 10}
-          elsif ($lcp == 3) {$pos_left -= 15}
-          elsif ($lcp == 2) {$pos_left -= 20}
-          elsif ($lcp == 1) {$pos_left -= 40}       
-          
-          $pos_left  += ($consDist * 2);
-      }
+      # Leistungszahl wieder zurück an den Ursprungspunkt
+      ####################################################          
+      if    ($lcp >= 5) {$pos_left += 10}
+      elsif ($lcp == 4) {$pos_left -= 10}
+      elsif ($lcp == 3) {$pos_left -= 15}
+      elsif ($lcp == 2) {$pos_left -= 20}
+      elsif ($lcp == 1) {$pos_left -= 40}       
+      
+      $pos_left  += ($consDist * 2);
   }
 
   ## Textangabe Consumer
@@ -14501,7 +14503,7 @@ END3
       $pos_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
 
       for my $c (@consumers) {
-          $currentPower    = sprintf "%.1f", $cpcurr->{$c};
+          $currentPower    = sprintf "%.1f", $cnsmr->{$c}{p};
           $currentPower    = sprintf "%.0f", $currentPower if($currentPower > 10);
           my $consumerTime = ConsumerVal ($hash, $c, 'remainTime', '');                               # Restlaufzeit
           my $rpcurr       = ConsumerVal ($hash, $c, 'rpcurr',     '');                               # Readingname f. current Power
@@ -14556,9 +14558,8 @@ sub __substituteIcon {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $cn    = $paref->{cn};
+  my $ptyp  = $paref->{ptyp};
   my $pn    = $paref->{pn};
-  my $in    = $paref->{in};
   my $don   = $paref->{don};
   my $pcurr = $paref->{pcurr};
   my $lang  = $paref->{lang};
@@ -14566,29 +14567,31 @@ sub __substituteIcon {
   my ($color, $icon);
   my $txt = '';
 
-  if ($cn) {                                                                           # Icon Consumer 
-      ($icon, $color) = split '@', ConsumerVal ($hash, $cn, 'icon', $cicondef);
+  if ($ptyp eq 'consumer') {                                                           # Icon Consumer 
+      ($icon, $color) = split '@', ConsumerVal ($hash, $pn, 'icon', $cicondef);
       
       if (!$color) {
-          $color = isConsumerLogOn ($hash, $cn, $pcurr) ? $ciconcoldef : '';
+          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? $ciconcoldef : '';
       }
   }
-  elsif ($pn) {                                                                        # Icon Producer
+  elsif ($ptyp eq 'producer') {                                                        # Icon Producer
       ($icon, $color) = split '@', CurrentVal ($hash, 'iconp'.$pn, $prodicondef);
+      $txt            = CurrentVal ($hash, 'aliasp'.$pn, 'namep'.$pn);
       
       if (!$pcurr) {
           $color = 'grey';
       }      
   }
-  elsif ($in) {                                                                        # Inverter, Smartloader
-      my ($iday, $inight) = split ':', InverterVal ($hash, $in, 'iicon', $invicondef);
+  elsif ($ptyp eq 'inverter') {                                                        # Inverter, Smartloader
+      my ($iday, $inight) = split ':', InverterVal ($hash, $pn, 'iicon', $invicondef);
       
       if ($don || $pcurr) {                                                            # Tag -> eigenes Icon oder Standard
+          $txt            = InverterVal ($hash, $pn, 'ialias', '');
           $iday           = $iday ? $iday : $invicondef;
           ($icon, $color) = split '@', $iday;
           $color          = !$pcurr ? $inactcoldef :
                             $color  ? $color       : 
-                            $inviconcoldef;
+                            $actcoldef;
       }
       else {                                                                           # Nacht -> eigenes Icon oder Mondphase
           my $mpi = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
@@ -14603,6 +14606,12 @@ sub __substituteIcon {
               ($icon, $color) = split '@', $icon;
           }
       }
+  }
+  elsif ($ptyp eq 'node') {                                                            # Knoten-Icon
+      ($icon, $color) = split '@', $nodeicondef;
+      $color          = !$pcurr ? $inactcoldef :
+                        $color  ? $color       : 
+                        $actcoldef;
   }
 
   $icon .= '@'.$color if($color);
@@ -18869,7 +18878,7 @@ return $def;
 # Usage:
 # CurrentVal ($hash, $key, $def)
 #
-# $key: generationpXX        - aktuelle Erzeugung Producer XX
+# $key: pgenerationXX        - aktuelle Erzeugung Producer XX
 #       aiinitstate          - Initialisierungsstatus der KI
 #       aitrainstate         - Traisningsstatus der KI
 #       aiaddistate          - Add Instanz Status der KI
