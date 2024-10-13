@@ -156,9 +156,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.36.0" => "11.10.2024  new Getter valInverter, preparation for multiple inverters, rename setupInverterDev to setupInverterDev01 ".
+  "1.36.0" => "13.10.2024  new Getter valInverter, preparation for multiple inverters, rename setupInverterDev to setupInverterDev01 ".
                            "Model DWD: dayAfterTomorrowPVforecast now available ".
-                           "delete etotal from HistoryVal ",
+                           "delete etotal from HistoryVal, _flowGraphic: move PV Icon up to the producers row ",
   "1.35.0" => "09.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
                            "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard ".
                            "scaling, __switchConsumer: run ___setConsumerSwitchingState before switch subs ".
@@ -5711,14 +5711,14 @@ sub _attrOtherProducer {                 ## no critic "not used"
       if (!$h->{pcurr} || !$h->{etotal}) {
           return qq{The syntax of '$aName' is not correct. Please consider the commandref.};
       }
+      
+      delete $data{$type}{$name}{current}{'iconp'.$prn};
   }
   elsif ($paref->{cmd} eq 'del') {
       $paref->{prn} = $prn;
       __delProducerValues ($paref);
       delete $paref->{prn};
   }
-
-  delete $data{$type}{$name}{current}{'iconp'.$prn};
 
   InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
@@ -5789,9 +5789,15 @@ sub _attrInverterDev {                   ## no critic "not used"
       }
 
       $data{$type}{$name}{circular}{99}{attrInvChangedTs} = int time;
+      delete $data{$type}{$name}{inverters}{$in}{invertercap};
+      delete $data{$type}{$name}{inverters}{$in}{iicon};
   }
   elsif ($paref->{cmd} eq 'del') {
-      readingsDelete    ($hash, "Current_PV");
+      for my $k (keys %{$data{$type}{$name}{inverters}}) {
+          delete $data{$type}{$name}{inverters}{$k} if($k eq $in);
+      }
+      
+      readingsDelete ($hash, "Current_PV");
       undef @{$data{$type}{$name}{current}{genslidereg}};
       
       if ($in eq '01') {                                                        # wenn der letzte Inverter gelöscht wurde
@@ -5799,9 +5805,6 @@ sub _attrInverterDev {                   ## no critic "not used"
           delete $data{$type}{$name}{circular}{99}{attrInvChangedTs};
       }
   }
-  
-  delete $data{$type}{$name}{inverters}{$in}{invertercap};
-  delete $data{$type}{$name}{inverters}{$in}{iicon};
 
   InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
@@ -19091,7 +19094,7 @@ sub ConsumerVal {
   my $type = $hash->{TYPE};
 
   if (defined($data{$type}{$name}{consumers})             &&
-      defined($data{$type}{$name}{consumers}{$co}{$key})  &&
+      defined($data{$type}{$name}{consumers}{$co})        &&
       defined($data{$type}{$name}{consumers}{$co}{$key})) {
       return  $data{$type}{$name}{consumers}{$co}{$key};
   }
@@ -19124,7 +19127,7 @@ sub InverterVal {
   my $type = $hash->{TYPE};
 
   if (defined($data{$type}{$name}{inverters})             &&
-      defined($data{$type}{$name}{inverters}{$in}{$key})  &&
+      defined($data{$type}{$name}{inverters}{$in})        &&
       defined($data{$type}{$name}{inverters}{$in}{$key})) {
       return  $data{$type}{$name}{inverters}{$in}{$key};
   }
