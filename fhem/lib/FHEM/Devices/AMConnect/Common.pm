@@ -48,6 +48,7 @@ BEGIN {
           CommandDeleteReading
           DoTrigger
           FmtDateTime
+          fhemTimeGm
           FW_ME
           FW_dir
           FW_wname
@@ -199,6 +200,7 @@ hideSchedulerButton=""
         url                     => 'https://raw.githubusercontent.com/AndriiHeonia/hull/master/dist/hull.js'
       },
       interval                  => 840,
+      isDst                     => -1,
       no_position_attr          => $noPositionAttr,
       interval_ws               => 7110,
       interval_ping             => 570,
@@ -211,7 +213,7 @@ hideSchedulerButton=""
       retry_interval_wsreopen   => 2,
       timeout_apiauth           => 5,
       timeout_getmower          => 5,
-      timeout_cmd               => 10,
+      timeout_cmd               => 15,
       midnightCycle             => 1,
       client_id                 => $client_id,
       grant_type                => 'client_credentials',
@@ -1170,8 +1172,6 @@ sub Set {
   my $type = $hash->{TYPE};
   my $name = $hash->{NAME};
   my $iam = "$type $name Set:";
-  my @ti = localtime();
-  my $tcorr = ($ti[8] ? '2,1,0' : '1,2,0 ');
 
   return "$iam: needs at least one argument" if ( @val < 2 );
   return "Unknown argument, $iam is disabled, choose one of none:noArg" if ( IsDisabled( $name ) );
@@ -1355,7 +1355,7 @@ sub Set {
 
   }
   ##########
-  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,30,30,600,0,lin Park:selectnumbers,30,30,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret dateTime:$tcorr ";
+  my $ret = " getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,30,30,600,0,lin Park:selectnumbers,30,30,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret dateTime ";
   $ret .= "mowerScheduleToAttribute:noArg sendScheduleFromAttributeToMower:noArg ";
   $ret .= "cuttingHeight:1,2,3,4,5,6,7,8,9 " if ( defined $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} );
   $ret .= "defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg chargingStationPositionToAttribute:noArg " if ( $hash->{helper}{mower}{attributes}{capabilities}{position} );
@@ -1398,6 +1398,7 @@ sub CMD {
   my $iam = "$type $name CMD:";
   my $timeout = AttrVal( $name, 'timeoutCMD', $hash->{helper}->{timeout_cmd} );
   my $method = 'POST';
+  my $ts = TimeLocal();
   $hash->{helper}{mower_commandSend} = $cmd[ 0 ] . ( $cmd[ 1 ] ? ' '.$cmd[ 1 ] : '' ) . ( $cmd[ 2 ] ? ' '.$cmd[ 2 ] : '' );
 
   if ( IsDisabled( $name ) ) {
@@ -1430,7 +1431,7 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
   elsif ($cmd[0] eq "StartInWorkArea" && !$cmd[2])
                                        { $json = '{"data": {"type":"'.$cmd[0].'","attributes":{"workAreaId":'.$cmd[1].'}}}'; $post = 'actions' }
   elsif ($cmd[0] eq "headlight")       { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": {"mode": "'.$cmd[1].'"}}}}'; $post = 'settings' }
-  elsif ($cmd[0] eq "dateTime")        { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.int(time + $cmd[1] * 3600).'}}}'; $post = 'settings' }
+  elsif ($cmd[0] eq "dateTime")        { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.( $cmd[1] ? $cmd[1] : $ts ).'}}}'; $post = 'settings';$hash->{helper}{mower_commandSend} .= ( $cmd[1] ? '' : ' '.$ts ) }
   elsif ($cmd[0] eq "cuttingHeight")   { $json = '{"data": {"type":"settings","attributes":{"'.$cmd[0].'": '.$cmd[1].'}}}'; $post = 'settings' }
   elsif ($cmd[0] eq "stayOutZone")     { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": '.$cmd[2].'}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
   elsif ($cmd[0] eq "confirmError")    { $json = '{}'; $post = 'errors/confirm' }
@@ -2865,10 +2866,40 @@ sub listErrorCodes {
 }
 
 #########################
-# Format mower timestamp assuming mower time is always set to daylight saving time, because it is the mowing period.
 sub FmtDateTimeGMT {
-  my $ti = shift // 0;
-  my $ret = POSIX::strftime( "%F %H:%M:%S", gmtime( $ti ) );
+  # Returns a yyyy-mm-dd HH:MM:SS formated string for a UNIX like timestamp for local time (seconds since EPOCH)
+  my $ret = POSIX::strftime( "%F %H:%M:%S", gmtime( shift // 0 ) );
+}
+
+#########################
+# Calculate time timestamp in seconds regarding RTC time and DST
+sub TimeLocal {
+  # Creates a UNIX like timestamp for local time (seconds since EPOCH)
+  my @ti = localtime();
+  return ceil( fhemTimeGm( $ti[0], $ti[1], $ti[2], $ti[3], $ti[4], $ti[5] ) );
+}
+
+#########################
+sub autoDstSync {
+  my ( $hash ) = @_;
+  my @ti = localtime();
+  my $isDstOld = $hash->{helper}{isDst};
+  if ( $ti[8] ne $isDstOld && ( $ti[2] == 4 || $isDstOld eq -1 ) ) {
+
+    $hash->{helper}{isDst} = $ti[8];
+    InternalTimer( gettimeofday() + 7, \&CMDdateTime, $hash, 0 );
+
+  }
+  return
+}
+
+#########################
+sub CMDdateTime {
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  RemoveInternalTimer( $hash, \&CMDdateTime );
+  CMD( $hash, 'dateTime' );
+  return
 }
 
 #########################
@@ -3140,6 +3171,8 @@ sub wsRead {
         }
 
       }
+
+      autoDstSync( $hash ) if ( AttrVal( $name, "mowerAutoSyncTime", 0 ) );
 
     }
 

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 74_AutomowerConnect: attribute controlled automatic syncronizing
+                                 the mower time if DST changes
  - feature: 76_SolarForecast: new attr affectConsForecastLastDays and more
                               features, changes in Flowgraphic
  - change:  74_XiaomiBTLESens: remove experimental switch

@@ -67,16 +67,17 @@ sub Initialize() {
                           "mapBackgroundColor " .
                           "mapDesignAttributes:textField-long " .
                           "mapZones:textField-long " .
-                          "showMap:1,0 " .
                           "chargingStationCoordinates " .
                           "chargingStationImagePosition:left,top,right,bottom,center " .
-                          "scaleToMeterXY " .
                           "mowerCuttingWidth " .
                           "mowerPanel:textField-long,85 " .
                           "mowerSchedule:textField-long " .
                           "mowingAreaLimits:textField-long " .
                           "mowingAreaHull:textField-long " .
+                          "mowerAutoSyncTime:1,0 " .
                           "propertyLimits:textField-long " .
+                          "scaleToMeterXY " .
+                          "showMap:1,0 " .
                           "weekdaysToResetWayPoints " .
                           "numberOfWayPointsToDisplay " .
                           "addPollingMinInterval " .
@@ -192,8 +193,8 @@ __END__
       Starts immediately for &lt;number of minutes&gt;</li>
 
     <li><a id='AutomowerConnect-set-dateTime'>dateTime</a><br>
-      <code>set &lt;name&gt; dateTime &lt;RTC and DST time corretion / h &gt;</code><br>
-      Syncronize the mower time. The proposal is for RTC = UTC and DST for CET(MEZ) </li>
+      <code>set &lt;name&gt; dateTime &lt;timestamp / s&gt;</code><br>
+      Syncronize the mower time to timestamp. The default (empty Input field) timestamp is for local time of the machine the mower is defined.</li>
 
     <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
       <code>set &lt;name&gt; confirmError</code><br>
@@ -376,6 +377,10 @@ __END__
     <li><a id='AutomowerConnect-attr-showMap'>showMap</a><br>
       <code>attr &lt;name&gt; showMap &lt;<b>1</b>,0&gt;</code><br>
       Shows Map on (1 default) or not (0).</li>
+
+    <li><a id='AutomowerConnect-attr-mowerAutoSyncTime'>mowerAutoSyncTime</a><br>
+      <code>attr &lt;name&gt; mowerAutoSyncTime &lt;<b>0</b>,1&gt;</code><br>
+      Synchronizes mower time if DST changes, on (1) or not (0 default).</li>
 
    <li><a id='AutomowerConnect-attr-chargingStationCoordinates'>chargingStationCoordinates</a><br>
       <code>attr &lt;name&gt; chargingStationCoordinates &lt;longitude&gt;&lt;separator&gt;&lt;latitude&gt;</code><br>
@@ -720,8 +725,9 @@ __END__
       Der Zonenname darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
 
     <li><a id='AutomowerConnect-set-dateTime'>dateTime</a><br>
-      <code>set &lt;name&gt; dateTime &lt;RTC and DST time corretion / h &gt;</code><br>
-      Synchronisiert die Zeit im Mäher. Der im Auswahlfeld vorgeschlagene Korrekturwert geht davon aus, dass die RTC auf UTC eingestellt ist und berücksichtigt DST für CET(MEZ).</li>
+      <code>set &lt;name&gt; dateTime &lt;timestamp / s&gt;</code><br>
+      Synchronisiert die Zeit im Mäher. Timestamp, ist die Zeit in Sekunden seit  1. Januar 1970, 00:00 Uhr UTC unter Berücksichtigung der Zeitzone und DST.
+      Der Standardwert (leeres Eingabefeld) verwendet die lokale Zeit des Rechners auf dem der Mäher definiert ist, siehe auch <a href="#AutomowerConnect-attr-mowerAutoSyncTime">mowerAutoSyncTime</a></li>
 
     <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
       <code>set &lt;name&gt; confirmError</code><br>
@@ -889,6 +895,10 @@ __END__
     <li><a id='AutomowerConnect-attr-chargingStationImagePosition'>chargingStationImagePosition</a><br>
       <code>attr &lt;name&gt; chargingStationImagePosition &lt;<b>right</b>, bottom, left, top, center&gt;</code><br>
       Position der Ladestation relativ zu ihren Koordinaten.</li>
+
+    <li><a id='AutomowerConnect-attr-mowerAutoSyncTime'>mowerAutoSyncTime</a><br>
+      <code>attr &lt;name&gt; mowerAutoSyncTime &lt;<b>0</b>,1&gt;</code><br>
+      Synchronisiert die Zeit im Mäher, bei einer Zeitumstellung, ein (1) aus (0 Standard).</li>
 
     <li><a id='AutomowerConnect-attr-mowerCuttingWidth'>mowerCuttingWidth</a><br>
       <code>attr &lt;name&gt; mowerCuttingWidth &lt;cutting width&gt;</code><br>
