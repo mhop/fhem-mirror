@@ -156,6 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.36.1" => "14.10.2024  _flowGraphic: consumer distance modified by kask, Coloring of icons corrected when creating 0 ",
   "1.36.0" => "13.10.2024  new Getter valInverter, valStrings and valProducer, preparation for multiple inverters ".
                            "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
                            "Model DWD: dayAfterTomorrowPVforecast now available ".
@@ -14121,8 +14122,7 @@ sub _flowGraphic {
       my $p = ProducerVal ($hash, $pn, 'pgeneration', undef);
 
       if (defined $p) {
-          $p                  = sprintf "%.2f", $p;
-          $p                  = sprintf "%.0f", $p if($p > 10);
+          $p                  = __normDecPlaces ($p);
           $pdcr->{$lfn}{p}    = $p;                                           # aktuelle Erzeugung nicht PV-Producer 
           $pdcr->{$lfn}{pn}   = $pn;                                          # Producernummer
           $pdcr->{$lfn}{ptyp} = 'producer';                                   # Typ des Producers
@@ -14137,8 +14137,7 @@ sub _flowGraphic {
       my $p = InverterVal ($hash, $in, 'igeneration', undef);
 
       if (defined $p) {
-          $p                  = sprintf "%.2f", $p;
-          $p                  = sprintf "%.0f", $p if($p > 10);
+          $p                  = __normDecPlaces ($p);
           $pdcr->{$lfn}{p}    = $p;                                           # aktuelle Erzeugung Inverter
           $pdcr->{$lfn}{pn}   = $in;                                          # Inverternummer
           $pdcr->{$lfn}{ptyp} = 'inverter';                                   # Typ des Producers
@@ -14148,8 +14147,7 @@ sub _flowGraphic {
       }
   }
   
-  my $pallsum       = $ppall + $pvall;
-  $pallsum          = sprintf "%.0f", $pallsum if($pallsum > 10);
+  my $pallsum       = __normDecPlaces ($ppall + $pvall);
   my $producercount = keys %{$pdcr};
   my @producers     = sort{$a<=>$b} keys %{$pdcr};
 
@@ -14212,9 +14210,7 @@ sub _flowGraphic {
   ## Werte / SteuerungVars anpassen
   ###################################
   $flowgcons  = 0 if(!$consumercount);                                # Consumer Anzeige ausschalten wenn keine Consumer definiert
-  my $p2home  = sprintf "%.1f", ($csc + $ppall);                      # Energiefluß von Knoten zum Haus: Selbstverbrauch + alle Producer
-  $p2home     = sprintf "%.0f", $p2home if($p2home > 10);
-  $p2home     = 0 if($p2home == 0);                                   # 0.0 eliminieren wenn keine Leistung zum Haus
+  my $p2home  = __normDecPlaces ($csc + $ppall);                      # Energiefluß von Knoten zum Haus: Selbstverbrauch + alle Producer
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
@@ -14330,7 +14326,7 @@ END0
           $cicon           = FW_makeImage    ($cicon, '');
           ($scale, $cicon) = __normIconScale ($cicon, $name);
           
-          $ret .= qq{<g id="consumer_$c" transform="translate($pos_left,485),scale($scale)">};
+          $ret .= qq{<g id="consumer_$c" transform="translate($pos_left,505),scale($scale)">};
           $ret .= "<title>$calias</title>".$cicon;
           $ret .= '</g> ';
 
@@ -14416,13 +14412,13 @@ END3
   ########################
   $pos_left              = $producer_start * 2;
   my $pos_left_start_con = 0;
-  my $distance_con       = 25;
+  my $distance_prd       = 65;
 
   if ($producercount % 2) {
-      $pos_left_start_con = 700 - ($distance_con  * (($producercount -1) / 2));
+      $pos_left_start_con = 700 - ($distance_prd  * (($producercount -1) / 2));
   }
   else {
-      $pos_left_start_con = 700 - ((($distance_con ) / 2) * ($producercount-1));
+      $pos_left_start_con = 700 - ((($distance_prd ) / 2) * ($producercount-1));
   }
 
   for my $lfn (@producers) {
@@ -14439,7 +14435,7 @@ END3
 
       $ret                .= qq{<path id="genproducer_$pn " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_con,200" />};   # Design Consumer Laufkette
       $pos_left           += ($consDist * 2);
-      $pos_left_start_con += $distance_con;
+      $pos_left_start_con += $distance_prd;
   }
 
   ## Consumer Laufketten
@@ -14447,13 +14443,13 @@ END3
   if ($flowgcons) {
       $pos_left          = $consumer_start * 2;
       my $pos_left_start = 0;
-      my $distance       = 25;
+      my $distance_con   = 65;
 
       if ($consumercount % 2) {
-          $pos_left_start = 700 - ($distance  * (($consumercount -1) / 2));
+          $pos_left_start = 700 - ($distance_con  * (($consumercount -1) / 2));
       }
       else {
-          $pos_left_start = 700 - ((($distance ) / 2) * ($consumercount-1));
+          $pos_left_start = 700 - ((($distance_con ) / 2) * ($consumercount-1));
       }
 
       for my $c (@consumers) {
@@ -14476,16 +14472,16 @@ END3
               #$chain_color  = 'style="stroke: #DF0101;"';
           }
 
-          $ret            .= qq{<path id="home-consumer_$c" class="$consumer_style" $chain_color d="M$pos_left_start,780 L$pos_left,850" />};   # Design Consumer Laufkette
+          $ret            .= qq{<path id="home-consumer_$c" class="$consumer_style" $chain_color d="M$pos_left_start,780 L$pos_left,880" />};
           $pos_left       += ($consDist * 2);
-          $pos_left_start += $distance;
+          $pos_left_start += $distance_con;
       }
   }
 
   ## Textangaben an Grafikelementen
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
-  $ret .= qq{<text class="flowg text" id="node-txt"      x="800"  y="320" style="text-anchor: start;">$pallsum</text>}    if ($pallsum);
+  $ret .= qq{<text class="flowg text" id="node-txt"      x="800"  y="320" style="text-anchor: start;">$pallsum</text>}    if ($pallsum > 0);
   $ret .= qq{<text class="flowg text" id="bat-txt"       x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
   $ret .= qq{<text class="flowg text" id="node_home-txt" x="730"  y="520" style="text-anchor: start;">$p2home</text>}     if ($p2home);
   $ret .= qq{<text class="flowg text" id="node-grid-txt" x="525"  y="420" style="text-anchor: end;">$cgfi</text>}         if ($cgfi);
@@ -14504,7 +14500,6 @@ END3
   for my $lfn (@producers) {
       my $pn        = $pdcr->{$lfn}{pn};
       $currentPower = $pdcr->{$lfn}{p};
-      $currentPower = 0 if(1 * $currentPower == 0);
       $lcp          = length $currentPower;
 
       # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
@@ -14648,6 +14643,22 @@ sub __substituteIcon {
   $icon .= '@'.$color if($color);
 
 return ($icon, $txt);
+}
+
+################################################################
+#    normiere Nachkommastellen
+#    Standard  - .xx (zwei Nachkommastellen)
+#    wenn > 10 - xx  (keine Nachkommastelle)
+#    wenn 0.0  - 0   (logisch 0)
+################################################################
+sub __normDecPlaces {
+  my $p = shift;
+  
+  $p = sprintf "%.2f", $p;
+  $p = sprintf "%.0f", $p if($p > 10);
+  $p = 0                  if($p == 0);
+  
+return $p;
 }
 
 ################################################################
