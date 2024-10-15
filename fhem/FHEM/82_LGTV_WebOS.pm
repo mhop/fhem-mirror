@@ -369,7 +369,7 @@ __END__
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.7.0",
+  "version": "v3.7.1",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],

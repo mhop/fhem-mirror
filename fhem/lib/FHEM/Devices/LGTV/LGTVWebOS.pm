@@ -199,6 +199,7 @@ my %openApps = (
     'DAZN'               => 'dazn',
     'SkyQ'               => 'com.skygo.app.de.q',
     'WaipuTv'            => 'tv.waipu.app.waipu-lg',
+    'JellyFin'           => 'org.jellyfin.webos',
 );
 
 my %openAppsPackageName = reverse %openApps;
