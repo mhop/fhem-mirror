@@ -156,6 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.37.0" => "15.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ",
   "1.36.1" => "14.10.2024  _flowGraphic: consumer distance modified by kask, Coloring of icons corrected when creating 0 ",
   "1.36.0" => "13.10.2024  new Getter valInverter, valStrings and valProducer, preparation for multiple inverters ".
                            "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
@@ -439,7 +440,7 @@ my $tempbasedef    = 25;                                                        
 
 my $maxconsumer    = 16;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
 my $maxproducer    = 3;                                                             # maximale Anzahl der möglichen anderen Produzenten (Attribut)
-my $maxinverter    = 1;                                                             # maximale Anzahl der möglichen Inverter
+my $maxinverter    = 3;                                                             # maximale Anzahl der möglichen Inverter
 
 my $epiecMaxCycles = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
@@ -565,10 +566,10 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    setupRoofTops
                  );
 
-for my $cinit (1..$maxconsumer) {
-  $cinit = sprintf "%02d", $cinit;
-  push @aconfigs, "consumer${cinit}";                         # Anlagenkonfiguration: add Consumer Attribute
-  push @dd,       "consumerSwitching${cinit}";                # ctrlDebug: add specific Consumer
+for my $cn (1..$maxconsumer) {
+  $cn = sprintf "%02d", $cn;
+  push @aconfigs, "consumer${cn}";                            # Anlagenkonfiguration: add Consumer Attribute
+  push @dd,       "consumerSwitching${cn}";                   # ctrlDebug: add specific Consumer
 }
 
 for my $in (1..$maxinverter) {
@@ -576,9 +577,9 @@ for my $in (1..$maxinverter) {
   push @aconfigs, "setupInverterDev${in}";                    # Anlagenkonfiguration: add Inverter Attribute
 }
 
-for my $prn (1..$maxproducer) {
-  $prn = sprintf "%02d", $prn;
-  push @aconfigs, "setupOtherProducer${prn}";                 # Anlagenkonfiguration: add Producer Attribute
+for my $pn (1..$maxproducer) {
+  $pn = sprintf "%02d", $pn;
+  push @aconfigs, "setupOtherProducer${pn}";                  # Anlagenkonfiguration: add Producer Attribute
 }
 
 my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
@@ -705,7 +706,7 @@ my %hqtxt = (                                                                   
   crd    => { EN => qq{Please select the radiation forecast service with "attr LINK setupRadiationAPI"},
               DE => qq{Bitte geben sie den Strahlungsvorhersage Dienst mit "attr LINK setupRadiationAPI" an}                },
   cid    => { EN => qq{Please specify the Inverter device with "attr LINK setupInverterDev01"},
-              DE => qq{Bitte geben sie das Wechselrichter Device mit "attr LINK setupInverterDev01" an}                       },
+              DE => qq{Bitte geben sie das Wechselrichter Device mit "attr LINK setupInverterDev01" an}                     },
   mid    => { EN => qq{Please specify the device for energy measurement with "attr LINK setupMeterDev"},
               DE => qq{Bitte geben sie das Device zur Energiemessung mit "attr LINK setupMeterDev" an}                      },
   ist    => { EN => qq{Please define all of your used string names with "attr LINK setupInverterStrings"},
@@ -5795,18 +5796,37 @@ sub _attrInverterDev {                   ## no critic "not used"
   if ($paref->{cmd} eq 'set') {
       my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
+      
+      if ($in ne '01' && !AttrVal ($name, 'setupInverterDev01', '')) {
+          return qq{Set the first Inverter device with attribute 'setupInverterDev01'};
+      }
 
       if (!$h->{pv} || !$h->{etotal}) {
-          return qq{The syntax of '$aName' is not correct. Please consider the commandref.};
+          return qq{The syntax of '$aName' is not valid. Please consider the commandref.};
       }
 
       if ($h->{capacity} && !isNumeric($h->{capacity})) {
-          return qq{The syntax of key 'capacity' is not correct. Please consider the commandref.};
+          return qq{The syntax of key 'capacity' is not valid. Please consider the commandref.};
       }
-
+      
+      if ($h->{feed} && $h->{feed} !~ /^grid$/xs) {
+          return qq{The value of key 'feed' is not valid. Please consider the commandref.};
+      }
+      
+      if ($h->{strings}) {
+          for my $s (split ',', $h->{strings}) {
+              if (!grep /^$s$/, keys %{$data{$type}{$name}{strings}}) {
+                  return qq{The string '$s' is not a valid string name defined in attribute 'setupInverterStrings'.};
+              }
+          }
+      }
+      
       $data{$type}{$name}{circular}{99}{attrInvChangedTs} = int time;
+      
       delete $data{$type}{$name}{inverters}{$in}{invertercap};
       delete $data{$type}{$name}{inverters}{$in}{iicon};
+      delete $data{$type}{$name}{inverters}{$in}{istrings};
+      delete $data{$type}{$name}{inverters}{$in}{ifeed};
   }
   elsif ($paref->{cmd} eq 'del') {
       for my $k (keys %{$data{$type}{$name}{inverters}}) {
@@ -6910,14 +6930,14 @@ sub centralTask {
   readingsDelete              ($hash, 'AllPVforecastsToEvent');
 
   _getRoofTopData             ($centpars);                                            # Strahlungswerte/Forecast-Werte in solcastapi-Hash erstellen
+  _transferInverterValues     ($centpars);                                            # WR Werte übertragen
   _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen
   _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
-  _transferInverterValues     ($centpars);                                            # WR Werte übertragen
+  #_transferInverterValues     ($centpars);                                            # WR Werte übertragen
   _transferProducerValues     ($centpars);                                            # Werte anderer Erzeuger übertragen
   _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
   _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
-  #_createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
   _estConsumptionForecast     ($centpars);                                            # Verbrauchsprognose erstellen
   _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
@@ -7584,7 +7604,7 @@ sub __deletePvCorffReadings  {
           ($pcf)  = split " / ", $pcf if($pcf =~ /\s\/\s/xs);
 
           if ($pcf !~ /manual/xs) {                                                   # manuell gesetzte pcf-Readings nicht löschen
-              deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+              readingsDelete ($hash, "pvCorrectionFactor_${n}");                      # V 1.37.0
           }
           else {
               readingsSingleUpdate ($hash, "pvCorrectionFactor_${n}", $pcf, 0);
@@ -8201,16 +8221,16 @@ sub __calcPVestimates {
   my $fd      = $paref->{fd};
   my $num     = $paref->{num};
   my $debug   = $paref->{debug};
-  my $hash    = $defs{$name};
-
+  
+  my $hash        = $defs{$name};
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
-  my $rr1c        = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",            0);     # Gesamtniederschlag während der letzten Stunde kg/m2
-  my $wcc         = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "wcc",             0);     # effektive Wolkendecke nächste Stunde X
-  my $temp        = NexthoursVal ($hash, "NextHour".sprintf ("%02d",$num), "temp", $tempbasedef);     # vorhergesagte Temperatur Stunde X
+  my $rr1c        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",            0);   # Gesamtniederschlag während der letzten Stunde kg/m2
+  my $wcc         = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "wcc",             0);   # effektive Wolkendecke nächste Stunde X
+  my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", $tempbasedef);   # vorhergesagte Temperatur Stunde X
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   $paref->{wcc}  = $wcc;
-  my ($hc, $hq)  = ___readCandQ ($paref);                                                      # liest den anzuwendenden Korrekturfaktor
+  my ($hc, $hq)  = ___readCandQ ($paref);                                                             # liest den anzuwendenden Korrekturfaktor
   delete $paref->{wcc};
 
   my ($lh,$sq,$peakloss, $modtemp);
@@ -8237,6 +8257,23 @@ sub __calcPVestimates {
       my $est = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0);
       my $pv  = sprintf "%.1f", ($est * $hc);                                                         # Korrekturfaktor anwenden
 
+      my $invcap = 0;
+      
+      for my $in (keys %{$data{$type}{$name}{inverters}}) {
+          my $istrings = InverterVal ($hash, $in, 'istrings', '');                                    # dem Inverter zugeordnete Strings
+          next if(!grep /^$string$/, (split ',', $istrings));
+          
+          $invcap = InverterVal ($hash, $in, 'invertercap', 0);                                       # Max. Leistung des Inverters
+          
+          last;
+      }
+
+      if ($invcap && $pv > $invcap) {
+          $pv = $invcap;                                                                              # PV Vorhersage auf WR Kapazität begrenzen
+
+          debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $pv Wh due to inverter capacity");
+      }
+  
       if ($debug =~ /radiationProcess/xs) {
           $lh = {                                                                                     # Log-Hash zur Ausgabe
               "String Peak"                    => $peak. " W",
@@ -8264,21 +8301,16 @@ sub __calcPVestimates {
   }
 
   $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # temperaturbedingte Korrektur der installierten Peakleistung in W
-
-  $pvsum  = $peaksum if($peaksum && $pvsum > $peaksum);                                              # Vorhersage nicht größer als die Summe aller PV-Strings Peak
-
-  my $invcap = InverterVal ($hash, '01', 'invertercap', 0);                                          # Max. Leistung des Invertrs
-
-  if ($invcap && $pvsum > $invcap) {
-      $pvsum = $invcap;                                                                              # PV Vorhersage auf WR Kapazität begrenzen
-
-      debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $pvsum Watt due to inverter capacity");
-  }
+  $pvsum                                       = $peaksum if($peaksum && $pvsum > $peaksum);         # Vorhersage nicht größer als die Summe aller PV-Strings Peak
 
   my $logao         = qq{};
   $paref->{pvsum}   = $pvsum;
   $paref->{peaksum} = $peaksum;
+  
   ($pvsum, $logao)  = ___70percentRule ($paref);
+  
+  delete $paref->{peaksum};
+  delete $paref->{pvsum};
 
   if ($debug =~ /radiationProcess/xs) {
       $lh = {                                                                                        # Log-Hash zur Ausgabe
@@ -8532,19 +8564,23 @@ sub _transferInverterValues {
           $warn = ' (WARNING invalid real PV occured - see Logfile)';
       }
       
-      $data{$type}{$name}{inverters}{$in}{igeneration} = $pv;                                          # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-      $data{$type}{$name}{inverters}{$in}{ietotal}     = $etotal;                                      # aktuellen etotal des WR speichern
-      $data{$type}{$name}{inverters}{$in}{iname}       = $indev;                                       # Name des Inverterdevices
-      $data{$type}{$name}{inverters}{$in}{ialias}      = AttrVal ($indev, 'alias', $indev);            # Alias Inverter
-      $data{$type}{$name}{inverters}{$in}{invertercap} = $h->{capacity} if(defined $h->{capacity});    # optionale Angabe max. WR-Leistung
-      $data{$type}{$name}{inverters}{$in}{iicon}       = $h->{icon}     if($h->{icon});                # Icon des Inverters
-
+      my $feed = $h->{feed} // 'default'; 
+      
+      $data{$type}{$name}{inverters}{$in}{igeneration}  = $pv;                                          # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      $data{$type}{$name}{inverters}{$in}{ietotal}      = $etotal;                                      # aktuellen etotal des WR speichern
+      $data{$type}{$name}{inverters}{$in}{iname}        = $indev;                                       # Name des Inverterdevices
+      $data{$type}{$name}{inverters}{$in}{ialias}       = AttrVal ($indev, 'alias', $indev);            # Alias Inverter
+      $data{$type}{$name}{inverters}{$in}{invertercap}  = $h->{capacity} if(defined $h->{capacity});    # optionale Angabe max. WR-Leistung
+      $data{$type}{$name}{inverters}{$in}{iicon}        = $h->{icon}     if($h->{icon});                # Icon des Inverters
+      $data{$type}{$name}{inverters}{$in}{istrings}     = $h->{strings}  if($h->{strings});             # dem Inverter zugeordnete Strings
+      $data{$type}{$name}{inverters}{$in}{ifeed}        = $feed;                                        # Eigenschaften der Energielieferung
+      
       $pvsum        += $pv;
       $ethishoursum += $ethishour;
       
       writeToHistory ( { paref => $paref, key => 'pvrl'.$in, val => $ethishour, hour => $nhour } );
       
-      debugLog ($paref, "collectData", "collect Inverter $in data - device: $indev =>");
+      debugLog ($paref, "collectData", "collect Inverter $in data - device: $indev, delivery: $feed =>");
       debugLog ($paref, "collectData", "pv: $pv W, etotal: $etotal Wh");
   }
   
@@ -8615,6 +8651,7 @@ sub _transferProducerValues {
       $data{$type}{$name}{producers}{$pn}{pname}       = $prdev;                                             # Name des Producerdevices
       $data{$type}{$name}{producers}{$pn}{palias}      = AttrVal ($prdev, 'alias', $prdev);                  # Alias Producer
       $data{$type}{$name}{producers}{$pn}{picon}       = $h->{icon} if($h->{icon});                          # Icon des Producers 
+      $data{$type}{$name}{producers}{$pn}{pfeed}       = 'default';                                          # Eigenschaften der Energielieferung
 
       if ($ethishour < 0) {
           $ethishour = 0;
@@ -9290,37 +9327,41 @@ sub _createSummaries {
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
   limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $slidenumdef);
 
-  my $gcon    = CurrentVal  ($hash, 'gridconsumption',         0);                                      # aktueller Netzbezug
-  my $tconsum = CurrentVal  ($hash, 'tomorrowconsumption', undef);                                      # Verbrauchsprognose für folgenden Tag
-  my $gfeedin = CurrentVal  ($hash, 'gridfeedin',              0);
-  my $batin   = CurrentVal  ($hash, 'powerbatin',              0);                                      # aktuelle Batterieladung
-  my $batout  = CurrentVal  ($hash, 'powerbatout',             0);                                      # aktuelle Batterieentladung
+  my $gcon    = CurrentVal ($hash, 'gridconsumption',         0);                                       # aktueller Netzbezug
+  my $tconsum = CurrentVal ($hash, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
+  my $gfeedin = CurrentVal ($hash, 'gridfeedin',              0);
+  my $batin   = CurrentVal ($hash, 'powerbatin',              0);                                       # aktuelle Batterieladung
+  my $batout  = CurrentVal ($hash, 'powerbatout',             0);                                       # aktuelle Batterieentladung
   
   my $pvgen   = 0;
+  my $pv2grid = 0;                                                                                      # PV-Erzeugung zu Grid-only
 
   for my $in (1..$maxinverter) {                                                                        # Summe alle Inverter
-      $in     = sprintf "%02d", $in;
-      $pvgen += InverterVal ($hash, $in, 'igeneration', 0);
+      $in      = sprintf "%02d", $in;
+      my $pvi  = InverterVal ($hash, $in, 'igeneration', 0);
+      my $feed = InverterVal ($hash, $in, 'ifeed',      '');
+      $pvgen   += $pvi;
+      $pv2grid += $pvi if($feed eq 'grid');
   }
   
   my $othprod = 0;                                                                                      # Summe Otherproducer
 
-  for my $pn (1..$maxproducer) {                                                                       # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
+  for my $pn (1..$maxproducer) {                                                                        # Erzeugung sonstiger Producer hinzufügen
       $pn       = sprintf "%02d", $pn;
       $othprod += ProducerVal ($hash, $pn, 'pgeneration', 0);
   }
 
-  my $consumption         = int ($pvgen + $othprod - $gfeedin + $gcon - $batin + $batout);
-  my $selfconsumption     = int ($pvgen - $gfeedin - $batin);
+  my $consumption         = int ($pvgen - $pv2grid + $othprod - $gfeedin + $gcon - $batin + $batout);   # ohne PV2Grid 
+  my $selfconsumption     = int ($pvgen - $pv2grid - $gfeedin - $batin);
   $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
 
-  my $surplus             = int ($pvgen + $othprod - $consumption);                                     # aktueller Überschuß
+  my $surplus             = int ($pvgen - $pv2grid + $othprod - $consumption);                          # aktueller Überschuß
   $surplus                = 0 if($surplus < 0);                                                         # wegen Vergleich nompower vs. surplus
 
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
   my $divi                = $selfconsumption + $batout + $gcon;
-  $selfconsumptionrate    = sprintf "%.0f", $selfconsumption / $pvgen * 100            if($pvgen * 1 > 0);
+  $selfconsumptionrate    = sprintf "%.0f", ($selfconsumption / $pvgen * 100)          if($pvgen * 1 > 0);
   $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / $divi * 100 if($divi);       # vermeide Illegal division by zero
 
   $data{$type}{$name}{current}{consumption}         = $consumption;
@@ -11514,8 +11555,8 @@ sub __calcNewFactor {
 
   my ($oldfac, $oldq)        = CircularSunCloudkorrVal ($hash, sprintf("%02d",$h), $sabin, $crang, 0);  # bisher definierter Korrekturfaktor / Qualität
   my ($pvhis, $fchis, $dnum) = CircularSumVal          ($hash, sprintf("%02d",$h), $sabin, $crang, 0);
-  $oldfac                    = 1 if(1 * $oldfac == 0);
-
+  $oldfac                    = 1 if(1 * $oldfac == 0);                                            
+  
   debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read historical values: pv real sum: $pvhis, pv forecast sum: $fchis, days sum: $dnum");
 
   if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !
@@ -11569,7 +11610,9 @@ sub __calcNewFactor {
       $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$crang} = $factor;
       $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$crang} = $qual;
   }
-
+  
+  $oldfac = sprintf "%.2f", $oldfac;
+  
 return ($oldfac, $factor, $dnum);
 }
 
@@ -12206,23 +12249,23 @@ sub _checkSetupNotComplete {
 
   ##########################################################################################
 
-  my $is    = AttrVal     ($name, 'setupInverterStrings',   undef);                       # String Konfig
-  my $wedev = AttrVal     ($name, 'setupWeatherDev1',       undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
-  my $radev = AttrVal     ($name, 'setupRadiationAPI',      undef);                       # Device Strahlungsdaten Vorhersage
-  my $indev = AttrVal     ($name, 'setupInverterDev01',     undef);                       # Inverter Device
-  my $medev = AttrVal     ($name, 'setupMeterDev',          undef);                       # Meter Device
-  my $peaks = AttrVal     ($name, 'setupStringPeak',        undef);                       # String Peak
-  my $maz   = ReadingsVal ($name, 'setupStringAzimuth',     undef);                       # Modulausrichtung Konfig (Azimut)
-  my $mdec  = ReadingsVal ($name, 'setupStringDeclination', undef);                       # Modul Neigungswinkel Konfig
-  my $mrt   = AttrVal     ($name, 'setupRoofTops',          undef);                       # RoofTop Konfiguration (SolCast API)
+  my $strings = AttrVal     ($name, 'setupInverterStrings',   undef);                       # String Konfig
+  my $wedev   = AttrVal     ($name, 'setupWeatherDev1',       undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
+  my $radev   = AttrVal     ($name, 'setupRadiationAPI',      undef);                       # Device Strahlungsdaten Vorhersage
+  my $indev   = AttrVal     ($name, 'setupInverterDev01',     undef);                       # Inverter Device
+  my $medev   = AttrVal     ($name, 'setupMeterDev',          undef);                       # Meter Device
+  my $peaks   = AttrVal     ($name, 'setupStringPeak',        undef);                       # String Peak
+  my $maz     = ReadingsVal ($name, 'setupStringAzimuth',     undef);                       # Modulausrichtung Konfig (Azimut)
+  my $mdec    = ReadingsVal ($name, 'setupStringDeclination', undef);                       # Modul Neigungswinkel Konfig
+  my $mrt     = AttrVal     ($name, 'setupRoofTops',          undef);                       # RoofTop Konfiguration (SolCast API)
 
-  my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
+  my $vrmcr   = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
 
-  my ($coset, $lat, $lon) = locCoordinates();                                             # Koordinaten im global device
+  my ($coset, $lat, $lon) = locCoordinates();                                               # Koordinaten im global device
   my $rip;
-  $rip      = 1 if(exists $data{$type}{$name}{solcastapi}{'?IdPair'});                    # es existiert mindestens ein Paar RoofTop-ID / API-Key
+  $rip      = 1 if(exists $data{$type}{$name}{solcastapi}{'?IdPair'});                      # es existiert mindestens ein Paar RoofTop-ID / API-Key
 
-  my $pv0   = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                          # der erste PV ForeCast Wert
+  my $pv0   = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                            # der erste PV ForeCast Wert
 
   my $link   = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$name</a>};
   my $height = AttrNum ($name, 'graphicBeamHeightLevel1', 200);
@@ -12249,7 +12292,7 @@ sub _checkSetupNotComplete {
   my $chkicon  = "<a onClick=$cmdplchk>$img</a>";
   my $chktitle = $htitles{plchk}{$lang};
 
-  if (!$is || !$wedev || !$radev || !$indev || !$medev || !$peaks                                        ||
+  if (!$strings || !$wedev || !$radev || !$indev || !$medev || !$peaks                                   ||
      (isSolCastUsed ($hash) ? (!$rip || !$mrt) : isVictronKiUsed ($hash) ? !$vrmcr : (!$maz || !$mdec )) ||
      (isForecastSolarUsed ($hash) ? !$coset : '')                                                        ||
      (isOpenMeteoUsed ($hash)     ? !$coset : '')                                                        ||
@@ -12262,7 +12305,7 @@ sub _checkSetupNotComplete {
       if (!$wedev) {                                                                        ## no critic 'Cascading'
           $ret .= $hqtxt{cfd}{$lang};
       }
-      elsif (!$is) {
+      elsif (!$strings) {
           $ret .= $hqtxt{ist}{$lang};
       }
       elsif (!$peaks) {
@@ -14097,10 +14140,10 @@ sub _flowGraphic {
   my $lang          = $paref->{lang};
 
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
-  my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';  # Animation Ja/Nein
+  my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';     # Animation Ja/Nein
   my $cgc        = ReadingsNum ($name, 'Current_GridConsumption', 0);
-  my $cgfi       = ReadingsNum ($name, 'Current_GridFeedIn',      0);
-  my $csc        = ReadingsNum ($name, 'Current_SelfConsumption', 0);
+  my $cgfi       = ReadingsNum ($name, 'Current_GridFeedIn',      0);                          # Summe zum Grid
+  my $cself      = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
@@ -14112,19 +14155,22 @@ sub _flowGraphic {
   
   ## definierte Producer + Inverter ermitteln und zusammenfassen
   ################################################################
-  my $pdcr  = {};                                                             # Hashref Producer
-  my $ppall = 0;                                                              # Summe Erzeugung alle nicht PV-Producer
-  my $pvall = 0;                                                              # Summe Erzeugung alle Inverter
-  my $lfn   = 0;
+  my $pdcr    = {};                                                           # Hashref Producer
+  my $ppall   = 0;                                                            # Summe Erzeugung alle nicht PV-Producer
+  my $pv2node = 0;                                                            # Summe PV-Erzeugung alle Inverter
+  my $pv2grid = 0;
+  my $lfn     = 0;
 
   for my $pn (1..$maxproducer) {
-      $pn   = sprintf "%02d", $pn;
-      my $p = ProducerVal ($hash, $pn, 'pgeneration', undef);
+      $pn      = sprintf "%02d", $pn;
+      my $p    = ProducerVal ($hash, $pn, 'pgeneration',    undef);
+      my $feed = ProducerVal ($hash, $pn, 'pfeed',      'default');
 
       if (defined $p) {
           $p                  = __normDecPlaces ($p);
           $pdcr->{$lfn}{p}    = $p;                                           # aktuelle Erzeugung nicht PV-Producer 
           $pdcr->{$lfn}{pn}   = $pn;                                          # Producernummer
+          $pdcr->{$lfn}{feed} = $feed;                                        # Eigenschaft der Energielieferung
           $pdcr->{$lfn}{ptyp} = 'producer';                                   # Typ des Producers
           $ppall             += $p;                                           # aktuelle Erzeuguung aller nicht PV-Producer
           
@@ -14133,23 +14179,27 @@ sub _flowGraphic {
   }
       
   for my $in (1..$maxinverter) {
-      $in   = sprintf "%02d", $in;
-      my $p = InverterVal ($hash, $in, 'igeneration', undef);
+      $in      = sprintf "%02d", $in;
+      my $p    = InverterVal ($hash, $in, 'igeneration',    undef);
+      my $feed = InverterVal ($hash, $in, 'ifeed',      'default');
 
       if (defined $p) {
           $p                  = __normDecPlaces ($p);
-          $pdcr->{$lfn}{p}    = $p;                                           # aktuelle Erzeugung Inverter
-          $pdcr->{$lfn}{pn}   = $in;                                          # Inverternummer
-          $pdcr->{$lfn}{ptyp} = 'inverter';                                   # Typ des Producers
-          $pvall             += $p;
+          $pdcr->{$lfn}{pn}   = $in;                                           # Inverternummer
+          $pdcr->{$lfn}{feed} = $feed;                                         # Eigenschaft der Energielieferung
+          $pdcr->{$lfn}{ptyp} = 'inverter';                                    # Typ des Producers
+          $pdcr->{$lfn}{p}    = $p;                                            # aktuelle PV
+          $pv2node           += $p if($feed eq 'default');                     # PV-Erzeugung Inverter für das Hausnetz     
+          $pv2grid           += $p if($feed eq 'grid');                        # PV nur für das öffentliche Netz 
           
           $lfn++;
       }
   }
   
-  my $pallsum       = __normDecPlaces ($ppall + $pvall);
+  my $node2grid     = $cgfi;                                                   # vom Knoten zum Grid
+  my $pnodesum      = __normDecPlaces ($ppall + $pv2node);                     # Erzeugung Summe im Knoten
   my $producercount = keys %{$pdcr};
-  my @producers     = sort{$a<=>$b} keys %{$pdcr};
+  my @prodsorted    = __sortProducer ($pdcr);                                  # lfn Producer sortiert nach ptyp und feed
 
   ## definierte Verbraucher ermitteln
   #####################################
@@ -14177,19 +14227,19 @@ sub _flowGraphic {
       $soc    = 0;
   }
 
-  my $grid_color    = $cgfi   ? 'flowg grid_color1'               : 'flowg grid_color2';
-  my $cgc_style     = $cgc    ? 'flowg active_in'                 : 'flowg inactive_in';
-  my $batout_style  = $batout ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
-  $grid_color       = 'flowg grid_color3'  if(!$cgfi && !$cgc && $batout);                     # dritte Farbe
-  my $cgc_direction = 'M490,515 L670,590';                                                     # Batterientladung ins Netz
+  my $grid_color    = $node2grid ? 'flowg grid_color1'               : 'flowg grid_color2';
+  my $cgc_style     = $cgc       ? 'flowg active_in'                 : 'flowg inactive_in';
+  my $batout_style  = $batout    ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
+  $grid_color       = 'flowg grid_color3'  if(!$node2grid && !$cgc && $batout);                     # dritte Farbe
+  my $cgc_direction = 'M490,515 L670,590';                                                          # Batterie wird geladen
 
-  if ($batout) {                                                                               # Batterie wird entladen
-      my $cgfo = $cgfi - $pvall;
+  if ($batout) {                                                                                    # Batterie wird entladen
+      my $cgfo = $node2grid - $pv2node;
 
       if ($cgfo > 1) {
           $cgc_style      = 'flowg active_out';
           $cgc_direction  = 'M670,590 L490,515';
-          $cgfi          -= $cgfo;
+          $node2grid     -= $cgfo;
           $cgc            = $cgfo;
       }
   }
@@ -14197,7 +14247,7 @@ sub _flowGraphic {
   my $batout_direction = 'M902,515 L730,590';
 
   if ($batin) {                                                       # Batterie wird geladen
-      my $gbi = $batin - $pvall;
+      my $gbi = $batin - $pv2node;
 
       if ($gbi > 1) {                                                 # Batterieladung anteilig aus Hausnetz geladen
           $batin            -= $gbi;
@@ -14210,7 +14260,7 @@ sub _flowGraphic {
   ## Werte / SteuerungVars anpassen
   ###################################
   $flowgcons  = 0 if(!$consumercount);                                # Consumer Anzeige ausschalten wenn keine Consumer definiert
-  my $p2home  = __normDecPlaces ($csc + $ppall);                      # Energiefluß von Knoten zum Haus: Selbstverbrauch + alle Producer
+  my $p2home  = __normDecPlaces ($cself + $ppall);                    # Energiefluß von Knoten zum Haus: Selbstverbrauch + alle Producer
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
@@ -14254,8 +14304,8 @@ END0
 
   $pos_left = $producer_start + 5;
 
-  for my $lfn (@producers) {
-      my $pn      = $pdcr->{$lfn}{pn};
+  for my $lfn (@prodsorted) {
+      my $pn             = $pdcr->{$lfn}{pn};
       my ($picon, $ptxt) = __substituteIcon ( { hash  => $hash,                                                 # Icon des Producerdevices
                                                 name  => $name,
                                                 pn    => $pn,
@@ -14281,7 +14331,7 @@ END0
   my ($nicon, $ntxt) = __substituteIcon ( { hash  => $hash,
                                             name  => $name,
                                             ptyp  => 'node',
-                                            pcurr => $pallsum,
+                                            pcurr => $pnodesum,
                                             lang  => $lang
                                            }
                                          );
@@ -14372,15 +14422,15 @@ END1
       $ret .= '</g> ';
   }
 
-  ## Laufketten PV->Home, PV->Grid, Grid->Home
+  ## Laufketten PV->Home, PV->Grid, Bat->Home
   ##############################################
-  my $csc_style  = $p2home ? 'flowg active_out' : 'flowg inactive_out';
-  my $cgfi_style = $cgfi   ? 'flowg active_out' : 'flowg inactive_out';
+  my $csc_style  = $p2home    ? 'flowg active_out' : 'flowg inactive_out';
+  my $cgfi_style = $node2grid ? 'flowg active_out' : 'flowg inactive_out';
   $ret          .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
   <path id="pv-home"   class="$csc_style"  d="M700,400 L700,580" />
   <path id="pv-grid"   class="$cgfi_style" d="M670,400 L490,480" />
-  <path id="grid-home" class="$cgc_style"  d="$cgc_direction" />
+  <path id="bat-home" class="$cgc_style"  d="$cgc_direction" />
 END2
 
   ## Laufketten PV->Batterie, Batterie->Home
@@ -14411,19 +14461,22 @@ END3
   ## Producer Laufketten
   ########################
   $pos_left              = $producer_start * 2;
-  my $pos_left_start_con = 0;
+  my $pos_left_start_nod = 0;
+  my $pos_left_start_grd = 390;
   my $distance_prd       = 65;
 
   if ($producercount % 2) {
-      $pos_left_start_con = 700 - ($distance_prd  * (($producercount -1) / 2));
+      $pos_left_start_nod = 700 - ($distance_prd  * (($producercount -1) / 2));
   }
   else {
-      $pos_left_start_con = 700 - ((($distance_prd ) / 2) * ($producercount-1));
+      $pos_left_start_nod = 700 - ((($distance_prd ) / 2) * ($producercount-1));
   }
 
-  for my $lfn (@producers) {
-      my $pn             = $pdcr->{$lfn}{pn};
-      my $p              = $pdcr->{$lfn}{p};
+  for my $lfn (@prodsorted) {
+      my $pn   = $pdcr->{$lfn}{pn};
+      my $p    = $pdcr->{$lfn}{p};
+      my $feed = $pdcr->{$lfn}{feed};                                                     # default | grid | bat
+      
       my $consumer_style = 'flowg inactive_out';
          $consumer_style = 'flowg active_out' if($p > 0);
       my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
@@ -14433,9 +14486,16 @@ END3
           $chain_color  = 'style="stroke: darkorange;"';
       }
 
-      $ret                .= qq{<path id="genproducer_$pn " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_con,200" />};   # Design Consumer Laufkette
+      if ($feed eq 'default') {
+          $ret .= qq{<path id="genproducer_$lfn " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_nod,200" />};
+      }
+      elsif ($feed eq 'grid') {
+          $ret .= qq{<path id="genproducer_$lfn " class="$consumer_style" $chain_color d=" M$pos_left,130 $pos_left_start_grd,390" />};
+      }
+      
       $pos_left           += ($consDist * 2);
-      $pos_left_start_con += $distance_prd;
+      $pos_left_start_nod += $distance_prd;
+      $pos_left_start_grd += 10;
   }
 
   ## Consumer Laufketten
@@ -14481,10 +14541,10 @@ END3
   ## Textangaben an Grafikelementen
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
-  $ret .= qq{<text class="flowg text" id="node-txt"      x="800"  y="320" style="text-anchor: start;">$pallsum</text>}    if ($pallsum > 0);
+  $ret .= qq{<text class="flowg text" id="node-txt"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
   $ret .= qq{<text class="flowg text" id="bat-txt"       x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
   $ret .= qq{<text class="flowg text" id="node_home-txt" x="730"  y="520" style="text-anchor: start;">$p2home</text>}     if ($p2home);
-  $ret .= qq{<text class="flowg text" id="node-grid-txt" x="525"  y="420" style="text-anchor: end;">$cgfi</text>}         if ($cgfi);
+  $ret .= qq{<text class="flowg text" id="node-grid-txt" x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
   $ret .= qq{<text class="flowg text" id="grid-home-txt" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
   $ret .= qq{<text class="flowg text" id="batout-txt"    x="880"  y="610" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
   $ret .= qq{<text class="flowg text" id="batin-txt"     x="880"  y="420" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat);
@@ -14497,7 +14557,7 @@ END3
   ########################                                                        
   $pos_left = $producer_start * 2 - 70;                                                       # -XX -> Start Lage Producer Beschriftung
 
-  for my $lfn (@producers) {
+  for my $lfn (@prodsorted) {
       my $pn        = $pdcr->{$lfn}{pn};
       $currentPower = $pdcr->{$lfn}{p};
       $lcp          = length $currentPower;
@@ -14569,6 +14629,41 @@ END3
   $ret .= qq{</g></svg>};
 
 return $ret;
+}
+
+################################################################
+#  erzeugt eine Liste der Producernummern sortiert von
+#  links nach rechts:
+#  -> alle Inverter mit Feed-Typ 'grid'
+#  -> alle Producer (nicht PV)
+#  -> alle Inverter mit Feed-Typ 'default'
+#  -> alle Inverter mit Feed-Typ 'bat'
+################################################################         
+sub __sortProducer {
+  my $pdcr = shift;                                                           # Hashref Producer
+  
+  my @all   = ();
+  my @igrid = ();
+  my @prod  = ();
+  my @idef  = ();
+  my @ibat  = ();  
+  
+  for my $lfn (sort{$a<=>$b} keys %{$pdcr}) {
+      my $ptyp = $pdcr->{$lfn}{ptyp};                                         # producer | inverter
+      my $feed = $pdcr->{$lfn}{feed};                                         # default | grid | bat
+      
+      push @igrid, $lfn if($ptyp eq 'inverter' && $feed eq 'grid');
+      push @prod,  $lfn if($ptyp eq 'producer');
+      push @idef,  $lfn if($ptyp eq 'inverter' && $feed eq 'default');
+      push @ibat,  $lfn if($ptyp eq 'inverter' && $feed eq 'bat');
+  }
+  
+  push @all, @igrid;
+  push @all, @prod;
+  push @all, @idef;
+  push @all, @ibat;
+  
+return @all;
 }
 
 ################################################################
@@ -14702,8 +14797,6 @@ sub __normIconScale {
   
   $icon =~ s/width="(.*?)"/width="$widthnormpt"/;
   $icon =~ s/height="(.*?)"/height="$heightnormpt"/;
-  
-  # Log3 ($name, 2, "$name - widthnormpt: $widthnormpt, heightnormpt: $heightnormpt");
   
 return ($fgscaledef, $icon);
 }
@@ -16468,7 +16561,7 @@ sub checkPlantConfig {
 
   for my $sn (sort keys %{$data{$type}{$name}{strings}}) {
       my $sp = $sn." => ".$sub->($sn)."<br>";
-      Log3 ($name, 1, "$name - sp: $sp");
+
       $result->{'String Configuration'}{note} .= $sn." => ".$sub->($sn)."<br>";
 
       if ($data{$type}{$name}{strings}{$sn}{peak} >= 500) {
@@ -20184,11 +20277,13 @@ to ensure that the system configuration is correct.
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>ietotal </b>        </td><td>total energy generated by the inverter to date (Wh)              </td></tr>
+            <tr><td> <b>ifeed </b>          </td><td>Energy supply characteristics                                    </td></tr>
             <tr><td> <b>igeneration </b>    </td><td>current PV generation (W)                                        </td></tr>
             <tr><td> <b>iicon </b>          </td><td>any icons defined for displaying the device in the graphic       </td></tr>
             <tr><td> <b>ialias </b>         </td><td>Alias of the device                                              </td></tr>
             <tr><td> <b>iname </b>          </td><td>Name of the device                                               </td></tr>
             <tr><td> <b>invertercap </b>    </td><td>the nominal power (W) of the inverter (if defined)               </td></tr>
+            <tr><td> <b>istrings </b>       </td><td>List of strings assigned to the inverter (if defined)            </td></tr>
 		 </table>
       </ul>
 
@@ -20204,11 +20299,12 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>petotal </b>        </td><td>total energy generated by the producer to date (Wh)             </td></tr>
-            <tr><td> <b>pgeneration </b>    </td><td>current power (W)                                               </td></tr>
-            <tr><td> <b>picon </b>          </td><td>any icons defined for displaying the device in the graphic      </td></tr>
-            <tr><td> <b>palias </b>         </td><td>Alias of the device                                             </td></tr>
-            <tr><td> <b>pname </b>          </td><td>Name of the device                                              </td></tr>
+            <tr><td> <b>petotal </b>        </td><td>total energy generated by the producer to date (Wh)              </td></tr>
+            <tr><td> <b>pfeed </b>          </td><td>Energy supply characteristics                                    </td></tr>
+            <tr><td> <b>pgeneration </b>    </td><td>current power (W)                                                </td></tr>
+            <tr><td> <b>picon </b>          </td><td>any icons defined for displaying the device in the graphic       </td></tr>
+            <tr><td> <b>palias </b>         </td><td>Alias of the device                                              </td></tr>
+            <tr><td> <b>pname </b>          </td><td>Name of the device                                               </td></tr>
 		 </table>
       </ul>
 
@@ -21323,35 +21419,47 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
        <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; 
-                                 [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
+                                 [capacity=&lt;max. WR-Leistung&gt;] [strings=&lt;String1&gt;,&lt;String2&gt;,...]
+                                 [feed=&lt;Delivery type&gt;]
+                                 [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
-       Specifies any Device and its Readings to deliver the current PV generation values.
-       It can also be a dummy device with appropriate readings.
-       The values of several inverter devices are merged e.g. in a dummy device and this device is specified with the
-       corresponding readings. <br>
+       Defines any inverter device or solar charger and its readings to supply the current PV generation values. <br>
+       A solar charger does not convert the energy supplied by the solar cells into alternating current, 
+       but instead directly charges an existing battery <br>
+       (e.g. a Victron SmartSolar MPPT). <br>
+       Several devices can be defined one after the other in the setupInverterDev01..XX attributes. <br>
+       This can also be a dummy device with corresponding readings. <br>
+       The values of several inverters can be combined in a dummy device, for example, and this device can 
+       be specified with the corresponding readings. <br>
        Specifying <b>capacity</b> is optional, but strongly recommended to optimize prediction accuracy.
        <br><br>
 
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>icon</b>     </td><td>Icon for displaying the inverter in the flow chart (optional)                                           </td></tr>
-           <tr><td>                 </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                 </td></tr>
-           <tr><td>                 </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed      </td></tr>           
-           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                                    </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                   </td></tr>
-           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                             </td></tr>
-           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.                   </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                       </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                 </td></tr>
-           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                                    </td></tr>
+           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                                        </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                       </td></tr>
+           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                                 </td></tr>
+           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.                       </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                           </td></tr>
+           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                     </td></tr>
+           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                                        </td></tr>
+           <tr><td> <b>strings</b>  </td><td>Comma-separated list of the strings assigned to the inverter (optional). The string names                   </td></tr>
+           <tr><td>                 </td><td>are defined in the <a href=“#SolarForecast-attr-setupInverterStrings”>setupInverterStrings</a> attribute.   </td></tr>
+           <tr><td>                 </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                       </td></tr>         
+           <tr><td> <b>feed</b>     </td><td>Defines special properties of the device's energy supply (optional).                                        </td></tr>
+           <tr><td>                 </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                             </td></tr>
+           <tr><td>                 </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                            </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon for displaying the inverter in the flow chart (optional)                                               </td></tr>
+           <tr><td>                 </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                     </td></tr>
+           <tr><td>                 </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed          </td></tr>           
         </table>
        </ul>
        <br>
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
+         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 strings=Garage icon=inverter@red:solar
        </ul>
        <br>
 
@@ -22600,11 +22708,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>ietotal </b>        </td><td>Stand gesamte bisher erzeugte Energie des Wechselrichters (Wh)              </td></tr>
+            <tr><td> <b>ifeed </b>          </td><td>Eigenschaften der Energielieferung                                          </td></tr>
             <tr><td> <b>igeneration </b>    </td><td>aktuelle PV Erzeugung (W)                                                   </td></tr>
             <tr><td> <b>iicon </b>          </td><td>die evtl. festgelegten Icons zur Darstellung des Gerätes in der Grafik      </td></tr>
             <tr><td> <b>ialias </b>         </td><td>Alias des Devices                                                           </td></tr>
             <tr><td> <b>iname </b>          </td><td>Name des Devices                                                            </td></tr>
             <tr><td> <b>invertercap </b>    </td><td>die nominale Leistung (W) des Wechselrichters (falls definiert)             </td></tr>
+            <tr><td> <b>istrings </b>       </td><td>Liste der dem Wechselrichter zugeordneten Strings (falls definiert)         </td></tr>
 		 </table>
       </ul>
 
@@ -22621,6 +22731,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>petotal </b>        </td><td>Stand gesamte bisher erzeugte Energie des Erzeugers (Wh)                    </td></tr>
+            <tr><td> <b>pfeed </b>          </td><td>Eigenschaften der Energielieferung                                          </td></tr>
             <tr><td> <b>pgeneration </b>    </td><td>aktuelle Leistung (W)                                                       </td></tr>
             <tr><td> <b>picon </b>          </td><td>die evtl. festgelegten Icons zur Darstellung des Gerätes in der Grafik      </td></tr>
             <tr><td> <b>palias </b>         </td><td>Alias des Devices                                                           </td></tr>
@@ -23739,35 +23850,48 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
        <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
-                                 [capacity=&lt;max. WR-Leistung&gt;] [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
+                                 [capacity=&lt;max. WR-Leistung&gt;] [strings=&lt;String1&gt;,&lt;String2&gt;,...]
+                                 [feed=&lt;Liefertyp&gt;]
+                                 [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
-       Legt ein beliebiges Device und dessen Readings zur Lieferung der aktuellen PV Erzeugungswerte fest.
-       Es kann auch ein Dummy Device mit entsprechenden Readings sein.
-       Die Werte mehrerer Inverterdevices führt man z.B. in einem Dummy Device zusammen und gibt dieses Device mit den
-       entsprechenden Readings an. <br>
+       Legt ein beliebiges Wechselrichter-Gerät bzw. Solar-Ladegerät und dessen Readings zur Lieferung der aktuellen 
+       PV Erzeugungswerte fest. <br>
+       Ein Solar-Ladegerät wandelt die von den Solarzellen gelieferte Energie nicht in Wechselstrom um, sondern 
+       lädt damit direkt eine vorhandene Batterie <br>
+       (z.B. ein Victron SmartSolar MPPT). <br>
+       Es können nacheinander mehrere Geräte in den Attributen setupInverterDev01..XX definiert werden. <br>
+       Dabei kann es sich auch um ein Dummy Gerät mit entsprechenden Readings handeln. <br>
+       Die Werte mehrerer Wechselrichter kann man z.B. in einem Dummy Gerät zusammenführen und gibt dieses Gerät mit 
+       den entsprechenden Readings an. <br>
        Die Angabe von <b>capacity</b> ist optional, wird aber zur Optimierung der Vorhersagegenauigkeit dringend empfohlen.
        <br><br>
 
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                      </td></tr>
-           <tr><td>                 </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                            </td></tr>
-           <tr><td>                 </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt  </td></tr>
-           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                                 </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)            </td></tr>
-           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt               </td></tr>
-           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.            </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                  </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt          </td></tr>
-           <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                                    </td></tr>
+           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                                        </td></tr>
+           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)                   </td></tr>
+           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                      </td></tr>
+           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                   </td></tr>
+           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                         </td></tr>
+           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt                 </td></tr>
+           <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                                           </td></tr>
+           <tr><td> <b>strings</b>  </td><td>Komma getrennte Liste der dem Wechselrichter zugeordneten Strings (optional). Die Stringnamen               </td></tr>
+           <tr><td>                 </td><td>werden im Attribut <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a> definiert.   </td></tr>
+           <tr><td>                 </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.           </td></tr>         
+           <tr><td> <b>feed</b>     </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                              </td></tr>
+           <tr><td>                 </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.    </td></tr>
+           <tr><td>                 </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentlich Netz eingespeist                            </td></tr>
+           <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                             </td></tr>
+           <tr><td>                 </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                                   </td></tr>
+           <tr><td>                 </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt         </td></tr>
          </table>
        </ul>
        <br>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 icon=inverter@red:solar
+         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 strings=Garage icon=inverter@red:solar
        </ul>
        <br>
 
