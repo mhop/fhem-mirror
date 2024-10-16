@@ -161,7 +161,6 @@ sub Define{
     my $paw = join( ' ', devspec2array( "TYPE=AutomowerConnect" ) );
     readingsSingleUpdate( $hash, '.associatedWith', $paw, 0 );
 
-
   }
 
   return undef;
@@ -213,6 +212,16 @@ sub Notify {
       }
 
     } elsif ( $dev_name eq 'global' && $event =~ /^(INITIALIZED|MODIFIED $name|ATTR $name disable 0|DELETEATTR $name disable)$/ ) {
+
+      foreach my $keyx ( devspec2array('TYPE=AutomowerConnect') ) {
+
+        if ( !defined( $defs{$keyx}->{VERSION_AMConnectTools} ) || defined( $defs{$keyx}->{VERSION_AMConnectTools} ) && $defs{$keyx}->{VERSION_AMConnectTools} ne $defs{AMConnectTools}->{VERSION} ) {
+
+          $defs{$keyx}->{VERSION_AMConnectTools} = $defs{AMConnectTools}->{VERSION}
+
+        }
+
+      }
 
       my $runningDevices = '';
       my @mowers = devspec2array( AttrVal( $name, 'notifiedByMowerDevices', '' ) );
@@ -640,6 +649,12 @@ sub Delete {
   my $type = $hash->{TYPE};
   my $iam ="$type $name Delete: ";
   Log3( $name, 5, "$iam called" );
+
+  foreach my $keyx ( devspec2array('TYPE=AutomowerConnect') ) {
+
+    delete( $defs{$keyx}->{VERSION_AMConnectTools} ) if ( defined( $defs{$keyx}->{VERSION_AMConnectTools} ) );
+
+  }
 
   my ($passResp,$passErr) = $hash->{helper}->{passObj}->setDeletePassword($name);
   Log3( $name, 1, "$iam error: $passErr" ) if ($passErr);
