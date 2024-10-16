@@ -156,7 +156,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.37.0" => "15.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ",
+  "1.37.0" => "16.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
+                           "_flowGraphic: controlhash for producer ",
   "1.36.1" => "14.10.2024  _flowGraphic: consumer distance modified by kask, Coloring of icons corrected when creating 0 ",
   "1.36.0" => "13.10.2024  new Getter valInverter, valStrings and valProducer, preparation for multiple inverters ".
                            "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
@@ -6933,7 +6934,6 @@ sub centralTask {
   _transferInverterValues     ($centpars);                                            # WR Werte übertragen
   _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen
   _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
-  #_transferInverterValues     ($centpars);                                            # WR Werte übertragen
   _transferProducerValues     ($centpars);                                            # Werte anderer Erzeuger übertragen
   _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
   _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
@@ -14130,19 +14130,19 @@ sub _flowGraphic {
   my $type          = $paref->{type};
   my $flowgsize     = $paref->{flowgsize};
   my $flowgani      = $paref->{flowgani};
-  my $flowgshift    = $paref->{flowgshift};                   # Verschiebung der Flußgrafikbox (muß negiert werden)
-  my $flowgcons     = $paref->{flowgcons};                    # Verbraucher in der Energieflußgrafik anzeigen
-  my $flowgconTime  = $paref->{flowgconsTime};                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
+  my $flowgshift    = $paref->{flowgshift};                                   # Verschiebung der Flußgrafikbox (muß negiert werden)
+  my $flowgcons     = $paref->{flowgcons};                                    # Verbraucher in der Energieflußgrafik anzeigen
+  my $flowgconTime  = $paref->{flowgconsTime};                                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
   my $flowgconX     = $paref->{flowgconX};
   my $flowgconPower = $paref->{flowgconsPower};
-  my $consDist      = $paref->{flowgconsDist};
+  my $cdist         = $paref->{flowgconsDist};                                # Abstand Consumer zueinander
   my $css           = $paref->{css};
   my $lang          = $paref->{lang};
 
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';     # Animation Ja/Nein
   my $cgc        = ReadingsNum ($name, 'Current_GridConsumption', 0);
-  my $cgfi       = ReadingsNum ($name, 'Current_GridFeedIn',      0);                          # Summe zum Grid
+  my $node2grid  = ReadingsNum ($name, 'Current_GridFeedIn',      0);                          # vom Knoten zum Grid
   my $cself      = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
@@ -14151,7 +14151,9 @@ sub _flowGraphic {
   my $cc_dummy   = $cc;
 
   my $scale      = $fgscaledef;
-  my $hasbat     = 1;                                         # initial Batterie vorhanden
+  my $pdist      = 130;                                                       # Abstand Producer zueinander
+  my $hasbat     = 1;                                                         # initial Batterie vorhanden
+  my $lcp;
   
   ## definierte Producer + Inverter ermitteln und zusammenfassen
   ################################################################
@@ -14196,10 +14198,16 @@ sub _flowGraphic {
       }
   }
   
-  my $node2grid     = $cgfi;                                                   # vom Knoten zum Grid
-  my $pnodesum      = __normDecPlaces ($ppall + $pv2node);                     # Erzeugung Summe im Knoten
-  my $producercount = keys %{$pdcr};
-  my @prodsorted    = __sortProducer ($pdcr);                                  # lfn Producer sortiert nach ptyp und feed
+  my $pnodesum                  = __normDecPlaces ($ppall + $pv2node);         # Erzeugung Summe im Knoten
+  my ($togrid, $tonode, $tobat) = __sortProducer ($pdcr);                      # lfn Producer sortiert nach ptyp und feed
+  
+  ## Producer Koordninaten Steuerhash
+  #####################################
+  my $psorted = {                                                             
+      '1togrid' => { xicon => -100, xchain => 350,  ychain => 420, step => 70,     count => scalar @{$togrid}, sorted => $togrid },      # Producer/PV nur zu Grid 
+      '2tonode' => { xicon =>  350, xchain => 700,  ychain => 200, step => $pdist, count => scalar @{$tonode}, sorted => $tonode },      # Producer/PV zum Knoten
+      '3tobat'  => { xicon =>  750, xchain => 1100, ychain => 390, step => 10,     count => scalar @{$tobat},  sorted => $tobat  },      # Producer/PV nur zu Batterie
+  };
 
   ## definierte Verbraucher ermitteln
   #####################################
@@ -14289,41 +14297,45 @@ sub _flowGraphic {
       </g>
 END0
 
-  ## Producer Liste und Icons in Grafik anzeigen
-  ################################################
-  my $pos_left       = 0;
-  my $producer_start = 0;
-  my $producerPower  = 0;
-
-  if ($producercount % 2) {
-      $producer_start = 350 - ($consDist  * (($producercount -1) / 2));
-  }
-  else {
-      $producer_start = 350 - (($consDist / 2) * ($producercount-1));
-  }
-
-  $pos_left = $producer_start + 5;
-
-  for my $lfn (@prodsorted) {
-      my $pn             = $pdcr->{$lfn}{pn};
-      my ($picon, $ptxt) = __substituteIcon ( { hash  => $hash,                                                 # Icon des Producerdevices
-                                                name  => $name,
-                                                pn    => $pn,
-                                                ptyp  => $pdcr->{$lfn}{ptyp},
-                                                don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
-                                                pcurr => $pdcr->{$lfn}{p},
-                                                lang  => $lang
-                                              }
-                                            );
-
-      $picon           = FW_makeImage    ($picon, '');
-      ($scale, $picon) = __normIconScale ($picon, $name);
+  ## Producer Icon - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
+  #########################################################################
+  for my $st (sort keys %{$psorted}) {
+      my $left   = 0;
+      my $xicon  = $psorted->{$st}{xicon};
+      my $count  = $psorted->{$st}{count};
+      my @sorted = @{$psorted->{$st}{sorted}};
       
-      $ret .= qq{<g id="producer_$pn" fill="grey" transform="translate($pos_left,0),scale($scale)">};
-      $ret .= "<title>$ptxt</title>".$picon;
-      $ret .= '</g> ';
+      if ($count % 2) {
+          $xicon = $xicon - ($pdist  * ($count - 1) / 2);
+      }
+      else {
+          $xicon = $xicon - ($pdist / 2 * ($count - 1));
+      }
+      
+      $psorted->{$st}{start} = $xicon;
+      $left                  = $xicon + 5;
 
-      $pos_left += $consDist;
+      for my $lfn (@sorted) {
+          my $pn             = $pdcr->{$lfn}{pn};
+          my ($picon, $ptxt) = __substituteIcon ( { hash  => $hash,                                                 # Icon des Producerdevices
+                                                    name  => $name,
+                                                    pn    => $pn,
+                                                    ptyp  => $pdcr->{$lfn}{ptyp},
+                                                    don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
+                                                    pcurr => $pdcr->{$lfn}{p},
+                                                    lang  => $lang
+                                                  }
+                                                );
+
+          $picon           = FW_makeImage    ($picon, '');
+          ($scale, $picon) = __normIconScale ($picon, $name);
+          
+          $ret .= qq{<g id="producer_$pn" fill="grey" transform="translate($left,0),scale($scale)">};
+          $ret .= "<title>$ptxt</title>".$picon;
+          $ret .= '</g> ';
+
+          $left += $pdist;
+      }
   }
   
   ## Knoten Icon
@@ -14345,19 +14357,19 @@ END0
 
   ## Consumer Liste und Icons in Grafik anzeigen
   ################################################
-  $pos_left          = 0;
+  my $cons_left      = 0;
   my $consumer_start = 0;
   my $currentPower   = 0;
 
   if ($flowgcons) {
       if ($consumercount % 2) {
-          $consumer_start = 350 - ($consDist  * (($consumercount -1) / 2));
+          $consumer_start = 350 - ($cdist  * ($consumercount -1) / 2);
       }
       else {
-          $consumer_start = 350 - (($consDist / 2) * ($consumercount-1));
+          $consumer_start = 350 - ($cdist / 2 * ($consumercount-1));
       }
 
-      $pos_left = $consumer_start + 15;
+      $cons_left = $consumer_start + 15;
 
       for my $c (@consumers) {
           my $calias     = ConsumerVal ($hash, $c, 'alias', '');                                           # Name des Consumerdevices
@@ -14376,11 +14388,11 @@ END0
           $cicon           = FW_makeImage    ($cicon, '');
           ($scale, $cicon) = __normIconScale ($cicon, $name);
           
-          $ret .= qq{<g id="consumer_$c" transform="translate($pos_left,505),scale($scale)">};
+          $ret .= qq{<g id="consumer_$c" transform="translate($cons_left,505),scale($scale)">};
           $ret .= "<title>$calias</title>".$cicon;
           $ret .= '</g> ';
 
-          $pos_left += $consDist;
+          $cons_left += $cdist;
       }
   }
   
@@ -14428,8 +14440,8 @@ END1
   my $cgfi_style = $node2grid ? 'flowg active_out' : 'flowg inactive_out';
   $ret          .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-  <path id="pv-home"   class="$csc_style"  d="M700,400 L700,580" />
-  <path id="pv-grid"   class="$cgfi_style" d="M670,400 L490,480" />
+  <path id="pv-home"  class="$csc_style"  d="M700,400 L700,580" />
+  <path id="pv-grid"  class="$cgfi_style" d="M670,400 L490,480" />
   <path id="bat-home" class="$cgc_style"  d="$cgc_direction" />
 END2
 
@@ -14448,68 +14460,63 @@ END3
    if ($flowgconX) {
       my $consumer_style = 'flowg inactive_out';
       $consumer_style    = 'flowg active_in' if($cc_dummy > 1);
-      my $chain_color    = "";                                                        # Farbe der Laufkette Consumer-Dummy
+      my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
       if ($cc_dummy > 0.5) {
           $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
           #$chain_color  = 'style="stroke: #DF0101;"';
       }
 
-      $ret .= qq{<path id="home-consumer_X" class="$consumer_style" $chain_color d="M790,690 L930,690" />};
+      $ret .= qq{<path id="home-dummy" class="$consumer_style" $chain_color d="M790,690 L930,690" />};
    }
+   
+  ## Producer Laufketten - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
+  ###############################################################################
+  for my $st (sort keys %{$psorted}) {
+      my $left   = $psorted->{$st}{start} * 2;                                                # Übertrag aus Producer Icon Abschnitt
+      my $count  = $psorted->{$st}{count};
+      my $xchain = $psorted->{$st}{xchain};                                                   # X- Koordinate Kette am Ziel
+      my $ychain = $psorted->{$st}{ychain};                                                   # Y- Koordinate Kette am Ziel
+      my $step   = $psorted->{$st}{step};
+      my @sorted = @{$psorted->{$st}{sorted}};
 
-  ## Producer Laufketten
-  ########################
-  $pos_left              = $producer_start * 2;
-  my $pos_left_start_nod = 0;
-  my $pos_left_start_grd = 390;
-  my $distance_prd       = 65;
-
-  if ($producercount % 2) {
-      $pos_left_start_nod = 700 - ($distance_prd  * (($producercount -1) / 2));
-  }
-  else {
-      $pos_left_start_nod = 700 - ((($distance_prd ) / 2) * ($producercount-1));
-  }
-
-  for my $lfn (@prodsorted) {
-      my $pn   = $pdcr->{$lfn}{pn};
-      my $p    = $pdcr->{$lfn}{p};
-      my $feed = $pdcr->{$lfn}{feed};                                                     # default | grid | bat
-      
-      my $consumer_style = 'flowg inactive_out';
-         $consumer_style = 'flowg active_out' if($p > 0);
-      my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
-
-      if ($p) {
-          #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
-          $chain_color  = 'style="stroke: darkorange;"';
+      if ($count % 2) {
+          $xchain = $xchain - ($pdist  * ($count -1) / 2);
+      }
+      else {
+          $xchain = $xchain - ($pdist / 2 * ($count - 1));
       }
 
-      if ($feed eq 'default') {
-          $ret .= qq{<path id="genproducer_$lfn " class="$consumer_style" $chain_color d=" M$pos_left,130 L$pos_left_start_nod,200" />};
+      for my $lfn (@sorted) {
+          my $pn             = $pdcr->{$lfn}{pn};
+          my $p              = $pdcr->{$lfn}{p};
+          my $consumer_style = 'flowg inactive_out';
+             $consumer_style = 'flowg active_out' if($p > 0);
+          my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
+
+          if ($p) {
+              #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+              $chain_color  = 'style="stroke: darkorange;"';
+          }
+ 
+          $ret    .= qq{<path id="genproducer_$pn " class="$consumer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />}; 
+          $left   += ($pdist * 2);
+          $xchain += $step;
       }
-      elsif ($feed eq 'grid') {
-          $ret .= qq{<path id="genproducer_$lfn " class="$consumer_style" $chain_color d=" M$pos_left,130 $pos_left_start_grd,390" />};
-      }
-      
-      $pos_left           += ($consDist * 2);
-      $pos_left_start_nod += $distance_prd;
-      $pos_left_start_grd += 10;
   }
 
   ## Consumer Laufketten
   ########################
   if ($flowgcons) {
-      $pos_left          = $consumer_start * 2;
-      my $pos_left_start = 0;
-      my $distance_con   = 65;
+      $cons_left          = $consumer_start * 2;
+      my $cons_left_start = 0;
+      my $distance_con    = 65;
 
       if ($consumercount % 2) {
-          $pos_left_start = 700 - ($distance_con  * (($consumercount -1) / 2));
+          $cons_left_start = 700 - ($distance_con  * ($consumercount -1) / 2);
       }
       else {
-          $pos_left_start = 700 - ((($distance_con ) / 2) * ($consumercount-1));
+          $cons_left_start = 700 - ($distance_con / 2 * ($consumercount-1));
       }
 
       for my $c (@consumers) {
@@ -14532,9 +14539,9 @@ END3
               #$chain_color  = 'style="stroke: #DF0101;"';
           }
 
-          $ret            .= qq{<path id="home-consumer_$c" class="$consumer_style" $chain_color d="M$pos_left_start,780 L$pos_left,880" />};
-          $pos_left       += ($consDist * 2);
-          $pos_left_start += $distance_con;
+          $ret            .= qq{<path id="home-consumer_$c" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,880" />};
+          $cons_left       += ($cdist * 2);
+          $cons_left_start += $distance_con;
       }
   }
 
@@ -14550,43 +14557,44 @@ END3
   $ret .= qq{<text class="flowg text" id="batin-txt"     x="880"  y="420" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat);
   $ret .= qq{<text class="flowg text" id="home-txt"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
   $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
-
-  my $lcp;
   
-  ## Textangabe Producer
-  ########################                                                        
-  $pos_left = $producer_start * 2 - 70;                                                       # -XX -> Start Lage Producer Beschriftung
-
-  for my $lfn (@prodsorted) {
-      my $pn        = $pdcr->{$lfn}{pn};
-      $currentPower = $pdcr->{$lfn}{p};
-      $lcp          = length $currentPower;
-
-      # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
-      ###############################################################################          
-      if    ($lcp >= 5) {$pos_left -= 10}
-      elsif ($lcp == 4) {$pos_left += 10}
-      elsif ($lcp == 3) {$pos_left += 15}
-      elsif ($lcp == 2) {$pos_left += 20}
-      elsif ($lcp == 1) {$pos_left += 40}
-
-      $ret .= qq{<text class="flowg text" id="producer-txt_$pn" x="$pos_left" y="100">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
-
-      # Leistungszahl wieder zurück an den Ursprungspunkt
-      ####################################################          
-      if    ($lcp >= 5) {$pos_left += 10}
-      elsif ($lcp == 4) {$pos_left -= 10}
-      elsif ($lcp == 3) {$pos_left -= 15}
-      elsif ($lcp == 2) {$pos_left -= 20}
-      elsif ($lcp == 1) {$pos_left -= 40}       
+  ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
+  ###############################################################################                                                      
+  for my $st (sort keys %{$psorted}) {                                                       
+      my $left   = $psorted->{$st}{start} * 2 - 70;                                            # Übertrag aus Producer Icon Abschnitt, -XX -> Start Lage Producer Beschriftung
+      my @sorted = @{$psorted->{$st}{sorted}};
       
-      $pos_left  += ($consDist * 2);
+      for my $lfn (@sorted) {
+          my $pn        = $pdcr->{$lfn}{pn};
+          $currentPower = $pdcr->{$lfn}{p};
+          $lcp          = length $currentPower;
+
+          # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
+          ###############################################################################          
+          if    ($lcp >= 5) {$left -= 10}
+          elsif ($lcp == 4) {$left += 10}
+          elsif ($lcp == 3) {$left += 15}
+          elsif ($lcp == 2) {$left += 20}
+          elsif ($lcp == 1) {$left += 40}
+
+          $ret .= qq{<text class="flowg text" id="producer-txt_$pn" x="$left" y="100">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
+
+          # Leistungszahl wieder zurück an den Ursprungspunkt
+          ####################################################          
+          if    ($lcp >= 5) {$left += 10}
+          elsif ($lcp == 4) {$left -= 10}
+          elsif ($lcp == 3) {$left -= 15}
+          elsif ($lcp == 2) {$left -= 20}
+          elsif ($lcp == 1) {$left -= 40}       
+          
+          $left += ($pdist * 2);
+      }
   }
 
   ## Textangabe Consumer
   ########################
   if ($flowgcons) {
-      $pos_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
+      $cons_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
 
       for my $c (@consumers) {
           $currentPower    = sprintf "%.1f", $cnsmr->{$c}{p};
@@ -14600,29 +14608,29 @@ END3
           
           $lcp = length $currentPower;
 
-          #$ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$pos_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
-          #$ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$pos_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
+          #$ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$cons_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
+          #$ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ##################################################################################
-          if    ($lcp >= 5) {$pos_left -= 40}
-          elsif ($lcp == 4) {$pos_left -= 25}
-          elsif ($lcp == 3) {$pos_left -= 5 }
-          elsif ($lcp == 2) {$pos_left += 7 }
-          elsif ($lcp == 1) {$pos_left += 25}
+          if    ($lcp >= 5) {$cons_left -= 40}
+          elsif ($lcp == 4) {$cons_left -= 25}
+          elsif ($lcp == 3) {$cons_left -= 5 }
+          elsif ($lcp == 2) {$cons_left += 7 }
+          elsif ($lcp == 1) {$cons_left += 25}
 
-          $ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$pos_left" y="1110">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
-          $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$pos_left" y="1170">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
+          $ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$cons_left" y="1110">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
+          $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$cons_left" y="1170">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl wieder zurück an den Ursprungspunkt
           ######################################################          
-          if    ($lcp >= 5) {$pos_left += 40}
-          elsif ($lcp == 4) {$pos_left += 25}
-          elsif ($lcp == 3) {$pos_left += 5 }
-          elsif ($lcp == 2) {$pos_left -= 7 }
-          elsif ($lcp == 1) {$pos_left -= 25}
+          if    ($lcp >= 5) {$cons_left += 40}
+          elsif ($lcp == 4) {$cons_left += 25}
+          elsif ($lcp == 3) {$cons_left += 5 }
+          elsif ($lcp == 2) {$cons_left -= 7 }
+          elsif ($lcp == 1) {$cons_left -= 25}
 
-          $pos_left  += ($consDist * 2);
+          $cons_left  += ($cdist * 2);
       }
   }
 
@@ -14642,11 +14650,13 @@ return $ret;
 sub __sortProducer {
   my $pdcr = shift;                                                           # Hashref Producer
   
-  my @all   = ();
-  my @igrid = ();
-  my @prod  = ();
-  my @idef  = ();
-  my @ibat  = ();  
+  my @igrid  = ();
+  my @togrid = ();
+  my @prod   = ();
+  my @idef   = ();
+  my @tonode = ();
+  my @ibat   = ();
+  my @tobat  = ();
   
   for my $lfn (sort{$a<=>$b} keys %{$pdcr}) {
       my $ptyp = $pdcr->{$lfn}{ptyp};                                         # producer | inverter
@@ -14658,12 +14668,12 @@ sub __sortProducer {
       push @ibat,  $lfn if($ptyp eq 'inverter' && $feed eq 'bat');
   }
   
-  push @all, @igrid;
-  push @all, @prod;
-  push @all, @idef;
-  push @all, @ibat;
+  push @togrid, @igrid;
+  push @tonode, @prod;
+  push @tonode, @idef;
+  push @tobat,  @ibat;
   
-return @all;
+return (\@togrid, \@tonode, \@tobat);
 }
 
 ################################################################
@@ -23920,7 +23930,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;
                             [conprice=&lt;Feld&gt;] [feedprice=&lt;Feld&gt;] </b> <br><br>
 
-       Legt ein beliebiges Device und seine Readings zur Energiemessung fest.
+       Legt ein beliebiges Device und seine Readings zur Energiemessung in bzw. aus dem öffentlichen Netz fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings positiv ist.
        Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
        <br><br>
