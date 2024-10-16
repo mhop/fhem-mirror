@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bufgix:  72_FRITZBOX: kleinere Schönheits-Fehler 
+ - feature: 72_FRITZBOX: Neue Readings box_usb...
+            Aktivierbar über Attribut enableBoxReadings
  - feature: 82_LGTV_WebOS: add Support for JellyFin App
  - feature: 74_AutomowerConnect: attribute controlled automatic syncronizing
                                  the mower time if DST changes
