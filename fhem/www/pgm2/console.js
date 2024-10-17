@@ -3,13 +3,14 @@ FW_version["console.js"] = "$Id$";
 
 var consConn;
 var consName="#console";
+var htmlInEventMonitor;
 
 var consFilter, oldFilter, consFType="";
 var consLastIndex = 0;
 var withLog = 0;
 var mustScroll = 1;
 
-log("Event monitor is starting!");
+log("Event monitor is starting");
 
 function
 cons_closeConn()
@@ -26,22 +27,32 @@ cons_closeConn()
 function
 consAppender(new_content)
 {
+  var isHtml = htmlInEventMonitor && new_content.match(/<html>[\s\S]*<\/html>/);
+
   // Extract the FHEM-Log, to avoid escaping its formatting (Forum #104842)
   var logContent = "";
   var rTab = {'<':'&lt;', '>':'&gt;',' ':'&nbsp;', '\n':'<br>' };
-  new_content = new_content.replace(
-  /(<div class='fhemlog'>)([\s\S]*?)(<\/div>)/gm,
-  function(all, div1, msg, div2) {
-    logContent += div1+
-                  msg.replace(/[<> \n]/g, function(a){return rTab[a]})+
-                  div2;
-    return "";
-  });
+
+  function
+  doEscape(inStr)
+  {
+    let r =  isHtml ? inStr :
+                    inStr.replace(/[<> \n]/g, function(a){return rTab[a]});
+    return isHtml ? inStr :
+                    inStr.replace(/[<> \n]/g, function(a){return rTab[a]});
+  }
+
+  new_content = new_content
+                  .replace(/(<div class='fhemlog'>)([\s\S]*?)(<\/div>)/gm,
+                    function(all, div1, msg, div2) {
+                      logContent += div1+msg+div2; // msg is already escaped
+                      return "";
+                    });
 
   var isTa = $(consName).is("textarea"); // 102773
   var ncA = new_content.split(/<br>[\r\n]/);
   for(var i1=0; i1<ncA.length; i1++)
-    ncA[i1] = ncA[i1].replace(/[<> ]/g, function(a){return rTab[a]});
+    ncA[i1] = doEscape(ncA[i1]);
   $(consName).append(logContent+ncA.join(isTa?"\n":"<br>"));
 }
 
@@ -217,6 +228,8 @@ consStart()
     }
   });
   consAddRegexpPart();
+
+  htmlInEventMonitor  = $("body").attr("data-htmlineventmonitor") == 1;
 }
 
 function

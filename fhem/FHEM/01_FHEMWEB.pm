@@ -177,6 +177,7 @@ FHEMWEB_Initialize($)
     hiddengroupRegexp
     hiddenroom
     hiddenroomRegexp
+    htmlInEventMonitor:1,0
     httpHeader
     iconPath
     jsLog:1,0
@@ -1256,6 +1257,7 @@ FW_dataAttr()
     addParam($FW_wname, "addHtmlTitle", 1).
     addParam($FW_wname, "styleData", "").
     addParam($FW_wname, "hiddenroom", "").
+    addParam($FW_wname, "htmlInEventMonitor", 0). #139453
     addParam("global",  "language", "EN").
     "data-availableJs='$FW_fhemwebjs' ".
     "data-webName='$FW_wname' ";
@@ -4126,6 +4128,12 @@ FW_log($$)
         </li>
         <br>
 
+    <a id="FHEMWEB-attr-htmlInEventMonitor"></a>
+    <li>htmlInEventMonitor<br>
+        if set to 1, text enclosed in &lt;html&gt;...&lt;/html&gt; will not be
+        escaped in the event monitor.
+        </li>
+        <br>
 
     <a id="FHEMWEB-attr-HTTPS"></a>
     <li>HTTPS<br>
@@ -4985,6 +4993,13 @@ FW_log($$)
         <ul><code>
           attr WEB httpHeader X-Clacks-Overhead: GNU Terry Pratchett
         </code></ul>
+        </li>
+        <br>
+
+    <a id="FHEMWEB-attr-htmlInEventMonitor"></a>
+    <li>htmlInEventMonitor<br>
+        falls 1, Text in &lt;html&gt;...&lt;/html&gt; wird im Event Monitor als
+        HTML interpretiert.
         </li>
         <br>
 
