@@ -1124,7 +1124,7 @@ sub Timer {
 
   # perform updates every quarter of an hour: alerts=every, forecast=specific
   my $firstRun = delete $hash->{'.firstRun'} // 0;
-  my $forecastQuarter = ::AttrVal($name, 'forecastRefresh', 6) >= 6 ? 0 : 2;
+  my $forecastQuarter = ::AttrVal($name, 'forecastRefresh', 6) >= 6 ? 0 : 3;                                        # V 1.17.6
   my $fetchAlerts = defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"}; # fetch either alerts or forecast
 
   ::Log3 $name, 5, "$name: Timer first:$firstRun forecastQuarter:$forecastQuarter fetchAlerts:$fetchAlerts";
@@ -3156,6 +3156,9 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 17.10.2024 (version 1.17.6) DS_Starter
+# feature: Timer - quarter 3 
 #
 # 20.05.2024 (version 1.17.5) DS_Starter
 # feature: use utf8, accept global encode=unicode
