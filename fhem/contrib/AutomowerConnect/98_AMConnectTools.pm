@@ -100,7 +100,6 @@ sub Initialize() {
   $hash->{SetFn}      = \&Set;
   $hash->{AttrFn}     = \&Attr;
   $hash->{AttrList}   = "disable:1,0 " .
-                        "disabledForIntervals " .
                         "notifiedByMowerDevices " .
                         $::readingFnAttributes;
 
@@ -115,6 +114,8 @@ sub Define{
   my $type = $val[1];
   my $iam = "$type $name Define:";
   my $username = '';
+
+  return "$iam multiple definitions are not allowed." if( scalar devspec2array( "TYPE=$type" ) > 1 );
 
   return "$iam Cannot define $type device. Perl modul $missingModul is missing." if ( $missingModul );
 
@@ -781,11 +782,9 @@ __END__
   <ul>
     <li><a id='AMConnectTools-attr-notifiedByMowerDevices'>notifiedByMowerDevice</a><br>
       <code>attr &lt;name&gt; notifiedByMowerDevice &lt;devspec for automower devices&gt;</code><br>
-      Sets the notify devices and starts increasing websocket events on mower event LEAVING and stops it with mower event PARKED_IN_CS </li>
+      Sets the notify devices and starts increasing websocket events on first running mower's event LEAVING and stops it with the last running mower's event PARKED_IN_CS </li>
 
     <li><a href="disable">disable</a></li>
-
-    <li><a href="disabledForIntervals">disabledForIntervals</a></li>
     <br><br>
   </ul>
   <br>
