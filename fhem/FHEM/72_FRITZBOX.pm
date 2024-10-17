@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "08.00.02";
+my $ModulVersion = "08.00.03";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -255,54 +255,57 @@ my %LuaQueryCmd = (
 );
 
 my %FB_Model = (
-        '7590 AX'     => "7.57" # 04.09.2023
-      , '7590'        => "7.57" # 04.09.2023
-      , '7583 VDSL'   => "7.57" # 04.09.2023
-      , '7583'        => "7.57" # 04.09.2023
-      , '7582'        => "7.17" # 04.09.2023
-      , '7581'        => "7.17" # 04.09.2023
-      , '7580'        => "7.30" # 04.09.2023
-      , '7560'        => "7.30" # 04.09.2023
-      , '7530'        => "7.57" # 04.09.2023
-      , '7530 AX'     => "7.57" # 04.09.2023
-      , '7520 B'      => "7.57" # 04.09.2023
-      , '7520'        => "7.57" # 04.09.2023
-      , '7510'        => "7.57" # 04.09.2023
-      , '7490'        => "7.57" # 04.09.2023
-      , '7430'        => "7.31" # 04.09.2023
-      , '7412'        => "6.88" # 04.09.2023
-      , '7390'        => "6.88" # 04.09.2023
-      , '7362 SL'     => "7.14" # 04.09.2023
-      , '7360 v2'     => "6.88" # 04.09.2023
-      , '7360 v1'     => "6.36" # 06.09.2023
-      , '7360'        => "6.85" # 13.03.2017
-      , '7360 SL'     => "6.35" # 07.09.2023
-      , '7312'        => "6.56" # 07.09.2023
-      , '7272'        => "6.89" # 04.09.2023
-      , '6890 LTE'    => "7.57" # 04.09.2023
-      , '6850 5G'     => "7.57" # 04.09.2023
-      , '6850 LTE'    => "7.57" # 04.09.2023
-      , '6842 LTE'    => "6.35" # 07.09.2023
-      , '6840 LTE'    => "6.88" # 07.09.2023
-      , '6820 LTE v3' => "7.57" # 04.09.2023
-      , '6820 LTE v2' => "7.57" # 04.09.2023
-      , '6820 LTE'    => "7.30" # 04.09.2023
-      , '6810 LTE'    => "6.35" # 07.09.2023
-      , '6690 Cable'  => "7.57" # 04.09.2023
-      , '6660 Cable'  => "7.57" # 04.09.2023
-      , '6591 Cable'  => "7.57" # 04.09.2023
-      , '6590 Cable'  => "7.57" # 04.09.2023
-      , '6490 Cable'  => "7.57" # 04.09.2023
-      , '6430 Cable'  => "7.30" # 04.09.2023
-      , '5590 Fiber'  => "7.58" # 08.09.2023
-      , '5530 Fiber'  => "7.58" # 08.09.2023
-      , '5491'        => "7.31" # 04.09.2023
-      , '5490'        => "7.31" # 04.09.2023
-      , '4060'        => "7.57" # 04.09.2023
-      , '4040'        => "7.57" # 04.09.2023
-      , '4020'        => "7.03" # 04.09.2023
-      , '3490'        => "7.31" # 04.09.2023
-      , '3272'        => "6.89" # 07.09.2023
+       '7690'        => { Version => "7.62", Datum => "27.08.2024"},
+       '7590 AX'     => { Version => "8.00", Datum => "16.09.2024"},
+       '7590'        => { Version => "7.59", Datum => "04.06.2024"},
+       '7583 VDSL'   => { Version => "7.59", Datum => "12.06.2024"},
+       '7583'        => { Version => "7.59", Datum => "12.06.2024"},
+       '7582'        => { Version => "7.18", Datum => "19.08.2024"},
+       '7581'        => { Version => "7.18", Datum => "19.08.2024"},
+       '7580'        => { Version => "7.30", Datum => "04.09.2023"},
+       '7560'        => { Version => "7.30", Datum => "04.09.2023"},
+       '7530'        => { Version => "8.00", Datum => "10.10.2024"},
+       '7530 AX'     => { Version => "8.00", Datum => "15.09.2024"},
+       '7520 B'      => { Version => "7.59", Datum => "26.06.2024"},
+       '7520'        => { Version => "7.59", Datum => "26.06.2024"},
+       '7510'        => { Version => "7.59", Datum => "26.06.2024"},
+       '7490'        => { Version => "7.57", Datum => "04.09.2023"},
+       '7430'        => { Version => "7.31", Datum => "04.09.2023"},
+       '7412'        => { Version => "6.88", Datum => "04.09.2023"},
+       '7390'        => { Version => "6.88", Datum => "04.09.2023"},
+       '7362 SL'     => { Version => "7.14", Datum => "04.09.2023"},
+       '7360 v2'     => { Version => "6.88", Datum => "04.09.2023"},
+       '7360 v1'     => { Version => "6.36", Datum => "06.09.2023"},
+       '7360'        => { Version => "6.85", Datum => "13.03.2017"},
+       '7360 SL'     => { Version => "6.35", Datum => "07.09.2023"},
+       '7312'        => { Version => "6.56", Datum => "07.09.2023"},
+       '7272'        => { Version => "6.89", Datum => "04.09.2023"},
+       '6890 LTE'    => { Version => "7.57", Datum => "04.09.2023"},
+       '6850 5G'     => { Version => "7.59", Datum => "13.08.2024"},
+       '6850 LTE'    => { Version => "7.59", Datum => "13.08.2024"},
+       '6842 LTE'    => { Version => "6.35", Datum => "07.09.2023"},
+       '6840 LTE'    => { Version => "6.88", Datum => "07.09.2023"},
+       '6820 LTE v3' => { Version => "7.57", Datum => "04.09.2023"},
+       '6820 LTE v2' => { Version => "7.57", Datum => "04.09.2023"},
+       '6820 LTE'    => { Version => "7.30", Datum => "04.09.2023"},
+       '6810 LTE'    => { Version => "6.35", Datum => "07.09.2023"},
+       '6690 Cable'  => { Version => "7.57", Datum => "04.09.2023"},
+       '6660 Cable'  => { Version => "8.00", Datum => "10.10.2024"},
+       '6591 Cable'  => { Version => "8.00", Datum => "02.10.2024"},
+       '6590 Cable'  => { Version => "7.57", Datum => "04.09.2023"},
+       '6490 Cable'  => { Version => "7.57", Datum => "04.09.2023"},
+       '6430 Cable'  => { Version => "7.30", Datum => "04.09.2023"},
+       '5590 Pro  '  => { Version => "7.62", Datum => "20.08.2024"},
+       '5590 Fiber'  => { Version => "7.58", Datum => "08.09.2023"},
+       '5530 Fiber'  => { Version => "8.00", Datum => "08.10.2024"},
+       '5491'        => { Version => "7.31", Datum => "04.09.2023"},
+       '5490'        => { Version => "7.31", Datum => "04.09.2023"},
+       '4060'        => { Version => "7.59", Datum => "11.06.2024"},
+       '4050'        => { Version => "7.57", Datum => "02.09.2024"},
+       '4040'        => { Version => "7.57", Datum => "04.09.2023"},
+       '4020'        => { Version => "7.04", Datum => "18.08.2024"},
+       '3490'        => { Version => "7.31", Datum => "04.09.2023"},
+       '3272'        => { Version => "6.89", Datum => "07.09.2023"}
    );
 
 my %RP_Model = (
@@ -6973,6 +6976,7 @@ sub FRITZBOX_Set_check_APIs($)
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "Error", "cannot connect due to network error 500";
 
+     $hash->{fhem}{sidTime} = 0;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
@@ -6981,6 +6985,7 @@ sub FRITZBOX_Set_check_APIs($)
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", 1;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", "Ok";
 
+     $hash->{fhem}{sidTime} = 0;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
 
@@ -7019,7 +7024,11 @@ sub FRITZBOX_Set_check_APIs($)
 
            if ( !defined $response->{sid} || defined $response->{Error} || defined $response->{AuthorizationRequired} ) {
              FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
-             $apiError = "luaQuery: error query string";
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 0;
+             $apiError = "luaQuery:";
+             $apiError .= " empty sid" if !defined $response->{sid};
+             $apiError .= " error: $response->{Error}" if defined $response->{Error};
+             $apiError .= " authorization: $response->{AuthorizationRequired}" if defined $response->{AuthorizationRequired};
              FRITZBOX_Log $hash, 4, "$queryStr: not Ok";
            } else {
 
