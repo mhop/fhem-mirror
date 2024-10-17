@@ -7,7 +7,6 @@
 #
 #   heating valves average, with some adjust and ignore options
 #   http://forum.fhem.de/index.php/topic,24658.0.html
-#   refer to mail a.T. duesterwald do T info if necessary
 #
 #   thanks to cwagner for testing and a great documentation of the module:
 #   http://www.fhemwiki.de/wiki/Raumbedarfsabh%C3%A4ngige_Heizungssteuerung
@@ -75,9 +74,7 @@ sub Initialize {
     $hash->{SetFn}   = \&Set;
     $hash->{GetFn}   = \&Get;
     $hash->{AttrFn}  = \&Attr;
-    my $attrList = "valvesPollInterval:1,2,3,4,5,6,7,8,9,10,11,15,20,25,30,45,60,90,120,240,480,900" . " valvesDeviceList valvesDeviceReading valvesIgnoreLowest valvesIgnoreHighest valvesIgnoreDeviceList" . " valvesPriorityDeviceList valvesInitialDelay";
-
-    #my $i = 0;
+    my $attrList = 'valvesPollInterval:1,2,3,4,5,6,7,8,9,10,11,15,20,25,30,45,60,90,120,240,480,900 decimals:0,1 valvesDeviceList valvesDeviceReading valvesIgnoreLowest valvesIgnoreHighest valvesIgnoreDeviceList valvesPriorityDeviceList valvesInitialDelay';
     $hash->{AttrList} = "disable:0,1 disabledForIntervals $readingFnAttributes $attrList";
     return;
 }
@@ -209,6 +206,13 @@ sub Attr {
         }
         InternalTimer( gettimeofday() + $attrVal, \&VALVES_GetUpdate, $hash, 0 ) if !$init_done;
     }
+    
+    if ( $attrName eq 'decimals' && $cmd eq 'set' ) {
+        if ( !looks_like_number($attrVal) ) {
+            return "$attrVal is not a number!" if $init_done;
+        }
+        return;
+    }
 
     #other attribs
     if ( $attrName =~ m{\Avalves\d+}x ) {
@@ -327,7 +331,10 @@ sub VALVES_GetUpdate {
         $state += $valveShort{$_};
     }
     my $corr = sum(@prios) / @prios;
-    $state = sprintf "%.0f", $state / @sorted / $corr;
+    my $decimals = AttrVal($name,'decimals',0);
+    $decimals = 0 if !looks_like_number($decimals);
+
+    $state = sprintf "%.${decimals}f", $state / @sorted / $corr;
     if ( ReadingsVal( $name, 'state', 'err' ) ne $state ) {
         readingsBulkUpdate( $hash, 'valve_average', $state, 1 );
         readingsBulkUpdate( $hash, 'state',         $state, 1 );
@@ -336,7 +343,7 @@ sub VALVES_GetUpdate {
     for (@raw_average) {
         $state += $_;
     }
-    $state = sprintf "%.0f", $state / @raw_average;
+    $state = sprintf "%.${decimals}f", $state / @raw_average;
     readingsBulkUpdateIfChanged( $hash, 'raw_average', $state, 1 );
 
     readingsEndUpdate( $hash, 1 );
@@ -471,7 +478,11 @@ __END__
         Thermostates matching the regex will be doubled in the calculation process</li>
     <a id="VALVES-attr-valvesDevicenameWeighting" data-pattern="valves.*Weighting"></a>
     <li><b>valves&lt;Devicename&gtWeighting &lt;float value&gt;</b><br>
-        Individual weighting factor (lfoat value) for each thermostate. May e.g. be used to compensate hydraulic problems in the heating system</li>
+        Individual weighting factor (float value) for each thermostate. May e.g. be used to compensate hydraulic problems in the heating system</li>
+    <a id="VALVES-attr-decimals"></a>
+    <li><b>decimals &lt;number of decimals&gt;</b><br>
+        Number of decimals for state, valve_raw and valve_average readings. Default is "0"</li>
+    
   </ul>
 </ul>
 
