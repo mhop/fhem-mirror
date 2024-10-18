@@ -910,10 +910,8 @@ sub Attr {
   my ($command, $name, $attribute, $value) = @_;
   my $hash = $::defs{$name};
 
-  for ($command) {
-    when ("set") {
-      for ($attribute) {
-        when ("disable") {
+    if ($command eq 'set') {                                       # V 1.17.7: change "when" to "if" - https://forum.fhem.de/index.php?msg=1319475
+        if ($attribute eq "disable") {
           # enable/disable polling
           if ($::init_done) {
             if ($value) {
@@ -925,7 +923,7 @@ sub Attr {
             }
           }
         }
-        when ("forecastRefresh") {
+        elsif ($attribute eq "forecastRefresh") {
           if (!(defined($value) && looks_like_number($value) && $value >= 1 && $value <= 6)) {
             my $oldRefresh = ::AttrVal($name, 'forecastRefresh', 6);
             if ($::init_done && (($oldRefresh < 6 && $value >= 6) || ($oldRefresh >= 6 && $value < 6))) {
@@ -934,7 +932,7 @@ sub Attr {
             }
           }
         }
-        when ("forecastResolution") {
+        elsif ($attribute eq "forecastResolution") {
           if (defined($value) && looks_like_number($value) && $value > 0) {
             my $oldForecastResolution = ::AttrVal($name, 'forecastResolution', 6);
             if ($::init_done && defined($oldForecastResolution) && $oldForecastResolution != $value) {
@@ -944,59 +942,54 @@ sub Attr {
             return "invalid value for forecastResolution (possible values are 1, 3 and 6)";
           }
         }
-        when ("downloadTimeout") {
+        elsif ($attribute eq "downloadTimeout") {
           if (!(defined($value) && looks_like_number($value) && $value >= DOWNLOAD_TIMEOUT_MIN && $value <= DOWNLOAD_TIMEOUT_MAX)) {
             return "invalid value for downloadTimeout (" . DOWNLOAD_TIMEOUT_MIN . " .. " . DOWNLOAD_TIMEOUT_MAX . ")";
           }
         }
-        when ("forecastStation") {
+        elsif ($attribute eq "forecastStation") {
           my $oldForecastStation = ::AttrVal($name, 'forecastStation', undef);
           if ($::init_done && defined($oldForecastStation) && $oldForecastStation ne $value) {
             ::CommandDeleteReading(undef, "$name ^fc.*");
           }
         }
-        when ("forecastWW2Text") {
+        elsif ($attribute eq "forecastWW2Text") {
           if ($::init_done && !$value) {
             ::CommandDeleteReading(undef, "$name ^fc.*wwd\$");
           }
         }
-        when ("timezone") {
+        elsif ($attribute eq "timezone") {
           if (defined($value) && length($value) > 0) {
             $hash->{'.TZ'} = $value;
           } else {
             return "timezone (e.g. Europe/Berlin) required";
           }
         }
-      }
     }
-
-    when ("del") {
-      for ($attribute) {
-        when ("disable") {
+    elsif ($command eq 'del') {
+        if ($attribute eq "disable") {
           ::readingsSingleUpdate($hash, 'state', 'defined', 1);
           ::InternalTimer(gettimeofday() + 3, 'DWD_OpenData::Timer', $hash, 0);
         }
-        when ("forecastResolution") {
+        elsif ($attribute eq "forecastResolution") {
           my $oldForecastResolution = ::AttrVal($name, 'forecastResolution', 6);
           if ($oldForecastResolution != 6) {
             ::CommandDeleteReading(undef, "$name ^fc.*");
           }
         }
-        when ("forecastStation") {
+        elsif ($attribute eq "forecastStation") {
           ::CommandDeleteReading(undef, "$name ^fc.*");
         }
-        when ("forecastResolution") {
+        elsif ($attribute eq "forecastResolution") {
           ::CommandDeleteReading(undef, "$name ^fc.*");
         }
-        when ("forecastWW2Text") {
+        elsif ($attribute eq "forecastWW2Text") {
           ::CommandDeleteReading(undef, "$name ^fc.*wwd\$");
         }
-        when ("timezone") {
+        elsif ($attribute eq "timezone") {
           $hash->{'.TZ'} = $hash->{FHEM_TZ};
         }
-      }
     }
-  }
 
   return undef;
 }
@@ -3156,6 +3149,9 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 18.10.2024 (version 1.17.7) DS_Starter
+# 1.17.7: bugfix: change attr "when" to "if" - https://forum.fhem.de/index.php?msg=1319475
 #
 # 17.10.2024 (version 1.17.6) DS_Starter
 # feature: Timer - quarter 3 
