@@ -100,10 +100,12 @@ sub DialogueTest{
     my $response = "RHASSPY asking for OK or cancellation: Site $site, Type $type";
     my $ca_string = qq{$hash->{LANGUAGE}.$hash->{fhemId}:ConfirmAction};
     my $reaction = { text         => $response, 
-                     intentFilter => ["$ca_string"] };
+                     intentFilter => ["$ca_string"],
+                     customData   => $data->{customData}		#hand over existing reference
+                   };
 
     $rets[0] = $reaction;
-    $rets[2] = 30; #timeout to replace default timeout
+    $rets[1] = 30; #timeout to replace default timeout
 
     return \@rets;
 }
@@ -127,6 +129,7 @@ __END__
   Example: <code>attr &lt;rhasspyDevice&gt; rhasspyIntents SetCustomIntentsDataTest=RHASSPY::Demo::DataTest(NAME,DATA)</code></p>
   <li>DialogueTest</li>
   This is to demonstrate how to keep dialogue open for some time and dynamically fill a slot for possible answer values to the dialoge. This is not fully tested jet and might somewhen in time be a good starting point for developing own complex Custom Intent functions including dialogues.</p>
+  <b>NOTE</b>: The format of the returned data might be subject to changes, see https://forum.fhem.de/index.php?topic=139337.0 for details!</p>
   Example: <code>attr &lt;rhasspyDevice&gt; rhasspyIntents SetCustomIntentsDialogueTest=RHASSPY::Demo::DialogueTest(NAME,DATA)</code></p>
 </ul>
 =end html
