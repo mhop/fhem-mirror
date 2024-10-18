@@ -1166,9 +1166,14 @@ sub checkDelayedExecution {
           next;
       }
       my $fk_typ  = $fk_hash->{TYPE};
+      my $uknown_state;
       if ( !defined $contacts{$fk_typ} ) {
-          Log3( $hash, 3, "[$name] TYPE '$fk_typ' of $fk not yet supported, $fk ignored - inform maintainer" );
-          next;
+          $uknown_state = ReadingsVal($fk,'contact', ReadingsVal($fk,'state',undef ));
+          if ( !defined $uknown_state || $uknown_state !~ m{open|tilt|close}ixms) {
+              Log3( $hash, 3, "[$name] TYPE '$fk_typ' of $fk not yet supported, $fk ignored - inform maintainer" );
+              next;
+          }
+          $uknown_state = $uknown_state =~ m{open|tilt}ixms ? 'open' : 'closed'; #normalize value
       }
 
       my $reading      = $contacts{$fk_typ}{READING};
@@ -1178,13 +1183,13 @@ sub checkDelayedExecution {
       my $windowStatus = $model eq 'r' ? ReadingsVal($fk,$reading,'nF')
                                        : AttrVal    ($fk,$reading,'nF');
 
-      if ( $windowStatus eq 'nF' ) {
+      if ( $windowStatus eq 'nF' && !defined $uknown_state ) {
           Log3( $hash, 3, "[$name] Reading/Attribute '$reading' of $fk not found, $fk ignored - inform maintainer" ) if ( $model eq 'r' );
           next;
       }
-      Log3( $hash, 5, "[$name] sensor '$fk' Reading/Attribute '$reading' is '$windowStatus'" );
+      Log3( $hash, defined $uknown_state ? 4 : 5, "[$name] sensor '$fk' Reading/Attribute '$reading' is '$windowStatus'" );
 
-      if ( $windowStatus =~  m{\A$statusReg\z}xms ) {
+      if ( $windowStatus =~  m{\A$statusReg\z}xms || ( defined $uknown_state && $uknown_state eq 'open' ) ) {
           if ( !defined $hash->{DELAYED} ) {
               Log3( $hash, 3, "[$name] switch of $hash->{DEVICE} delayed - sensor '$fk' Reading/Attribute '$reading' is '$windowStatus'" );
           }

@@ -4223,6 +4223,7 @@ sub handleCustomIntent {
         respond( $hash, $data, $response );
         return ${$error}[1]; #comma separated list of devices to trigger
     } elsif ( ref $error eq 'HASH' ) {
+        $timeout = $error->{sessionTimeout} if defined $error->{sessionTimeout} && looks_like_number( $error->{sessionTimeout} );
         return setDialogTimeout($hash, $data, $timeout, $error);
     } else {
         $response = $error; # if $error && $error !~ m{Please.define.*first}x;
