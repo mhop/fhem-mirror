@@ -156,8 +156,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.37.0" => "16.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
-                           "_flowGraphic: controlhash for producer ",
+  "1.37.0" => "18.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
+                           "_flowGraphic: controlhash for producer, prepare new attr flowGraphicControl ",
   "1.36.1" => "14.10.2024  _flowGraphic: consumer distance modified by kask, Coloring of icons corrected when creating 0 ",
   "1.36.0" => "13.10.2024  new Getter valInverter, valStrings and valProducer, preparation for multiple inverters ".
                            "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
@@ -660,6 +660,7 @@ my %hattr = (                                                                # H
   setupRadiationAPI         => { fn => \&_attrRadiationAPI        },
   setupStringPeak           => { fn => \&_attrStringPeak          },
   setupRoofTops             => { fn => \&_attrRoofTops            },
+  flowGraphicControl        => { fn => \&_attrflowGraphicControl  },
 );
 
   for my $in (1..$maxinverter) {
@@ -1266,6 +1267,7 @@ sub Initialize {
                                 "ctrlStatisticReadings:multiple-strict,$srd ".
                                 "ctrlUserExitFn:textField-long ".
                                 "disable:1,0 ".
+                             #   "flowGraphicControl:textField-long ".
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
                                 "flowGraphicConsumerDistance:slider,80,10,500 ".
@@ -5408,7 +5410,6 @@ sub Attr {
   }
 
   if ($aName eq 'ctrlGenPVdeviation' && $aVal eq 'daily') {
-      my $type = $hash->{TYPE};
       readingsDelete ($hash, 'Today_PVdeviation');
       delete $data{$type}{$name}{circular}{99}{tdayDvtn};
   }
@@ -5672,6 +5673,60 @@ return;
 }
 
 ################################################################
+#                  Attr flowGraphicControl
+################################################################
+sub _attrflowGraphicControl {            ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $aVal  = $paref->{aVal};
+  my $cmd   = $paref->{cmd};
+
+  my $hash  = $defs{$name};
+  
+  for my $av ( qw( flowGraphicAnimate 
+                   flowGraphicConsumerDistance 
+                   flowGraphicShift 
+                   flowGraphicShowConsumer 
+                   flowGraphicShowConsumerRemainTime
+                   flowGraphicSize
+                   flowGraphicShowConsumerDummy
+                   flowGraphicShowConsumerPower
+                 ) ) {
+      
+      delete $data{$type}{$name}{current}{$av};
+  }
+ 
+  if ($cmd eq 'set') {
+      my $valid = {
+          animate                => '0|1',
+          consumerdist           => '[89]\d{1}|[1234]\d{2}|500',
+          shift                  => '-?[0-7]\d{0,1}|-?80',
+          size                   => '\d+',
+          showconsumer           => '0|1',
+          showconsumerdummy      => '0|1',
+          showconsumerremaintime => '0|1',
+          showconsumerpower      => '0|1',
+      };
+      
+      my ($a, $h) = parseParams ($aVal);
+      
+      for my $key (keys %{$h}) {
+          my $comp = $valid->{$key};
+
+          if ($h->{$key} =~ /^$comp$/xs) {
+              $data{$type}{$name}{current}{$key} = $h->{$key};
+          }
+          else {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please use a valid value.";
+          }
+      }
+  }
+
+return;
+}
+
+################################################################
 #                      Attr setupMeterDev
 ################################################################
 sub _attrMeterDev {                    ## no critic "not used"
@@ -5810,7 +5865,7 @@ sub _attrInverterDev {                   ## no critic "not used"
           return qq{The syntax of key 'capacity' is not valid. Please consider the commandref.};
       }
       
-      if ($h->{feed} && $h->{feed} !~ /^grid$/xs) {
+      if ($h->{feed} && $h->{feed} !~ /^grid|bat$/xs) {
           return qq{The value of key 'feed' is not valid. Please consider the commandref.};
       }
       
@@ -8696,10 +8751,10 @@ sub _transferMeterValues {
 
   my $type = $paref->{type};
 
-  my ($gc,$gcunit) = split ":", $h->{gcon};                                                   # Readingname/Unit für aktuellen Netzbezug
-  my ($gf,$gfunit) = split ":", $h->{gfeedin};                                                # Readingname/Unit für aktuelle Netzeinspeisung
-  my ($gt,$ctunit) = split ":", $h->{contotal};                                               # Readingname/Unit für Bezug total
-  my ($ft,$ftunit) = split ":", $h->{feedtotal};                                              # Readingname/Unit für Einspeisung total
+  my ($gc, $gcunit) = split ":", $h->{gcon};                                                   # Readingname/Unit für aktuellen Netzbezug
+  my ($gf, $gfunit) = split ":", $h->{gfeedin};                                                # Readingname/Unit für aktuelle Netzeinspeisung
+  my ($gt, $ctunit) = split ":", $h->{contotal};                                               # Readingname/Unit für Bezug total
+  my ($ft, $ftunit) = split ":", $h->{feedtotal};                                              # Readingname/Unit für Einspeisung total
 
   return if(!$gc || !$gf || !$gt || !$ft);
 
@@ -8765,19 +8820,19 @@ sub _transferMeterValues {
   my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
   my $gfuf = $gfunit =~ /^kW$/xi ? 1000 : 1;
 
-  $gco  = ReadingsNum ($medev, $gc, 0) * $gcuf;                                               # aktueller Bezug (W)
-  $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;                                               # aktuelle Einspeisung (W)
+  $gco  = ReadingsNum ($medev, $gc, 0) * $gcuf;                                                      # aktueller Bezug (W)
+  $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;                                                      # aktuelle Einspeisung (W)
 
   my $params;
 
-  if ($gc eq '-gfeedin') {                                                                    # Spezialfall gcon bei neg. gfeedin                                                                                      # Spezialfall: bei negativen gfeedin -> $gco = abs($gf), $gf = 0
+  if ($gc eq '-gfeedin') {                                                                           # Spezialfall gcon bei neg. gfeedin                                                                                      # Spezialfall: bei negativen gfeedin -> $gco = abs($gf), $gf = 0
       $params = {
           dev  => $medev,
           rdg  => $gf,
           rdgf => $gfuf
       };
 
-      ($gfin,$gco) = substSpecialCases ($params);
+      ($gfin, $gco) = substSpecialCases ($params);
   }
 
   if ($gf eq '-gcon') {                                                                              # Spezialfall gfeedin bei neg. gcon
@@ -8787,14 +8842,8 @@ sub _transferMeterValues {
           rdgf => $gcuf
       };
 
-      ($gco,$gfin) = substSpecialCases ($params);
+      ($gco, $gfin) = substSpecialCases ($params);
   }
-
-  storeReading ('Current_GridConsumption', (int $gco).' W');
-  $data{$type}{$name}{current}{gridconsumption} = int $gco;                                          # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-
-  storeReading ('Current_GridFeedIn', (int $gfin).' W');
-  $data{$type}{$name}{current}{gridfeedin} = int $gfin;                                              # Hilfshash Wert current grid Feed in
 
   my $ctuf    = $ctunit =~ /^kWh$/xi ? 1000 : 1;
   my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                                # Bezug total (Wh)
@@ -8804,21 +8853,24 @@ sub _transferMeterValues {
 
   $data{$type}{$name}{circular}{99}{gridcontotal} = $gctotal;                                        # Total Netzbezug speichern
   $data{$type}{$name}{circular}{99}{feedintotal}  = $fitotal;                                        # Total Feedin speichern
+  $data{$type}{$name}{current}{gridconsumption}   = int $gco;                                        # Current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  $data{$type}{$name}{current}{gridfeedin}        = int $gfin;                                       # Wert current grid Feed in
 
   debugLog ($paref, "collectData", "collect Meter data - device: $medev =>");
   debugLog ($paref, "collectData", "gcon: $gco W, gfeedin: $gfin W, contotal: $gctotal Wh, feedtotal: $fitotal Wh");
 
+
+  ## Management aus dem Netz bezogener Energie
+  ##############################################
   my $gcdaypast = 0;
   my $gfdaypast = 0;
+  my $docon     = 0;
 
   for my $hour (0..int $chour) {                                                                     # alle bisherigen Erzeugungen des Tages summieren
       $gcdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridConsumption", 0);
       $gfdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridFeedIn",      0);
   }
-
-  ## Management aus dem Netz bezogener Energie
-  ##############################################
-  my $docon  = 0;
+  
   my $idgcon = CircularVal ($hash, 99, 'initdaygcon', undef);
 
   if (!$gctotal) {
@@ -8853,8 +8905,8 @@ sub _transferMeterValues {
       writeToHistory ( { paref => $paref, key => 'gcons', val => $gctotthishour, hour => $nhour } );
   }
 
-  ## Management der in das Netz eingespeister Energie
-  #####################################################
+  ## Management der in das Netz eingespeister (nur vom Meter gemessene) Energie
+  ###############################################################################
   my $dofeed = 0;
   my $idfin  = CircularVal ($hash, 99, 'initdayfeedin', undef);
 
@@ -8871,7 +8923,7 @@ sub _transferMeterValues {
       }
   }
   elsif (!defined $idfin) {
-      $data{$type}{$name}{circular}{99}{initdayfeedin} = $fitotal - $gfdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn", 0);
+      $data{$type}{$name}{circular}{99}{initdayfeedin} = $fitotal - $gfdaypast - ReadingsNum ($name, 'Today_Hour'.sprintf("%02d",$chour+1).'_GridFeedIn', 0);
   }
   else {
       $dofeed = 1;
@@ -9371,6 +9423,8 @@ sub _createSummaries {
   $data{$type}{$name}{current}{surplus}             = $surplus;
   $data{$type}{$name}{current}{tdConFcTillSunset}   = $tdConFcTillSunset;
 
+  storeReading ('Current_GridFeedIn',           (int $gfeedin).       ' W');                            # V 1.37.0
+  storeReading ('Current_GridConsumption',      (int $gcon).          ' W');                            # V 1.37.0
   storeReading ('Current_Consumption',          $consumption.         ' W');
   storeReading ('Current_SelfConsumption',      $selfconsumption.     ' W');
   storeReading ('Current_SelfConsumptionRate',  $selfconsumptionrate. ' %');
@@ -14145,7 +14199,7 @@ sub _flowGraphic {
   my $node2grid  = ReadingsNum ($name, 'Current_GridFeedIn',      0);                          # vom Knoten zum Grid
   my $cself      = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
-  my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
+  my $wr2bat     = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
   my $cc_dummy   = $cc;
@@ -14161,6 +14215,7 @@ sub _flowGraphic {
   my $ppall   = 0;                                                            # Summe Erzeugung alle nicht PV-Producer
   my $pv2node = 0;                                                            # Summe PV-Erzeugung alle Inverter
   my $pv2grid = 0;
+  my $pv2bat  = 0;
   my $lfn     = 0;
 
   for my $pn (1..$maxproducer) {
@@ -14193,6 +14248,7 @@ sub _flowGraphic {
           $pdcr->{$lfn}{p}    = $p;                                            # aktuelle PV
           $pv2node           += $p if($feed eq 'default');                     # PV-Erzeugung Inverter für das Hausnetz     
           $pv2grid           += $p if($feed eq 'grid');                        # PV nur für das öffentliche Netz 
+          $pv2bat            += $p if($feed eq 'bat');                         # PV nur in die Batterie
           
           $lfn++;
       }
@@ -14206,7 +14262,7 @@ sub _flowGraphic {
   my $psorted = {                                                             
       '1togrid' => { xicon => -100, xchain => 350,  ychain => 420, step => 70,     count => scalar @{$togrid}, sorted => $togrid },      # Producer/PV nur zu Grid 
       '2tonode' => { xicon =>  350, xchain => 700,  ychain => 200, step => $pdist, count => scalar @{$tonode}, sorted => $tonode },      # Producer/PV zum Knoten
-      '3tobat'  => { xicon =>  750, xchain => 1100, ychain => 390, step => 10,     count => scalar @{$tobat},  sorted => $tobat  },      # Producer/PV nur zu Batterie
+      '3tobat'  => { xicon =>  750, xchain => 1100, ychain => 430, step => 40,     count => scalar @{$tobat},  sorted => $tobat  },      # Producer/PV nur zu Batterie
   };
 
   ## definierte Verbraucher ermitteln
@@ -14228,11 +14284,15 @@ sub _flowGraphic {
                   $soc < 76 ? 'flowg bat50' :
                   'flowg bat75';
 
-  if (!defined($batin) && !defined($batout)) {
+  if (!defined $wr2bat && !defined $batout) {
       $hasbat = 0;
-      $batin  = 0;
+      $wr2bat = 0;
       $batout = 0;
       $soc    = 0;
+  }
+  else {
+      $wr2bat -= $pv2bat;                                                                            # abzüglich Direktladung
+      $wr2bat  = 0 if($wr2bat < 0);
   }
 
   my $grid_color    = $node2grid ? 'flowg grid_color1'               : 'flowg grid_color2';
@@ -14254,21 +14314,21 @@ sub _flowGraphic {
 
   my $batout_direction = 'M902,515 L730,590';
 
-  if ($batin) {                                                       # Batterie wird geladen
-      my $gbi = $batin - $pv2node;
+  if ($wr2bat) {                                                           # Batterie wird geladen
+      my $home2bat = $wr2bat - $pv2node;
 
-      if ($gbi > 1) {                                                 # Batterieladung anteilig aus Hausnetz geladen
-          $batin            -= $gbi;
+      if ($home2bat > 1) {                                                 # Batterieladung anteilig aus Hausnetz geladen
+          $wr2bat           -= $home2bat;
           $batout_style      = 'flowg active_in';
           $batout_direction  = 'M730,590 L902,515';
-          $batout            = $gbi;
+          $batout            = $home2bat;
       }
   }
 
   ## Werte / SteuerungVars anpassen
   ###################################
   $flowgcons  = 0 if(!$consumercount);                                # Consumer Anzeige ausschalten wenn keine Consumer definiert
-  my $p2home  = __normDecPlaces ($cself + $ppall);                    # Energiefluß von Knoten zum Haus: Selbstverbrauch + alle Producer
+  my $pv2home = __normDecPlaces ($cself + $ppall);                    # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
@@ -14436,7 +14496,7 @@ END1
 
   ## Laufketten PV->Home, PV->Grid, Bat->Home
   ##############################################
-  my $csc_style  = $p2home    ? 'flowg active_out' : 'flowg inactive_out';
+  my $csc_style  = $pv2home    ? 'flowg active_out' : 'flowg inactive_out';
   my $cgfi_style = $node2grid ? 'flowg active_out' : 'flowg inactive_out';
   $ret          .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
@@ -14448,10 +14508,10 @@ END2
   ## Laufketten PV->Batterie, Batterie->Home
   ##############################################
   if ($hasbat) {
-      my $batin_style = $batin ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
-      $ret           .= << "END3";
+      my $wr2bat_style = $wr2bat ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
+      $ret            .= << "END3";
       <path id="bat-home" class="$batout_style" d="$batout_direction" />
-      <path id="pv-bat"   class="$batin_style"  d="M730,400 L910,480" />
+      <path id="pv-bat"   class="$wr2bat_style" d="M730,400 L910,480" />
 END3
   }
 
@@ -14549,12 +14609,12 @@ END3
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
   $ret .= qq{<text class="flowg text" id="node-txt"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
-  $ret .= qq{<text class="flowg text" id="bat-txt"       x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
-  $ret .= qq{<text class="flowg text" id="node_home-txt" x="730"  y="520" style="text-anchor: start;">$p2home</text>}     if ($p2home);
+  $ret .= qq{<text class="flowg text" id="batsoc-txt"    x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
+  $ret .= qq{<text class="flowg text" id="node_home-txt" x="730"  y="520" style="text-anchor: start;">$pv2home</text>}    if ($pv2home);
   $ret .= qq{<text class="flowg text" id="node-grid-txt" x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
   $ret .= qq{<text class="flowg text" id="grid-home-txt" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
   $ret .= qq{<text class="flowg text" id="batout-txt"    x="880"  y="610" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
-  $ret .= qq{<text class="flowg text" id="batin-txt"     x="880"  y="420" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat);
+  $ret .= qq{<text class="flowg text" id="wr2bat-txt"    x="880"  y="420" style="text-anchor: start;">$wr2bat</text>}     if ($wr2bat && $hasbat);
   $ret .= qq{<text class="flowg text" id="home-txt"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
   $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
   
@@ -21388,7 +21448,7 @@ to ensure that the system configuration is correct.
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data.
        The module assumes that the numerical value of the readings is always positive.
-       It can also be a dummy device with corresponding readings. The meaning of the respective "Readingname" is:
+       It can also be a dummy device with corresponding readings.
        <br><br>
 
        <ul>
@@ -21459,6 +21519,7 @@ to ensure that the system configuration is correct.
            <tr><td>                 </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                       </td></tr>         
            <tr><td> <b>feed</b>     </td><td>Defines special properties of the device's energy supply (optional).                                        </td></tr>
            <tr><td>                 </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                             </td></tr>
+           <tr><td>                 </td><td><b>bat</b> - the device supplies energy exclusively to the battery                                          </td></tr>
            <tr><td>                 </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                            </td></tr>
            <tr><td> <b>icon</b>     </td><td>Icon for displaying the inverter in the flow chart (optional)                                               </td></tr>
            <tr><td>                 </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                     </td></tr>
@@ -21498,9 +21559,9 @@ to ensure that the system configuration is correct.
                             gfeedin=&lt;Readingname&gt;:&lt;Unit&gt; feedtotal=&lt;Readingname&gt;:&lt;Unit&gt;
                             [conprice=&lt;Field&gt;] [feedprice=&lt;Field&gt;] </b> <br><br>
 
-       Sets any device and its readings for energy measurement.
+       Defines any device and its readings for measuring energy into or out of the public grid.
        The module assumes that the numeric value of the readings is positive.
-       It can also be a dummy device with corresponding readings. The meaning of the respective "Readingname" is:
+       It can also be a dummy device with corresponding readings.
        <br><br>
 
        <ul>
@@ -23819,7 +23880,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
-       Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
+       Es kann auch ein Dummy Device mit entsprechenden Readings sein.
        <br><br>
 
        <ul>
@@ -23891,6 +23952,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                 </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.           </td></tr>         
            <tr><td> <b>feed</b>     </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                              </td></tr>
            <tr><td>                 </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.    </td></tr>
+           <tr><td>                 </td><td><b>bat</b> - das Gerät liefert die Energie ausschließlich an die Batterie                                   </td></tr>
            <tr><td>                 </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentlich Netz eingespeist                            </td></tr>
            <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                             </td></tr>
            <tr><td>                 </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                                   </td></tr>
@@ -23932,7 +23994,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        Legt ein beliebiges Device und seine Readings zur Energiemessung in bzw. aus dem öffentlichen Netz fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings positiv ist.
-       Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
+       Es kann auch ein Dummy Device mit entsprechenden Readings sein.
        <br><br>
 
        <ul>
