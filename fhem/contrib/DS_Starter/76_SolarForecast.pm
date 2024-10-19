@@ -14199,7 +14199,7 @@ sub _flowGraphic {
   my $node2grid  = ReadingsNum ($name, 'Current_GridFeedIn',      0);                          # vom Knoten zum Grid
   my $cself      = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
-  my $wr2bat     = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
+  my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
   my $cc_dummy   = $cc;
@@ -14248,7 +14248,7 @@ sub _flowGraphic {
           $pdcr->{$lfn}{p}    = $p;                                            # aktuelle PV
           $pv2node           += $p if($feed eq 'default');                     # PV-Erzeugung Inverter für das Hausnetz     
           $pv2grid           += $p if($feed eq 'grid');                        # PV nur für das öffentliche Netz 
-          $pv2bat            += $p if($feed eq 'bat');                         # PV nur in die Batterie
+          $pv2bat            += $p if($feed eq 'bat');                         # Direktladen PV nur in die Batterie
           
           $lfn++;
       }
@@ -14284,16 +14284,14 @@ sub _flowGraphic {
                   $soc < 76 ? 'flowg bat50' :
                   'flowg bat75';
 
-  if (!defined $wr2bat && !defined $batout) {
+  if (!defined $batin && !defined $batout) {
       $hasbat = 0;
-      $wr2bat = 0;
+      $batin  = 0;
       $batout = 0;
       $soc    = 0;
   }
-  else {
-      $wr2bat -= $pv2bat;                                                                            # abzüglich Direktladung
-      $wr2bat  = 0 if($wr2bat < 0);
-  }
+  
+  my $node2bat = $batin;
 
   my $grid_color    = $node2grid ? 'flowg grid_color1'               : 'flowg grid_color2';
   my $cgc_style     = $cgc       ? 'flowg active_in'                 : 'flowg inactive_in';
@@ -14311,19 +14309,22 @@ sub _flowGraphic {
           $cgc            = $cgfo;
       }
   }
-
+ 
   my $batout_direction = 'M902,515 L730,590';
 
-  if ($wr2bat) {                                                           # Batterie wird geladen
-      my $home2bat = $wr2bat - $pv2node;
+  if ($node2bat) {                                                           # Batterie wird geladen
+      my $home2bat = $node2bat - $pv2node;
 
-      if ($home2bat > 1) {                                                 # Batterieladung anteilig aus Hausnetz geladen
-          $wr2bat           -= $home2bat;
+      if ($home2bat > 1) {                                                   # Batterieladung anteilig aus Hausnetz geladen
+          $node2bat         -= $home2bat;
           $batout_style      = 'flowg active_in';
           $batout_direction  = 'M730,590 L902,515';
           $batout            = $home2bat;
       }
   }
+  
+  $node2bat -= $pv2bat;                                                      # abzüglich Direktladung
+  $pnodesum += abs $node2bat if($node2bat < 0);                              # Batterie ist voll und SolarLader liefert an Knoten
 
   ## Werte / SteuerungVars anpassen
   ###################################
@@ -14494,11 +14495,12 @@ END1
       $ret .= '</g> ';
   }
 
-  ## Laufketten PV->Home, PV->Grid, Bat->Home
-  ##############################################
-  my $csc_style  = $pv2home    ? 'flowg active_out' : 'flowg inactive_out';
+  ## Laufketten Node->Home, Node->Grid, Bat->Home
+  #################################################
+  my $csc_style  = $pv2home   ? 'flowg active_out' : 'flowg inactive_out';
   my $cgfi_style = $node2grid ? 'flowg active_out' : 'flowg inactive_out';
-  $ret          .= << "END2";
+  
+  $ret .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
   <path id="pv-home"  class="$csc_style"  d="M700,400 L700,580" />
   <path id="pv-grid"  class="$cgfi_style" d="M670,400 L490,480" />
@@ -14508,10 +14510,12 @@ END2
   ## Laufketten PV->Batterie, Batterie->Home
   ##############################################
   if ($hasbat) {
-      my $wr2bat_style = $wr2bat ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
-      $ret            .= << "END3";
-      <path id="bat-home" class="$batout_style" d="$batout_direction" />
-      <path id="pv-bat"   class="$wr2bat_style" d="M730,400 L910,480" />
+      my $node2bat_style  = $node2bat     ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
+      my $batin_direction = $node2bat < 0 ? 'M910,480 L730,400'             : 'M730,400 L910,480';  
+                           
+      $ret .= << "END3";
+      <path id="bat2home" class="$batout_style"   d="$batout_direction" />
+      <path id="pv2bat"   class="$node2bat_style" d="$batin_direction" />
 END3
   }
 
@@ -14608,15 +14612,15 @@ END3
   ## Textangaben an Grafikelementen
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
-  $ret .= qq{<text class="flowg text" id="node-txt"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
-  $ret .= qq{<text class="flowg text" id="batsoc-txt"    x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
-  $ret .= qq{<text class="flowg text" id="node_home-txt" x="730"  y="520" style="text-anchor: start;">$pv2home</text>}    if ($pv2home);
-  $ret .= qq{<text class="flowg text" id="node-grid-txt" x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
-  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
-  $ret .= qq{<text class="flowg text" id="batout-txt"    x="880"  y="610" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
-  $ret .= qq{<text class="flowg text" id="wr2bat-txt"    x="880"  y="420" style="text-anchor: start;">$wr2bat</text>}     if ($wr2bat && $hasbat);
-  $ret .= qq{<text class="flowg text" id="home-txt"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
-  $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
+  $ret .= qq{<text class="flowg text" id="nodetxt"       x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
+  $ret .= qq{<text class="flowg text" id="batsoctxt"     x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
+  $ret .= qq{<text class="flowg text" id="node2hometxt"  x="730"  y="520" style="text-anchor: start;">$pv2home</text>}    if ($pv2home);
+  $ret .= qq{<text class="flowg text" id="node2gridtxt"  x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
+  $ret .= qq{<text class="flowg text" id="grid2hometxt"  x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
+  $ret .= qq{<text class="flowg text" id="batouttxt"     x="880"  y="610" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
+  $ret .= qq{<text class="flowg text" id="node2battxt"   x="880"  y="420" style="text-anchor: start;">$node2bat</text>}   if ($node2bat && $hasbat);
+  $ret .= qq{<text class="flowg text" id="hometxt"       x="600"  y="710" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
+  $ret .= qq{<text class="flowg text" id="dummytxt"      x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
   
   ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ###############################################################################                                                      
