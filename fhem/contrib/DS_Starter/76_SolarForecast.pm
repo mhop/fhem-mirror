@@ -5346,7 +5346,7 @@ sub Attr {
   # 20.10.2024
   if ($cmd eq 'set' && $aName =~ /^flowGraphicCss|flowGraphicSize|flowGraphicAnimate|flowGraphicConsumerDistance|flowGraphicShowConsumer|flowGraphicShowConsumerDummy|flowGraphicShowConsumerPower|flowGraphicShowConsumerRemainTime|flowGraphicShift$/) {
       if (!$init_done) {
-          return qq{Device "$name" -> The attribute '$aName' is replaced by 'flowGraphicControl'. Please press "save config" when restart is finished.};
+          # return qq{Device "$name" -> The attribute '$aName' is replaced by 'flowGraphicControl'. Please press "save config" when restart is finished.};
       }
       else {
           return qq{The attribute '$aName' is obsolete and replaced by 'flowGraphicControl'.};
