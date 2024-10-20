@@ -156,8 +156,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.37.0" => "18.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
-                           "_flowGraphic: controlhash for producer, prepare new attr flowGraphicControl ",
+  "1.37.0" => "20.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
+                           "_flowGraphic: controlhash for producer, new attr flowGraphicControl and replace the attributes: ".
+                           "flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer flowGraphicShowConsumerDummy ".
+                           "flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime flowGraphicShift ",
   "1.36.1" => "14.10.2024  _flowGraphic: consumer distance modified by kask, Coloring of icons corrected when creating 0 ",
   "1.36.0" => "13.10.2024  new Getter valInverter, valStrings and valProducer, preparation for multiple inverters ".
                            "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
@@ -552,8 +554,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    ctrlSolCastAPIoptimizeReq ctrlStatisticReadings ctrlUserExitFn
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    disable
-                   flowGraphicSize flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer
-                   flowGraphicShowConsumerDummy flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime
+                   flowGraphicControl
                    flowGraphicCss graphicBeamWidth
                    graphicBeamHeightLevel1 graphicBeamHeightLevel2
                    graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content
@@ -1267,15 +1268,7 @@ sub Initialize {
                                 "ctrlStatisticReadings:multiple-strict,$srd ".
                                 "ctrlUserExitFn:textField-long ".
                                 "disable:1,0 ".
-                             #   "flowGraphicControl:textField-long ".
-                                "flowGraphicSize ".
-                                "flowGraphicAnimate:1,0 ".
-                                "flowGraphicConsumerDistance:slider,80,10,500 ".
-                                "flowGraphicShift:slider,-80,5,80 ".
-                                "flowGraphicShowConsumer:1,0 ".
-                                "flowGraphicShowConsumerDummy:1,0 ".
-                                "flowGraphicShowConsumerPower:0,1 ".
-                                "flowGraphicShowConsumerRemainTime:0,1 ".
+                                "flowGraphicControl:textField-long ".
                                 "flowGraphicCss:textField-long ".
                                 "graphicBeamHeightLevel1 ".
                                 "graphicBeamHeightLevel2 ".
@@ -1324,6 +1317,12 @@ sub Initialize {
                                 $setupprod.
                                 $consumer.
                                 $readingFnAttributes;
+                    
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ##########################################################################################################################                    
+  $hash->{AttrList} .= " flowGraphicSize flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer flowGraphicShowConsumerDummy flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime flowGraphicShift ";
+ 
+  ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
 
@@ -5360,14 +5359,15 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  #if ($cmd eq 'set' && $aName eq 'affectMaxDayVariance') {
-  #    if (!$init_done) {
-  #        return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when restart is finished.};
-  #    }
-  #    else {
-  #        return qq{The attribute '$aName' is obsolete and will be deleted soon.};
-  #    }
-  #}
+  # 20.10.2024
+  if ($cmd eq 'set' && $aName =~ /^flowGraphicSize|flowGraphicAnimate|flowGraphicConsumerDistance|flowGraphicShowConsumer|flowGraphicShowConsumerDummy|flowGraphicShowConsumerPower|flowGraphicShowConsumerRemainTime|flowGraphicShift$/) {
+      if (!$init_done) {
+          return qq{Device "$name" -> The attribute '$aName' is replaced by 'flowGraphicControl'. Please press "save config" when restart is finished.};
+      }
+      else {
+          return qq{The attribute '$aName' is obsolete and replaced by 'flowGraphicControl'.};
+      }
+  }
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -5684,14 +5684,14 @@ sub _attrflowGraphicControl {            ## no critic "not used"
 
   my $hash  = $defs{$name};
   
-  for my $av ( qw( flowGraphicAnimate 
-                   flowGraphicConsumerDistance 
-                   flowGraphicShift 
-                   flowGraphicShowConsumer 
-                   flowGraphicShowConsumerRemainTime
-                   flowGraphicSize
-                   flowGraphicShowConsumerDummy
-                   flowGraphicShowConsumerPower
+  for my $av ( qw( animate 
+                   consumerdist 
+                   shift 
+                   showconsumer 
+                   showconsumerremaintime
+                   size
+                   showconsumerdummy
+                   showconsumerpower
                  ) ) {
       
       delete $data{$type}{$name}{current}{$av};
@@ -5713,6 +5713,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
       
       for my $key (keys %{$h}) {
           my $comp = $valid->{$key};
+          next if(!$comp);
 
           if ($h->{$key} =~ /^$comp$/xs) {
               $data{$type}{$name}{current}{$key} = $h->{$key};
@@ -6919,6 +6920,28 @@ sub centralTask {
       $n = sprintf "%02d", $n;
       readingsDelete ($hash, "pvCorrectionFactor_${n}_autocalc");
   }
+    
+  my $fg1 = AttrVal ($name, 'flowGraphicSize', undef);                     # 20.10.2024
+  my $fg2 = AttrVal ($name, 'flowGraphicAnimate', undef);
+  my $fg3 = AttrVal ($name, 'flowGraphicConsumerDistance', undef);
+  my $fg4 = AttrVal ($name, 'flowGraphicShowConsumer', undef);
+  my $fg5 = AttrVal ($name, 'flowGraphicShowConsumerDummy', undef);
+  my $fg6 = AttrVal ($name, 'flowGraphicShowConsumerPower', undef);
+  my $fg7 = AttrVal ($name, 'flowGraphicShowConsumerRemainTime', undef);
+  my $fg8 = AttrVal ($name, 'flowGraphicShift', undef);
+  
+  my $newval;
+  $newval .= "size=$fg1 " if(defined $fg1);
+  $newval .= "animate=$fg2 " if(defined $fg2);
+  $newval .= "consumerdist=$fg3 " if(defined $fg3);
+  $newval .= "showconsumer=$fg4 " if(defined $fg4);
+  $newval .= "showconsumerdummy=$fg5 " if(defined $fg5);
+  $newval .= "showconsumerpower=$fg6 " if(defined $fg6);
+  $newval .= "showconsumerremaintime=$fg7 " if(defined $fg7);
+  $newval .= "shift=$fg8 " if(defined $fg8);  
+
+  CommandAttr (undef, "$name flowGraphicControl $newval") if($newval);
+  
   ##########################################################################################################################
 
   setModel ($hash);                                                                            # Model setzen
@@ -12098,44 +12121,44 @@ sub entryGraphic {
       modulo         => 1,
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'},     # TD-Style
       offset         => $offset,
-      hourstyle      => AttrVal ($name, 'graphicHourStyle',                  ''),
-      colorb1        => AttrVal ($name, 'graphicBeam1Color',          $b1coldef),
-      colorb2        => AttrVal ($name, 'graphicBeam2Color',          $b2coldef),
-      fcolor1        => AttrVal ($name, 'graphicBeam1FontColor',  $b1fontcoldef),
-      fcolor2        => AttrVal ($name, 'graphicBeam2FontColor',  $b2fontcoldef),
-      beam1cont      => AttrVal ($name, 'graphicBeam1Content',         'pvReal'),
-      beam2cont      => AttrVal ($name, 'graphicBeam2Content',     'pvForecast'),
-      beam3cont      => AttrVal ($name, 'graphicBeam3Content',               ''),
-      beam4cont      => AttrVal ($name, 'graphicBeam4Content',               ''),
-      caicon         => AttrVal ($name, 'consumerAdviceIcon',        $caicondef),                # Consumer AdviceIcon
-      clegend        => AttrVal ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
-      clink          => AttrVal ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
-      lotype         => AttrVal ($name, 'graphicLayoutType',           'double'),
-      kw             => AttrVal ($name, 'graphicEnergyUnit',               'Wh'),
-      height         => AttrNum ($name, 'graphicBeamHeightLevel1',          200),
+      hourstyle      => AttrVal    ($name, 'graphicHourStyle',                  ''),
+      colorb1        => AttrVal    ($name, 'graphicBeam1Color',          $b1coldef),
+      colorb2        => AttrVal    ($name, 'graphicBeam2Color',          $b2coldef),
+      fcolor1        => AttrVal    ($name, 'graphicBeam1FontColor',  $b1fontcoldef),
+      fcolor2        => AttrVal    ($name, 'graphicBeam2FontColor',  $b2fontcoldef),
+      beam1cont      => AttrVal    ($name, 'graphicBeam1Content',         'pvReal'),
+      beam2cont      => AttrVal    ($name, 'graphicBeam2Content',     'pvForecast'),
+      beam3cont      => AttrVal    ($name, 'graphicBeam3Content',               ''),
+      beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
+      caicon         => AttrVal    ($name, 'consumerAdviceIcon',        $caicondef),                # Consumer AdviceIcon
+      clegend        => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
+      clink          => AttrVal    ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
+      lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
+      kw             => AttrVal    ($name, 'graphicEnergyUnit',               'Wh'),
+      height         => AttrNum    ($name, 'graphicBeamHeightLevel1',          200),
       width          => $width,
-      fsize          => AttrNum ($name, 'graphicSpaceSize',                  24),
-      maxVal         => AttrNum ($name, 'graphicBeam1MaxVal',                 0),                # dyn. Anpassung der Balkenhöhe oder statisch ?
-      show_night     => AttrNum ($name, 'graphicShowNight',                   0),                # alle Balken (Spalten) anzeigen ?
-      show_diff      => AttrVal ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
-      weather        => AttrNum ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
-      colorw         => AttrVal ($name, 'graphicWeatherColor',      $wthcolddef),                # Wetter Icon Farbe Tag
-      colorwn        => AttrVal ($name, 'graphicWeatherColorNight', $wthcolndef),                # Wetter Icon Farbe Nacht
-      wlalias        => AttrVal ($name, 'alias',                          $name),
-      sheader        => AttrNum ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
-      hdrDetail      => AttrVal ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-      flowgsize      => AttrVal ($name, 'flowGraphicSize',        $flowGSizedef),                # Größe Energieflußgrafik
-      flowgani       => AttrVal ($name, 'flowGraphicAnimate',                 0),                # Animation Energieflußgrafik
-      flowgshift     => AttrVal ($name, 'flowGraphicShift',                   0),                # Verschiebung der Flußgrafikbox (muß negiert werden)
-      flowgcons      => AttrVal ($name, 'flowGraphicShowConsumer',            1),                # Verbraucher in der Energieflußgrafik anzeigen
-      flowgconX      => AttrVal ($name, 'flowGraphicShowConsumerDummy',       1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
-      flowgconsPower => AttrVal ($name, 'flowGraphicShowConsumerPower'     ,  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
-      flowgconsTime  => AttrVal ($name, 'flowGraphicShowConsumerRemainTime',  1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
-      flowgconsDist  => AttrVal ($name, 'flowGraphicConsumerDistance', $fgCDdef),                # Abstand Verbrauchericons zueinander
-      css            => AttrVal ($name, 'flowGraphicCss',               $cssdef),                # flowGraphicCss Styles
-      genpvdva       => AttrVal ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
-      lang           => getLang  ($hash),
-      debug          => getDebug ($hash),                                                        # Debug Module
+      fsize          => AttrNum    ($name, 'graphicSpaceSize',                  24),
+      maxVal         => AttrNum    ($name, 'graphicBeam1MaxVal',                 0),                # dyn. Anpassung der Balkenhöhe oder statisch ?
+      show_night     => AttrNum    ($name, 'graphicShowNight',                   0),                # alle Balken (Spalten) anzeigen ?
+      show_diff      => AttrVal    ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
+      weather        => AttrNum    ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
+      colorw         => AttrVal    ($name, 'graphicWeatherColor',      $wthcolddef),                # Wetter Icon Farbe Tag
+      colorwn        => AttrVal    ($name, 'graphicWeatherColorNight', $wthcolndef),                # Wetter Icon Farbe Nacht
+      wlalias        => AttrVal    ($name, 'alias',                          $name),
+      sheader        => AttrNum    ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
+      hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+      flowgsize      => CurrentVal ($hash, 'size',                   $flowGSizedef),                # Größe Energieflußgrafik
+      flowgani       => CurrentVal ($hash, 'animate',                            0),                # Animation Energieflußgrafik
+      flowgshift     => CurrentVal ($hash, 'shift',                              0),                # Verschiebung der Flußgrafikbox (muß negiert werden)
+      flowgcons      => CurrentVal ($hash, 'showconsumer',                       1),                # Verbraucher in der Energieflußgrafik anzeigen
+      flowgconX      => CurrentVal ($hash, 'showconsumerdummy',                  1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
+      flowgconsPower => CurrentVal ($hash, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
+      flowgconsTime  => CurrentVal ($hash, 'showconsumerremaintime',             1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
+      flowgconsDist  => CurrentVal ($hash, 'consumerdist',                $fgCDdef),                # Abstand Verbrauchericons zueinander
+      css            => AttrVal    ($name, 'flowGraphicCss',               $cssdef),                # flowGraphicCss Styles
+      genpvdva       => AttrVal    ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
+      lang           => getLang    ($hash),
+      debug          => getDebug   ($hash),                                                         # Debug Module
   };
 
   my $ret = q{};
@@ -14174,24 +14197,29 @@ sub __weatherOnBeam {
 return $ret;
 }
 
-################################################################
+######################################################################################
 #                  Energieflußgrafik
-################################################################
+# M - MoveTo setzt den aktuellen Punkt fest, von dem aus der Pfad starten soll
+#     (https://wiki.selfhtml.org/wiki/SVG/Tutorials/Pfade#MoveTo)
+# L - LineTo zeichnet eine Linie vom aktuellen zum angegebenen Punkt
+#     (https://wiki.selfhtml.org/wiki/SVG/Tutorials/Pfade#LineTo)
+######################################################################################
 sub _flowGraphic {
-  my $paref         = shift;
-  my $hash          = $paref->{hash};
-  my $name          = $paref->{name};
-  my $type          = $paref->{type};
-  my $flowgsize     = $paref->{flowgsize};
-  my $flowgani      = $paref->{flowgani};
-  my $flowgshift    = $paref->{flowgshift};                                   # Verschiebung der Flußgrafikbox (muß negiert werden)
-  my $flowgcons     = $paref->{flowgcons};                                    # Verbraucher in der Energieflußgrafik anzeigen
-  my $flowgconTime  = $paref->{flowgconsTime};                                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
-  my $flowgconX     = $paref->{flowgconX};
-  my $flowgconPower = $paref->{flowgconsPower};
-  my $cdist         = $paref->{flowgconsDist};                                # Abstand Consumer zueinander
-  my $css           = $paref->{css};
-  my $lang          = $paref->{lang};
+  my $paref          = shift;
+  my $hash           = $paref->{hash};
+  my $name           = $paref->{name};
+  my $type           = $paref->{type};
+  my $flowgsize      = $paref->{flowgsize};
+  my $flowgani       = $paref->{flowgani};
+  my $flowgshift     = $paref->{flowgshift};                                   # Verschiebung der Flußgrafikbox (muß negiert werden)
+  my $flowgcons      = $paref->{flowgcons};                                    # Verbraucher in der Energieflußgrafik anzeigen
+  my $flowgconsTime  = $paref->{flowgconsTime};                                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
+  my $flowgconX      = $paref->{flowgconX};
+  my $flowgconsPower = $paref->{flowgconsPower};
+  my $flowgPrdsPower = 1;                                                      # initial Producer akt. Erzeugung anzeigen
+  my $cdist          = $paref->{flowgconsDist};                                # Abstand Consumer zueinander
+  my $css            = $paref->{css};
+  my $lang           = $paref->{lang};
 
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';     # Animation Ja/Nein
@@ -14200,7 +14228,7 @@ sub _flowGraphic {
   my $cself      = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
-  my $batout     = ReadingsNum ($name, 'Current_PowerBatOut', undef);
+  my $bat2home   = ReadingsNum ($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum ($name, 'Current_BatCharge',     100);
   my $cc_dummy   = $cc;
 
@@ -14254,11 +14282,10 @@ sub _flowGraphic {
       }
   }
   
-  my $pnodesum                  = __normDecPlaces ($ppall + $pv2node);         # Erzeugung Summe im Knoten
-  my ($togrid, $tonode, $tobat) = __sortProducer ($pdcr);                      # lfn Producer sortiert nach ptyp und feed
-  
   ## Producer Koordninaten Steuerhash
   #####################################
+  my ($togrid, $tonode, $tobat) = __sortProducer ($pdcr);                      # lfn Producer sortiert nach ptyp und feed
+   
   my $psorted = {                                                             
       '1togrid' => { xicon => -100, xchain => 350,  ychain => 420, step => 70,     count => scalar @{$togrid}, sorted => $togrid },      # Producer/PV nur zu Grid 
       '2tonode' => { xicon =>  350, xchain => 700,  ychain => 200, step => $pdist, count => scalar @{$tonode}, sorted => $tonode },      # Producer/PV zum Knoten
@@ -14284,22 +14311,21 @@ sub _flowGraphic {
                   $soc < 76 ? 'flowg bat50' :
                   'flowg bat75';
 
-  if (!defined $batin && !defined $batout) {
-      $hasbat = 0;
-      $batin  = 0;
-      $batout = 0;
-      $soc    = 0;
+  if (!defined $batin && !defined $bat2home) {
+      $hasbat   = 0;
+      $batin    = 0;
+      $bat2home = 0;
+      $soc      = 0;
   }
   
-  my $node2bat = $batin;
+  my $node2bat       = $batin;
+  my $grid_color     = $node2grid ? 'flowg grid_color1'               : 'flowg grid_color2';          # green : red
+  my $cgc_style      = $cgc       ? 'flowg active_in'                 : 'flowg inactive_in';          # cgc current GridConsumption
+  my $bat2home_style = $bat2home  ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
+  $grid_color        = 'flowg grid_color3'  if(!$node2grid && !$cgc && $bat2home);                    # gray
+  my $cgc_direction  = 'M490,515 L670,590';                                                           
 
-  my $grid_color    = $node2grid ? 'flowg grid_color1'               : 'flowg grid_color2';
-  my $cgc_style     = $cgc       ? 'flowg active_in'                 : 'flowg inactive_in';
-  my $batout_style  = $batout    ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
-  $grid_color       = 'flowg grid_color3'  if(!$node2grid && !$cgc && $batout);                     # dritte Farbe
-  my $cgc_direction = 'M490,515 L670,590';                                                          # Batterie wird geladen
-
-  if ($batout) {                                                                                    # Batterie wird entladen
+  if ($bat2home) {                                                           # Batterie wird entladen
       my $cgfo = $node2grid - $pv2node;
 
       if ($cgfo > 1) {
@@ -14310,35 +14336,36 @@ sub _flowGraphic {
       }
   }
  
-  my $batout_direction = 'M902,515 L730,590';
+  my $bat2home_direction = 'M902,515 L730,590';
 
-  if ($node2bat) {                                                           # Batterie wird geladen
+  if ($node2bat) {                                                          # Batterie wird geladen
       my $home2bat = $node2bat - $pv2node;
 
-      if ($home2bat > 1) {                                                   # Batterieladung anteilig aus Hausnetz geladen
-          $node2bat         -= $home2bat;
-          $batout_style      = 'flowg active_in';
-          $batout_direction  = 'M730,590 L902,515';
-          $batout            = $home2bat;
+      if ($home2bat > 1) {                                                  # Batterieladung anteilig aus Hausnetz geladen
+          $node2bat           -= $home2bat;
+          $bat2home_style      = 'flowg active_in';
+          $bat2home_direction  = 'M730,590 L902,515';
+          $bat2home            = $home2bat;
       }
   }
-  
-  $node2bat -= $pv2bat;                                                      # abzüglich Direktladung
-  $pnodesum += abs $node2bat if($node2bat < 0);                              # Batterie ist voll und SolarLader liefert an Knoten
 
   ## Werte / SteuerungVars anpassen
   ###################################
-  $flowgcons  = 0 if(!$consumercount);                                # Consumer Anzeige ausschalten wenn keine Consumer definiert
-  my $pv2home = __normDecPlaces ($cself + $ppall);                    # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
+  my $pnodesum = __normDecPlaces ($ppall + $pv2node);                       # Erzeugung Summe im Knoten
+  $pnodesum   += abs $node2bat if($node2bat < 0);                           # Batterie ist voll und SolarLader liefert an Knoten
+  $node2bat   -= $pv2bat;                                                   # Knoten -> Bat : abzüglich Direktladung
+  $flowgcons   = 0 if(!$consumercount);                                     # Consumer Anzeige ausschalten wenn keine Consumer definiert
+  my $pv2home  = __normDecPlaces ($cself + $ppall);                         # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
+
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
-  my $vbwidth   = 800;                                                # width and height specify the viewBox size
-  my $vbminx    = -10 * $flowgshift;                                  # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbwidth   = 800;                                                      # width and height specify the viewBox size
+  my $vbminx    = -10 * $flowgshift;                                        # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
   my $vbminy    = -25;
 
-  my $vbhight   = !$flowgcons    ? 380 :
-                  !$flowgconTime ? 590 :
+  my $vbhight   = !$flowgcons     ? 380 :
+                  !$flowgconsTime ? 590 :
                   610;
 
   $vbhight += 100;
@@ -14512,9 +14539,10 @@ END2
   if ($hasbat) {
       my $node2bat_style  = $node2bat     ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
       my $batin_direction = $node2bat < 0 ? 'M910,480 L730,400'             : 'M730,400 L910,480';  
+      $node2bat           = abs $node2bat;
                            
       $ret .= << "END3";
-      <path id="bat2home" class="$batout_style"   d="$batout_direction" />
+      <path id="bat2home" class="$bat2home_style"   d="$bat2home_direction" />
       <path id="pv2bat"   class="$node2bat_style" d="$batin_direction" />
 END3
   }
@@ -14613,14 +14641,14 @@ END3
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
   $ret .= qq{<text class="flowg text" id="nodetxt"       x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
-  $ret .= qq{<text class="flowg text" id="batsoctxt"     x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                        # Lage Text Batterieladungszustand
+  $ret .= qq{<text class="flowg text" id="batsoctxt"     x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                         # Lage Text Batterieladungszustand
   $ret .= qq{<text class="flowg text" id="node2hometxt"  x="730"  y="520" style="text-anchor: start;">$pv2home</text>}    if ($pv2home);
   $ret .= qq{<text class="flowg text" id="node2gridtxt"  x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
   $ret .= qq{<text class="flowg text" id="grid2hometxt"  x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
-  $ret .= qq{<text class="flowg text" id="batouttxt"     x="880"  y="610" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
+  $ret .= qq{<text class="flowg text" id="batouttxt"     x="880"  y="610" style="text-anchor: start;">$bat2home</text>}   if ($bat2home && $hasbat);
   $ret .= qq{<text class="flowg text" id="node2battxt"   x="880"  y="420" style="text-anchor: start;">$node2bat</text>}   if ($node2bat && $hasbat);
-  $ret .= qq{<text class="flowg text" id="hometxt"       x="600"  y="710" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
-  $ret .= qq{<text class="flowg text" id="dummytxt"      x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
+  $ret .= qq{<text class="flowg text" id="hometxt"       x="600"  y="710" style="text-anchor: end;">$cc</text>};                                                # Current_Consumption Anlage
+  $ret .= qq{<text class="flowg text" id="dummytxt"      x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
   
   ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ###############################################################################                                                      
@@ -14641,7 +14669,7 @@ END3
           elsif ($lcp == 2) {$left += 20}
           elsif ($lcp == 1) {$left += 40}
 
-          $ret .= qq{<text class="flowg text" id="producer-txt_$pn" x="$left" y="100">$currentPower</text>} if($flowgconPower);    # Lage producer Consumption
+          $ret .= qq{<text class="flowg text" id="producertxt_$pn" x="$left" y="100">$currentPower</text>} if($flowgPrdsPower);
 
           # Leistungszahl wieder zurück an den Ursprungspunkt
           ####################################################          
@@ -14672,8 +14700,8 @@ END3
           
           $lcp = length $currentPower;
 
-          #$ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$cons_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
-          #$ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
+          #$ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$cons_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
+          #$ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ##################################################################################
@@ -14683,8 +14711,8 @@ END3
           elsif ($lcp == 2) {$cons_left += 7 }
           elsif ($lcp == 1) {$cons_left += 25}
 
-          $ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$cons_left" y="1110">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption
-          $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$cons_left" y="1170">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit
+          $ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$cons_left" y="1110">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
+          $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$cons_left" y="1170">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl wieder zurück an den Ursprungspunkt
           ######################################################          
@@ -20984,6 +21012,52 @@ to ensure that the system configuration is correct.
          </ul>
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-flowGraphicControl"></a>
+       <li><b>flowGraphicControl &lt;Key1=Value1&gt; &lt;Key2=Value2&gt; ... </b><br>
+         By optionally specifying the key=value pairs listed below, various display properties of the energy flow 
+         graph can be influenced. <br>
+         The entry can be made in several lines.
+         <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>animate</b>                 </td><td> Animates the energy flow graphic if displayed. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)         </td></tr>
+            <tr><td>                                </td><td><b>0</b> - Animation off, <b>1</b> - Animation on, default: 0                                                           </td></tr>
+            <tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>consumerdist</b>            </td><td>Controls the distance between the consumer icons in the energy flow graphic.                                            </td></tr>
+            <tr><td>                                </td><td>Value: <b>80 ... 500</b>, default: 130                                                                                  </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>shift</b>                   </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
+			<tr><td>                                </td><td>Value: <b>-80 ... 80</b>, default: 0                                                                                    </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showconsumer</b>            </td><td>Display of consumers in the energy flow chart.                                                                          </td></tr>
+			<tr><td>                                </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 1                                                               </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showconsumerdummy</b>       </td><td>Controls the display of the dummy consumer. The dummy consumer is assigned the                                          </td></tr>
+			<tr><td>                                </td><td>energy consumption that cannot be assigned to other consumers.                                                          </td></tr>
+			<tr><td>                                </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 1                                                               </td></tr>	
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showconsumerpower</b>       </td><td>Controls the display of the consumers' energy consumption.                                                              </td></tr>
+			<tr><td>                                </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 1                                                               </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showconsumerremaintime</b>  </td><td>Controls the display of the remaining running time (minutes) of the loads.                                              </td></tr>
+			<tr><td>                                </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 1                                                               </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>size </b>                   </td><td>Size of the energy flow graphic in pixels if displayed. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>) </td></tr>
+			<tr><td>                                </td><td>Value: <b>Integer</b>, default: 400                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+        </table>
+         </ul>
+		 
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20
+       </ul>
+	   
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-flowGraphicCss"></a>
        <li><b>flowGraphicCss </b><br>
@@ -21006,66 +21080,6 @@ to ensure that the system configuration is correct.
            .flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
          </ul>
 
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicAnimate"></a>
-       <li><b>flowGraphicAnimate </b><br>
-         Animates the energy flow graph if displayed.
-         Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
-         (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicConsumerDistance"></a>
-       <li><b>flowGraphicConsumerDistance </b><br>
-         Controls the spacing between consumer icons in the energy flow graph if displayed.
-         Siehe auch Attribut <a href="#SolarForecast-attr-flowGraphicShowConsumer">flowGraphicShowConsumer</a>. <br>
-         (default: 130)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShowConsumer"></a>
-       <li><b>flowGraphicShowConsumer </b><br>
-         Suppresses the display of loads in the energy flow graph when set to "0". <br>
-         (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShift"></a>
-       <li><b>flowGraphicShift &lt;Pixel/10&gt; </b><br>
-         Horizontal shift of the energy flow graph. <br>
-         (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShowConsumerDummy"></a>
-       <li><b>flowGraphicShowConsumerDummy </b><br>
-         Shows or suppresses the dummy consumer in the energy flow graph. <br>
-         The dummy consumer is assigned the energy consumption that could not be assigned to other consumers. <br>
-         (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShowConsumerPower"></a>
-       <li><b>flowGraphicShowConsumerPower </b><br>
-         Shows or suppresses the energy consumption of the loads in the energy flow graph. <br>
-         (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShowConsumerRemainTime"></a>
-       <li><b>flowGraphicShowConsumerRemainTime </b><br>
-         Shows or suppresses the remaining time (in minutes) of the loads in the energy flow graph. <br>
-         (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicSize"></a>
-       <li><b>flowGraphicSize &lt;Pixel&gt; </b><br>
-         Size of the energy flow graph if displayed.
-         Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
-         (default: 400)
        </li>
        <br>
 
@@ -21251,7 +21265,6 @@ to ensure that the system configuration is correct.
             <tr><td>                                         </td><td>Consumer&lt;br&gt;Quickstart:consumerImmediatePlanning : : :                            </td></tr>
             <tr><td>                                         </td><td>Weather:graphicShowWeather : : :                                                        </td></tr>
             <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                                        </td></tr>
-            <tr><td>                                         </td><td>GraphicSize:flowGraphicSize : : :                                                       </td></tr>
             <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                                        </td></tr>
             <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                                   </td></tr>
          </table>
@@ -23418,6 +23431,52 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          </ul>
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-flowGraphicControl"></a>
+       <li><b>flowGraphicControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+         Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene 
+         Anzeigeeigenschaften der Energieflußgrafik beeinflusst werden. <br>
+         Die Eingabe kann mehrzeilig erfolgen.
+         <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>animate</b>                 </td><td> Animiert die Energieflußgrafik sofern angezeigt. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)       </td></tr>
+            <tr><td>                                </td><td><b>0</b> - Animation aus,  <b>1</b> - Animation an, default: 0                                                          </td></tr>
+            <tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>consumerdist</b>            </td><td>Steuert den Abstand zwischen den Consumer-Icons in der Energieflußgrafik.                                               </td></tr>
+            <tr><td>                                </td><td>Wert: <b>80 ... 500</b>, default: 130                                                                                   </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>shift</b>                   </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
+			<tr><td>                                </td><td>Wert: <b>-80 ... 80</b>, default: 0                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showconsumer</b>            </td><td>Anzeige der Verbraucher in der Energieflußgrafik.                                                                       </td></tr>
+			<tr><td>                                </td><td><b>0</b> - Anzeige aus,  <b>1</b> - Anzeige an, default: 1                                                              </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showconsumerdummy</b>       </td><td>Steuert die Anzeige des Dummy-Verbrauchers. Dem Dummy-Verbraucher wird der                                              </td></tr>
+			<tr><td>                                </td><td>Energieverbrauch zugewiesen der anderen Verbrauchern nicht zugeordnet werden kann.                                      </td></tr>
+			<tr><td>                                </td><td><b>0</b> - Anzeige aus,  <b>1</b> - Anzeige an, default: 1                                                              </td></tr>	
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showconsumerpower</b>       </td><td>Steuert die Anzeige des Energieverbrauchs der Verbraucher.                                                              </td></tr>
+			<tr><td>                                </td><td><b>0</b> - Anzeige aus,  <b>1</b> - Anzeige an, default: 1                                                              </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showconsumerremaintime</b>  </td><td>Steuert die Anzeige der Restlaufzeit (Minuten) der Verbraucher.                                                         </td></tr>
+			<tr><td>                                </td><td><b>0</b> - Anzeige aus,  <b>1</b> - Anzeige an, default: 1                                                              </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>size </b>                   </td><td>Größe der Energieflußgrafik in Pixel sofern angezeigt. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)  </td></tr>
+			<tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 400                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+        </table>
+         </ul>
+		 
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20
+       </ul>
+	   
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-flowGraphicCss"></a>
        <li><b>flowGraphicCss </b><br>
@@ -23440,66 +23499,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            .flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
          </ul>
 
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicAnimate"></a>
-       <li><b>flowGraphicAnimate </b><br>
-         Animiert die Energieflußgrafik sofern angezeigt.
-         Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
-         (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicConsumerDistance"></a>
-       <li><b>flowGraphicConsumerDistance </b><br>
-         Steuert den Abstand zwischen den Consumer-Icons in der Energieflußgrafik sofern angezeigt.
-         Siehe auch Attribut <a href="#SolarForecast-attr-flowGraphicShowConsumer">flowGraphicShowConsumer</a>. <br>
-         (default: 130)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShowConsumer"></a>
-       <li><b>flowGraphicShowConsumer </b><br>
-         Unterdrückt die Anzeige der Verbraucher in der Energieflußgrafik wenn auf "0" gesetzt. <br>
-         (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShift"></a>
-       <li><b>flowGraphicShift &lt;Pixel/10&gt; </b><br>
-         Horizontale Verschiebung der Energieflußgrafik. <br>
-         (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShowConsumerDummy"></a>
-       <li><b>flowGraphicShowConsumerDummy </b><br>
-         Zeigt bzw. unterdrückt den Dummy-Verbraucher in der Energieflußgrafik. <br>
-         Dem Dummy-Verbraucher wird der Energieverbrauch zugewiesen der anderen Verbrauchern nicht zugeordnet werden konnte. <br>
-         (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShowConsumerPower"></a>
-       <li><b>flowGraphicShowConsumerPower </b><br>
-         Zeigt bzw. unterdrückt den Energieverbrauch der Verbraucher in der Energieflußgrafik. <br>
-         (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicShowConsumerRemainTime"></a>
-       <li><b>flowGraphicShowConsumerRemainTime </b><br>
-         Zeigt bzw. unterdrückt die Restlaufzeit (in Minuten) der Verbraucher in der Energieflußgrafik. <br>
-         (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-flowGraphicSize"></a>
-       <li><b>flowGraphicSize &lt;Pixel&gt; </b><br>
-         Größe der Energieflußgrafik sofern angezeigt.
-         Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
-         (default: 400)
        </li>
        <br>
 
@@ -23685,7 +23684,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                         </td><td>Consumer&lt;br&gt;Sofortstart:consumerImmediatePlanning : : :                 </td></tr>
             <tr><td>                                         </td><td>Wetter:graphicShowWeather : : :                                               </td></tr>
             <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                              </td></tr>
-            <tr><td>                                         </td><td>GraphicSize:flowGraphicSize : : :                                             </td></tr>
             <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                              </td></tr>
             <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                         </td></tr>
          </table>
