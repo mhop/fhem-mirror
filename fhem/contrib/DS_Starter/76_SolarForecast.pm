@@ -6924,8 +6924,10 @@ sub centralTask {
   $newval .= "showconsumerremaintime=$fg7 " if(defined $fg7);
   $newval .= "shift=$fg8 " if(defined $fg8);  
 
-  CommandAttr (undef, "$name flowGraphicControl $newval") if($newval);
-  
+  if ($newval) {
+      CommandAttr (undef, "$name flowGraphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name flowGraphicSize|flowGraphicAnimate|flowGraphicConsumerDistance|flowGraphicShowConsumer|flowGraphicShowConsumerDummy|flowGraphicShowConsumerPower|flowGraphicShowConsumerRemainTime|flowGraphicShift");
+  }
   ##########################################################################################################################
 
   setModel ($hash);                                                                            # Model setzen
@@ -21017,7 +21019,7 @@ to ensure that the system configuration is correct.
 
          <ul>
          <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
             <tr><td> <b>animate</b>                 </td><td> Animates the energy flow graphic if displayed. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)         </td></tr>
             <tr><td>                                </td><td><b>0</b> - Animation off, <b>1</b> - Animation on, default: 0                                                           </td></tr>
             <tr><td>                                </td><td>                                                                                                                        </td></tr>
@@ -23410,7 +23412,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
          <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
             <tr><td> <b>animate</b>                 </td><td> Animiert die Energieflußgrafik sofern angezeigt. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)       </td></tr>
             <tr><td>                                </td><td><b>0</b> - Animation aus,  <b>1</b> - Animation an, default: 0                                                          </td></tr>
             <tr><td>                                </td><td>                                                                                                                        </td></tr>
