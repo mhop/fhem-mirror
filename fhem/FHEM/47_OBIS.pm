@@ -640,7 +640,7 @@ sub OBIS_Parse($$)
 			
 			# End of Message
 					if ($rmsg=~/^!.*/) {
-						$hash->{helper}{EoM}+=1 if ($hash->{helper}{DEVICES}[1]>0);
+						$hash->{helper}{EoM}+=1 if ($hash->{helper}{DEVICES}[1]>0 // '');
 					}
 			#Version
 					elsif ($rmsg=~ /.*\/(.*)/) {
