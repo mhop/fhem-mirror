@@ -5347,6 +5347,7 @@ sub Attr {
   if ($cmd eq 'set' && $aName =~ /^flowGraphicCss|flowGraphicSize|flowGraphicAnimate|flowGraphicConsumerDistance|flowGraphicShowConsumer|flowGraphicShowConsumerDummy|flowGraphicShowConsumerPower|flowGraphicShowConsumerRemainTime|flowGraphicShift$/) {
       if (!$init_done) {
           # return qq{Device "$name" -> The attribute '$aName' is replaced by 'flowGraphicControl'. Please press "save config" when restart is finished.};
+          Log3 ($name, 1, qq{$name - The attribute '$aName' is replaced by 'flowGraphicControl'. Please press "save config" when restart is finished.});
       }
       else {
           return qq{The attribute '$aName' is obsolete and replaced by 'flowGraphicControl'.};
@@ -14205,8 +14206,6 @@ sub _flowGraphic {
   my $cdist          = $paref->{flowgconsDist};                                # Abstand Consumer zueinander
   my $lang           = $paref->{lang};
 
-  my $style      = 'width:98%; height:'.$flowgsize.'px;';
-  my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';     # Animation Ja/Nein
   my $cgc        = ReadingsNum ($name, 'Current_GridConsumption', 0);
   my $node2grid  = ReadingsNum ($name, 'Current_GridFeedIn',      0);                          # vom Knoten zum Grid
   my $cself      = ReadingsNum ($name, 'Current_SelfConsumption', 0);
@@ -14302,32 +14301,30 @@ sub _flowGraphic {
       $soc      = 0;
   }
   
-  my $node2bat       = $batin;
-  my $grid_color     = $node2grid ? 'flowg grid_color1'               : 'flowg grid_color2';          # green : red
-  my $cgc_style      = $cgc       ? 'flowg active_in'                 : 'flowg inactive_in';          # cgc current GridConsumption
-  my $bat2home_style = $bat2home  ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
-  $grid_color        = 'flowg grid_color3'  if(!$node2grid && !$cgc && $bat2home);                    # gray
-  my $cgc_direction  = 'M490,515 L670,590';                                                           
+  my $grid2home_style = $cgc       ? 'flowg active_red'    : 'flowg inactive';          # cgc current GridConsumption
+  my $bat2home_style  = $bat2home  ? 'flowg active_orange' : 'flowg inactive';
+  my $cgc_direction   = 'M490,515 L670,590';                                                           
 
-  if ($bat2home) {                                                           # Batterie wird entladen
+  if ($bat2home) {                                                                        # Batterie wird ins Haus entladen
       my $cgfo = $node2grid - $pv2node;
 
       if ($cgfo > 1) {
-          $cgc_style      = 'flowg active_out';
-          $cgc_direction  = 'M670,590 L490,515';
-          $node2grid     -= $cgfo;
-          $cgc            = $cgfo;
+          $grid2home_style = 'flowg active_orange';
+          $cgc_direction   = 'M670,590 L490,515';
+          $node2grid      -= $cgfo;
+          $cgc             = $cgfo;
       }
   }
  
   my $bat2home_direction = 'M902,515 L730,590';
+  my $node2bat           = $batin;
 
-  if ($node2bat) {                                                          # Batterie wird geladen
-      my $home2bat = $node2bat - $pv2node;
+  if ($batin) {                                                             # Batterie wird geladen
+      my $home2bat = $batin - ($pv2node + $pv2bat);
 
-      if ($home2bat > 1) {                                                  # Batterieladung anteilig aus Hausnetz geladen
+      if ($home2bat > 1) {                                                  # Batterieladung wird anteilig aus Hausnetz geladen
           $node2bat           -= $home2bat;
-          $bat2home_style      = 'flowg active_in';
+          $bat2home_style      = 'flowg active_red';
           $bat2home_direction  = 'M730,590 L902,515';
           $bat2home            = $home2bat;
       }
@@ -14335,11 +14332,11 @@ sub _flowGraphic {
 
   ## Werte / SteuerungVars anpassen
   ###################################
-  my $pnodesum = __normDecPlaces ($ppall + $pv2node);                       # Erzeugung Summe im Knoten
-  $pnodesum   += abs $node2bat if($node2bat < 0);                           # Batterie ist voll und SolarLader liefert an Knoten
-  $node2bat   -= $pv2bat;                                                   # Knoten -> Bat : abzüglich Direktladung
-  $flowgcons   = 0 if(!$consumercount);                                     # Consumer Anzeige ausschalten wenn keine Consumer definiert
-  my $pv2home  = __normDecPlaces ($cself + $ppall);                         # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
+  my $pnodesum  = __normDecPlaces ($ppall + $pv2node);                      # Erzeugung Summe im Knoten
+  $pnodesum    += abs $node2bat if($node2bat < 0);                          # Batterie ist voll und SolarLader liefert an Knoten
+  $node2bat    -= $pv2bat;                                                  # Knoten-Bat -> abzüglich Direktladung (pv2bat)
+  $flowgcons    = 0 if(!$consumercount);                                    # Consumer Anzeige ausschalten wenn keine Consumer definiert
+  my $node2home = __normDecPlaces ($cself + $ppall);                        # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
 
 
   ## SVG Box initialisieren mit Grid-Icon
@@ -14354,28 +14351,33 @@ sub _flowGraphic {
 
   $vbhight += 100;
 
-  my $vbox = "$vbminx $vbminy $vbwidth $vbhight";
+  my $vbox       = "$vbminx $vbminy $vbwidth $vbhight";
+  my $svgstyle   = 'width:98%; height:'.$flowgsize.'px;';
+  my $animation  = $flowgani  ? '@keyframes dash { to { stroke-dashoffset: 0; } }' : '';     # Animation Ja/Nein
+  
+  my $grid_color = $node2grid                        ? 'flowg grid_green' : 
+                   !$node2grid && !$cgc && $bat2home ? 'flowg grid_gray'  :
+                   'flowg grid_red';
+  
+  # $grid_color    = 'flowg grid_gray'  if(!$node2grid && !$cgc && $bat2home);
 
   my $ret = << "END0";
       <style>
-      .flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     
-      .flowg.bat25          { stroke: red; fill: red; }                                                        
-      .flowg.bat50          { stroke: darkorange; fill: darkorange; }                                          
-      .flowg.bat75          { stroke: green; fill: green; }                                                    
-      .flowg.grid_color1    { fill: green; }                                                                   
-      .flowg.grid_color2    { fill: red; }                                                                     
-      .flowg.grid_color3    { fill: gray; }                                                                    
-      .flowg.inactive_in    { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } 
-      .flowg.inactive_out   { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } 
-      .flowg.active_in      { stroke: red;        stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
-      .flowg.active_out     { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
-      .flowg.active_bat_in  { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
-      .flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      .flowg.text            { stroke: none; fill: gray; font-size: 60px; }                                     
+      .flowg.bat25           { stroke: red; fill: red; }                                                        
+      .flowg.bat50           { stroke: darkorange; fill: darkorange; }                                          
+      .flowg.bat75           { stroke: green; fill: green; }                                                    
+      .flowg.grid_green      { fill: green; }                                                                   
+      .flowg.grid_red        { fill: red; }                                                                     
+      .flowg.grid_gray       { fill: gray; }                                                                    
+      .flowg.inactive        { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } 
+      .flowg.active_red      { stroke: red;        stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      .flowg.active_orange   { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
       
       $animation
       </style>
 
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$style" id="SVGPLOT">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$svgstyle" id="SVGPLOT">
 
       <g id="grid" class="$grid_color" transform="translate(215,260),scale(3.0)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
@@ -14521,25 +14523,25 @@ END1
 
   ## Laufketten Node->Home, Node->Grid, Bat->Home
   #################################################
-  my $csc_style  = $pv2home   ? 'flowg active_out' : 'flowg inactive_out';
-  my $cgfi_style = $node2grid ? 'flowg active_out' : 'flowg inactive_out';
+  my $node2home_style = $node2home ? 'flowg active_orange' : 'flowg inactive';
+  my $node2grid_style = $node2grid ? 'flowg active_orange' : 'flowg inactive';
   
   $ret .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-  <path id="pv-home"  class="$csc_style"  d="M700,400 L700,580" />
-  <path id="pv-grid"  class="$cgfi_style" d="M670,400 L490,480" />
-  <path id="bat-home" class="$cgc_style"  d="$cgc_direction" />
+  <path id="node2home" class="$node2home_style" d="M700,400 L700,580" />
+  <path id="node2grid" class="$node2grid_style" d="M670,400 L490,480" />
+  <path id="grid2home" class="$grid2home_style" d="$cgc_direction" />
 END2
 
   ## Laufketten PV->Batterie, Batterie->Home
   ##############################################
   if ($hasbat) {
-      my $node2bat_style  = $node2bat     ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
-      my $batin_direction = $node2bat < 0 ? 'M910,480 L730,400'             : 'M730,400 L910,480';  
+      my $node2bat_style  = $node2bat     ? 'flowg active_orange' : 'flowg inactive';
+      my $batin_direction = $node2bat < 0 ? 'M910,480 L730,400'   : 'M730,400 L910,480';  
       $node2bat           = abs $node2bat;
                            
       $ret .= << "END3";
-      <path id="bat2home" class="$bat2home_style"   d="$bat2home_direction" />
+      <path id="bat2home" class="$bat2home_style" d="$bat2home_direction" />
       <path id="pv2bat"   class="$node2bat_style" d="$batin_direction" />
 END3
   }
@@ -14547,8 +14549,8 @@ END3
   ## Dummy Consumer Laufketten
   ##############################
    if ($flowgconX) {
-      my $consumer_style = 'flowg inactive_out';
-      $consumer_style    = 'flowg active_in' if($cc_dummy > 1);
+      my $consumer_style = 'flowg inactive';
+      $consumer_style    = 'flowg active_red' if($cc_dummy > 1);
       my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
       if ($cc_dummy > 0.5) {
@@ -14579,8 +14581,8 @@ END3
       for my $lfn (@sorted) {
           my $pn             = $pdcr->{$lfn}{pn};
           my $p              = $pdcr->{$lfn}{p};
-          my $consumer_style = 'flowg inactive_out';
-             $consumer_style = 'flowg active_out' if($p > 0);
+          my $consumer_style = 'flowg inactive';
+             $consumer_style = 'flowg active_orange' if($p > 0);
           my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
 
           if ($p) {
@@ -14619,8 +14621,8 @@ END3
 
           my $p              = $currentPower;
           $p                 = (($currentPower / $power) * 100) if ($power > 0);
-          my $consumer_style = 'flowg inactive_out';
-          $consumer_style    = 'flowg active_out' if($p > $defpopercent);
+          my $consumer_style = 'flowg inactive';
+          $consumer_style    = 'flowg active_orange' if($p > $defpopercent);
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
           if ($p > 0.5) {
@@ -14639,7 +14641,7 @@ END3
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
   $ret .= qq{<text class="flowg text" id="nodetxt"       x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
   $ret .= qq{<text class="flowg text" id="batsoctxt"     x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                         # Lage Text Batterieladungszustand
-  $ret .= qq{<text class="flowg text" id="node2hometxt"  x="730"  y="520" style="text-anchor: start;">$pv2home</text>}    if ($pv2home);
+  $ret .= qq{<text class="flowg text" id="node2hometxt"  x="730"  y="520" style="text-anchor: start;">$node2home</text>}  if ($node2home);
   $ret .= qq{<text class="flowg text" id="node2gridtxt"  x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
   $ret .= qq{<text class="flowg text" id="grid2hometxt"  x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
   $ret .= qq{<text class="flowg text" id="batouttxt"     x="880"  y="610" style="text-anchor: start;">$bat2home</text>}   if ($bat2home && $hasbat);
