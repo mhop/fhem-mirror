@@ -159,7 +159,7 @@ my %vNotesIntern = (
   "1.37.0" => "20.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
                            "_flowGraphic: controlhash for producer, new attr flowGraphicControl and replace the attributes: ".
                            "flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer flowGraphicShowConsumerDummy ".
-                           "flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime flowGraphicShift ",
+                           "flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime flowGraphicShift flowGraphicCss ",
   "1.36.1" => "14.10.2024  _flowGraphic: consumer distance modified by kask, Coloring of icons corrected when creating 0 ",
   "1.36.0" => "13.10.2024  new Getter valInverter, valStrings and valProducer, preparation for multiple inverters ".
                            "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
@@ -485,21 +485,6 @@ my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/'
 my $pPath = '?format=txt';                                                          # Download Format
 my $cfile = 'controls_solarforecast.txt';                                           # Name des Controlfiles
 
-                                                                                    # default CSS-Style
-my $cssdef = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     \n}.
-             qq{.flowg.bat25          { stroke: red; fill: red; }                                                        \n}.
-             qq{.flowg.bat50          { stroke: darkorange; fill: darkorange; }                                          \n}.
-             qq{.flowg.bat75          { stroke: green; fill: green; }                                                    \n}.
-             qq{.flowg.grid_color1    { fill: green; }                                                                   \n}.
-             qq{.flowg.grid_color2    { fill: red; }                                                                     \n}.
-             qq{.flowg.grid_color3    { fill: gray; }                                                                    \n}.
-             qq{.flowg.inactive_in    { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } \n}.
-             qq{.flowg.inactive_out   { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } \n}.
-             qq{.flowg.active_in      { stroke: red;        stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-             qq{.flowg.active_out     { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-             qq{.flowg.active_bat_in  { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-             qq{.flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
-             ;
 
 # initiale Hashes für Stunden Consumption Forecast inkl. und exkl. Verbraucher
 my $conhfc = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
@@ -554,8 +539,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    ctrlSolCastAPIoptimizeReq ctrlStatisticReadings ctrlUserExitFn
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    disable
-                   flowGraphicControl
-                   flowGraphicCss graphicBeamWidth
+                   flowGraphicControl graphicBeamWidth
                    graphicBeamHeightLevel1 graphicBeamHeightLevel2
                    graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content
                    graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color
@@ -1269,7 +1253,6 @@ sub Initialize {
                                 "ctrlUserExitFn:textField-long ".
                                 "disable:1,0 ".
                                 "flowGraphicControl:textField-long ".
-                                "flowGraphicCss:textField-long ".
                                 "graphicBeamHeightLevel1 ".
                                 "graphicBeamHeightLevel2 ".
                                 "graphicBeamWidth:slider,20,5,100 ".
@@ -1320,7 +1303,8 @@ sub Initialize {
                     
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################                    
-  $hash->{AttrList} .= " flowGraphicSize flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer flowGraphicShowConsumerDummy flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime flowGraphicShift ";
+  my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';
+  $hash->{AttrList} .= " flowGraphicCss:$av flowGraphicSize:$av flowGraphicAnimate:$av flowGraphicConsumerDistance:$av flowGraphicShowConsumer:$av flowGraphicShowConsumerDummy:$av flowGraphicShowConsumerPower:$av flowGraphicShowConsumerRemainTime:$av flowGraphicShift:$av ";
  
   ##########################################################################################################################
 
@@ -5360,7 +5344,7 @@ sub Attr {
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
   # 20.10.2024
-  if ($cmd eq 'set' && $aName =~ /^flowGraphicSize|flowGraphicAnimate|flowGraphicConsumerDistance|flowGraphicShowConsumer|flowGraphicShowConsumerDummy|flowGraphicShowConsumerPower|flowGraphicShowConsumerRemainTime|flowGraphicShift$/) {
+  if ($cmd eq 'set' && $aName =~ /^flowGraphicCss|flowGraphicSize|flowGraphicAnimate|flowGraphicConsumerDistance|flowGraphicShowConsumer|flowGraphicShowConsumerDummy|flowGraphicShowConsumerPower|flowGraphicShowConsumerRemainTime|flowGraphicShift$/) {
       if (!$init_done) {
           return qq{Device "$name" -> The attribute '$aName' is replaced by 'flowGraphicControl'. Please press "save config" when restart is finished.};
       }
@@ -12155,7 +12139,6 @@ sub entryGraphic {
       flowgconsPower => CurrentVal ($hash, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
       flowgconsTime  => CurrentVal ($hash, 'showconsumerremaintime',             1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
       flowgconsDist  => CurrentVal ($hash, 'consumerdist',                $fgCDdef),                # Abstand Verbrauchericons zueinander
-      css            => AttrVal    ($name, 'flowGraphicCss',               $cssdef),                # flowGraphicCss Styles
       genpvdva       => AttrVal    ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
       lang           => getLang    ($hash),
       debug          => getDebug   ($hash),                                                         # Debug Module
@@ -14218,7 +14201,6 @@ sub _flowGraphic {
   my $flowgconsPower = $paref->{flowgconsPower};
   my $flowgPrdsPower = 1;                                                      # initial Producer akt. Erzeugung anzeigen
   my $cdist          = $paref->{flowgconsDist};                                # Abstand Consumer zueinander
-  my $css            = $paref->{css};
   my $lang           = $paref->{lang};
 
   my $style      = 'width:98%; height:'.$flowgsize.'px;';
@@ -14374,7 +14356,20 @@ sub _flowGraphic {
 
   my $ret = << "END0";
       <style>
-      $css
+      .flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     
+      .flowg.bat25          { stroke: red; fill: red; }                                                        
+      .flowg.bat50          { stroke: darkorange; fill: darkorange; }                                          
+      .flowg.bat75          { stroke: green; fill: green; }                                                    
+      .flowg.grid_color1    { fill: green; }                                                                   
+      .flowg.grid_color2    { fill: red; }                                                                     
+      .flowg.grid_color3    { fill: gray; }                                                                    
+      .flowg.inactive_in    { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } 
+      .flowg.inactive_out   { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } 
+      .flowg.active_in      { stroke: red;        stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      .flowg.active_out     { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      .flowg.active_bat_in  { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      .flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      
       $animation
       </style>
 
@@ -21059,30 +21054,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-flowGraphicCss"></a>
-       <li><b>flowGraphicCss </b><br>
-         Defines the style for the energy flow graph. The attribute is automatically preset.
-         To change the flowGraphicCss attribute, please accept the default and adjust it: <br><br>
-
-         <ul>
-           .flowg.text           { stroke: none; fill: gray; font-size: 60px; } <br>
-           .flowg.bat25          { stroke: red; fill: red; }                    <br>
-           .flowg.bat50          { stroke: darkorange; fill: darkorange; }      <br>
-           .flowg.bat75          { stroke: green; fill: green; }                <br>
-           .flowg.grid_color1    { fill: green; }                               <br>
-           .flowg.grid_color2    { fill: red; }                                 <br>
-           .flowg.grid_color3    { fill: gray; }                                <br>
-           .flowg.inactive_in    { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }                                                                     <br>
-           .flowg.inactive_out   { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }                                                                     <br>
-           .flowg.active_in      { stroke: red;        stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-           .flowg.active_out     { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-           .flowg.active_bat_in  { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-           .flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-         </ul>
-
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-graphicBeam1Color"></a>
        <li><b>graphicBeam1Color </b><br>
          Color selection of the primary bar of the first level. <br>
@@ -21384,9 +21355,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicSelect"></a>
        <li><b>graphicSelect </b><br>
-         Selects the graphic segments of the module to be displayed. <br>
-         To customize the energy flow graphic, the <a href="#SolarForecast-attr-flowGraphicCss">flowGraphicCss</a>
-         attribute is available in addition to the flowGraphic.* attributes.
+         Selects the graphic segments of the module to be displayed.
          <br><br>
 
          <ul>
@@ -23478,30 +23447,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-flowGraphicCss"></a>
-       <li><b>flowGraphicCss </b><br>
-         Definiert den Style für die Energieflußgrafik. Das Attribut wird automatisch vorbelegt.
-         Zum Ändern des flowGraphicCss-Attributes bitte den Default übernehmen und anpassen: <br><br>
-
-         <ul>
-           .flowg.text           { stroke: none; fill: gray; font-size: 60px; } <br>
-           .flowg.bat25          { stroke: red; fill: red; }                    <br>
-           .flowg.bat50          { stroke: darkorange; fill: darkorange; }      <br>
-           .flowg.bat75          { stroke: green; fill: green; }                <br>
-           .flowg.grid_color1    { fill: green; }                               <br>
-           .flowg.grid_color2    { fill: red; }                                 <br>
-           .flowg.grid_color3    { fill: gray; }                                <br>
-           .flowg.inactive_in    { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }                                                                     <br>
-           .flowg.inactive_out   { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }                                                                     <br>
-           .flowg.active_in      { stroke: red;        stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-           .flowg.active_out     { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-           .flowg.active_bat_in  { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-           .flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-         </ul>
-
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-graphicBeam1Color"></a>
        <li><b>graphicBeam1Color </b><br>
          Farbauswahl des primären Balken der ersten Ebene. <br>
@@ -23802,9 +23747,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicSelect"></a>
        <li><b>graphicSelect </b><br>
-         Wählt die anzuzeigenden Grafiksegmente des Moduls aus. <br>
-         Zur Anpassung der Energieflußgrafik steht neben den flowGraphic.*-Attributen auch
-         das Attribut <a href="#SolarForecast-attr-flowGraphicCss">flowGraphicCss</a> zur Verfügung. <br><br>
+         Wählt die anzuzeigenden Grafiksegmente des Moduls aus.
+         <br><br>
 
          <ul>
          <table>
