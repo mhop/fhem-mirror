@@ -156,10 +156,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.37.0" => "20.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
+  "1.37.0" => "21.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
                            "_flowGraphic: controlhash for producer, new attr flowGraphicControl and replace the attributes: ".
                            "flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer flowGraphicShowConsumerDummy ".
-                           "flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime flowGraphicShift flowGraphicCss ",
+                           "flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime flowGraphicShift flowGraphicCss ".
+                           "flowGraphicControl: new keys strokecolina, strokecolsig, strokecolstd, strokewidth ",
   "1.36.1" => "14.10.2024  _flowGraphic: consumer distance modified by kask, Coloring of icons corrected when creating 0 ",
   "1.36.0" => "13.10.2024  new Getter valInverter, valStrings and valProducer, preparation for multiple inverters ".
                            "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
@@ -469,7 +470,11 @@ my $b4coldef       = 'DBDBD0';                                                  
 my $b4fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 4
 my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
-my $fgscaledef     = 0.10;                                                          # Scale Normativ Icons in Flowgreafik
+my $fgscaledef     = 0.10;                                                          # Flußgrafik: Scale Normativ Icons
+my $strokcolstddef = 'darkorange';                                                  # Flußgrafik: Standardfarbe aktive normale Kette
+my $strokcolsigdef = 'red';                                                         # Flußgrafik: Standardfarbe aktive Signal-Kette
+my $strokcolinadef = 'gray';                                                        # Flußgrafik: Standardfarbe inaktive Kette
+my $strokwidthdef  = 25;                                                            # Flußgrafik: Standard Breite der Kette
 my $prodicondef    = 'sani_garden_pump';                                            # default Producer-Icon
 my $cicondef       = 'light_light_dim_100';                                         # default Consumer-Icon
 my $ciconcoldef    = 'darkorange';                                                  # default Consumer-Icon Färbung
@@ -5677,6 +5682,10 @@ sub _attrflowGraphicControl {            ## no critic "not used"
                    size
                    showconsumerdummy
                    showconsumerpower
+                   strokecolstd
+                   strokecolsig
+                   strokecolina
+                   strokewidth
                  ) ) {
       
       delete $data{$type}{$name}{current}{$av};
@@ -5692,6 +5701,10 @@ sub _attrflowGraphicControl {            ## no critic "not used"
           showconsumerdummy      => '0|1',
           showconsumerremaintime => '0|1',
           showconsumerpower      => '0|1',
+          strokecolstd           => '.*',
+          strokecolsig           => '.*',
+          strokecolina           => '.*',
+          strokewidth            => '\d+',
       };
       
       my ($a, $h) = parseParams ($aVal);
@@ -9696,7 +9709,7 @@ sub __calcEnergyPieces {
   my $cotype  = ConsumerVal ($hash, $c, "type",    $defctype  );
   my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
 
-  if (isSunPath ($hash, $c)) {                                                                            # SunPath ist in mintime gesetzt
+  if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
       my ($riseshift, $setshift) = sunShift    ($hash, $c);
       my $tdiff                  = (CurrentVal ($hash, 'sunsetTodayTs',  0) + $setshift) -
                                    (CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift);
@@ -9705,8 +9718,7 @@ sub __calcEnergyPieces {
 
   my $hours   = ceil ($mintime / 60);                                                          # Einplanungsdauer in h
   my $ctote   = ConsumerVal ($hash, $c, "avgenergy", undef);                                   # gemessener durchschnittlicher Energieverbrauch pro Stunde (Wh)
-  $ctote      = $ctote ?
-                $ctote :
+  $ctote      = $ctote ? $ctote :
                 ConsumerVal ($hash, $c, "power", 0);                                           # alternativer nominaler Energieverbrauch in W (bzw. Wh bezogen auf 1 h)
 
   if (int($hef{$cotype}{f}) == 1) {                                                            # bei linearen Verbrauchertypen die nominale Leistungsangabe verwenden statt Durchschnitt
@@ -14207,7 +14219,7 @@ sub _flowGraphic {
   my $lang           = $paref->{lang};
 
   my $cgc        = ReadingsNum ($name, 'Current_GridConsumption', 0);
-  my $node2grid  = ReadingsNum ($name, 'Current_GridFeedIn',      0);                          # vom Knoten zum Grid
+  my $node2grid  = ReadingsNum ($name, 'Current_GridFeedIn',      0);          # vom Knoten zum Grid
   my $cself      = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc         = CurrentVal  ($hash, 'consumption',             0);
   my $batin      = ReadingsNum ($name, 'Current_PowerBatIn',  undef);
@@ -14216,15 +14228,15 @@ sub _flowGraphic {
   my $cc_dummy   = $cc;
 
   my $scale      = $fgscaledef;
-  my $pdist      = 130;                                                       # Abstand Producer zueinander
-  my $hasbat     = 1;                                                         # initial Batterie vorhanden
+  my $pdist      = 130;                                                        # Abstand Producer zueinander
+  my $hasbat     = 1;                                                          # initial Batterie vorhanden
   my $lcp;
   
   ## definierte Producer + Inverter ermitteln und zusammenfassen
   ################################################################
-  my $pdcr    = {};                                                           # Hashref Producer
-  my $ppall   = 0;                                                            # Summe Erzeugung alle nicht PV-Producer
-  my $pv2node = 0;                                                            # Summe PV-Erzeugung alle Inverter
+  my $pdcr    = {};                                                            # Hashref Producer
+  my $ppall   = 0;                                                             # Summe Erzeugung alle nicht PV-Producer
+  my $pv2node = 0;                                                             # Summe PV-Erzeugung alle Inverter
   my $pv2grid = 0;
   my $pv2bat  = 0;
   my $lfn     = 0;
@@ -14236,11 +14248,11 @@ sub _flowGraphic {
 
       if (defined $p) {
           $p                  = __normDecPlaces ($p);
-          $pdcr->{$lfn}{p}    = $p;                                           # aktuelle Erzeugung nicht PV-Producer 
-          $pdcr->{$lfn}{pn}   = $pn;                                          # Producernummer
-          $pdcr->{$lfn}{feed} = $feed;                                        # Eigenschaft der Energielieferung
-          $pdcr->{$lfn}{ptyp} = 'producer';                                   # Typ des Producers
-          $ppall             += $p;                                           # aktuelle Erzeuguung aller nicht PV-Producer
+          $pdcr->{$lfn}{p}    = $p;                                            # aktuelle Erzeugung nicht PV-Producer 
+          $pdcr->{$lfn}{pn}   = $pn;                                           # Producernummer
+          $pdcr->{$lfn}{feed} = $feed;                                         # Eigenschaft der Energielieferung
+          $pdcr->{$lfn}{ptyp} = 'producer';                                    # Typ des Producers
+          $ppall             += $p;                                            # aktuelle Erzeuguung aller nicht PV-Producer
           
           $lfn++;
       }
@@ -14290,9 +14302,9 @@ sub _flowGraphic {
 
   ## Batterie + Werte festlegen
   ###############################
-  my $bat_color = $soc < 26 ? 'flowg bat25' :
-                  $soc < 76 ? 'flowg bat50' :
-                  'flowg bat75';
+  my $bat_color = $soc < 26 ? "$name bat25" :
+                  $soc < 76 ? "$name bat50" :
+                  "$name bat75";
 
   if (!defined $batin && !defined $bat2home) {
       $hasbat   = 0;
@@ -14301,22 +14313,22 @@ sub _flowGraphic {
       $soc      = 0;
   }
   
-  my $grid2home_style = $cgc       ? 'flowg active_red'    : 'flowg inactive';          # cgc current GridConsumption
-  my $bat2home_style  = $bat2home  ? 'flowg active_orange' : 'flowg inactive';
-  my $cgc_direction   = 'M490,515 L670,590';                                                           
+  my $grid2home_style = $cgc       ? "$name active_sig"    : "$name inactive";          # cgc current GridConsumption
+  my $bat2home_style  = $bat2home  ? "$name active_normal" : "$name inactive";
+  my $cgc_direction   = "M490,515 L670,590";                                                           
 
   if ($bat2home) {                                                                        # Batterie wird ins Haus entladen
       my $cgfo = $node2grid - $pv2node;
 
       if ($cgfo > 1) {
-          $grid2home_style = 'flowg active_orange';
-          $cgc_direction   = 'M670,590 L490,515';
+          $grid2home_style = "$name active_normal";
+          $cgc_direction   = "M670,590 L490,515";
           $node2grid      -= $cgfo;
           $cgc             = $cgfo;
       }
   }
  
-  my $bat2home_direction = 'M902,515 L730,590';
+  my $bat2home_direction = "M902,515 L730,590";
   my $node2bat           = $batin;
 
   if ($batin) {                                                             # Batterie wird geladen
@@ -14324,8 +14336,8 @@ sub _flowGraphic {
 
       if ($home2bat > 1) {                                                  # Batterieladung wird anteilig aus Hausnetz geladen
           $node2bat           -= $home2bat;
-          $bat2home_style      = 'flowg active_red';
-          $bat2home_direction  = 'M730,590 L902,515';
+          $bat2home_style      = "$name active_sig";
+          $bat2home_direction  = "M730,590 L902,515";
           $bat2home            = $home2bat;
       }
   }
@@ -14355,31 +14367,34 @@ sub _flowGraphic {
   my $svgstyle   = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani  ? '@keyframes dash { to { stroke-dashoffset: 0; } }' : '';     # Animation Ja/Nein
   
-  my $grid_color = $node2grid                        ? 'flowg grid_green' : 
-                   !$node2grid && !$cgc && $bat2home ? 'flowg grid_gray'  :
-                   'flowg grid_red';
+  my $grid_color = $node2grid                        ? "$name grid_green" : 
+                   !$node2grid && !$cgc && $bat2home ? "$name grid_gray"  :
+                   "$name grid_red";
   
-  # $grid_color    = 'flowg grid_gray'  if(!$node2grid && !$cgc && $bat2home);
+  my $strokecolstd = CurrentVal ($hash, 'strokecolstd', $strokcolstddef);
+  my $strokecolsig = CurrentVal ($hash, 'strokecolsig', $strokcolsigdef);
+  my $strokecolina = CurrentVal ($hash, 'strokecolina', $strokcolinadef);
+  my $strokewidth  = CurrentVal ($hash, 'strokewidth',  $strokwidthdef);  
 
   my $ret = << "END0";
       <style>
-      .flowg.text            { stroke: none; fill: gray; font-size: 60px; }                                     
-      .flowg.bat25           { stroke: red; fill: red; }                                                        
-      .flowg.bat50           { stroke: darkorange; fill: darkorange; }                                          
-      .flowg.bat75           { stroke: green; fill: green; }                                                    
-      .flowg.grid_green      { fill: green; }                                                                   
-      .flowg.grid_red        { fill: red; }                                                                     
-      .flowg.grid_gray       { fill: gray; }                                                                    
-      .flowg.inactive        { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } 
-      .flowg.active_red      { stroke: red;        stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
-      .flowg.active_orange   { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      .$name.text            { stroke: none; fill: gray; font-size: 60px; }                                     
+      .$name.bat25           { stroke: red; fill: red; }                                                        
+      .$name.bat50           { stroke: darkorange; fill: darkorange; }                                          
+      .$name.bat75           { stroke: green; fill: green; }                                                    
+      .$name.grid_green      { fill: green; }                                                                   
+      .$name.grid_red        { fill: red; }                                                                     
+      .$name.grid_gray       { fill: gray; }                                                                    
+      .$name.inactive        { stroke: $strokecolina; stroke-width: $strokewidth; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } 
+      .$name.active_sig      { stroke: $strokecolsig; stroke-width: $strokewidth; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      .$name.active_normal   { stroke: $strokecolstd; stroke-width: $strokewidth; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
       
       $animation
       </style>
 
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$svgstyle" id="SVGPLOT">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$svgstyle" id="SVGPLOT_$name">
 
-      <g id="grid" class="$grid_color" transform="translate(215,260),scale(3.0)">
+      <g id="grid_$name" class="$grid_color" transform="translate(215,260),scale(3.0)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
       </g>
 END0
@@ -14417,7 +14432,7 @@ END0
           $picon           = FW_makeImage    ($picon, '');
           ($scale, $picon) = __normIconScale ($picon, $name);
           
-          $ret .= qq{<g id="producer_$pn" fill="grey" transform="translate($left,0),scale($scale)">};
+          $ret .= qq{<g id="producer_${pn}_$name" fill="grey" transform="translate($left,0),scale($scale)">};
           $ret .= "<title>$ptxt</title>".$picon;
           $ret .= '</g> ';
 
@@ -14438,7 +14453,7 @@ END0
   $nicon           = FW_makeImage    ($nicon, '');
   ($scale, $nicon) = __normIconScale ($nicon, $name);
   
-  $ret .= qq{<g id="Node" transform="translate(360,165),scale($scale)">};                                # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= qq{<g id="node_$name" transform="translate(360,165),scale($scale)">};                            # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret .= "<title>$ntxt</title>".$nicon;
   $ret .= '</g> ';
 
@@ -14475,7 +14490,7 @@ END0
           $cicon           = FW_makeImage    ($cicon, '');
           ($scale, $cicon) = __normIconScale ($cicon, $name);
           
-          $ret .= qq{<g id="consumer_$c" transform="translate($cons_left,505),scale($scale)">};
+          $ret .= qq{<g id="consumer_${c}_$name" transform="translate($cons_left,505),scale($scale)">};
           $ret .= "<title>$calias</title>".$cicon;
           $ret .= '</g> ';
 
@@ -14504,7 +14519,7 @@ END1
   my $hicon        = FW_makeImage    ($homeicondef, '');
   ($scale, $hicon) = __normIconScale ($hicon, $name);
   
-  $ret .= qq{<g id="Home" transform="translate(368,360),scale($scale)">};                         # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= qq{<g id="home_$name" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret .= "<title>Home</title>".$hicon;
   $ret .= '</g> ';  
 
@@ -14516,41 +14531,41 @@ END1
       my $dicon        = FW_makeImage    ($cicondef.$dumcol, '');
       ($scale, $dicon) = __normIconScale ($dicon, $name);
       
-      $ret .= qq{<g id="consumer_X" transform="translate(520,360),scale($scale)">};
+      $ret .= qq{<g id="dummy_$name" transform="translate(520,360),scale($scale)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
       $ret .= '</g> ';
   }
 
   ## Laufketten Node->Home, Node->Grid, Bat->Home
   #################################################
-  my $node2home_style = $node2home ? 'flowg active_orange' : 'flowg inactive';
-  my $node2grid_style = $node2grid ? 'flowg active_orange' : 'flowg inactive';
+  my $node2home_style = $node2home ? "$name active_normal" : "$name inactive";
+  my $node2grid_style = $node2grid ? "$name active_normal" : "$name inactive";
   
   $ret .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-  <path id="node2home" class="$node2home_style" d="M700,400 L700,580" />
-  <path id="node2grid" class="$node2grid_style" d="M670,400 L490,480" />
-  <path id="grid2home" class="$grid2home_style" d="$cgc_direction" />
+  <path id="node2home_$name" class="$node2home_style" d="M700,400 L700,580" />
+  <path id="node2grid_$name" class="$node2grid_style" d="M670,400 L490,480" />
+  <path id="grid2home_$name" class="$grid2home_style" d="$cgc_direction" />
 END2
 
   ## Laufketten PV->Batterie, Batterie->Home
   ##############################################
   if ($hasbat) {
-      my $node2bat_style  = $node2bat     ? 'flowg active_orange' : 'flowg inactive';
-      my $batin_direction = $node2bat < 0 ? 'M910,480 L730,400'   : 'M730,400 L910,480';  
+      my $node2bat_style  = $node2bat     ? "$name active_normal" : "$name inactive";
+      my $batin_direction = $node2bat < 0 ? "M910,480 L730,400"   : "M730,400 L910,480";  
       $node2bat           = abs $node2bat;
                            
       $ret .= << "END3";
-      <path id="bat2home" class="$bat2home_style" d="$bat2home_direction" />
-      <path id="pv2bat"   class="$node2bat_style" d="$batin_direction" />
+      <path id="bat2home_$name" class="$bat2home_style" d="$bat2home_direction" />
+      <path id="pv2bat_$name"   class="$node2bat_style" d="$batin_direction" />
 END3
   }
 
   ## Dummy Consumer Laufketten
   ##############################
    if ($flowgconX) {
-      my $consumer_style = 'flowg inactive';
-      $consumer_style    = 'flowg active_red' if($cc_dummy > 1);
+      my $consumer_style = "$name inactive";
+      $consumer_style    = "$name active_sig" if($cc_dummy > 1);
       my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
       if ($cc_dummy > 0.5) {
@@ -14558,7 +14573,7 @@ END3
           #$chain_color  = 'style="stroke: #DF0101;"';
       }
 
-      $ret .= qq{<path id="home-dummy" class="$consumer_style" $chain_color d="M790,690 L930,690" />};
+      $ret .= qq{<path id="home2dummy_$name" class="$consumer_style" $chain_color d="M790,690 L930,690" />};
    }
    
   ## Producer Laufketten - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
@@ -14581,8 +14596,8 @@ END3
       for my $lfn (@sorted) {
           my $pn             = $pdcr->{$lfn}{pn};
           my $p              = $pdcr->{$lfn}{p};
-          my $consumer_style = 'flowg inactive';
-             $consumer_style = 'flowg active_orange' if($p > 0);
+          my $consumer_style = "$name inactive";
+             $consumer_style = "$name active_normal" if($p > 0);
           my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
 
           if ($p) {
@@ -14590,7 +14605,7 @@ END3
               $chain_color  = 'style="stroke: darkorange;"';
           }
  
-          $ret    .= qq{<path id="genproducer_$pn " class="$consumer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />}; 
+          $ret    .= qq{<path id="genproducer_${pn}_$name" class="$consumer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />}; 
           $left   += ($pdist * 2);
           $xchain += $step;
       }
@@ -14621,8 +14636,8 @@ END3
 
           my $p              = $currentPower;
           $p                 = (($currentPower / $power) * 100) if ($power > 0);
-          my $consumer_style = 'flowg inactive';
-          $consumer_style    = 'flowg active_orange' if($p > $defpopercent);
+          my $consumer_style = "$name inactive";
+          $consumer_style    = "$name active_normal" if($p > $defpopercent);
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
           if ($p > 0.5) {
@@ -14630,7 +14645,7 @@ END3
               #$chain_color  = 'style="stroke: #DF0101;"';
           }
 
-          $ret            .= qq{<path id="home-consumer_$c" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,880" />};
+          $ret            .= qq{<path id="home2consumer_${c}_$name" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,880" />};
           $cons_left       += ($cdist * 2);
           $cons_left_start += $distance_con;
       }
@@ -14639,15 +14654,15 @@ END3
   ## Textangaben an Grafikelementen
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
-  $ret .= qq{<text class="flowg text" id="nodetxt"       x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
-  $ret .= qq{<text class="flowg text" id="batsoctxt"     x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                         # Lage Text Batterieladungszustand
-  $ret .= qq{<text class="flowg text" id="node2hometxt"  x="730"  y="520" style="text-anchor: start;">$node2home</text>}  if ($node2home);
-  $ret .= qq{<text class="flowg text" id="node2gridtxt"  x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
-  $ret .= qq{<text class="flowg text" id="grid2hometxt"  x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
-  $ret .= qq{<text class="flowg text" id="batouttxt"     x="880"  y="610" style="text-anchor: start;">$bat2home</text>}   if ($bat2home && $hasbat);
-  $ret .= qq{<text class="flowg text" id="node2battxt"   x="880"  y="420" style="text-anchor: start;">$node2bat</text>}   if ($node2bat && $hasbat);
-  $ret .= qq{<text class="flowg text" id="hometxt"       x="600"  y="710" style="text-anchor: end;">$cc</text>};                                                # Current_Consumption Anlage
-  $ret .= qq{<text class="flowg text" id="dummytxt"      x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
+  $ret .= qq{<text class="$name text" id="nodetxt_$name"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
+  $ret .= qq{<text class="$name text" id="batsoctxt_$name"    x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                         # Lage Text Batterieladungszustand
+  $ret .= qq{<text class="$name text" id="node2hometxt_$name" x="730"  y="520" style="text-anchor: start;">$node2home</text>}  if ($node2home);
+  $ret .= qq{<text class="$name text" id="node2gridtxt_$name" x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
+  $ret .= qq{<text class="$name text" id="grid2hometxt_$name" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
+  $ret .= qq{<text class="$name text" id="batouttxt_$name"    x="880"  y="610" style="text-anchor: start;">$bat2home</text>}   if ($bat2home && $hasbat);
+  $ret .= qq{<text class="$name text" id="node2battxt_$name"  x="880"  y="420" style="text-anchor: start;">$node2bat</text>}   if ($node2bat && $hasbat);
+  $ret .= qq{<text class="$name text" id="hometxt_$name"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                                # Current_Consumption Anlage
+  $ret .= qq{<text class="$name text" id="dummytxt_$name"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
   
   ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ###############################################################################                                                      
@@ -14668,7 +14683,7 @@ END3
           elsif ($lcp == 2) {$left += 20}
           elsif ($lcp == 1) {$left += 40}
 
-          $ret .= qq{<text class="flowg text" id="producertxt_$pn" x="$left" y="100">$currentPower</text>} if($flowgPrdsPower);
+          $ret .= qq{<text class="$name text" id="producertxt_${pn}_$name" x="$left" y="100">$currentPower</text>} if($flowgPrdsPower);
 
           # Leistungszahl wieder zurück an den Ursprungspunkt
           ####################################################          
@@ -14699,8 +14714,8 @@ END3
           
           $lcp = length $currentPower;
 
-          #$ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$cons_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
-          #$ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
+          #$ret .= qq{<text class="$name text" id="consumertxt_${c}_$name"      x="$cons_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
+          #$ret .= qq{<text class="$name text" id="consumertxt_time_${c}_$name" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ##################################################################################
@@ -14710,8 +14725,8 @@ END3
           elsif ($lcp == 2) {$cons_left += 7 }
           elsif ($lcp == 1) {$cons_left += 25}
 
-          $ret .= qq{<text class="flowg text" id="consumer-txt_$c"      x="$cons_left" y="1110">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
-          $ret .= qq{<text class="flowg text" id="consumer-txt_time_$c" x="$cons_left" y="1170">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
+          $ret .= qq{<text class="$name text" id="consumertxt_${c}_$name"      x="$cons_left" y="1110">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
+          $ret .= qq{<text class="$name text" id="consumertxt_time_${c}_$name" x="$cons_left" y="1170">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl wieder zurück an den Ursprungspunkt
           ######################################################          
@@ -21047,12 +21062,23 @@ to ensure that the system configuration is correct.
 			<tr><td> <b>size </b>                   </td><td>Size of the energy flow graphic in pixels if displayed. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>) </td></tr>
 			<tr><td>                                </td><td>Value: <b>Integer</b>, default: 400                                                                                     </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>strokecolina </b>           </td><td>Color of an inactive line                                                                                               </td></tr>
+			<tr><td>                                </td><td>Value: <b>Hex (e.g. #cc3300) or designation (e.g. red, blue)</b>, default: gray                                         </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>strokecolsig </b>           </td><td>Color of an active signal line                                                                                          </td></tr>
+			<tr><td>                                </td><td>Value: <b>Hex (e.g. #cc3300) or designation (e.g. red, blue)</b>, default: red                                          </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>strokecolstd </b>           </td><td>Color of an active standard line                                                                                        </td></tr>
+			<tr><td>                                </td><td>Value: <b>Hex (e.g. #cc3300) or designation (e.g. red, blue)</b>, default: darkorange                                   </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>strokewidth </b>            </td><td>Width of the lines                                                                                                      </td></tr>
+			<tr><td>                                </td><td>Value: <b>Integer</b>, default: 25                                                                                      </td></tr>
         </table>
          </ul>
 		 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20
+         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20 strokewidth=15 strokecolstd=#99cc00
        </ul>
 	   
        </li>
@@ -23440,12 +23466,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td> <b>size </b>                   </td><td>Größe der Energieflußgrafik in Pixel sofern angezeigt. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)  </td></tr>
 			<tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 400                                                                                     </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>strokecolina </b>           </td><td>Farbe einer inaktiven Linie                                                                                             </td></tr>
+			<tr><td>                                </td><td>Wert: <b>Hex (z.B. #cc3300) oder Bezeichnung (z.B. red, blue)</b>, default: gray                                        </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>strokecolsig </b>           </td><td>Farbe einer aktiven Signallinie                                                                                         </td></tr>
+			<tr><td>                                </td><td>Wert: <b>Hex (z.B. #cc3300) oder Bezeichnung (z.B. red, blue)</b>, default: red                                         </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>strokecolstd </b>           </td><td>Farbe einer aktiven Standardlinie                                                                                       </td></tr>
+			<tr><td>                                </td><td>Wert: <b>Hex (z.B. #cc3300) oder Bezeichnung (z.B. red, blue)</b>, default: darkorange                                  </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>strokewidth </b>            </td><td>Breite der Linien                                                                                                       </td></tr>
+			<tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 25                                                                                      </td></tr>
         </table>
          </ul>
 		 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20
+         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20 strokewidth=15 strokecolstd=#99cc00
        </ul>
 	   
        </li>
