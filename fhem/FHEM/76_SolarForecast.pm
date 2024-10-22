@@ -14592,20 +14592,20 @@ END3
       else {
           $xchain = $xchain - ($pdist / 2 * ($count - 1));
       }
-
+      
+      my $producer_style;
+      
       for my $lfn (@sorted) {
           my $pn             = $pdcr->{$lfn}{pn};
           my $p              = $pdcr->{$lfn}{p};
-          my $consumer_style = "$name inactive";
-             $consumer_style = "$name active_normal" if($p > 0);
+          $producer_style    = $p > 0 ? "$name active_normal" : "$name inactive";
           my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
 
           if ($p) {
               #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
-              $chain_color  = 'style="stroke: darkorange;"';
           }
  
-          $ret    .= qq{<path id="genproducer_${pn}_$name" class="$consumer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />}; 
+          $ret    .= qq{<path id="genproducer_${pn}_$name" class="$producer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />}; 
           $left   += ($pdist * 2);
           $xchain += $step;
       }
@@ -14624,6 +14624,8 @@ END3
       else {
           $cons_left_start = 700 - ($distance_con / 2 * ($consumercount-1));
       }
+      
+      my $consumer_style;
 
       for my $c (@consumers) {
           my $power     = ConsumerVal ($hash, $c, 'power',   0);
@@ -14636,13 +14638,11 @@ END3
 
           my $p              = $currentPower;
           $p                 = (($currentPower / $power) * 100) if ($power > 0);
-          my $consumer_style = "$name inactive";
-          $consumer_style    = "$name active_normal" if($p > $defpopercent);
+          $consumer_style    = $p > $defpopercent ? "$name active_normal" : "$name inactive";
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
           if ($p > 0.5) {
               $chain_color = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
-              #$chain_color  = 'style="stroke: #DF0101;"';
           }
 
           $ret            .= qq{<path id="home2consumer_${c}_$name" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,880" />};
