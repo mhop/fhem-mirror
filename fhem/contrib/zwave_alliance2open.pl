@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+
 # convert ZWAVE-Alliance XML description file into openzwacve format, which can
 # be digested by the FHEM ZWave module. Note: only the config parameters are converted.
 
