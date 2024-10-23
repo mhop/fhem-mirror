@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  76_SolarForecast: minor fix in Flowgraphic
  - bufgix:  72_FRITZBOX: Perl Warning behoben 
  - feature: 76_SolarForecast: see Forum: ..index.php?msg=1323142
  - bufgix:  72_FRITZBOX: reconnect Fehler nach offline Device 
