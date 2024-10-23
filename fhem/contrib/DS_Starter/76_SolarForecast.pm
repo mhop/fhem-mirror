@@ -4,7 +4,7 @@
 #       76_SolarForecast.pm
 #
 #       (c) 2020-2024 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
-#       with credits to: kask, Prof. Dr. Peter Henning, Wzut (and much more FHEM users)
+#       with credits to: kask, Prof. Dr. Peter Henning, Wzut, ch.eick (and much more FHEM users)
 #
 #       This script is part of fhem.
 #
@@ -156,7 +156,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.37.0" => "21.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
+  "1.37.1" => "23.10.2024  state: 'The setup routine is still incomplete' if setup is incomplete ".
+                           "change: 'trackFlex' && \$wcc >= 80 to \$wcc >= 70, implement Rename function ".
+                           "_flowGraphic: eliminate numbers in device name - Forum: https://forum.fhem.de/index.php?msg=1323229 ",
+  "1.37.0" => "22.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
                            "_flowGraphic: controlhash for producer, new attr flowGraphicControl and replace the attributes: ".
                            "flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer flowGraphicShowConsumerDummy ".
                            "flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime flowGraphicShift flowGraphicCss ".
@@ -330,55 +333,6 @@ my %vNotesIntern = (
   "1.1.1"  => "19.11.2023  graphicHeaderOwnspec: fix ignoring the last element of allsets/allattr ",
   "1.1.0"  => "14.11.2023  graphicHeaderOwnspec: possible add set/attr commands, new setter consumerNewPlanning ",
   "1.0.10" => "31.10.2023  fix warnings, edit comref ",
-  "1.0.9"  => "29.10.2023  _aiGetSpread: set spread from 50 to 20 ",
-  "1.0.8"  => "22.10.2023  codechange: add central readings store array, new function storeReading, writeCacheToFile ".
-                           "solcastapi in sub __delObsoleteAPIData, save freespace if flowGraphicShowConsumer=0 is set ".
-                           "pay attention to attr graphicEnergyUnit in __createOwnSpec ",
-  "1.0.7"  => "21.10.2023  more design options for graphicHeaderOwnspec and a possible line title ",
-  "1.0.6"  => "19.10.2023  new attr ctrlGenPVdeviation ",
-  "1.0.5"  => "11.10.2023  new sub _aiGetSpread for estimate AI results stepwise, allow key 'noshow' values 0,1,2,3 ".
-                           "calculate conForecastTillNextSunrise accurate to the minute ",
-  "1.0.4"  => "10.10.2023  fix: print always Log in _calcCaQ* subroutines even if calaculated factors are equal ".
-                           "new consumer attr key 'noshow' ",
-  "1.0.3"  => "08.10.2023  change graphic header PV/CO detail, new attr graphicHeaderOwnspec, internal code changes ".
-                           "fix isAddSwitchOffCond 0 Forum: https://forum.fhem.de/index.php?msg=1288877 ".
-                           "change _calcValueImproves and subroutines ",
-  "1.0.2"  => "05.10.2023  replace calcRange by cloud2bin ",
-  "1.0.1"  => "03.10.2023  fixes in comRef, bug fix Forum: https://forum.fhem.de/index.php?msg=1288637 ",
-  "1.0.0"  => "01.10.2023  preparation for check in ",
-  "0.83.3" => "28.09.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1288032 ".
-                           "delete AllPVforecastsToEvent after event generation ",
-  "0.83.2" => "26.09.2023  setter reset consumption ",
-  "0.83.1" => "26.09.2023  change currentRadiationDev to currentRadiationAPI, new attr ctrlAIdataStorageDuration ".
-                           "new elements todayConsumptionForecast, conForecastTillNextSunrise for attr ctrlStatisticReadings ".
-                           "add entry text in guided procedure ",
-  "0.83.0" => "19.09.2023  add manageTrain for AI Training in parallel process ",
-  "0.82.4" => "16.09.2023  generate DWD API graphics header information and extend plant check for DWD API errors, minor fixes ",
-  "0.82.3" => "14.09.2023  more mouse over information in graphic header, ai support in autocorrection selectable ".
-                           "substitute use of Test2::Suite ",
-  "0.82.2" => "11.09.2023  activate implementation of DWD AI support, add runTimeTrainAI ",
-  "0.82.1" => "08.09.2023  rebuild implementation of DWD AI support, some error fixing (FHEM restarts between 0 and 1) ",
-  "0.82.0" => "02.09.2023  first implementation of DWD AI support, new ctrlDebug aiProcess aiData, reset aiData ",
-  "0.81.1" => "30.08.2023  show forecast qualities when pressing quality icon in forecast grafic, store rad1h (model DWD) in ".
-                           "pvhistory, removed: affectCloudfactorDamping, affectRainfactorDamping ",
-  "0.81.0" => "27.08.2023  development version for Victron VRM API, __PvFcSimpleDnumHist changed, available setter ".
-                           "are now API specific, switch currentForecastDev to currentWeatherDev ".
-                           "affectCloudfactorDamping default 0, affectRainfactorDamping default 0 ".
-                           "call consumption forecast from Victron VRM API ",
-  "0.80.20"=> "15.08.2023  hange calculation in ___setSolCastAPIcallKeyData once again, fix some warnings ",
-  "0.80.19"=> "10.08.2023  fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1283836 ",
-  "0.80.18"=> "07.08.2023  change calculation of todayDoneAPIcalls in ___setSolCastAPIcallKeyData, add \$lagtime ".
-                           "Forum: https://forum.fhem.de/index.php?msg=1283487 ",
-  "0.80.17"=> "05.08.2023  change sequence of _createSummaries in centralTask, ComRef edited ",
-  "0.80.16"=> "26.07.2023  new consumer type noSchedule, expand maxconsumer to 16, minor changes/fixes ",
-  "0.80.15"=> "24.07.2023  new sub getDebug, new key switchdev in consumer attributes, change Debug consumtion ".
-                           "reorg data in pvHistory when a hour of day was deleted ",
-  "0.80.14"=> "21.07.2023  __substituteIcon: use isConsumerLogOn instead of isConsumerPhysOn ",
-  "0.80.13"=> "18.07.2023  include parameter DoN in nextHours hash, new KPI's todayConForecastTillSunset, currentRunMtsConsumer_XX ".
-                           "minor fixes and improvements ",
-  "0.80.12"=> "16.07.2023  preparation for alternative switch device in consumer attribute, revise CommandRef ".
-                           "fix/improve sub ___readCandQ and much more, get pvHistory -> one specific day selectable ".
-                           "get valConsumerMaster -> one specific consumer selectable, enhance consumer key locktime by on-locktime ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -679,6 +633,19 @@ my %hmoon = (
   6 => { icon => 'weather_moon_phases_7_half', DE => 'letztes Viertel',   EN => 'last quarter'        },
   7 => { icon => 'weather_moon_phases_8',      DE => 'abnehmende Sichel', EN => 'decreasing crescent' },
 );
+
+  my %hrepl = (                                                             # Zeichenersetzungen
+    0 => 'a',
+    1 => 'b',
+    2 => 'c',
+    3 => 'd',
+    4 => 'e',
+    5 => 'f',
+    6 => 'g',
+    7 => 'h',
+    8 => 'i',
+    9 => 'j',
+  );
 
 my %hqtxt = (                                                                                                 # Hash (Setup) Texte
   entry  => { EN => qq{<b>Warm welcome!</b><br>
@@ -1225,6 +1192,7 @@ sub Initialize {
   $hash->{FW_summaryFn}       = \&FwFn;
   $hash->{FW_detailFn}        = \&FwFn;
   $hash->{ShutdownFn}         = \&Shutdown;
+  $hash->{RenameFn}           = \&Rename;
   $hash->{DbLog_splitFn}      = \&DbLogSplit;
   $hash->{AttrFn}             = \&Attr;
   $hash->{NotifyFn}           = \&Notify;
@@ -3460,7 +3428,7 @@ sub __getDWDSolarData {
 
           my ($af, $pv, $sdr, $wcc);
 
-          if ($cafd =~ /track/xs) {                                                                  # Flächenfaktor Sonnenstand geführt
+          if ($cafd =~ /track/xs) {                                                            # Flächenfaktor Sonnenstand geführt
               ($af, $sdr, $wcc) = ___areaFactorTrack ( { name   => $name,
                                                          day    => $day,
                                                          dday   => $dday,
@@ -3480,7 +3448,7 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
 
-              if ($cafd eq 'trackShared'|| ($cafd eq 'trackFlex' && $wcc >= 80)) {                  # Direktstrahlung + Diffusstrahlung
+              if ($cafd eq 'trackShared'|| ($cafd eq 'trackFlex' && $wcc >= 70)) {                  # Direktstrahlung + Diffusstrahlung
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
@@ -6353,6 +6321,24 @@ return ($reading, $value, $unit);
 }
 
 ################################################################
+#                         Rename
+################################################################
+sub Rename {
+  my $new_name = shift;
+  my $old_name = shift;
+  
+  my $hash = $defs{$old_name};
+  my $type = (split '::', __PACKAGE__)[1];
+  
+  $data{$type}{$new_name} = $data{$type}{$old_name};
+  delete $data{$type}{$old_name};                            
+  
+  # Log3 ($new_name, 1, qq{$new_name - Dump -> \n}. Dumper $data{$type}{$new_name});
+
+return;
+}
+
+################################################################
 #                         Shutdown
 ################################################################
 sub Shutdown {
@@ -6958,8 +6944,12 @@ sub centralTask {
   if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
       my $ret = createStringConfig ($hash);
 
-      if ($ret) {
-          singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );                                                                    # Central Task running Statusbit
+      if ($ret) { 
+          if (!CurrentVal ($hash, 'setupcomplete', 0)) {
+              $ret = 'The setup routine is still incomplete';
+          }      
+          singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );                      # Central Task running Statusbit
+          
           return;
       }
   }
@@ -12017,7 +12007,7 @@ sub FwFn {
 
   # Autorefresh nur des aufrufenden FHEMWEB-Devices
   my $al = AttrVal ($name, 'ctrlAutoRefresh', 0);
-  if($al) {
+  if ($al) {
       pageRefresh ($hash);
   }
 
@@ -12034,7 +12024,7 @@ sub pageRefresh {
 
   my $al = AttrVal($name, 'ctrlAutoRefresh', 0);
 
-  if($al) {
+  if ($al) {
       my $rftime = gettimeofday()+$al;
 
       if (!$hash->{HELPER}{AREFRESH} || $hash->{HELPER}{AREFRESH} <= gettimeofday()) {
@@ -12428,9 +12418,13 @@ sub _checkSetupNotComplete {
       $ret .= "</tr>";
       $ret .= "</table>";
       $ret  =~ s/LINK/$link/gxs;
+      
+      delete $data{$type}{$name}{current}{setupcomplete};
 
       return $ret;
   }
+  
+  $data{$type}{$name}{current}{setupcomplete} = 1;
 
 return;
 }
@@ -14232,6 +14226,9 @@ sub _flowGraphic {
   my $hasbat     = 1;                                                          # initial Batterie vorhanden
   my $lcp;
   
+  my $stna = $name;
+  $stna =~ s/([0-9])/$hrepl{$1}/ge if($name =~ /[0-9]/xs);                       # V 1.37.1 Ziffern eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
+  
   ## definierte Producer + Inverter ermitteln und zusammenfassen
   ################################################################
   my $pdcr    = {};                                                            # Hashref Producer
@@ -14302,9 +14299,9 @@ sub _flowGraphic {
 
   ## Batterie + Werte festlegen
   ###############################
-  my $bat_color = $soc < 26 ? "$name bat25" :
-                  $soc < 76 ? "$name bat50" :
-                  "$name bat75";
+  my $bat_color = $soc < 26 ? "$stna bat25" :
+                  $soc < 76 ? "$stna bat50" :
+                  "$stna bat75";
 
   if (!defined $batin && !defined $bat2home) {
       $hasbat   = 0;
@@ -14313,15 +14310,15 @@ sub _flowGraphic {
       $soc      = 0;
   }
   
-  my $grid2home_style = $cgc       ? "$name active_sig"    : "$name inactive";          # cgc current GridConsumption
-  my $bat2home_style  = $bat2home  ? "$name active_normal" : "$name inactive";
+  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";          # cgc current GridConsumption
+  my $bat2home_style  = $bat2home  ? "$stna active_normal" : "$stna inactive";
   my $cgc_direction   = "M490,515 L670,590";                                                           
 
   if ($bat2home) {                                                                        # Batterie wird ins Haus entladen
       my $cgfo = $node2grid - $pv2node;
 
       if ($cgfo > 1) {
-          $grid2home_style = "$name active_normal";
+          $grid2home_style = "$stna active_normal";
           $cgc_direction   = "M670,590 L490,515";
           $node2grid      -= $cgfo;
           $cgc             = $cgfo;
@@ -14336,7 +14333,7 @@ sub _flowGraphic {
 
       if ($home2bat > 1) {                                                  # Batterieladung wird anteilig aus Hausnetz geladen
           $node2bat           -= $home2bat;
-          $bat2home_style      = "$name active_sig";
+          $bat2home_style      = "$stna active_sig";
           $bat2home_direction  = "M730,590 L902,515";
           $bat2home            = $home2bat;
       }
@@ -14367,34 +14364,34 @@ sub _flowGraphic {
   my $svgstyle   = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani  ? '@keyframes dash { to { stroke-dashoffset: 0; } }' : '';     # Animation Ja/Nein
   
-  my $grid_color = $node2grid                        ? "$name grid_green" : 
-                   !$node2grid && !$cgc && $bat2home ? "$name grid_gray"  :
-                   "$name grid_red";
+  my $grid_color = $node2grid                        ? "$stna grid_green" : 
+                   !$node2grid && !$cgc && $bat2home ? "$stna grid_gray"  :
+                   "$stna grid_red";
   
   my $strokecolstd = CurrentVal ($hash, 'strokecolstd', $strokcolstddef);
   my $strokecolsig = CurrentVal ($hash, 'strokecolsig', $strokcolsigdef);
   my $strokecolina = CurrentVal ($hash, 'strokecolina', $strokcolinadef);
   my $strokewidth  = CurrentVal ($hash, 'strokewidth',  $strokwidthdef);  
-
+  
   my $ret = << "END0";
       <style>
-      .$name.text            { stroke: none; fill: gray; font-size: 60px; }                                     
-      .$name.bat25           { stroke: red; fill: red; }                                                        
-      .$name.bat50           { stroke: darkorange; fill: darkorange; }                                          
-      .$name.bat75           { stroke: green; fill: green; }                                                    
-      .$name.grid_green      { fill: green; }                                                                   
-      .$name.grid_red        { fill: red; }                                                                     
-      .$name.grid_gray       { fill: gray; }                                                                    
-      .$name.inactive        { stroke: $strokecolina; stroke-width: $strokewidth; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } 
-      .$name.active_sig      { stroke: $strokecolsig; stroke-width: $strokewidth; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
-      .$name.active_normal   { stroke: $strokecolstd; stroke-width: $strokewidth; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      .$stna.text            { stroke: none; fill: gray; font-size: 60px; }                                     
+      .$stna.bat25           { stroke: red; fill: red; }                                                        
+      .$stna.bat50           { stroke: darkorange; fill: darkorange; }                                          
+      .$stna.bat75           { stroke: green; fill: green; }                                                    
+      .$stna.grid_green      { fill: green; }                                                                   
+      .$stna.grid_red        { fill: red; }                                                                     
+      .$stna.grid_gray       { fill: gray; }                                                                    
+      .$stna.inactive        { stroke: $strokecolina; stroke-width: $strokewidth; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } 
+      .$stna.active_sig      { stroke: $strokecolsig; stroke-width: $strokewidth; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
+      .$stna.active_normal   { stroke: $strokecolstd; stroke-width: $strokewidth; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } 
       
       $animation
       </style>
 
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$svgstyle" id="SVGPLOT_$name">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$svgstyle" id="SVGPLOT_$stna">
 
-      <g id="grid_$name" class="$grid_color" transform="translate(215,260),scale(3.0)">
+      <g id="grid_$stna" class="$grid_color" transform="translate(215,260),scale(3.0)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
       </g>
 END0
@@ -14432,7 +14429,7 @@ END0
           $picon           = FW_makeImage    ($picon, '');
           ($scale, $picon) = __normIconScale ($picon, $name);
           
-          $ret .= qq{<g id="producer_${pn}_$name" fill="grey" transform="translate($left,0),scale($scale)">};
+          $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($left,0),scale($scale)">};
           $ret .= "<title>$ptxt</title>".$picon;
           $ret .= '</g> ';
 
@@ -14453,7 +14450,7 @@ END0
   $nicon           = FW_makeImage    ($nicon, '');
   ($scale, $nicon) = __normIconScale ($nicon, $name);
   
-  $ret .= qq{<g id="node_$name" transform="translate(360,165),scale($scale)">};                            # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= qq{<g id="node_$stna" transform="translate(360,165),scale($scale)">};                            # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret .= "<title>$ntxt</title>".$nicon;
   $ret .= '</g> ';
 
@@ -14490,7 +14487,7 @@ END0
           $cicon           = FW_makeImage    ($cicon, '');
           ($scale, $cicon) = __normIconScale ($cicon, $name);
           
-          $ret .= qq{<g id="consumer_${c}_$name" transform="translate($cons_left,505),scale($scale)">};
+          $ret .= qq{<g id="consumer_${c}_$stna" transform="translate($cons_left,505),scale($scale)">};
           $ret .= "<title>$calias</title>".$cicon;
           $ret .= '</g> ';
 
@@ -14519,7 +14516,7 @@ END1
   my $hicon        = FW_makeImage    ($homeicondef, '');
   ($scale, $hicon) = __normIconScale ($hicon, $name);
   
-  $ret .= qq{<g id="home_$name" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret .= qq{<g id="home_$stna" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret .= "<title>Home</title>".$hicon;
   $ret .= '</g> ';  
 
@@ -14531,41 +14528,41 @@ END1
       my $dicon        = FW_makeImage    ($cicondef.$dumcol, '');
       ($scale, $dicon) = __normIconScale ($dicon, $name);
       
-      $ret .= qq{<g id="dummy_$name" transform="translate(520,360),scale($scale)">};
+      $ret .= qq{<g id="dummy_$stna" transform="translate(520,360),scale($scale)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
       $ret .= '</g> ';
   }
 
   ## Laufketten Node->Home, Node->Grid, Bat->Home
   #################################################
-  my $node2home_style = $node2home ? "$name active_normal" : "$name inactive";
-  my $node2grid_style = $node2grid ? "$name active_normal" : "$name inactive";
+  my $node2home_style = $node2home ? "$stna active_normal" : "$stna inactive";
+  my $node2grid_style = $node2grid ? "$stna active_normal" : "$stna inactive";
   
   $ret .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-  <path id="node2home_$name" class="$node2home_style" d="M700,400 L700,580" />
-  <path id="node2grid_$name" class="$node2grid_style" d="M670,400 L490,480" />
-  <path id="grid2home_$name" class="$grid2home_style" d="$cgc_direction" />
+  <path id="node2home_$stna" class="$node2home_style" d="M700,400 L700,580" />
+  <path id="node2grid_$stna" class="$node2grid_style" d="M670,400 L490,480" />
+  <path id="grid2home_$stna" class="$grid2home_style" d="$cgc_direction" />
 END2
 
   ## Laufketten PV->Batterie, Batterie->Home
   ##############################################
   if ($hasbat) {
-      my $node2bat_style  = $node2bat     ? "$name active_normal" : "$name inactive";
+      my $node2bat_style  = $node2bat     ? "$stna active_normal" : "$stna inactive";
       my $batin_direction = $node2bat < 0 ? "M910,480 L730,400"   : "M730,400 L910,480";  
       $node2bat           = abs $node2bat;
                            
       $ret .= << "END3";
-      <path id="bat2home_$name" class="$bat2home_style" d="$bat2home_direction" />
-      <path id="pv2bat_$name"   class="$node2bat_style" d="$batin_direction" />
+      <path id="bat2home_$stna" class="$bat2home_style" d="$bat2home_direction" />
+      <path id="pv2bat_$stna"   class="$node2bat_style" d="$batin_direction" />
 END3
   }
 
   ## Dummy Consumer Laufketten
   ##############################
    if ($flowgconX) {
-      my $consumer_style = "$name inactive";
-      $consumer_style    = "$name active_sig" if($cc_dummy > 1);
+      my $consumer_style = "$stna inactive";
+      $consumer_style    = "$stna active_sig" if($cc_dummy > 1);
       my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
       if ($cc_dummy > 0.5) {
@@ -14573,7 +14570,7 @@ END3
           #$chain_color  = 'style="stroke: #DF0101;"';
       }
 
-      $ret .= qq{<path id="home2dummy_$name" class="$consumer_style" $chain_color d="M790,690 L930,690" />};
+      $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L930,690" />};
    }
    
   ## Producer Laufketten - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
@@ -14592,20 +14589,20 @@ END3
       else {
           $xchain = $xchain - ($pdist / 2 * ($count - 1));
       }
-
+      
+      my $producer_style;
+      
       for my $lfn (@sorted) {
           my $pn             = $pdcr->{$lfn}{pn};
           my $p              = $pdcr->{$lfn}{p};
-          my $consumer_style = "$name inactive";
-             $consumer_style = "$name active_normal" if($p > 0);
+          $producer_style    = $p > 0 ? "$stna active_normal" : "$stna inactive";
           my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
 
           if ($p) {
               #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
-              $chain_color  = 'style="stroke: darkorange;"';
           }
  
-          $ret    .= qq{<path id="genproducer_${pn}_$name" class="$consumer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />}; 
+          $ret    .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />}; 
           $left   += ($pdist * 2);
           $xchain += $step;
       }
@@ -14624,6 +14621,8 @@ END3
       else {
           $cons_left_start = 700 - ($distance_con / 2 * ($consumercount-1));
       }
+      
+      my $consumer_style;
 
       for my $c (@consumers) {
           my $power     = ConsumerVal ($hash, $c, 'power',   0);
@@ -14636,16 +14635,14 @@ END3
 
           my $p              = $currentPower;
           $p                 = (($currentPower / $power) * 100) if ($power > 0);
-          my $consumer_style = "$name inactive";
-          $consumer_style    = "$name active_normal" if($p > $defpopercent);
+          $consumer_style    = $p > $defpopercent ? "$stna active_normal" : "$stna inactive";
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
           if ($p > 0.5) {
               $chain_color = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
-              #$chain_color  = 'style="stroke: #DF0101;"';
           }
 
-          $ret            .= qq{<path id="home2consumer_${c}_$name" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,880" />};
+          $ret            .= qq{<path id="home2consumer_${c}_$stna" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,880" />};
           $cons_left       += ($cdist * 2);
           $cons_left_start += $distance_con;
       }
@@ -14654,15 +14651,15 @@ END3
   ## Textangaben an Grafikelementen
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
-  $ret .= qq{<text class="$name text" id="nodetxt_$name"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
-  $ret .= qq{<text class="$name text" id="batsoctxt_$name"    x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                         # Lage Text Batterieladungszustand
-  $ret .= qq{<text class="$name text" id="node2hometxt_$name" x="730"  y="520" style="text-anchor: start;">$node2home</text>}  if ($node2home);
-  $ret .= qq{<text class="$name text" id="node2gridtxt_$name" x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
-  $ret .= qq{<text class="$name text" id="grid2hometxt_$name" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
-  $ret .= qq{<text class="$name text" id="batouttxt_$name"    x="880"  y="610" style="text-anchor: start;">$bat2home</text>}   if ($bat2home && $hasbat);
-  $ret .= qq{<text class="$name text" id="node2battxt_$name"  x="880"  y="420" style="text-anchor: start;">$node2bat</text>}   if ($node2bat && $hasbat);
-  $ret .= qq{<text class="$name text" id="hometxt_$name"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                                # Current_Consumption Anlage
-  $ret .= qq{<text class="$name text" id="dummytxt_$name"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
+  $ret .= qq{<text class="$stna text" id="nodetxt_$stna"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
+  $ret .= qq{<text class="$stna text" id="batsoctxt_$stna"    x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                         # Lage Text Batterieladungszustand
+  $ret .= qq{<text class="$stna text" id="node2hometxt_$stna" x="730"  y="520" style="text-anchor: start;">$node2home</text>}  if ($node2home);
+  $ret .= qq{<text class="$stna text" id="node2gridtxt_$stna" x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
+  $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
+  $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="880"  y="610" style="text-anchor: start;">$bat2home</text>}   if ($bat2home && $hasbat);
+  $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="880"  y="420" style="text-anchor: start;">$node2bat</text>}   if ($node2bat && $hasbat);
+  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                                # Current_Consumption Anlage
+  $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
   
   ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ###############################################################################                                                      
@@ -14683,7 +14680,7 @@ END3
           elsif ($lcp == 2) {$left += 20}
           elsif ($lcp == 1) {$left += 40}
 
-          $ret .= qq{<text class="$name text" id="producertxt_${pn}_$name" x="$left" y="100">$currentPower</text>} if($flowgPrdsPower);
+          $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$left" y="100">$currentPower</text>} if($flowgPrdsPower);
 
           # Leistungszahl wieder zurück an den Ursprungspunkt
           ####################################################          
@@ -14714,8 +14711,8 @@ END3
           
           $lcp = length $currentPower;
 
-          #$ret .= qq{<text class="$name text" id="consumertxt_${c}_$name"      x="$cons_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
-          #$ret .= qq{<text class="$name text" id="consumertxt_time_${c}_$name" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
+          #$ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
+          #$ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ##################################################################################
@@ -14725,8 +14722,8 @@ END3
           elsif ($lcp == 2) {$cons_left += 7 }
           elsif ($lcp == 1) {$cons_left += 25}
 
-          $ret .= qq{<text class="$name text" id="consumertxt_${c}_$name"      x="$cons_left" y="1110">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
-          $ret .= qq{<text class="$name text" id="consumertxt_time_${c}_$name" x="$cons_left" y="1170">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
+          $ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="1110">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
+          $ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$cons_left" y="1170">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl wieder zurück an den Ursprungspunkt
           ######################################################          
