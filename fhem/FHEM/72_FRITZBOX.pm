@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "08.00.03";
+my $ModulVersion = "08.00.04";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -3424,7 +3424,7 @@ sub FRITZBOX_Readout_Run_Web_LuaQuery($$$$) {
            FRITZBOX_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_custRingToneName",       $_->{G722RingToneName} ;
            FRITZBOX_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_imagePath",              $_->{ImagePath} ;
            FRITZBOX_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_NoRingWithNightSetting", $_->{NoRingWithNightSetting}, "onoff";
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_NoRingTimeFlags"       , $_->{NoRingTimeFlags};
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_NoRingTimeFlags"       , $_->{NoRingTimeFlags}, "onoff";
 
            # telcfg:settings/Foncontrol/User/list(Name,NoRingTime,RingAllowed,NoRingTimeFlags,NoRingWithNightSetting)
            if ($_->{NoRingTime}) {
@@ -4718,7 +4718,8 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
        FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_guestWlan_groupAccess", $resultData->{data}->{guestAccess}->{guestGroupAccess}, "onoff";
        FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_guestWlan_tmoActive", $resultData->{data}->{guestAccess}->{isTimeoutActive}, "onoff";
 
-       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_powerLine", $resultData->{data}->{guestAccess}->{isPowerline} * 1, "onoff";
+       # FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_powerLine", $resultData->{data}->{guestAccess}->{isPowerline} * 1, "onoff";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_powerLine", $resultData->{data}->{guestAccess}->{isPowerline}, "onoff";
 
        FRITZBOX_Log $hash, 4, "WLAN detailed info - end getting data";
      } else {
@@ -4889,20 +4890,28 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
 
        $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
 
-         $resultData->{data}->{usbOverview}->{isFTPStorageEnabled} = 0   unless $resultData->{data}->{usbOverview}->{isFTPStorageEnabled};
-         $resultData->{data}->{usbOverview}->{isFTPServerEnabled} = 0    unless $resultData->{data}->{usbOverview}->{isFTPServerEnabled};
-         $resultData->{data}->{usbOverview}->{isNASEnabled} = 0          unless $resultData->{data}->{usbOverview}->{isNASEnabled};
-         $resultData->{data}->{usbOverview}->{isSMBv1Enabled} = 0        unless $resultData->{data}->{usbOverview}->{isSMBv1Enabled};
-         $resultData->{data}->{usbOverview}->{isWebdavEnabled} = 0       unless $resultData->{data}->{usbOverview}->{isWebdavEnabled};
-         $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled} = 0 unless $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled};
+       #  $resultData->{data}->{usbOverview}->{isFTPStorageEnabled} = 0   unless $resultData->{data}->{usbOverview}->{isFTPStorageEnabled};
+       #  $resultData->{data}->{usbOverview}->{isFTPServerEnabled} = 0    unless $resultData->{data}->{usbOverview}->{isFTPServerEnabled};
+       #  $resultData->{data}->{usbOverview}->{isNASEnabled} = 0          unless $resultData->{data}->{usbOverview}->{isNASEnabled};
+       #  $resultData->{data}->{usbOverview}->{isSMBv1Enabled} = 0        unless $resultData->{data}->{usbOverview}->{isSMBv1Enabled};
+       #  $resultData->{data}->{usbOverview}->{isWebdavEnabled} = 0       unless $resultData->{data}->{usbOverview}->{isWebdavEnabled};
+       #  $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled} = 0 unless $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled};
 
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_activ",    $resultData->{data}->{usbOverview}->{isFTPStorageEnabled} * 1, "onoff";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_enabled",  $resultData->{data}->{usbOverview}->{isFTPServerEnabled} * 1, "onoff";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_NAS_enabled",  $resultData->{data}->{usbOverview}->{isNASEnabled} * 1, "onoff";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_SMB_enabled",  $resultData->{data}->{usbOverview}->{isSMBv1Enabled} * 1, "onoff";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_webDav",       $resultData->{data}->{usbOverview}->{isWebdavEnabled} * 1, "onoff";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_autoIndex",    $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled} * 1, "onoff";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_indexStatus",  $resultData->{data}->{usbOverview}->{indexingStatus};
+       #  FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_activ",    $resultData->{data}->{usbOverview}->{isFTPStorageEnabled} * 1, "onoff";
+       #  FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_enabled",  $resultData->{data}->{usbOverview}->{isFTPServerEnabled} * 1, "onoff";
+       #  FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_NAS_enabled",  $resultData->{data}->{usbOverview}->{isNASEnabled} * 1, "onoff";
+       #  FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_SMB_enabled",  $resultData->{data}->{usbOverview}->{isSMBv1Enabled} * 1, "onoff";
+       #  FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_webDav",       $resultData->{data}->{usbOverview}->{isWebdavEnabled} * 1, "onoff";
+       #  FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_autoIndex",    $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled} * 1, "onoff";
+       #  FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_indexStatus",  $resultData->{data}->{usbOverview}->{indexingStatus};
+
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_activ",    $resultData->{data}->{usbOverview}->{isFTPStorageEnabled}, "onoff";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_enabled",  $resultData->{data}->{usbOverview}->{isFTPServerEnabled}, "onoff";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_NAS_enabled",  $resultData->{data}->{usbOverview}->{isNASEnabled}, "onoff";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_SMB_enabled",  $resultData->{data}->{usbOverview}->{isSMBv1Enabled}, "onoff";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_webDav",       $resultData->{data}->{usbOverview}->{isWebdavEnabled}, "onoff";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_autoIndex",    $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled}, "onoff";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_indexStatus",  $resultData->{data}->{usbOverview}->{indexingStatus};
 
        $nbViews = 0;
        if (defined $resultData->{data}->{usbOverview}->{devices}) {
@@ -4920,7 +4929,8 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
              FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devName",         $resultData->{data}->{usbOverview}->{devices}->[$i]->{deviceName};
              FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devStatus",       $resultData->{data}->{usbOverview}->{devices}->[$i]->{storageStatus};
              FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devConType",      $resultData->{data}->{usbOverview}->{devices}->[$i]->{connectionType};
-             FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devEject",        $resultData->{data}->{usbOverview}->{devices}->[$i]->{isEjectable} * 1, "onoff";
+           #  FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devEject",        $resultData->{data}->{usbOverview}->{devices}->[$i]->{isEjectable} * 1, "onoff";
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devEject",        $resultData->{data}->{usbOverview}->{devices}->[$i]->{isEjectable}, "onoff";
              FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devStorageUsed",  $resultData->{data}->{usbOverview}->{devices}->[$i]->{partitions}->[0]->{usedStorageInBytes};
              FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devStorageTotal", $resultData->{data}->{usbOverview}->{devices}->[$i]->{partitions}->[0]->{totalStorageInBytes};
 
@@ -6349,7 +6359,8 @@ sub FRITZBOX_Readout_Format($$$)
 {
    my ($hash, $format, $readout) = @_;
 
-   $readout = "" unless defined $readout;
+#   $readout = "" unless defined $readout;
+   return "" unless defined $readout;
 
    return $readout unless defined( $format ) && $format ne "";
 
@@ -6357,7 +6368,8 @@ sub FRITZBOX_Readout_Format($$$)
       $readout = "0";
    }
 
-   return $readout unless $readout ne "";
+#   return $readout unless $readout ne "";
+#   return $readout if $readout eq "";
 
    if ($format eq "aldays") {
       if ($readout eq "0") {
@@ -6387,15 +6399,13 @@ sub FRITZBOX_Readout_Format($$$)
       } elsif ($readout == 50) {
          $readout = "all";
       }
-      $readout .= " (".$hash->{fhem}{$intern}{name}.")"
-         if defined $hash->{fhem}{$intern}{name};
+      $readout .= " (".$hash->{fhem}{$intern}{name}.")" if defined $hash->{fhem}{$intern}{name};
    }
    elsif ($format eq "altime") {
       $readout =~ s/(\d\d)(\d\d)/$1:$2/;
    }
    elsif ($format eq "deviceip") {
-      $readout = $landevice{$readout}." ($readout)"
-         if defined $landevice{$readout};
+      $readout = $landevice{$readout}." ($readout)" if defined $landevice{$readout};
    }
    elsif ($format eq "dialport") {
       $readout = $dialPort{$readout}   if $dialPort{$readout};
@@ -6418,8 +6428,8 @@ sub FRITZBOX_Readout_Format($$$)
    elsif ($format eq "onoff") {
       $readout =~ s/er//;
       $readout =~ s/no-emu//;
-      $readout =~ s/0/off/;
-      $readout =~ s/1/on/;
+      $readout =~ s/^0*$/off/;
+      $readout =~ s/^1*$/on/;
    }
    elsif ($format eq "radio") {
       if (defined $hash->{fhem}{radio}{$readout}) {
@@ -11775,6 +11785,11 @@ sub FRITZBOX_Helper_Url_Regex {
 # } # end FRITZBOX_Helper_Json2HTML
 
 #####################################
+
+#sub isnum ($) {
+#    return 0 if $_[0] eq '';
+#    $_[0] ^ $_[0] ? 0 : 1
+#}
 
 
 1;
