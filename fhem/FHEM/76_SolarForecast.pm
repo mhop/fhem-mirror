@@ -156,6 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.37.2" => "24.10.2024  _flowGraphic: show Producer Row only if more than one Producer is defined ",
   "1.37.1" => "23.10.2024  state: 'The setup routine is still incomplete' if setup is incomplete ".
                            "change: 'trackFlex' && \$wcc >= 80 to \$wcc >= 70, implement Rename function ".
                            "_flowGraphic: eliminate numbers in device name - Forum: https://forum.fhem.de/index.php?msg=1323229 ",
@@ -14282,11 +14283,14 @@ sub _flowGraphic {
   #####################################
   my ($togrid, $tonode, $tobat) = __sortProducer ($pdcr);                      # lfn Producer sortiert nach ptyp und feed
    
-  my $psorted = {                                                             
+  my $psorted = {                                                    
       '1togrid' => { xicon => -100, xchain => 350,  ychain => 420, step => 70,     count => scalar @{$togrid}, sorted => $togrid },      # Producer/PV nur zu Grid 
       '2tonode' => { xicon =>  350, xchain => 700,  ychain => 200, step => $pdist, count => scalar @{$tonode}, sorted => $tonode },      # Producer/PV zum Knoten
       '3tobat'  => { xicon =>  750, xchain => 1100, ychain => 430, step => 40,     count => scalar @{$tobat},  sorted => $tobat  },      # Producer/PV nur zu Batterie
   };
+  
+  my $doproducerrow = 1;
+  $doproducerrow    = 0 if(!$psorted->{'1togrid'}{count} && !$psorted->{'3tobat'}{count}  && $psorted->{'2tonode'}{count} == 1);
 
   ## definierte Verbraucher ermitteln
   #####################################
@@ -14356,13 +14360,13 @@ sub _flowGraphic {
   #########################################
   my $vbwidth   = 800;                                                      # width and height specify the viewBox size
   my $vbminx    = -10 * $flowgshift;                                        # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
-  my $vbminy    = -25;
+  my $vbminy    = $doproducerrow ? -25 : 125;                               # Grafik höher positionieren wenn keine Poducerreihe angezeigt
 
   my $vbhight   = !$flowgcons     ? 380 :
                   !$flowgconsTime ? 590 :
                   610;
 
-  $vbhight += 100;
+  if ($doproducerrow) {$vbhight += 100};                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
 
   my $vbox       = "$vbminx $vbminy $vbwidth $vbhight";
   my $svgstyle   = 'width:98%; height:'.$flowgsize.'px;';
@@ -14402,61 +14406,32 @@ END0
 
   ## Producer Icon - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   #########################################################################
-  for my $st (sort keys %{$psorted}) {
-      my $left   = 0;
-      my $xicon  = $psorted->{$st}{xicon};
-      my $count  = $psorted->{$st}{count};
-      my @sorted = @{$psorted->{$st}{sorted}};
+  $paref->{stna}     = $stna;
+  $paref->{pnodesum} = $pnodesum; 
+  $paref->{psorted}  = $psorted;
+  $paref->{pdcr}     = $pdcr;
+  $paref->{pdist}    = $pdist;
+  
+  if (!$doproducerrow) {
+      $paref->{y_coord} = 165;      
+      $ret .= __addProducerIcon ($paref);                                             # Producer Icons row einfügen
+  }
+  else {                                                                              # mehr als ein Producer vorhanden
+      $paref->{y_coord} = 0;      
+      $ret .= __addProducerIcon ($paref);                                             # Producer Icons row einfügen
       
-      if ($count % 2) {
-          $xicon = $xicon - ($pdist  * ($count - 1) / 2);
-      }
-      else {
-          $xicon = $xicon - ($pdist / 2 * ($count - 1));
-      }
-      
-      $psorted->{$st}{start} = $xicon;
-      $left                  = $xicon + 5;
-
-      for my $lfn (@sorted) {
-          my $pn             = $pdcr->{$lfn}{pn};
-          my ($picon, $ptxt) = __substituteIcon ( { hash  => $hash,                                                 # Icon des Producerdevices
-                                                    name  => $name,
-                                                    pn    => $pn,
-                                                    ptyp  => $pdcr->{$lfn}{ptyp},
-                                                    don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
-                                                    pcurr => $pdcr->{$lfn}{p},
-                                                    lang  => $lang
-                                                  }
-                                                );
-
-          $picon           = FW_makeImage    ($picon, '');
-          ($scale, $picon) = __normIconScale ($picon, $name);
-          
-          $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($left,0),scale($scale)">};
-          $ret .= "<title>$ptxt</title>".$picon;
-          $ret .= '</g> ';
-
-          $left += $pdist;
-      }
+      $paref->{x_coord} = 360;
+      $paref->{y_coord} = 165;
+      $ret .= __addNodeIcon ($paref);                                                 # Knoten Icon
   }
   
-  ## Knoten Icon
-  ################                                       
-  my ($nicon, $ntxt) = __substituteIcon ( { hash  => $hash,
-                                            name  => $name,
-                                            ptyp  => 'node',
-                                            pcurr => $pnodesum,
-                                            lang  => $lang
-                                           }
-                                         );
-  
-  $nicon           = FW_makeImage    ($nicon, '');
-  ($scale, $nicon) = __normIconScale ($nicon, $name);
-  
-  $ret .= qq{<g id="node_$stna" transform="translate(360,165),scale($scale)">};                            # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
-  $ret .= "<title>$ntxt</title>".$nicon;
-  $ret .= '</g> ';
+  delete $paref->{stna};
+  delete $paref->{pnodesum};
+  delete $paref->{psorted};
+  delete $paref->{pdcr};
+  delete $paref->{pdist};
+  delete $paref->{x_coord};
+  delete $paref->{y_coord};
 
   ## Consumer Liste und Icons in Grafik anzeigen
   ################################################
@@ -14578,37 +14553,40 @@ END3
    }
    
   ## Producer Laufketten - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
+  ## Laufkette nur anzeigen wenn Producerzeile angezeigt werden soll
   ###############################################################################
-  for my $st (sort keys %{$psorted}) {
-      my $left   = $psorted->{$st}{start} * 2;                                                # Übertrag aus Producer Icon Abschnitt
-      my $count  = $psorted->{$st}{count};
-      my $xchain = $psorted->{$st}{xchain};                                                   # X- Koordinate Kette am Ziel
-      my $ychain = $psorted->{$st}{ychain};                                                   # Y- Koordinate Kette am Ziel
-      my $step   = $psorted->{$st}{step};
-      my @sorted = @{$psorted->{$st}{sorted}};
+  if ($doproducerrow) {
+      for my $st (sort keys %{$psorted}) {
+          my $left   = $psorted->{$st}{start} * 2;                                                # Übertrag aus Producer Icon Abschnitt
+          my $count  = $psorted->{$st}{count};
+          my $xchain = $psorted->{$st}{xchain};                                                   # X- Koordinate Kette am Ziel
+          my $ychain = $psorted->{$st}{ychain};                                                   # Y- Koordinate Kette am Ziel
+          my $step   = $psorted->{$st}{step};
+          my @sorted = @{$psorted->{$st}{sorted}};
 
-      if ($count % 2) {
-          $xchain = $xchain - ($pdist  * ($count -1) / 2);
-      }
-      else {
-          $xchain = $xchain - ($pdist / 2 * ($count - 1));
-      }
-      
-      my $producer_style;
-      
-      for my $lfn (@sorted) {
-          my $pn             = $pdcr->{$lfn}{pn};
-          my $p              = $pdcr->{$lfn}{p};
-          $producer_style    = $p > 0 ? "$stna active_normal" : "$stna inactive";
-          my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
-
-          if ($p) {
-              #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+          if ($count % 2) {
+              $xchain = $xchain - ($pdist  * ($count -1) / 2);
           }
- 
-          $ret    .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />}; 
-          $left   += ($pdist * 2);
-          $xchain += $step;
+          else {
+              $xchain = $xchain - ($pdist / 2 * ($count - 1));
+          }
+          
+          my $producer_style;
+          
+          for my $lfn (@sorted) {
+              my $pn             = $pdcr->{$lfn}{pn};
+              my $p              = $pdcr->{$lfn}{p};
+              $producer_style    = $p > 0 ? "$stna active_normal" : "$stna inactive";
+              my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
+
+              if ($p) {
+                  #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+              }
+     
+              $ret    .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />}; 
+              $left   += ($pdist * 2);
+              $xchain += $step;
+          }
       }
   }
 
@@ -14666,35 +14644,38 @@ END3
   $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
   
   ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
-  ###############################################################################                                                      
-  for my $st (sort keys %{$psorted}) {                                                       
-      my $left   = $psorted->{$st}{start} * 2 - 70;                                            # Übertrag aus Producer Icon Abschnitt, -XX -> Start Lage Producer Beschriftung
-      my @sorted = @{$psorted->{$st}{sorted}};
-      
-      for my $lfn (@sorted) {
-          my $pn        = $pdcr->{$lfn}{pn};
-          $currentPower = $pdcr->{$lfn}{p};
-          $lcp          = length $currentPower;
-
-          # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
-          ###############################################################################          
-          if    ($lcp >= 5) {$left -= 10}
-          elsif ($lcp == 4) {$left += 10}
-          elsif ($lcp == 3) {$left += 15}
-          elsif ($lcp == 2) {$left += 20}
-          elsif ($lcp == 1) {$left += 40}
-
-          $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$left" y="100">$currentPower</text>} if($flowgPrdsPower);
-
-          # Leistungszahl wieder zurück an den Ursprungspunkt
-          ####################################################          
-          if    ($lcp >= 5) {$left += 10}
-          elsif ($lcp == 4) {$left -= 10}
-          elsif ($lcp == 3) {$left -= 15}
-          elsif ($lcp == 2) {$left -= 20}
-          elsif ($lcp == 1) {$left -= 40}       
+  ## Textangabe nur anzeigen wenn Producerzeile angezeigt werden soll
+  ###############################################################################
+  if ($doproducerrow) {                                                    
+      for my $st (sort keys %{$psorted}) {                                                       
+          my $left   = $psorted->{$st}{start} * 2 - 70;                                            # Übertrag aus Producer Icon Abschnitt, -XX -> Start Lage Producer Beschriftung
+          my @sorted = @{$psorted->{$st}{sorted}};
           
-          $left += ($pdist * 2);
+          for my $lfn (@sorted) {
+              my $pn        = $pdcr->{$lfn}{pn};
+              $currentPower = $pdcr->{$lfn}{p};
+              $lcp          = length $currentPower;
+
+              # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
+              ###############################################################################          
+              if    ($lcp >= 5) {$left -= 10}
+              elsif ($lcp == 4) {$left += 10}
+              elsif ($lcp == 3) {$left += 15}
+              elsif ($lcp == 2) {$left += 20}
+              elsif ($lcp == 1) {$left += 40}
+
+              $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$left" y="100">$currentPower</text>} if($flowgPrdsPower);
+
+              # Leistungszahl wieder zurück an den Ursprungspunkt
+              ####################################################          
+              if    ($lcp >= 5) {$left += 10}
+              elsif ($lcp == 4) {$left -= 10}
+              elsif ($lcp == 3) {$left -= 15}
+              elsif ($lcp == 2) {$left -= 20}
+              elsif ($lcp == 1) {$left -= 40}       
+              
+              $left += ($pdist * 2);
+          }
       }
   }
 
@@ -14781,6 +14762,97 @@ sub __sortProducer {
   push @tobat,  @ibat;
   
 return (\@togrid, \@tonode, \@tobat);
+}
+
+################################################################
+#          Producer Icon einfügen
+################################################################
+sub __addProducerIcon {
+  my $paref    = shift;
+  my $hash     = $paref->{hash};
+  my $name     = $paref->{name};
+  my $lang     = $paref->{lang};
+  my $stna     = $paref->{stna};
+  my $psorted  = $paref->{psorted};
+  my $pdcr     = $paref->{pdcr};
+  my $pdist    = $paref->{pdist};
+  my $y_coord  = $paref->{y_coord};
+  
+  my ($scale, $ret);
+  
+  for my $st (sort keys %{$psorted}) {
+      my $left   = 0;
+      my $xicon  = $psorted->{$st}{xicon};
+      my $count  = $psorted->{$st}{count};
+      my @sorted = @{$psorted->{$st}{sorted}};
+      
+      if ($count % 2) {
+          $xicon = $xicon - ($pdist  * ($count - 1) / 2);
+      }
+      else {
+          $xicon = $xicon - ($pdist / 2 * ($count - 1));
+      }
+      
+      $psorted->{$st}{start} = $xicon;
+      $left                  = $xicon + 5;
+
+      for my $lfn (@sorted) {
+          my $pn             = $pdcr->{$lfn}{pn};
+          my ($picon, $ptxt) = __substituteIcon ( { hash  => $hash,                                                 # Icon des Producerdevices
+                                                    name  => $name,
+                                                    pn    => $pn,
+                                                    ptyp  => $pdcr->{$lfn}{ptyp},
+                                                    don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
+                                                    pcurr => $pdcr->{$lfn}{p},
+                                                    lang  => $lang
+                                                  }
+                                                );
+
+          $picon           = FW_makeImage    ($picon, '');
+          ($scale, $picon) = __normIconScale ($picon, $name);
+          
+          $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($left,$y_coord),scale($scale)">};
+          $ret .= "<title>$ptxt</title>".$picon;
+          $ret .= '</g> ';
+
+          $left += $pdist;
+      }
+  }
+  
+return $ret;
+}
+
+################################################################
+#          Knoten Icon einfügen
+################################################################
+sub __addNodeIcon {                                
+  my $paref    = shift;
+  my $hash     = $paref->{hash};
+  my $name     = $paref->{name};
+  my $lang     = $paref->{lang};
+  my $stna     = $paref->{stna};
+  my $pnodesum = $paref->{pnodesum};
+  my $x_coord  = $paref->{x_coord};
+  my $y_coord  = $paref->{y_coord};
+  
+  my $scale;
+  
+  my ($nicon, $ntxt) = __substituteIcon ( { hash  => $hash,
+                                            name  => $name,
+                                            ptyp  => 'node',
+                                            pcurr => $pnodesum,
+                                            lang  => $lang
+                                           }
+                                         );
+  
+  $nicon           = FW_makeImage    ($nicon, '');
+  ($scale, $nicon) = __normIconScale ($nicon, $name);
+  
+  my $ret = qq{<g id="node_$stna" transform="translate($x_coord,$y_coord),scale($scale)">};     # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
+  $ret   .= "<title>$ntxt</title>".$nicon;
+  $ret   .= '</g> ';
+  
+return $ret;
 }
 
 ################################################################
