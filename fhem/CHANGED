@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  36_Shelly: ShellyPro3EM: div by zero when attr Periods is not set 
  - bugfix:  36_Shelly: diverse Korrekturen/Ergänzungen/siehe Forum
  - bugfix:  76_SolarForecast: minor fix in Flowgraphic
  - bufgix:  72_FRITZBOX: Perl Warning behoben 

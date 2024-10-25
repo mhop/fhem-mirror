@@ -121,6 +121,7 @@
 #           change: use 'blank' sign instead of removing '%20' when displaying actions urls
 #           change: on updating action query strings, substitue spaces by '+' sign, instead of %20 (Shelly fw replace %20 by space)
 #           fix: removed lost '&' when webhooks changed to have no csrf token
+# 6.01.1    fix: division by zero when attr Periods is not set at ShellyPro3EM 
 
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
@@ -143,7 +144,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.01 24.10.2024";
+my $version = "6.01.1 25.10.2024";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -5536,9 +5537,9 @@ sub Shelly_procEMData {
 
   if( $hash->{INTERVAL}>0 ){
       #-- initiate next run, adjusted to full minute plus 1 sec
-      my $perds = AttrVal($name,"Periods", "");
+      my $perds = AttrVal($name,"Periods", "min");
       $perds=~/(\w+)$/; # \w matches all word chars, looking for last key in descending order
-      my $timer=$periods{$1}[2];
+      my $timer=$periods{$1}[2]; $timer=60 if( !defined($timer) || $timer==0 );
       my $Time=(int(time()/$timer)+1)*$timer+1; 
       Log3 $name,4,"[Shelly_procEMData] $name: \'EM Data\' update interval is $timer sec, next update \@ ".strftime("%H:%M:%S",localtime($Time)); #4
       RemoveInternalTimer($hash,"Shelly_getEMData");
