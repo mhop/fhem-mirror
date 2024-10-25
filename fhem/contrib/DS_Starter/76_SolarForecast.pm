@@ -5645,7 +5645,8 @@ sub _attrflowGraphicControl {            ## no critic "not used"
   my $hash  = $defs{$name};
   
   for my $av ( qw( animate 
-                   consumerdist 
+                   consumerdist
+                   h2consumerdist                   
                    shift 
                    showconsumer 
                    showconsumerremaintime
@@ -5665,6 +5666,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
       my $valid = {
           animate                => '0|1',
           consumerdist           => '[89]\d{1}|[1234]\d{2}|500',
+          h2consumerdist         => '\d{1,3}',
           shift                  => '-?[0-7]\d{0,1}|-?80',
           size                   => '\d+',
           showconsumer           => '0|1',
@@ -12150,6 +12152,7 @@ sub entryGraphic {
       flowgconsPower => CurrentVal ($hash, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
       flowgconsTime  => CurrentVal ($hash, 'showconsumerremaintime',             1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
       flowgconsDist  => CurrentVal ($hash, 'consumerdist',                $fgCDdef),                # Abstand Verbrauchericons zueinander
+      flowgh2cDist   => CurrentVal ($hash, 'h2consumerdist',                     0),                # Erweiterung vertikaler Abstand Home -> Consumer
       genpvdva       => AttrVal    ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
       lang           => getLang    ($hash),
       debug          => getDebug   ($hash),                                                         # Debug Module
@@ -14216,6 +14219,7 @@ sub _flowGraphic {
   my $flowgconsPower = $paref->{flowgconsPower};
   my $flowgPrdsPower = 1;                                                      # initial Producer akt. Erzeugung anzeigen
   my $cdist          = $paref->{flowgconsDist};                                # Abstand Consumer zueinander
+  my $exth2cdist     = $paref->{flowgh2cDist};                                 # vertikaler Abstand Home -> Consumer Zeile
   my $lang           = $paref->{lang};
 
   my $cgc        = ReadingsNum ($name, 'Current_GridConsumption', 0);
@@ -14230,7 +14234,7 @@ sub _flowGraphic {
   my $scale      = $fgscaledef;
   my $pdist      = 130;                                                        # Abstand Producer zueinander
   my $hasbat     = 1;                                                          # initial Batterie vorhanden
-  my $lcp;
+  my ($lcp, $y_pos, $y_pos1);
   
   my $stna = $name;
   $stna =~ s/([0-9])/$hrepl{$1}/ge if($name =~ /[0-9]/xs);                     # V 1.37.1 Ziffern eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
@@ -14359,14 +14363,15 @@ sub _flowGraphic {
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
-  my $vbwidth   = 800;                                                      # width and height specify the viewBox size
-  my $vbminx    = -10 * $flowgshift;                                        # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
-  my $vbminy    = $doproducerrow ? -25 : 125;                               # Grafik höher positionieren wenn keine Poducerreihe angezeigt
+  my $vbwidth    = 800;                                                     # width and height specify the viewBox size
+  my $vbminx     = -10 * $flowgshift;                                       # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbminy     = $doproducerrow ? -25 : 125;                              # Grafik höher positionieren wenn keine Poducerreihe angezeigt
 
-  my $vbhight   = !$flowgcons     ? 380 :
-                  !$flowgconsTime ? 590 :
-                  610;
-
+  my $vbhight    = !$flowgcons     ? 380 :
+                   !$flowgconsTime ? 590 :
+                   610;
+  $vbhight      += $exth2cdist;
+  
   if ($doproducerrow) {$vbhight += 100};                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
 
   my $vbox       = "$vbminx $vbminy $vbwidth $vbhight";
@@ -14439,6 +14444,7 @@ END0
   my $cons_left      = 0;
   my $consumer_start = 0;
   my $currentPower   = 0;
+  $y_pos             = 505 + $exth2cdist;
 
   if ($flowgcons) {
       if ($consumercount % 2) {
@@ -14467,7 +14473,7 @@ END0
           $cicon           = FW_makeImage    ($cicon, '');
           ($scale, $cicon) = __normIconScale ($cicon, $name);
           
-          $ret .= qq{<g id="consumer_${c}_$stna" transform="translate($cons_left,505),scale($scale)">};
+          $ret .= qq{<g id="consumer_${c}_$stna" transform="translate($cons_left,$y_pos),scale($scale)">};
           $ret .= "<title>$calias</title>".$cicon;
           $ret .= '</g> ';
 
@@ -14544,7 +14550,7 @@ END3
       my $consumer_style = "$stna inactive";
       $consumer_style    = "$stna active_sig" if($cc_dummy > 1);
       my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
-
+      
       if ($cc_dummy > 0.5) {
           $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
           #$chain_color  = 'style="stroke: #DF0101;"';
@@ -14597,6 +14603,7 @@ END3
       $cons_left          = $consumer_start * 2;
       my $cons_left_start = 0;
       my $distance_con    = 65;
+      $y_pos              = 880 + 2 * $exth2cdist;
 
       if ($consumercount % 2) {
           $cons_left_start = 700 - ($distance_con  * ($consumercount -1) / 2);
@@ -14625,7 +14632,7 @@ END3
               $chain_color = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
           }
 
-          $ret            .= qq{<path id="home2consumer_${c}_$stna" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,880" />};
+          $ret             .= qq{<path id="home2consumer_${c}_$stna" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,$y_pos" />};
           $cons_left       += ($cdist * 2);
           $cons_left_start += $distance_con;
       }
@@ -14684,7 +14691,9 @@ END3
   ########################
   if ($flowgcons) {
       $cons_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
-
+      $y_pos     = 1110 + 2 * $exth2cdist;
+      $y_pos1    = 1170 + 2 * $exth2cdist;
+       
       for my $c (@consumers) {
           $currentPower    = sprintf "%.1f", $cnsmr->{$c}{p};
           $currentPower    = sprintf "%.0f", $currentPower if($currentPower > 10);
@@ -14707,9 +14716,9 @@ END3
           elsif ($lcp == 3) {$cons_left -= 5 }
           elsif ($lcp == 2) {$cons_left += 7 }
           elsif ($lcp == 1) {$cons_left += 25}
-
-          $ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="1110">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
-          $ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$cons_left" y="1170">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
+          
+          $ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="$y_pos">$currentPower</text>}  if($flowgconsPower);    # Lage Consumer Consumption
+          $ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$cons_left" y="$y_pos1">$consumerTime</text>} if($flowgconsTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl wieder zurück an den Ursprungspunkt
           ######################################################          
@@ -21117,6 +21126,9 @@ to ensure that the system configuration is correct.
             <tr><td> <b>consumerdist</b>            </td><td>Controls the distance between the consumer icons in the energy flow graphic.                                            </td></tr>
             <tr><td>                                </td><td>Value: <b>80 ... 500</b>, default: 130                                                                                  </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>h2consumerdist</b>          </td><td>Extension of the vertical distance between the house and the consumer icons.                                            </td></tr>
+            <tr><td>                                </td><td>Value: <b>0 ... 999</b>, default: 0                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shift</b>                   </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
 			<tr><td>                                </td><td>Value: <b>-80 ... 80</b>, default: 0                                                                                    </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
@@ -23520,6 +23532,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>consumerdist</b>            </td><td>Steuert den Abstand zwischen den Consumer-Icons in der Energieflußgrafik.                                               </td></tr>
             <tr><td>                                </td><td>Wert: <b>80 ... 500</b>, default: 130                                                                                   </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>h2consumerdist</b>          </td><td>Erweiterung des vertikalen Abstandes zwischen dem Haus und den Consumer-Icons.                                          </td></tr>
+            <tr><td>                                </td><td>Wert: <b>0 ... 999</b>, default: 0                                                                                      </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shift</b>                   </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
 			<tr><td>                                </td><td>Wert: <b>-80 ... 80</b>, default: 0                                                                                     </td></tr>
