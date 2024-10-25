@@ -194,7 +194,7 @@ __END__
 
     <li><a id='AutomowerConnect-set-dateTime'>dateTime</a><br>
       <code>set &lt;name&gt; dateTime &lt;timestamp / s&gt;</code><br>
-      Syncronize the mower time to timestamp. The default (empty Input field) timestamp is for local time of the machine the mower is defined.</li>
+      Syncronize the mower time to timestamp. The default (empty Input field) timestamp is for local time of the machine the mower is defined, see also <a href="#AutomowerConnect-attr-mowerAutoSyncTime">mowerAutoSyncTime</a>.</li>
 
     <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
       <code>set &lt;name&gt; confirmError</code><br>
@@ -218,6 +218,10 @@ __END__
       <code>set &lt;name&gt; cuttingHeight &lt;1..9&gt;</code><br>
       Sets the cutting height. NOTE: Do not use for 550 EPOS and Ceora.</li>
 
+    <li><a id='AutomowerConnect-set-resetCuttingBladeUsageTime'>resetCuttingBladeUsageTime</a><br>
+      <code>set &lt;name&gt; resetCuttingBladeUsageTime</code><br>
+      Resets the cutting blade usage time if the mower provides it.</li>
+
     <li><a id='AutomowerConnect-set-cuttingHeightInWorkArea'>cuttingHeightInWorkArea</a><br>
       <code>set &lt;name&gt; cuttingHeightInWorkArea &lt;Id|name&gt; &lt;0..100&gt;</code><br>
       Testing: Sets the cutting height for Id or zone name from 0 to 100. Zone name must not include space and contain at least one alphabetic character.</li>
@@ -233,6 +237,10 @@ __END__
     <li><a id='AutomowerConnect-set-getUpdate'>getUpdate</a><br>
       <code>set &lt;name&gt; getUpdate</code><br>
       For debug purpose only.</li>
+
+    <li><a id='AutomowerConnect-set-getMessages'getMessages</a><br>
+      <code>get &lt;name&gt; getMessages</code><br>
+      Gets messages from mower if supported, see also <a href="#AutomowerConnect-get-errorStack">errorStack</a>.</li>
 
     <li><a id='AutomowerConnect-set-headlight'>headlight</a><br>
       <code>set &lt;name&gt; headlight &lt;ALWAYS_OFF|ALWAYS_ON|EVENIG_ONLY|EVENING_AND_NIGHT&gt;</code><br>
@@ -284,8 +292,9 @@ __END__
 
     <li><a id='AutomowerConnect-get-errorStack'>errorStack</a><br>
       <code>get &lt;name&gt; errorStack</code><br>
-      Lists error stack.</li>
-    <br><br>
+      Lists error stack and messages, see also <a href="#AutomowerConnect-set-getMessages">getMessages</a>.</li>
+
+    <br>
   </ul>
   <br>
 
@@ -715,6 +724,10 @@ __END__
       <code>set &lt;name&gt; cuttingHeight &lt;1..9&gt;</code><br>
       Setzt die Schnitthöhe. HINWEIS: Nicht für 550 EPOS und Ceora geeignet.</li>
 
+    <li><a id='AutomowerConnect-set-resetCuttingBladeUsageTime'>resetCuttingBladeUsageTime</a><br>
+      <code>set &lt;name&gt; resetCuttingBladeUsageTime</code><br>
+      Setzt die Benutzungszeit der Messer zurück, falls der Mäher es unterstützt.</li>
+
     <li><a id='AutomowerConnect-set-cuttingHeightInWorkArea'>cuttingHeightInWorkArea</a><br>
       <code>set &lt;name&gt; cuttingHeightInWorkArea &lt;Id|name&gt; &lt;0..100&gt;</code><br>
       Testing: Setzt die Schnitthöhe für Id oder Zonennamen von 0 bis 100. Der Zonenname darf keine Leerzeichen beinhalten und muss mindestens einen Buchstaben enthalten.</li>
@@ -740,6 +753,10 @@ __END__
     <li><a id='AutomowerConnect-set-getUpdate'>getUpdate</a><br>
       <code>set &lt;name&gt; getUpdate</code><br>
       Nur zur Fehlerbehebung.</li>
+
+    <li><a id='AutomowerConnect-set-getMessages'>getMessages</a><br>
+      <code>get &lt;name&gt; getMessages</code><br>
+      Läd die im Mäher gespeicherten Meldungen, sofern unterstützt, siehe auch <a href="#AutomowerConnect-get-errorStack">errorStack</a>.</li>
 
      <li><a id='AutomowerConnect-set-headlight'>headlight</a><br>
       <code>set &lt;name&gt; headlight &lt;ALWAYS_OFF|ALWAYS_ON|EVENIG_ONLY|EVENING_AND_NIGHT&gt;</code><br>
@@ -791,7 +808,8 @@ __END__
 
     <li><a id='AutomowerConnect-get-errorStack'>errorStack</a><br>
       <code>get &lt;name&gt; errorStack</code><br>
-      Listet die gespeicherten Fehler auf.</li>
+      Listet die gespeicherten Fehler und die geladenen Meldungen auf, siehe auch <a href="#AutomowerConnect-set-getMessages">getMessages</a>.</li>
+
     <br>
   </ul>
   <br>

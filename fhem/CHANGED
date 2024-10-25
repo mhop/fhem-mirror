@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 74_AutomowerConnect: new statistics values upTime, downTime
+            new setter getMessages, resetCuttingBladeUsageTime
+            added messages to listErrorStack
  - bugfix:  36_Shelly: ShellyPro3EM: div by zero when attr Periods is not set 
  - bugfix:  36_Shelly: diverse Korrekturen/Ergänzungen/siehe Forum
  - bugfix:  76_SolarForecast: minor fix in Flowgraphic
