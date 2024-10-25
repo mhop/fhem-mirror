@@ -156,6 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.37.3" => "25.10.2024  _flowGraphic: grid, dummy and battery displacement by kask ",
   "1.37.2" => "24.10.2024  _flowGraphic: show Producer Row only if more than one Producer is defined ",
   "1.37.1" => "23.10.2024  state: 'The setup routine is still incomplete' if setup is incomplete ".
                            "change: 'trackFlex' && \$wcc >= 80 to \$wcc >= 70, implement Rename function ".
@@ -14232,7 +14233,7 @@ sub _flowGraphic {
   my $lcp;
   
   my $stna = $name;
-  $stna =~ s/([0-9])/$hrepl{$1}/ge if($name =~ /[0-9]/xs);                       # V 1.37.1 Ziffern eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
+  $stna =~ s/([0-9])/$hrepl{$1}/ge if($name =~ /[0-9]/xs);                     # V 1.37.1 Ziffern eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
   
   ## definierte Producer + Inverter ermitteln und zusammenfassen
   ################################################################
@@ -14284,9 +14285,9 @@ sub _flowGraphic {
   my ($togrid, $tonode, $tobat) = __sortProducer ($pdcr);                      # lfn Producer sortiert nach ptyp und feed
    
   my $psorted = {                                                    
-      '1togrid' => { xicon => -100, xchain => 350,  ychain => 420, step => 70,     count => scalar @{$togrid}, sorted => $togrid },      # Producer/PV nur zu Grid 
+      '1togrid' => { xicon => -100, xchain => 150,  ychain => 400, step => 30,     count => scalar @{$togrid}, sorted => $togrid },      # Producer/PV nur zu Grid 
       '2tonode' => { xicon =>  350, xchain => 700,  ychain => 200, step => $pdist, count => scalar @{$tonode}, sorted => $tonode },      # Producer/PV zum Knoten
-      '3tobat'  => { xicon =>  750, xchain => 1100, ychain => 430, step => 40,     count => scalar @{$tobat},  sorted => $tobat  },      # Producer/PV nur zu Batterie
+      '3tobat'  => { xicon =>  750, xchain => 1370, ychain => 430, step => 30,     count => scalar @{$tobat},  sorted => $tobat  },      # Producer/PV nur zu Batterie
   };
   
   my $doproducerrow = 1;
@@ -14294,10 +14295,10 @@ sub _flowGraphic {
 
   ## definierte Verbraucher ermitteln
   #####################################
-  my $cnsmr = {};                                                              # Hashref Consumer current power
+  my $cnsmr = {};                                                                       # Hashref Consumer current power
   
-  for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {           # definierte Verbraucher ermitteln
-      next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                     # auszublendende Consumer nicht berücksichtigen
+  for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {                    # definierte Verbraucher ermitteln
+      next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                              # auszublendende Consumer nicht berücksichtigen
       $cnsmr->{$c}{p}    = ReadingsNum ($name, "consumer${c}_currentPower", 0);
       $cnsmr->{$c}{ptyp} = 'consumer';
   }
@@ -14318,22 +14319,22 @@ sub _flowGraphic {
       $soc      = 0;
   }
   
-  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";          # cgc current GridConsumption
+  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";            # cgc current GridConsumption
   my $bat2home_style  = $bat2home  ? "$stna active_normal" : "$stna inactive";
-  my $cgc_direction   = "M490,515 L670,590";                                                           
+  my $cgc_direction   = "M250,515 L670,590";                                                         
 
   if ($bat2home) {                                                                        # Batterie wird ins Haus entladen
       my $cgfo = $node2grid - $pv2node;
 
       if ($cgfo > 1) {
           $grid2home_style = "$stna active_normal";
-          $cgc_direction   = "M670,590 L490,515";
+          $cgc_direction   = "M670,590 L250,515";
           $node2grid      -= $cgfo;
           $cgc             = $cgfo;
       }
   }
  
-  my $bat2home_direction = "M902,515 L730,590";
+  my $bat2home_direction = "M1200,515 L730,590";
   my $node2bat           = $batin;
 
   if ($batin) {                                                             # Batterie wird geladen
@@ -14342,7 +14343,7 @@ sub _flowGraphic {
       if ($home2bat > 1) {                                                  # Batterieladung wird anteilig aus Hausnetz geladen
           $node2bat           -= $home2bat;
           $bat2home_style      = "$stna active_sig";
-          $bat2home_direction  = "M730,590 L902,515";
+          $bat2home_direction  = "M730,590 L1200,515";
           $bat2home            = $home2bat;
       }
   }
@@ -14399,7 +14400,7 @@ sub _flowGraphic {
 
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="$vbox" style="$svgstyle" id="SVGPLOT_$stna">
 
-      <g id="grid_$stna" class="$grid_color" transform="translate(215,260),scale(3.0)">
+      <g id="grid_$stna" class="$grid_color" transform="translate(100,260),scale(3.0)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
       </g>
 END0
@@ -14475,10 +14476,10 @@ END0
   }
   
   ## Batterie Icon
-  ##################
-  if ($hasbat) {                                                                                   
+  ##################   
+  if ($hasbat) {                                                                             
       $ret .= << "END1";
-      <g class="$bat_color" transform="translate(610,245),scale(.30) rotate (90)">
+      <g class="$bat_color" transform="translate(750,245),scale(.30) rotate (90)">
       <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
       <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
 END1
@@ -14507,7 +14508,7 @@ END1
       my $dicon        = FW_makeImage    ($cicondef.$dumcol, '');
       ($scale, $dicon) = __normIconScale ($dicon, $name);
       
-      $ret .= qq{<g id="dummy_$stna" transform="translate(520,360),scale($scale)">};
+      $ret .= qq{<g id="dummy_$stna" transform="translate(660,360),scale($scale)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
       $ret .= '</g> ';
   }
@@ -14520,7 +14521,7 @@ END1
   $ret .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
   <path id="node2home_$stna" class="$node2home_style" d="M700,400 L700,580" />
-  <path id="node2grid_$stna" class="$node2grid_style" d="M670,400 L490,480" />
+  <path id="node2grid_$stna" class="$node2grid_style" d="M670,400 L250,480" />
   <path id="grid2home_$stna" class="$grid2home_style" d="$cgc_direction" />
 END2
 
@@ -14528,7 +14529,7 @@ END2
   ##############################################
   if ($hasbat) {
       my $node2bat_style  = $node2bat     ? "$stna active_normal" : "$stna inactive";
-      my $batin_direction = $node2bat < 0 ? "M910,480 L730,400"   : "M730,400 L910,480";  
+      my $batin_direction = $node2bat < 0 ? "M1200,480 L730,400"  : "M730,400 L1200,480";
       $node2bat           = abs $node2bat;
                            
       $ret .= << "END3";
@@ -14549,7 +14550,7 @@ END3
           #$chain_color  = 'style="stroke: #DF0101;"';
       }
 
-      $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L930,690" />};
+      $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};
    }
    
   ## Producer Laufketten - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
@@ -14633,15 +14634,15 @@ END3
   ## Textangaben an Grafikelementen
   ###################################
   $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
-  $ret .= qq{<text class="$stna text" id="nodetxt_$stna"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}   if ($pnodesum > 0);
-  $ret .= qq{<text class="$stna text" id="batsoctxt_$stna"    x="1110" y="520" style="text-anchor: start;">$soc %</text>}      if ($hasbat);                         # Lage Text Batterieladungszustand
-  $ret .= qq{<text class="$stna text" id="node2hometxt_$stna" x="730"  y="520" style="text-anchor: start;">$node2home</text>}  if ($node2home);
-  $ret .= qq{<text class="$stna text" id="node2gridtxt_$stna" x="525"  y="420" style="text-anchor: end;">$node2grid</text>}    if ($node2grid);
-  $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="515"  y="610" style="text-anchor: end;">$cgc</text>}          if ($cgc);
-  $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="880"  y="610" style="text-anchor: start;">$bat2home</text>}   if ($bat2home && $hasbat);
-  $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="880"  y="420" style="text-anchor: start;">$node2bat</text>}   if ($node2bat && $hasbat);
-  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                                # Current_Consumption Anlage
-  $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1085" y="710" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
+  $ret .= qq{<text class="$stna text" id="nodetxt_$stna"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}    if ($pnodesum > 0);
+  $ret .= qq{<text class="$stna text" id="batsoctxt_$stna"    x="1380" y="520" style="text-anchor: start;">$soc %</text>}       if ($hasbat);                         # Lage Text Batterieladungszustand
+  $ret .= qq{<text class="$stna text" id="node2hometxt_$stna" x="730"  y="520" style="text-anchor: start;">$node2home</text>}   if ($node2home); 
+  $ret .= qq{<text class="$stna text" id="node2gridtxt_$stna" x="420"  y="420" style="text-anchor: end;">$node2grid</text>}     if ($node2grid);
+  $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="420"  y="610" style="text-anchor: end;">$cgc</text>}           if ($cgc); 
+  $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}    if ($bat2home && $hasbat);
+  $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="1000" y="420" style="text-anchor: start;">$node2bat</text>}    if ($node2bat && $hasbat); 
+  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="750" style="text-anchor: end;">$cc</text>};                                                 # Current_Consumption Anlage
+  $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1380" y="710" style="text-anchor: start;">$cc_dummy</text>}    if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
   
   ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ## Textangabe nur anzeigen wenn Producerzeile angezeigt werden soll
