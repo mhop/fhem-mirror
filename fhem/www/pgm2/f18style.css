@@ -62,7 +62,7 @@ h3 { margin-bottom:0; color:#52865D; line-height:1.3;
 div.dist { padding-top:0.3em; }
 button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
 div.block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
-#right { position:absolute; top:10px; left:10px; bottom:5px; right: 5px; }
+#right { position:fixed; overflow:auto; top:10px; left:10px; bottom:5px; right: 5px; }
 
 .langLinks { font-size: 0.6em; }
 
