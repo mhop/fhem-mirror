@@ -792,6 +792,7 @@ ZWave_Initialize($)
     neighborListPos
     noExplorerFrames:1,0
     noWakeupForApplicationUpdate:1,0
+    noUnits:1,0
     secure_classes
     setExtensionsEvent:1,0
     setList
@@ -1841,6 +1842,7 @@ my @meter_type_text = (
   "cooling"
 );
 
+# 212400000000000000000000 => 0 kWh
 sub
 ZWave_meterParse($$)
 {
@@ -1884,15 +1886,16 @@ ZWave_meterParse($$)
   # Log 1, "$v1 $v2 $v3 precision:$precision size:$size scale:$scale val:$mv";
   $v3 = substr($v3, 2*$size, length($v3)-(2*$size));
 
+  $unit_text = AttrVal($name, "noUnits", 0) ? "" : " $unit_text"; #126384
   if (length($v3) < 4) { # V1 report
-    return "$meter_type_text:$mv $unit_text";
+    return "$meter_type_text:$mv$unit_text";
 
   } else { # V2 or greater report
     my $delta_time = hex(substr($v3, 0, 4));
     $v3 = substr($v3, 4, length($v3)-4);
 
     if ($delta_time == 0) { # no previous meter value
-      return "$meter_type_text:$mv $unit_text";
+      return "$meter_type_text:$mv$unit_text";
 
     } else { # previous meter value present
       my $pmv = hex(substr($v3, 0, 2*$size));
@@ -1904,7 +1907,7 @@ ZWave_meterParse($$)
       } else {
         $delta_time .= " s";
       };
-      return "$meter_type_text:$mv $unit_text previous: $pmv delta_time: ".
+      return "$meter_type_text:$mv$unit_text previous: $pmv delta_time: ".
                 "$delta_time"; # V2 report
     }
   }
@@ -7494,12 +7497,16 @@ ZWave_tmSet($)
       turn off the use of Explorer Frames
       </li>
 
-    <li><a id="ZWave-attr-noWakeupForApplicationUpdate">noWakeupForApplicationUpdate</a>
-        <br>
+    <li><a id="ZWave-attr-noWakeupForApplicationUpdate">noWakeupForApplicationUpdate</a><br>
       some devices (notable the Aeotec Multisensor 6) are only awake after an
       APPLICATION UPDATE telegram for a very short time. If this attribute is
       set (recommended for the Aeotec Multisensor 6), the WakeUp-Stack is not
       processed after receiving such a message.
+      </li>
+
+    <li><a id="ZWave-attr-noUnits">noUnits</a><br>
+      the meter class generates the reading as "value unit".
+      If this attribute is set to 1, the unit is not part of the reading.
       </li>
 
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
