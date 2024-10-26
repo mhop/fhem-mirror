@@ -44,8 +44,8 @@ sub Initialize {
 # Enter you functions below _this_ line.
 
 sub BasicTest {
-    my $site = shift; 
-    my $type = shift;
+    my $site = shift // return 'No site argument provided!';
+    my $type = shift // return 'No type argument provided!';
     Log3('rhasspy',3 , "RHASSPY: Site $site, Type $type");
     return "RHASSPY: Site $site, Type $type";
 }
@@ -56,7 +56,7 @@ sub DataTest {
 
     my $hash = $defs{$name} // return;
     my $data;
-    if ( !eval { $data  = decode_json($rawd) ; 1 } ) {
+    if ( !eval { $data  = JSON->new->decode($rawd) ; 1 } ) {
         Log3($hash->{NAME}, 1, "JSON decoding error, $rawd seems not to be valid JSON data:  $@");
         return "Error! $rawd seems not to be valid JSON data!";
     }
@@ -75,12 +75,12 @@ sub DataTest {
 }
 
 sub DialogueTest{
-    my $name = shift; 
-    my $rawd = shift;
+    my $name = shift // return 'No RHASSPY name argument provided!';
+    my $rawd = shift // return 'No JSON data argument provided!';
 
-    my $hash = $defs{$name} // return;
+    my $hash = $defs{$name} // return "RHASSPY name doesn't exist!";
     my $data;
-    if ( !eval { $data  = decode_json($rawd) ; 1 } ) {
+    if ( !eval { $data  = JSON->new->decode($rawd) ; 1 } ) {
         Log3($hash->{NAME}, 1, "JSON decoding error, $rawd seems not to be valid JSON data:  $@");
         return "Error! $rawd seems not to be valid JSON data!";
     }

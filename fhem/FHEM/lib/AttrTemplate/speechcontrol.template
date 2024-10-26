@@ -126,7 +126,7 @@ par:RADIO_KEEPalexaNAME;Keep current attribute value;{ defined AttrVal('DEVICE',
 par:RADIO_SETalexaNAME;Set a new alexaName;{ undef }
 par:RADIO_DoNotSetalexaName;Leave alexaName attribute empty;{ defined AttrVal('DEVICE','alexaName',undef) ? 0 : undef }
 par:RADIO_Delete_gDT;Discard genericDeviceType attribute;{ undef }
-par:RADIO_SKIPP_SCONTROLL;Skipp setting speech controll specific attributes;{ undef }
+par:RADIO_SKIP_SCONTROLL;Skip setting speech controll specific attributes;{ undef }
 option:{ RADIO_KEEPalexaNAME }
 set DEVICE attrTemplate speechcontrol_siri_specials CHECKGDTDONE=1
 option:{ RADIO_Delete_gDT }
@@ -136,7 +136,7 @@ deleteAttr DEVICE alexaName #optional falls Name zuvor vorhanden
 set DEVICE attrTemplate speechcontrol_siri_specials CHECKGDTDONE=1
 option:{ RADIO_SETalexaNAME }
 set DEVICE attrTemplate speechcontrol_request_alexaName
-option:{ RADIO_SKIPP_SCONTROLL }
+option:{ RADIO_SKIP_SCONTROLL }
 set DEVICE attrTemplate speechcontrol_siri_specials CHECKGDTDONE=1 SKIPSCONTROLL=1
 
 
