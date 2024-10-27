@@ -138,7 +138,8 @@ my %zwave_class = (
                "043003(..)(..)"=> 'ZWave_sensorbinaryV2Parse($1,$2)' } },
   SENSOR_MULTILEVEL        => { id => '31',
     get   => { smStatus    => "04" },
-    parse => { "..3105(..)(..)(.*)" => 'ZWave_multilevelParse($1,$2,$3)'} },
+    parse => { "..3105(..)(..)(.*)"
+               => 'ZWave_multilevelParse($hash,$1,$2,$3)'} },
   METER                    => { id => '32',
     set   => { meterReset  => "05",
                meterResetToValue => 'ZWave_meterSet($cmd, "%s")' },
@@ -2146,9 +2147,10 @@ my %zwave_ml_tbl = (
 );
 
 sub
-ZWave_multilevelParse($$$)
+ZWave_multilevelParse($$$$)
 {
-  my ($type,$fl,$arg) = @_;
+  my ($hash,$type,$fl,$arg) = @_;
+  my $name = $hash->{NAME};
 
   my $pr = (hex($fl)>>5)&0x07; # precision
   my $sc = (hex($fl)>>3)&0x03; # scale
@@ -2159,8 +2161,10 @@ ZWave_multilevelParse($$$)
   my $val = $msb ? -( 2 ** (8 * $bc) - hex($arg) ) : hex($arg); # 2's complement
   my $ml = $zwave_ml_tbl{$type};
   return "UNKNOWN multilevel type: $type fl: $fl arg: $arg" if(!$ml);
-  return sprintf("%s:%.*f %s", $ml->{n}, $pr, $val/(10**$pr),
-       int(@{$ml->{st}}) > $sc ? $ml->{st}->[$sc] : "");
+
+  my $unit_text = int(@{$ml->{st}}) > $sc ? $ml->{st}->[$sc] : "";
+  $unit_text = AttrVal($name, "noUnits", 0) ? "" : " $unit_text"; #126384
+  return sprintf("%s:%.*f%s", $ml->{n}, $pr, $val/(10**$pr),$unit_text);
 }
 
 sub
