@@ -192,6 +192,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.0" => "27.10.2024  internal code changes, implement new Take camera snapshot API if SVS >= 9.2.1 ".
+                           "set COMPATIBILITY to 9.2.0, rename attr simu_SVSversion to customSVSversion ".
+                           "(https://surveillance-api.synology.com/#get-/webapi/SurveillanceStation/ThirdParty/SnapShot/Take/v1) ",
   "9.11.6" => "20.07.2024  optimize memory consumption once more, set cache driver => '(Raw)Memory' to global => 1 ",
   "9.11.5" => "19.05.2024  optimize memory consumption once more, set enable/disable renamed to enableCam/disableCam ".
                            "switch commandref to ID tags ",
@@ -213,6 +216,7 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
+  "9.12.0"  => "27.10.2024 Attribute 'simu_SVSversion' is renamed to 'customSVSversion'. New Snapshot API is used for SVS version >= 9.2.1. ",
   "9.9.0"   => "21.05.2021 The new get command 'saveLastSnap' to save the last snapshot locally is now available. ",
   "9.8.0"   => "27.09.2020 New get command 'apiInfo' retrieves the API information and opens a popup window to show it.  ",
   "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpful if your PTZ camera doesn't have the capability ".
@@ -468,7 +472,8 @@ my %hparse = (                                                              # Ha
 );
 
 my %hdt = (                                                                 # Delta Timer Hash für Zeitsteuerung der Funktionen
-  __camSnap          => 0.2,                                                # ab hier hohe Prio
+  __getSvsInfo       => 0.1,                                                # hohe Prio
+  __camSnap          => 0.2,                                                
   __camStartRec      => 0.3,
   __camStopRec       => 0.3,
   __startTrack       => 0.3,
@@ -491,7 +496,6 @@ my %hdt = (                                                                 # De
   __reactivateHls    => 0.7,
   __getSvsLog        => 0.8,
   __getRecAndSave    => 0.9,
-  __getSvsInfo       => 1.0,
   __camExpmode       => 1.1,
   __getPresets       => 1.2,
   __setPreset        => 1.2,
@@ -565,46 +569,146 @@ my %sdswfn = (                                                             # Fun
 );
 
 my %hvada = (                                                              # Funktionshash Version Adaption
-  "a01"  => {AUTH  => "6" },
+  'a01'  => {AUTH       => { VER  => '6',  
+                             PATH => 'webapi/entry.cgi', 
+                             NAME => 'SYNO.API.Auth'},
+            },
+  '921'  => {AUTH       => { VER  => '6',  
+                             PATH => 'webapi/entry.cgi', 
+                             NAME => 'SYNO.API.Auth'},  
+             SNAPWEBAPI => { VER  => 'v1', 
+                             PATH => 'webapi/SurveillanceStation/ThirdParty/SnapShot/Take/v1', 
+                             NAME => 'WebAPI.Snapshot',
+                             mk   => 0}, 
+            },
 );
 
 my %hsimu = (                                                              # Funktionshash Version Simulation
-  "71xxxx-simu"   => {INFO      => "1", AUTH      => "4", EXTREC   => "2", CAM      => "8", SNAPSHOT => "1",
-                      PTZ       => "4", PRESET    => "1", SVSINFO  => "5", CAMEVENT => "1", EVENT    => "5",
-                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", LOG      => "1", REC      => "4"  },
-  "72xxxx-simu"   => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "8", SNAPSHOT => "1",
-                      PTZ       => "5", PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5",
-                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", LOG      => "1", REC      => "4"  },
-  "800xxxx-simu"  => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1",
-                      PTZ       => "5", PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5",
-                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", LOG      => "1", REC      => "6"  },
-  "815xxxx-simu"  => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1",
-                      PTZ       => "5", PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5",
-                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", LOG      => "3", REC      => "6",
-                      AUDIOSTM  => "2", VIDEOSTMS => "1", HMODE    => "1"                                    },
-  "820xxxx-simu"  => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1",
-                      PTZ       => "5", PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5",
-                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", HMODE    => "1", LOG      => "3",
-                      AUDIOSTM  => "2", VIDEOSTMS => "1", REC      => "6"                                    },
-  "828xxxx-simu"  => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1",
-                      PTZ       => "6", PRESET    => "1", SVSINFO  => "8", CAMEVENT => "1", EVENT    => "5",
-                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", HMODE    => "1", LOG      => "3",
-                      AUDIOSTM  => "2", VIDEOSTMS => "1", REC      => "6"                                    },
+  '71'       => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' }, 
+                 AUTH      => { VER => '4', PATH => 'webapi/entry.cgi' },
+                 EXTREC    => { VER => '2', PATH => 'webapi/entry.cgi' },
+                 CAM       => { VER => '8', PATH => 'webapi/entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 PTZ       => { VER => '4', PATH => 'webapi/entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 SVSINFO   => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 LOG       => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 REC       => { VER => '4', PATH => 'webapi/entry.cgi' },
+                },
+  '72'       => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
+                 CAM       => { VER => '8', PATH => 'webapi/entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 PTZ       => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 SVSINFO   => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 LOG       => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 REC       => { VER => '4', PATH => 'webapi/entry.cgi' },
+                },
+  '800'      => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
+                 CAM       => { VER => '9', PATH => 'webapi/entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 PTZ       => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 SVSINFO   => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 LOG       => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 REC       => { VER => '6', PATH => 'webapi/entry.cgi' },
+                },
+  '815'      => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
+                 CAM       => { VER => '9', PATH => 'webapi/entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 PTZ       => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 SVSINFO   => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 LOG       => { VER => '3', PATH => 'webapi/entry.cgi' },
+                 REC       => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 AUDIOSTM  => { VER => '2', PATH => 'webapi/entry.cgi' },
+                 VIDEOSTMS => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 HMODE     => { VER => '1', PATH => 'webapi/entry.cgi' },
+                },
+  '820'      => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
+                 CAM       => { VER => '9', PATH => 'webapi/entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 PTZ       => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 SVSINFO   => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 HMODE     => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 LOG       => { VER => '3', PATH => 'webapi/entry.cgi' },
+                 AUDIOSTM  => { VER => '2', PATH => 'webapi/entry.cgi' },
+                 VIDEOSTMS => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 REC       => { VER => '6', PATH => 'webapi/entry.cgi' },
+                },
+  '828'      => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
+                 CAM       => { VER => '9', PATH => 'webapi/entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 PTZ       => { VER => '6', PATH => 'webapi/entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 SVSINFO   => { VER => '8', PATH => 'webapi/entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 HMODE     => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 LOG       => { VER => '3', PATH => 'webapi/entry.cgi' },
+                 AUDIOSTM  => { VER => '2', PATH => 'webapi/entry.cgi' },
+                 VIDEOSTMS => { VER => '1', PATH => 'webapi/entry.cgi' },
+                 REC       => { VER => '6', PATH => 'webapi/entry.cgi' },
+                },
 );
 
 # Standardvariablen und Forward-Deklaration
 my $defSlim           = 3;                                 # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
-my $sgnum             = "1,2,3,4,5,6,7,8,9,10";            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $sgnum             = '1,2,3,4,5,6,7,8,9,10';            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $sgbdef            = 0;                                 # default value Attr snapGalleryBoost
-my $compstat          = "9.0.00";                          # getestete SVS-Version
-my $valZoom           = ".++,+,stop,-,--.";                # Inhalt des Setters "setZoom"
+my $compstat          = '9.2.0';                           # getestete SVS-Version
+my $valZoom           = '.++,+,stop,-,--.';                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
 my $todef             = 20;                                # httptimeout default Wert
 
- my @simus  = qw(7.1-xxxx 7.2-xxxx 8.0.0-xxxx
-                 8.1.5-xxxx 8.2.0-xxxx 8.2.8-xxxx
-                );                                          # mögliche Simulationsversionen
+                                                           # mögliche Customizin Versionen
+ my @simus  = qw (7.1                                      
+                  7.2 
+                  8.0.0
+                  8.1.5
+                  8.2.0 
+                  8.2.8
+                 );                                         
 
 # use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
 # use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -755,69 +859,72 @@ my %vHintsExt_de = (
 
 ################################################################
 sub Initialize {
- my $hash = shift;
+  my $hash = shift;
 
- $hash->{DefFn}             = \&Define;
- $hash->{UndefFn}           = \&Undef;
- $hash->{DeleteFn}          = \&Delete;
- $hash->{SetFn}             = \&Set;
- $hash->{GetFn}             = \&Get;
- $hash->{AttrFn}            = \&Attr;
- $hash->{DelayedShutdownFn} = \&delayedShutdown;
- # Aufrufe aus FHEMWEB
- $hash->{FW_summaryFn}      = \&FWsummaryFn;
- $hash->{FW_detailFn}       = \&FWdetailFn;
- $hash->{FW_deviceOverview} = 1;
+  $hash->{DefFn}             = \&Define;
+  $hash->{UndefFn}           = \&Undef;
+  $hash->{DeleteFn}          = \&Delete;
+  $hash->{SetFn}             = \&Set;
+  $hash->{GetFn}             = \&Get;
+  $hash->{AttrFn}            = \&Attr;
+  $hash->{DelayedShutdownFn} = \&delayedShutdown;
 
- my $simver = join ",", @simus;
+  $hash->{FW_summaryFn}      = \&FWsummaryFn;
+  $hash->{FW_detailFn}       = \&FWdetailFn;
+  $hash->{FW_deviceOverview} = 1;
 
- $hash->{AttrList} = "disable:1,0 ".
-                     "debugactivetoken:1,0 ".
-                     "debugCachetime:1,0 ".
-                     "genericStrmHtmlTag ".
-                     "hlsNetScript:1,0 ".
-                     "hlsStrmObject ".
-                     "httptimeout ".
-                     "htmlattr ".
-                     "livestreamprefix ".
-                     "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
-                     "pollcaminfoall ".
-                     "ptzNoCapPrePat:1,0 ".
-                     "recChatTxt:textField-long ".
-                     "recEmailTxt:textField-long ".
-                     "recTelegramTxt:textField-long ".
-                     "rectime ".
-                     "recextend:1,0 ".
-                     "smtpCc ".
-                     "smtpDebug:1,0 ".
-                     "smtpFrom ".
-                     "smtpHost ".
-                     "smtpPort ".
-                     "smtpSSLPort ".
-                     "smtpTo ".
-                     "smtpNoUseSSL:1,0 ".
-                     "snapChatTxt:textField-long ".
-                     "snapEmailTxt:textField-long ".
-                     "snapTelegramTxt:textField-long ".
-                     "snapGalleryBoost:0,1 ".
-                     "snapGallerySize:Icon,Full ".
-                     "snapGalleryNumber:$sgnum ".
-                     "snapGalleryColumns ".
-                     "snapGalleryHtmlAttr ".
-                     "snapReadingRotate:0,1,2,3,4,5,6,7,8,9,10 ".
-                     "cacheServerParam ".
-                     "cacheType:file,internal,mem,rawmem,redis ".
-                     "pollnologging:1,0 ".
-                     "noQuotesForSID:1,0 ".
-                     "session:SurveillanceStation,DSM ".
-                     "showPassInLog:1,0 ".
-                     "showStmInfoFull:1,0 ".
-                     "simu_SVSversion:$simver ".
-                     "videofolderMap ".
-                     "webCmd ".
-                     $readingFnAttributes;
+  my $simver = join ",", @simus;
 
- eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  $hash->{AttrList} = "disable:1,0 ".
+                      "debugactivetoken:1,0 ".
+                      "debugCachetime:1,0 ".
+                      "genericStrmHtmlTag ".
+                      "hlsNetScript:1,0 ".
+                      "hlsStrmObject ".
+                      "httptimeout ".
+                      "htmlattr ".
+                      "livestreamprefix ".
+                      "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
+                      "pollcaminfoall ".
+                      "ptzNoCapPrePat:1,0 ".
+                      "recChatTxt:textField-long ".
+                      "recEmailTxt:textField-long ".
+                      "recTelegramTxt:textField-long ".
+                      "rectime ".
+                      "recextend:1,0 ".
+                      "smtpCc ".
+                      "smtpDebug:1,0 ".
+                      "smtpFrom ".
+                      "smtpHost ".
+                      "smtpPort ".
+                      "smtpSSLPort ".
+                      "smtpTo ".
+                      "smtpNoUseSSL:1,0 ".
+                      "snapChatTxt:textField-long ".
+                      "snapEmailTxt:textField-long ".
+                      "snapTelegramTxt:textField-long ".
+                      "snapGalleryBoost:0,1 ".
+                      "snapGallerySize:Icon,Full ".
+                      "snapGalleryNumber:$sgnum ".
+                      "snapGalleryColumns ".
+                      "snapGalleryHtmlAttr ".
+                      "snapReadingRotate:0,1,2,3,4,5,6,7,8,9,10 ".
+                      "cacheServerParam ".
+                      "cacheType:file,internal,mem,rawmem,redis ".
+                      "pollnologging:1,0 ".
+                      "noQuotesForSID:1,0 ".
+                      "session:SurveillanceStation,DSM ".
+                      "showPassInLog:1,0 ".
+                      "showStmInfoFull:1,0 ".
+                      "customSVSversion:$simver ".
+                      "videofolderMap ".
+                      "webCmd ".
+                      $readingFnAttributes;
+                     
+  $hash->{AttrRenameMap} = { "simu_SVSversion"  => "customSVSversion",                # 27.10.24
+                           };
+
+  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return;
 }
@@ -1278,7 +1385,7 @@ sub Attr {
     }
 
     if($aName =~ m/ptzPanel_row|ptzPanel_Home|ptzPanel_use/x) {
-        InternalTimer(gettimeofday()+0.7, "FHEM::SSCam::addptzattr", "$name", 0);
+        InternalTimer (gettimeofday()+0.7, "FHEM::SSCam::addptzattr", "$name", 0);
     }
 
     if ($aName eq "disable") {
@@ -1386,7 +1493,7 @@ sub Attr {
         }
         elsif ($init_done == 1) {                                                            # snapgallery regelmäßig neu einlesen wenn Polling ein
             return qq{When you want activate "snapGalleryBoost", you have to set the attribute "pollcaminfoall" first because of the functionality depends on retrieving snapshots periodical.}
-               if(!AttrVal($name,"pollcaminfoall",0));
+               if(!AttrVal ($name, 'pollcaminfoall', 0));
 
             $hash->{HELPER}{GETSNAPGALLERY} = 1;
             my $slim  = AttrVal($name, "snapGalleryNumber", $defSlim);                       # Anzahl der abzurufenden Snaps
@@ -1440,7 +1547,7 @@ sub Attr {
         }
     }
 
-    if ($aName eq "simu_SVSversion") {
+    if ($aName eq "customSVSversion") {
         delete $hash->{HELPER}{API}{PARSET};
         delete $hash->{HELPER}{SID};
         delete $hash->{CAMID};
@@ -3093,8 +3200,10 @@ sub __camSnap {
     return if(exitOnDis ($name, "Snapshot of Camera $camname can't be executed"));
 
     if ($hash->{HELPER}{ACTIVE} eq "off" || (defined $ta && $ta == $tac)) {
-        $hash->{OPMODE}               = "Snap";
+        $hash->{OPMODE} = "Snap";
+        
         return if(startOrShut($name));
+        
         $hash->{HELPER}{LOGINRETRIES} = 0;
 
         if (!$hash->{HELPER}{API}{PARSET}) {
@@ -3109,10 +3218,15 @@ sub __camSnap {
         $hash->{HELPER}{CHATMSG}      = $chattxt if($chattxt);                     # Text für Chat-Versand
         $hash->{HELPER}{TELEMSG}      = $teletxt if($teletxt);                     # Text für Telegram-Versand
 
-        $hash->{HELPER}{CALL}{VKEY}   = "SNAPSHOT";
+        $hash->{HELPER}{CALL}{VKEY}   = 'SNAPSHOT';
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&dsId="0"&method="TakeSnapshot"&blSave="true"&camId="_CID_"&_sid="_SID_"};
 
-        readingsSingleUpdate ($hash,"state", "snap", 1);
+        if (defined $hash->{HELPER}{API}{SNAPWEBAPI}) {
+            $hash->{HELPER}{CALL}{VKEY} = 'SNAPWEBAPI';
+            $hash->{HELPER}{CALL}{PART} = qq{camId="_CID_"&download=false&_sid="_SID_"};
+        }
+
+        readingsSingleUpdate ($hash, 'state', 'snap', 1);
 
         setActiveToken ($hash);
         checkSid       ($name);
@@ -4360,7 +4474,6 @@ return;
 sub _getsvsinfo {                        ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-
   my $hash  = $defs{$name};
 
   __getSvsInfo ($hash);
@@ -4374,7 +4487,6 @@ return;
 sub _getstoredCredentials {              ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-
   my $hash  = $defs{$name};
 
   my $out = showStoredCredentials ($hash, 3);
@@ -4389,7 +4501,6 @@ sub _getsnapGallery {                    ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $arg   = $paref->{arg};
-
   my $hash  = $defs{$name};
 
   return if(!IsModelCam($hash));
@@ -4618,6 +4729,8 @@ sub __getCaminfoAll {
 
     RemoveInternalTimer ($hash, $caller);
     return if(IsDisabled($name));
+    
+     __getSvsInfo ($hash);
 
     if (IsModelCam($hash)) {
         __getCapabilities ($hash);
@@ -4627,35 +4740,34 @@ sub __getCaminfoAll {
         __getStreamFormat ($hash);
         __getStmUrlPath   ($hash);
 
-        my ($slim,$ssize) = snapLimSize($hash,1);
-        __getSnapInfo     ("$name:$slim:$ssize");                                         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps, Force-Bit -> es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
+        my ($slim,$ssize) = snapLimSize ($hash, 1);
+        __getSnapInfo ("$name:$slim:$ssize");                                             # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps, Force-Bit -> es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
     }
     else {                                                                                # Model ist SVS
         __getHomeModeState ($hash);
         __getSvsLog        ($hash);
     }
 
-    __getSvsInfo ($hash);
-
-    my $pcia = AttrVal ($name,"pollcaminfoall", 0);
-    my $pnl  = AttrVal ($name,"pollnologging",  0);
+    my $pcia = AttrVal ($name, 'pollcaminfoall', 0);
+    my $pnl  = AttrVal ($name, 'pollnologging',  0);
 
     if ($pcia) {
-        my $new = gettimeofday()+$pcia;
+        my $new = gettimeofday() + $pcia;
         InternalTimer ($new, $caller, $hash, 0);
 
-        my $now = FmtTime(gettimeofday());
-        $new    = FmtTime(gettimeofday()+$pcia);
-        readingsSingleUpdate ($hash, "state",     "polling",                  1) if(!IsModelCam($hash));  # state für SVS-Device setzen
-        readingsSingleUpdate ($hash, "PollState", "Active - next time: $new", 1);
+        my $now = FmtTime (gettimeofday());
+        $new    = FmtTime (gettimeofday() + $pcia);
+        
+        readingsSingleUpdate ($hash, 'state',     'polling',                  1) if(!IsModelCam($hash));  # state für SVS-Device setzen
+        readingsSingleUpdate ($hash, 'PollState', "Active - next time: $new", 1);
 
         if (!$pnl) {
             Log3 ($name, 3, "$name - Polling now: $now , next Polling: $new");
         }
     }
     else {                                                                                               # Beenden Polling aller Caminfos
-        readingsSingleUpdate ($hash, "PollState", "Inactive",   1);
-        readingsSingleUpdate ($hash, "state",     "initialized",1) if(!IsModelCam($hash));                # state für SVS-Device setzen
+        readingsSingleUpdate ($hash, 'PollState', 'Inactive',    1);
+        readingsSingleUpdate ($hash, 'state',     'initialized', 1) if(!IsModelCam($hash));              # state für SVS-Device setzen
 
         Log3 ($name, 3, "$name - Polling of $camname is deactivated");
     }
@@ -4754,12 +4866,15 @@ sub __getSvsInfo {
 
     my $caller  = (caller(0))[3];
 
-    RemoveInternalTimer($hash, $caller);
+    RemoveInternalTimer ($hash, $caller);
+    
     return if(IsDisabled($name));
 
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{OPMODE}               = "getsvsinfo";
+        $hash->{OPMODE} = "getsvsinfo";
+        
         return if(startOrShut($name));
+        
         $hash->{HELPER}{LOGINRETRIES} = 0;
 
         if (!$hash->{HELPER}{API}{PARSET}) {
@@ -4767,11 +4882,11 @@ sub __getSvsInfo {
             return;
         }
 
-        $hash->{HELPER}{CALL}{VKEY}   = "SVSINFO";
-        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="GetInfo"&_sid="_SID_"};
+        $hash->{HELPER}{CALL}{VKEY} = "SVSINFO";
+        $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="GetInfo"&_sid="_SID_"};
 
-        setActiveToken($hash);
-        checkSid      ($name);
+        setActiveToken ($hash);
+        checkSid       ($name);
     }
     else {
         schedule ($name, $hash);
@@ -4822,10 +4937,12 @@ sub __getSnapInfo {
 
         if ($hash->{OPMODE} eq "getsnapinfo" && $snapid =~/\d+/x) {                   # getsnapinfo UND Reading LastSnapId gesetzt
             Log3 ($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
+            
             $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&idList="$snapid"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};
         }
         else {                                                                       # snapgallery oder kein Reading LastSnapId gesetzt
             Log3 ($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
+            
             $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&keyword="$keyword"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};
         }
 
@@ -5233,7 +5350,7 @@ sub getApiSites {
 
    my ($url,$param);
 
-   if($fret) {                                                                           # Activetoken setzen wenn Caller angegeben
+   if ($fret) {                                                                          # Activetoken setzen wenn Caller angegeben
        setActiveToken($hash);
    }
 
@@ -5246,6 +5363,7 @@ sub getApiSites {
    }
 
    my $httptimeout = AttrVal($name, "httptimeout", $todef);
+   
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
    # API initialisieren und abrufen
@@ -5255,13 +5373,17 @@ sub getApiSites {
    Log3 ($name, 4, "$name - API imported:\n".Dumper $hash->{HELPER}{API});
 
    my @ak;
+   
    for my $key (keys %{$hash->{HELPER}{API}}) {
        next if($key =~ /^PARSET$/x);
        push @ak, $hash->{HELPER}{API}{$key}{NAME};
    }
+   
    my $apis = join ",", @ak;
+   
+   $hash->{HELPER}{API}{INFO}{PATH} = 'webapi/'.$hash->{HELPER}{API}{INFO}{PATH};
 
-   $url = "$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{INFO}{PATH}?".
+   $url = "$proto://$serveraddr:$serverport/$hash->{HELPER}{API}{INFO}{PATH}?".
               "api=$hash->{HELPER}{API}{INFO}{NAME}".
               "&method=Query".
               "&version=$hash->{HELPER}{API}{INFO}{VER}".
@@ -5276,9 +5398,10 @@ sub getApiSites {
        fret     => $fret,
        arg      => $arg,
        method   => 'GET',
-       header   => 'Accept: application/json',
+       header   => 'accept: application/json',
        callback => \&getApiSites_Parse
    };
+   
    HttpUtils_NonblockingGet ($param);
 
 return;
@@ -5307,7 +5430,7 @@ sub getApiSites_Parse {
         delActiveToken       ($hash);                                                                     # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
         return;
     }
-    elsif ($jdata ne "") {                                                            # Evaluiere ob Daten im JSON-Format empfangen wurden
+    elsif ($jdata ne "") {                                                                                # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($success) = evaljson ($hash, $jdata);
 
         if (!$success) {
@@ -5318,11 +5441,11 @@ sub getApiSites_Parse {
         $data{SSCam}{$name}{TMPDA} = decode_json ($jdata);
         $success                   = $data{SSCam}{$name}{TMPDA}->{success};
 
-        Log3 ($name, 5, "$name - JSON returned: ". Dumper $data{SSCam}{$name}{TMPDA});                    # Logausgabe decodierte JSON Daten
-
         if ($success) {
+            Log3 ($name, 5, "$name - JSON returned: ". Dumper $data{SSCam}{$name}{TMPDA});                # Logausgabe decodierte JSON Daten
+            
             my $completed = completeAPI ($data{SSCam}{$name}{TMPDA}, $hash->{HELPER}{API});               # übergibt Referenz zum instanziierten API-Hash
-
+            
             if (!$completed) {
                 $errorcode = "9001";
                 $error     = expErrors($hash,$errorcode);                                                 # Fehlertext zum Errorcode ermitteln
@@ -5337,79 +5460,33 @@ sub getApiSites_Parse {
                 delActiveToken ($hash);                                                                   # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
                 return;
             }
-
-            # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
-            my $major = $hash->{HELPER}{SVSVERSION}{MAJOR} // "";
-            my $minor = $hash->{HELPER}{SVSVERSION}{MINOR} // "";
-            my $small = $hash->{HELPER}{SVSVERSION}{SMALL} // "";
-            my $build = $hash->{HELPER}{SVSVERSION}{BUILD} // "";
-            my $actvs = $major.$minor.$small.$build;
-
-            Log3 ($name, 4, "$name - installed SVS version is: $actvs");
-
-            if (AttrVal($name,"simu_SVSversion",0)) {
-                my @vl  = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
-                $actvs  = $vl[0];
-                $actvs .= $vl[1];
-                $actvs .= ($vl[2] =~ /\d/x) ? $vl[2]."xxxx" : $vl[2];
-                $actvs .= "-simu";
+            
+            for my $key (keys %{$hash->{HELPER}{API}}) {                                                  # V 9.12.0: Pfad ergänzen
+                next if($key =~ /^PARSET$/x ||
+                        !defined $hash->{HELPER}{API}{$key}{PATH} ||
+                        $hash->{HELPER}{API}{$key}{PATH} =~ /webapi/x);
+                $hash->{HELPER}{API}{$key}{PATH} = 'webapi/'.$hash->{HELPER}{API}{$key}{PATH};
             }
-
-            ### Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll
-            ###########################################################################################################
-            Log3 ($name, 4, "$name - ------- Begin of adaption section -------");
-
-            my $adavs = "a01";                                                             # adaptierte Version
-
-            if ($adavs) {
-                for my $av (sort keys %{$hvada{$adavs}}) {
-                    $hash->{HELPER}{API}{$av}{VER} = $hvada{$adavs}{$av};
-                    $hash->{HELPER}{API}{$av}{MOD} = "yes";
-                    Log3 ($name, 4, "$name - Version of $hash->{HELPER}{API}{$av}{NAME} adapted to: $hash->{HELPER}{API}{$av}{VER}");
-                }
-            }
-
-            Log3 ($name, 4, "$name - ------- End of adaption section -------");
-
-            ### Simulation älterer SVS-Versionen
+            
+            ## zentrale Anpassung API-Versionen
             #####################################
-            Log3 ($name, 4, "$name - ------- Begin of simulation section -------");
-
-            if (AttrVal($name, "simu_SVSversion", undef)) {
-                Log3 ($name, 4, "$name - SVS version $actvs will be simulated");
-
-                for my $ak (sort keys %{$hash->{HELPER}{API}}  ) {
-                    next if($ak =~ /^PARSET$/x);
-
-                    if (!exists $hsimu{$actvs}{$ak}) {
-                        Log3 ($name, 4, "$name - delete $hash->{HELPER}{API}{$ak}{NAME} due to version setting");
-                        delete $hash->{HELPER}{API}{$ak};
-                    }
-                }
-
-                for my $k (sort keys %{$hsimu{$actvs}}  ) {
-                    next if(!ApiVal ($hash, $hash->{HELPER}{API}{$k}, 'NAME', ''));
-                    $hash->{HELPER}{API}{$k}{VER} = $hsimu{$actvs}{$k};
-                    $hash->{HELPER}{API}{$k}{MOD} = "yes";
-                    Log3 ($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");
-                }
-            }
-
-            Log3 ($name, 4, "$name - ------- End of simulation section -------");
+            apiAutoAdadapt ( {hash => $hash, name => $name} );
+            
+            $hash->{HELPER}{APIPRINTOUT} = 1;                                         # API Info  nach _parsegetsvsinfo im Log ausgeben
+            $hash->{HELPER}{SHOWAPIINFO} = 1  if($opmode eq 'apiInfo');               # API Infos nach _parsegetsvsinfo in Popup anzeigen 
+             
+            __getSvsInfo   ($hash);
 
             setReadingErrorNone ($hash, 1);
-
-            Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API});
-
-            if ($opmode eq "apiInfo") {                                              # API Infos in Popup anzeigen
-                showAPIinfo    ($hash, $hash->{HELPER}{API});                        # übergibt Referenz zum instanziierten API-Hash)
-                delActiveToken ($hash);                                              # Freigabe Funktionstoken
-                return;
+            
+            if (defined $hash->{HELPER}{SHOWAPIINFO}) {
+                delActiveToken ($hash);                                               # Freigabe Funktionstoken                            
+                return;                                                               # Opmode API Infos war gesetzt
             }
         }
         else {
             $errorcode = "806";
-            $error     = expErrors($hash,$errorcode);                                # Fehlertext zum Errorcode ermitteln
+            $error     = expErrors($hash,$errorcode);                                 # Fehlertext zum Errorcode ermitteln
 
             readingsBeginUpdate ($hash);
             readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
@@ -5418,14 +5495,14 @@ sub getApiSites_Parse {
 
             Log3 ($name, 2, "$name - ERROR - $error");
 
-            delActiveToken($hash);                                                  # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+            delActiveToken($hash);                                                   # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
             return;
         }
     }
 
-    if ($fret) {                                                                    # Caller aufrufen wenn angegeben
-        no strict "refs";                                                           ## no critic 'NoStrict'
-        delActiveToken($hash);                                                      # Freigabe Funktionstoken vor Neudurchlauf der aufrufenden Funktion
+    if ($fret) {                                                                     # Caller aufrufen wenn angegeben
+        no strict "refs";                                                            ## no critic 'NoStrict'
+        delActiveToken($hash);                                                       # Freigabe Funktionstoken vor Neudurchlauf der aufrufenden Funktion
         &$fret($arg);
         use strict "refs";
         return;
@@ -5497,9 +5574,9 @@ sub getCamId {
    my $httptimeout = AttrVal($name, "httptimeout", $todef);
    Log3 ($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
-   $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
+   $url = "$proto://$serveraddr:$serverport/$apicampath?api=$apicam&version=$apicamver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
    if ($apicamver >= 9) {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=\"List\"&basic=true&streamInfo=true&camStm=0&_sid=\"$sid\"";
+       $url = "$proto://$serveraddr:$serverport/$apicampath?api=$apicam&version=$apicamver&method=\"List\"&basic=true&streamInfo=true&camStm=0&_sid=\"$sid\"";
    }
 
    Log3 ($name, 4, "$name - Call-Out now: $url");
@@ -5509,7 +5586,7 @@ sub getCamId {
        timeout  => $httptimeout,
        name     => $name,
        method   => 'GET',
-       header   => 'Accept: application/json',
+       header   => 'accept: application/json',
        callback => \&getCamId_Parse
    };
 
@@ -5686,10 +5763,10 @@ sub camOp {
        $part =~ s/_SID_/$hash->{HELPER}{SID}/x;
 
        if ($head) {
-           $url = $head.qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
+           $url = $head.qq{/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
        }
        else {
-           $url = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
+           $url = qq{$proto://$serveraddr:$serverport/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
        }
    }
 
@@ -5702,7 +5779,7 @@ sub camOp {
        $apart =~ s/_CID_/$hash->{CAMID}/x;
        $apart =~ s/_SID_/$hash->{HELPER}{SID}/x;
 
-       $hash->{HELPER}{AUDIOLINK} = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$akey}{PATH}?}.$apart;
+       $hash->{HELPER}{AUDIOLINK} = qq{$proto://$serveraddr:$serverport/$hash->{HELPER}{API}{$akey}{PATH}?}.$apart;
    }
 
    if ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
@@ -5718,7 +5795,7 @@ sub camOp {
        timeout  => $httptimeout,
        name     => $name,
        method   => 'GET',
-       header   => 'Accept: application/json',
+       header   => "accept: application/json",
        callback => \&camOp_Parse
    };
 
@@ -5749,16 +5826,16 @@ sub _Oprunliveview {
 
   if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {
       if ($part) {                                                                                           # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
-          $exturl .= qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
-          $url     = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;   # interne URL
+          $exturl .= qq{/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
+          $url     = qq{$proto://$serveraddr:$serverport/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;          # interne URL
       }
       elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
       }
   }
   else {                                                                                                     # Abspielen der letzten Aufnahme (EventId)
-      $exturl .= qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
-      $url     = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;       # interne URL
+      $exturl .= qq{/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
+      $url     = qq{$proto://$serveraddr:$serverport/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;              # interne URL
   }
 
   readingsSingleUpdate ($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", 0));
@@ -6393,6 +6470,7 @@ sub _parseSnap {                                        ## no critic "not used"
   }
 
   my $snapid = $data{SSCam}{$name}{TMPDA}->{data}{'id'};
+  $snapid    = $data{SSCam}{$name}{TMPDA}->{data}{'snapshotId'} if($hash->{HELPER}{CALL}{VKEY} eq 'SNAPWEBAPI');
 
   setReadingErrorNone ($hash, 1);
 
@@ -6452,66 +6530,75 @@ sub _parsegetsvsinfo {                                  ## no critic "not used"
   my $verbose = $paref->{verbose};
 
   my $hash     = $defs{$name};
-  my $userPriv = $data{SSCam}{$name}{TMPDA}->{'data'}{'userPriv'};
+  my $userPriv = $data{SSCam}{$name}{TMPDA}{'data'}{'userPriv'};
 
   if (defined $userPriv) {
       $userPriv = $hrkeys{userPriv}{$userPriv};
   }
 
-  $hash->{HELPER}{SVSVERSION}{MAJOR} = $data{SSCam}{$name}{TMPDA}->{'data'}{'version'}{'major'};         # Werte in $hash zur späteren Auswertung einfügen
-  $hash->{HELPER}{SVSVERSION}{MINOR} = $data{SSCam}{$name}{TMPDA}->{'data'}{'version'}{'minor'};
-  $hash->{HELPER}{SVSVERSION}{SMALL} = $data{SSCam}{$name}{TMPDA}->{'data'}{'version'}{'small'};
-  $hash->{HELPER}{SVSVERSION}{BUILD} = $data{SSCam}{$name}{TMPDA}->{'data'}{'version'}{'build'};
+  $hash->{HELPER}{SVSVERSION}{MAJOR} = $data{SSCam}{$name}{TMPDA}{'data'}{'version'}{'major'};         # Werte in $hash zur späteren Auswertung einfügen
+  $hash->{HELPER}{SVSVERSION}{MINOR} = $data{SSCam}{$name}{TMPDA}{'data'}{'version'}{'minor'};
+  $hash->{HELPER}{SVSVERSION}{SMALL} = $data{SSCam}{$name}{TMPDA}{'data'}{'version'}{'small'};
+  $hash->{HELPER}{SVSVERSION}{BUILD} = $data{SSCam}{$name}{TMPDA}{'data'}{'version'}{'build'};
+  
+  readingsDelete ($hash, 'SVScustomPortHttp')  if(!exists($data{SSCam}{$name}{TMPDA}{'data'}{'customizedPortHttp'}));
+  readingsDelete ($hash, 'SVScustomPortHttps') if(!exists($data{SSCam}{$name}{TMPDA}{'data'}{'customizedPortHttps'}));
 
-  my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
-  my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
-  my $small = $hash->{HELPER}{SVSVERSION}{SMALL};
-  my $build = $hash->{HELPER}{SVSVERSION}{BUILD};
+  my $major = $hash->{HELPER}{SVSVERSION}{MAJOR} // '';
+  my $minor = $hash->{HELPER}{SVSVERSION}{MINOR} // '';
+  my $small = $hash->{HELPER}{SVSVERSION}{SMALL} // '';
+  my $build = $hash->{HELPER}{SVSVERSION}{BUILD} // '';
+  
+  $hash->{HELPER}{SVSVERSION}{FULL} = $major.$minor.$small;
+  
+  ## zentrale Anpassung API-Versionen
+  #####################################
+  apiAutoAdadapt ( {hash => $hash, name => $name} );
 
-  if (AttrVal($name, "simu_SVSversion", undef)) {                                  # simulieren einer anderen SVS-Version
-      Log3($name, 4, "$name - another SVS-version ".AttrVal($name, "simu_SVSversion", undef)." will be simulated");
+  ## Simulation einer anderen API
+  #################################
+  apiCustomChange ( {hash => $hash, name => $name} );
+  
+  if (delete $hash->{HELPER}{APIPRINTOUT}) {
+      Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API});
+  }
 
-      my @vl = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
+  ## COMPATIBILITY setzen
+  #################################
+  my $custapi = AttrVal ($name, 'customSVSversion', 0);
+  
+  if ($custapi) {
+      my @vl = split /\.|-/x, $custapi;
       $major = $vl[0];
       $minor = $vl[1];
-      $small = ($vl[2] =~ /\d/x) ? $vl[2] : '';
-      $build = "xxxx-simu";
+      $small = $vl[2] =~ /\d/x ? $vl[2] : 0;
+      $build = 'customized';
   }
 
-  my $avsc   = $major.$minor.(($small=~/\d/x) ? $small : 0);                      # Kompatibilitätscheck
-  my $avcomp = $compstat;
-  $avcomp    =~ s/\.//gx;
-
-  my $compstate = ($avsc <= $avcomp) ? "true" : "false";
-  readingsSingleUpdate($hash, "compstate", $compstate, 1);
-
-  if (!exists($data{SSCam}{$name}{TMPDA}->{'data'}{'customizedPortHttp'})) {
-      delete $defs{$name}{READINGS}{SVScustomPortHttp};
-  }
-
-  if (!exists($data{SSCam}{$name}{TMPDA}->{'data'}{'customizedPortHttps'})) {
-      delete $defs{$name}{READINGS}{SVScustomPortHttps};
-  }
+  my $avsc      = $major.$minor.$small;                                 # Kompatibilitätscheck
+  my $avcomp    = $compstat;
+  $avcomp       =~ s/\.//gx;
+  my $compstate = ($avsc <= $avcomp) ? 'true' : 'false';
 
   readingsBeginUpdate ($hash);
 
-  readingsBulkUpdate  ($hash, "SVScustomPortHttp",  $data{SSCam}{$name}{TMPDA}->{'data'}{'customizedPortHttp'});
-  readingsBulkUpdate  ($hash, "SVScustomPortHttps", $data{SSCam}{$name}{TMPDA}->{'data'}{'customizedPortHttps'});
-  readingsBulkUpdate  ($hash, "SVSlicenseNumber",   $data{SSCam}{$name}{TMPDA}->{'data'}{'liscenseNumber'});
-  readingsBulkUpdate  ($hash, "SVSuserPriv",$userPriv);
+  readingsBulkUpdate  ($hash, 'SVScustomPortHttp',  $data{SSCam}{$name}{TMPDA}{'data'}{'customizedPortHttp'});
+  readingsBulkUpdate  ($hash, 'SVScustomPortHttps', $data{SSCam}{$name}{TMPDA}{'data'}{'customizedPortHttps'});
+  readingsBulkUpdate  ($hash, 'SVSlicenseNumber',   $data{SSCam}{$name}{TMPDA}{'data'}{'liscenseNumber'});
+  readingsBulkUpdate  ($hash, 'SVSuserPriv',        $userPriv);
+  readingsBulkUpdate  ($hash, 'compstate',          $compstate); 
+  readingsBulkUpdate  ($hash, 'SVSversion',         $major.".".$minor.".".$small."-".$build);
 
-  if (defined $small) {
-      readingsBulkUpdate($hash, "SVSversion", $major.".".$minor.".".$small."-".$build);
-  }
-  else {
-      readingsBulkUpdate($hash, "SVSversion", $major.".".$minor."-".$build);
-  }
-
-  readingsBulkUpdate ($hash, "Errorcode", "none");
-  readingsBulkUpdate ($hash, "Error",     "none");
+  readingsBulkUpdate ($hash, 'Errorcode', 'none');
+  readingsBulkUpdate ($hash, 'Error',     'none');
+  
   readingsEndUpdate  ($hash, 1);
 
   Log3 ($name, $verbose, "$name - Informations related to Surveillance Station retrieved");
+  
+  if (delete $hash->{HELPER}{SHOWAPIINFO}) {                           # Opmode 'apiInfo' war Initiator -> API Infos nach _parsegetsvsinfo in Popup anzeigen 
+      showAPIinfo  ($hash, $hash->{HELPER}{API});                      # übergibt Referenz zum instanziierten API-Hash
+  }
 
 return;
 }
@@ -6556,13 +6643,13 @@ sub __parserunliveviewHLS {                             ## no critic "not used"
   $hash->{HELPER}{HLSSTREAM} = "active";
 
   my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");    # externe LivestreamURL setzen
-  $exturl   .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid";
+  $exturl   .= "/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid";
 
   if (AttrVal($name, "showStmInfoFull", 0)) {
       readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1);
   }
 
-  my $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid";
+  my $url = "$proto://$serveraddr:$serverport/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid";
 
   $hash->{HELPER}{LINK} = $url;                                                           # Liveview-Link in Hash speichern und Aktivitätsstatus speichern
 
@@ -7014,10 +7101,10 @@ sub _parsegeteventlist {                                ## no critic "not used"
   my $verbose = $paref->{verbose};
   my $camname = $paref->{camname};
 
-  my $hash      = $defs{$name};
-  my $eventnum  = $data{SSCam}{$name}{TMPDA}->{'data'}{'total'};
-  my $lrec      = $data{SSCam}{$name}{TMPDA}->{'data'}{'events'}[0]{name};
-  my $lrecid    = $data{SSCam}{$name}{TMPDA}->{'data'}{'events'}[0]{'eventId'};
+  my $hash     = $defs{$name};
+  my $eventnum = $data{SSCam}{$name}{TMPDA}->{'data'}{'total'};
+  my $lrec     = $data{SSCam}{$name}{TMPDA}->{'data'}{'events'}[0]{name};
+  my $lrecid   = $data{SSCam}{$name}{TMPDA}->{'data'}{'events'}[0]{'eventId'};
 
   my ($lastrecstarttime,$lastrecstoptime);
 
@@ -7500,6 +7587,93 @@ sub __refreshAfterSnap {
   else {
        roomRefresh ($hash,0,0,0);                                       # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
   }
+
+return;
+}
+
+###############################################################################
+#  Anpassen API-Versionen. Hier nur nutzen wenn API zentral, z.B. wegen 
+#  einer bestimmten SVS-Version, die API-Verwendung verändert werden soll
+###############################################################################
+sub apiAutoAdadapt {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hash  = $paref->{hash};
+
+  Log3 ($name, 4, "$name - ------- Start of auto adaption section -------");
+  
+  my $adavs   = 'a01';  
+  my $svsfull = $hash->{HELPER}{SVSVERSION}{FULL};
+  
+  if (defined $svsfull) {
+      Log3 ($name, 4, "$name - Currently used SVS version is: $svsfull");
+      
+      $adavs = '921' if($svsfull >= 921);
+  }
+
+  if ($adavs) {
+      for my $av (sort keys %{$hvada{$adavs}}) {
+          $hash->{HELPER}{API}{$av}{VER}  = $hvada{$adavs}{$av}{VER};
+          $hash->{HELPER}{API}{$av}{PATH} = $hvada{$adavs}{$av}{PATH};
+          $hash->{HELPER}{API}{$av}{NAME} = $hvada{$adavs}{$av}{NAME};
+          $hash->{HELPER}{API}{$av}{mk}   = $hvada{$adavs}{$av}{mk} // 0;
+          $hash->{HELPER}{API}{$av}{MOD}  = "yes";
+      
+          Log3 ($name, 4, "$name - $av adapted -> NAME: $hash->{HELPER}{API}{$av}{NAME}, ".
+                                   "VER: $hash->{HELPER}{API}{$av}{VER}, ".
+                                   "PATH: $hash->{HELPER}{API}{$av}{PATH}");
+      }
+  }
+
+  Log3 ($name, 4, "$name - ------- End of auto adaption section -------");
+
+return;
+}
+
+###############################################################################
+#       Anpassung der verwendeten API-Version durch Anwenderattribut
+###############################################################################
+sub apiCustomChange {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hash  = $paref->{hash};
+  
+  my $custapi = AttrVal ($name, 'customSVSversion', 0);
+  
+  Log3 ($name, 4, "$name - ------- Start of the user-defined section by attribute -------");
+  
+  if ($custapi) {
+      my @vl     = split /\.|-/x, $custapi;
+      my $cusvs  = $vl[0];
+      $cusvs    .= $vl[1];
+      $cusvs    .= $vl[2] if(defined $vl[2]);
+
+      Log3 ($name, 4, "$name - Conversion from current to the SVS $custapi version");
+
+      for my $ak (sort keys %{$hash->{HELPER}{API}}  ) {
+          next if($ak =~ /^PARSET$/x);
+
+          if (!exists $hsimu{$cusvs}{$ak}) {
+              Log3 ($name, 4, "$name - delete $hash->{HELPER}{API}{$ak}{NAME} due to version setting");
+              delete $hash->{HELPER}{API}{$ak};
+          }
+      }
+
+      for my $kapi (sort keys %{$hsimu{$cusvs}}  ) {
+          my $apiname = ApiVal ($hash, $hash->{HELPER}{API}{$kapi}, 'NAME', '');
+          next if(!$apiname);
+          
+          $hash->{HELPER}{API}{$kapi}{VER}  = $hsimu{$cusvs}{$kapi}{VER};
+          $hash->{HELPER}{API}{$kapi}{PATH} = $hsimu{$cusvs}{$kapi}{PATH};
+          $hash->{HELPER}{API}{$kapi}{MOD}  = "yes";
+          
+          Log3 ($name, 4, "$name - $kapi customized -> NAME: $apiname, ".
+                                   "VER: $hash->{HELPER}{API}{$kapi}{VER}, ".
+                                   "PATH: $hash->{HELPER}{API}{$kapi}{PATH}");
+      }
+  }
+
+  Log3 ($name, 4, "$name - ------- End of the user-defined section by attribute -------");
 
 return;
 }
@@ -8051,7 +8225,7 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   }
   else {
       if($apivideostmsver) {
-          $link = qq{$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$quote.$sid.$quote};
+          $link = qq{$proto://$serveraddr:$serverport/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$quote.$sid.$quote};
       }
       elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
@@ -8061,7 +8235,7 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
       return $ret if(!$link);
 
       if($apiaudiostmver) {
-          $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$quote.$sid.$quote";
+          $audiolink = "$proto://$serveraddr:$serverport/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$quote.$sid.$quote";
       }
 
       if(!$ftui) {
@@ -8805,13 +8979,13 @@ sub doAutocreate {
            my $room    = AttrVal($name, "room",    "SSCam");
            my $session = AttrVal($name, "session", "DSM"  );
 
-           CommandAttr (undef,"$camname room $room");
-           CommandAttr (undef,"$camname session $session");
-           CommandAttr (undef,"$camname icon it_camera");
-           CommandAttr (undef,"$camname devStateIcon .*isable.*:set_off .*nap:li_wht_on");
-           CommandAttr (undef,"$camname pollcaminfoall 210");
-           CommandAttr (undef,"$camname pollnologging 1");
-           CommandAttr (undef,"$camname httptimeout 20");
+           CommandAttr (undef, "$camname room $room");
+           CommandAttr (undef, "$camname session $session");
+           CommandAttr (undef, "$camname icon it_camera");
+           CommandAttr (undef, "$camname devStateIcon .*isable.*:set_off .*nap:li_wht_on");
+           CommandAttr (undef, "$camname pollcaminfoall 210");
+           CommandAttr (undef, "$camname pollnologging 1");
+           CommandAttr (undef, "$camname httptimeout 20");
 
            # Credentials abrufen und setzen
            my ($success, $username, $password) = getCredentials($hash,0,"credentials");
@@ -12074,33 +12248,37 @@ return $actvs;
 # wenn Attribut "pollcaminfoall" > 10 und "PollState"=Inactive -> start Polling
 ######################################################################################
 sub wdpollcaminfo {
-    my ($hash)   = @_;
-    my $name     = $hash->{NAME};
-    my $camname  = $hash->{CAMNAME};
-    my $pcia     = AttrVal($name,"pollcaminfoall",0);
-    my $pnl      = AttrVal($name,"pollnologging",0);
-    my $watchdogtimer = 60+rand(30);
-    my $lang     = AttrVal("global","language","EN");
+    my ($hash)        = @_;
+    my $name          = $hash->{NAME};
+    my $camname       = $hash->{CAMNAME};
+    
+    my $pcia          = AttrVal ($name,    'pollcaminfoall'  ,0);
+    my $pnl           = AttrVal ($name,    'pollnologging',   0);
+    my $lang          = AttrVal ('global', 'language',     'EN');
+    my $watchdogtimer = 60 + rand(30);
 
     RemoveInternalTimer($hash, "FHEM::SSCam::wdpollcaminfo");
 
     if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} != $pnl) {                                             # Poll-Logging prüfen
         $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $pnl;                                                # aktuellen pollnologging-Wert in $hash eintragen für späteren Vergleich
+        
         if ($pnl) {
-            Log3($name, 3, "$name - Polling-Log of $camname is deactivated");
+            Log3 ($name, 3, "$name - Polling-Log of $camname is deactivated");
         }
         else {
-            Log3($name, 3, "$name - Polling-Log of $camname is activated");
+            Log3 ($name, 3, "$name - Polling-Log of $camname is activated");
         }
     }
 
     if ($pcia && !IsDisabled($name)) {                                                              # Polling prüfen
-        if(ReadingsVal($name, "PollState", "Active") eq "Inactive") {
+        if (ReadingsVal($name, "PollState", "Active") eq "Inactive") {
             readingsSingleUpdate($hash,"PollState","Active",1);                                     # Polling ist jetzt aktiv
             readingsSingleUpdate($hash,"state","polling",1) if(!IsModelCam($hash));                 # Polling-state bei einem SVS-Device setzten
+            
             Log3($name, 3, "$name - Polling of $camname is activated - Pollinginterval: $pcia s");
+            
             $hash->{HELPER}{OLDVALPOLL} = $pcia;                                                    # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
-            __getCaminfoAll($hash,0);
+            __getCaminfoAll ($hash,0);
         }
 
         my $lupd = ReadingsVal($name, "LastUpdateTime", "1970-01-01 / 01:00:00");
@@ -12115,15 +12293,15 @@ sub wdpollcaminfo {
 
         $lupd = fhemTimeLocal($sec, $min, $hour, $mday, $month-=1, $year-=1900);
 
-        if( gettimeofday() > ($lupd + $pcia + 20) ) {
-            __getCaminfoAll($hash,0);
+        if (gettimeofday() > ($lupd + $pcia + 20) ) {
+            __getCaminfoAll ($hash,0);
         }
 
     }
 
     if (defined($hash->{HELPER}{OLDVALPOLL}) && $pcia) {
         if ($hash->{HELPER}{OLDVALPOLL} != $pcia) {
-            Log3($name, 3, "$name - Pollinginterval of $camname has been changed to: $pcia s");
+            Log3 ($name, 3, "$name - Pollinginterval of $camname has been changed to: $pcia s");
             $hash->{HELPER}{OLDVALPOLL} = $pcia;
         }
     }
@@ -13507,6 +13685,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
     <br>
   </li><br>
+  
+  <a id="SSCam-attr-customSVSversion"></a>
+  <li><b>customSVSversion</b><br>
+    A logical change to the specified SVS version is performed. The attribute could be useful to temporarily eliminate
+    incompatibilities that may occur when updating/upgrading Synology Surveillance Station.
+    Incompatibilities should be reported to the maintainer in a timely manner.
+  </li>
+  <br>
 
   <a id="SSCam-attr-debugactivetoken"></a>
   <li><b>debugactivetoken</b><br>
@@ -13624,7 +13810,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   <a id="SSCam-attr-pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
-    Interval of automatic polling the Camera properties (&lt;= 10: no polling, &gt; 10: polling with interval)
+    Interval of the automatic property query (polling) of the device (&lt;= 10: no polling, &gt; 10: polling with interval) 
+    <br><br>
+    <b>Note:</b> It is strongly recommended to keep the polling to get the full functionality of the module.
+    <br> 
   </li><br>
 
   <a id="SSCam-attr-pollnologging"></a>
@@ -13818,15 +14007,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault).
     "SurveillanceStation" -&gt; session will be established to SVS. <br>
     For establish a sesion with Surveillance Station you have to create a user with suitable privilege profile in SVS.
-    If you need more infomations please execute "get &lt;name&gt; versionNotes 5".    </li><br>
-
-  <a id="SSCam-attr-simu_SVSversion"></a>
-  <li><b>simu_SVSversion</b><br>
-    A logical "downgrade" to the specified SVS version is performed. The attribute is useful to temporarily eliminate
-    incompatibilities that may occur when updating/upgrading Synology Surveillance Station.
-    Incompatibilities should be reported to the maitainer in a timely manner.
-  </li>
-  <br>
+    If you need more infomations please execute "get &lt;name&gt; versionNotes 5".    
+  </li><br>
 
   <a id="SSCam-attr-smtpHost"></a>
   <li><b>smtpHost &lt;Hostname&gt; </b><br>
@@ -15580,6 +15762,14 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 
     <br>
   </li><br>
+  
+  <a id="SSCam-attr-customSVSversion"></a>
+  <li><b>customSVSversion</b><br>
+    Es wird eine logische Änderung auf die angegebene SVS-Version vorgenommen. Das Attribut kann hilfreich sein um eventuell
+    auftretende Inkompatibilitäten nach einem Update/Upgrade der Synology Surveillance Station temporär zu beseitigen.
+    Auftretende Inkompatibilitäten sollten zeitnah dem Maintainer mitgeteilt werden.
+  </li>
+  <br>
 
   <a id="SSCam-attr-debugactivetoken"></a>
   <li><b>debugactivetoken</b><br>
@@ -15700,7 +15890,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   <a id="SSCam-attr-pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
-    Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (&lt;= 10: kein Polling, &gt; 10: Polling mit Intervall) </li><br>
+    Intervall der automatischen Eigenschaftsabfrage (Polling) des Gerätes (&lt;= 10: kein Polling, &gt; 10: Polling mit Intervall) 
+    <br><br>
+    <b>Hinweis:</b> Es wird dringend empfohlen das Polling beizubehalten um den vollen Funktionsumfang des Moduls zu erhalten.
+    <br> 
+  </li><br>
 
   <a id="SSCam-attr-pollnologging"></a>
   <li><b>pollnologging</b><br>
@@ -15884,27 +16078,22 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>rectime</b><br>
     festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine
     Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s
-    verwendet.</li><br>
+    verwendet.
+  </li><br>
 
   <a id="SSCam-attr-recextend"></a>
   <li><b>recextend</b><br>
     "rectime" einer gestarteten Aufnahme wird neu gesetzt. Dadurch verlängert sich die
-    Aufnahemzeit einer laufenden Aufnahme </li><br>
+    Aufnahemzeit einer laufenden Aufnahme 
+  </li><br>
 
   <a id="SSCam-attr-session"></a>
   <li><b>session</b><br>
     Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut
     (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS. <br>
     Um eine Session mit der Surveillance Station aufzubauen muss ein Nutzer mit passenden Privilegien Profil in der SVS
-    angelegt werden. Für weitere Informationen bitte "get &lt;name&gt; versionNotes 5" ausführen.  </li><br>
-
-  <a id="SSCam-attr-simu_SVSversion"></a>
-  <li><b>simu_SVSversion</b><br>
-    Es wird ein logisches "Downgrade" auf die angegebene SVS-Version ausgeführt. Das Attribut ist hilfreich um eventuell
-    bei einem Update/Upgrade der Synology Surveillance Station auftretende Inkompatibilitäten temporär zu eliminieren.
-    Auftretende Inkompatibilitäten sollten zeitnah dem Maitainer mitgeteilt werden.
-  </li>
-  <br>
+    angelegt werden. Für weitere Informationen bitte "get &lt;name&gt; versionNotes 5" ausführen.  
+  </li><br>
 
   <a id="SSCam-attr-smtpHost"></a>
   <li><b>smtpHost &lt;Hostname&gt; </b><br>
