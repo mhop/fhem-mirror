@@ -104,7 +104,6 @@ my $languagevars = {
     'DefaultConfirmationTimeout' => "Sorry, too late to confirm.",
     'DefaultCancelConfirmation' => "Thanks, aborted.",
     'RetryIntent' => "Please try again",
-    'SilentClosure' => " ",
     'DefaultConfirmationReceived' => "Ok, will do it!",
     'DefaultConfirmationNoOutstanding' => "No command is awaiting confirmation!",
     'DefaultConfirmationRequestRawInput' => 'Please confirm: $rawInput!',
@@ -1697,7 +1696,7 @@ sub RHASSPY_DialogTimeout {
 
     deleteSingleRegIntTimer($identity, $hash, 1);
 
-    respond( $hash, $data, getResponse( $hash, defined $data->{silent} ? 'SilentClosure' : 'DefaultConfirmationTimeout' ) );
+    respond( $hash, $data, getResponse( $hash, defined $data->{SilentClosure} ? 'SilentClosure' : 'DefaultConfirmationTimeout' ) );
     delete $hash->{helper}{'.delayed'}{$identity};
 
     return;
@@ -1706,11 +1705,23 @@ sub RHASSPY_DialogTimeout {
 sub setDialogTimeout {
     my $hash     = shift // return;
     my $data     = shift // return;
-    my $timeout  = shift // _getDialogueTimeout($hash);
+    my $timeout  = shift;
     my $response = shift;
     my $toEnable = shift // [qw(ConfirmAction CancelAction)];
 
     my $siteId = $data->{siteId};
+    my $sendIntentNotRecognized = 'true';
+    if ( ref $response eq 'HASH' ) {
+        $sendIntentNotRecognized = $response->{sendIntentNotRecognized} if defined $response->{sendIntentNotRecognized};
+        $toEnable = $response->{intentFilter} if defined $response->{intentFilter};
+        $timeout = $response->{sessionTimeout} if defined $response->{sessionTimeout} && looks_like_number( $response->{sessionTimeout} );
+        delete $response->{intent};
+        delete $response->{intentFilter};
+        for my $key (keys %{$response}) {
+            $data->{$key} = $response->{$key};
+        }
+    }
+    $timeout //= _getDialogueTimeout($hash);
     $data->{'.ENABLED'} = $toEnable; #dialog 
     my $identity = qq($data->{sessionId});
 
@@ -1729,20 +1740,20 @@ sub setDialogTimeout {
         }
     }
 
-    my $reaction = ref $response eq 'HASH' 
+    my $reaction = ref $response eq 'HASH'
         ? $response
         : { text         => $response, 
             intentFilter => [@ca_strings],
-            sendIntentNotRecognized => 'true', #'false',
+            sendIntentNotRecognized => $sendIntentNotRecognized,
             customData => $data->{customData}
           };
 
-    respond( $hash, $data, $reaction );
+    return respond( $hash, $data, $reaction );
 
-    my $toTrigger = $hash->{'.toTrigger'} // $hash->{NAME};
-    delete $hash->{'.toTrigger'};
+#    my $toTrigger = $hash->{'.toTrigger'} // $hash->{NAME};
+#    delete $hash->{'.toTrigger'};
 
-    return $toTrigger;
+#    return $toTrigger;
 }
 
 sub get_unique {
@@ -2259,10 +2270,11 @@ sub getDevicesByGroup {
     for my $dev (@devs) {
         if ( !$isVirt ) {
             my $allrooms = $hash->{helper}{devicemap}{devices}{$dev}->{rooms} // '';
-            next if $room ne 'global' && $allrooms !~ m{\b$room(?:[\b:\s]|\Z)}i; ##no critic qw(RequireExtendedFormatting)
+            #https://forum.fhem.de/index.php?msg=1323443
+            next if $room ne 'global' && $allrooms !~ m{(?<!\p{L})$room(?:(?!\p{L})|\Z)}i; ##no critic qw(RequireExtendedFormatting)
 
             my $allgroups = $hash->{helper}{devicemap}{devices}{$dev}->{groups} // next;
-            next if $allgroups !~ m{\b$group\b}i; ##no critic qw(RequireExtendedFormatting)
+            next if $allgroups !~ m{(?<!\p{L})$group(?:(?!\p{L})|\Z)}i; ##no critic qw(RequireExtendedFormatting)
         }
 
         my $specials = $hash->{helper}{devicemap}{devices}{$dev}{group_specials};
@@ -2388,8 +2400,8 @@ sub getIsVirtualGroup {
         my $rawInput = $data->{rawInput};
         $response =~ s{(\$\w+)}{$1}eegx;
         Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true for virtual group, response is $response" );
-        setDialogTimeout($hash, $restdata, _getDialogueTimeout($hash), $response);
-        return $hash->{NAME};
+        return setDialogTimeout($hash, $restdata, _getDialogueTimeout($hash), $response);
+        #return $hash->{NAME};
     }
 
     if (ref $dispatchFns->{$grpIntent} eq 'CODE' ) {
@@ -2497,8 +2509,8 @@ sub getNeedsClarification {
     for (split m{,}x, $todelete) {
         delete $data->{$_};
     }
-    setDialogTimeout($hash, $data, $timeout, "$response $response2", [qw(Choice CancelAction)]);
-    return $hash->{NAME};
+    return setDialogTimeout($hash, $data, $timeout, "$response $response2", [qw(Choice CancelAction)]);
+    #return $hash->{NAME};
 }
 
 
@@ -2852,7 +2864,7 @@ sub Parse {
           push (@ret, @{$fret});
           $forceNext = 1 if AttrVal($hash->{NAME},'forceNEXT',0);
         } else {
-          Log3($hash->{NAME},5,"RHASSPY: [$hash->{NAME}] Parse: internal error:  onmessage returned an unexpected value: ".$fret);
+          Log3($hash->{NAME},5,"RHASSPY: [$hash->{NAME}] Parse: internal error: analyzeMQTTmessage returned an unexpected value: $fret");
         }
     }
     unshift(@ret, '[NEXT]') if !@ret || $forceNext;
@@ -3531,7 +3543,7 @@ sub analyzeMQTTmessage {
         $active = $data->{reason} if $active && defined $data->{reason};
         readingsSingleUpdate($hash, "hotwordAwaiting_" . makeReadingName($siteId), $active, 1);
 
-        my $ret = handleHotwordGlobal($hash, $active ? 'on' : 'off', $data, $active ? 'on' : 'off');
+        my $ret = handleHotwordGlobal($hash, $active ? 'on' : 'off', $data, $active ? 'on' : 'off') // q{};
         my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
         for (@candidates) {
            push @updatedList, $_ if $defs{$_} && $_ ne $name;
@@ -3564,7 +3576,7 @@ sub analyzeMQTTmessage {
         }
         #return \@updatedList if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         return if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
-        my $ret = handleHotwordDetection($hash, $hotword, $data);
+        my $ret = handleHotwordDetection($hash, $hotword, $data) // q{};
         my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
 		for (@candidates) {
 			push @updatedList, $_ if $defs{$_} && $_ ne $name;
@@ -3579,7 +3591,7 @@ sub analyzeMQTTmessage {
 
     if ( $topic =~ m{\Ahermes/tts/say}x ) {
         return if !$hash->{siteId} || $siteId ne $hash->{siteId};
-        my $ret = handleTtsMsgDialog($hash, $data);
+        my $ret = handleTtsMsgDialog($hash, $data) // q{};
         my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
         for (@candidates) {
             push @updatedList, $_ if $defs{$_} && $_ ne $name; 
@@ -3645,8 +3657,10 @@ sub respond {
     my $topic    = shift // q{endSession};
     my $delay    = shift;
 
+    $response = q{} if $response eq 'SilentClosure'; 
+
     my $contByDelay = $delay // $topic ne 'endSession';
-    $delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
+    #$delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
     if ( defined $hash->{helper}->{lng}->{$data->{sessionId}} ) {
         $response .= " $hash->{helper}->{lng}->{$data->{sessionId}}->{post}" if defined $hash->{helper}->{lng}->{$data->{sessionId}}->{post};
@@ -3670,7 +3684,6 @@ sub respond {
     }
 
     if (ref $response eq 'HASH') {
-        #intentFilter
         $topic = q{continueSession};
         for my $key (keys %{$response}) {
             $sendData->{$key} = $response->{$key};
@@ -3680,8 +3693,10 @@ sub respond {
         $sendData->{intentFilter} = 'null';
     } elsif ( $delay ) {
         $sendData->{text} = $response;
-        $topic = 'continueSession';
-        my @ca_strings = configure_DialogManager($hash,$data->{siteId}, [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)], 'false', undef, 1 );
+        $topic = q{continueSession};
+		my $toDisable = $data->{intentFilter} // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
+		$toDisable = split m{,}xms, $toDisable if ref $toDisable ne 'ARRAY';
+        my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
         $sendData->{intentFilter} = [@ca_strings];
     } else {
         $sendData->{text} = $response;
@@ -3697,7 +3712,8 @@ sub respond {
       : readingsBulkUpdate($hash, 'textResponse', $response);
     readingsBulkUpdate($hash, 'responseType', $type);
     readingsEndUpdate($hash,1);
-    Log3($hash->{NAME}, 5, "Response is: $response");
+    Log3($hash, 5, "Response is: $response");
+    my $name = $hash->{NAME};
 
     #check for msgDialog or SpeechDialog sessions
     my $identity = (split m{_$hash->{siteId}_}xms, $data->{sessionId},3)[0];
@@ -3713,12 +3729,20 @@ sub respond {
 
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
     Log3($hash, 5, "published " . qq{hermes/dialogueManager/$topic $json});
+    
+    #new reopen or sessionTimeout variant: Close the old session and reopen a new one:
+    if ( $topic ne 'continueSession' && $type eq 'voice' && ( defined $data->{reopenVoiceInput} || defined $hash->{sessionTimeout} ) ) {
+        activateVoiceInput($hash,[$data->{siteId}]);
+        $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
+        $delay = $data->{SilentClosure} if defined $data->{SilentClosure} && 	looks_like_number($data->{SilentClosure});
+        resetRegIntTimer( 'testmode_end', time + $delay, \&RHASSPY_testmode_timeout, $hash ); #Beta-User: needs different timeout function
+    }
 
-    my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",undef) // return $hash->{NAME};
+    my $secondAudio = ReadingsVal($name, "siteId2doubleSpeak_$data->{siteId}",undef) // return [$name];
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
             text   => $response} );
-    return $hash->{NAME};
+    return [$name];
 }
 
 
@@ -3728,6 +3752,7 @@ sub getResponse {
     my $identifier = shift // return 'Code error! No identifier provided for getResponse!' ;
     my $subtype = shift;
 
+    if ( $identifier eq 'SilentClosure' ) { return 'SilentClosure'; }														  
     my $responses = defined $subtype
         ? $hash->{helper}{lng}->{responses}->{$identifier}->{$subtype}
         : getKeyValFromAttr($hash, $hash->{NAME}, 'response', $identifier) // $hash->{helper}{lng}->{responses}->{$identifier};
@@ -4111,12 +4136,11 @@ sub RHASSPY_ParseHttpResponse {
     }
     elsif ( $url =~ m{api/intents}ix ) {
         my $refb; 
-        #if ( !eval { $refb = decode_json($data) ; 1 } ) {
         if ( !eval { $refb = JSON->new->decode($data) ; 1 } ) {
             readingsEndUpdate($hash, 1);
             return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
         }
-        my $intents = join q{,}, keys %{$refb}; #encode($cp,join q{,}, keys %{$refb});
+        my $intents = join q{,}, keys %{$refb};
         readingsBulkUpdate($hash, 'intents', $intents);
         configure_DialogManager($hash);
     }
@@ -4240,7 +4264,7 @@ sub handleCustomIntent {
         respond( $hash, $data, $response );
         return ${$error}[1]; #comma separated list of devices to trigger
     } elsif ( ref $error eq 'HASH' ) {
-    	$timeout = $error->{sessionTimeout} if defined $error->{sessionTimeout} && looks_like_number( $error->{sessionTimeout} );
+        $timeout = $error->{sessionTimeout} if defined $error->{sessionTimeout} && looks_like_number( $error->{sessionTimeout} );
         return setDialogTimeout($hash, $data, $timeout, $error);
     } else {
         $response = $error; # if $error && $error !~ m{Please.define.*first}x;
@@ -4433,7 +4457,7 @@ sub handleIntentSetOnOffGroup {
     _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
 
     # Send response
-    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') );
+    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') ) if !defined $data->{noResponse};
     return $updatedList;
 }
 
@@ -4488,7 +4512,7 @@ sub handleIntentSetTimedOnOff {
     else { $response = getResponse($hash, 'DefaultConfirmation'); }
     # Send response
     $response //= getResponse($hash, 'DefaultError');
-    respond( $hash, $data, $response );
+    respond( $hash, $data, $response ) if !defined $data->{noResponse};;
     return $device; 
 }
 
@@ -4566,7 +4590,7 @@ sub handleIntentSetTimedOnOffGroup {
     _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
 
     # Send response
-    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') );
+    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') ) if !defined $data->{noResponse};
     return $updatedList;
 }
 
@@ -4675,7 +4699,7 @@ sub handleIntentSetNumericGroup {
     _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
 
     # Send response
-    respond( $hash, $data, getResponse( $hash, 'DefaultConfirmation' ) );
+    respond( $hash, $data, getResponse( $hash, 'DefaultConfirmation' ) ) if !defined $data->{noResponse};
     return $updatedList;
 }
 
@@ -4849,7 +4873,7 @@ sub handleIntentSetNumeric {
 
     # send response
     $response //= getResponse($hash, 'DefaultError');
-    respond( $hash, $data, $response );
+    respond( $hash, $data, $response ) if !defined $data->{noResponse};
     return $device;
 }
 
@@ -5142,7 +5166,7 @@ sub handleIntentMediaControls {
         : getResponse($hash, 'DefaultConfirmation');
 
     # Send voice response
-    respond( $hash, $data, $response );
+    respond( $hash, $data, $response ) if !defined $data->{noResponse};
     return $device;
 }
 
@@ -5201,7 +5225,7 @@ sub handleIntentSetScene{
     # Define response
     my $response = _shuffle_answer($mapping->{response}) // getResponse( $hash, 'DefaultConfirmation' );
 
-    respond( $hash, $data, $response );
+    respond( $hash, $data, $response ) if !defined $data->{noResponse};;
     return $device;
 }
 
@@ -5273,7 +5297,7 @@ sub handleIntentMediaChannels {
     analyzeAndRunCmd($hash, $device, $cmd);
 
     # Antwort senden
-    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') );
+    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') ) if !defined $data->{noResponse};;
     return $device;
 }
 
@@ -5330,7 +5354,7 @@ sub handleIntentSetColor {
     }
     # Send voice response
     $response //= getResponse($hash, 'DefaultError');
-    respond( $hash, $data, $response ) if !$inBulk;
+    respond( $hash, $data, $response ) if !$inBulk && !defined $data->{noResponse};
     return $device;
 }
 
@@ -5525,7 +5549,7 @@ sub handleIntentSetColorGroup {
     _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
 
     # Send response
-    respond( $hash, $data, getResponse( $hash, 'DefaultConfirmation' ) );
+    respond( $hash, $data, getResponse( $hash, 'DefaultConfirmation' ) ) if !defined $data->{noResponse};
     return $updatedList;
 }
 
@@ -5688,29 +5712,17 @@ sub handleIntentNotRecognized {
         $data->{requestType} = 'text';
         return respond( $hash, $data, getResponse( $hash, 'NoIntentRecognized' ));
     }
-    #return; #Beta-User: End of recent changes...
 
-    # @@@ added by GV start - THIS keeps the session open speaking "please try again" after IntentNotRecognized - can repeatedly happen, but terminates with dialogue timeout
     $data->{requestType} //= $data_old->{requestType} // 'voice';                                                                                           # required, otherwise session open but no voice input possible
-    my $intentFilter = 'null'; #don't disable anything by default
-	$intentFilter = $data_old->{'.ENABLED'} if defined $data_old->{'.ENABLED'} && ref $data_old->{'.ENABLED'} eq 'ARRAY';  # get intent filter(s)
-    my @ca_strings;                                                                                                           # just copied from setDialogTimeout
-    $intentFilter = split m{,}xms, $intentFilter if ref $intentFilter ne 'ARRAY';			#Beta-User: Das ist an dieser Stelle nicht logisch...
-    if (ref $intentFilter eq 'ARRAY') {
-        for (@{$intentFilter}) {
-            my $id = qq{$hash->{LANGUAGE}.$hash->{fhemId}:$_};
-            push @ca_strings, $id;
-        }
-    }
     my $response = getResponse( $hash, 'RetryIntent');                                                                         # get retry response
-    my $reaction = { text => $response,                                                                                        # hash to control respond() behaviour
-                     intentFilter => [@ca_strings],
-                     sendIntentNotRecognized => 'true', #'false',
-                     customData => $data->{customData}
-                   };
+    my $reaction = { 
+        text => $response,
+        sendIntentNotRecognized => 'true',
+        customData => $data->{customData}
+    };
     respond( $hash, $data, $reaction);                                                                                         # keep session open and continue listening
     return $hash->{NAME};
-# @@@ added by GV end
+
 
 =pod
     return if !defined $data->{input} || length($data->{input}) < 12; #Beta-User: silence chuncks or single words, might later be configurable
@@ -6444,6 +6456,7 @@ After changing something relevant within FHEM for either the data structure in</
     <li>siteId, Device etc. => any element out of the JSON-$data.</li>
     </ul>
     <p>If a simple text is returned, this will be considered as response, if return value is not defined, the default response will be used.<br>
+	You may use the internal functions (e.g. "handleIntentSetOnOff()" as well. To skipp the default answers for these intents, you have to add a "noResponse"-key to the $data argument (or ".inBulk" key forr single device intents).<br>
     For more advanced use of this feature, you may return either a HASH or an ARRAY data structure (Note: The formating of the required data might be subject to changes!). If ARRAY is returned:
     <ul><li>First element of the array is interpreted as response and may be plain text (dialog will be ended) or HASH type to continue the session. The latter will keep the dialogue-session open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, (configurable) default is 20 seconds, you may alternatively hand over other numeric values as second element of the array.
     </li>
