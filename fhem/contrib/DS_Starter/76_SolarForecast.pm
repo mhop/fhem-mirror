@@ -156,7 +156,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.37.3" => "25.10.2024  _flowGraphic: grid, dummy and battery displacement by kask ",
+  "1.37.4" => "29.10.2024  both attr graphicStartHtml, graphicEndHtml removed ",
+  "1.37.3" => "25.10.2024  _flowGraphic: grid, dummy and battery displacement by kask ".
+                           "Attr flowGraphicControl: new key h2consumerdist, animate=1 is default now ",
   "1.37.2" => "24.10.2024  _flowGraphic: show Producer Row only if more than one Producer is defined ",
   "1.37.1" => "23.10.2024  state: 'The setup routine is still incomplete' if setup is incomplete ".
                            "change: 'trackFlex' && \$wcc >= 80 to \$wcc >= 70, implement Rename function ".
@@ -508,7 +510,7 @@ my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsFo
                    graphicBeam1MaxVal graphicEnergyUnit graphicHeaderOwnspec graphicHeaderOwnspecValForm
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
-                   graphicSpaceSize graphicStartHtml graphicEndHtml graphicWeatherColor graphicWeatherColorNight
+                   graphicSpaceSize graphicWeatherColor graphicWeatherColorNight
                    setupMeterDev setupBatteryDev setupInverterStrings setupRadiationAPI setupStringPeak
                    setupRoofTops
                  );
@@ -1258,8 +1260,6 @@ sub Initialize {
                                 "graphicShowNight:1,0 ".
                                 "graphicShowWeather:1,0 ".
                                 "graphicSpaceSize ".
-                                "graphicStartHtml ".
-                                "graphicEndHtml ".
                                 "graphicWeatherColor:colorpicker,RGB ".
                                 "graphicWeatherColorNight:colorpicker,RGB ".
                                 "setupInverterStrings ".
@@ -5326,6 +5326,14 @@ sub Attr {
       }
       else {
           return qq{The attribute '$aName' is obsolete and replaced by 'flowGraphicControl'.};
+      }
+  }
+  # 29.10.2024
+  if ($cmd eq 'set' && $aName =~ /^graphicStartHtml|graphicEndHtml$/) {
+      if (!$init_done) {
+          my $msg = "The attribute $aName has been removed and is no longer valid.";
+          Log3 ($name, 1, "$name - $msg");
+          return qq{Device "$name" -> $msg};
       }
   }
   ######################################################################################################################
@@ -12094,14 +12102,12 @@ sub entryGraphic {
 
   # Parameter f. Anzeige extrahieren
   ###################################
-  my $width      = AttrNum ($name, 'graphicBeamWidth',    20);                             # zu klein ist nicht problematisch
-  my $maxhours   = AttrNum ($name, 'graphicHourCount',    24);
-  my $alias      = AttrVal ($name, 'alias',            $name);                             # Linktext als Aliasname oder Devicename setzen  my $html_start = AttrVal ($name, 'graphicStartHtml', undef);                             # beliebige HTML Strings die vor der Grafik ausgegeben werden
-  my $html_start = AttrVal ($name, 'graphicStartHtml', undef);                             # beliebige HTML Strings die vor der Grafik ausgegeben werden
-  my $html_end   = AttrVal ($name, 'graphicEndHtml',   undef);                             # beliebige HTML Strings die nach der Grafik ausgegeben werden  my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
-  my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
-  my $offset     = -1 * AttrNum ($name, 'graphicHistoryHour', $histhourdef);
-  my $dlink      = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
+  my $width    = AttrNum ($name, 'graphicBeamWidth',    20);                               # zu klein ist nicht problematisch
+  my $maxhours = AttrNum ($name, 'graphicHourCount',    24);
+  my $alias    = AttrVal ($name, 'alias',            $name);                               # Linktext als Aliasname oder Devicename setzen
+  my $w        = $width * $maxhours;                                                       # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
+  my $offset   = -1 * AttrNum ($name, 'graphicHistoryHour', $histhourdef);
+  my $dlink    = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
 
   if (!$gsel) {
       $gsel = AttrVal ($name, 'graphicSelect', 'both');                                    # Auswahl der anzuzeigenden Grafiken
@@ -12145,14 +12151,14 @@ sub entryGraphic {
       sheader        => AttrNum    ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
       hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       flowgsize      => CurrentVal ($hash, 'size',                   $flowGSizedef),                # Größe Energieflußgrafik
-      flowgani       => CurrentVal ($hash, 'animate',                            0),                # Animation Energieflußgrafik
+      flowgani       => CurrentVal ($hash, 'animate',                            1),                # Animation Energieflußgrafik
       flowgshift     => CurrentVal ($hash, 'shift',                              0),                # Verschiebung der Flußgrafikbox (muß negiert werden)
       flowgcons      => CurrentVal ($hash, 'showconsumer',                       1),                # Verbraucher in der Energieflußgrafik anzeigen
       flowgconX      => CurrentVal ($hash, 'showconsumerdummy',                  1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
       flowgconsPower => CurrentVal ($hash, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
       flowgconsTime  => CurrentVal ($hash, 'showconsumerremaintime',             1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
       flowgconsDist  => CurrentVal ($hash, 'consumerdist',                $fgCDdef),                # Abstand Verbrauchericons zueinander
-      flowgh2cDist   => CurrentVal ($hash, 'h2consumerdist',                     0),                # Erweiterung vertikaler Abstand Home -> Consumer
+      flowgh2cDist   => CurrentVal ($hash, 'h2consumerdist',                     0),                # Erweiterung des vertikalen Abstandes Haus -> Consumer
       genpvdva       => AttrVal    ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
       lang           => getLang    ($hash),
       debug          => getDebug   ($hash),                                                         # Debug Module
@@ -12162,7 +12168,6 @@ sub entryGraphic {
 
   $ret .= "<span>$dlink </span><br>"  if(AttrVal($name, 'ctrlShowLink', 0));
 
-  $ret .= $html_start if (defined($html_start));
   #$ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
   $ret .= "<style>TD.solarfc {text-align: center; padding-left:5px; padding-right:5px; margin:0px;}</style>";
   $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
@@ -12303,7 +12308,6 @@ sub entryGraphic {
 
   $ret .= "</td></tr>";
   $ret .= "</table>";
-  $ret .= $html_end if (defined($html_end));
 
 return $ret;
 }
@@ -21121,9 +21125,9 @@ to ensure that the system configuration is correct.
          <table>
          <colgroup> <col width="26%"> <col width="74%"> </colgroup>
             <tr><td> <b>animate</b>                 </td><td> Animates the energy flow graphic if displayed. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)         </td></tr>
-            <tr><td>                                </td><td><b>0</b> - Animation off, <b>1</b> - Animation on, default: 0                                                           </td></tr>
+            <tr><td>                                </td><td><b>0</b> - Animation off, <b>1</b> - Animation on, default: 1                                                           </td></tr>
             <tr><td>                                </td><td>                                                                                                                        </td></tr>
-            <tr><td> <b>consumerdist</b>            </td><td>Controls the distance between the consumer icons in the energy flow graphic.                                            </td></tr>
+            <tr><td> <b>consumerdist</b>            </td><td>Controls the distance between the consumer icons.                                                                       </td></tr>
             <tr><td>                                </td><td>Value: <b>80 ... 500</b>, default: 130                                                                                  </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>h2consumerdist</b>          </td><td>Extension of the vertical distance between the house and the consumer icons.                                            </td></tr>
@@ -21507,18 +21511,6 @@ to ensure that the system configuration is correct.
        <li><b>graphicShowWeather </b><br>
          Show/hide weather icons in the bar graph. <br>
          (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicStartHtml"></a>
-       <li><b>graphicStartHtml &lt;HTML-String&gt; </b><br>
-         Specify any HTML string to be executed before the graphics code.
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicEndHtml"></a>
-       <li><b>graphicEndHtml &lt;HTML-String&gt; </b><br>
-         Specify any HTML string that will be executed after the graphic code.
        </li>
        <br>
 
@@ -23528,12 +23520,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <table>
          <colgroup> <col width="26%"> <col width="74%"> </colgroup>
             <tr><td> <b>animate</b>                 </td><td> Animiert die Energieflußgrafik sofern angezeigt. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)       </td></tr>
-            <tr><td>                                </td><td><b>0</b> - Animation aus,  <b>1</b> - Animation an, default: 0                                                          </td></tr>
+            <tr><td>                                </td><td><b>0</b> - Animation aus,  <b>1</b> - Animation an, default: 1                                                          </td></tr>
             <tr><td>                                </td><td>                                                                                                                        </td></tr>
-            <tr><td> <b>consumerdist</b>            </td><td>Steuert den Abstand zwischen den Consumer-Icons in der Energieflußgrafik.                                               </td></tr>
+            <tr><td> <b>consumerdist</b>            </td><td>Steuert den Abstand zwischen den Verbraucher-Icons.                                                                     </td></tr>
             <tr><td>                                </td><td>Wert: <b>80 ... 500</b>, default: 130                                                                                   </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
-            <tr><td> <b>h2consumerdist</b>          </td><td>Erweiterung des vertikalen Abstandes zwischen dem Haus und den Consumer-Icons.                                          </td></tr>
+            <tr><td> <b>h2consumerdist</b>          </td><td>Erweiterung des vertikalen Abstandes zwischen dem Haus und den Verbraucher-Icons.                                       </td></tr>
             <tr><td>                                </td><td>Wert: <b>0 ... 999</b>, default: 0                                                                                      </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shift</b>                   </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
@@ -23913,18 +23905,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>graphicShowWeather </b><br>
          Wettericons in der Balkengrafik anzeigen/verbergen. <br>
          (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicStartHtml"></a>
-       <li><b>graphicStartHtml &lt;HTML-String&gt; </b><br>
-         Angabe eines beliebigen HTML-Strings der vor dem Grafik-Code ausgeführt wird.
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicEndHtml"></a>
-       <li><b>graphicEndHtml &lt;HTML-String&gt; </b><br>
-         Angabe eines beliebigen HTML-Strings der nach dem Grafik-Code ausgeführt wird.
        </li>
        <br>
 
