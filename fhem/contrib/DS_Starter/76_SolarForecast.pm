@@ -156,7 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.37.4" => "29.10.2024  both attr graphicStartHtml, graphicEndHtml removed ",
+  "1.37.4" => "29.10.2024  both attr graphicStartHtml, graphicEndHtml removed, fix flowGraphic when device name contains '.' ",
   "1.37.3" => "25.10.2024  _flowGraphic: grid, dummy and battery displacement by kask ".
                            "Attr flowGraphicControl: new key h2consumerdist, animate=1 is default now ",
   "1.37.2" => "24.10.2024  _flowGraphic: show Producer Row only if more than one Producer is defined ",
@@ -638,20 +638,21 @@ my %hmoon = (
   7 => { icon => 'weather_moon_phases_8',      DE => 'abnehmende Sichel', EN => 'decreasing crescent' },
 );
 
-  my %hrepl = (                                                             # Zeichenersetzungen
-    0 => 'a',
-    1 => 'b',
-    2 => 'c',
-    3 => 'd',
-    4 => 'e',
-    5 => 'f',
-    6 => 'g',
-    7 => 'h',
-    8 => 'i',
-    9 => 'j',
-  );
+my %hrepl = (                                                                # Zeichenersetzungen
+  '0' => 'a',
+  '1' => 'b',
+  '2' => 'c',
+  '3' => 'd',
+  '4' => 'e',
+  '5' => 'f',
+  '6' => 'g',
+  '7' => 'h',
+  '8' => 'i',
+  '9' => 'j',
+  '.' => 'k',
+);
 
-my %hqtxt = (                                                                                                 # Hash (Setup) Texte
+my %hqtxt = (                                                                # Hash (Setup) Texte
   entry  => { EN => qq{<b>Warm welcome!</b><br>
                        The next queries will guide you through the basic installation.<br>
                        If all entries are made, please check the configuration finally with
@@ -14241,7 +14242,7 @@ sub _flowGraphic {
   my ($lcp, $y_pos, $y_pos1);
   
   my $stna = $name;
-  $stna =~ s/([0-9])/$hrepl{$1}/ge if($name =~ /[0-9]/xs);                     # V 1.37.1 Ziffern eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
+  $stna =~ s/([0-9.])/$hrepl{$1}/ge if($name =~ /[0-9]/xs);                    # V 1.37.1 Ziffern eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
   
   ## definierte Producer + Inverter ermitteln und zusammenfassen
   ################################################################
