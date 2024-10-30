@@ -652,8 +652,6 @@ my %hrepl = (                                                                # Z
   '.' => 'k',
 );
 
-my @hreplkeys  = keys %hrepl;
-
 my %hqtxt = (                                                                # Hash (Setup) Texte
   entry  => { EN => qq{<b>Warm welcome!</b><br>
                        The next queries will guide you through the basic installation.<br>
@@ -14241,10 +14239,13 @@ sub _flowGraphic {
   my $scale      = $fgscaledef;
   my $pdist      = 130;                                                        # Abstand Producer zueinander
   my $hasbat     = 1;                                                          # initial Batterie vorhanden
+  my $stna       = $name;
+  
   my ($lcp, $y_pos, $y_pos1);
   
-  my $stna = $name;
-  $stna    =~ s/([@hreplkeys])/$hrepl{$1}/ge if($name =~ /[@hreplkeys]/xs);    # V 1.37.1 Ziffern etc. eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
+  for my $re (keys %hrepl) {                                                   # V 1.37.1 Ziffern etc. eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
+      $stna =~ s/$re/$hrepl{$re}/gxs;
+  }
   
   ## definierte Producer + Inverter ermitteln und zusammenfassen
   ################################################################
