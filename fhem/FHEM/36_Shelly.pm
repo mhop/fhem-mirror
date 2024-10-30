@@ -122,6 +122,7 @@
 #           change: on updating action query strings, substitue spaces by '+' sign, instead of %20 (Shelly fw replace %20 by space)
 #           fix: removed lost '&' when webhooks changed to have no csrf token
 # 6.01.1    fix: division by zero when attr Periods is not set at ShellyPro3EM 
+# 6.01.2    add: Shelly Plug S MTR Gen3
 
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
@@ -144,7 +145,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.01.1 25.10.2024";
+my $version = "6.01.2 30.10.2024";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -273,6 +274,7 @@ my %shelly_vendor_ids = (
     "S3SN-0024X"      => ["shellyi4gen3",   "Shelly i4 Gen3"],    ## (AC), new
     "S3SN-0U12A"      => ["generic",        "Shelly H&T Gen3"],   ## new, not yet implemented
     "S3DM-0010WW"     => ["shellyplus010v", "Shelly Dimmer 0/1-10V PM Gen3"], ## new
+    "S3PL-00112EU"    => ["shellyplusplug", "Shelly Plug S MTR Gen3"],
     ## Mini Gen3 Devices
     "S3SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen3"],
     "S3SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1 PM Mini Gen3"],
