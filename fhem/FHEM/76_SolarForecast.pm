@@ -14240,6 +14240,7 @@ sub _flowGraphic {
   my $pdist      = 130;                                                        # Abstand Producer zueinander
   my $hasbat     = 1;                                                          # initial Batterie vorhanden
   my $stna       = $name;
+  $stna         .= int (rand (1500));
   
   my ($lcp, $y_pos, $y_pos1);
   
