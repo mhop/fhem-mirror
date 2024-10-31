@@ -9302,7 +9302,6 @@ sub _batChargeRecmd {
   my $pvCu     = ReadingsNum ($name, 'Current_PV',                   0);                     # aktuelle PV Erzeugung
   my $batcap   = CurrentVal  ($hash, 'batinstcap',                   0);                     # installierte Batteriekapazität Wh
   my $soc      = CurrentVal  ($hash, 'batcharge',                    0);                     # aktueller SOC (%)
-  my $batin    = ReadingsNum ($name, 'Current_PowerBatIn',           0);                     # aktulle Batterie Ladeleistung
   my $curcon   = ReadingsNum ($name, 'Current_Consumption',          0);                     # aktueller Verbrauch
   
   my $inpmax   = 0;
@@ -9350,10 +9349,10 @@ sub _batChargeRecmd {
       
       $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
       
-      if ( $betEneed + $sfmargin             >= $spday  ) {$dold = 1}                        # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-      if ( !$num && $pvCu - $curcon - $batin >= $inpmax ) {$dold = 1}                        # Ladeempfehlung wenn akt. PV Leistung >= WR-Leistungsbegrenzung
+      if ( $betEneed + $sfmargin    >= $spday  ) {$dold = 1}                                 # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+      if ( !$num && $pvCu - $curcon >= $inpmax ) {$dold = 1}                                 # Ladeempfehlung wenn akt. PV Leistung >= WR-Leistungsbegrenzung
 
-      my $msg = "(Eneed: $betEneed -> Surplus Day: $spday, Curr PV: $pvCu, Curr Consumption: $curcon, BatIn: $batin -> Limit: $inpmax)";
+      my $msg = "(Eneed: $betEneed -> Surplus Day: $spday, Curr PV: $pvCu, Curr Consumption: $curcon -> Limit: $inpmax)";
       
       if ($num) {
           $msg = "(Eneed: $betEneed -> Surplus Day: $spday)";
