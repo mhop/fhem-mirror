@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  76_SolarForecast: attr setupInverterDevXX: new key 'limit', 
+            the key 'capacity' is now mandatory! Attr affect70percentRule, 
+            ctrlAutoRefresh, ctrlAutoRefreshFW are deleted
  - feature: 36_Shelly: add Shelly Plug S MTR Gen3
  - change:  76_SolarForecast: Attr graphicStartHtml, graphicEndHtml removed
  - feature: 49_SSCam: Compatibility (Snapshot API) to SVS version >= 9.2.1
