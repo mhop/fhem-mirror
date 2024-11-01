@@ -123,6 +123,8 @@
 #           fix: removed lost '&' when webhooks changed to have no csrf token
 # 6.01.1    fix: division by zero when attr Periods is not set at ShellyPro3EM 
 # 6.01.2    add: Shelly Plug S MTR Gen3
+# 6.01.3    fix: bad firmware identification
+#           add: reading 'firmware_ID' (Gen2)
 
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
@@ -145,7 +147,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.01.2 30.10.2024";
+my $version = "6.01.3 01.11.2024";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -4954,7 +4956,9 @@ sub Shelly_settings2G {
        my $model_id = $jhash->{model};  # vendor id
        readingsBulkUpdateIfChanged($hash,"model_ID",$model_id);
 
-       #my $firmware_ver   = $jhash->{'fw_id'};
+       my $firmware_id   = $jhash->{fw_id};  #eg "20241011-114455/1.4.4-g7d3b567"
+       readingsBulkUpdateIfChanged($hash,"firmware_ID",$firmware_id);       
+       
        my $fw_shelly  = $jhash->{ver};   # the firmware information stored in the Shelly
 
        my $fw_fhem = ReadingsVal($name,"firmware_current","none"); # the firmware information that fhem knows
@@ -5721,7 +5725,7 @@ sub Shelly_response {
       }elsif( defined($jhash->{cover}) && $jhash->{cover} eq "successfull" ){
           if( $urlcmd =~ m/toggle_after=(\d+)/ ){
               $hash->{helper}{timer} = $1;
-              $hash->{helper}{timerCnt}=1; #  Debug "helperCnt set to 1, command: $urlcmd,  D1=$1  ";
+              $hash->{helper}{timerCnt}=1; 
           } 
         # Shellies type dimmer gen2 response of 'on-for-timer' etc. is 'null'
         Log3 $name,5,"[Shelly_response:onoff] received \'null\' --> skipping helper=$1=".$hash->{helper}{timer};
@@ -6635,16 +6639,16 @@ sub cmpVersions {
     my $new=shift;
     my (@oldN,@newN,$icon,$txt);
     $old =~ /(\d+)\.(\d+)\.(\d+)(-((rc)|(beta))\d+)?/;
-    $oldN[2]=$1;
-    $oldN[1]=$2;
-    $oldN[0]=$3;
+    $oldN[2]=$1  // 0;
+    $oldN[1]=$2  // 0;
+    $oldN[0]=$3  // 0;
     $oldN[3]=$4;
     $old = "v$1.$2.$3";
     $old .= $4  if( defined($4) );
     $new =~ /(\d+)\.(\d+)\.(\d+)(-((rc)|(beta))\d+)?/;
-    $newN[2]=$1;
-    $newN[1]=$2;
-    $newN[0]=$3;
+    $newN[2]=$1  // 0;
+    $newN[1]=$2  // 0;
+    $newN[0]=$3  // 0;
     $newN[3]=$4;
     $new = "v$1.$2.$3";
     $new .= $4  if( defined($4) );
