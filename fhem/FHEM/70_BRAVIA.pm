@@ -183,7 +183,7 @@ sub GetStatus {
     RemoveInternalTimer($hash);
     InternalTimer( gettimeofday() + $interval, \&GetStatus, $hash, 0 );
 
-    return if ( AttrVal($name, "disable", 0) == 1 );
+    return if ( ReadingsVal($name, "mode", "") eq "disabled" or AttrVal($name, "disable", 0) == 1 );
 
     # check device availability
     if (!$update) {
@@ -235,6 +235,7 @@ sub Set {
     my $inputs = "";
     my $apps = "";
     my $mutes = "toggle";
+    my $mode = ReadingsVal($name, "mode", "enabled");
 
     if ( ReadingsVal($name, "input", "") ne "-" ) {
         $hash->{helper}{lastInput} = ReadingsVal($name, "input", "");
@@ -308,7 +309,9 @@ sub Set {
     $usage .= " channel:$channels" if ( $channels ne "" );
     $usage .= " openUrl application:" . $apps if ( $apps ne "" );
     $usage .= " text" if (ReadingsVal($name, "requestFormat", "") eq "json");
-    $usage .= " requestReboot:noArg " if (ReadingsVal($name, "requestFormat", "") eq "json");
+    $usage .= " requestReboot:noArg" if (ReadingsVal($name, "requestFormat", "") eq "json");
+    $usage .= " enable:noArg " if ( $mode ne "enabled" );
+    $usage .= " disable:noArg " if ( $mode eq "enabled" );
 
     my $cmd = '';
 
@@ -745,9 +748,9 @@ sub Set {
         
       # reboot
     elsif ($a[1] eq "requestReboot") {  
-        Log3($name, 2, "BRAVIA set $name " . $a[1]);     
+        Log3($name, 2, "BRAVIA set $name " . $a[1]);
         SendCommand( $hash, "requestReboot" );
-      }
+    }
         
     # text
     elsif ( $a[1] eq "text" ) {
@@ -758,6 +761,15 @@ sub Set {
         Log3($name, 2, "BRAVIA set $name text $text");
         
         SendCommand( $hash, "text", $text );
+    }
+
+    # mode: enable / disable
+    elsif ( $a[1] eq "enable" or $a[1] eq "disable" ) {
+        Log3($name, 2, "BRAVIA set $name " . $a[1]);
+        if ( AttrVal($name, "disable", "") ) {
+	          return ("device is deactivated by disable attribute, delete disable attribute first");
+	      }
+        readingsSingleUpdate( $hash, 'mode', $a[1] eq "enable" ? "enabled" : "disabled", 1 );
     }
 
     # return usage hint
@@ -2330,6 +2342,10 @@ sub GetNormalizedName {
         Switches a channel back.</li>
       <li><a name="channelUp"></a><i>channelUp</i><br>
         Switches a channel forward.</li>
+      <li><a name="enable"></a><i>enable</i><br>
+        Enables the internal task to pull the status and other information from the TV.</li>
+      <li><a name="disable"></a><i>disable</i><br>
+        Disables the internal task to pull the status and other information from the TV.</li>
       <li><a name="input"></a><i>input</i><br>
         List of input channels.
         Imputs are available with models from 2013 and newer.</li>
@@ -2452,6 +2468,10 @@ sub GetNormalizedName {
         Einen Kanal zurück schalten.</li>
       <li><a name="channelUp"></a><i>channelUp</i><br>
         Einen Kanal weiter schalten.</li>
+      <li><a name="enable"></a><i>enable</i><br>
+        Aktiviert den internen Task zum regelmäßigen Abrufen des Status des TV und weiterer Informationen.</li>
+      <li><a name="disable"></a><i>disable</i><br>
+        Unterbricht den internen Task zum regelmäßigen Abrufen des Status des TV und weiterer Informationen.</li>
       <li><a name="input"></a><i>input</i><br>
         Liste der Eingänge.
         Eingänge sind ab Modelljahr 2013 verfügbar.</li>
