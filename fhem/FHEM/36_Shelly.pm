@@ -125,6 +125,8 @@
 # 6.01.2    add: Shelly Plug S MTR Gen3
 # 6.01.3    fix: bad firmware identification
 #           add: reading 'firmware_ID' (Gen2)
+# 6.01.4    fix: use of defined-or operator
+# 6.01.5    add: reading 'temperature' for ShellyPlusUni 
 
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
@@ -147,7 +149,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.01.3 01.11.2024";
+my $version = "6.01.5 06.11.2024";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -4310,6 +4312,8 @@ if( $hash->{helper}{timer}>0 ){
         if( defined $percent ){
             readingsBulkUpdateMonitored($hash,"input$subs",$percent.$si_units{pct}[$hash->{units}]);
         }
+        my $temperature = $jhash->{'temperature:100'}{tC};
+        readingsBulkUpdateMonitored($hash,"temperature",$temperature.$si_units{tempC}[$hash->{units}] ) if( defined($temperature) );
     }
     # set state of 'input-only' devices to OK  (may have state 'error')
     readingsBulkUpdateMonitored($hash,"state","OK") if( $model eq "shellyplusi4" );
