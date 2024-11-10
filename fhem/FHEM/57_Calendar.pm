@@ -27,13 +27,12 @@ use warnings;
 use HttpUtils;
 use Storable qw(freeze thaw);
 use POSIX qw(strftime);
+use List::Util qw(any); # for contains
 
 
 ##############################################
 
 package main;
-
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 #
 # *** Potential issues:
@@ -399,6 +398,93 @@ changes
   notifications for changes of the mode... readings.
 
 =cut
+
+#####################################
+#
+# smartmatch replacement
+# 
+#####################################
+
+# use contains_<type>($scalar, @array) instead of $scalar ~~ @array
+# requires List:Util
+# see https://www.perlmonks.org/?node_id=1067462
+
+sub contains_numeric($@) {
+  my ($scalar, @array) = @_;
+  return any { $_ == $scalar } @array;
+}
+
+sub contains_string($@) {
+  my ($scalar, @array) = @_;
+  return any { $_ eq $scalar } @array;
+}
+
+#####################################
+#
+# human readable time format
+# 
+#####################################
+
+sub beginOfMinute($) {
+  my ($sec) = @_;
+  return $sec == 0;
+}
+
+sub beginOfHour($$) {
+  my ($sec,$min) = @_;
+  return $sec == 0 && $min == 0;
+}
+
+sub beginOfDay($$$) {
+  my ($sec,$min,$hour) = @_;
+  return $sec == 0 && $min == 0 && $hour == 0;
+}
+
+sub humanDurationFormat($$) {
+  my ($t1, $t2)= @_;
+  my $d= $t2-$t1;
+  my ($sec1, $min1, $hour1, $day1, $mon1, $year1) = localtime($t1);
+  my ($sec2, $min2, $hour2, $day2, $mon2, $year2) = localtime($t2);
+  # whole day events
+  if(beginOfDay($sec1,$min1,$hour1) && beginOfDay($sec2,$min2,$hour2)) {
+    if($year1 == $year2) {
+      if($mon1 == $mon2) {
+        if($day1 + 1 == $day2) {
+          return strftime("%d.%m.%Y", $sec1, $min1, $hour1, $day1, $mon1, $year1);
+        } else {
+            return strftime("%d", $sec1, $min1, $hour1, $day1, $mon1, $year1) . "-" .
+            strftime("%d.%m.%Y", $sec2, $min2, $hour2, $day2, $mon2, $year2); 
+        }
+      } else {
+          return strftime("%d.%m", $sec1, $min1, $hour1, $day1, $mon1, $year1) . "-" .
+          strftime("%d.%m.%Y", $sec2, $min2, $hour2, $day2, $mon2, $year2); 
+        }
+    } else {
+          return strftime("%d.%m.%Y", $sec1, $min1, $hour1, $day1, $mon1, $year1) . "-" .
+          strftime("%d.%m.%Y", $sec2, $min2, $hour2, $day2, $mon2, $year2); 
+      }
+  } else {
+  # events that start intra-day
+    if($year1 == $year2) {
+      if(($day1 == $day2) && ($mon1 == $mon2)) {
+        return strftime("%d.%m.%Y %k:%M", $sec1, $min1, $hour1, $day1, $mon1, $year1) . "-" .
+        strftime("%k:%M", $sec2, $min2, $hour2, $day2, $mon2, $year2); 
+      } else {
+        return strftime("%d.%m. %k:%M", $sec1, $min1, $hour1, $day1, $mon1, $year1) . "-" .
+        strftime("%d.%m.%Y %k:%M", $sec2, $min2, $hour2, $day2, $mon2, $year2); 
+      }
+    } else {
+        return strftime("%d.%m.%Y %k:%M", $sec1, $min1, $hour1, $day1, $mon1, $year1) . "-" .
+        strftime("%d.%m.%Y %k:%M", $sec2, $min2, $hour2, $day2, $mon2, $year2); 
+    }
+  }
+  return("error in humanDurationFormat");
+}
+
+sub human($$$) {
+  my($t1,$t2,$S) = @_;
+  return humanDurationFormat($t1,$t2) . " " . $S;
+}
 
 #####################################
 #
@@ -835,14 +921,14 @@ sub isObsolete($) {
   my($self)= @_;
   # VEVENT records in these states are obsolete
   my @statesObsolete= qw/deleted changed-old modified-old/;
-  return $self->state() ~~ @statesObsolete ? 1 : 0;
+  return main::contains_string $self->state(), @statesObsolete;
 }
 
 sub hasChanged($) {
   my($self)= @_;
   # VEVENT records in these states have changed
   my @statesChanged= qw/new changed-new modified-new/;
-  return $self->state() ~~ @statesChanged ? 1 : 0;
+  return main::contains_string $self->state(), @statesChanged;
 }
 
 #
@@ -1530,7 +1616,7 @@ sub createEvents($$$$$$%) {
 
         my @keywords= qw(FREQ INTERVAL UNTIL COUNT BYMONTHDAY BYDAY BYMONTH WKST);
         foreach my $k (keys %r) {
-            if(not($k ~~ @keywords)) {
+            if(not(main::contains_string $k, @keywords)) {
                 main::Log3 $name, 3, "Calendar $name: keyword $k in RRULE $rrule is not supported";
             } else {
                 #main::Debug "keyword $k in RRULE $rrule has value $r{$k}";
@@ -1613,7 +1699,7 @@ sub createEvents($$$$$$%) {
               # if we reach MO, then skip ($interval-1) weeks
               $nextstart= plusNSeconds($nextstart, 7*24*60*60, $interval-1) if($weekday==1);
               #main::Debug "Skip to: start " . $event->ts($nextstart) . " = " . $weekdays[$weekday];
-              if($weekdays[$weekday] ~~ @bydays) {
+              if(main::contains_string $weekdays[$weekday], @bydays) {
                 my $event= $self->createSingleEvent($nextstart, $onCreateEvent);
                 return if(!$self->addOrSkipSeriesEvent($event, $t0, $until, $count, \%vevents));
               }
@@ -1844,7 +1930,7 @@ sub Calendar_Attr(@) {
     }
   } elsif($a[0] eq "update") {
     my @args= qw/sync async/;
-    if ($arg ~~ @args) { # inform about new attribute synchronousUpdate
+    if (main::contains_string $arg, @args) { # inform about new attribute synchronousUpdate
        Log3 $hash,2,"Calendar $name: Value '$arg' for attribute 'update' is deprecated.";
        Log3 $hash,2,"Calendar $name: Please use new attribute 'synchronousUpdate' if really needed.";
        Log3 $hash,2,"Calendar $name: Attribute 'update' deleted. Please use 'save config' to update your configuration.";
@@ -1853,7 +1939,7 @@ sub Calendar_Attr(@) {
     }
     @args= qw/none onUrlChanged/;
     return "Calendar $name: Argument for update must be one of " . join(" ", @args) .
-           " instead of $arg." unless($arg ~~ @args);
+           " instead of $arg." unless(main::contains_string $arg, @args);
   }
 
   return undef;
@@ -2024,6 +2110,8 @@ sub Calendar_Get($@) {
         } elsif($v =~ /^custom=(\{.+\})$/) {
           $format= $1;
           #Debug "Format=$format";
+        } elsif($v eq "human") {
+          $format='{ main::human($t1,$t2,$S) }';
         } else {
           return "$name: Illegal format specification: $v";
         }
@@ -2177,7 +2265,7 @@ sub Calendar_Get($@) {
 
   # --------------------------------------------------------------------------
   my @cmds2= qw/text full summary location description categories alarm start end uid debug/;
-  if($cmd ~~ @cmds2) {
+  if(main::contains_string $cmd, @cmds2) {
 
     return "argument is missing" if($#a < 2);
     Log3 $hash, 2, "get $name $cmd is deprecated and will be removed soon. Use get $name events instead.";
@@ -2879,7 +2967,7 @@ sub Calendar_UpdateCalendar($$) {
   my $name= $hash->{NAME};
 
   my @quirks= split(",", AttrVal($name, "quirks", ""));
-  my $nodtstamp= "ignoreDtStamp" ~~ @quirks;
+  my $nodtstamp= main::contains_string "ignoreDtStamp", @quirks;
 
   # *******************************
   # *** Step 1 Digest Parser Result
@@ -3483,6 +3571,7 @@ sub CalendarEventsAsHtml($;$) {
     <tr><td><code>default</code></td><td>the default format (see below)</td></tr>
     <tr><td><code>full</code></td><td>same as <code>custom="$U $M $A $T1-$T2 $S $CA $L"</code></td></tr>
     <tr><td><code>text</code></td><td>same as <code>custom="$T1 $S"</code></td></tr>
+    <tr><td><code>human</code></td><td>same as <code>custom={ human($t1,$t2,$S) }</code> -  <code>human()</code> is a built-in function that presents the event in a terse human-readable format</td></tr>
     <tr><td><code>custom="&lt;formatString&gt;"</code></td><td> a custom format (see below)</td></tr>
     <tr><td><code>custom="{ &lt;perl-code&gt; }"</code></td><td>a custom format (see below)</td></tr>
     </table><br>
@@ -4215,6 +4304,7 @@ sub CalendarEventsAsHtml($;$) {
     <tr><td><code>default</code></td><td>Standardformat (siehe unten)</td></tr>
     <tr><td><code>full</code></td><td>entspricht <code>custom="$U $M $A $T1-$T2 $S $CA $L"</code></td></tr>
     <tr><td><code>text</code></td><td>entspricht <code>custom="$T1 $S"</code></td></tr>
+    <tr><td><code>human</code></td><td>same as <code>custom={ human($t1,$t2,$S) }</code> -  <code>human()</code> ist eine eingebaute Funktion, die das Ereignis in einem verdichteten menschenlesbaren Format ausgibt</td></tr>
     <tr><td><code>custom="&lt;formatString&gt;"</code></td><td>ein spezifisches Format (siehe unten)</td></tr>
     <tr><td><code>custom="{ &lt;perl-code&gt; }"</code></td><td>ein spezifisches Format (siehe unten)</td></tr>
     </table><br>
