@@ -4,7 +4,7 @@ FW_version["f18.js"] = "$Id$";
 // TODO: hierMenu+Pin,SVGcolors,floorplan
 // Known bugs: AbsSize is wrong for ColorSlider
 var f18_attr={}, f18_sd, f18_icon={}, f18_room, f18_grid=20, f18_margin=10;
-var f18_small = (screen.width < 480 || screen.height < 480);
+var f18_small = (screen.width < 600 || screen.height < 600); // #139782
 var f18_cols = {
   "default":{ bg:     "FFFFE7", fg:    "000000", link:   "278727", 
               evenrow:"F8F8E0", oddrow:"F0F0D8", header: "E0E0C8",
