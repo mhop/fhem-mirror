@@ -2,6 +2,12 @@
 #
 ##############################################
 #
+# 2024.05.27 - fichtennadel v0.2
+# - CHANGE: 
+#          - set GetActiveDeviceInfo
+#          - re-init timer for fronius_GetActiveDeviceInfo in fronius_GetMeterRealtimeData and fronius_GetInverterRealtimeData if DeviceInfo_ is missing
+#          - internal VERSION          
+#
 # 2024.05.27 - fichtennadel v0.1
 # - INFO:  check in to svn trunk/fhem/contrib/fichtennadel 
 #          - renamed file to lower case fronius to match device type (fhem standard)
@@ -110,7 +116,7 @@ use Date::Parse;
 use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 
-my $ModulVersion        = "0.1";
+my $ModulVersion        = "0.2";
 
 ##############################################################################
 sub fronius_Initialize($) {
@@ -149,6 +155,9 @@ sub fronius_Define($$$) {
   # nur notifies für global
   $hash->{NOTIFYDEV} = "global";
 
+  # current version
+  $hash->{VERSION} = $ModulVersion;
+  
   # Internaltimer löschen
   RemoveInternalTimer($hash);
 
@@ -269,6 +278,7 @@ sub fronius_Set($@) {
     "GetStorageData" => "noArg",
     "GetMeterData" => "noArg",
     "GetInverterData" => "noArg",
+    "GetActiveDeviceInfo" => "noArg",
     "RestartInterval" => "noArg"
     );
   my %order = (
@@ -277,19 +287,27 @@ sub fronius_Set($@) {
     "Meter" => -1,
     "Inverter" => -1
     );
+
+  Log3 $name, 4, "[$name] [fronius_Set] $opt" if (($opt ne '?') && ($opt ne ''));
   
   if (($opt eq '?') || ($opt eq '')){
       #return join( ' ', @options);
       return join(" ", sort keys %sets);
+      
   } elsif ($opt eq 'RestartInterval') {
+    RemoveInternalTimer($hash, "fronius_GetAPIVersionInfo");
+    RemoveInternalTimer($hash, "fronius_GetActiveDeviceInfo");
     RemoveInternalTimer($hash, "fronius_GetPowerFlowRealtimeData");
     RemoveInternalTimer($hash, "fronius_GetStorageRealtimeData");
     RemoveInternalTimer($hash, "fronius_GetMeterRealtimeData");
     RemoveInternalTimer($hash, "fronius_GetInverterRealtimeData");
-    InternalTimer(gettimeofday() + $interval, "fronius_GetPowerFlowRealtimeData", $hash, 0);
-    InternalTimer(gettimeofday() + 2 + $interval, "fronius_GetStorageRealtimeData",   $hash, 0);
-    InternalTimer(gettimeofday() + 4 + $interval, "fronius_GetMeterRealtimeData",     $hash, 0);
-    InternalTimer(gettimeofday() + 6 + $interval, "fronius_GetInverterRealtimeData",  $hash, 0);
+    InternalTimer(gettimeofday() +      $interval, "fronius_GetAPIVersionInfo",        $hash, 0);
+    InternalTimer(gettimeofday() +  5 + $interval, "fronius_GetActiveDeviceInfo",      $hash, 0);
+    InternalTimer(gettimeofday() + 10 + $interval, "fronius_GetPowerFlowRealtimeData", $hash, 0);
+    InternalTimer(gettimeofday() + 15 + $interval, "fronius_GetStorageRealtimeData",   $hash, 0);
+    InternalTimer(gettimeofday() + 20 + $interval, "fronius_GetMeterRealtimeData",     $hash, 0);
+    InternalTimer(gettimeofday() + 25 + $interval, "fronius_GetInverterRealtimeData",  $hash, 0);
+    
   } elsif ($interval le 0) {
     if ($opt eq 'GetAllData') {
       #übergabeparameter durchsuchen auf gültigkeit und übernehmen
@@ -325,6 +343,9 @@ sub fronius_Set($@) {
       InternalTimer(gettimeofday(), "fronius_GetMeterRealtimeData",     $hash, 0);
     } elsif ($opt eq 'GetInverterData') {
       InternalTimer(gettimeofday(), "fronius_GetInverterRealtimeData",  $hash, 0);
+    } elsif ($opt eq 'GetActiveDeviceInfo') {
+      RemoveInternalTimer($hash, "fronius_GetActiveDeviceInfo");
+      InternalTimer(gettimeofday(), "fronius_GetActiveDeviceInfo",  $hash, 0);
     } else {
       #return "Unknown argument $opt choose one of : " . join( ', ', @options);
       return "Unknown argument $opt choose one of : " . join(" ", sort keys %sets) . 
@@ -449,10 +470,14 @@ sub fronius_GetStorageRealtimeData($) {
     } 
 
   } else {
+    Log3 $name, 4, "[$name] [fronius_GetStorageRealtimeData] removing DeviceInfo_Storage_ readings";
     # Eventuell vorhandene Daten wieder löschen!
     foreach my $StorageDevice (sort keys %{$hash->{READINGS}}) {
       readingsDelete($hash, $StorageDevice) if ($StorageDevice =~ m/DeviceInfo_Storage_/ );
     }
+    
+    Log3 $name, 4, "[$name] [fronius_GetStorageRealtimeData] calling GetActiveDeviceInfo";
+    fronius_SendCommand($hash,"GetActiveDeviceInfo","");
   }
 
   if ($interval > 0) {
@@ -485,10 +510,14 @@ sub fronius_GetMeterRealtimeData($) {
     } 
 
   } else {
+    Log3 $name, 4, "[$name] [fronius_GetMeterRealtimeData] removing DeviceInfo_Meter_ readings";
     # Eventuell vorhandene Daten wieder löschen!
     foreach my $MeterDevice (sort keys %{$hash->{READINGS}}) {
       readingsDelete($hash, $MeterDevice) if ($MeterDevice =~ m/DeviceInfo_Meter_/ );
     }
+
+    Log3 $name, 4, "[$name] [fronius_GetStorageRealtimeData] calling GetActiveDeviceInfo";
+    fronius_SendCommand($hash,"GetActiveDeviceInfo","");
   }
 
   if ($interval > 0) {
@@ -526,10 +555,14 @@ sub fronius_GetInverterRealtimeData($) {
     } 
 
   } else {
+    Log3 $name, 4, "[$name] [fronius_GetInverterRealtimeData] removing DeviceInfo_Inverter_ readings";
     # Eventuell vorhandene Daten wieder löschen!
     foreach my $InverterDevice (sort keys %{$hash->{READINGS}}) {
       readingsDelete($hash, $InverterDevice) if ($InverterDevice =~ m/DeviceInfo_Inverter_/ );
     }
+
+    Log3 $name, 4, "[$name] [fronius_GetInverterRealtimeData] calling GetActiveDeviceInfo";
+    fronius_SendCommand($hash,"GetActiveDeviceInfo","");
   }
 
   if ($interval > 0) {
@@ -875,6 +908,7 @@ sub fronius_setState($$) {
        <li>Set devicename GetStorageData </li>
        <li>Set devicename GetMeterData </li>
        <li>Set devicename GetInverterData </li>
+       <li>Set devicename GetActiveDeviceInfo </li>
       </ul>
      </li>
      <li>Restart timers, needed after changed to Interval* attributes:
