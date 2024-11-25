@@ -156,6 +156,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.37.7" => "25.11.2024  Attr flowGraphicControl: key shift changed to shiftx, new key shifty ".
+                           "change: 'trackFlex' && \$wcc >= 70 to \$wcc >= 80 ",
+  "1.37.6" => "01.11.2024  minor code change, Attr setupBatteryDev: the key 'cap' is mandatory now ",
+  "1.37.5" => "31.10.2024  attr setupInverterDevXX: new key 'limit', the key 'capacity' is now mandatory ".
+                           "Attr affect70percentRule, ctrlAutoRefresh, ctrlAutoRefreshFW deleted ",
   "1.37.4" => "29.10.2024  both attr graphicStartHtml, graphicEndHtml removed, fix flowGraphic when device name contains '.' ",
   "1.37.3" => "25.10.2024  _flowGraphic: grid, dummy and battery displacement by kask ".
                            "Attr flowGraphicControl: new key h2consumerdist, animate=1 is default now ",
@@ -493,10 +498,10 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                    energyH4Trigger
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
-my @aconfigs = qw( affect70percentRule affectBatteryPreferredCharge affectConsForecastIdentWeekdays
+my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    affectConsForecastInPlanning affectSolCastPercentile
                    consumerLegend consumerAdviceIcon consumerLink
-                   ctrlAIdataStorageDuration ctrlAutoRefresh ctrlAutoRefreshFW ctrlBackupFilesKeep
+                   ctrlAIdataStorageDuration ctrlBackupFilesKeep
                    ctrlBatSocManagement ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
                    ctrlLanguage ctrlNextDayForecastReadings ctrlShowLink ctrlSolCastAPImaxReq
                    ctrlSolCastAPIoptimizeReq ctrlStatisticReadings ctrlUserExitFn
@@ -1164,7 +1169,6 @@ my %hfspvh = (
 sub Initialize {
   my $hash = shift;
 
-  my $fwd = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
   my $hod = join ",", map { sprintf "%02d", $_} (1..24);
   my $srd = join ",", sort keys (%hcsr);
   my $gbc = 'pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,gridfeedin,feedincome';
@@ -1202,8 +1206,7 @@ sub Initialize {
   $hash->{AttrFn}             = \&Attr;
   $hash->{NotifyFn}           = \&Notify;
   $hash->{ReadyFn}            = \&runTask;
-  $hash->{AttrList}           = "affect70percentRule:1,dynamic,0 ".
-                                "affectBatteryPreferredCharge:slider,0,1,100 ".
+  $hash->{AttrList}           = "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
                                 "affectConsForecastLastDays:slider,1,1,31 ".
@@ -1213,12 +1216,10 @@ sub Initialize {
                                 "consumerLink:0,1 ".
                                 "ctrlAIdataStorageDuration ".
                                 "ctrlAIshiftTrainStart:slider,1,1,23 ".
-                                "ctrlAutoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
-                                "ctrlAutoRefreshFW:$fwd ".
                                 "ctrlBackupFilesKeep ".
                                 "ctrlBatSocManagement:textField-long ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
-                                "ctrlDebug:multiple-strict,$dm,#14 ".
+                                "ctrlDebug:multiple-strict,$dm,#10 ".
                                 "ctrlAreaFactorUsage:fix,trackFull,trackShared,trackFlex ".
                                 "ctrlGenPVdeviation:daily,continuously ".
                                 "ctrlInterval ".
@@ -1282,6 +1283,8 @@ sub Initialize {
   my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';
   $hash->{AttrList} .= " flowGraphicCss:$av flowGraphicSize:$av flowGraphicAnimate:$av flowGraphicConsumerDistance:$av flowGraphicShowConsumer:$av flowGraphicShowConsumerDummy:$av flowGraphicShowConsumerPower:$av flowGraphicShowConsumerRemainTime:$av flowGraphicShift:$av ";
  
+  my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";
+  $hash->{AttrList} .= " affect70percentRule:$av1 ctrlAutoRefresh:$av1 ctrlAutoRefreshFW:$av1 ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -3451,7 +3454,7 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
 
-              if ($cafd eq 'trackShared'|| ($cafd eq 'trackFlex' && $wcc >= 70)) {                  # Direktstrahlung + Diffusstrahlung
+              if ($cafd eq 'trackShared'|| ($cafd eq 'trackFlex' && $wcc >= 80)) {                  # Direktstrahlung + Diffusstrahlung
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
@@ -5329,13 +5332,16 @@ sub Attr {
           return qq{The attribute '$aName' is obsolete and replaced by 'flowGraphicControl'.};
       }
   }
-  # 29.10.2024
-  if ($cmd eq 'set' && $aName =~ /^graphicStartHtml|graphicEndHtml$/) {
+  # 31.10.2024
+  if ($cmd eq 'set' && $aName =~ /^graphicStartHtml|affect70percentRule|graphicEndHtml|ctrlAutoRefresh|ctrlAutoRefreshFW$/) {
       if (!$init_done) {
           my $msg = "The attribute $aName has been removed and is no longer valid.";
           Log3 ($name, 1, "$name - $msg");
           return qq{Device "$name" -> $msg};
       }
+      else {
+          return qq{The attribute '$aName' is obsolete.};
+      }     
   }
   ######################################################################################################################
 
@@ -5348,18 +5354,13 @@ sub Attr {
       singleUpdateState ( {hash => $hash, state => $val, evt => 1} );
   }
 
-  if ($aName eq 'ctrlAutoRefresh') {
-      delete $hash->{HELPER}{AREFRESH};
-      delete $hash->{AUTOREFRESH};
-  }
-
   if ($aName eq 'ctrlNextDayForecastReadings') {
       deleteReadingspec ($hash, "Tomorrow_Hour.*");
   }
 
   if ($aName eq 'ctrlBatSocManagement' && $init_done) {
       if ($cmd eq 'set') {
-          return qq{Define the key "cap" with "attr $name setupBatteryDev" before this attribute in the correct form.}
+          return qq{Define the key 'cap' with "attr $name setupBatteryDev" before this attribute in the correct form.}
                  if(!CurrentVal($hash, 'batinstcap', 0));                                             # https://forum.fhem.de/index.php?msg=1310930
 
           my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $aVal);
@@ -5656,7 +5657,8 @@ sub _attrflowGraphicControl {            ## no critic "not used"
   for my $av ( qw( animate 
                    consumerdist
                    h2consumerdist                   
-                   shift 
+                   shiftx
+                   shifty                   
                    showconsumer 
                    showconsumerremaintime
                    size
@@ -5676,7 +5678,8 @@ sub _attrflowGraphicControl {            ## no critic "not used"
           animate                => '0|1',
           consumerdist           => '[89]\d{1}|[1234]\d{2}|500',
           h2consumerdist         => '\d{1,3}',
-          shift                  => '-?[0-7]\d{0,1}|-?80',
+          shiftx                 => '-?[0-7]\d{0,1}|-?80',
+          shifty                 => '\d+',
           size                   => '\d+',
           showconsumer           => '0|1',
           showconsumerdummy      => '0|1',
@@ -5837,13 +5840,19 @@ sub _attrInverterDev {                   ## no critic "not used"
           return qq{Set the first Inverter device with attribute 'setupInverterDev01'};
       }
 
-      if (!$h->{pv} || !$h->{etotal}) {
-          return qq{The syntax of '$aName' is not valid. Please consider the commandref.};
+      if (!$h->{pv} || !$h->{etotal} || !$h->{capacity}) {
+          return qq{One or more of the keys 'pv, etotal, capacity' are missing. Please consider the commandref.};
       }
 
-      if ($h->{capacity} && !isNumeric($h->{capacity})) {
-          return qq{The syntax of key 'capacity' is not valid. Please consider the commandref.};
+      if (!isNumeric($h->{capacity})) {
+          return qq{The value of key 'capacity' must be numeric. Please consider the commandref.};
       }
+   
+      if ($h->{limit}) {
+          if (!isNumeric($h->{limit}) || $h->{limit} < 0 || $h->{limit} > 100) {
+              return qq{The value of key 'limit' is not valid. Please consider the commandref.};
+          }
+      }   
       
       if ($h->{feed} && $h->{feed} !~ /^grid|bat$/xs) {
           return qq{The value of key 'feed' is not valid. Please consider the commandref.};
@@ -5860,6 +5869,7 @@ sub _attrInverterDev {                   ## no critic "not used"
       $data{$type}{$name}{circular}{99}{attrInvChangedTs} = int time;
       
       delete $data{$type}{$name}{inverters}{$in}{invertercap};
+      delete $data{$type}{$name}{inverters}{$in}{ilimit};   
       delete $data{$type}{$name}{inverters}{$in}{iicon};
       delete $data{$type}{$name}{inverters}{$in}{istrings};
       delete $data{$type}{$name}{inverters}{$in}{ifeed};
@@ -6027,8 +6037,8 @@ sub _attrBatteryDev {                    ## no critic "not used"
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
 
-      if (!$h->{pin} || !$h->{pout}) {
-          return qq{The keys 'pin' and/or 'pout' are not set. Please note the command reference.};
+      if (!$h->{pin} || !$h->{pout} || !$h->{cap}) {
+          return qq{One or more of the keys 'pin, pout, cap' are missing. Please note the command reference.};
       }
 
       if (($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
@@ -7023,6 +7033,7 @@ sub centralTask {
   _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
   _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
+  _batChargeRecmd             ($centpars);                                            # Batterie Ladeempfehlung berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
   _estConsumptionForecast     ($centpars);                                            # Verbrauchsprognose erstellen
   _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
@@ -8387,16 +8398,8 @@ sub __calcPVestimates {
 
   $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # temperaturbedingte Korrektur der installierten Peakleistung in W
   $pvsum                                       = $peaksum if($peaksum && $pvsum > $peaksum);         # Vorhersage nicht größer als die Summe aller PV-Strings Peak
-
-  my $logao         = qq{};
-  $paref->{pvsum}   = $pvsum;
-  $paref->{peaksum} = $peaksum;
+  $pvsum                                       = sprintf "%.0f", $pvsum;
   
-  ($pvsum, $logao)  = ___70percentRule ($paref);
-  
-  delete $paref->{peaksum};
-  delete $paref->{pvsum};
-
   if ($debug =~ /radiationProcess/xs) {
       $lh = {                                                                                        # Log-Hash zur Ausgabe
           "Starttime"                => $wantdt,
@@ -8404,7 +8407,7 @@ sub __calcPVestimates {
           "Cloudcover"               => $wcc,
           "Total Rain last hour"     => $rr1c." kg/m2",
           "PV Correction mode"       => ($acu ? $acu : 'no'),
-          "PV generation forecast"   => $pvsum." Wh ".$logao,
+          "PV generation forecast"   => $pvsum." Wh",
       };
 
       $sq = q{};
@@ -8519,36 +8522,6 @@ return ($peakloss, $modtemp);
 }
 
 ################################################################
-#                 70% Regel kalkulieren
-################################################################
-sub ___70percentRule {
-  my $paref   = shift;
-  my $name    = $paref->{name};
-  my $pvsum   = $paref->{pvsum};
-  my $peaksum = $paref->{peaksum};
-  my $num     = $paref->{num};                                                          # Nexthour
-
-  my $hash  = $defs{$name};
-  my $logao = qq{};
-  my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "confc", 0);
-  my $max70 = $peaksum/100 * 70;
-
-  if (AttrVal ($name, "affect70percentRule", "0") eq "1" && $pvsum > $max70) {
-      $pvsum = $max70;
-      $logao = qq{(reduced by 70 percent rule)};
-  }
-
-  if (AttrVal ($name, "affect70percentRule", "0") eq "dynamic" && $pvsum > $max70 + $confc) {
-      $pvsum = $max70 + $confc;
-      $logao = qq{(reduced by 70 percent dynamic rule)};
-  }
-
-  $pvsum = int $pvsum;
-
-return ($pvsum, $logao);
-}
-
-################################################################
 #    den Maximalwert PV Vorhersage für Heute ermitteln
 ################################################################
 sub _calcMaxEstimateToday {
@@ -8651,14 +8624,15 @@ sub _transferInverterValues {
       
       my $feed = $h->{feed} // 'default'; 
       
-      $data{$type}{$name}{inverters}{$in}{igeneration}  = $pv;                                          # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-      $data{$type}{$name}{inverters}{$in}{ietotal}      = $etotal;                                      # aktuellen etotal des WR speichern
-      $data{$type}{$name}{inverters}{$in}{iname}        = $indev;                                       # Name des Inverterdevices
-      $data{$type}{$name}{inverters}{$in}{ialias}       = AttrVal ($indev, 'alias', $indev);            # Alias Inverter
-      $data{$type}{$name}{inverters}{$in}{invertercap}  = $h->{capacity} if(defined $h->{capacity});    # optionale Angabe max. WR-Leistung
-      $data{$type}{$name}{inverters}{$in}{iicon}        = $h->{icon}     if($h->{icon});                # Icon des Inverters
-      $data{$type}{$name}{inverters}{$in}{istrings}     = $h->{strings}  if($h->{strings});             # dem Inverter zugeordnete Strings
-      $data{$type}{$name}{inverters}{$in}{ifeed}        = $feed;                                        # Eigenschaften der Energielieferung
+      $data{$type}{$name}{inverters}{$in}{igeneration} = $pv;                                           # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      $data{$type}{$name}{inverters}{$in}{ietotal}     = $etotal;                                       # aktuellen etotal des WR speichern
+      $data{$type}{$name}{inverters}{$in}{iname}       = $indev;                                        # Name des Inverterdevices
+      $data{$type}{$name}{inverters}{$in}{ialias}      = AttrVal ($indev, 'alias', $indev);             # Alias Inverter
+      $data{$type}{$name}{inverters}{$in}{invertercap} = $h->{capacity}  if(defined $h->{capacity});    # optionale Angabe max. WR-Leistung
+      $data{$type}{$name}{inverters}{$in}{ilimit}      = $h->{limit} // 100;                            # Wirkleistungsbegrenzung
+      $data{$type}{$name}{inverters}{$in}{iicon}       = $h->{icon}      if($h->{icon});                # Icon des Inverters
+      $data{$type}{$name}{inverters}{$in}{istrings}    = $h->{strings}   if($h->{strings});             # dem Inverter zugeordnete Strings
+      $data{$type}{$name}{inverters}{$in}{ifeed}       = $feed;                                         # Eigenschaften der Energielieferung
       
       $pvsum        += $pv;
       $ethishoursum += $ethishour;
@@ -9309,6 +9283,112 @@ sub __batSaveSocKeyFigures {
   $data{$type}{$name}{circular}{99}{lastTsMaxSocRchd} = $t;                                   # Timestamp des letzten Erreichens von >= maxSoC
   $data{$type}{$name}{circular}{99}{nextTsMaxSocChge} = $t + (86400 * $careCycle);            # Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
 
+return;
+}
+
+################################################################
+#             Erstellung Batterie Ladeempfehlung 
+################################################################
+sub _batChargeRecmd {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};
+  
+  return if(!isBatteryUsed ($name));
+  
+  my $hash     = $defs{$name};
+  
+  my $rodpvfc  = ReadingsNum ($name, 'RestOfDayPVforecast',          0);                     # PV Prognose Rest des Tages
+  my $tompvfc  = ReadingsNum ($name, 'Tomorrow_PVforecast',          0);                     # PV Prognose nächster Tag
+  
+  my $confcss  = CurrentVal  ($hash, 'tdConFcTillSunset',            0);                     # Verbrauchsprognose bis Sonnenuntergang
+  my $tomconfc = ReadingsNum ($name, 'Tomorrow_ConsumptionForecast', 0); 
+  
+  my $pvCu     = ReadingsNum ($name, 'Current_PV',                   0);                     # aktuelle PV Erzeugung
+  my $batcap   = CurrentVal  ($hash, 'batinstcap',                   0);                     # installierte Batteriekapazität Wh
+  my $soc      = CurrentVal  ($hash, 'batcharge',                    0);                     # aktueller SOC (%)
+  my $curcon   = ReadingsNum ($name, 'Current_Consumption',          0);                     # aktueller Verbrauch
+  
+  my $inpmax   = 0;
+  
+  for my $in (1..$maxinverter) {                           
+      $in      = sprintf "%02d", $in;
+      my $feed = InverterVal ($hash, $in, 'ifeed', '');
+      next if(!$feed || $feed eq 'grid');                                                    # Inverter 'Grid' ausschließen
+      
+      my $iname = InverterVal ($hash, $in, 'iname',        '');
+      my $icap  = InverterVal ($hash, $in, 'invertercap',   0);
+      my $limit = InverterVal ($hash, $in, 'ilimit',      100);                              # Wirkleistungsbegrenzung  (default keine Begrenzung)
+      my $aplim = $icap * $limit / 100;
+      $inpmax  += $aplim;                                                                    # max. Leistung aller WR mit Berücksichtigung Wirkleistungsbegrenzung 
+  
+      debugLog ($paref, 'batteryManagement', "Inverter '$iname' capacity: $icap, Active power limit: $limit % -> Pmax limited: $aplim");
+  }
+  
+  debugLog ($paref, 'batteryManagement', "Summary active power limit of all Inverter (except feed 'grid'): $inpmax");
+  debugLog ($paref, 'batteryManagement', "Installed Battery capacity: $batcap");
+  
+  if (!$inpmax || !$batcap) {
+      debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation are not met. Exit.");
+      return;
+  }
+  
+  my $sfmargin = $inpmax * 0.5;                                                              # Sicherheitszuschlag 50% der installierten Leistung (Wh)                                                         
+  my $betEneed = sprintf "%.0f", ($batcap - ($batcap * $soc / 100));                         # benötigte Energie bis 100% Batteriekapazität Wh
+
+  for my $num (0..47) {
+      my ($fd,$fh) = calcDayHourMove ($chour, $num);
+      next if($fd > 1);
+
+      my $today = NexthoursVal ($hash, 'NextHour'.sprintf("%02d",$num), 'today',      0);
+      my $confc = NexthoursVal ($hash, 'NextHour'.sprintf("%02d",$num), 'confc',      0);
+      my $pvfc  = NexthoursVal ($hash, 'NextHour'.sprintf("%02d",$num), 'pvfc',       0);
+      my $stt   = NexthoursVal ($hash, 'NextHour'.sprintf("%02d",$num), 'starttime', '');
+      $stt      = (split '-', $stt)[2] if($stt);
+            
+      my $dold  = 0;                                                                         # Ladeempfehlung 0 per Default
+      my $spday = 0;
+      
+      if ($today) {                                                                          # (Rest) heutiger Tag
+          $spday = $rodpvfc - $confcss;
+      }
+      else {                                                                                 # nächster Tag
+          $spday = $tompvfc - $tomconfc;
+      }
+      
+      $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
+      
+      if ( $betEneed + $sfmargin    >= $spday  ) {$dold = 1}                                 # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+      if ( !$num && $pvCu - $curcon >= $inpmax ) {$dold = 1}                                 # Ladeempfehlung wenn akt. PV Leistung >= WR-Leistungsbegrenzung
+
+      my $msg = "(Eneed: $betEneed -> Surplus Day: $spday, Curr PV: $pvCu, Curr Consumption: $curcon -> Limit: $inpmax)";
+      
+      if ($num) {
+          $msg = "(Eneed: $betEneed -> Surplus Day: $spday)";
+      }
+      else {
+          storeReading ('Battery_ChargeRecommended', $dold);                                 # Reading nur für aktuelle Stunde
+      }
+      
+      debugLog ($paref, 'batteryManagement', "Charge activation $stt -> $dold $msg");
+      
+      if ($pvfc) {
+          if ($today) {                                                                      # (Rest) heutiger Tag
+              $confcss  -= $confc;
+              $confcss   = 0 if($confcss < 0);
+              $rodpvfc  -= $pvfc;
+          }
+          else {                                                                             # nächster Tag
+              $tomconfc -= $confc;
+              $tomconfc  = 0 if($tomconfc < 0);
+              $tompvfc  -= $pvfc;          
+          }
+      }
+      
+      $betEneed -= sprintf "%.0f", ($pvfc - $confc);
+      $betEneed  = $betEneed < 0 ? 0 : $betEneed; 
+  }
+  
 return;
 }
 
@@ -12022,46 +12102,7 @@ sub FwFn {
   $ret   .= entryGraphic ($name);
   $ret   .= "</html>";
 
-  # Autorefresh nur des aufrufenden FHEMWEB-Devices
-  my $al = AttrVal ($name, 'ctrlAutoRefresh', 0);
-  if ($al) {
-      pageRefresh ($hash);
-  }
-
 return $ret;
-}
-
-###########################################################################
-# Seitenrefresh festgelegt durch SolarForecast-Attribut "ctrlAutoRefresh"
-# und "ctrlAutoRefreshFW"
-###########################################################################
-sub pageRefresh {
-  my $hash = shift;
-  my $name = $hash->{NAME};
-
-  my $al = AttrVal($name, 'ctrlAutoRefresh', 0);
-
-  if ($al) {
-      my $rftime = gettimeofday()+$al;
-
-      if (!$hash->{HELPER}{AREFRESH} || $hash->{HELPER}{AREFRESH} <= gettimeofday()) {
-          RemoveInternalTimer ($hash, \&pageRefresh);
-          InternalTimer($rftime, \&pageRefresh, $hash, 0);
-
-          my $rd = AttrVal ($name, 'ctrlAutoRefreshFW', $hash->{HELPER}{FW});
-          { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }       ## no critic 'Map blocks'
-
-          $hash->{HELPER}{AREFRESH} = $rftime;
-          $hash->{AUTOREFRESH}      = FmtDateTime($rftime);
-      }
-  }
-  else {
-      delete $hash->{HELPER}{AREFRESH};
-      delete $hash->{AUTOREFRESH};
-      RemoveInternalTimer ($hash, \&pageRefresh);
-  }
-
-return;
 }
 
 ################################################################
@@ -12153,7 +12194,8 @@ sub entryGraphic {
       hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       flowgsize      => CurrentVal ($hash, 'size',                   $flowGSizedef),                # Größe Energieflußgrafik
       flowgani       => CurrentVal ($hash, 'animate',                            1),                # Animation Energieflußgrafik
-      flowgshift     => CurrentVal ($hash, 'shift',                              0),                # Verschiebung der Flußgrafikbox (muß negiert werden)
+      flowgxshift    => CurrentVal ($hash, 'shiftx',                             0),                # X-Verschiebung der Flußgrafikbox (muß negiert werden)
+      flowgyshift    => CurrentVal ($hash, 'shifty',                             0),                # Y-Verschiebung der Flußgrafikbox (muß negiert werden)
       flowgcons      => CurrentVal ($hash, 'showconsumer',                       1),                # Verbraucher in der Energieflußgrafik anzeigen
       flowgconX      => CurrentVal ($hash, 'showconsumerdummy',                  1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
       flowgconsPower => CurrentVal ($hash, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
@@ -14217,7 +14259,8 @@ sub _flowGraphic {
   my $type           = $paref->{type};
   my $flowgsize      = $paref->{flowgsize};
   my $flowgani       = $paref->{flowgani};
-  my $flowgshift     = $paref->{flowgshift};                                   # Verschiebung der Flußgrafikbox (muß negiert werden)
+  my $flowgxshift    = $paref->{flowgxshift};                                  # X-Verschiebung der Flußgrafikbox (muß negiert werden)
+  my $flowgyshift    = $paref->{flowgyshift};                                  # Y-Verschiebung der Flußgrafikbox (muß negiert werden)
   my $flowgcons      = $paref->{flowgcons};                                    # Verbraucher in der Energieflußgrafik anzeigen
   my $flowgconsTime  = $paref->{flowgconsTime};                                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
   my $flowgconX      = $paref->{flowgconX};
@@ -14373,13 +14416,16 @@ sub _flowGraphic {
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
   my $vbwidth    = 800;                                                     # width and height specify the viewBox size
-  my $vbminx     = -10 * $flowgshift;                                       # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbminx     = -10 * $flowgxshift;                                      # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
   my $vbminy     = $doproducerrow ? -25 : 125;                              # Grafik höher positionieren wenn keine Poducerreihe angezeigt
 
   my $vbhight    = !$flowgcons     ? 380 :
                    !$flowgconsTime ? 590 :
                    610;
   $vbhight      += $exth2cdist;
+  
+  $vbminy       -= $flowgyshift;                                            # Y-Verschiebung berücksichtigen
+  $vbhight      += $flowgyshift;                                            # Y-Verschiebung berücksichtigen
   
   if ($doproducerrow) {$vbhight += 100};                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
 
@@ -20537,22 +20583,6 @@ to ensure that the system configuration is correct.
   <br><br>
   <ul>
      <ul>
-       <a id="SolarForecast-attr-affect70percentRule"></a>
-       <li><b>affect70percentRule</b><br>
-         If set, the predicted power is limited according to the 70% rule. <br><br>
-
-         <ul>
-         <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>0</b>       </td><td>No limit on the forecast PV generation (default)                                </td></tr>
-            <tr><td> <b>1</b>       </td><td>the predicted PV generation is limited to 70% of the installed string power(s)  </td></tr>
-            <tr><td> <b>dynamic</b> </td><td>the predicted PV generation is limited when 70% of the installed                </td></tr>
-            <tr><td>                </td><td>string(s) power plus the predicted consumption is exceeded.                     </td></tr>
-         </table>
-         </ul>
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-affectBatteryPreferredCharge"></a>
        <li><b>affectBatteryPreferredCharge </b><br>
          Consumers with the <b>can</b> mode are only switched on when the specified battery charge (%)
@@ -20862,21 +20892,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlAutoRefresh"></a>
-       <li><b>ctrlAutoRefresh</b> <br>
-         If set, active browser pages of the FHEMWEB device that has called up the SolarForecast device are
-         reloaded after the set time (seconds). If browser pages of a certain FHEMWEB device are to be reloaded
-         instead, this device can be specified with the attribute "ctrlAutoRefreshFW".
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAutoRefreshFW"></a>
-       <li><b>ctrlAutoRefreshFW</b><br>
-         If "ctrlAutoRefresh" is activated, this attribute can be used to determine the FHEMWEB device whose active browser pages
-         should be regularly reloaded.
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-ctrlBackupFilesKeep"></a>
        <li><b>ctrlBackupFilesKeep &lt;Integer&gt; </b><br>
          Defines the number of generations of backup files
@@ -21138,8 +21153,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>h2consumerdist</b>          </td><td>Extension of the vertical distance between the house and the consumer icons.                                            </td></tr>
             <tr><td>                                </td><td>Value: <b>0 ... 999</b>, default: 0                                                                                     </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
-			<tr><td> <b>shift</b>                   </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
+			<tr><td> <b>shiftx</b>                  </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
 			<tr><td>                                </td><td>Value: <b>-80 ... 80</b>, default: 0                                                                                    </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>shifty</b>                  </td><td>Vertical shift of the energy flow chart.                                                                                </td></tr>
+			<tr><td>                                </td><td>Wert: <b>Integer</b>, default: 0                                                                                        </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>showconsumer</b>            </td><td>Display of consumers in the energy flow chart.                                                                          </td></tr>
 			<tr><td>                                </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 1                                                               </td></tr>
@@ -21173,7 +21191,7 @@ to ensure that the system configuration is correct.
 		 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20 strokewidth=15 strokecolstd=#99cc00
+         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shiftx=-20 strokewidth=15 strokecolstd=#99cc00
        </ul>
 	   
        </li>
@@ -21543,7 +21561,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-setupBatteryDev"></a>
        <li><b>setupBatteryDev &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
                               [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
-                              [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
+                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;]  </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data.
        The module assumes that the numerical value of the readings is always positive.
@@ -21557,7 +21575,7 @@ to ensure that the system configuration is correct.
            <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                         </td></tr>
            <tr><td> <b>intotal</b>   </td><td>Reading which provides the total battery charge as a continuous counter (optional)                </td></tr>
            <tr><td> <b>outtotal</b>  </td><td>Reading which provides the total battery discharge as a continuous counter (optional)             </td></tr>
-           <tr><td> <b>cap</b>       </td><td>installed battery capacity (optional). Option can be:                                             </td></tr>
+           <tr><td> <b>cap</b>       </td><td>installed battery capacity. Option can be:                                                        </td></tr>
            <tr><td>                  </td><td><b>numerical value</b> - direct indication of the battery capacity in Wh                          </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)  </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                    </td></tr>
@@ -21588,8 +21606,8 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
        <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; 
-                                 [capacity=&lt;max. WR-Leistung&gt;] [strings=&lt;String1&gt;,&lt;String2&gt;,...]
-                                 [feed=&lt;Delivery type&gt;]
+                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...]
+                                 [feed=&lt;Delivery type&gt;] [limit=&lt;0..100&gt;]
                                  [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
        Defines any inverter device or solar charger and its readings to supply the current PV generation values. <br>
@@ -21600,7 +21618,6 @@ to ensure that the system configuration is correct.
        This can also be a dummy device with corresponding readings. <br>
        The values of several inverters can be combined in a dummy device, for example, and this device can 
        be specified with the corresponding readings. <br>
-       Specifying <b>capacity</b> is optional, but strongly recommended to optimize prediction accuracy.
        <br><br>
 
        <ul>
@@ -21612,7 +21629,6 @@ to ensure that the system configuration is correct.
            <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.                       </td></tr>
            <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                           </td></tr>
            <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                     </td></tr>
-           <tr><td>                 </td><td>(The entry is optional, but is strongly recommended)                                                        </td></tr>
            <tr><td> <b>strings</b>  </td><td>Comma-separated list of the strings assigned to the inverter (optional). The string names                   </td></tr>
            <tr><td>                 </td><td>are defined in the <a href=“#SolarForecast-attr-setupInverterStrings”>setupInverterStrings</a> attribute.   </td></tr>
            <tr><td>                 </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                       </td></tr>         
@@ -21620,6 +21636,7 @@ to ensure that the system configuration is correct.
            <tr><td>                 </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                             </td></tr>
            <tr><td>                 </td><td><b>bat</b> - the device supplies energy exclusively to the battery                                          </td></tr>
            <tr><td>                 </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                            </td></tr>
+           <tr><td> <b>limit</b>    </td><td>Defines any active power limitation in % (optional).                                                        </td></tr>
            <tr><td> <b>icon</b>     </td><td>Icon for displaying the inverter in the flow chart (optional)                                               </td></tr>
            <tr><td>                 </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                     </td></tr>
            <tr><td>                 </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed          </td></tr>           
@@ -22930,22 +22947,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
   <br><br>
   <ul>
      <ul>
-       <a id="SolarForecast-attr-affect70percentRule"></a>
-       <li><b>affect70percentRule</b><br>
-         Wenn gesetzt, wird die prognostizierte Leistung entsprechend der 70% Regel begrenzt. <br><br>
-
-         <ul>
-         <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>0</b>       </td><td>keine Begrenzung der prognostizierten PV-Erzeugung (default)                                 </td></tr>
-            <tr><td> <b>1</b>       </td><td>die prognostizierte PV-Erzeugung wird auf 70% der installierten Stringleistung(en) begrenzt  </td></tr>
-            <tr><td> <b>dynamic</b> </td><td>die prognostizierte PV-Erzeugung wird begrenzt wenn 70% der installierten                    </td></tr>
-            <tr><td>                </td><td>Stringleistung(en) zzgl. des prognostizierten Verbrauchs überschritten wird                  </td></tr>
-         </table>
-         </ul>
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-affectBatteryPreferredCharge"></a>
        <li><b>affectBatteryPreferredCharge </b><br>
          Es werden Verbraucher mit dem Mode <b>can</b> erst dann eingeschaltet, wenn die angegebene Batterieladung (%)
@@ -23255,21 +23256,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlAutoRefresh"></a>
-       <li><b>ctrlAutoRefresh</b> <br>
-         Wenn gesetzt, werden aktive Browserseiten des FHEMWEB-Devices welches das SolarForecast-Device aufgerufen hat, nach der
-         eingestellten Zeit (Sekunden) neu geladen. Sollen statt dessen Browserseiten eines bestimmten FHEMWEB-Devices neu
-         geladen werden, kann dieses Device mit dem Attribut "ctrlAutoRefreshFW" festgelegt werden.
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAutoRefreshFW"></a>
-       <li><b>ctrlAutoRefreshFW</b><br>
-         Ist "ctrlAutoRefresh" aktiviert, kann mit diesem Attribut das FHEMWEB-Device bestimmt werden dessen aktive Browserseiten
-         regelmäßig neu geladen werden sollen.
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-ctrlBackupFilesKeep"></a>
        <li><b>ctrlBackupFilesKeep &lt;Ganzzahl&gt;</b><br>
          Legt die Anzahl der Generationen von Sicherungsdateien
@@ -23533,8 +23519,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>h2consumerdist</b>          </td><td>Erweiterung des vertikalen Abstandes zwischen dem Haus und den Verbraucher-Icons.                                       </td></tr>
             <tr><td>                                </td><td>Wert: <b>0 ... 999</b>, default: 0                                                                                      </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
-			<tr><td> <b>shift</b>                   </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
+			<tr><td> <b>shiftx</b>                  </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
 			<tr><td>                                </td><td>Wert: <b>-80 ... 80</b>, default: 0                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>shifty</b>                  </td><td>Vertikale Verschiebung der Energieflußgrafik.                                                                           </td></tr>
+			<tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 0                                                                                       </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>showconsumer</b>            </td><td>Anzeige der Verbraucher in der Energieflußgrafik.                                                                       </td></tr>
 			<tr><td>                                </td><td><b>0</b> - Anzeige aus,  <b>1</b> - Anzeige an, default: 1                                                              </td></tr>
@@ -23568,7 +23557,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 		 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20 strokewidth=15 strokecolstd=#99cc00
+         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shiftx=-20 strokewidth=15 strokecolstd=#99cc00
        </ul>
 	   
        </li>
@@ -23937,7 +23926,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-setupBatteryDev"></a>
        <li><b>setupBatteryDev &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;
                               [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
-                              [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
+                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;]  </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
@@ -23951,7 +23940,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                                             </td></tr>
            <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)                    </td></tr>
            <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung als fortlaufenden Zähler liefert (optional)                 </td></tr>
-           <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität (optional). Option kann sein:                                             </td></tr>
+           <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität. Option kann sein:                                                        </td></tr>
            <tr><td>                  </td><td><b>numerischer Wert</b> - direkte Angabe der Batteriekapazität in Wh                                     </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
@@ -23982,8 +23971,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
        <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
-                                 [capacity=&lt;max. WR-Leistung&gt;] [strings=&lt;String1&gt;,&lt;String2&gt;,...]
-                                 [feed=&lt;Liefertyp&gt;]
+                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...]
+                                 [feed=&lt;Liefertyp&gt;] [limit=&lt;0..100&gt;]
                                  [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
        Legt ein beliebiges Wechselrichter-Gerät bzw. Solar-Ladegerät und dessen Readings zur Lieferung der aktuellen 
@@ -23995,7 +23984,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        Dabei kann es sich auch um ein Dummy Gerät mit entsprechenden Readings handeln. <br>
        Die Werte mehrerer Wechselrichter kann man z.B. in einem Dummy Gerät zusammenführen und gibt dieses Gerät mit 
        den entsprechenden Readings an. <br>
-       Die Angabe von <b>capacity</b> ist optional, wird aber zur Optimierung der Vorhersagegenauigkeit dringend empfohlen.
        <br><br>
 
        <ul>
@@ -24007,7 +23995,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                   </td></tr>
            <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                         </td></tr>
            <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt                 </td></tr>
-           <tr><td>                 </td><td>(Die Angabe ist optional, wird aber dringend empfohlen zu setzen)                                           </td></tr>
            <tr><td> <b>strings</b>  </td><td>Komma getrennte Liste der dem Wechselrichter zugeordneten Strings (optional). Die Stringnamen               </td></tr>
            <tr><td>                 </td><td>werden im Attribut <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a> definiert.   </td></tr>
            <tr><td>                 </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.           </td></tr>         
@@ -24015,6 +24002,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                 </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.    </td></tr>
            <tr><td>                 </td><td><b>bat</b> - das Gerät liefert die Energie ausschließlich an die Batterie                                   </td></tr>
            <tr><td>                 </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentlich Netz eingespeist                            </td></tr>
+           <tr><td> <b>limit</b>    </td><td>Definiert eine eventuelle Wirkleistungsbeschränkung in % (optional).                                        </td></tr>
            <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                             </td></tr>
            <tr><td>                 </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                                   </td></tr>
            <tr><td>                 </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt         </td></tr>
