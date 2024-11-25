@@ -493,6 +493,7 @@ sub Broadlink_auth(@) {
 
 sub Broadlink_getCipher(@) {
 	my ($hash) = @_;
+	my $version = $Crypt::CBC::VERSION // 2;
 	return Crypt::CBC->new(
 					-key         => $hash->{'.key'},
 					-cipher      => "Crypt::OpenSSL::AES",
@@ -501,6 +502,16 @@ sub Broadlink_getCipher(@) {
 					-literal_key => 1,
 					-keysize     => 16,
 					-padding	 => 'space'
+			) if ($version < 3);
+			
+	return Crypt::CBC->new(
+					-key         => $hash->{'.key'},
+					-cipher      => "Crypt::OpenSSL::AES",
+					-header      => "none",
+					-iv          => $hash->{'.iv'},
+					-literal_key => 1,
+					-keysize     => 16,
+					-padding	 => 'none'
 			);
 }
 
