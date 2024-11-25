@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.20";
+my $Signalbot_VERSION="3.21";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -120,6 +120,7 @@ sub Signalbot_Initialize($) {
   $hash->{MessageReceived} = "Signalbot_MessageReceived";
   $hash->{MessageReceivedV2} = "Signalbot_MessageReceivedV2";
   $hash->{ReceiptReceived} = "Signalbot_ReceiptReceived";
+  $hash->{SyncMessageReceived} = "Signalbot_SyncMessageReceived";
   $hash->{version}		= "Signalbot_Version_cb";
   $hash->{updateGroup}  = "Signalbot_UpdateGroup_cb";
   $hash->{createGroup}  = "Signalbot_UpdateGroup_cb";
@@ -1192,18 +1193,11 @@ sub Signalbot_ReceiptReceived {
 }
 
 sub Signalbot_SyncMessageReceived {
-	my ($hash,$timestamp, $source, $string1, $array1, $string2, $array2) = @_;
+#Used when sending messages to self
+#Content of array2 are attachments, is array1 really groups?
+	my ($hash,$timestamp, $source, $destination, $array1, $message, $attachments) = @_;
 	LogUnicode $hash->{NAME}, 5, $hash->{NAME}."Signalbot: Signalbot_sync_callback $timestamp $source";
-	my $tmp="";
-	my @arr1=@$array1;
-	foreach (@arr1) {
-		$tmp.=$_." " if defined $_;
-	} 
-
-	my @arr2=@$array2;
-	foreach (@arr2) {
-		$tmp.= $_." " if defined $_;
-	} 	
+	Signalbot_MessageReceived($hash,$timestamp,$source,$array1,$message,$attachments);
 }
 
 sub Signalbot_disconnect($@) {
