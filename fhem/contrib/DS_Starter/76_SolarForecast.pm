@@ -156,8 +156,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.37.7" => "25.11.2024  Attr flowGraphicControl: key shift changed to shiftx, new key shifty ".
-                           "change: 'trackFlex' && \$wcc >= 70 to \$wcc >= 80 ",
+  "1.37.7" => "26.11.2024  Attr flowGraphicControl: key shift changed to shiftx, new key shifty ".
+                           "change: 'trackFlex' && \$wcc >= 70 to \$wcc >= 80 ".
+                           "obsolete Attr deleted: flowGraphicCss, flowGraphicSize, flowGraphicAnimate, flowGraphicConsumerDistance, ".
+                           "flowGraphicShowConsumer, flowGraphicShowConsumerDummy, flowGraphicShowConsumerPower, ".
+                           "flowGraphicShowConsumerRemainTime, flowGraphicShift, affect70percentRule, ctrlAutoRefresh, ctrlAutoRefreshFW ",
   "1.37.6" => "01.11.2024  minor code change, Attr setupBatteryDev: the key 'cap' is mandatory now ",
   "1.37.5" => "31.10.2024  attr setupInverterDevXX: new key 'limit', the key 'capacity' is now mandatory ".
                            "Attr affect70percentRule, ctrlAutoRefresh, ctrlAutoRefreshFW deleted ",
@@ -1280,11 +1283,11 @@ sub Initialize {
                     
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################                    
-  my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';
-  $hash->{AttrList} .= " flowGraphicCss:$av flowGraphicSize:$av flowGraphicAnimate:$av flowGraphicConsumerDistance:$av flowGraphicShowConsumer:$av flowGraphicShowConsumerDummy:$av flowGraphicShowConsumerPower:$av flowGraphicShowConsumerRemainTime:$av flowGraphicShift:$av ";
+  # my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';
+  # $hash->{AttrList} .= " flowGraphicCss:$av flowGraphicSize:$av flowGraphicAnimate:$av flowGraphicConsumerDistance:$av flowGraphicShowConsumer:$av flowGraphicShowConsumerDummy:$av flowGraphicShowConsumerPower:$av flowGraphicShowConsumerRemainTime:$av flowGraphicShift:$av ";
  
-  my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";
-  $hash->{AttrList} .= " affect70percentRule:$av1 ctrlAutoRefresh:$av1 ctrlAutoRefreshFW:$av1 ";
+  # my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";
+  # $hash->{AttrList} .= " affect70percentRule:$av1 ctrlAutoRefresh:$av1 ctrlAutoRefreshFW:$av1 ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -14424,11 +14427,11 @@ sub _flowGraphic {
                    610;
   $vbhight      += $exth2cdist;
   
+  if ($doproducerrow) {$vbhight += 100};                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
+
   $vbminy       -= $flowgyshift;                                            # Y-Verschiebung berücksichtigen
   $vbhight      += $flowgyshift;                                            # Y-Verschiebung berücksichtigen
   
-  if ($doproducerrow) {$vbhight += 100};                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
-
   my $vbox       = "$vbminx $vbminy $vbwidth $vbhight";
   my $svgstyle   = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani  ? '@keyframes dash { to { stroke-dashoffset: 0; } }' : '';     # Animation Ja/Nein

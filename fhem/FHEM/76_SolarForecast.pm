@@ -156,6 +156,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.37.7" => "26.11.2024  Attr flowGraphicControl: key shift changed to shiftx, new key shifty ".
+                           "change: 'trackFlex' && \$wcc >= 70 to \$wcc >= 80 ".
+                           "obsolete Attr deleted: flowGraphicCss, flowGraphicSize, flowGraphicAnimate, flowGraphicConsumerDistance, ".
+                           "flowGraphicShowConsumer, flowGraphicShowConsumerDummy, flowGraphicShowConsumerPower, ".
+                           "flowGraphicShowConsumerRemainTime, flowGraphicShift, affect70percentRule, ctrlAutoRefresh, ctrlAutoRefreshFW ",
+  "1.37.6" => "01.11.2024  minor code change, Attr setupBatteryDev: the key 'cap' is mandatory now ",
   "1.37.5" => "31.10.2024  attr setupInverterDevXX: new key 'limit', the key 'capacity' is now mandatory ".
                            "Attr affect70percentRule, ctrlAutoRefresh, ctrlAutoRefreshFW deleted ",
   "1.37.4" => "29.10.2024  both attr graphicStartHtml, graphicEndHtml removed, fix flowGraphic when device name contains '.' ",
@@ -1277,11 +1283,11 @@ sub Initialize {
                     
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################                    
-  my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';
-  $hash->{AttrList} .= " flowGraphicCss:$av flowGraphicSize:$av flowGraphicAnimate:$av flowGraphicConsumerDistance:$av flowGraphicShowConsumer:$av flowGraphicShowConsumerDummy:$av flowGraphicShowConsumerPower:$av flowGraphicShowConsumerRemainTime:$av flowGraphicShift:$av ";
+  # my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';
+  # $hash->{AttrList} .= " flowGraphicCss:$av flowGraphicSize:$av flowGraphicAnimate:$av flowGraphicConsumerDistance:$av flowGraphicShowConsumer:$av flowGraphicShowConsumerDummy:$av flowGraphicShowConsumerPower:$av flowGraphicShowConsumerRemainTime:$av flowGraphicShift:$av ";
  
-  my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";
-  $hash->{AttrList} .= " affect70percentRule:$av1 ctrlAutoRefresh:$av1 ctrlAutoRefreshFW:$av1 ";
+  # my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";
+  # $hash->{AttrList} .= " affect70percentRule:$av1 ctrlAutoRefresh:$av1 ctrlAutoRefreshFW:$av1 ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -3451,7 +3457,7 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
 
-              if ($cafd eq 'trackShared'|| ($cafd eq 'trackFlex' && $wcc >= 70)) {                  # Direktstrahlung + Diffusstrahlung
+              if ($cafd eq 'trackShared'|| ($cafd eq 'trackFlex' && $wcc >= 80)) {                  # Direktstrahlung + Diffusstrahlung
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
@@ -5357,7 +5363,7 @@ sub Attr {
 
   if ($aName eq 'ctrlBatSocManagement' && $init_done) {
       if ($cmd eq 'set') {
-          return qq{Define the key "cap" with "attr $name setupBatteryDev" before this attribute in the correct form.}
+          return qq{Define the key 'cap' with "attr $name setupBatteryDev" before this attribute in the correct form.}
                  if(!CurrentVal($hash, 'batinstcap', 0));                                             # https://forum.fhem.de/index.php?msg=1310930
 
           my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $aVal);
@@ -5654,7 +5660,8 @@ sub _attrflowGraphicControl {            ## no critic "not used"
   for my $av ( qw( animate 
                    consumerdist
                    h2consumerdist                   
-                   shift 
+                   shiftx
+                   shifty                   
                    showconsumer 
                    showconsumerremaintime
                    size
@@ -5674,7 +5681,8 @@ sub _attrflowGraphicControl {            ## no critic "not used"
           animate                => '0|1',
           consumerdist           => '[89]\d{1}|[1234]\d{2}|500',
           h2consumerdist         => '\d{1,3}',
-          shift                  => '-?[0-7]\d{0,1}|-?80',
+          shiftx                 => '-?[0-7]\d{0,1}|-?80',
+          shifty                 => '\d+',
           size                   => '\d+',
           showconsumer           => '0|1',
           showconsumerdummy      => '0|1',
@@ -5836,7 +5844,7 @@ sub _attrInverterDev {                   ## no critic "not used"
       }
 
       if (!$h->{pv} || !$h->{etotal} || !$h->{capacity}) {
-          return qq{One or more of the keys 'pv, etotal, capacity' are missing . Please consider the commandref.};
+          return qq{One or more of the keys 'pv, etotal, capacity' are missing. Please consider the commandref.};
       }
 
       if (!isNumeric($h->{capacity})) {
@@ -6032,8 +6040,8 @@ sub _attrBatteryDev {                    ## no critic "not used"
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
 
-      if (!$h->{pin} || !$h->{pout}) {
-          return qq{The keys 'pin' and/or 'pout' are not set. Please note the command reference.};
+      if (!$h->{pin} || !$h->{pout} || !$h->{cap}) {
+          return qq{One or more of the keys 'pin, pout, cap' are missing. Please note the command reference.};
       }
 
       if (($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
@@ -9321,8 +9329,12 @@ sub _batChargeRecmd {
   }
   
   debugLog ($paref, 'batteryManagement', "Summary active power limit of all Inverter (except feed 'grid'): $inpmax");
+  debugLog ($paref, 'batteryManagement', "Installed Battery capacity: $batcap");
   
-  return if(!$inpmax);
+  if (!$inpmax || !$batcap) {
+      debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation are not met. Exit.");
+      return;
+  }
   
   my $sfmargin = $inpmax * 0.5;                                                              # Sicherheitszuschlag 50% der installierten Leistung (Wh)                                                         
   my $betEneed = sprintf "%.0f", ($batcap - ($batcap * $soc / 100));                         # benötigte Energie bis 100% Batteriekapazität Wh
@@ -12185,7 +12197,8 @@ sub entryGraphic {
       hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       flowgsize      => CurrentVal ($hash, 'size',                   $flowGSizedef),                # Größe Energieflußgrafik
       flowgani       => CurrentVal ($hash, 'animate',                            1),                # Animation Energieflußgrafik
-      flowgshift     => CurrentVal ($hash, 'shift',                              0),                # Verschiebung der Flußgrafikbox (muß negiert werden)
+      flowgxshift    => CurrentVal ($hash, 'shiftx',                             0),                # X-Verschiebung der Flußgrafikbox (muß negiert werden)
+      flowgyshift    => CurrentVal ($hash, 'shifty',                             0),                # Y-Verschiebung der Flußgrafikbox (muß negiert werden)
       flowgcons      => CurrentVal ($hash, 'showconsumer',                       1),                # Verbraucher in der Energieflußgrafik anzeigen
       flowgconX      => CurrentVal ($hash, 'showconsumerdummy',                  1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
       flowgconsPower => CurrentVal ($hash, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
@@ -14249,7 +14262,8 @@ sub _flowGraphic {
   my $type           = $paref->{type};
   my $flowgsize      = $paref->{flowgsize};
   my $flowgani       = $paref->{flowgani};
-  my $flowgshift     = $paref->{flowgshift};                                   # Verschiebung der Flußgrafikbox (muß negiert werden)
+  my $flowgxshift    = $paref->{flowgxshift};                                  # X-Verschiebung der Flußgrafikbox (muß negiert werden)
+  my $flowgyshift    = $paref->{flowgyshift};                                  # Y-Verschiebung der Flußgrafikbox (muß negiert werden)
   my $flowgcons      = $paref->{flowgcons};                                    # Verbraucher in der Energieflußgrafik anzeigen
   my $flowgconsTime  = $paref->{flowgconsTime};                                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
   my $flowgconX      = $paref->{flowgconX};
@@ -14405,7 +14419,7 @@ sub _flowGraphic {
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
   my $vbwidth    = 800;                                                     # width and height specify the viewBox size
-  my $vbminx     = -10 * $flowgshift;                                       # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbminx     = -10 * $flowgxshift;                                      # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
   my $vbminy     = $doproducerrow ? -25 : 125;                              # Grafik höher positionieren wenn keine Poducerreihe angezeigt
 
   my $vbhight    = !$flowgcons     ? 380 :
@@ -14415,6 +14429,9 @@ sub _flowGraphic {
   
   if ($doproducerrow) {$vbhight += 100};                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
 
+  $vbminy       -= $flowgyshift;                                            # Y-Verschiebung berücksichtigen
+  $vbhight      += $flowgyshift;                                            # Y-Verschiebung berücksichtigen
+  
   my $vbox       = "$vbminx $vbminy $vbwidth $vbhight";
   my $svgstyle   = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani  ? '@keyframes dash { to { stroke-dashoffset: 0; } }' : '';     # Animation Ja/Nein
@@ -21139,8 +21156,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>h2consumerdist</b>          </td><td>Extension of the vertical distance between the house and the consumer icons.                                            </td></tr>
             <tr><td>                                </td><td>Value: <b>0 ... 999</b>, default: 0                                                                                     </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
-			<tr><td> <b>shift</b>                   </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
+			<tr><td> <b>shiftx</b>                  </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
 			<tr><td>                                </td><td>Value: <b>-80 ... 80</b>, default: 0                                                                                    </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>shifty</b>                  </td><td>Vertical shift of the energy flow chart.                                                                                </td></tr>
+			<tr><td>                                </td><td>Wert: <b>Integer</b>, default: 0                                                                                        </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>showconsumer</b>            </td><td>Display of consumers in the energy flow chart.                                                                          </td></tr>
 			<tr><td>                                </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 1                                                               </td></tr>
@@ -21174,7 +21194,7 @@ to ensure that the system configuration is correct.
 		 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20 strokewidth=15 strokecolstd=#99cc00
+         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shiftx=-20 strokewidth=15 strokecolstd=#99cc00
        </ul>
 	   
        </li>
@@ -21544,7 +21564,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-setupBatteryDev"></a>
        <li><b>setupBatteryDev &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
                               [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
-                              [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
+                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;]  </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data.
        The module assumes that the numerical value of the readings is always positive.
@@ -21558,7 +21578,7 @@ to ensure that the system configuration is correct.
            <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                         </td></tr>
            <tr><td> <b>intotal</b>   </td><td>Reading which provides the total battery charge as a continuous counter (optional)                </td></tr>
            <tr><td> <b>outtotal</b>  </td><td>Reading which provides the total battery discharge as a continuous counter (optional)             </td></tr>
-           <tr><td> <b>cap</b>       </td><td>installed battery capacity (optional). Option can be:                                             </td></tr>
+           <tr><td> <b>cap</b>       </td><td>installed battery capacity. Option can be:                                                        </td></tr>
            <tr><td>                  </td><td><b>numerical value</b> - direct indication of the battery capacity in Wh                          </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)  </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                    </td></tr>
@@ -23502,8 +23522,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>h2consumerdist</b>          </td><td>Erweiterung des vertikalen Abstandes zwischen dem Haus und den Verbraucher-Icons.                                       </td></tr>
             <tr><td>                                </td><td>Wert: <b>0 ... 999</b>, default: 0                                                                                      </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
-			<tr><td> <b>shift</b>                   </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
+			<tr><td> <b>shiftx</b>                  </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
 			<tr><td>                                </td><td>Wert: <b>-80 ... 80</b>, default: 0                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>shifty</b>                  </td><td>Vertikale Verschiebung der Energieflußgrafik.                                                                           </td></tr>
+			<tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 0                                                                                       </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>showconsumer</b>            </td><td>Anzeige der Verbraucher in der Energieflußgrafik.                                                                       </td></tr>
 			<tr><td>                                </td><td><b>0</b> - Anzeige aus,  <b>1</b> - Anzeige an, default: 1                                                              </td></tr>
@@ -23537,7 +23560,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 		 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shift=-20 strokewidth=15 strokecolstd=#99cc00
+         attr &lt;name&gt; flowGraphicControl size=300 animate=0 consumerdist=100 showconsumer=1 showconsumerdummy=0 shiftx=-20 strokewidth=15 strokecolstd=#99cc00
        </ul>
 	   
        </li>
@@ -23906,7 +23929,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-setupBatteryDev"></a>
        <li><b>setupBatteryDev &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;
                               [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
-                              [cap=&lt;Option&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br>
+                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;]  </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
@@ -23920,7 +23943,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                                             </td></tr>
            <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)                    </td></tr>
            <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung als fortlaufenden Zähler liefert (optional)                 </td></tr>
-           <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität (optional). Option kann sein:                                             </td></tr>
+           <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität. Option kann sein:                                                        </td></tr>
            <tr><td>                  </td><td><b>numerischer Wert</b> - direkte Angabe der Batteriekapazität in Wh                                     </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
