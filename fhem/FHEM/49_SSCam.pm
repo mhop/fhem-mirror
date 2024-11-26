@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.2" => "26.11.2024  Bugfix PATH in hvada & hsimu ",
   "9.12.1" => "25.11.2024  set COMPATIBILITY to 9.2.1, attr customSVSversion new option 9.2.0 ",
   "9.12.0" => "27.10.2024  internal code changes, implement new Take camera snapshot API if SVS >= 9.2.1 ".
                            "set COMPATIBILITY to 9.2.0, rename attr simu_SVSversion to customSVSversion ".
@@ -569,145 +570,145 @@ my %sdswfn = (                                                             # Fun
   "hls"       => {fn => "__switchedHLS"       },
 );
 
-my %hvada = (                                                              # Funktionshash Version Adaption
-  'a01'  => {AUTH       => { VER  => '6',  
-                             PATH => 'webapi/entry.cgi', 
-                             NAME => 'SYNO.API.Auth'},
+my %hvada = (                                                              # Funktionshash Version Adaption !!PATH ohne führendes webapi/!!
+  'a01'  => {AUTH       => { VER  => '6', 
+                             NAME => 'SYNO.API.Auth',
+                             mk   => 1},
             },
-  '921'  => {AUTH       => { VER  => '6',  
-                             PATH => 'webapi/entry.cgi', 
-                             NAME => 'SYNO.API.Auth'},  
+  '921'  => {AUTH       => { VER  => '6',
+                             NAME => 'SYNO.API.Auth',
+                             mk   => 1},  
              SNAPWEBAPI => { VER  => 'v1', 
-                             PATH => 'webapi/SurveillanceStation/ThirdParty/SnapShot/Take/v1', 
+                             PATH => 'SurveillanceStation/ThirdParty/SnapShot/Take/v1', 
                              NAME => 'WebAPI.Snapshot',
                              mk   => 0}, 
             },
 );
 
-my %hsimu = (                                                              # Funktionshash Version Simulation
-  '71'       => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' }, 
-                 AUTH      => { VER => '4', PATH => 'webapi/entry.cgi' },
-                 EXTREC    => { VER => '2', PATH => 'webapi/entry.cgi' },
-                 CAM       => { VER => '8', PATH => 'webapi/entry.cgi' },
-                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 PTZ       => { VER => '4', PATH => 'webapi/entry.cgi' },
-                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 SVSINFO   => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 LOG       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 REC       => { VER => '4', PATH => 'webapi/entry.cgi' },
+my %hsimu = (                                                              # Funktionshash Version Simulation !!PATH ohne führendes webapi/!!
+  '71'       => {INFO      => { VER => '1' }, 
+                 AUTH      => { VER => '4' },
+                 EXTREC    => { VER => '2', PATH => 'entry.cgi' },
+                 CAM       => { VER => '8', PATH => 'entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'entry.cgi' },
+                 PTZ       => { VER => '4', PATH => 'entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'entry.cgi' },
+                 SVSINFO   => { VER => '5', PATH => 'entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'entry.cgi' },
+                 STM       => { VER => '1', PATH => 'entry.cgi' },
+                 LOG       => { VER => '1', PATH => 'entry.cgi' },
+                 REC       => { VER => '4', PATH => 'entry.cgi' },
                 },
-  '72'       => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 CAM       => { VER => '8', PATH => 'webapi/entry.cgi' },
-                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 PTZ       => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 SVSINFO   => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 LOG       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 REC       => { VER => '4', PATH => 'webapi/entry.cgi' },
+  '72'       => {INFO      => { VER => '1' },
+                 AUTH      => { VER => '6' },
+                 EXTREC    => { VER => '3', PATH => 'entry.cgi' },
+                 CAM       => { VER => '8', PATH => 'entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'entry.cgi' },
+                 PTZ       => { VER => '5', PATH => 'entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'entry.cgi' },
+                 SVSINFO   => { VER => '6', PATH => 'entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'entry.cgi' },
+                 STM       => { VER => '1', PATH => 'entry.cgi' },
+                 LOG       => { VER => '1', PATH => 'entry.cgi' },
+                 REC       => { VER => '4', PATH => 'entry.cgi' },
                 },
-  '800'      => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 CAM       => { VER => '9', PATH => 'webapi/entry.cgi' },
-                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 PTZ       => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 SVSINFO   => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 LOG       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 REC       => { VER => '6', PATH => 'webapi/entry.cgi' },
+  '800'      => {INFO      => { VER => '1' },
+                 AUTH      => { VER => '6' },
+                 EXTREC    => { VER => '3', PATH => 'entry.cgi' },
+                 CAM       => { VER => '9', PATH => 'entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'entry.cgi' },
+                 PTZ       => { VER => '5', PATH => 'entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'entry.cgi' },
+                 SVSINFO   => { VER => '6', PATH => 'entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'entry.cgi' },
+                 STM       => { VER => '1', PATH => 'entry.cgi' },
+                 LOG       => { VER => '1', PATH => 'entry.cgi' },
+                 REC       => { VER => '6', PATH => 'entry.cgi' },
                 },
-  '815'      => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 CAM       => { VER => '9', PATH => 'webapi/entry.cgi' },
-                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 PTZ       => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 SVSINFO   => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 LOG       => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 REC       => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 AUDIOSTM  => { VER => '2', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTMS => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 HMODE     => { VER => '1', PATH => 'webapi/entry.cgi' },
+  '815'      => {INFO      => { VER => '1' },
+                 AUTH      => { VER => '6' },
+                 EXTREC    => { VER => '3', PATH => 'entry.cgi' },
+                 CAM       => { VER => '9', PATH => 'entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'entry.cgi' },
+                 PTZ       => { VER => '5', PATH => 'entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'entry.cgi' },
+                 SVSINFO   => { VER => '6', PATH => 'entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'entry.cgi' },
+                 STM       => { VER => '1', PATH => 'entry.cgi' },
+                 LOG       => { VER => '3', PATH => 'entry.cgi' },
+                 REC       => { VER => '6', PATH => 'entry.cgi' },
+                 AUDIOSTM  => { VER => '2', PATH => 'entry.cgi' },
+                 VIDEOSTMS => { VER => '1', PATH => 'entry.cgi' },
+                 HMODE     => { VER => '1', PATH => 'entry.cgi' },
                 },
-  '820'      => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 CAM       => { VER => '9', PATH => 'webapi/entry.cgi' },
-                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 PTZ       => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 SVSINFO   => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 HMODE     => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 LOG       => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 AUDIOSTM  => { VER => '2', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTMS => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 REC       => { VER => '6', PATH => 'webapi/entry.cgi' },
+  '820'      => {INFO      => { VER => '1' },
+                 AUTH      => { VER => '6' },
+                 EXTREC    => { VER => '3', PATH => 'entry.cgi' },
+                 CAM       => { VER => '9', PATH => 'entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'entry.cgi' },
+                 PTZ       => { VER => '5', PATH => 'entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'entry.cgi' },
+                 SVSINFO   => { VER => '6', PATH => 'entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'entry.cgi' },
+                 STM       => { VER => '1', PATH => 'entry.cgi' },
+                 HMODE     => { VER => '1', PATH => 'entry.cgi' },
+                 LOG       => { VER => '3', PATH => 'entry.cgi' },
+                 AUDIOSTM  => { VER => '2', PATH => 'entry.cgi' },
+                 VIDEOSTMS => { VER => '1', PATH => 'entry.cgi' },
+                 REC       => { VER => '6', PATH => 'entry.cgi' },
                 },
-  '828'      => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 CAM       => { VER => '9', PATH => 'webapi/entry.cgi' },
-                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 PTZ       => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 SVSINFO   => { VER => '8', PATH => 'webapi/entry.cgi' },
-                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 HMODE     => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 LOG       => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 AUDIOSTM  => { VER => '2', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTMS => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 REC       => { VER => '6', PATH => 'webapi/entry.cgi' },
+  '828'      => {INFO      => { VER => '1' },
+                 AUTH      => { VER => '6' },
+                 EXTREC    => { VER => '3', PATH => 'entry.cgi' },
+                 CAM       => { VER => '9', PATH => 'entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'entry.cgi' },
+                 PTZ       => { VER => '6', PATH => 'entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'entry.cgi' },
+                 SVSINFO   => { VER => '8', PATH => 'entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'entry.cgi' },
+                 STM       => { VER => '1', PATH => 'entry.cgi' },
+                 HMODE     => { VER => '1', PATH => 'entry.cgi' },
+                 LOG       => { VER => '3', PATH => 'entry.cgi' },
+                 AUDIOSTM  => { VER => '2', PATH => 'entry.cgi' },
+                 VIDEOSTMS => { VER => '1', PATH => 'entry.cgi' },
+                 REC       => { VER => '6', PATH => 'entry.cgi' },
                 },
-  '920'      => {INFO      => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 AUTH      => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 EXTREC    => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 CAM       => { VER => '9', PATH => 'webapi/entry.cgi' },
-                 SNAPSHOT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 PTZ       => { VER => '6', PATH => 'webapi/entry.cgi' },
-                 PRESET    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 SVSINFO   => { VER => '8', PATH => 'webapi/entry.cgi' },
-                 CAMEVENT  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EVENT     => { VER => '5', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTM  => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 EXTEVT    => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 STM       => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 HMODE     => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 LOG       => { VER => '3', PATH => 'webapi/entry.cgi' },
-                 AUDIOSTM  => { VER => '2', PATH => 'webapi/entry.cgi' },
-                 VIDEOSTMS => { VER => '1', PATH => 'webapi/entry.cgi' },
-                 REC       => { VER => '6', PATH => 'webapi/entry.cgi' },
+  '920'      => {INFO      => { VER => '1' },
+                 AUTH      => { VER => '6' },
+                 EXTREC    => { VER => '3', PATH => 'entry.cgi' },
+                 CAM       => { VER => '9', PATH => 'entry.cgi' },
+                 SNAPSHOT  => { VER => '1', PATH => 'entry.cgi' },
+                 PTZ       => { VER => '6', PATH => 'entry.cgi' },
+                 PRESET    => { VER => '1', PATH => 'entry.cgi' },
+                 SVSINFO   => { VER => '8', PATH => 'entry.cgi' },
+                 CAMEVENT  => { VER => '1', PATH => 'entry.cgi' },
+                 EVENT     => { VER => '5', PATH => 'entry.cgi' },
+                 VIDEOSTM  => { VER => '1', PATH => 'entry.cgi' },
+                 EXTEVT    => { VER => '1', PATH => 'entry.cgi' },
+                 STM       => { VER => '1', PATH => 'entry.cgi' },
+                 HMODE     => { VER => '1', PATH => 'entry.cgi' },
+                 LOG       => { VER => '3', PATH => 'entry.cgi' },
+                 AUDIOSTM  => { VER => '2', PATH => 'entry.cgi' },
+                 VIDEOSTMS => { VER => '1', PATH => 'entry.cgi' },
+                 REC       => { VER => '6', PATH => 'entry.cgi' },
                 },
 );
 
@@ -5402,7 +5403,9 @@ sub getApiSites {
    
    my $apis = join ",", @ak;
    
-   $hash->{HELPER}{API}{INFO}{PATH} = 'webapi/'.$hash->{HELPER}{API}{INFO}{PATH};
+   if ($hash->{HELPER}{API}{INFO}{PATH} !~ /webapi/xs) {
+       $hash->{HELPER}{API}{INFO}{PATH} = 'webapi/'.$hash->{HELPER}{API}{INFO}{PATH};
+   }
 
    $url = "$proto://$serveraddr:$serverport/$hash->{HELPER}{API}{INFO}{PATH}?".
               "api=$hash->{HELPER}{API}{INFO}{NAME}".
@@ -5483,7 +5486,7 @@ sub getApiSites_Parse {
             }
             
             for my $key (keys %{$hash->{HELPER}{API}}) {                                                  # V 9.12.0: Pfad ergänzen
-                next if($key =~ /^PARSET$/x ||
+                next if($key =~ /^PARSET$/x                       ||
                         !defined $hash->{HELPER}{API}{$key}{PATH} ||
                         $hash->{HELPER}{API}{$key}{PATH} =~ /webapi/x);
                 $hash->{HELPER}{API}{$key}{PATH} = 'webapi/'.$hash->{HELPER}{API}{$key}{PATH};
@@ -7634,9 +7637,9 @@ sub apiAutoAdadapt {
 
   if ($adavs) {
       for my $av (sort keys %{$hvada{$adavs}}) {
-          $hash->{HELPER}{API}{$av}{VER}  = $hvada{$adavs}{$av}{VER};
-          $hash->{HELPER}{API}{$av}{PATH} = $hvada{$adavs}{$av}{PATH};
-          $hash->{HELPER}{API}{$av}{NAME} = $hvada{$adavs}{$av}{NAME};
+          $hash->{HELPER}{API}{$av}{VER}  = $hvada{$adavs}{$av}{VER}            if(defined $hvada{$adavs}{$av}{VER});
+          $hash->{HELPER}{API}{$av}{PATH} = 'webapi/'.$hvada{$adavs}{$av}{PATH} if(defined $hvada{$adavs}{$av}{PATH});
+          $hash->{HELPER}{API}{$av}{NAME} = $hvada{$adavs}{$av}{NAME}           if(defined $hvada{$adavs}{$av}{NAME});
           $hash->{HELPER}{API}{$av}{mk}   = $hvada{$adavs}{$av}{mk} // 0;
           $hash->{HELPER}{API}{$av}{MOD}  = "yes";
       
@@ -7669,7 +7672,7 @@ sub apiCustomChange {
       $cusvs    .= $vl[1];
       $cusvs    .= $vl[2] if(defined $vl[2]);
 
-      Log3 ($name, 4, "$name - Conversion from current to the SVS $custapi version");
+      Log3 ($name, 4, "$name - Conversion from current to SVS $custapi version (Note: the SVS must provide this API version!)");
 
       for my $ak (sort keys %{$hash->{HELPER}{API}}  ) {
           next if($ak =~ /^PARSET$/x);
@@ -7684,8 +7687,8 @@ sub apiCustomChange {
           my $apiname = ApiVal ($hash, $hash->{HELPER}{API}{$kapi}, 'NAME', '');
           next if(!$apiname);
           
-          $hash->{HELPER}{API}{$kapi}{VER}  = $hsimu{$cusvs}{$kapi}{VER};
-          $hash->{HELPER}{API}{$kapi}{PATH} = $hsimu{$cusvs}{$kapi}{PATH};
+          $hash->{HELPER}{API}{$kapi}{VER}  = $hsimu{$cusvs}{$kapi}{VER}            if(defined $hsimu{$cusvs}{$kapi}{VER});
+          $hash->{HELPER}{API}{$kapi}{PATH} = 'webapi/'.$hsimu{$cusvs}{$kapi}{PATH} if(defined $hsimu{$cusvs}{$kapi}{PATH});
           $hash->{HELPER}{API}{$kapi}{MOD}  = "yes";
           
           Log3 ($name, 4, "$name - $kapi customized -> NAME: $apiname, ".
