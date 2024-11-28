@@ -3083,7 +3083,8 @@ sub __forecastSolar_ApiRequest {
   my $hash       = $defs{$name};
 
   if (!$allstrings) {                                                                  # alle Strings wurden abgerufen
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}       += 1;
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{todayDoneAPIcalls} += 1;
       return;
   }
 
@@ -3168,7 +3169,8 @@ sub __forecastSolar_ApiResponse {
 
       Log3 ($name, 1, "$name - $msg");
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}       = $err;
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_message} = $err;
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
       $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
@@ -3217,12 +3219,19 @@ sub __forecastSolar_ApiResponse {
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_code}           = $jdata->{'message'}{'code'};
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
+          
+          $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_message}        = $jdata->{'message'}{'text'};
+          $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_code}           = $jdata->{'message'}{'code'};
+          $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];          # letzte Abrufzeit
+          $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_timestamp} = $t;
 
           if (defined $jdata->{'message'}{'ratelimit'}{'remaining'}) {
-              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_remaining} = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
+              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_remaining}       = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
+              $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{requests_remaining} = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
           }
           else {
               delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_remaining};                                                   # verbleibende Requests unbestimmt
+              delete $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{requests_remaining};                                             # verbleibende Requests unbestimmt
           }
 
           if($debug =~ /apiCall/x) {
@@ -3238,6 +3247,9 @@ sub __forecastSolar_ApiResponse {
 
               $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{retryat_time}      = $rtyat;
               $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{retryat_timestamp} = $rtyatts;
+              
+              $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{retryat_time}      = $rtyat;
+              $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{retryat_timestamp} = $rtyatts;
 
               debugLog ($paref, "apiCall", "ForecastSolar API Call - retry at: ".$rtyat." ($rtyatts)");
           }
@@ -3262,6 +3274,15 @@ sub __forecastSolar_ApiResponse {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_limit_period}   = $jdata->{'message'}{'ratelimit'}{'period'};             # Requests Limit Periode
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_limit}          = $jdata->{'message'}{'ratelimit'}{'limit'};              # Requests Limit in Periode
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{place}                   = encode ("utf8", $jdata->{'message'}{'info'}{'place'});
+
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_time}      = $rt;  
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_timestamp} = $rts; 
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_message}        = $jdata->{'message'}{'type'};
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_code}           = $jdata->{'message'}{'code'};
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{requests_remaining}      = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{requests_limit_period}   = $jdata->{'message'}{'ratelimit'}{'period'};             # Requests Limit Periode
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{requests_limit}          = $jdata->{'message'}{'ratelimit'}{'limit'};              # Requests Limit in Periode
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{place}                   = encode ("utf8", $jdata->{'message'}{'info'}{'place'});
 
       if ($debug =~ /apiCall/x) {
           Log3 ($name, 1, qq{$name DEBUG> ForecastSolar API Call - server response for PV string "$string"});
@@ -3311,7 +3332,8 @@ sub ___setForeCastAPIcallKeyData {
 
   my $hash  = $defs{$name};
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests}       += 1;
+  $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{todayDoneAPIrequests} += 1;
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
@@ -3319,12 +3341,14 @@ sub ___setForeCastAPIcallKeyData {
   my $period = SolCastAPIVal ($hash, '?All', '?All', 'requests_limit_period', 3600);        # Requests Limit Periode
   my $limit  = SolCastAPIVal ($hash, '?All', '?All', 'requests_limit',          12);        # Request Limit in Periode
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $forapirepdef;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}       = $forapirepdef;
+  $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{currentAPIinterval} = $forapirepdef;
 
   my $interval = int ($period / ($limit / $snum));
   $interval    = 900 if($interval < 900);
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $interval;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}       = $interval;
+  $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{currentAPIinterval} = $interval;
 
   ####
 
@@ -3334,7 +3358,8 @@ sub ___setForeCastAPIcallKeyData {
 
   if ($rtyatts && $rtyatts > $t) {                                                          # Zwangswartezeit durch API berücksichtigen
       $apiitv = $rtyatts - $t;
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apiitv;
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}       = $apiitv;
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{currentAPIinterval} = $apiitv;
       $smt    = '(forced waiting time)';
   }
 
@@ -7848,7 +7873,8 @@ sub __delObsoleteAPIData {
   ## Status-API Daten löschen
   #############################
   if (keys %{$data{$type}{$name}{statusapi}}) {
-      delete $data{$type}{$name}{statusapi}{OpenMeteo} if(!isWeatherModelOpenMeteo ($hash) && !isOpenMeteoUsed ($hash));
+      delete $data{$type}{$name}{statusapi}{OpenMeteo}     if(!isWeatherModelOpenMeteo ($hash) && !isOpenMeteoUsed ($hash));
+      delete $data{$type}{$name}{statusapi}{ForecastSolar} if(!isForecastSolarUsed ($hash));
   }
   
   ## Solar-API Daten löschen
