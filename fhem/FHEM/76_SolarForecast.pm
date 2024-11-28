@@ -158,7 +158,7 @@ BEGIN {
 my %vNotesIntern = (
   "1.37.8" => "28.11.2024  edit commref, func _searchCacheFiles for renaming Cache files when device is renamed ".
                            "_saveEnergyConsumption: extended for Debug collectData, preparation of weatherApiData ".
-                           "new func WeatherAPIVal ",
+                           "new func WeatherAPIVal, StatusAPIVal ",
   "1.37.7" => "26.11.2024  Attr flowGraphicControl: key shift changed to shiftx, new key shifty ".
                            "change: 'trackFlex' && \$wcc >= 70 to \$wcc >= 80 ".
                            "obsolete Attr deleted: flowGraphicCss, flowGraphicSize, flowGraphicAnimate, flowGraphicConsumerDistance, ".
@@ -600,6 +600,7 @@ my %hget = (                                                                # Ha
   rooftopData        => { fn => \&_getRoofTopData,              needcred => 0 },
   solApiData         => { fn => \&_getlistSolCastData,          needcred => 0 },
   weatherApiData     => { fn => \&_getlistWeatherApiData,       needcred => 0 },
+  statusApiData      => { fn => \&_getlistStatusApiData,        needcred => 0 },
   valDecTree         => { fn => \&_getaiDecTree,                needcred => 0 },
   ftuiFramefiles     => { fn => \&_ftuiFramefiles,              needcred => 0 },
   dwdCatalog         => { fn => \&_getdwdCatalog,               needcred => 0 },
@@ -1163,6 +1164,7 @@ my %hfspvh = (
 # $data{$type}{$name}{strings}                                                   # Stringkonfiguration Hash
 # $data{$type}{$name}{solcastapi}                                                # Zwischenspeicher API-Solardaten
 # $data{$type}{$name}{weatherapi}                                                # Zwischenspeicher API-Wetterdaten
+# $data{$type}{$name}{statusapi}                                                 # Zwischenspeicher API-Status
 # $data{$type}{$name}{aidectree}{object}                                         # AI Decision Tree Object
 # $data{$type}{$name}{aidectree}{aitrained}                                      # AI Decision Tree trainierte Daten
 # $data{$type}{$name}{aidectree}{airaw}                                          # Rohdaten für AI Input = Raw Trainigsdaten
@@ -2475,6 +2477,7 @@ sub Get {
                 "pvHistory:#,exportToCsv,$pvl ".
                 "rooftopData:noArg ".
                 "solApiData:noArg ".
+                "statusApiData:noArg ".
                 "valCurrent:noArg ".
                 "weatherApiData:noArg "
                 ;
@@ -4122,8 +4125,8 @@ sub __openMeteoDWD_ApiRequest {
       my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef);
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
       
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}    += 1;
-      $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{todayDoneAPIcalls} += 1;
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}   += 1;
+      $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{todayDoneAPIcalls} += 1;
       
       return;
   }
@@ -4235,8 +4238,8 @@ sub __openMeteoDWD_ApiResponse {
 
       Log3 ($name, 1, "$name - $msg");
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}    = $err;
-      $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{response_message} = $err;
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}   = $err;
+      $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = $err;
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
       $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                                 # Verarbeitungszeit ermitteln
@@ -4262,10 +4265,10 @@ sub __openMeteoDWD_ApiResponse {
       my $rt    = (timestampToTimestring ($t, $lang))[3];
       my $jdata = decode_json ($myjson);
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}         = $rt;                                                    # letzte Abrufzeit
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp}    = $t;                   # letzter Abrufzeitstempel
-      $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{lastretrieval_time}      = $rt;
-      $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{lastretrieval_timestamp} = $t;
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}        = $rt;                                                    # letzte Abrufzeit
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp}   = $t;                   # letzter Abrufzeitstempel
+      $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{lastretrieval_time}      = $rt;
+      $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{lastretrieval_timestamp} = $t;
       
       ## bei Fehler in API intern kommt
       ###################################
@@ -4279,8 +4282,8 @@ sub __openMeteoDWD_ApiResponse {
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}    = $jdata->{'reason'};
-          $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{response_message} = $jdata->{'reason'};
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}   = $jdata->{'reason'};
+          $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = $jdata->{'reason'};
           
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
           $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
@@ -4288,8 +4291,8 @@ sub __openMeteoDWD_ApiResponse {
           return;
       }
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}    = 'success';
-      $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{response_message} = 'success';
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}   = 'success';
+      $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = 'success';
 
       if ($debug =~ /apiCall/xs) {
           Log3 ($name, 1, qq{$name DEBUG> Open-Meteo API Call - server response for PV string "$string"});
@@ -4493,8 +4496,8 @@ sub ___setOpenMeteoAPIcallKeyData {
 
   my $hash  = $defs{$name};
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests}    += $cequ;
-  $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{todayDoneAPIrequests} += $cequ;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests}   += $cequ;
+  $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{todayDoneAPIrequests} += $cequ;
 
   my $dar = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
   my $dac = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',    0);
@@ -4503,11 +4506,11 @@ sub ___setOpenMeteoAPIcallKeyData {
   my $drr = $ometmaxreq - $dar;
   $drr    = 0 if($drr < 0);
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests}    = $drr;
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}           = $ometeorepdef;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests}   = $drr;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}          = $ometeorepdef;
   
-  $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{todayRemainingAPIrequests} = $drr;
-  $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{currentAPIinterval}        = $ometeorepdef;
+  $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{todayRemainingAPIrequests} = $drr;
+  $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval}        = $ometeorepdef;
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
@@ -4519,8 +4522,8 @@ sub ___setOpenMeteoAPIcallKeyData {
       my $optrep = $rmdif / ($drr / ($cequ * $asc));
       $optrep    = $ometeorepdef if($optrep < $ometeorepdef);
       
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}    = $optrep;
-      $data{$type}{$name}{weatherapi}{OpenMeteo}{'?All'}{currentAPIinterval} = $optrep;
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}   = $optrep;
+      $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval} = $optrep;
   }
 
   debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef));
@@ -4723,6 +4726,20 @@ sub _getlistWeatherApiData {
   my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'weatherApiData');
+  $ret   .= lineFromSpaces ($ret, 20);
+
+return $ret;
+}
+
+###############################################################
+#                       Getter statusApiData
+###############################################################
+sub _getlistStatusApiData {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
+
+  my $ret = listDataPool   ($hash, 'statusApiData');
   $ret   .= lineFromSpaces ($ret, 20);
 
 return $ret;
@@ -7826,6 +7843,12 @@ sub __delObsoleteAPIData {
       else {
           delete $data{$type}{$name}{weatherapi}{OpenMeteo};
       }
+  }
+  
+  ## Status-API Daten löschen
+  #############################
+  if (keys %{$data{$type}{$name}{statusapi}}) {
+      delete $data{$type}{$name}{statusapi}{OpenMeteo} if(!isWeatherModelOpenMeteo ($hash) && !isOpenMeteoUsed ($hash));
   }
   
   ## Solar-API Daten löschen
@@ -16678,9 +16701,10 @@ sub listDataPool {
       return $ret;
   };
 
-  if ($htol =~ /solApiData|weatherApiData/xs) {                       
+  if ($htol =~ /solApiData|weatherApiData|statusApiData/xs) {                       
       $h = $data{$type}{$name}{solcastapi};
       $h = $data{$type}{$name}{weatherapi} if($htol eq 'weatherApiData');
+      $h = $data{$type}{$name}{statusapi}  if($htol eq 'statusApiData');
       
       if (!keys %{$h}) {
           return qq{The API values cache is empty.};
@@ -19757,6 +19781,50 @@ sub WeatherAPIVal {
 return $def;
 }
 
+##########################################################################################################################################################
+# Wert des StatusAPI-Hash zurückliefern
+# Usage:
+# StatusAPIVal ($hash, $apiname, '?All', $key, $def)
+#
+# $apiname:  Hauptname der API gemäß setupWeatherDevX (z.B. OpenMeteo)
+# $key:      Parameter
+# $def:      Defaultwert
+#
+# WeatherAPIVal ($hash, $apiname, '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
+# WeatherAPIVal ($hash, $apiname, '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
+# WeatherAPIVal ($hash, $apiname, '?All', 'todayDoneAPIrequests',    $def) - heute ausgeführte API Requests
+# WeatherAPIVal ($hash, $apiname, '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Calls (hat u.U. mehrere Requests)
+# WeatherAPIVal ($hash, $apiname, '?All', 'todayRemainingAPIrequests $def) - heute verbleibende API Requests
+# WeatherAPIVal ($hash, $apiname, '?All', 'todayRemainingAPIcalls',  $def) - heute noch mögliche API Calls (ungl. Requests !)
+# WeatherAPIVal ($hash, $apiname, '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall
+# WeatherAPIVal ($hash, $apiname, '?All', 'response_message',        $def) - letzte API Antwort
+# WeatherAPIVal ($hash, $apiname, '?All', 'place',                   $def) - ForecastSolarAPI -> Location der Anlage
+# WeatherAPIVal ($hash, $apiname, '?All', 'requests_limit',          $def) - ForecastSolarAPI -> Request Limit innerhalb der Periode
+# WeatherAPIVal ($hash, $apiname, '?All', 'requests_limit_period',   $def) - ForecastSolarAPI -> Periode für Request Limit
+# WeatherAPIVal ($hash, $apiname, '?All', 'requests_remaining',      $def) - ForecastSolarAPI -> verbleibende Requests innerhalb der laufenden Periode
+# WeatherAPIVal ($hash, $apiname, '?All', 'response_code',           $def) - ForecastSolarAPI -> letzter Antwortcode
+# WeatherAPIVal ($hash, $apiname, '?All', 'retryat_time',            $def) - ForecastSolarAPI -> Zwangsverzögerung des nächsten Calls bis Uhrzeit
+# WeatherAPIVal ($hash, $apiname, '?All', 'retryat_timestamp',       $def) - ForecastSolarAPI -> Zwangsverzögerung des nächsten Calls bis UNIX-Zeitstempel
+##########################################################################################################################################################
+sub StatusAPIVal {
+  my $hash    = shift;
+  my $apiname = shift;
+  my $key     = shift;
+  my $def     = shift;
+
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+
+  if (defined $data{$type}{$name}{statusapi}                          &&
+      defined $data{$type}{$name}{statusapi}{$apiname}                &&
+      defined $data{$type}{$name}{statusapi}{$apiname}{'?All'}        &&
+      defined $data{$type}{$name}{statusapi}{$apiname}{'?All'}{$key}) {
+      return  $data{$type}{$name}{statusapi}{$apiname}{'?All'}{$key};
+  }
+
+return $def;
+}
+
 1;
 
 =pod
@@ -20625,6 +20693,14 @@ to ensure that the system configuration is correct.
             <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Maximum number of SolCast API calls per day                                                </td></tr>
          </table>
       </ul>
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-statusApiData"></a>
+      <li><b>statusApiData </b> <br><br>
+      Under construction for the next version.
       </li>
     </ul>
     <br>
@@ -23003,6 +23079,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Anzahl der maximal möglichen SolCast API Abrufe pro Tag                                         </td></tr>
          </table>
       </ul>
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-statusApiData"></a>
+      <li><b>statusApiData </b> <br><br>
+      Im Aufbau für die kommende Version.
       </li>
     </ul>
     <br>
