@@ -156,6 +156,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.37.8" => "27.11.2024  edit commref, func _searchCacheFiles for renaming Cache files when device is renamed ".
+                           "_saveEnergyConsumption: extended for Debug collectData ",
   "1.37.7" => "26.11.2024  Attr flowGraphicControl: key shift changed to shiftx, new key shifty ".
                            "change: 'trackFlex' && \$wcc >= 70 to \$wcc >= 80 ".
                            "obsolete Attr deleted: flowGraphicCss, flowGraphicSize, flowGraphicAnimate, flowGraphicConsumerDistance, ".
@@ -350,7 +352,7 @@ my %vNotesIntern = (
 
 ## Standardvariablen
 ######################
-my @da;                                                                             # Readings-Store
+my @da;                                                                             # zentraler Readings-Store
 my $deflang        = 'EN';                                                          # default Sprache wenn nicht konfiguriert
 my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
 my $kJtokWh        = 0.0002777777778;                                               # Umrechnungsfaktor kJ in kWh
@@ -6357,7 +6359,16 @@ sub Rename {
   my $type = (split '::', __PACKAGE__)[1];
   
   $data{$type}{$new_name} = $data{$type}{$old_name};
-  delete $data{$type}{$old_name};                            
+  delete $data{$type}{$old_name}; 
+
+  my @ftd = _searchCacheFiles ($old_name);
+
+  for my $oldf (@ftd) {
+      my $newf = $oldf;
+      $newf    =~ s/_SolarForecast_${old_name}/_SolarForecast_${new_name}/xsg;
+      rename ($oldf, $newf) or  
+          Log3 ($new_name, 2, qq{$new_name - WARNING - File "$oldf" could not be renamed: $!});
+  }  
   
   # Log3 ($new_name, 1, qq{$new_name - Dump -> \n}. Dumper $data{$type}{$new_name});
 
@@ -6414,26 +6425,7 @@ sub Delete {
   my $arg  = shift;
   my $name = $hash->{NAME};
 
-  my @ftd = ( $pvhcache.$name,
-              $pvccache.$name,
-              $plantcfg.$name,
-              $csmcache.$name,
-              $scpicache.$name,
-              $airaw.$name,
-              $aitrained.$name,
-              $pvhexprtcsv.$name
-            );
-
-  opendir (DIR, $cachedir);
-
-  while (my $file = readdir (DIR)) {
-      next unless (-f "$cachedir/$file");
-      next unless ($file =~ /_${name}_/);
-      next unless ($file =~ /_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}$/);
-      push @ftd, "$cachedir/$file";
-  }
-
-  closedir (DIR);
+  my @ftd = _searchCacheFiles ($name);
 
   for my $f (@ftd) {
       my $err = FileDelete ($f);
@@ -6442,7 +6434,7 @@ sub Delete {
           Log3 ($name, 1, qq{$name - Message while deleting file "$f": $err});
       }
       else {
-          Log3 ($name, 3, qq{$name - INFO - File "$f" successfully deleted.});
+          Log3 ($name, 3, qq{$name - INFO - File "$f" deleted.});
       }
   }
 
@@ -6451,6 +6443,28 @@ sub Delete {
   delete $data{$type}{$name};
 
 return;
+}
+
+#################################################################
+#  Cache Files im Cache Directory suchen und als Array 
+#  zurückliefern
+#################################################################
+sub _searchCacheFiles {
+  my $name = shift;
+
+  my @ftd;
+
+  opendir (DIR, $cachedir);
+
+  while (my $file = readdir (DIR)) {
+      next unless (-f "$cachedir/$file");
+      next unless ($file =~ /_SolarForecast_${name}/);
+      push @ftd, "$cachedir/$file";
+  }
+
+  closedir (DIR);
+
+return @ftd;
 }
 
 ################################################################
@@ -11847,33 +11861,40 @@ sub _saveEnergyConsumption {
   my $paref  = shift;
   my $name   = $paref->{name};
   my $chour  = $paref->{chour};
+  my $debug  = $paref->{debug};
 
   my $shr     = sprintf "%02d", ($chour + 1);
-  my $pvrl    = ReadingsNum ($name, "Today_Hour".$shr."_PVreal",          0);
+  my $pvrl    = ReadingsNum ($name, "Today_Hour".$shr."_PVreal",          0);   # Reading enthält die Summe aller Inverterdevices
   my $gfeedin = ReadingsNum ($name, "Today_Hour".$shr."_GridFeedIn",      0);
   my $gcon    = ReadingsNum ($name, "Today_Hour".$shr."_GridConsumption", 0);
   my $batin   = ReadingsNum ($name, "Today_Hour".$shr."_BatIn",           0);
   my $batout  = ReadingsNum ($name, "Today_Hour".$shr."_BatOut",          0);
+  my $ppreal  = 0;
 
-  my $con     = $pvrl - $gfeedin + $gcon - $batin + $batout;
-
-  for my $prn (1..$maxproducer) {                                         # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
-      $prn  = sprintf "%02d", $prn;
-      $con += ReadingsNum ($name, "Today_Hour".$shr."_PPreal".$prn, 0);
+  for my $prn (1..$maxproducer) {                                               # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
+      $prn     = sprintf "%02d", $prn;
+      $ppreal += ReadingsNum ($name, "Today_Hour".$shr."_PPreal".$prn, 0);
   }
+  
+  my $con = $pvrl + $ppreal - $gfeedin + $gcon - $batin + $batout;
 
-  if (int $paref->{minute} > 30 && $con < 0) {                            # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
+  if (int $paref->{minute} > 30 && $con < 0) {                                  # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
       my $vl  = 3;
       my $pre = '- WARNING -';
 
-      if ($paref->{debug} =~ /consumption/xs) {
+      if ($debug =~ /consumption/xs) {
           $vl  = 1;
           $pre = 'DEBUG> - WARNING -';
       }
 
       Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error. Check Readings _PVreal, _GridFeedIn, _GridConsumption, _BatIn, _BatOut of hour >$shr<");
   }
-
+  
+  if ($debug =~ /collectData/xs) {
+      Log3 ($name, 1, "$name DEBUG> EnergyConsumption input -> PV: $pvrl, PP: $ppreal, GridIn: $gfeedin, GridCon: $gcon, BatIn: $batin, BatOut: $batout");
+      Log3 ($name, 1, "$name DEBUG> EnergyConsumption result -> $con Wh");
+  }
+  
   writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $shr } );
 
 return;
@@ -21010,11 +21031,15 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-ctrlInterval"></a>
        <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
          Repetition interval of the data collection. <br>
-         Regardless of the set interval, data is collected automatically a few seconds before the end and after the start
-         of a full hour. <br>
-         If ctrlInterval is explicitly set to "0", no automatic data collection takes place and must be carried out
-         externally with "get &lt;name&gt; data". <br>
-         (default: 70)
+         If ctrlInterval is explicitly set to “0”, no regular data collection takes place and must be started externally 
+         with “get &lt;name&gt; data”. <br>
+         (default: 70) 
+         <br><br>
+         
+         <b>Note:</b> Regardless of the set interval (even with “0”), data is collected automatically a few seconds 
+                      before the end and after the start of a full hour. <br>
+                      Furthermore, data is collected automatically when an event from a device defined as “asynchron” 
+                      device (consumer, meter, etc.) is received and processed.
        </li><br>
 
        <a id="SolarForecast-attr-ctrlLanguage"></a>
@@ -21637,7 +21662,7 @@ to ensure that the system configuration is correct.
            <tr><td>                 </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                       </td></tr>         
            <tr><td> <b>feed</b>     </td><td>Defines special properties of the device's energy supply (optional).                                        </td></tr>
            <tr><td>                 </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                             </td></tr>
-           <tr><td>                 </td><td><b>bat</b> - the device supplies energy exclusively to the battery                                          </td></tr>
+           <tr><td>                 </td><td><b>bat</b> - Solar charger for direct battery charging. Any surplus is fed into the inverter/house network. </td></tr>
            <tr><td>                 </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                            </td></tr>
            <tr><td> <b>limit</b>    </td><td>Defines any active power limitation in % (optional).                                                        </td></tr>
            <tr><td> <b>icon</b>     </td><td>Icon for displaying the inverter in the flow chart (optional)                                               </td></tr>
@@ -23376,11 +23401,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-ctrlInterval"></a>
        <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
          Wiederholungsintervall der Datensammlung. <br>
-         Unabhängig vom eingestellten Intervall erfolgt einige Sekunden vor dem Ende sowie nach dem Beginn einer
-         vollen Stunde eine automatische Datensammlung. <br>
-         Ist ctrlInterval explizit auf "0" gesetzt, erfolgt keinerlei automatische Datensammlung und muss mit
-         "get &lt;name&gt; data" extern erfolgen. <br>
-         (default: 70)
+         Ist ctrlInterval explizit auf "0" gesetzt, erfolgt keine regelmäßige Datensammlung und muss mit
+         "get &lt;name&gt; data" extern gestartet werden. <br>
+         (default: 70) 
+         <br><br>
+         
+         <b>Hinweis:</b> Unabhängig vom eingestellten Intervall (auch bei "0") erfolgt einige Sekunden vor dem Ende 
+                         sowie nach dem Beginn einer vollen Stunde eine automatische Datensammlung. <br>
+                         Weiterhin erfolgt eine automatische Datensammlung wenn ein Event eines als "asynchron" 
+                         definierten Gerätes (Consumer, Meter, etc.) empfangen und verarbeitet wird.
        </li><br>
 
        <a id="SolarForecast-attr-ctrlLanguage"></a>
@@ -24003,7 +24032,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                 </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.           </td></tr>         
            <tr><td> <b>feed</b>     </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                              </td></tr>
            <tr><td>                 </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.    </td></tr>
-           <tr><td>                 </td><td><b>bat</b> - das Gerät liefert die Energie ausschließlich an die Batterie                                   </td></tr>
+           <tr><td>                 </td><td><b>bat</b> - Solar-Ladegerät zur Batterie Direktladung. Ein Überschuß wird dem Inverter/Hausnetz zugeführt. </td></tr>
            <tr><td>                 </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentlich Netz eingespeist                            </td></tr>
            <tr><td> <b>limit</b>    </td><td>Definiert eine eventuelle Wirkleistungsbeschränkung in % (optional).                                        </td></tr>
            <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                             </td></tr>
