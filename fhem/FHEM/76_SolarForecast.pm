@@ -156,6 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.37.9" => "29.11.2024  activate StatusAPI-Hash, Separation of radiation API-data , API-state data , weather-API data ",
   "1.37.8" => "28.11.2024  edit commref, func _searchCacheFiles for renaming Cache files when device is renamed ".
                            "_saveEnergyConsumption: extended for Debug collectData, preparation of weatherApiData ".
                            "new func WeatherAPIVal, StatusAPIVal ",
@@ -375,6 +376,8 @@ my $pvccache       = $root."/FHEM/FhemUtils/PVC_SolarForecast_";                
 my $plantcfg       = $root."/FHEM/FhemUtils/PVCfg_SolarForecast_";                  # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
 my $csmcache       = $root."/FHEM/FhemUtils/PVCsm_SolarForecast_";                  # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
 my $scpicache      = $root."/FHEM/FhemUtils/ScApi_SolarForecast_";                  # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
+my $statcache      = $root."/FHEM/FhemUtils/StatApi_SolarForecast_";                # Filename-Fragment für Status-API Werte (wird mit Devicename ergänzt)
+my $weathercache   = $root."/FHEM/FhemUtils/WeatherApi_SolarForecast_";             # Filename-Fragment für Weather-API Werte (wird mit Devicename ergänzt)
 my $aitrained      = $root."/FHEM/FhemUtils/AItra_SolarForecast_";                  # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
 my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";                  # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
 my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename für DWD Stationskatalog
@@ -1051,15 +1054,15 @@ my %hef = (                                                                     
 );
 
 my %hcsr = (                                                                                                                               # Funktiontemplate zur Erstellung optionaler Statistikreadings
-  currentAPIinterval          => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
-  lastretrieval_time          => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => '-'         },
-  lastretrieval_timestamp     => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => '-'         },
-  response_message            => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => '-'         },
-  todayMaxAPIcalls            => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 'apimaxreq' },
-  todayDoneAPIcalls           => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 0           },
-  todayDoneAPIrequests        => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 0           },
-  todayRemainingAPIcalls      => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 'apimaxreq' },
-  todayRemainingAPIrequests   => { fnr => 1, fn => \&SolCastAPIVal, par => '',                  unit => '',     def => 'apimaxreq' },
+  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
+  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => '-'         },
+  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => '-'         },
+  response_message            => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => '-'         },
+  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 'apimaxreq' },
+  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 0           },
+  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 0           },
+  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 'apimaxreq' },
+  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 'apimaxreq' },
   runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
   runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
   runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
@@ -1363,6 +1366,16 @@ sub Define {
   $params->{cachename} = 'solcastapi';
   $params->{title}     = 'solApiData';
   _readCacheFile ($params);
+  
+  $params->{file}      = $statcache.$name;                                                               # Cache File API-Status einlesen wenn vorhanden
+  $params->{cachename} = 'statusapi';
+  $params->{title}     = 'statusApiData';
+  _readCacheFile ($params);
+  
+  $params->{file}      = $weathercache.$name;                                                            # Cache File Weather-API Daten einlesen wenn vorhanden
+  $params->{cachename} = 'weatherapi';
+  $params->{title}     = 'weatherApiData';
+  _readCacheFile ($params);
 
   $params->{file}      = $aitrained.$name;                                                               # AI Cache File einlesen wenn vorhanden
   $params->{cachename} = 'aitrained';
@@ -1423,6 +1436,30 @@ sub _readCacheFile {
           delete $data{$type}{$name}{aidectree}{airaw};
           $data{$type}{$name}{aidectree}{airaw}     = $data;
           $data{$type}{$name}{current}{aitrawstate} = 'ok';
+          Log3 ($name, 3, qq{$name - cached data "$title" restored});
+      }
+
+      return;
+  }
+  
+  if ($cachename eq 'statusapi') {
+      my ($err, $statapi) = fileRetrieve ($file);
+
+      if (!$err && $statapi) {
+          delete $data{$type}{$name}{statusapi};
+          $data{$type}{$name}{statusapi} = $statapi;
+          Log3 ($name, 3, qq{$name - cached data "$title" restored});
+      }
+
+      return;
+  }
+  
+  if ($cachename eq 'weatherapi') {
+      my ($err, $wthtapi) = fileRetrieve ($file);
+
+      if (!$err && $wthtapi) {
+          delete $data{$type}{$name}{weatherapi};
+          $data{$type}{$name}{weatherapi} = $wthtapi;
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
       }
 
@@ -1728,10 +1765,10 @@ sub _setroofIdentPair {                 ## no critic "not used"
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }
 
-  $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{rtid}   = $h->{rtid};
-  $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{apikey} = $h->{apikey};
+  $data{$type}{$name}{statusapi}{'?IdPair'}{'?'.$pk}{rtid}   = $h->{rtid};
+  $data{$type}{$name}{statusapi}{'?IdPair'}{'?'.$pk}{apikey} = $h->{apikey};
 
-  writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                             # Cache File SolCast API Werte schreiben
+  writeCacheToFile ($hash, 'statusapi', $statcache.$name);                               # Status-API Cache sichern
 
   my $msg = qq{The Roof identification pair "$pk" has been saved. }.
             qq{Repeat the command if you want to save more Roof identification pairs.};
@@ -1762,7 +1799,7 @@ sub _setVictronCredentials {                 ## no critic "not used"
   my ($a,$h) = parseParams ($arg);
 
   if ($a->[0] && $a->[0] eq 'delete') {
-      delete $data{$type}{$name}{solcastapi}{'?VRM'};
+      delete $data{$type}{$name}{statusapi}{'?VRM'};
       $msg = qq{Credentials for the Victron VRM API are deleted. };
   }
   else {
@@ -1774,11 +1811,11 @@ sub _setVictronCredentials {                 ## no critic "not used"
                         }
                         or do { return "Serialization ERROR: $@" };
 
-      $data{$type}{$name}{solcastapi}{'?VRM'}{'?API'}{credentials} = chew ($serial);
+      $data{$type}{$name}{statusapi}{'?VRM'}{'?API'}{credentials} = chew ($serial);
       $msg = qq{Credentials for the Victron VRM API has been saved.};
   }
 
-  writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                             # Cache File SolCast API Werte schreiben
+  writeCacheToFile ($hash, 'statusapi', $statcache.$name);                               # Status-API Cache sichern
 
 return $msg;
 }
@@ -2246,11 +2283,11 @@ sub _setreset {                          ## no critic "not used"
       my $pk   = $paref->{prop1} // "";                                        # ein bestimmter PairKey angegeben ?
 
       if ($pk) {
-          delete $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk};
+          delete $data{$type}{$name}{statusapi}{'?IdPair'}{'?'.$pk};
           Log3 ($name, 3, qq{$name - roofIdentPair: pair key "$pk" deleted});
       }
       else {
-          delete $data{$type}{$name}{solcastapi}{'?IdPair'};
+          delete $data{$type}{$name}{statusapi}{'?IdPair'};
           Log3($name, 3, qq{$name - roofIdentPair: all pair keys deleted});
       }
 
@@ -2311,7 +2348,7 @@ sub _setoperatingMemory {                ## no critic "not used"
   my $hash  = $defs{$name};
 
   if ($prop eq 'save') {
-      periodicWriteMemcache ($hash);                                           # Cache File für PV History, PV Circular schreiben
+      periodicWriteMemcache ($hash);                                           # Cache Files schreiben
   }
 
   if ($prop eq 'backup') {
@@ -2589,8 +2626,8 @@ sub __getSolCastData {
 
   my $type = $paref->{type};
 
-  for my $pk (keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}}) {
-      my $apikey = SolCastAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
+  for my $pk (keys %{$data{$type}{$name}{statusapi}{'?IdPair'}}) {
+      my $apikey = StatusAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
       next if(!$apikey);
 
       $mx{$apikey} += 1;
@@ -2600,16 +2637,17 @@ sub __getSolCastData {
   my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef);
   my $madc      = sprintf "%.0f", ($apimaxreq / $maxcnt);                                          # max. tägliche Anzahl API Calls
   my $mpk       = $maxcnt;                                                                         # Requestmultiplikator
-
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier}  = $mpk;
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls}          = $madc;
+  
+  $data{$type}{$name}{statusapi}{SolCast}{'?All'}{solCastAPIcallMultiplier}  = $mpk;
+  $data{$type}{$name}{statusapi}{SolCast}{'?All'}{todayMaxAPIcalls}          = $madc;
 
   #########################
 
   if (!$force) {                                                                                   # regulärer SolCast API Abruf
-      my $trc       = SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIcalls', $madc);
-      my $etxt      = $hqtxt{bnsas}{$lang};
-      $etxt         =~ s{<WT>}{($leadtime/60)}eg;
+      my ($rapi, $wapi) = getStatusApiName ($hash); 
+      my $trc           = StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIcalls', $madc);
+      my $etxt          = $hqtxt{bnsas}{$lang};
+      $etxt            =~ s{<WT>}{($leadtime/60)}eg;
 
       if ($trc <= 0) {
           readingsSingleUpdate ($hash, 'nextRadiationAPICall', $etxt, 1);
@@ -2625,8 +2663,8 @@ sub __getSolCastData {
           return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
       }
 
-      my $lrt    = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp',            0);
-      my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',     $solapirepdef);
+      my $lrt    = StatusAPIVal ($hash, $rapi, '?All', 'lastretrieval_timestamp',            0);
+      my $apiitv = StatusAPIVal ($hash, $rapi, '?All', 'currentAPIinterval',     $solapirepdef);
 
       if ($lrt && $t < $lrt + $apiitv) {
           my $rt = $lrt + $apiitv - $t;
@@ -2676,8 +2714,8 @@ sub __solCast_ApiRequest {
   my ($a,$h) = parseParams ($rft);
 
   my $pk     = $h->{$string} // q{};
-  my $roofid = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
-  my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
+  my $roofid = StatusAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
+  my $apikey = StatusAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
 
   if (!$roofid || !$apikey) {
       my $err = qq{The roofIdentPair "$pk" of String "$string" has no Rooftop-ID and/or SolCast-API key assigned !};
@@ -2749,7 +2787,7 @@ sub __solCast_ApiResponse {
 
       Log3 ($name, 1, "$name - $msg");
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
+      $data{$type}{$name}{statusapi}{SolCast}{'?All'}{response_message} = $err;
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
       $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
@@ -2793,10 +2831,10 @@ sub __solCast_ApiResponse {
 
           ___setSolCastAPIcallKeyData ($paref);
 
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
+          $data{$type}{$name}{statusapi}{SolCast}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
 
           if ($jdata->{'response_status'}{'error_code'} eq 'TooManyRequests') {
-              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = 0;
+              $data{$type}{$name}{statusapi}{SolCast}{'?All'}{todayRemainingAPIrequests} = 0;
           }
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
@@ -2807,7 +2845,7 @@ sub __solCast_ApiResponse {
               my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef);
 
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - response status: ".$jdata->{'response_status'}{'message'});
-              Log3 ($name, 1, "$name DEBUG> SolCast API Call - todayRemainingAPIrequests: ".SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', $apimaxreq));
+              Log3 ($name, 1, "$name DEBUG> SolCast API Call - todayRemainingAPIrequests: ".StatusAPIVal ($hash, 'SolCast', '?All', 'todayRemainingAPIrequests', $apimaxreq));
           }
 
           return;
@@ -2882,7 +2920,7 @@ sub __solCast_ApiResponse {
 
   ___setSolCastAPIcallKeyData ($paref);
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
+  $data{$type}{$name}{statusapi}{SolCast}{'?All'}{response_message} = 'success';
 
   my $param = {
       name       => $name,
@@ -2957,25 +2995,25 @@ sub ___setSolCastAPIcallKeyData {
 
   my $hash  = $defs{$name};
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];   # letzte Abrufzeit
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                       # letzter Abrufzeitstempel
-
+  $data{$type}{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];   # letzte Abrufzeit
+  $data{$type}{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_timestamp} = $t;                                       # letzter Abrufzeitstempel
+  
   my $apimaxreq = AttrVal       ($name, 'ctrlSolCastAPImaxReq',        $solcmaxreqdef);
-  my $mpl       = SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier', 1);
-  my $ddc       = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',        0);
+  my $mpl       = StatusAPIVal ($hash, 'SolCast', '?All', 'solCastAPIcallMultiplier', 1);
+  my $ddc       = StatusAPIVal ($hash, 'SolCast', '?All', 'todayDoneAPIcalls',        0);
 
   $ddc         += 1 if($paref->{firstreq});
-  my $drc       = SolCastAPIVal ($hash, '?All', '?All', 'todayMaxAPIcalls', $apimaxreq / $mpl) - $ddc;                 # verbleibende SolCast API Calls am aktuellen Tag
+  my $drc       = StatusAPIVal ($hash, 'SolCast', '?All', 'todayMaxAPIcalls', $apimaxreq / $mpl) - $ddc;               # verbleibende SolCast API Calls am aktuellen Tag
   $drc          = 0 if($drc < 0);
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} = $ddc * $mpl;
+  $data{$type}{$name}{statusapi}{SolCast}{'?All'}{todayDoneAPIrequests} = $ddc * $mpl;
 
   my $drr       = $apimaxreq - ($mpl * $ddc);
   $drr          = 0 if($drr < 0);
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = $drr;
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls}    = $drc;
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}         = $ddc;
+  $data{$type}{$name}{statusapi}{SolCast}{'?All'}{todayRemainingAPIrequests} = $drr;
+  $data{$type}{$name}{statusapi}{SolCast}{'?All'}{todayRemainingAPIcalls}    = $drc;
+  $data{$type}{$name}{statusapi}{SolCast}{'?All'}{todayDoneAPIcalls}         = $ddc;
 
   debugLog ($paref, "apiProcess|apiCall", "SolCast API Call - done API Calls: $ddc");
 
@@ -2988,19 +3026,19 @@ sub ___setSolCastAPIcallKeyData {
       my $dart   = $sstime - $t;                                                                                      # verbleibende Sekunden bis Sonnenuntergang
       $dart      = 0 if($dart < 0);
       $drc      += 1;
+      
+      $data{$type}{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = $solapirepdef;
+      $data{$type}{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $solapirepdef;
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
-
-      debugLog ($paref, "apiProcess|apiCall", "SolCast API Call - Sunset: $sunset, remain Sec to Sunset: $dart, new interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $solapirepdef));
+      debugLog ($paref, "apiProcess|apiCall", "SolCast API Call - Sunset: $sunset, remain Sec to Sunset: $dart, new interval: ".StatusAPIVal ($hash, 'SolCast', '?All', 'currentAPIinterval', $solapirepdef));
   }
   else {
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $solapirepdef;
+      $data{$type}{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = $solapirepdef;
   }
 
   ####
 
-  my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $solapirepdef);
+  my $apiitv = StatusAPIVal ($hash, 'SolCast', '?All', 'currentAPIinterval', $solapirepdef);
 
   if ($debug =~ /apiProcess|apiCall/x) {
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - remaining API Calls: ".($drc - 1));
@@ -3036,8 +3074,8 @@ sub __getForecastSolarData {
           return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
       }
 
-      my $lrt    = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp',            0);
-      my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',     $forapirepdef);
+      my $lrt    = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'lastretrieval_timestamp',            0);
+      my $apiitv = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'currentAPIinterval',     $forapirepdef);
 
       if ($lrt && $t < $lrt + $apiitv) {
           my $rt = $lrt + $apiitv - $t;
@@ -3083,7 +3121,6 @@ sub __forecastSolar_ApiRequest {
   my $hash       = $defs{$name};
 
   if (!$allstrings) {                                                                  # alle Strings wurden abgerufen
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}       += 1;
       $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{todayDoneAPIcalls} += 1;
       return;
   }
@@ -3169,7 +3206,6 @@ sub __forecastSolar_ApiResponse {
 
       Log3 ($name, 1, "$name - $msg");
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}       = $err;
       $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_message} = $err;
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
@@ -3214,11 +3250,6 @@ sub __forecastSolar_ApiResponse {
           Log3 ($name, 3, "$name - $msg");
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}        = $jdata->{'message'}{'text'};
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_code}           = $jdata->{'message'}{'code'};
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
           
           $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_message}        = $jdata->{'message'}{'text'};
           $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_code}           = $jdata->{'message'}{'code'};
@@ -3226,15 +3257,13 @@ sub __forecastSolar_ApiResponse {
           $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_timestamp} = $t;
 
           if (defined $jdata->{'message'}{'ratelimit'}{'remaining'}) {
-              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_remaining}       = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
               $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{requests_remaining} = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
           }
           else {
-              delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_remaining};                                                   # verbleibende Requests unbestimmt
               delete $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{requests_remaining};                                             # verbleibende Requests unbestimmt
           }
 
-          if($debug =~ /apiCall/x) {
+          if ($debug =~ /apiCall/x) {
               Log3 ($name, 1, "$name DEBUG> ForecastSolar API Call - $msg");
               Log3 ($name, 1, "$name DEBUG> ForecastSolar API Call - limit period: ".$jdata->{'message'}{'ratelimit'}{'period'});
               Log3 ($name, 1, "$name DEBUG> ForecastSolar API Call - limit: ".$jdata->{'message'}{'ratelimit'}{'limit'});
@@ -3244,9 +3273,6 @@ sub __forecastSolar_ApiResponse {
 
           if ($rtyat) {
               my $rtyatts = timestringToTimestamp ($rtyat);
-
-              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{retryat_time}      = $rtyat;
-              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{retryat_timestamp} = $rtyatts;
               
               $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{retryat_time}      = $rtyat;
               $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{retryat_timestamp} = $rtyatts;
@@ -3265,18 +3291,8 @@ sub __forecastSolar_ApiResponse {
       my $rt  = timestringFormat      ($jdata->{'message'}{'info'}{'time'});
       my $rts = timestringToTimestamp ($rt);
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = $rt;                                                    # letzte Abrufzeit
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $rts;                                                   # letzter Abrufzeitstempel
-
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}        = $jdata->{'message'}{'type'};
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_code}           = $jdata->{'message'}{'code'};
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_remaining}      = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_limit_period}   = $jdata->{'message'}{'ratelimit'}{'period'};             # Requests Limit Periode
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{requests_limit}          = $jdata->{'message'}{'ratelimit'}{'limit'};              # Requests Limit in Periode
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{place}                   = encode ("utf8", $jdata->{'message'}{'info'}{'place'});
-
-      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_time}      = $rt;  
-      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_timestamp} = $rts; 
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_time}      = $rt;                                                    # letzte Abrufzeit
+      $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_timestamp} = $rts;                                                   # letzter Abrufzeitstempel
       $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_message}        = $jdata->{'message'}{'type'};
       $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{response_code}           = $jdata->{'message'}{'code'};
       $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{requests_remaining}      = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
@@ -3332,33 +3348,29 @@ sub ___setForeCastAPIcallKeyData {
 
   my $hash  = $defs{$name};
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests}       += 1;
   $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{todayDoneAPIrequests} += 1;
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
-  my $snum   = scalar (split ",", AttrVal ($name, 'setupInverterStrings',  'Dummy'));       # Anzahl der Strings (mindestens ein String als Dummy)
-  my $period = SolCastAPIVal ($hash, '?All', '?All', 'requests_limit_period', 3600);        # Requests Limit Periode
-  my $limit  = SolCastAPIVal ($hash, '?All', '?All', 'requests_limit',          12);        # Request Limit in Periode
+  my $snum   = scalar (split ",", AttrVal ($name, 'setupInverterStrings',  'Dummy'));               # Anzahl der Strings (mindestens ein String als Dummy)
+  my $period = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'requests_limit_period', 3600);        # Requests Limit Periode
+  my $limit  = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'requests_limit',          12);        # Request Limit in Periode
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}       = $forapirepdef;
   $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{currentAPIinterval} = $forapirepdef;
 
   my $interval = int ($period / ($limit / $snum));
   $interval    = 900 if($interval < 900);
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}       = $interval;
   $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{currentAPIinterval} = $interval;
 
   ####
 
-  my $apiitv  = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $forapirepdef);
-  my $rtyatts = SolCastAPIVal ($hash, '?All', '?All', 'retryat_timestamp',  0);
+  my $apiitv  = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'currentAPIinterval', $forapirepdef);
+  my $rtyatts = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'retryat_timestamp',  0);
   my $smt     = q{};
 
   if ($rtyatts && $rtyatts > $t) {                                                          # Zwangswartezeit durch API berücksichtigen
       $apiitv = $rtyatts - $t;
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}       = $apiitv;
       $data{$type}{$name}{statusapi}{ForecastSolar}{'?All'}{currentAPIinterval} = $apiitv;
       $smt    = '(forced waiting time)';
   }
@@ -3424,10 +3436,10 @@ sub __getDWDSolarData {
   my $sts     = timestringToTimestamp ($stime);
   my @strings = sort keys %{$data{$type}{$name}{strings}};
   my $ret     = q{};
-
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests}   += 1;
+  
+  $data{$type}{$name}{statusapi}{DWD}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3]; 
+  $data{$type}{$name}{statusapi}{DWD}{'?All'}{lastretrieval_timestamp} = $t;
+  $data{$type}{$name}{statusapi}{DWD}{'?All'}{todayDoneAPIrequests}   += 1;
 
   my $fctime                                  = ReadingsVal ($raname, 'fc_time', '-');
   $data{$type}{$name}{current}{dwdRad1hDev}   = $raname;
@@ -3448,7 +3460,7 @@ sub __getDWDSolarData {
 
       if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $ret;
+          $data{$type}{$name}{statusapi}{DWD}{'?All'}{response_message} = $ret;
 
           debugLog ($paref, "apiCall", "DWD API - ERROR - got unusual data of starttime: $dateTime. ".$ret);
       }
@@ -3512,7 +3524,7 @@ sub __getDWDSolarData {
       }
   }
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success' if(!$ret);
+  $data{$type}{$name}{statusapi}{DWD}{'?All'}{response_message} = 'success' if(!$ret);
 
 return;
 }
@@ -3636,7 +3648,7 @@ sub __getVictronSolarData {
 
   my $hash  = $defs{$name};
 
-  my $lrt    = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
+  my $lrt    = StatusAPIVal ($hash, 'VictronKi', '?All', 'lastretrieval_timestamp', 0);
   my $apiitv = $vrmapirepdef;
 
   if (!$force) {
@@ -3672,7 +3684,7 @@ sub __VictronVRM_ApiRequestLogin {
 
   my ($user, $pwd, $idsite);
 
-  my $serial = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');
+  my $serial = StatusAPIVal ($hash, '?VRM', '?API', 'credentials', '');
 
   if ($serial) {
       my $h   = eval { thaw (assemble ($serial)) };                                # Deserialisierung
@@ -3687,7 +3699,7 @@ sub __VictronVRM_ApiRequestLogin {
       Log3              ($name, 2, "$name - $msg");
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $msg;
+      $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $msg;
       return;
   }
 
@@ -3743,7 +3755,7 @@ sub __VictronVRM_ApiResponseLogin {
       Log3              ($name, 1, "$name - $msg");
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
+      $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
       $data{$type}{$name}{current}{runTimeLastAPIProc}                  = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
       $data{$type}{$name}{current}{runTimeLastAPIAnswer}                = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
@@ -3773,9 +3785,9 @@ sub __VictronVRM_ApiResponseLogin {
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
           $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}        = $jdata->{'error_code'};
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = $jdata->{'error_code'};
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_timestamp} = $t;
 
           if ($debug =~ /apiProcess|apiCall/x) {
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - error_code: ".$jdata->{'error_code'});
@@ -3784,24 +3796,24 @@ sub __VictronVRM_ApiResponseLogin {
 
           return;
       }
-      else {
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}        = 'success';
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{idUser}                  = $jdata->{'idUser'};
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{verification_mode}       = $jdata->{'verification_mode'};
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
+      else { 
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = 'success';
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{idUser}                  = $jdata->{'idUser'};
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{verification_mode}       = $jdata->{'verification_mode'};
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_timestamp} = $t;
 
           if ($debug eq 'apiProcess') {
               Log3 ($name, 1, qq{$name DEBUG> Victron VRM API response Login:\n}. Dumper $jdata);
           }
 
           if (defined $jdata->{'token'}) {
-              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{token} = 'got successful at '.SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
+              $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{token} = 'got successful at '.StatusAPIVal ($hash, 'VictronKi', '?All', 'lastretrieval_time', '-');
               $paref->{token}                                        = $jdata->{'token'};
               __VictronVRM_ApiRequestForecast ($paref);
           }
           else {
-              $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'empty Token';
+              $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{response_message} = 'empty Token';
           }
       }
   }
@@ -3883,9 +3895,9 @@ sub __VictronVRM_ApiResponseForecast {
       Log3              ($name, 1, "$name - $msg");
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
-      $data{$type}{$name}{current}{runTimeLastAPIProc}                  = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-      $data{$type}{$name}{current}{runTimeLastAPIAnswer}                = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+      $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
+      $data{$type}{$name}{current}{runTimeLastAPIProc}                    = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+      $data{$type}{$name}{current}{runTimeLastAPIAnswer}                  = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
       return;
   }
@@ -3913,10 +3925,10 @@ sub __VictronVRM_ApiResponseForecast {
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
           $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}        = $jdata->{'error_code'};
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
-
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = $jdata->{'error_code'};
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_timestamp} = $t;
+          
           if ($debug =~ /apiProcess|apiCall/x) {
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - error_code: ".$jdata->{'error_code'});
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - errors: "    .$jdata->{'errors'});
@@ -3924,9 +3936,9 @@ sub __VictronVRM_ApiResponseForecast {
 
           return;
       }
-      else {
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}    += 1;
+      else { 
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{todayDoneAPIrequests} += 1;
+          $data{$type}{$name}{statusapi}{VictronKi}{'?All'}{todayDoneAPIcalls}    += 1;
 
           my $k = 0;
           while ($jdata->{'records'}{'solar_yield_forecast'}[$k]) {
@@ -4075,7 +4087,7 @@ sub __getopenMeteoData {
   my $debug = $paref->{debug};
 
   my $hash    = $defs{$name};
-  my $donearq = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+  my $donearq = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
 
   if ($donearq >= $ometmaxreq) {
       my $msg = "The limit of maximum $ometmaxreq daily API requests is reached or already exceeded. Process is exited.";
@@ -4084,7 +4096,7 @@ sub __getopenMeteoData {
   }
 
   if (!$force) {                                                                                      # regulärer API Abruf
-      my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
+      my $lrt = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'lastretrieval_timestamp', 0);
 
       if ($lrt && $t < $lrt + $ometeorepdef) {
           my $rt = $lrt + $ometeorepdef - $t;
@@ -4147,10 +4159,9 @@ sub __openMeteoDWD_ApiRequest {
   my $hash       = $defs{$name};
 
   if (!$allstrings) {                                                        # alle Strings wurden abgerufen
-      my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef);
+      my $apiitv = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', $ometeorepdef);
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
       
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}   += 1;
       $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{todayDoneAPIcalls} += 1;
       
       return;
@@ -4263,7 +4274,6 @@ sub __openMeteoDWD_ApiResponse {
 
       Log3 ($name, 1, "$name - $msg");
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}   = $err;
       $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = $err;
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
@@ -4290,8 +4300,6 @@ sub __openMeteoDWD_ApiResponse {
       my $rt    = (timestampToTimestring ($t, $lang))[3];
       my $jdata = decode_json ($myjson);
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}        = $rt;                                                    # letzte Abrufzeit
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp}   = $t;                   # letzter Abrufzeitstempel
       $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{lastretrieval_time}      = $rt;
       $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{lastretrieval_timestamp} = $t;
       
@@ -4307,7 +4315,6 @@ sub __openMeteoDWD_ApiResponse {
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}   = $jdata->{'reason'};
           $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = $jdata->{'reason'};
           
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
@@ -4316,7 +4323,6 @@ sub __openMeteoDWD_ApiResponse {
           return;
       }
 
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message}   = 'success';
       $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = 'success';
 
       if ($debug =~ /apiCall/xs) {
@@ -4521,18 +4527,14 @@ sub ___setOpenMeteoAPIcallKeyData {
 
   my $hash  = $defs{$name};
 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests}   += $cequ;
   $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{todayDoneAPIrequests} += $cequ;
 
-  my $dar = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
-  my $dac = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',    0);
-  my $asc = CurrentVal    ($hash, 'allstringscount', 1);
+  my $dar = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
+  my $dac = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIcalls',    0);
+  my $asc = CurrentVal   ($hash, 'allstringscount', 1);
 
   my $drr = $ometmaxreq - $dar;
   $drr    = 0 if($drr < 0);
-
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests}   = $drr;
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}          = $ometeorepdef;
   
   $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{todayRemainingAPIrequests} = $drr;
   $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval}        = $ometeorepdef;
@@ -4547,11 +4549,10 @@ sub ___setOpenMeteoAPIcallKeyData {
       my $optrep = $rmdif / ($drr / ($cequ * $asc));
       $optrep    = $ometeorepdef if($optrep < $ometeorepdef);
       
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval}   = $optrep;
       $data{$type}{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval} = $optrep;
   }
 
-  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef));
+  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', $ometeorepdef));
 
 return;
 }
@@ -6094,8 +6095,8 @@ sub _attrRoofTops {                      ## no critic "not used"
       }
 
       while (my ($is, $pk) = each %$h) {
-          my $rtid   = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
-          my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
+          my $rtid   = StatusAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
+          my $apikey = StatusAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
 
           if (!$rtid || !$apikey) {
               return qq{The roofIdentPair "$pk" of String "$is" has no Rooftop-ID and/or SolCast-API key assigned! \n}.
@@ -6481,10 +6482,12 @@ sub Shutdown {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  writeCacheToFile ($hash, 'pvhist',      $pvhcache.$name);             # Cache File für PV History schreiben
-  writeCacheToFile ($hash, 'circular',    $pvccache.$name);             # Cache File für PV Circular schreiben
-  writeCacheToFile ($hash, 'consumers',   $csmcache.$name);             # Cache File Consumer schreiben
-  writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);             # Cache File SolCast API Werte schreiben
+  writeCacheToFile ($hash, 'pvhist',          $pvhcache.$name);             # Cache File für PV History schreiben
+  writeCacheToFile ($hash, 'circular',        $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeCacheToFile ($hash, 'consumers',       $csmcache.$name);             # Cache File Consumer schreiben
+  writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name);             # Cache File SolCast API Werte schreiben
+  writeCacheToFile ($hash, 'statusapi',      $statcache.$name);             # Status-API Cache sichern
+  writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name);             # Weather-API Cache sichern
 
 return;
 }
@@ -6575,15 +6578,17 @@ sub periodicWriteMemcache {
   my $name = $hash->{NAME};
 
   RemoveInternalTimer ($hash, "FHEM::SolarForecast::periodicWriteMemcache");
-  InternalTimer       (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteMemcache", $hash, 0);
+  InternalTimer       (gettimeofday() + $whistrepeat, "FHEM::SolarForecast::periodicWriteMemcache", $hash, 0);
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
 
-  writeCacheToFile ($hash, 'circular',   $pvccache.$name);                    # Cache File PV Circular schreiben
-  writeCacheToFile ($hash, 'pvhist',     $pvhcache.$name);                    # Cache File PV History schreiben
-  writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                   # Cache File SolCast API Werte schreiben
-
+  writeCacheToFile ($hash, 'circular',        $pvccache.$name);             # Cache File PV Circular schreiben
+  writeCacheToFile ($hash, 'pvhist',          $pvhcache.$name);             # Cache File PV History schreiben
+  writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name);             # Cache File Strahlungsdaten-API Werte schreiben
+  writeCacheToFile ($hash, 'statusapi',      $statcache.$name);             # Status-API Cache sichern
+  writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name);             # Weather-API Cache sichern
+ 
   $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." whole Operating Memory";
 
   Log3 ($name, 4, "$name - The working memory >circular pvhist solcastapi< has been saved to persistance");
@@ -6756,6 +6761,40 @@ sub writeCacheToFile {
       }
       else {
           return "The DWD Station Catalog is empty";
+      }
+
+      return;
+  }
+  
+  if ($cachename eq 'statusapi') {
+      if (scalar keys %{$data{$type}{$name}{statusapi}}) {
+          $error = fileStore ($data{$type}{$name}{statusapi}, $file);
+
+          if ($error) {
+              $err = qq{ERROR while writing API Status to file "$file": $error};
+              Log3 ($name, 1, "$name - $err");
+              return $err;
+          }
+      }
+      else {
+          return "The API Status is empty";
+      }
+
+      return;
+  }
+  
+  if ($cachename eq 'weatherapi') {
+      if (scalar keys %{$data{$type}{$name}{weatherapi}}) {
+          $error = fileStore ($data{$type}{$name}{weatherapi}, $file);
+
+          if ($error) {
+              $err = qq{ERROR while writing API Status to file "$file": $error};
+              Log3 ($name, 1, "$name - $err");
+              return $err;
+          }
+      }
+      else {
+          return "The API Status is empty";
       }
 
       return;
@@ -7039,6 +7078,8 @@ sub centralTask {
   RemoveInternalTimer ($hash, 'FHEM::SolarForecast::singleUpdateState');
 
   return if(!$init_done);
+  
+  setModel ($hash);                                                    # Model setzen
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
@@ -7070,9 +7111,53 @@ sub centralTask {
       CommandAttr (undef, "$name flowGraphicControl $newval");
       ::CommandDeleteAttr (undef, "$name flowGraphicSize|flowGraphicAnimate|flowGraphicConsumerDistance|flowGraphicShowConsumer|flowGraphicShowConsumerDummy|flowGraphicShowConsumerPower|flowGraphicShowConsumerRemainTime|flowGraphicShift");
   }
-  ##########################################################################################################################
+  
+  if (exists $data{$type}{$name}{solcastapi}{'?IdPair'}) {                             # 29.11.2024
+      for my $pk (keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}}) {                
+          my $apikey = SolCastAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
+          my $rtid   = SolCastAPIVal ($hash, '?IdPair', $pk, 'rtid', '');
+          
+          if ($apikey && $rtid) {
+              $data{$type}{$name}{statusapi}{'?IdPair'}{$pk}{rtid}   = $rtid;
+              $data{$type}{$name}{statusapi}{'?IdPair'}{$pk}{apikey} = $apikey;
+              
+              delete $data{$type}{$name}{solcastapi}{'?IdPair'};
+          }
+      }
+  }
+  
+  if (exists $data{$type}{$name}{solcastapi}{'?All'}{'?All'}) {                         # 29.11.2024                    
+      my ($rapi, $wapi) = getStatusApiName ($hash); 
+      
+      for my $key (keys %{$data{$type}{$name}{solcastapi}{'?All'}{'?All'}}) {         
+          my $val = SolCastAPIVal ($hash, '?All', '?All', $key, '');
+          
+          if ($val) {
+              $data{$type}{$name}{statusapi}{$rapi}{'?All'}{$key} = $val;
+              delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{$key};
+          }
+      }
+      
+      delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'};
+  }
+  
+  if (keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                               # 29.11.2024
+      for my $idx (keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                   
+          delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);
+          delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($idx eq 'sunrise');
+          delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($idx eq 'sunset');
+      }
+  }
+ 
+  delete $data{$type}{$name}{solcastapi}{'?All'} if(!keys %{$data{$type}{$name}{solcastapi}{'?All'}});
+  
+  my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');               # 29.11.2024
+  if ($vrmcr) {
+      $data{$type}{$name}{statusapi}{'?VRM'}{'?API'}{credentials} = $vrmcr;
+      delete $data{$type}{$name}{solcastapi}{'?VRM'};
+  }
 
-  setModel ($hash);                                                                            # Model setzen
+  ##########################################################################################################################
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);                                                           # disabled / inactive
@@ -7678,16 +7763,8 @@ sub _specialActivities {
               }
           }
 
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayMaxAPIcalls};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{idUser};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{token};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{verification_mode};
+          my ($rapi, $wapi) = getStatusApiName ($hash); 
+          delete $data{$type}{$name}{statusapi}{$rapi}{'?All'} if($rapi);
 
           delete $data{$type}{$name}{circular}{99}{initdayfeedin};
           delete $data{$type}{$name}{circular}{99}{initdaygcon};
@@ -7701,9 +7778,9 @@ sub _specialActivities {
           $data{$type}{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
           delete $data{$type}{$name}{circular}{99}{tdayDvtn};
 
-          delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
+          delete $data{$type}{$name}{pvhist}{$day};                                              # den (alten) aktuellen Tag aus History löschen
 
-          writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                         # Anlagenkonfiguration sichern
+          writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration sichern
 
           Log3 ($name, 3, "$name - history day >$day< deleted");
           Log3 ($name, 4, "$name - Daily special tasks - Task 1 finished");
@@ -7860,7 +7937,7 @@ sub __delObsoleteAPIData {
   ## Wetter-API Daten löschen
   #############################
   if (keys %{$data{$type}{$name}{weatherapi}}) {
-      if (isWeatherModelOpenMeteo ($hash)) {   
+      if (isWeatherOpenMeteoUsed ($hash)) {   
           for my $idx (keys %{$data{$type}{$name}{weatherapi}{OpenMeteo}}) {                   
               delete $data{$type}{$name}{weatherapi}{OpenMeteo}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);
           }
@@ -7873,8 +7950,13 @@ sub __delObsoleteAPIData {
   ## Status-API Daten löschen
   #############################
   if (keys %{$data{$type}{$name}{statusapi}}) {
-      delete $data{$type}{$name}{statusapi}{OpenMeteo}     if(!isWeatherModelOpenMeteo ($hash) && !isOpenMeteoUsed ($hash));
+      delete $data{$type}{$name}{statusapi}{OpenMeteo}     if(!isOpenMeteoUsed     ($hash) && !isWeatherOpenMeteoUsed ($hash));
       delete $data{$type}{$name}{statusapi}{ForecastSolar} if(!isForecastSolarUsed ($hash));
+      delete $data{$type}{$name}{statusapi}{SolCast}       if(!isSolCastUsed       ($hash));
+      delete $data{$type}{$name}{statusapi}{'?IdPair'}     if(!isSolCastUsed       ($hash));
+      delete $data{$type}{$name}{statusapi}{DWD}           if(!isDWDUsed           ($hash));
+      delete $data{$type}{$name}{statusapi}{VictronKi}     if(!isVictronKiUsed     ($hash));
+      delete $data{$type}{$name}{statusapi}{'?VRM'}        if(!isVictronKiUsed     ($hash));
   }
   
   ## Solar-API Daten löschen
@@ -7941,8 +8023,9 @@ sub _transferWeatherValues {
       $fctimets = timestringToTimestamp ($fctime);
   }
   else {
-      $fctime   = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      '-');
-      $fctimets = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', '-');
+      my ($rapi, $wapi) = getStatusApiName ($hash); 
+      $fctime           = StatusAPIVal ($hash, $wapi, '?All', 'lastretrieval_time',      '-');
+      $fctimets         = StatusAPIVal ($hash, $wapi, '?All', 'lastretrieval_timestamp', '-');
   }
 
   $data{$type}{$name}{current}{dwdWfchAge}   = $fctime;
@@ -8080,13 +8163,15 @@ sub ___readDataWeatherAPI {
 
   debugLog ($paref, 'collectData', "collect Weather data step $step - API: $fcname =>");
 
-  for my $idx (sort keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {
-      if ($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs) {                                        # valider Weather API Index
-          my $rr1c = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{rr1c};
-          my $wid  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{ww};
-          my $neff = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{neff};
-          my $don  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{don};
-          my $ttt  = $data{$type}{$name}{solcastapi}{'?All'}{$idx}{ttt};
+  my ($rapi, $wapi) = getStatusApiName ($hash); 
+  
+  for my $idx (sort keys %{$data{$type}{$name}{weatherapi}{$wapi}}) {
+      if ($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs) {                                        # valider Weather API Index          
+          my $rr1c = WeatherAPIVal ($hash, $wapi, $idx, 'rr1c', undef);
+          my $wid  = WeatherAPIVal ($hash, $wapi, $idx, 'ww',   undef);
+          my $neff = WeatherAPIVal ($hash, $wapi, $idx, 'neff', undef);
+          my $don  = WeatherAPIVal ($hash, $wapi, $idx, 'don',  undef);
+          my $ttt  = WeatherAPIVal ($hash, $wapi, $idx, 'ttt',  undef);
 
           $data{$type}{$name}{weatherdata}{$idx}{$step}{ww}   = $wid  if(defined $wid);
           $data{$type}{$name}{weatherdata}{$idx}{$step}{neff} = $neff if(defined $neff);
@@ -8192,6 +8277,8 @@ sub __sunRS {
   my ($cset, undef, undef, undef) = locCoordinates();
 
   debugLog ($paref, 'collectData', "collect sunrise/sunset times - device: $fcname =>");
+  
+  my ($rapi, $wapi) = getStatusApiName ($hash); 
 
   if ($cset) {
       my $alt = 'HORIZON=-0.833';                                                 # default from https://metacpan.org/release/JFORGET/DateTime-Event-Sunrise-0.0505/view/lib/DateTime/Event/Sunrise.pm
@@ -8207,11 +8294,11 @@ sub __sunRS {
           $fc1_sr = ReadingsVal ($fcname, 'fc1_SunRise', '23:59');
           $fc1_ss = ReadingsVal ($fcname, 'fc1_SunSet',  '00:00');
       }
-      else {                                                                                          # Daten aus solcastapi (API) holen
-          $fc0_sr = substr (SolCastAPIVal ($hash, '?All', 'sunrise', 'today',    '23:59:59'), 0, 5);
-          $fc0_ss = substr (SolCastAPIVal ($hash, '?All', 'sunset',  'today',    '00:00:00'), 0, 5);
-          $fc1_sr = substr (SolCastAPIVal ($hash, '?All', 'sunrise', 'tomorrow', '23:59:59'), 0, 5);
-          $fc1_ss = substr (SolCastAPIVal ($hash, '?All', 'sunset',  'tomorrow', '00:00:00'), 0, 5);
+      else {                                                                                          # Daten aus solcastapi (API) holen        
+          $fc0_sr = substr (WeatherAPIVal ($hash, $wapi, 'sunrise', 'today',    '23:59:59'), 0, 5);
+          $fc0_ss = substr (WeatherAPIVal ($hash, $wapi, 'sunset',  'today',    '00:00:00'), 0, 5);
+          $fc1_sr = substr (WeatherAPIVal ($hash, $wapi, 'sunrise', 'tomorrow', '23:59:59'), 0, 5);
+          $fc1_ss = substr (WeatherAPIVal ($hash, $wapi, 'sunset',  'tomorrow', '00:00:00'), 0, 5);
       }
   }
 
@@ -10149,7 +10236,8 @@ sub ___noPlanRelease {
       $dnp = qq{consumer is already planned};
   }
   elsif (isSolCastUsed ($hash) || isForecastSolarUsed ($hash)) {
-      my $tdc = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0);
+      my ($rapi, $wapi) = getStatusApiName ($hash);  
+      my $tdc           = StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIcalls', 0);
 
       if ($tdc < 1) {                                                                      # Planung erst nach dem zweiten API Abruf freigeben
            $dnp = qq{do not plan because off "todayDoneAPIcalls" is not set};
@@ -12039,6 +12127,8 @@ sub _genStatisticReadings {
   }
 
   return if(!@csr);
+  
+  my ($rapi, $wapi) = getStatusApiName ($hash); 
 
   for my $kpi (@csr) {
       my $def = $hcsr{$kpi}{def};
@@ -12056,7 +12146,8 @@ sub _genStatisticReadings {
       }
 
       if ($hcsr{$kpi}{fnr} == 1) {
-          storeReading ('statistic_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, '?All', '?All', $kpi, $def));
+          
+          storeReading ('statistic_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $rapi, '?All', $kpi, $def));
       }
 
       if ($hcsr{$kpi}{fnr} == 2) {
@@ -12526,11 +12617,11 @@ sub _checkSetupNotComplete {
   my $mdec    = ReadingsVal ($name, 'setupStringDeclination', undef);                       # Modul Neigungswinkel Konfig
   my $mrt     = AttrVal     ($name, 'setupRoofTops',          undef);                       # RoofTop Konfiguration (SolCast API)
 
-  my $vrmcr   = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');                   # Victron VRM Credentials gesetzt
+  my $vrmcr   = StatusAPIVal ($hash, '?VRM', '?API', 'credentials', '');                    # Victron VRM Credentials gesetzt
 
   my ($coset, $lat, $lon) = locCoordinates();                                               # Koordinaten im global device
   my $rip;
-  $rip      = 1 if(exists $data{$type}{$name}{solcastapi}{'?IdPair'});                      # es existiert mindestens ein Paar RoofTop-ID / API-Key
+  $rip      = 1 if(exists $data{$type}{$name}{statusapi}{'?IdPair'});                       # es existiert mindestens ein Paar RoofTop-ID / API-Key
 
   my $pv0   = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                            # der erste PV ForeCast Wert
 
@@ -12658,6 +12749,8 @@ sub _graphicHeader {
   my $pvRe      = ReadingsNum ($name, "RestOfDayPVforecast",                 0);
   my $pvTo      = ReadingsNum ($name, "Tomorrow_PVforecast",                 0);
   my $pvCu      = ReadingsNum ($name, "Current_PV",                          0);
+  
+  my ($rapi, $wapi) = getStatusApiName ($hash);                                                    # Status-API Name
 
   if ($kw eq 'kWh') {
       $co4h = sprintf ("%.1f", $co4h/1000)."&nbsp;kWh";
@@ -12758,9 +12851,9 @@ sub _graphicHeader {
                 isOpenMeteoUsed     ($hash) ? '<a href="https://open-meteo.com/" style="color: inherit !important;" target="_blank">OpenMeteo</a>:'                                                                        :
                 q{};
 
-      my $nscc = ReadingsVal   ($name, 'nextRadiationAPICall', '?');
-      my $lrt  = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
-      my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message',   '-');
+      my $nscc = ReadingsVal  ($name, 'nextRadiationAPICall', '?');
+      my $lrt  = StatusAPIVal ($hash, $rapi, '?All', 'lastretrieval_time', '-');
+      my $scrm = StatusAPIVal ($hash, $rapi, '?All', 'response_message',   '-');
 
       if ($lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x) {
           my ($sly, $slmo, $sld, $slt) = $lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
@@ -12795,9 +12888,9 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.' / '.$htitles{rapic}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', $solcmaxreqdef);
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIrequests', $solcmaxreqdef);
           $api .= ')';
           $api .= '</span>';
       }
@@ -12819,9 +12912,9 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.' / '.$htitles{raricp}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'requests_remaining', '-');
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'requests_remaining', '-');
           $api .= ')';
           $api .= '</span>';
       }
@@ -12840,7 +12933,7 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= ')';
           $api .= '</span>';
       }
@@ -12867,7 +12960,7 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= ')';
           $api .= '</span>';
       }
@@ -12886,9 +12979,9 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.' / '.$htitles{rapic}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', $ometmaxreq);
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIrequests', $ometmaxreq);
           $api .= ')';
           $api .= '</span>';
       }
@@ -17155,8 +17248,8 @@ sub checkPlantConfig {
       my ($a,$h) = parseParams ($rft);
 
       while (my ($is, $pk) = each %$h) {
-          my $rtid   = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
-          my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
+          my $rtid   = StatusAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
+          my $apikey = StatusAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
 
           if(!$rtid || !$apikey) {
               my $res  = qq{String "$is" has no Roof Ident Pair "$pk" defined or has no Rooftop-ID and/or SolCast-API key assigned. <br>};
@@ -17283,7 +17376,7 @@ sub checkPlantConfig {
       my $gdn = AttrVal ('global', 'dnsServer',                '');
       my $osi = AttrVal ($name,    'ctrlSolCastAPIoptimizeReq', 0);
 
-      my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
+      my $lam = StatusAPIVal ($hash, 'SolCast', '?All', 'response_message', 'success');
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
@@ -17326,7 +17419,7 @@ sub checkPlantConfig {
   }
 
   if (isDWDUsed ($hash)) {                                                               # allg. Settings bei Nutzung DWD API
-      my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
+      my $lam = StatusAPIVal ($hash, 'DWD', '?All', 'response_message', 'success');
 
       if ($aidtabs) {
           $result->{'Common Settings'}{state}   = $info;
@@ -17360,8 +17453,8 @@ sub checkPlantConfig {
   }
 
   if (isVictronKiUsed ($hash)) {                                                              # allg. Settings bei Nutzung VictronKI-API
-      my $gdn   = AttrVal       ('global', 'dnsServer', '');
-      my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');
+      my $gdn   = AttrVal      ('global', 'dnsServer', '');
+      my $vrmcr = StatusAPIVal ($hash, '?VRM', '?API', 'credentials', '');
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $warn;
@@ -18427,7 +18520,7 @@ return $ret;
 #  Prüfung auf Verwendung von Open-Meteo API als 
 #  Lieferant für Wetterdaten
 ################################################################
-sub isWeatherModelOpenMeteo {
+sub isWeatherOpenMeteoUsed {
   my $hash = shift;
 
   my $ret = 0;
@@ -18618,7 +18711,8 @@ sub isWeatherAgeExceeded {
           }
       }
       else {
-          $newts = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $agets);
+          my ($rapi, $wapi) = getStatusApiName ($hash); 
+          $newts            = StatusAPIVal     ($hash, $wapi, '?All', 'lastretrieval_timestamp', $agets);
 
           if ($newts <= $agets) {
               $agets         = $newts;
@@ -18893,6 +18987,26 @@ sub getCDnames {
   $err        = qq{$err Please check device names in consumer '$c' attribute} if($err);
 
 return ($err, $cname, $dswname);
+}
+
+################################################################
+#  Namen der Strahlungs-API und Wetter-API ermitteln. 
+#  Wird als Schlüssel in statusapi bzw. weatherapi verwendet.
+################################################################      
+sub getStatusApiName {
+  my $hash = shift;
+
+  my $rapi = isOpenMeteoUsed     ($hash) ? 'OpenMeteo'     :
+             isForecastSolarUsed ($hash) ? 'ForecastSolar' :
+             isSolCastUsed       ($hash) ? 'SolCast'       :
+             isVictronKiUsed     ($hash) ? 'VictronKi'     :
+             isDWDUsed           ($hash) ? 'DWD'           :
+             '';
+             
+  my $wapi = isWeatherOpenMeteoUsed ($hash) ? 'OpenMeteo' :
+             '';
+              
+return ($rapi, $wapi);
 }
 
 ################################################################
@@ -19724,28 +19838,8 @@ return $def;
 #          Rad1h         - vorhergesagte Globalstrahlung (Model DWD)
 # $def:    Defaultwert
 #
-# Sonderabfragen
-# SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
-# SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
-# SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',    $def) - heute ausgeführte API Requests
-# SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests $def) - heute verbleibende API Requests
-# SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Calls (hat u.U. mehrere Requests)
-# SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIcalls',  $def) - heute noch mögliche API Calls (ungl. Requests !)
-# SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier',$def) - APIcalls = APIRequests * solCastAPIcallMultiplier
-# SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall
-# SolCastAPIVal ($hash, '?All', '?All', 'response_message',        $def) - letzte API Antwort
-# SolCastAPIVal ($hash, '?All', $ststr, 'Rad1h',                   $def) - Globalstrahlung mit Startzeit
-# SolCastAPIVal ($hash, '?All', '?All', 'place',                   $def) - ForecastSolarAPI -> Location der Anlage
-# SolCastAPIVal ($hash, '?All', '?All', 'requests_limit',          $def) - ForecastSolarAPI -> Request Limit innerhalb der Periode
-# SolCastAPIVal ($hash, '?All', '?All', 'requests_limit_period',   $def) - ForecastSolarAPI -> Periode für Request Limit
-# SolCastAPIVal ($hash, '?All', '?All', 'requests_remaining',      $def) - ForecastSolarAPI -> verbleibende Requests innerhalb der laufenden Periode
-# SolCastAPIVal ($hash, '?All', '?All', 'response_code',           $def) - ForecastSolarAPI -> letzter Antwortcode
-# SolCastAPIVal ($hash, '?All', '?All', 'retryat_time',            $def) - ForecastSolarAPI -> Zwangsverzögerung des nächsten Calls bis Uhrzeit
-# SolCastAPIVal ($hash, '?All', '?All', 'retryat_timestamp',       $def) - ForecastSolarAPI -> Zwangsverzögerung des nächsten Calls bis UNIX-Zeitstempel
-#
-# SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'rtid',                $def) - RoofTop-ID, <pk> = Paarschlüssel
-# SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'apikey',              $def) - API-Key, <pk> = Paarschlüssel
-#
+# Sonderabfragen:
+# SolCastAPIVal ($hash, '?All', $ststr, 'Rad1h', $def) - Globalstrahlung mit Startzeit ohne Stringbezug
 ##########################################################################################################################################################
 sub SolCastAPIVal {
   my $hash   = shift;
@@ -19777,15 +19871,6 @@ return $def;
 # $key:      Parameter (z.B. don, neff, rr1c, ...)
 # $def:      Defaultwert
 #
-# Sonderabfragen
-# WeatherAPIVal ($hash, $apiname, '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
-# WeatherAPIVal ($hash, $apiname, '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
-# WeatherAPIVal ($hash, $apiname, '?All', 'todayDoneAPIrequests',    $def) - heute ausgeführte API Requests
-# WeatherAPIVal ($hash, $apiname, '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Calls (hat u.U. mehrere Requests)
-# WeatherAPIVal ($hash, $apiname, '?All', 'todayRemainingAPIrequests $def) - heute verbleibende API Requests
-# WeatherAPIVal ($hash, $apiname, '?All', 'todayRemainingAPIcalls',  $def) - heute noch mögliche API Calls (ungl. Requests !)
-# WeatherAPIVal ($hash, $apiname, '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall
-# WeatherAPIVal ($hash, $apiname, '?All', 'response_message',        $def) - letzte API Antwort
 ##########################################################################################################################################################
 sub WeatherAPIVal {
   my $hash    = shift;
@@ -19813,39 +19898,45 @@ return $def;
 # StatusAPIVal ($hash, $apiname, '?All', $key, $def)
 #
 # $apiname:  Hauptname der API gemäß setupWeatherDevX (z.B. OpenMeteo)
+# $tstr:     default '?All'
 # $key:      Parameter
 # $def:      Defaultwert
 #
-# WeatherAPIVal ($hash, $apiname, '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
-# WeatherAPIVal ($hash, $apiname, '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
-# WeatherAPIVal ($hash, $apiname, '?All', 'todayDoneAPIrequests',    $def) - heute ausgeführte API Requests
-# WeatherAPIVal ($hash, $apiname, '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Calls (hat u.U. mehrere Requests)
-# WeatherAPIVal ($hash, $apiname, '?All', 'todayRemainingAPIrequests $def) - heute verbleibende API Requests
-# WeatherAPIVal ($hash, $apiname, '?All', 'todayRemainingAPIcalls',  $def) - heute noch mögliche API Calls (ungl. Requests !)
-# WeatherAPIVal ($hash, $apiname, '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall
-# WeatherAPIVal ($hash, $apiname, '?All', 'response_message',        $def) - letzte API Antwort
-# WeatherAPIVal ($hash, $apiname, '?All', 'place',                   $def) - ForecastSolarAPI -> Location der Anlage
-# WeatherAPIVal ($hash, $apiname, '?All', 'requests_limit',          $def) - ForecastSolarAPI -> Request Limit innerhalb der Periode
-# WeatherAPIVal ($hash, $apiname, '?All', 'requests_limit_period',   $def) - ForecastSolarAPI -> Periode für Request Limit
-# WeatherAPIVal ($hash, $apiname, '?All', 'requests_remaining',      $def) - ForecastSolarAPI -> verbleibende Requests innerhalb der laufenden Periode
-# WeatherAPIVal ($hash, $apiname, '?All', 'response_code',           $def) - ForecastSolarAPI -> letzter Antwortcode
-# WeatherAPIVal ($hash, $apiname, '?All', 'retryat_time',            $def) - ForecastSolarAPI -> Zwangsverzögerung des nächsten Calls bis Uhrzeit
-# WeatherAPIVal ($hash, $apiname, '?All', 'retryat_timestamp',       $def) - ForecastSolarAPI -> Zwangsverzögerung des nächsten Calls bis UNIX-Zeitstempel
+# StatusAPIVal ($hash, $apiname, '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
+# StatusAPIVal ($hash, $apiname, '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
+# StatusAPIVal ($hash, $apiname, '?All', 'todayDoneAPIrequests',    $def) - heute ausgeführte API Requests
+# StatusAPIVal ($hash, $apiname, '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Calls (hat u.U. mehrere Requests)
+# StatusAPIVal ($hash, $apiname, '?All', 'todayRemainingAPIrequests $def) - heute verbleibende API Requests
+# StatusAPIVal ($hash, $apiname, '?All', 'todayRemainingAPIcalls',  $def) - heute noch mögliche API Calls (ungl. Requests !)
+# StatusAPIVal ($hash, $apiname, '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall
+# StatusAPIVal ($hash, $apiname, '?All', 'response_message',        $def) - letzte API Antwort
+# StatusAPIVal ($hash, $apiname, '?All', 'place',                   $def) - ForecastSolarAPI -> Location der Anlage
+# StatusAPIVal ($hash, $apiname, '?All', 'requests_limit',          $def) - ForecastSolarAPI -> Request Limit innerhalb der Periode
+# StatusAPIVal ($hash, $apiname, '?All', 'requests_limit_period',   $def) - ForecastSolarAPI -> Periode für Request Limit
+# StatusAPIVal ($hash, $apiname, '?All', 'requests_remaining',      $def) - ForecastSolarAPI -> verbleibende Requests innerhalb der laufenden Periode
+# StatusAPIVal ($hash, $apiname, '?All', 'response_code',           $def) - ForecastSolarAPI -> letzter Antwortcode
+# StatusAPIVal ($hash, $apiname, '?All', 'retryat_time',            $def) - ForecastSolarAPI -> Zwangsverzögerung des nächsten Calls bis Uhrzeit
+# StatusAPIVal ($hash, $apiname, '?All', 'retryat_timestamp',       $def) - ForecastSolarAPI -> Zwangsverzögerung des nächsten Calls bis UNIX-Zeitstempel
+#
+# Sonderabfragen:
+# StatusAPIVal ($hash, '?IdPair', '?<pk>', 'rtid',                  $def) - SolCast RoofTop-ID, <pk> = Paarschlüssel
+# StatusAPIVal ($hash, '?IdPair', '?<pk>', 'apikey',                $def) - SolCast API-Key, <pk> = Paarschlüssel
 ##########################################################################################################################################################
 sub StatusAPIVal {
   my $hash    = shift;
   my $apiname = shift;
+  my $tstr    = shift;
   my $key     = shift;
   my $def     = shift;
 
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  if (defined $data{$type}{$name}{statusapi}                          &&
-      defined $data{$type}{$name}{statusapi}{$apiname}                &&
-      defined $data{$type}{$name}{statusapi}{$apiname}{'?All'}        &&
-      defined $data{$type}{$name}{statusapi}{$apiname}{'?All'}{$key}) {
-      return  $data{$type}{$name}{statusapi}{$apiname}{'?All'}{$key};
+  if (defined $data{$type}{$name}{statusapi}                         &&
+      defined $data{$type}{$name}{statusapi}{$apiname}               &&
+      defined $data{$type}{$name}{statusapi}{$apiname}{$tstr}        &&
+      defined $data{$type}{$name}{statusapi}{$apiname}{$tstr}{$key}) {
+      return  $data{$type}{$name}{statusapi}{$apiname}{$tstr}{$key};
   }
 
 return $def;
@@ -20696,27 +20787,19 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-get-solApiData"></a>
       <li><b>solApiData </b> <br><br>
 
-      Lists the data stored in the context of the API call.
-      Administrative records are marked with a leading '?
-      The predicted global irradiation and PV yield (Wh) data provided by the API is consolidated to one hour.
+      Lists the radiation data saved in the context of the API call.
+      The forecast data supplied by the API regarding the global radiation Rad1h and the predicted PV yield (Wh) 
+      related to a string are normalized to one hour. 
       The available characteristic values differ depending on the API used.
       <br><br>
 
       <ul>
          <table>
-         <colgroup> <col width="37%"> <col width="63%"> </colgroup>
-            <tr><td> <b>currentAPIinterval</b>        </td><td>the currently used API retrieval interval in seconds                                       </td></tr>
-            <tr><td> <b>lastretrieval_time</b>        </td><td>Time of the last API call                                                                  </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix timestamp of the last API call                                                        </td></tr>
-            <tr><td> <b>Rad1h</b>                     </td><td>if available, expected Global Irradiation (GI) or Global tilted Irradiation (GTI) in kJ/m2 </td></tr>
-            <tr><td> <b>pv_estimate</b>               </td><td>expected PV generation (Wh)                                                                </td></tr>
-            <tr><td> <b>KI-based_co</b>               </td><td>expected Energy consumption (Wh)                                                           </td></tr>
-            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Number of executed API requests on the current day                                         </td></tr>
-            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Number of remaining SolCast API requests on the current day                                </td></tr>
-            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Number of executed API calls on the current day                                            </td></tr>
-            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Number of SolCast API calls still possible on the current day                              </td></tr>
-            <tr><td>                                  </td><td>(one call can execute several SolCast API requests)                                        </td></tr>
-            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Maximum number of SolCast API calls per day                                                </td></tr>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>Rad1h</b>          </td><td>if available, expected global irradiation (GI) or global tilt irradiation (GTI) in kJ/m2 </td></tr>
+            <tr><td> <b>pv_estimateXX</b>  </td><td>Expected PV generation (Wh)                                                              </td></tr>
+            <tr><td> <b>KI-based</b>       </td><td>expected PV generation (Wh) of the VictronKI-API                                         </td></tr>
+            <tr><td> <b>KI-based_co</b>    </td><td>expected energy consumption (Wh) of the VictronKI-API                                    </td></tr>
          </table>
       </ul>
       </li>
@@ -20726,7 +20809,24 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-get-statusApiData"></a>
       <li><b>statusApiData </b> <br><br>
-      Under construction for the next version.
+      Shows the status data of the radiation data API or weather data API used. 
+      Only the status data of the leading weather service is output.
+      <br><br>
+      
+      <ul>
+         <table>
+         <colgroup> <col width="37%"> <col width="63%"> </colgroup>
+            <tr><td> <b>currentAPIinterval</b>        </td><td>the API call interval currently used in seconds                   </td></tr>
+            <tr><td> <b>lastretrieval_time</b>        </td><td>Time of the last API call                                         </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix timestamp of the last API call                               </td></tr>
+            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Number of API requests executed on the current day                </td></tr>
+            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Number of remaining SolCast API requests on the current day       </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Number of API calls executed on the current day                   </td></tr>
+            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Number of SolCast API calls still possible on the current day     </td></tr>
+            <tr><td>                                  </td><td>(one call can execute several SolCast API requests)               </td></tr>
+            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Maximum number of possible SolCast API calls per day              </td></tr>
+         </table>
+      </ul>
       </li>
     </ul>
     <br>
@@ -20827,7 +20927,7 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-get-weatherApiData"></a>
       <li><b>weatherApiData </b> <br><br>
-      Under construction for the upcoming version.
+      Shows the data supplied by the selected weather API.
       </li>
     </ul>
     <br>
@@ -23082,27 +23182,19 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-get-solApiData"></a>
       <li><b>solApiData </b> <br><br>
 
-      Listet die im Kontext des API-Abrufs gespeicherten Daten auf.
-      Verwaltungsdatensätze sind mit einem führenden '?' gekennzeichnet.
-      Die von der API gelieferten Vorhersagedaten bzgl. der Globalstrahlung Rad1h und des PV Ertrages (Wh) sind auf
-      eine Stunde konsolidiert. Die verfügbaren Kennwerte unterscheiden sich je nach verwendeter API.
+      Listet die im Kontext des API-Abrufs gespeicherten Strahlungsdaten auf.
+      Die von der API gelieferten Vorhersagedaten bzgl. der Globalstrahlung Rad1h und des auf einen String bezogenen 
+      prognostizierten PV Ertrag (Wh) sind auf eine Stunde normiert. 
+      Die verfügbaren Kennwerte unterscheiden sich je nach verwendeter API.
       <br><br>
 
       <ul>
          <table>
-         <colgroup> <col width="37%"> <col width="63%"> </colgroup>
-            <tr><td> <b>currentAPIinterval</b>        </td><td>das aktuell verwendete API Abrufintervall in Sekunden                                           </td></tr>
-            <tr><td> <b>lastretrieval_time</b>        </td><td>Zeit des letzten API Abrufs                                                                     </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix Timestamp des letzten API Abrufs                                                           </td></tr>
-            <tr><td> <b>Rad1h</b>                     </td><td>wenn vorhanden, erwartete Globalstrahlung (GI) bzw. globale Schräglagenstrahlung (GTI) in kJ/m2 </td></tr>
-            <tr><td> <b>pv_estimate</b>               </td><td>erwartete PV Erzeugung (Wh)                                                                     </td></tr>
-            <tr><td> <b>KI-based_co</b>               </td><td>erwarteter Energieverbrauch (Wh)                                                                </td></tr>
-            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag                                           </td></tr>
-            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Anzahl der verbleibenden SolCast API Requests am aktuellen Tag                                  </td></tr>
-            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Anzahl der ausgeführten API Abrufe am aktuellen Tag                                             </td></tr>
-            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Anzahl der noch möglichen SolCast API Abrufe am aktuellen Tag                                   </td></tr>
-            <tr><td>                                  </td><td>(ein Abruf kann mehrere SolCast API Requests ausführen)                                         </td></tr>
-            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Anzahl der maximal möglichen SolCast API Abrufe pro Tag                                         </td></tr>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>                                                                      
+            <tr><td> <b>Rad1h</b>          </td><td>wenn vorhanden, erwartete Globalstrahlung (GI) bzw. globale Schräglagenstrahlung (GTI) in kJ/m2 </td></tr>
+            <tr><td> <b>pv_estimateXX</b>  </td><td>erwartete PV Erzeugung (Wh)                                                                     </td></tr>
+            <tr><td> <b>KI-based</b>       </td><td>erwartete PV Erzeugung (Wh) der VictronKI-API                                                   </td></tr>
+            <tr><td> <b>KI-based_co</b>    </td><td>erwarteter Energieverbrauch (Wh) der VictronKI-API                                              </td></tr>
          </table>
       </ul>
       </li>
@@ -23112,7 +23204,24 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-statusApiData"></a>
       <li><b>statusApiData </b> <br><br>
-      Im Aufbau für die kommende Version.
+      Zeigt die Statusdaten der verwendeten Strahlungsdaten-API bzw. Wetterdaten-API. 
+      Es werden nur die Statusdaten des führenden Wetterdienstes ausgegeben.
+      <br><br>
+      
+      <ul>
+         <table>
+         <colgroup> <col width="37%"> <col width="63%"> </colgroup>
+            <tr><td> <b>currentAPIinterval</b>        </td><td>das aktuell verwendete API Abrufintervall in Sekunden              </td></tr>
+            <tr><td> <b>lastretrieval_time</b>        </td><td>Zeit des letzten API Abrufs                                        </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix Timestamp des letzten API Abrufs                              </td></tr>
+            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag              </td></tr>
+            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Anzahl der verbleibenden SolCast API Requests am aktuellen Tag     </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Anzahl der ausgeführten API Abrufe am aktuellen Tag                </td></tr>
+            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Anzahl der noch möglichen SolCast API Abrufe am aktuellen Tag      </td></tr>
+            <tr><td>                                  </td><td>(ein Abruf kann mehrere SolCast API Requests ausführen)            </td></tr>
+            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Anzahl der maximal möglichen SolCast API Abrufe pro Tag            </td></tr>
+         </table>
+      </ul>
       </li>
     </ul>
     <br>
@@ -23211,7 +23320,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-weatherApiData"></a>
       <li><b>weatherApiData </b> <br><br>
-      Im Aufbau für die kommende Version.
+      Zeigt die gelieferten Daten der gewählten Wetter-API.
       </li>
     </ul>
     <br>
