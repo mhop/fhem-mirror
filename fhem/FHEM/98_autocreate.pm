@@ -70,8 +70,20 @@ autocreate_Initialize($)
   $hash->{DefFn} = "autocreate_Define";
   $hash->{NotifyFn} = "autocreate_Notify";
   $hash->{AttrFn}   = "autocreate_Attr";
-  $hash->{AttrList}= "autosave filelog device_room weblink weblink_room " .
-                     "disable ignoreTypes autocreateThreshold";
+  no warnings 'qw';
+  my @attrList = qw(
+    autocreateThreshold
+    autosave
+    device_room
+    disable
+    filelog
+    ignoreTypes
+    weblink
+    weblink_room
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
+
   my %ahash = ( Fn=>"CommandCreateLog",
         Hlp=>"<device>,create log/weblink for <device>",
         ModuleName => "autocreate" );
@@ -131,7 +143,7 @@ autocreate_Notify($$)
       $s =~ s/ -temporary//;
     }
 
-    if($s =~ m/^UNDEFINED ([^ ]*) ([^ ]*) (.*)$/) {
+    if($s =~ m/^UNDEFINED ([^ ]*) ([^ ]*)(.*)$/) {
       my ($name, $type, $arg) = ($1, $2, $3);
       next if(AttrVal($me, "disable", undef));
 
@@ -210,11 +222,11 @@ autocreate_Notify($$)
 
             my $count = keys %{$hash->{received}{$type}{$arg}};
             Log3 $me, 4, "autocreate: received $count event(s) for ".
-                        "'$type $arg' during the last $interval seconds";
+                        "'$type$arg' during the last $interval seconds";
 
             if( $count < $min_count ) {
               Log3 $me, 4, "autocreate: ignoring event for ".
-                          "'$type $arg': at least $min_count needed";
+                          "'$type$arg': at least $min_count needed";
               next;
             }
           }
@@ -236,8 +248,8 @@ autocreate_Notify($$)
 
       ####################
       if(!$hash) {
-        $cmd = "$name $type $arg";
-        $cmd = "-temporary $name $type $arg" if($temporary);
+        $cmd = "$name $type$arg";
+        $cmd = "-temporary $name $type$arg" if($temporary);
         Log3 $me, 2, "autocreate: define $cmd";
         $ret = CommandDefine(undef, $cmd);
         if($ret) {
@@ -729,7 +741,7 @@ autocreate_Attr(@)
 =item summary_DE Erzeugt FHEM-Ger&auml;te automatisch
 =begin html
 
-<a name="autocreate"></a>
+<a id="autocreate"></a>
 <h3>autocreate</h3>
 <ul>
 
@@ -739,7 +751,7 @@ autocreate_Attr(@)
 
   <br>
 
-  <a name="autocreatedefine"></a>
+  <a id="autocreate-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; autocreate</code><br>
@@ -776,16 +788,16 @@ autocreate_Attr(@)
   </ul>
 
 
-  <a name="autocreateset"></a>
+  <a id="autocreate-set"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
-  <a name="autocreateget"></a>
+  <a id="autocreate-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="autocreateattr"></a>
+  <a id="autocreate-attr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="autosave"></a>
+    <a id="autocreate-attr-autosave"></a>
     <li>autosave<br>
         After creating a device, automatically save the config file with the
         command <a href="#save">save</a> command. Default is 1 (i.e. on), set
@@ -794,22 +806,22 @@ autocreate_Attr(@)
         attribute instead.
         </li><br>
 
-    <a name="device_room"></a>
+    <a id="autocreate-attr-device_room"></a>
     <li>device_room<br>
         "Put" the newly created device in this room. The name can contain the
         wildcards %TYPE and %NAME, see the example above.</li><br>
 
-    <a name="filelogattr"></a>
+    <a id="autocreate-attr-filelog"></a>
     <li>filelog<br>
         Create a filelog associated with the device. The filename can contain
         the wildcards %TYPE and %NAME, see the example above. The filelog will
         be "put" in the same room as the device.</li><br>
 
-    <a name="weblinkattr"></a>
+    <a id="autocreate-attr-weblink"></a>
     <li>weblink<br>
         Create an SVG associated with the device/filelog.</li><br>
 
-    <a name="weblink_room"></a>
+    <a id="autocreate-attr-weblink_room"></a>
     <li>weblink_room<br>
         "Put" the newly created SVG in this room. The name can contain the
         wildcards %TYPE and %NAME, see the example above.</li><br>
@@ -817,7 +829,7 @@ autocreate_Attr(@)
     <li><a href="#disable">disable</a></li>
       <br>
 
-    <a name="ignoreTypes"></a>
+    <a id="autocreate-attr-ignoreTypes"></a>
     <li>ignoreTypes<br>
         This is a regexp, to ignore certain devices, e.g. the neighbours FHT.
         You can specify more than one, with usual regexp syntax, e.g.<br>
@@ -829,7 +841,7 @@ autocreate_Attr(@)
         type:name (same procedure as in notify and FileLog).
         </li><br>
 
-    <a name="autocreateThreshold"></a>
+    <a id="autocreate-attr-autocreateThreshold"></a>
     <li>autocreateThreshold<br>
         A list of &lt;type&gt;:&lt;count&gt;:&lt;interval&gt; triplets. A new
         device is only created if there have been at least <code>count</code>
@@ -841,7 +853,7 @@ autocreate_Attr(@)
   </ul>
   <br>
 
-  <a name="createlog"></a>
+  <a id="createlog"></a>
   <b>createlog</b>
   <ul>
       Use this command to manually add a FileLog and an SVG to an existing
@@ -850,7 +862,7 @@ autocreate_Attr(@)
   </ul>
   <br>
 
-  <a name="usb"></a>
+  <a id="usb"></a>
   <b>usb</b>
   <ul>
       Usage:
@@ -880,7 +892,7 @@ autocreate_Attr(@)
 
 =begin html_DE
 
-<a name="autocreate"></a>
+<a id="autocreate"></a>
 <h3>autocreate</h3>
 <ul>
 
@@ -891,7 +903,7 @@ autocreate_Attr(@)
   &uuml;ber EM1010PC) werden NICHT automatisch erzeugt.
   <br><br>
 
-  <a name="autocreatedefine"></a>
+  <a id="autocreatedefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; autocreate</code><br>
@@ -936,16 +948,16 @@ autocreate_Attr(@)
   </ul>
 
 
-  <a name="autocreateset"></a>
+  <a id="autocreate-set"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
-  <a name="autocreateget"></a>
+  <a id="autocreate-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="autocreateattr"></a>
+  <a id="autocreate-attr"></a>
   <b>Attribute</b>
   <ul>
-    <a name="autosave"></a>
+    <a id="autocreate-attr-autosave"></a>
     <li>autosave<br>
         Nach der Erzeugung eines neuen Ger&auml;tes wird automatisch die
         Konfigurationsdatei mit dem Befehl <a href="#save">save</a>
@@ -955,25 +967,25 @@ autocreate_Attr(@)
         das global autosave Attribut verwenden.
         </li><br>
 
-    <a name="device_room"></a>
+    <a id="autocreate-attr-device_room"></a>
     <li>device_room<br>
         "Schiebt" das neu erstellte Ger&auml;t in diesen Raum. Der Name kann
         die Wildcards %NAME und %TYPE enthalten, siehe oben stehendes
         Beispiel.</li><br>
 
-    <a name="filelogattr"></a>
+    <a id="autocreate-attr-filelog"></a>
     <li>filelog<br>
         Erstellt ein Filelog welches zu einem Ger&auml;t geh&ouml;rt. Der
         Dateiname darf die Wildcards %NAME und %TYPE enthalten, siehe oben
         stehendes Beispiel. Das Filelog wird in den gleichen Raum "geschoben"
         wie das zugeh&ouml;rige Ger&auml;t.</li><br>
 
-    <a name="weblinkattr"></a>
+    <a id="autocreate-attr-weblink"></a>
     <li>weblink<br>
         Erzeugt ein SVG, welches mit dem Ger&auml;t/Filelog verkn&uuml;pft
         ist.</li><br>
 
-    <a name="weblink_room"></a>
+    <a id="autocreate-attr-weblink_room"></a>
     <li>weblink_room<br>
         "Schiebt" das neu erstellte SVG in den bezeichneten Raum. Der Name kann
         die Wildcards %NAME und %TYPE enthalten, siehe oben stehendes
@@ -982,7 +994,7 @@ autocreate_Attr(@)
     <li><a href="#disable">disable</a></li>
       <br>
 
-    <a name="ignoreTypes"></a>
+    <a id="autocreate-attr-ignoreTypes"></a>
     <li>ignoreTypes<br>
         Dies ist ein Regexp, um bestimmte Ger&auml;te zu ignorieren, z.b. der
         Funk-Heizungsthermostat (FHT) des Nachbarn. In dem Ausdruck k&ouml;nnen
@@ -996,7 +1008,7 @@ autocreate_Attr(@)
         bei notify und FileLog).
         </li><br>
 
-    <a name="autocreateThreshold"></a>
+    <a id="autocreate-attr-autocreateThreshold"></a>
     <li>autocreateThreshold<br>
         Eine Liste of &lt;type&gt;:&lt;count&gt;:&lt;interval&gt; tripeln. Ein
         neues Device wird nur dann erzeugt wenn es mindestens <code>count</code>
@@ -1009,7 +1021,7 @@ autocreate_Attr(@)
   </ul>
   <br>
 
-  <a name="createlog"></a>
+  <a id="createlog"></a>
   <b>createlog</b>
   <ul>
       Dieser Befehl wird f&uuml;r ein manuelles Hinzuf&uuml;gen eines Logfile
@@ -1019,7 +1031,7 @@ autocreate_Attr(@)
   </ul>
   <br>
 
-  <a name="usb"></a>
+  <a id="usb"></a>
   <b>usb</b>
   <ul>
       Verwendung:
