@@ -1629,12 +1629,13 @@ FW_doDetail($)
 
   FW_pO "<div id='detLink'>";
   my @detCmd = (
-    'devSpecHelp',   "Help for $t",
-    'forumCopy',     'Copy for forum.fhem.de',
-    'rawDef',        'Raw definition',
-    'style iconFor', 'Select icon',
-    'style showDSI', 'Extend devStateIcon',
-    'delete',        "Delete $d"
+    'devSpecHelp',        "Help for $t",
+    'forumCopy',          'Copy for forum.fhem.de',
+    'rawDef',             'Raw definition',
+    'style iconFor',      'Select icon',
+    'style showDSI',      'Extend devStateIcon',
+    'style eventMonitor', 'Event Monitor (filtered)',
+    'delete',             "Delete $d"
   );
   my $lNum = AttrVal($FW_wname, "detailLinks", 2);
   if($lNum =~ m/^(\d),(.+)$/) {
@@ -3943,7 +3944,8 @@ FW_log($$)
         The rest of the commands is shown in a dropdown menu. Default is 2.<br>
         This can optionally followed by a comma separated list of ids to order
         or filter the desired links, the ids being one of devSpecHelp,
-        forumCopy, rawDef, style iconFor, style showDSI, delete. Example:<br>
+        forumCopy, rawDef, style iconFor, style showDSI, style eventMonitor, delete.<br>
+        Example:<br>
         attr WEB detailLinks 2,devSpecHelp,forumCopy
         </li>
         <br>
@@ -4808,7 +4810,8 @@ FW_log($$)
         Voreinstellung ist 2.<br>
         Das kann optional mit der Liste der anzuzeigenden IDs erweitert werden,
         um die Links zu sortieren oder zu filtern. Die m&ouml;glichen IDs sind
-        devSpecHelp, forumCopy, rawDef, style iconFor, style showDSI, delete.
+        devSpecHelp, forumCopy, rawDef, style iconFor, style showDSI,
+        style eventMonitor, delete.<br>
         Beispiel:<br> attr WEB detailLinks 2,devSpecHelp,forumCopy
         </li>
         <br>
