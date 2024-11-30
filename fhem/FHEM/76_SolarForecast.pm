@@ -156,7 +156,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.37.9" => "29.11.2024  activate StatusAPI-Hash, Separation of radiation API-data , API-state data , weather-API data ",
+  "1.38.0" => "30.11.2024  optimize data handling, rename getter solApiData to radiationApiData, ".
+                           "set setupStringAzimuth, setupStringDeclination is checked due to dependencies to OpenMeteo ".
+                           "attr setupRadiationAPI and setupWeatherDev1 can be set largely independently of each other ",
+  "1.37.9" => "29.11.2024  activate StatusAPI-Hash, Separation of radiation API-data, API-state data, weather-API data ",
   "1.37.8" => "28.11.2024  edit commref, func _searchCacheFiles for renaming Cache files when device is renamed ".
                            "_saveEnergyConsumption: extended for Debug collectData, preparation of weatherApiData ".
                            "new func WeatherAPIVal, StatusAPIVal ",
@@ -601,7 +604,7 @@ my %hget = (                                                                # Ha
   forecastQualities  => { fn => \&_getForecastQualities,        needcred => 0 },
   nextHours          => { fn => \&_getlistNextHours,            needcred => 0 },
   rooftopData        => { fn => \&_getRoofTopData,              needcred => 0 },
-  solApiData         => { fn => \&_getlistSolCastData,          needcred => 0 },
+  radiationApiData   => { fn => \&_getlistRadiationApiData,     needcred => 0 },
   weatherApiData     => { fn => \&_getlistWeatherApiData,       needcred => 0 },
   statusApiData      => { fn => \&_getlistStatusApiData,        needcred => 0 },
   valDecTree         => { fn => \&_getaiDecTree,                needcred => 0 },
@@ -1293,9 +1296,6 @@ sub Initialize {
                     
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################                    
-  # my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';
-  # $hash->{AttrList} .= " flowGraphicCss:$av flowGraphicSize:$av flowGraphicAnimate:$av flowGraphicConsumerDistance:$av flowGraphicShowConsumer:$av flowGraphicShowConsumerDummy:$av flowGraphicShowConsumerPower:$av flowGraphicShowConsumerRemainTime:$av flowGraphicShift:$av ";
- 
   # my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";
   # $hash->{AttrList} .= " affect70percentRule:$av1 ctrlAutoRefresh:$av1 ctrlAutoRefreshFW:$av1 ";
   ##########################################################################################################################
@@ -1364,7 +1364,7 @@ sub Define {
 
   $params->{file}      = $scpicache.$name;                                                               # Cache File SolCast API Werte einlesen wenn vorhanden
   $params->{cachename} = 'solcastapi';
-  $params->{title}     = 'solApiData';
+  $params->{title}     = 'radiationApiData';
   _readCacheFile ($params);
   
   $params->{file}      = $statcache.$name;                                                               # Cache File API-Status einlesen wenn vorhanden
@@ -1590,6 +1590,8 @@ sub Set {
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,' : ',')."off ".
              "reset:$resets ".
+             "setupStringAzimuth ".
+             "setupStringDeclination ".
              $cf." "
              ;
 
@@ -1599,18 +1601,8 @@ sub Set {
       $setlist .= "roofIdentPair "
                   ;
   }
-  elsif (isForecastSolarUsed ($hash)) {
-      $setlist .= "setupStringAzimuth ".
-                  "setupStringDeclination "
-                  ;
-  }
   elsif (isVictronKiUsed ($hash)) {
       $setlist .= "vrmCredentials "
-                  ;
-  }
-  else {
-      $setlist .= "setupStringAzimuth ".
-                  "setupStringDeclination "
                   ;
   }
 
@@ -2513,7 +2505,7 @@ sub Get {
                 "pvCircular:noArg ".
                 "pvHistory:#,exportToCsv,$pvl ".
                 "rooftopData:noArg ".
-                "solApiData:noArg ".
+                "radiationApiData:noArg ".
                 "statusApiData:noArg ".
                 "valCurrent:noArg ".
                 "weatherApiData:noArg "
@@ -2569,24 +2561,36 @@ sub _getRoofTopData {
 
   delete $data{$type}{$name}{current}{dwdRad1hAge};
   delete $data{$type}{$name}{current}{dwdRad1hAgeTS};
+  
+  my ($rapi, $wapi) = getStatusApiName ($hash);                                       # $rapi - Radiation-API, $wapi - Weather-API
+  my $ret           = "$name is not a valid Radiation ($rapi) and/or Weather ($wapi) Model";
+  
 
-  my $ret = "$name is not a valid SolarForeCast Model: ".$hash->{MODEL};
-
-  if ($hash->{MODEL} eq 'SolCastAPI') {
+  if ($rapi eq 'SolCast') {
       $ret = __getSolCastData ($paref);
   }
-  elsif ($hash->{MODEL} eq 'ForecastSolarAPI') {
+  elsif ($rapi eq 'ForecastSolar') {
       $ret = __getForecastSolarData ($paref);
   }
-  elsif ($hash->{MODEL} eq 'DWD') {
+  elsif ($rapi eq 'DWD') {
       $ret = __getDWDSolarData ($paref);
   }
-  elsif ($hash->{MODEL} eq 'VictronKiAPI') {
+  elsif ($rapi eq 'VictronKi') {
       $ret = __getVictronSolarData ($paref);
   }
-  elsif ($hash->{MODEL} =~ /^OpenMeteo/xs) {
+  
+  if ($rapi eq 'OpenMeteo' || $wapi eq 'OpenMeteo') {
+      if ($rapi eq 'OpenMeteo') { 
+          $paref->{reqm} = 'MODEL';
+      }
+      else {
+          $paref->{reqm} = 'WEATHERMODEL';
+      }
+      
       $ret = __getopenMeteoData ($paref);
   }
+  
+  delete $paref->{reqm};
 
 return $ret;
 }
@@ -2876,7 +2880,7 @@ sub __solCast_ApiResponse {
               $period   =~ s/.*(\d\d).*/$1/;                                                             # -> die neuen Daten (in dem Fall nur die einer halben Stunde) im nächsten Schritt addiert werden
 
               my $est50 = SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0) / (60/$period);
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = $est50 if($est50);
+              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = sprintf "%.0f", $est50 if($est50);
 
               $k++;
               next;
@@ -2902,15 +2906,17 @@ sub __solCast_ApiResponse {
 
           $period             = $jdata->{'forecasts'}[$k]{'period'};
           $period             =~ s/.*(\d\d).*/$1/;
-
+          
+          $pvest50            = sprintf "%.0f", ($pvest50 * ($period/60) * 1000);
+          
           if ($debug =~ /apiProcess/x) {                                                                     # nur für Debugging
               if (exists $data{$type}{$name}{solcastapi}{$string}{$starttmstr}) {
                   Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - Start Date/Time: }. $starttmstr);
-                  Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - pv_estimate50 add: }.(sprintf "%.0f", ($pvest50 * ($period/60) * 1000)).qq{, contains already: }.SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
+                  Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - pv_estimate50 add: }.$pvest50.qq{, contains already: }.SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
               }
           }
 
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} += sprintf "%.0f", ($pvest50 * ($period/60) * 1000);
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} += $pvest50;
 
           $k++;
       }
@@ -4085,6 +4091,7 @@ sub __getopenMeteoData {
   my $t     = $paref->{t};
   my $lang  = $paref->{lang};
   my $debug = $paref->{debug};
+  my $reqm  = $paref->{reqm};
 
   my $hash    = $defs{$name};
   my $donearq = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
@@ -4106,7 +4113,8 @@ sub __getopenMeteoData {
 
   debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - the daily API requests -> limited to: $ometmaxreq, done: $donearq});
 
-  my $submodel         = InternalVal ($hash->{NAME}, 'MODEL', '');
+  my $submodel         = InternalVal ($hash->{NAME}, $reqm, '');
+  
   $paref->{allstrings} = AttrVal ($name, 'setupInverterStrings', '');
   $paref->{submodel}   = $submodel eq 'OpenMeteoDWDAPI'         ? 'DWD ICON Seamless'          :
                          $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 'DWD ICON Seamless Ensemble' :
@@ -4117,6 +4125,7 @@ sub __getopenMeteoData {
 
   $paref->{callequivalent} = $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 20 : 1;
   $paref->{begin}          = 1;
+  $paref->{requestmode}    = $reqm;
 
   __openMeteoDWD_ApiRequest ($paref);
 
@@ -4154,7 +4163,8 @@ sub __openMeteoDWD_ApiRequest {
   my $debug      = $paref->{debug};
   my $lang       = $paref->{lang};
   my $t          = $paref->{t}       // int time;
-  my $submodel   = $paref->{submodel};                                       # abzufragendes Wettermodell
+  my $submodel   = $paref->{submodel};                                       # abzufragendes Datenmodell
+  my $requestmode = $paref->{requestmode};
 
   my $hash       = $defs{$name};
 
@@ -4167,18 +4177,26 @@ sub __openMeteoDWD_ApiRequest {
       return;
   }
 
-  my $string;
+  my ($string, $err);
   ($string, $allstrings)       = split ",", $allstrings, 2;
   my ($set, $lat, $lon, $elev) = locCoordinates();
 
   if (!$set) {
-      my $err = qq{the attribute 'latitude' and/or 'longitude' in global device is not set};
-      singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
-      return $err;
+      $err = qq{ERROR - the attribute 'latitude' and/or 'longitude' in global device is not set};
+      Log3 ($name, 1, "$name - $err");
+      return;
   }
 
   my $tilt = StringVal ($hash, $string, 'tilt',   '<unknown>');
   my $az   = StringVal ($hash, $string, 'azimut', '<unknown>');
+  
+  if ($requestmode eq 'WEATHERMODEL' && $string eq 'KI-based') {$tilt = 0; $az = 0;}            # Dummy Settings
+  
+  if ($tilt eq '<unknown>' || $az eq '<unknown>') {
+      $err = qq{ERROR OpenMeteo API Call - the reading 'setupStringAzimuth' and/or 'setupStringDeclination' is not set};
+      Log3 ($name, 1, "$name - $err");
+      return;
+  }
 
   my $url = "https://api.open-meteo.com/v1/forecast?";
   $url    = "https://ensemble-api.open-meteo.com/v1/ensemble?" if($submodel =~ /Ensemble/xs);                    # Ensemble Modell gewählt
@@ -4195,8 +4213,9 @@ sub __openMeteoDWD_ApiRequest {
   $url   .= "&tilt=".$tilt;
   $url   .= "&azimuth=".$az;
 
-  debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - Request for PV-String "$string" with Weather Model >$submodel<:\n$url});
-
+  debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - Request for PV-String "$string" with Data Model >$submodel<:\n$url});
+  debugLog ($paref, 'apiCall|apiProcess', qq{Open-Meteo API Call - Request Mode: $requestmode});
+  
   my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
 
   my $param = {
@@ -4209,6 +4228,7 @@ sub __openMeteoDWD_ApiRequest {
       submodel       => $submodel,
       begin          => $paref->{begin},
       callequivalent => $paref->{callequivalent},
+      requestmode    => $requestmode,
       caller         => \&$caller,
       stc            => [gettimeofday],
       allstrings     => $allstrings,
@@ -4257,6 +4277,7 @@ sub __openMeteoDWD_ApiResponse {
   my $caller      = $paref->{caller};
   my $string      = $paref->{string};
   my $allstrings  = $paref->{allstrings};
+  my $requestmode = $paref->{requestmode};                # MODEL oder WEATHERMODEL
   my $stc         = $paref->{stc};                                                                                             # Startzeit API Abruf
   my $lang        = $paref->{lang};
   my $debug       = $paref->{debug};
@@ -4379,6 +4400,7 @@ sub __openMeteoDWD_ApiResponse {
           my $rad1wh  = $jdata->{hourly}{global_tilted_irradiance}[$k];                         # Wh/m2
           my $rad     = 10 * (sprintf "%.0f", ($rad1wh * $WhtokJ) / 10);                        # Umrechnung Wh/m2 in kJ/m2 ->
           my $pv      = sprintf "%.2f", int ($rad1wh / 1000 * $peak * $prdef);                  # Rad wird in kWh/m2 erwartet
+          
           my $don     = $jdata->{hourly}{is_day}[$k];
           my $temp    = $jdata->{hourly}{temperature_2m}[$k];
           my $rain    = $jdata->{hourly}{rain}[$k];                                             # Regen in Millimeter = kg/m2
@@ -4388,7 +4410,10 @@ sub __openMeteoDWD_ApiResponse {
           if ($k == 0 && $curwid) { $curwid = ($don ? 0 : 100) +  $curwid }
 
           if ($debug =~ /apiProcess/xs) {
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Rad1Wh: $rad1wh, Rad1kJ: $rad, PV est: $pv Wh");
+              if ($requestmode eq 'MODEL') {
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Rad1Wh: $rad1wh, Rad1kJ: $rad, PV est: $pv Wh");
+              }
+              
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - RR1c: $rain");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - DoN: $don");
               Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Temp: $temp");
@@ -4402,29 +4427,24 @@ sub __openMeteoDWD_ApiResponse {
               }
           }
 
-          $data{$type}{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;              # Startstunde verschieben
+          if ($requestmode eq 'MODEL') {
+              $data{$type}{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;              # Startstunde verschieben
 
-          my $fwtg = formatWeatherTimestrg ($pvtmstr);
+              if ($paref->{begin}) {                                                                # im ersten Call den DS löschen -> dann Aufsummierung
+                  delete $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h};
+              }
 
-          if ($paref->{begin}) {                                                                # im ersten Call den DS löschen -> dann Aufsummierung
-              delete $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h};
+              $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} += $rad;                     # Startstunde verschieben, Rad Werte aller Strings addieren
           }
-
-          $data{$type}{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} += $rad;                     # Startstunde verschieben, Rad Werte aller Strings addieren
           
           ## Wetterdaten
-          ################
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{rr1c}          = $rain;                # Startstunde verschieben
-          $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{rr1c}       = $rain; 
+          ################     
+          my $fwtg = formatWeatherTimestrg ($pvtmstr);                                              # Zeit gemäß DWD_OpenData-Format
+          
+          $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{rr1c}       = $rain;
           $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{StartTime}  = $pvtmstr;
           
-          $fwtg = formatWeatherTimestrg ($otmstr);
-
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{don}           = $don;
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff}          = $wcc;
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}            = $wid;
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt}           = $temp;
-          $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{UpdateTime}    = $rt;
+          $fwtg = formatWeatherTimestrg ($otmstr);                                                  # Zeit gemäß DWD_OpenData-Format
           
           $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{don}        = $don;
           $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{neff}       = $wcc;
@@ -4433,11 +4453,7 @@ sub __openMeteoDWD_ApiResponse {
           $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{UpdateTime} = $rt;
           $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{StartTime}  = $otmstr;
 
-          if ($k == 0) {
-              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{neff}    = $curwcc if(defined $curwcc);
-              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ww}      = $curwid if(defined $curwid);
-              $data{$type}{$name}{solcastapi}{'?All'}{$fwtg}{ttt}     = $curtmp if(defined $curtmp);
-              
+          if ($k == 0) {             
               $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{neff} = $curwcc if(defined $curwcc);
               $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{ww}   = $curwid if(defined $curwid);
               $data{$type}{$name}{weatherapi}{OpenMeteo}{$fwtg}{ttt}  = $curtmp if(defined $curtmp);
@@ -4464,9 +4480,6 @@ sub __openMeteoDWD_ApiResponse {
           }
 
           if ($k == 0) {
-              $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{today}    = $sunrise;
-              $data{$type}{$name}{solcastapi}{'?All'}{sunset}{today}     = $sunset;
-              
               $data{$type}{$name}{weatherapi}{OpenMeteo}{sunrise}{today} = $sunrise;
               $data{$type}{$name}{weatherapi}{OpenMeteo}{sunset}{today}  = $sunset;
 
@@ -4477,9 +4490,6 @@ sub __openMeteoDWD_ApiResponse {
           }
 
           if ($k == 1) {
-              $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{tomorrow}    = $sunrise;
-              $data{$type}{$name}{solcastapi}{'?All'}{sunset}{tomorrow}     = $sunset;
-              
               $data{$type}{$name}{weatherapi}{OpenMeteo}{sunrise}{tomorrow} = $sunrise;
               $data{$type}{$name}{weatherapi}{OpenMeteo}{sunset}{tomorrow}  = $sunset;
 
@@ -4504,6 +4514,7 @@ sub __openMeteoDWD_ApiResponse {
       allstrings     => $allstrings,
       submodel       => $submodel,
       callequivalent => $paref->{callequivalent},
+      requestmode    => $requestmode,
       lang           => $lang
   };
 
@@ -4730,14 +4741,14 @@ return $ret;
 }
 
 ###############################################################
-#                       Getter solApiData
+#                       Getter radiationApiData
 ###############################################################
-sub _getlistSolCastData {
+sub _getlistRadiationApiData {
   my $paref = shift;
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
 
-  my $ret = listDataPool   ($hash, 'solApiData');
+  my $ret = listDataPool   ($hash, 'radiationApiData');
   $ret   .= lineFromSpaces ($ret, 10);
 
 return $ret;
@@ -5425,16 +5436,6 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  # 20.10.2024
-  if ($cmd eq 'set' && $aName =~ /^flowGraphicCss|flowGraphicSize|flowGraphicAnimate|flowGraphicConsumerDistance|flowGraphicShowConsumer|flowGraphicShowConsumerDummy|flowGraphicShowConsumerPower|flowGraphicShowConsumerRemainTime|flowGraphicShift$/) {
-      if (!$init_done) {
-          # return qq{Device "$name" -> The attribute '$aName' is replaced by 'flowGraphicControl'. Please press "save config" when restart is finished.};
-          Log3 ($name, 1, qq{$name - The attribute '$aName' is replaced by 'flowGraphicControl'. Please press "save config" when restart is finished.});
-      }
-      else {
-          return qq{The attribute '$aName' is obsolete and replaced by 'flowGraphicControl'.};
-      }
-  }
   # 31.10.2024
   if ($cmd eq 'set' && $aName =~ /^graphicStartHtml|affect70percentRule|graphicEndHtml|ctrlAutoRefresh|ctrlAutoRefreshFW$/) {
       if (!$init_done) {
@@ -6197,19 +6198,26 @@ sub _attrWeatherDev {                    ## no critic "not used"
 
       if ($aVal =~ /^OpenMeteo/xs) {
           if ($aName ne 'setupWeatherDev1') {
-              return qq{Only the leading attribute 'setupWeatherDev1' can set to '$aVal'};
+              return qq{Only the leading weather attribute 'setupWeatherDev1' can set to '$aVal'};
           }
-
-          InternalTimer (gettimeofday()+1, 'FHEM::SolarForecast::__setRadAPIdelayed', $hash, 0);   # automatisch setupRadiationAPI setzen wenn setupWeatherDev1
-          return;
+          
+          my @istrings = split ",", AttrVal ($name, 'setupInverterStrings', '');          # Stringbezeichner
+          
+          if ((!ReadingsVal ($name, 'setupStringAzimuth', '') || !ReadingsVal ($name, 'setupStringDeclination', '')) &&
+              !grep /KI-based/, @istrings) {
+              return qq{Execute 'set $name setupStringAzimuth' and/or 'set $name setupStringDeclination' first.};
+          }
       }
 
-      my $err = checkdwdattr ($name, $aVal, \@dweattrmust);
-      return $err if($err);
+      if ($aVal !~ /-API$/xs) {                                                      # Attribute des DWD-Devices prüfen
+          my $err = checkdwdattr ($name, $aVal, \@dweattrmust);
+          return $err if($err);
+      }
   }
 
-  InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::setModel',             $hash, 0);  
-  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::__harmonizeAPIdelayed', $hash, 0);
+  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::setModel',              $hash, 0);  
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::createAssociatedWith',  $hash, 0);
 
 return;
 }
@@ -6233,14 +6241,14 @@ sub _attrRadiationAPI {                  ## no critic "not used"
           return qq{The device "$aVal" doesn't exist or has no TYPE "DWD_OpenData"};
       }
 
-      my $awdev1 = AttrVal ($name, 'setupWeatherDev1', '');
+      #my $awdev1 = AttrVal ($name, 'setupWeatherDev1', '');
 
-      if (($awdev1 eq 'OpenMeteoDWD-API'         && $aVal ne 'OpenMeteoDWD-API')         ||
-          ($awdev1 eq 'OpenMeteoDWDEnsemble-API' && $aVal ne 'OpenMeteoDWDEnsemble-API') ||
-          ($awdev1 eq 'OpenMeteoWorld-API'       && $aVal ne 'OpenMeteoWorld-API')) {
-          return "The attribute 'setupWeatherDev1' is set to '$awdev1'. \n".
-                 "Change that attribute to another weather device first if you want use an other API.";
-      }
+      #if (($awdev1 eq 'OpenMeteoDWD-API'         && $aVal ne 'OpenMeteoDWD-API')         ||
+      #    ($awdev1 eq 'OpenMeteoDWDEnsemble-API' && $aVal ne 'OpenMeteoDWDEnsemble-API') ||
+      #    ($awdev1 eq 'OpenMeteoWorld-API'       && $aVal ne 'OpenMeteoWorld-API')) {
+      #    return "The attribute 'setupWeatherDev1' is set to '$awdev1'. \n".
+      #           "Change that attribute to another weather device first if you want use an other API.";
+      #}
 
       if ($aVal =~ /(SolCast|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
           return "The library FHEM::Utility::CTZ is missing. Please update FHEM completely." if($ctzAbsent);
@@ -6267,9 +6275,10 @@ sub _attrRadiationAPI {                  ## no critic "not used"
 
   readingsDelete ($hash, 'nextRadiationAPICall');
 
-  InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::setModel',             $hash, 0);                                  # Model setzen
-  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);    # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::__harmonizeAPIdelayed', $hash, 0);
+  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::setModel',              $hash, 0);                                  # Model setzen
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::createAssociatedWith',  $hash, 0);
+  InternalTimer (gettimeofday() + 4, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);    # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -6302,15 +6311,22 @@ return;
 }
 
 ################################################################
-#     setupRadiationAPI verzögert aus Attr setzen
+#   Attr setupRadiationAPI und setupWeatherDev1 
+#   harmonisieren wenn erforderlich
+#   setupRadiationAPI ist führend
 ################################################################
-sub __setRadAPIdelayed {
+sub __harmonizeAPIdelayed {
   my $hash = shift;
 
   my $name   = $hash->{NAME};
-  my $awdev1 = AttrVal ($name, 'setupWeatherDev1', '');
-
-  CommandAttr (undef, "$name setupRadiationAPI $awdev1");                         # automatisch setupRadiationAPI setzen
+  my $wedev1 = AttrVal ($name, 'setupWeatherDev1',  '');
+  my $radapi = AttrVal ($name, 'setupRadiationAPI', '');
+  
+  return if($wedev1 eq $radapi);
+  
+  if ($radapi =~ /OpenMeteo/xs && $wedev1 =~ /OpenMeteo/xs) {      # auf OpenMeteo Datenmodell harmonisieren
+      CommandAttr (undef, "$name setupWeatherDev1 $radapi");      
+  }
 
 return;
 }
@@ -7082,36 +7098,7 @@ sub centralTask {
   setModel ($hash);                                                    # Model setzen
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################
-  for my $n (1..24) {                                                  # 08.10.2024
-      $n = sprintf "%02d", $n;
-      readingsDelete ($hash, "pvCorrectionFactor_${n}_autocalc");
-  }
-    
-  my $fg1 = AttrVal ($name, 'flowGraphicSize', undef);                     # 20.10.2024
-  my $fg2 = AttrVal ($name, 'flowGraphicAnimate', undef);
-  my $fg3 = AttrVal ($name, 'flowGraphicConsumerDistance', undef);
-  my $fg4 = AttrVal ($name, 'flowGraphicShowConsumer', undef);
-  my $fg5 = AttrVal ($name, 'flowGraphicShowConsumerDummy', undef);
-  my $fg6 = AttrVal ($name, 'flowGraphicShowConsumerPower', undef);
-  my $fg7 = AttrVal ($name, 'flowGraphicShowConsumerRemainTime', undef);
-  my $fg8 = AttrVal ($name, 'flowGraphicShift', undef);
-  
-  my $newval;
-  $newval .= "size=$fg1 " if(defined $fg1);
-  $newval .= "animate=$fg2 " if(defined $fg2);
-  $newval .= "consumerdist=$fg3 " if(defined $fg3);
-  $newval .= "showconsumer=$fg4 " if(defined $fg4);
-  $newval .= "showconsumerdummy=$fg5 " if(defined $fg5);
-  $newval .= "showconsumerpower=$fg6 " if(defined $fg6);
-  $newval .= "showconsumerremaintime=$fg7 " if(defined $fg7);
-  $newval .= "shift=$fg8 " if(defined $fg8);  
-
-  if ($newval) {
-      CommandAttr (undef, "$name flowGraphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name flowGraphicSize|flowGraphicAnimate|flowGraphicConsumerDistance|flowGraphicShowConsumer|flowGraphicShowConsumerDummy|flowGraphicShowConsumerPower|flowGraphicShowConsumerRemainTime|flowGraphicShift");
-  }
-  
+  ##########################################################################################################################    
   if (exists $data{$type}{$name}{solcastapi}{'?IdPair'}) {                             # 29.11.2024
       for my $pk (keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}}) {                
           my $apikey = SolCastAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
@@ -7132,7 +7119,7 @@ sub centralTask {
       for my $key (keys %{$data{$type}{$name}{solcastapi}{'?All'}{'?All'}}) {         
           my $val = SolCastAPIVal ($hash, '?All', '?All', $key, '');
           
-          if ($val) {
+          if ($rapi && $val) {
               $data{$type}{$name}{statusapi}{$rapi}{'?All'}{$key} = $val;
               delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{$key};
           }
@@ -7156,7 +7143,6 @@ sub centralTask {
       $data{$type}{$name}{statusapi}{'?VRM'}{'?API'}{credentials} = $vrmcr;
       delete $data{$type}{$name}{solcastapi}{'?VRM'};
   }
-
   ##########################################################################################################################
 
   my (undef, $disabled, $inactive) = controller ($name);
@@ -7225,7 +7211,7 @@ sub centralTask {
 
   readingsDelete              ($hash, 'AllPVforecastsToEvent');
 
-  _getRoofTopData             ($centpars);                                            # Strahlungswerte/Forecast-Werte in solcastapi-Hash erstellen
+  _getRoofTopData             ($centpars);                                            # Strahlungs/Wetter-Daten der gewählten API's abrufen und in internen Strukturen speichern
   _transferInverterValues     ($centpars);                                            # WR Werte übertragen
   _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen und Forecast mit/ohne Korrektur erstellen
   _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
@@ -7320,9 +7306,10 @@ sub createStringConfig {                 ## no critic "not used"
           return qq{You use a KI based model. Please set only "KI-based" as String with command "attr $name setupInverterStrings".};
       }
   }
-  elsif (!isVictronKiUsed ($hash)) {
+  
+  if (!grep /^KI-based$/, @istrings) {
       my $tilt = ReadingsVal ($name, 'setupStringDeclination', '');                                    # Modul Neigungswinkel für jeden Stringbezeichner
-      return qq{Please complete command "set $name setupStringDeclination".} if(!$tilt);
+      return qq{Please complete command "set $name setupStringDeclination"} if(!$tilt);
 
       my ($at,$ht) = parseParams ($tilt);
 
@@ -7336,7 +7323,7 @@ sub createStringConfig {                 ## no critic "not used"
       }
 
       my $dir = ReadingsVal ($name, 'setupStringAzimuth', '');                                         # Modul Ausrichtung für jeden Stringbezeichner
-      return qq{Please complete command "set $name setupStringAzimuth".} if(!$dir);
+      return qq{Please complete command "set $name setupStringAzimuth"} if(!$dir);
 
       my ($ad,$hd) = parseParams ($dir);
       my $iwrong   = qq{Please check the input of set "setupStringAzimuth". It seems to be wrong.};
@@ -7934,29 +7921,24 @@ sub __delObsoleteAPIData {
   my $date  = $paref->{date};                                                          # aktuelles Datum
   my $hash  = $defs{$name};
   
+  my ($rapi, $wapi) = getStatusApiName ($hash); 
+  
   ## Wetter-API Daten löschen
   #############################
   if (keys %{$data{$type}{$name}{weatherapi}}) {
-      if (isWeatherOpenMeteoUsed ($hash)) {   
-          for my $idx (keys %{$data{$type}{$name}{weatherapi}{OpenMeteo}}) {                   
-              delete $data{$type}{$name}{weatherapi}{OpenMeteo}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);
-          }
-      }
-      else {
-          delete $data{$type}{$name}{weatherapi}{OpenMeteo};
-      }
+      delete $data{$type}{$name}{weatherapi}{OpenMeteo}    if($wapi ne 'OpenMeteo');       
   }
   
   ## Status-API Daten löschen
   #############################
   if (keys %{$data{$type}{$name}{statusapi}}) {
-      delete $data{$type}{$name}{statusapi}{OpenMeteo}     if(!isOpenMeteoUsed     ($hash) && !isWeatherOpenMeteoUsed ($hash));
-      delete $data{$type}{$name}{statusapi}{ForecastSolar} if(!isForecastSolarUsed ($hash));
-      delete $data{$type}{$name}{statusapi}{SolCast}       if(!isSolCastUsed       ($hash));
-      delete $data{$type}{$name}{statusapi}{'?IdPair'}     if(!isSolCastUsed       ($hash));
-      delete $data{$type}{$name}{statusapi}{DWD}           if(!isDWDUsed           ($hash));
-      delete $data{$type}{$name}{statusapi}{VictronKi}     if(!isVictronKiUsed     ($hash));
-      delete $data{$type}{$name}{statusapi}{'?VRM'}        if(!isVictronKiUsed     ($hash));
+      delete $data{$type}{$name}{statusapi}{OpenMeteo}     if($rapi ne 'OpenMeteo' && $wapi ne 'OpenMeteo');
+      delete $data{$type}{$name}{statusapi}{ForecastSolar} if($rapi ne 'ForecastSolar');
+      delete $data{$type}{$name}{statusapi}{SolCast}       if($rapi ne 'SolCast');
+      delete $data{$type}{$name}{statusapi}{'?IdPair'}     if($rapi ne 'SolCast');
+      delete $data{$type}{$name}{statusapi}{DWD}           if($rapi ne 'DWD');
+      delete $data{$type}{$name}{statusapi}{VictronKi}     if($rapi ne 'VictronKi');
+      delete $data{$type}{$name}{statusapi}{'?VRM'}        if($rapi ne 'VictronKi');
   }
   
   ## Solar-API Daten löschen
@@ -12020,6 +12002,7 @@ return ($fd, $fh);
 }
 
 ################################################################
+#  Zeit gemäß DWD_OpenData-Format
 #  Berechnen Tag / Stunden Verschieber ab aktuellen Tag
 #  Input:   YYYY-MM-DD HH:MM:SS
 #  Output:  $fd - 0 (Heute), 1 (Morgen), 2 (Übermorgen), ....
@@ -12660,10 +12643,7 @@ sub _checkSetupNotComplete {
       $ret .= "<td>";
       $ret .= $hqtxt{entry}{$lang};                                                         # Entry Text
 
-      if (!$wedev) {                                                                        ## no critic 'Cascading'
-          $ret .= $hqtxt{cfd}{$lang};
-      }
-      elsif (!$strings) {
+      if (!$strings) {                                                                      ## no critic 'Cascading'
           $ret .= $hqtxt{ist}{$lang};
       }
       elsif (!$peaks) {
@@ -12671,7 +12651,7 @@ sub _checkSetupNotComplete {
       }
       elsif (!$radev) {
           $ret .= $hqtxt{crd}{$lang};
-      }
+      }    
       elsif (!$indev) {
           $ret .= $hqtxt{cid}{$lang};
       }
@@ -12690,6 +12670,9 @@ sub _checkSetupNotComplete {
       elsif (!$mdec && !isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {
           $ret .= $hqtxt{mta}{$lang};
       }
+      elsif (!$wedev) {                                                                        
+          $ret .= $hqtxt{cfd}{$lang};
+      } 
       elsif (!$vrmcr && isVictronKiUsed ($hash)) {
           $ret .= $hqtxt{vrmcr}{$lang};
       }
@@ -16820,7 +16803,7 @@ sub listDataPool {
       return $ret;
   };
 
-  if ($htol =~ /solApiData|weatherApiData|statusApiData/xs) {                       
+  if ($htol =~ /radiationApiData|weatherApiData|statusApiData/xs) {                       
       $h = $data{$type}{$name}{solcastapi};
       $h = $data{$type}{$name}{weatherapi} if($htol eq 'weatherApiData');
       $h = $data{$type}{$name}{statusapi}  if($htol eq 'statusApiData');
@@ -17027,10 +17010,10 @@ sub checkPlantConfig {
   my $info   = FW_makeImage ('message_info',             '');
 
   my $result = {                                                                                    # Ergebnishash
-      'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'DWD Weather Properties'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'Common Settings'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'FTUI Widget Files'        => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'String Configuration' => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Weather Properties'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Common Settings'      => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'FTUI Widget Files'    => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
 
   my $sub = sub {
@@ -17099,44 +17082,44 @@ sub checkPlantConfig {
       next if(!$fcname && $step ne 1);
 
       if (!$valid) {
-          $result->{'DWD Weather Properties'}{state} = $nok;
+          $result->{'Weather Properties'}{state} = $nok;
 
           if (!$fcname) {
-              $result->{'DWD Weather Properties'}{result} .= qq{No DWD device is defined in attribute "setupWeatherDev$step". <br>};
+              $result->{'Weather Properties'}{result} .= qq{No DWD device is defined in attribute "setupWeatherDev$step". <br>};
           }
           else {
-              $result->{'DWD Weather Properties'}{result} .= qq{The DWD device "$fcname" doesn't exist. <br>};
+              $result->{'Weather Properties'}{result} .= qq{The DWD device "$fcname" doesn't exist. <br>};
           }
 
-          $result->{'DWD Weather Properties'}{fault} = 1;
+          $result->{'Weather Properties'}{fault} = 1;
       }
       else {
           if (!$apiu) {
               $err = checkdwdattr ($name, $fcname, \@dweattrmust);
 
               if ($err) {
-                  $result->{'DWD Weather Properties'}{state}   = $nok;
-                  $result->{'DWD Weather Properties'}{result} .= $err.'<br>';
-                  $result->{'DWD Weather Properties'}{fault}   = 1;
+                  $result->{'Weather Properties'}{state}   = $nok;
+                  $result->{'Weather Properties'}{result} .= $err.'<br>';
+                  $result->{'Weather Properties'}{fault}   = 1;
               }
               else {
                   $mosm = AttrVal ($fcname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';
 
                   if ($mosm eq 'MOSMIX_L') {
-                      $result->{'DWD Weather Properties'}{state}   = $info;
-                      $result->{'DWD Weather Properties'}{result} .= qq(The device "$fcname" uses "$mosm" which is only updated by DWD every 6 hours. <br>);
-                      $result->{'DWD Weather Properties'}{info}    = 1;
+                      $result->{'Weather Properties'}{state}   = $info;
+                      $result->{'Weather Properties'}{result} .= qq(The device "$fcname" uses "$mosm" which is only updated by DWD every 6 hours. <br>);
+                      $result->{'Weather Properties'}{info}    = 1;
                   }
 
-                  $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: setupWeatherDev$step)<br>";
+                  $result->{'Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: setupWeatherDev$step)<br>";
               }
 
-              $result->{'DWD Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
-              $result->{'DWD Weather Properties'}{note} .= 'forecastProperties -> '.join (',', @dweattrmust).'<br>';
-              $result->{'DWD Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
+              $result->{'Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
+              $result->{'Weather Properties'}{note} .= 'forecastProperties -> '.join (',', @dweattrmust).'<br>';
+              $result->{'Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
           }
           else {
-              $result->{'DWD Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: setupWeatherDev$step)<br>";
+              $result->{'Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: setupWeatherDev$step)<br>";
           }
       }
   }
@@ -17146,16 +17129,16 @@ sub checkPlantConfig {
   ($err, $resh) = isWeatherAgeExceeded ( {name => $name, lang => $lang} );
 
   if (!$err && $resh->{exceed}) {
-      $result->{'DWD Weather Properties'}{state} = $warn;
-      $result->{'DWD Weather Properties'}{note} .= qq{The Prediction time of Weather data is older than expected when using $resh->{mosmix}. <br>};
-      $result->{'DWD Weather Properties'}{note} .= qq{Data time forecast: $resh->{fctime} <br>};
-      $result->{'DWD Weather Properties'}{note} .= qq{Check the DWD device(s) for proper functioning of the data retrieval. <br>};
-      $result->{'DWD Weather Properties'}{warn}  = 1;
+      $result->{'Weather Properties'}{state} = $warn;
+      $result->{'Weather Properties'}{note} .= qq{The Prediction time of Weather data is older than expected when using $resh->{mosmix}. <br>};
+      $result->{'Weather Properties'}{note} .= qq{Data time forecast: $resh->{fctime} <br>};
+      $result->{'Weather Properties'}{note} .= qq{Check the DWD device(s) for proper functioning of the data retrieval. <br>};
+      $result->{'Weather Properties'}{warn}  = 1;
   }
 
-  $result->{'DWD Weather Properties'}{note} .= '<br>';
-  $result->{'DWD Weather Properties'}{note} .= qq{checked global Weather parameters: <br>};
-  $result->{'DWD Weather Properties'}{note} .= 'MOSMIX variant or ICON Forecast Model, Age of Weather data. <br>';
+  $result->{'Weather Properties'}{note} .= '<br>';
+  $result->{'Weather Properties'}{note} .= qq{checked global Weather parameters: <br>};
+  $result->{'Weather Properties'}{note} .= 'MOSMIX variant or ICON Forecast Model, Age of Weather data. <br>';
 
   ## Check DWD Radiation Device
   ###############################
@@ -17969,8 +17952,10 @@ sub setModel {
   elsif ($radapi =~ /OpenMeteoWorld-/xs)       { $hash->{MODEL} = 'OpenMeteoWorldAPI';       }
   else                                         { $hash->{MODEL} = 'DWD';                     }
   
-  if   ($wthapi =~ /OpenMeteo.*-API/xs) { $hash->{WEATHERMODEL} = 'OpenMeteo'; }
-  else                                  { $hash->{WEATHERMODEL} = 'DWD';       }
+  if    ($wthapi =~ /OpenMeteoDWDEnsemble-/xs) { $hash->{WEATHERMODEL} = 'OpenMeteoDWDEnsembleAPI'; }
+  elsif ($wthapi =~ /OpenMeteoDWD-/xs)         { $hash->{WEATHERMODEL} = 'OpenMeteoDWDAPI';         }
+  elsif ($wthapi =~ /OpenMeteoWorld-/xs)       { $hash->{WEATHERMODEL} = 'OpenMeteoWorldAPI';       }
+  else                                         { $hash->{WEATHERMODEL} = 'DWD';       }
 
 return;
 }
@@ -18653,10 +18638,12 @@ sub isWeatherDevValid {
 
   if ($fcname) { $valid = 1  }
   if (!$defs{$fcname} || $defs{$fcname}{TYPE} ne "DWD_OpenData") { $valid = '' }
+  
+  my ($rapi, $wapi) = getStatusApiName ($hash);                                              # $rapi - Radiation-API, $wapi - Weather-API
 
- if (isOpenMeteoUsed($hash) && $fcname =~ /^OpenMeteo/xs) {
+ if ($wapi =~ /^OpenMeteo/xs) {
      $valid = 1;
-     $apiu  = $fcname;
+     $apiu  = $wapi;
  }
 
 return ($valid, $fcname, $apiu);
@@ -18992,6 +18979,9 @@ return ($err, $cname, $dswname);
 ################################################################
 #  Namen der Strahlungs-API und Wetter-API ermitteln. 
 #  Wird als Schlüssel in statusapi bzw. weatherapi verwendet.
+#  Return: 
+#  $rapi - Name der Strahlungsdaten-API
+#  $wapi - Name der Wetter-API
 ################################################################      
 sub getStatusApiName {
   my $hash = shift;
@@ -20166,8 +20156,7 @@ to ensure that the system configuration is correct.
 
     <ul>
       <a id="SolarForecast-set-setupStringAzimuth"></a>
-      <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
-      (only model DWD, OpenMeteo*, ForecastSolarAPI) <br><br>
+      <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br><br>
 
       Alignment &lt;dir&gt; of the solar modules in the string "StringnameX". The string name is a key value of the
       <b>setupInverterStrings</b> attribute. <br>
@@ -20204,8 +20193,7 @@ to ensure that the system configuration is correct.
 
     <ul>
       <a id="SolarForecast-set-setupStringDeclination"></a>
-      <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Angle&gt; [&lt;Stringname2&gt;=&lt;Angle&gt; &lt;Stringname3&gt;=&lt;Angle&gt; ...] </b> <br>
-      (only model DWD, ForecastSolarAPI) <br><br>
+      <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Angle&gt; [&lt;Stringname2&gt;=&lt;Angle&gt; &lt;Stringname3&gt;=&lt;Angle&gt; ...] </b> <br><br>
 
       Tilt angle of the solar modules. The string name is a key value of the attribute <b>setupInverterStrings</b>. <br>
       Possible angles of inclination are: 0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90
@@ -20784,8 +20772,8 @@ to ensure that the system configuration is correct.
     <br>
 
     <ul>
-      <a id="SolarForecast-get-solApiData"></a>
-      <li><b>solApiData </b> <br><br>
+      <a id="SolarForecast-get-radiationApiData"></a>
+      <li><b>radiationApiData </b> <br><br>
 
       Lists the radiation data saved in the context of the API call.
       The forecast data supplied by the API regarding the global radiation Rad1h and the predicted PV yield (Wh) 
@@ -22122,9 +22110,10 @@ to ensure that the system configuration is correct.
        <li><b>setupRadiationAPI </b> <br><br>
 
        Defines the source for the delivery of the solar radiation data. You can select a device of the type DWD_OpenData or
-       an implemented API can be selected. <br>
-       <b>Note:</b> If OpenMeteoDWD-API is set in the 'setupWeatherDev1' attribute, no radiation data service other than
-       OpenMeteoDWD-API can be selected. <br><br>
+       an implemented API can be selected. <br><br>
+       
+       <b>Note:</b> If an OpenMeteo API is also set in the 'setupWeatherDev1' attribute, the settings of both attributes 
+                    are harmonized, whereby the setting of 'setupRadiationAPI' is leading. <br><br>
 
        <b>OpenMeteoDWD-API</b> <br>
 
@@ -22254,29 +22243,30 @@ to ensure that the system configuration is correct.
       </li>
       <br>
       
-       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
-       <li><b>setupWeatherDevX </b> <br><br>
+      <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
+      <li><b>setupWeatherDevX </b> <br><br>
 
-       Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
-       The attribute 'setupWeatherDev1' specifies the leading weather service and is mandatory.<br>
-       If an Open-Meteo API is selected in the 'setupWeatherDev1' attribute, this Open-Meteo service is automatically set as the
-       source of the radiation data (Attribute setupRadiationAPI). <br><br>
+      Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
+      The attribute 'setupWeatherDev1' specifies the leading weather service and is mandatory.<br><br>
+       
+      <b>Note:</b> If an OpenMeteo API is also set in the 'setupRadiationAPI' attribute, the settings of both attributes 
+                   are harmonized, whereby the setting of 'setupRadiationAPI' is leading. <br><br>
 
-       <b>OpenMeteoDWD-API</b> <br>
+      <b>OpenMeteoDWD-API</b> <br>
 
-       Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
-       No API key is required.
-       Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
-       national weather services.
-       This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
-       15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
-       The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
-       models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a
-       seamless forecast.
-       The comprehensive and clearly laid out
-       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
-       the service's website.
-       <br><br>
+      Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
+      No API key is required.
+      Open-Meteo leverages a powerful combination of global (11 km) and mesoscale (1 km) weather models from esteemed
+      national weather services.
+      This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
+      15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
+      The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
+      models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a
+      seamless forecast.
+      The comprehensive and clearly laid out
+      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
+      the service's website.
+      <br><br>
 
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
@@ -22552,8 +22542,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
     <ul>
       <a id="SolarForecast-set-setupStringAzimuth"></a>
-      <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br>
-      (nur Model DWD, OpenMeteo*, ForecastSolarAPI) <br><br>
+      <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br><br>
 
       Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des
       Attributs <b>setupInverterStrings</b>. <br>
@@ -22590,8 +22579,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
     <ul>
       <a id="SolarForecast-set-setupStringDeclination"></a>
-      <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br>
-      (nur Model DWD, ForecastSolarAPI) <br><br>
+      <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br><br>
 
       Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Attributs <b>setupInverterStrings</b>. <br>
       Mögliche Neigungswinkel sind: 0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90
@@ -23179,8 +23167,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <br>
 
     <ul>
-      <a id="SolarForecast-get-solApiData"></a>
-      <li><b>solApiData </b> <br><br>
+      <a id="SolarForecast-get-radiationApiData"></a>
+      <li><b>radiationApiData </b> <br><br>
 
       Listet die im Kontext des API-Abrufs gespeicherten Strahlungsdaten auf.
       Die von der API gelieferten Vorhersagedaten bzgl. der Globalstrahlung Rad1h und des auf einen String bezogenen 
@@ -24517,9 +24505,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>setupRadiationAPI </b> <br><br>
 
       Legt die Quelle zur Lieferung der solaren Strahlungsdaten fest. Es kann ein Device vom Typ DWD_OpenData oder
-      eine implementierte API eines Dienstes ausgewählt werden. <br>
-      <b>Hinweis:</b> Ist eine OpenMeteo API im Attribut 'setupWeatherDev1' gesetzt, kann kein anderer Strahlungsdatendienst als
-      diese OpenMeteo API ausgewählt werden. <br><br>
+      eine implementierte API eines Dienstes ausgewählt werden. <br><br>
+      
+      <b>Hinweis:</b> Ist im Attribut 'setupWeatherDev1' ebenfalls eine OpenMeteo API gesetzt, werden die Einstellungen
+                      beider Attribute harmonisiert wobei die Einstellung von 'setupRadiationAPI' führend ist. <br><br>
 
       <b>OpenMeteoDWD-API</b> <br>
 
@@ -24651,28 +24640,29 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </li>
       <br>
       
-       <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
-       <li><b>setupWeatherDevX </b> <br><br>
+      <a id="SolarForecast-attr-setupWeatherDev" data-pattern="setupWeatherDev.*"></a>
+      <li><b>setupWeatherDevX </b> <br><br>
 
-       Gibt das Gerät oder die API zur Lieferung der erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) an.<br>
-       Das Attribut 'setupWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich.<br>
-       Ist eine Open-Meteo API im Attribut 'setupWeatherDev1' ausgewählt, wird dieser Open-Meteo Dienst automatisch auch als Quelle
-       der Strahlungsdaten (Attribut setupRadiationAPI) eingestellt. <br><br>
+      Gibt das Gerät oder die API zur Lieferung der erforderlichen Wetterdaten (Wolkendecke, Niederschlag usw.) an.<br>
+      Das Attribut 'setupWeatherDev1' definiert den führenden Wetterdienst und ist zwingend erforderlich. <br><br>
+       
+      <b>Hinweis:</b> Ist im Attribut 'setupRadiationAPI' ebenfalls eine OpenMeteo API gesetzt, werden die Einstellungen
+                      beider Attribute harmonisiert wobei die Einstellung von 'setupRadiationAPI' führend ist. <br><br>
 
-       <b>OpenMeteoDWD-API</b> <br>
+      <b>OpenMeteoDWD-API</b> <br>
 
-       Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
-       Es ist kein API-Schlüssel erforderlich.
-       Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
-       von angesehenen nationalen Wetterdiensten.
-       Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
-       15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
-       von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
-       anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU
-       und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
-       Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
-       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
-       <br><br>
+      Open-Meteo ist eine Open-Source-Wetter-API und bietet kostenlosen Zugang für nicht-kommerzielle Zwecke.
+      Es ist kein API-Schlüssel erforderlich.
+      Open-Meteo nutzt eine leistungsstarke Kombination aus globalen (11 km) und mesoskaligen (1 km) Wettermodellen
+      von angesehenen nationalen Wetterdiensten.
+      Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
+      15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
+      von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
+      anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU
+      und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
+      Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
+      <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
+      <br><br>
 
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
