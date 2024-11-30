@@ -5460,7 +5460,7 @@ json2nameValue($;$$$$)
       my $in2 = $val;
       while($in2 =~ m/^\s*"([^"]*)"\s*:\s*(.*)$/s) { # 125340
         my ($name,$val) = ($1,$2);
-        $name =~ s/[^a-z0-9._\-\/]/_/gsi;
+        ($err,$name) = lStr('"'.$name.'"'); #139807
         ($err,$in2) = eObj(\%r2, $name, $val, $in2, $prefix);
         return ($err,undef) if($err);
         $in2 =~ s/^\s*,\s*//;
@@ -6209,8 +6209,11 @@ makeReadingName($) # Convert non-valid characters to _
     return $name;
   }
   my %umlaut = ( '\xc3\xa4'=>'ae',
+                 '\xc3\x84'=>'Ae',
                  '\xc3\xb6'=>'oe',
+                 '\xc3\x96'=>'Oe',
                  '\xc3\xbc'=>'ue',
+                 '\xc3\x9c'=>'Ue',
                  '\xc3\x9f'=>'ss');
   map { $name =~ s/$_/$umlaut{$_}/g } keys %umlaut;
   $name =~ s/[^a-z0-9._\-\/]/_/gi;
