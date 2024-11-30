@@ -6488,4 +6488,16 @@ CheckRegexp($$)
   return undef;
 }
 
+# smartmatch replacement #137776
+# use contains_<type>($scalar, @array) instead of $scalar ~~ @array
+sub contains_numeric($@) {
+  my ($scalar, @array) = @_;
+  return (grep { $_ == $scalar } @array > 0);
+}
+
+sub contains_string($@) {
+  my ($scalar, @array) = @_;
+  return (grep { $_ eq $scalar } @array > 0);
+}
+
 1;
