@@ -31,6 +31,7 @@ use Time::HiRes qw(gettimeofday time);
 use Scalar::Util qw(looks_like_number);
 use POSIX;
 use File::Copy qw(copy);
+use List::Util qw(any);
 use Encode;
 
 ##################################################
@@ -6492,12 +6493,12 @@ CheckRegexp($$)
 # use contains_<type>($scalar, @array) instead of $scalar ~~ @array
 sub contains_numeric($@) {
   my ($scalar, @array) = @_;
-  return (grep { $_ == $scalar } @array > 0);
+  return any { $_ == $scalar } @array;
 }
 
 sub contains_string($@) {
   my ($scalar, @array) = @_;
-  return (grep { $_ eq $scalar } @array > 0);
+  return any { $_ eq $scalar } @array;
 }
 
 1;
