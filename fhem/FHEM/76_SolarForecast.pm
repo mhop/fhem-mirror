@@ -158,7 +158,8 @@ BEGIN {
 my %vNotesIntern = (
   "1.38.0" => "30.11.2024  optimize data handling, rename getter solApiData to radiationApiData, ".
                            "set setupStringAzimuth, setupStringDeclination is checked due to dependencies to OpenMeteo ".
-                           "attr setupRadiationAPI and setupWeatherDev1 can be set largely independently of each other ",
+                           "attr setupRadiationAPI and setupWeatherDev1 can be set largely independently of each other ".
+                           "rename sub SolCastAPIVal to RadiationAPIVal ",
   "1.37.9" => "29.11.2024  activate StatusAPI-Hash, Separation of radiation API-data, API-state data, weather-API data ",
   "1.37.8" => "28.11.2024  edit commref, func _searchCacheFiles for renaming Cache files when device is renamed ".
                            "_saveEnergyConsumption: extended for Debug collectData, preparation of weatherApiData ".
@@ -1057,31 +1058,31 @@ my %hef = (                                                                     
 );
 
 my %hcsr = (                                                                                                                               # Funktiontemplate zur Erstellung optionaler Statistikreadings
-  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
-  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => '-'         },
-  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => '-'         },
-  response_message            => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => '-'         },
-  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 'apimaxreq' },
-  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 0           },
-  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 0           },
-  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 'apimaxreq' },
-  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 'apimaxreq' },
-  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
-  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
-  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
-  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },
-  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,    par => 'tdConFcTillSunset', unit => ' Wh',  def => 0           },
-  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => '-'         },
-  SunHours_Remain             => { fnr => 4, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
-  SunMinutes_Remain           => { fnr => 4, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },
-  dayAfterTomorrowPVforecast  => { fnr => 4, fn => \&SolCastAPIVal, par => 'pv_estimate50',     unit => '',     def => 0           },
-  todayGridFeedIn             => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  todayGridConsumption        => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  todayBatIn                  => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  todayBatOut                 => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  daysUntilBatteryCare        => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => '-'         },
-  todayConsumptionForecast    => { fnr => 4, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => '-'         },
-  conForecastTillNextSunrise  => { fnr => 4, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => 0           },
+  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
+  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
+  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
+  response_message            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
+  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
+  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },
+  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },
+  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
+  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
+  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
+  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
+  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
+  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },
+  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', unit => ' Wh',  def => 0           },
+  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  unit => '',     def => '-'         },
+  SunHours_Remain             => { fnr => 4, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
+  SunMinutes_Remain           => { fnr => 4, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },
+  dayAfterTomorrowPVforecast  => { fnr => 4, fn => \&RadiationAPIVal, par => 'pv_estimate50',     unit => '',     def => 0           },
+  todayGridFeedIn             => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
+  todayGridConsumption        => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
+  todayBatIn                  => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
+  todayBatOut                 => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
+  daysUntilBatteryCare        => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => '-'         },
+  todayConsumptionForecast    => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => '-'         },
+  conForecastTillNextSunrise  => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => 0           },
 );
 
   for my $csr (1..$maxconsumer) {
@@ -2879,7 +2880,7 @@ sub __solCast_ApiResponse {
               $period   = $jdata->{'forecasts'}[$k]{'period'};                                           # -> dann bereits beim letzten Abruf gespeicherte Daten der aktuellen Stunde durch 2 teilen damit
               $period   =~ s/.*(\d\d).*/$1/;                                                             # -> die neuen Daten (in dem Fall nur die einer halben Stunde) im nächsten Schritt addiert werden
 
-              my $est50 = SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0) / (60/$period);
+              my $est50 = RadiationAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0) / (60/$period);
               $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = sprintf "%.0f", $est50 if($est50);
 
               $k++;
@@ -2912,7 +2913,7 @@ sub __solCast_ApiResponse {
           if ($debug =~ /apiProcess/x) {                                                                     # nur für Debugging
               if (exists $data{$type}{$name}{solcastapi}{$string}{$starttmstr}) {
                   Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - Start Date/Time: }. $starttmstr);
-                  Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - pv_estimate50 add: }.$pvest50.qq{, contains already: }.SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
+                  Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - pv_estimate50 add: }.$pvest50.qq{, contains already: }.RadiationAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
               }
           }
 
@@ -7101,8 +7102,8 @@ sub centralTask {
   ##########################################################################################################################    
   if (exists $data{$type}{$name}{solcastapi}{'?IdPair'}) {                             # 29.11.2024
       for my $pk (keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}}) {                
-          my $apikey = SolCastAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
-          my $rtid   = SolCastAPIVal ($hash, '?IdPair', $pk, 'rtid', '');
+          my $apikey = RadiationAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
+          my $rtid   = RadiationAPIVal ($hash, '?IdPair', $pk, 'rtid', '');
           
           if ($apikey && $rtid) {
               $data{$type}{$name}{statusapi}{'?IdPair'}{$pk}{rtid}   = $rtid;
@@ -7117,7 +7118,7 @@ sub centralTask {
       my ($rapi, $wapi) = getStatusApiName ($hash); 
       
       for my $key (keys %{$data{$type}{$name}{solcastapi}{'?All'}{'?All'}}) {         
-          my $val = SolCastAPIVal ($hash, '?All', '?All', $key, '');
+          my $val = RadiationAPIVal ($hash, '?All', '?All', $key, '');
           
           if ($rapi && $val) {
               $data{$type}{$name}{statusapi}{$rapi}{'?All'}{$key} = $val;
@@ -7138,7 +7139,7 @@ sub centralTask {
  
   delete $data{$type}{$name}{solcastapi}{'?All'} if(!keys %{$data{$type}{$name}{solcastapi}{'?All'}});
   
-  my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');               # 29.11.2024
+  my $vrmcr = RadiationAPIVal ($hash, '?VRM', '?API', 'credentials', '');               # 29.11.2024
   if ($vrmcr) {
       $data{$type}{$name}{statusapi}{'?VRM'}{'?API'}{credentials} = $vrmcr;
       delete $data{$type}{$name}{solcastapi}{'?VRM'};
@@ -8340,7 +8341,7 @@ sub _transferAPIRadiationValues {
       my $nhtstr           = 'NextHour'.sprintf "%02d", $num;
       my ($wtday, $wthour) = $wantdt =~ /(\d{2})\s(\d{2}):/xs;
       my $hod              = sprintf "%02d", int $wthour + 1;                                              # Stunde des Tages
-      my $rad1h            = SolCastAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
+      my $rad1h            = RadiationAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
 
       $paref->{wantdt} = $wantdt;
       $paref->{wantts} = $wantts;
@@ -8556,7 +8557,7 @@ sub __calcPVestimates {
       }
 
       $peak  *= 1000;
-      my $est = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0);
+      my $est = RadiationAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0);
       my $pv  = sprintf "%.1f", ($est * $hc);                                                         # Korrekturfaktor anwenden
 
       my $invcap = 0;
@@ -19583,7 +19584,7 @@ return $def;
 # Usage:
 # StringVal ($hash, $strg, $key, $def)
 #
-# $strg:        - Name des Strings aus setupStringPeak
+# $strg:        - Name des Strings aus setupInverterStrings
 # $key:  peak   - Peakleistung aus setupStringPeak
 #        tilt   - Neigungswinkel der Module aus setupStringDeclination
 #        dir    - Ausrichtung der Module als Azimut-Bezeichner (N,NE,E,SE,S,SW,W,NW)
@@ -19820,7 +19821,7 @@ return $def;
 ##########################################################################################################################################################
 # Wert des solcastapi-Hash zurückliefern
 # Usage:
-# SolCastAPIVal ($hash, $tring, $ststr, $key, $def)
+# RadiationAPIVal ($hash, $tring, $ststr, $key, $def)
 #
 # $tring:  Stringname aus "setupInverterStrings" (?All für allg. Werte)
 # $ststr:  Startzeit der Form YYYY-MM-DD hh:00:00
@@ -19829,9 +19830,9 @@ return $def;
 # $def:    Defaultwert
 #
 # Sonderabfragen:
-# SolCastAPIVal ($hash, '?All', $ststr, 'Rad1h', $def) - Globalstrahlung mit Startzeit ohne Stringbezug
+# RadiationAPIVal ($hash, '?All', $ststr, 'Rad1h', $def) - Globalstrahlung mit Startzeit ohne Stringbezug
 ##########################################################################################################################################################
-sub SolCastAPIVal {
+sub RadiationAPIVal {
   my $hash   = shift;
   my $string = shift;
   my $ststr  = shift;
