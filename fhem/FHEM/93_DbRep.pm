@@ -1110,7 +1110,7 @@ sub DbRep_Set {
       my $oldval = $hc->{old};
       my $newval = $hc->{new};
 
-      if (!defined $oldval || !defined $newval) {
+      if ($oldval eq '' || $newval eq '') {
           return qq{Both entries old="old string" new="new string" are needed.};
       }
 
