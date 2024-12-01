@@ -116,6 +116,8 @@ sub attrSplit($);
 sub computeClientArray($$);
 sub concatc($$$);
 sub configDBUsed();
+sub contains_numeric($@);
+sub contains_string($@);
 sub createNtfyHash();
 sub createUniqueId();
 sub devspec2array($;$$);
