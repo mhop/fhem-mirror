@@ -1,5 +1,5 @@
 ##############################################################################################################################
-# $Id: 93_DbLog.pm 28345 2024-01-05 19:46:43Z DS_Starter $
+# $Id: 93_DbLog.pm 29036 2024-07-21 20:47:25Z DS_Starter $
 ##############################################################################################################################
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -54,12 +54,14 @@ use Encode qw(encode_utf8);
 use HttpUtils;
 use SubProcess;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-
 use vars qw($FW_ME $FW_subdir);                                      # predeclare global variable names
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.10.3"  => "01.12.2024 check valid Time limit 1970-01-01 00:00:00 of Event time, Forum: #139847 ", 
+  "5.10.2"  => "21.07.2024 _DbLog_copyCache: Copy process changed to minimize memory usage after reopen ", 
+  "5.10.1"  => "01.04.2024 _DbLog_plotData: avoid possible uninitialized value \$out_value (SVG: Argument '' isn't numeric) ".
+                           "replace Smartmatch Forum:#137776 ",
   "5.10.0"  => "17.03.2024 support of MariaDB driver, optimize Timer execMemCacheAsync, optimize DbLog_configcheck,_DbLog_SBP_connectDB ".
                            "remove countNbl, support compression between client and server, improved performance if attr excludeDevs is set ".
                            "Fix _DbLog_plotData Forum: https://forum.fhem.de/index.php?topic=136930.0 ",
@@ -821,14 +823,13 @@ sub _DbLog_setaddLog {                   ## no critic "not used"
   }
 
   my @args = @{$argsref};
-
-  my $nce = ("\!useExcludes" ~~ @args) ? 1 : 0;
+  my $nce  = grep (/\!useExcludes/, @args) ? 1 : 0;    
 
   map (s/\!useExcludes//g, @args);
 
   my $cn;
 
-  if(/CN=/ ~~ @args) {
+  if (grep (/CN=/, @args)) {                        
       my $t = join " ", @args;
       ($cn) = ($t =~ /^.*CN=(\w+).*$/);
       map(s/CN=$cn//g, @args);
@@ -860,7 +861,7 @@ sub _DbLog_setaddCacheLine {              ## no critic "not used"
   my $prop    = $paref->{prop};
   my $argsref = $paref->{argsref};
 
-  if(!$prop) {
+  if (!$prop) {
       return "Syntax error in set $opt command. Use this line format: YYYY-MM-DD HH:MM:SS|<device>|<type>|<event>|<reading>|<value>|[<unit>] ";
   }
 
@@ -877,16 +878,14 @@ sub _DbLog_setaddCacheLine {              ## no critic "not used"
 
   my ($i_timestamp, $i_dev, $i_type, $i_evt, $i_reading, $i_val, $i_unit) = split "\\|", $aa;
 
-  if($i_timestamp !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/ || !$i_dev || !$i_reading) {
+  if ($i_timestamp !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/ || !$i_dev || !$i_reading) {
       return "Syntax error in set $opt command. Use this line format: YYYY-MM-DD HH:MM:SS|<device>|<type>|<event>|<reading>|<value>|[<unit>] ";
   }
 
-  my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($i_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-  eval { my $ts = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+  my $err = DbLog_checkValidTime ($i_timestamp);
 
-  if ($@) {
-      my @l = split /at/, $@;
-      return "Timestamp is out of range - $l[0]";
+  if ($err) {
+      return "Timestamp is out of range: $err";
   }
 
   DbLog_addCacheLine ( { hash        => $hash,
@@ -1216,7 +1215,7 @@ sub DbLog_Log {
       }
   }
 
-  my ($event,$reading,$value,$unit,$err,$DoIt);
+  my ($event, $reading, $value, $unit, $err, $DoIt, $epoch_seconds_begin);
 
   my $memcount           = 0;
   my $re                 = $hash->{REGEXP};
@@ -1402,15 +1401,14 @@ sub DbLog_Log {
 
                           next;
                       }
+                      
+                      $err = DbLog_checkValidTime ($TIMESTAMP);
 
-                      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-
-                      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-                      if (!$@) {
-                          $timestamp = $TIMESTAMP;
+                      if ($err) {
+                          Log3 ($name, 2, "$name - TIMESTAMP >$TIMESTAMP< got from DbLogValueFn in $dev_name is invalid: $err");
                       }
                       else {
-                          Log3 ($name, 2, "$name - TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
+                          $timestamp = $TIMESTAMP;
                       }
 
                       $reading = $READING  if($READING ne '');
@@ -1447,15 +1445,14 @@ sub DbLog_Log {
 
                           next;
                       }
+                      
+                      $err = DbLog_checkValidTime ($TIMESTAMP);
 
-                      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-
-                      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-                      if (!$@) {
-                          $timestamp = $TIMESTAMP;
+                      if ($err) {
+                          Log3 ($name, 2, "$name - Parameter TIMESTAMP >$TIMESTAMP< got from valueFn is invalid: $err");
                       }
                       else {
-                          Log3 ($name, 2, "$name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+                          $timestamp = $TIMESTAMP;
                       }
 
                       $dev_name  = $DEVICE     if($DEVICE ne '');
@@ -1465,6 +1462,13 @@ sub DbLog_Log {
                       $unit      = $UNIT       if(defined $UNIT);
                       $event     = $EVENT      if(defined $EVENT);
                   }
+                  
+                  $err = DbLog_checkValidTime ($timestamp);
+
+                  if ($err) {
+                      Log3 ($name, 2, "$name - timestamp >$timestamp< is invalid: ".$err.". The dataset is ignored.");
+                      next;
+                  }
 
                   # Daten auf maximale Länge beschneiden
                   ($dev_name,$dev_type,$event,$reading,$value,$unit) = DbLog_cutCol ($hash, $dev_name, $dev_type, $event, $reading, $value, $unit);
@@ -1472,7 +1476,7 @@ sub DbLog_Log {
                   my $row = $timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit;
 
                   if ($log4rel) {
-                    Log3 ($name, 4, "$name - added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
+                      Log3 ($name, 4, "$name - added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                   }
 
                   $memcount = DbLog_addMemCacheRow ($name, $row);                             # Datensatz zum Memory Cache hinzufügen
@@ -2048,11 +2052,10 @@ sub _DbLog_copyCache {
 
   while (my ($key, $val) = each %{$data{DbLog}{$name}{cache}{memcache}} ) {
       $memc->{cdata}{$key} = $val;                                              # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
+      delete $data{DbLog}{$name}{cache}{memcache}{$key};
   }
 
   $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                      # aktuellen Index an Subprozess übergeben
-
-  undef %{$data{DbLog}{$name}{cache}{memcache}};                                # Löschen mit Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
 return $memc;
 }
@@ -3189,7 +3192,7 @@ sub _DbLog_SBP_onRun_LogArray {
           return;
       }
 
-      if ($tl) {                                                                     # Tracelevel setzen
+      if ($tl) {                                                                      # Tracelevel setzen
           $sth_ih->{TraceLevel} = "$tl|$tf";
       }
       else {
@@ -3209,7 +3212,7 @@ sub _DbLog_SBP_onRun_LogArray {
 
       $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta, $subprocess);
 
-      if(!$useta) {                                                                  # keine Transaktion: generate errstr, keine Ausnahme
+      if (!$useta) {                                                                  # keine Transaktion: generate errstr, keine Ausnahme
           _DbLog_SBP_dbhPrintError ($dbh);
       }
 
@@ -3228,7 +3231,7 @@ sub _DbLog_SBP_onRun_LogArray {
                                        }
                                      );
 
-               if($useta) {
+               if ($useta) {
                    $rowlback = $cdata;                                                # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
 
                    _DbLog_SBP_Log3Parent ( { name       => $name,
@@ -3262,7 +3265,7 @@ sub _DbLog_SBP_onRun_LogArray {
 
                __DbLog_SBP_sendToParent ($subprocess, $ret);
 
-               return;
+               return $error;
            };
 
       _DbLog_SBP_dbhRaiseError ($dbh);
@@ -3298,7 +3301,7 @@ sub _DbLog_SBP_onRun_LogArray {
 
       use warnings;
 
-      if(!$nins_hist) {
+      if (!$nins_hist) {
           _DbLog_SBP_Log3Parent ( { name       => $name,
                                     level      => 4,
                                     msg        => "$ceti of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""),
@@ -3977,7 +3980,7 @@ sub _DbLog_SBP_onRun_importCachefile {
   if (!$error && $nins_hist && keys %{$rowlback}) {
       _DbLog_SBP_Log3Parent ( { name       => $name,
                                 level      => 2,
-                                msg        => "WARNING - $nins_hist datasets from $infile were not imported:",
+                                msg        => "WARNING - $nins_hist datasets from $infile were not imported.",
                                 oper       => 'log3parent',
                                 subprocess => $subprocess
                               }
@@ -6451,13 +6454,13 @@ sub _DbLog_plotData {
   $from          = $from_datetime{datetime};
   $to            = $to_datetime{datetime};
 
-  $err = DbLog_checkTimeformat($from);                                     # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
+  $err = DbLog_checkTimeformat ($from);                                     # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
       Log3 ($name, 1, "$name - wrong date/time format (from: $from) requested by SVG: $err");
       return;
   }
 
-  $err = DbLog_checkTimeformat($to);                                       # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
+  $err = DbLog_checkTimeformat ($to);                                       # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
       Log3 ($name, 1, "$name - wrong date/time format (to: $to) requested by SVG: $err");
       return;
@@ -6876,23 +6879,23 @@ sub _DbLog_plotData {
               $writeout = 0 if (!defined($sql_value) && AttrVal($name, 'suppressUndef', 0));
 
               ###################### Ausgabe ###########################
-              if($writeout) {
+              if ($writeout) {
                   if ($outf =~ m/(all)/) {
                       # Timestamp: Device, Type, Event, Reading, Value, Unit
                       $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
                       $retval .= $retvaldummy;
                   }
                   elsif ($outf =~ m/(array)/) {
-                      push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+                      push (@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
                   }
-                  else {                                                         # generating plots
-                      $out_tstamp =~ s/\ /_/g;                                   # needed by generating plots
-                      $retval    .= "$out_tstamp $out_value\n";
+                  else {                                                                  # generating plots
+                      $out_tstamp =~ s/\ /_/g;                                            # needed by generating plots
+                      $retval    .= "$out_tstamp $out_value\n" if(defined  $out_value);   # V 5.10.1
                       $retval    .= $retvaldummy;
                   }
               }
 
-              if (Scalar::Util::looks_like_number($sql_value)) {                  # nur setzen wenn numerisch
+              if (Scalar::Util::looks_like_number($sql_value)) {                          # nur setzen wenn numerisch
                   if ($deltacalc) {
                       if (Scalar::Util::looks_like_number($out_value)) {
                           if ($out_value < $min[$i]) {
@@ -7656,7 +7659,7 @@ sub DbLog_configcheck {
           $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Search_Idx</b> <br>";
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
-          $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
+          $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well! <br>";
       }
       else {
           ($err, @six_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='DEVICE'");
@@ -7688,7 +7691,7 @@ sub DbLog_configcheck {
           $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Search_Idx</b> <br>";
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
-          $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
+          $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well! <br>";
       }
       else {
           $idef     = $six[4];
@@ -7720,7 +7723,7 @@ sub DbLog_configcheck {
           $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Search_Idx</b> <br>";
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
-          $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
+          $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well! <br>";
       }
       else {
           $idef     = $six[1];
@@ -7778,7 +7781,7 @@ sub DbLog_configcheck {
               $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Report_Idx</b> <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
               $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
-              $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
+              $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well! <br>";
           }
           else {
               ($err, @dix_rdg) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Report_Idx' and Column_name='READING'");
@@ -7809,7 +7812,7 @@ sub DbLog_configcheck {
               $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Report_Idx</b> <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
               $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
-              $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
+              $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well! <br>";
           }
           else {
               $irep     = $dix[4];
@@ -7839,7 +7842,7 @@ sub DbLog_configcheck {
               $rec    = "You can create the index by the DbRep command <b>set &lt;DbRep-Device&gt; index recreate_Report_Idx</b> <br>";
               $rec   .= "Depending on your database size this command may running a long time. <br>";
               $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
-              $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
+              $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well! <br>";
           }
           else {
               $irep     = $dix[1];
@@ -8023,7 +8026,7 @@ sub DbLog_AddLog {
 
   my ($dev_type,$dev_name,$dev_reading,$read_val,$event,$ut);
   my $memcount;
-  my $ts;
+  my ($ts, $err);
 
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
 
@@ -8129,7 +8132,6 @@ sub DbLog_AddLog {
           my $ctz = AttrVal($name, 'convertTimezone', 'none');                                               # convert time zone
 
           if($ctz ne 'none') {
-              my $err;
               my $params = {
                   name      => $name,
                   dtstring  => $ts,
@@ -8167,20 +8169,19 @@ sub DbLog_AddLog {
 
               Log3 ($name, 2, "$name - error valueFn: ".$@) if($@);
 
-              if($IGNORE) {                                                                                # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
-                 $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$name}{TIME}  = $lastt if($lastt);          # patch Forum:#111423
+              if ($IGNORE) {                                                                                # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
+                 $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$name}{TIME}  = $lastt if($lastt);           # patch Forum:#111423
                  $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$name}{VALUE} = $lastv if(defined $lastv);
                  next;
               }
 
-              my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+              $err = DbLog_checkValidTime ($TIMESTAMP);
 
-              eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-              if (!$@) {
-                  $ts = $TIMESTAMP;
+              if ($err) {
+                  Log3 ($name, 2, "$name - Parameter TIMESTAMP >$TIMESTAMP< got from valueFn is invalid: $err");
               }
               else {
-                  Log3 ($name, 2, "$name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+                  $ts = $TIMESTAMP;
               }
 
               $dev_name     = $DEVICE     if($DEVICE ne '');
@@ -8289,14 +8290,13 @@ sub DbLog_addCacheLine {
           next;
       }
 
-      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+      my $err = DbLog_checkValidTime ($TIMESTAMP);
 
-      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-      if (!$@) {
-          $i_timestamp = $TIMESTAMP;
+      if ($err) {
+          Log3 ($name, 2, "$name - Parameter TIMESTAMP >$TIMESTAMP< got from valueFn is invalid: $err");
       }
       else {
-          Log3 ($name, 2, "$name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+          $i_timestamp = $TIMESTAMP;
       }
 
       $i_dev     = $DEVICE     if($DEVICE ne '');
@@ -8787,11 +8787,36 @@ sub DbLog_checkTimeformat {
   @date     = split("-", $datetime[0]);
   @time     = split(":", $datetime[1]);
 
-  eval { timelocal($time[2], $time[1], $time[0], $date[2], $date[1]-1, $date[0]-1900); };
+  eval { timelocal ($time[2], $time[1], $time[0], $date[2], $date[1]-1, $date[0]-1900); };
 
   if ($@) {
       my $err = (split(" at ", $@))[0];
       return $err;
+  }
+
+return;
+}
+
+#################################################################
+#    valide Zeitangabe prüfen
+#################################################################
+sub DbLog_checkValidTime {          
+  my $timestamp = shift;
+  
+  my $esb;
+  
+  my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+  
+  eval { $esb = timelocal ($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+  if ($@) {
+      my @l = split /at/, $@;
+      return $l[0];
+  }
+
+  $esb = fhemTimeLocal ($sec, $min, $hh, $dd, $mm-1, $yyyy-1900);
+
+  if ($esb <= 0) {
+      return "Time limit undershot: $esb";
   }
 
 return;
@@ -8812,13 +8837,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 28345 2024-01-05 19:46:43Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 29036 2024-07-21 20:47:25Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 28345 2024-01-05 19:46:43Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 29036 2024-07-21 20:47:25Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
