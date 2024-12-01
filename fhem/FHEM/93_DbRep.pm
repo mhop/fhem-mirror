@@ -58,6 +58,7 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.53.16" => "01.12.2024  fix check changeValue Forum: #139950.0, Role Agent can use executeBeforeProc, executeAfterProc ",
   "8.53.15" => "18.08.2024  DbRep_diffvalDone: change loglevel to 2, Forum:#138986 ",
   "8.53.14" => "29.05.2024  _DbRep_avgTimeWeightMean: accept if \$val1=0 (use looks_like_number) ",
   "8.53.13" => "25.05.2024  replace Smartmatch Forum:#137776 ",
@@ -78,36 +79,6 @@ my %DbRep_vNotesIntern = (
                             "Forum:https://forum.fhem.de/index.php?msg=1305266 ",
   "8.53.1"  => "16.02.2024  sqlCmd: executing ckey:latest possible ",
   "8.53.0"  => "10.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog problem Forum:#136581 ",
-  "8.52.15" => "08.12.2023  fix use fhem default variables in attr executeBeforeProc/executeAfterProc ".
-                            "forum: https://forum.fhem.de/index.php?msg=1296146 ",
-  "8.52.14" => "08.11.2023  fix period calculation when using attr timeYearPeriod ",
-  "8.52.13" => "07.11.2023  dumpMySQL clientSide: add create database to dump file ",
-  "8.52.12" => "05.11.2023  dumpMySQL clientSide: change the dump file to stricter rights ",
-  "8.52.11" => "17.09.2023  improve the markout in func DbRep_checkValidTimeSequence, Forum:#134973 ",
-  "8.52.10" => "09.07.2023  fix wrong SQL syntax for PostgreSQL -> DbRep_createSelectSql, Forum:#134170 ",
-  "8.52.9"  => "05.07.2023  fix wrong SQL syntax for PostgreSQL -> maxValue deleteOther, Forum:#134170 ",
-  "8.52.8"  => "28.06.2023  fix check of DbRep_afterproc, DbRep_beforeproc if should exec PERL code ",
-  "8.52.7"  => "16.05.2023  DbRep_afterproc, DbRep_beforeproc can execute FHEM commands as well as PERL code ",
-  "8.52.6"  => "11.04.2023  change diffValue for aggr month ",
-  "8.52.5"  => "10.04.2023  change diffValue, Forum: https://forum.fhem.de/index.php?msg=1271853 ",
-  "8.52.4"  => "10.04.2023  fix perl warning ",
-  "8.52.3"  => "04.04.2023  fix diffValue writeToDB: https://forum.fhem.de/index.php?topic=53584.msg1270905#msg1270905 ",
-  "8.52.2"  => "28.03.2023  diffValue can operate positive and negative differences, sqlCmd can execute 'describe' statement ",
-  "8.52.1"  => "19.03.2023  fix Perl Warnings ",
-  "8.52.0"  => "17.02.2023  get utf8mb4 info by connect db and set connection collation accordingly, new setter migrateCollation ",
-  "8.51.6"  => "11.02.2023  fix execute DbRep_afterproc after generating readings ".
-                            "Forum: https://forum.fhem.de/index.php/topic,53584.msg1262970.html#msg1262970 ".
-                            "fix MySQL 50mostFreqLogsLast2days ",
-  "8.51.5"  => "05.02.2023  fix Perl Warning Forum: https://forum.fhem.de/index.php/topic,53584.msg1262032.html#msg1262032 ",
-  "8.51.4"  => "01.02.2023  ignore non-numeric values in diffValue and output the erroneous record in the log ",
-  "8.51.3"  => "22.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ".
-                            "DbRep_reduceLog -> Handling of field 'value' with NULL value ",
-  "8.51.2"  => "13.01.2023  rewrite sub DbRep_OutputWriteToDB, new averageValue option writeToDBSingleStart ",
-  "8.51.1"  => "11.01.2023  write TYPE uppercase with writeToDB option, Commandref edited, fix add SQL Cache History ".
-                            "set PRAGMA auto_vacuum = FULL when execute SQLite vacuum command",
-  "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
-                            "sqlCmdBlocking customized like sqlCmd, bugfix avgTimeWeightMean ",
-  "8.50.10" => "01.01.2023  Commandref edited ",
   "1.0.0"   => "19.05.2016  Initial"
 );
 
@@ -1139,7 +1110,7 @@ sub DbRep_Set {
       my $oldval = $hc->{old};
       my $newval = $hc->{new};
 
-      if (!$oldval || !$newval) {
+      if (!defined $oldval || !defined $newval) {
           return qq{Both entries old="old string" new="new string" are needed.};
       }
 
@@ -1519,8 +1490,6 @@ sub DbRep_Attr {
                          readingPreventFromDel
                          device
                          diffAccept
-                         executeBeforeProc
-                         executeAfterProc
                          expimpfile
                          ftpUse
                          ftpUser
