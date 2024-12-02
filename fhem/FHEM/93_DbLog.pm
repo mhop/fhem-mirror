@@ -58,6 +58,7 @@ use vars qw($FW_ME $FW_subdir);                                      # predeclar
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.10.3"  => "01.12.2024 check valid Time limit 1970-01-01 00:00:00 of Event time, Forum: #139847 ", 
   "5.10.2"  => "21.07.2024 _DbLog_copyCache: Copy process changed to minimize memory usage after reopen ", 
   "5.10.1"  => "01.04.2024 _DbLog_plotData: avoid possible uninitialized value \$out_value (SVG: Argument '' isn't numeric) ".
                            "replace Smartmatch Forum:#137776 ",
@@ -860,7 +861,7 @@ sub _DbLog_setaddCacheLine {              ## no critic "not used"
   my $prop    = $paref->{prop};
   my $argsref = $paref->{argsref};
 
-  if(!$prop) {
+  if (!$prop) {
       return "Syntax error in set $opt command. Use this line format: YYYY-MM-DD HH:MM:SS|<device>|<type>|<event>|<reading>|<value>|[<unit>] ";
   }
 
@@ -877,16 +878,14 @@ sub _DbLog_setaddCacheLine {              ## no critic "not used"
 
   my ($i_timestamp, $i_dev, $i_type, $i_evt, $i_reading, $i_val, $i_unit) = split "\\|", $aa;
 
-  if($i_timestamp !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/ || !$i_dev || !$i_reading) {
+  if ($i_timestamp !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/ || !$i_dev || !$i_reading) {
       return "Syntax error in set $opt command. Use this line format: YYYY-MM-DD HH:MM:SS|<device>|<type>|<event>|<reading>|<value>|[<unit>] ";
   }
 
-  my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($i_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-  eval { my $ts = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+  my $err = DbLog_checkValidTime ($i_timestamp);
 
-  if ($@) {
-      my @l = split /at/, $@;
-      return "Timestamp is out of range - $l[0]";
+  if ($err) {
+      return "Timestamp is out of range: $err";
   }
 
   DbLog_addCacheLine ( { hash        => $hash,
@@ -1216,7 +1215,7 @@ sub DbLog_Log {
       }
   }
 
-  my ($event,$reading,$value,$unit,$err,$DoIt);
+  my ($event, $reading, $value, $unit, $err, $DoIt, $epoch_seconds_begin);
 
   my $memcount           = 0;
   my $re                 = $hash->{REGEXP};
@@ -1402,15 +1401,14 @@ sub DbLog_Log {
 
                           next;
                       }
+                      
+                      $err = DbLog_checkValidTime ($TIMESTAMP);
 
-                      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-
-                      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-                      if (!$@) {
-                          $timestamp = $TIMESTAMP;
+                      if ($err) {
+                          Log3 ($name, 2, "$name - TIMESTAMP >$TIMESTAMP< got from DbLogValueFn in $dev_name is invalid: $err");
                       }
                       else {
-                          Log3 ($name, 2, "$name - TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
+                          $timestamp = $TIMESTAMP;
                       }
 
                       $reading = $READING  if($READING ne '');
@@ -1447,15 +1445,14 @@ sub DbLog_Log {
 
                           next;
                       }
+                      
+                      $err = DbLog_checkValidTime ($TIMESTAMP);
 
-                      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-
-                      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-                      if (!$@) {
-                          $timestamp = $TIMESTAMP;
+                      if ($err) {
+                          Log3 ($name, 2, "$name - Parameter TIMESTAMP >$TIMESTAMP< got from valueFn is invalid: $err");
                       }
                       else {
-                          Log3 ($name, 2, "$name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+                          $timestamp = $TIMESTAMP;
                       }
 
                       $dev_name  = $DEVICE     if($DEVICE ne '');
@@ -1465,6 +1462,13 @@ sub DbLog_Log {
                       $unit      = $UNIT       if(defined $UNIT);
                       $event     = $EVENT      if(defined $EVENT);
                   }
+                  
+                  $err = DbLog_checkValidTime ($timestamp);
+
+                  if ($err) {
+                      Log3 ($name, 2, "$name - timestamp >$timestamp< is invalid: ".$err.". The dataset is ignored.");
+                      next;
+                  }
 
                   # Daten auf maximale Länge beschneiden
                   ($dev_name,$dev_type,$event,$reading,$value,$unit) = DbLog_cutCol ($hash, $dev_name, $dev_type, $event, $reading, $value, $unit);
@@ -1472,7 +1476,7 @@ sub DbLog_Log {
                   my $row = $timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit;
 
                   if ($log4rel) {
-                    Log3 ($name, 4, "$name - added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
+                      Log3 ($name, 4, "$name - added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                   }
 
                   $memcount = DbLog_addMemCacheRow ($name, $row);                             # Datensatz zum Memory Cache hinzufügen
@@ -3188,7 +3192,7 @@ sub _DbLog_SBP_onRun_LogArray {
           return;
       }
 
-      if ($tl) {                                                                     # Tracelevel setzen
+      if ($tl) {                                                                      # Tracelevel setzen
           $sth_ih->{TraceLevel} = "$tl|$tf";
       }
       else {
@@ -3208,7 +3212,7 @@ sub _DbLog_SBP_onRun_LogArray {
 
       $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta, $subprocess);
 
-      if(!$useta) {                                                                  # keine Transaktion: generate errstr, keine Ausnahme
+      if (!$useta) {                                                                  # keine Transaktion: generate errstr, keine Ausnahme
           _DbLog_SBP_dbhPrintError ($dbh);
       }
 
@@ -3227,7 +3231,7 @@ sub _DbLog_SBP_onRun_LogArray {
                                        }
                                      );
 
-               if($useta) {
+               if ($useta) {
                    $rowlback = $cdata;                                                # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
 
                    _DbLog_SBP_Log3Parent ( { name       => $name,
@@ -3261,7 +3265,7 @@ sub _DbLog_SBP_onRun_LogArray {
 
                __DbLog_SBP_sendToParent ($subprocess, $ret);
 
-               return;
+               return $error;
            };
 
       _DbLog_SBP_dbhRaiseError ($dbh);
@@ -3297,7 +3301,7 @@ sub _DbLog_SBP_onRun_LogArray {
 
       use warnings;
 
-      if(!$nins_hist) {
+      if (!$nins_hist) {
           _DbLog_SBP_Log3Parent ( { name       => $name,
                                     level      => 4,
                                     msg        => "$ceti of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""),
@@ -3976,7 +3980,7 @@ sub _DbLog_SBP_onRun_importCachefile {
   if (!$error && $nins_hist && keys %{$rowlback}) {
       _DbLog_SBP_Log3Parent ( { name       => $name,
                                 level      => 2,
-                                msg        => "WARNING - $nins_hist datasets from $infile were not imported:",
+                                msg        => "WARNING - $nins_hist datasets from $infile were not imported.",
                                 oper       => 'log3parent',
                                 subprocess => $subprocess
                               }
@@ -6450,13 +6454,13 @@ sub _DbLog_plotData {
   $from          = $from_datetime{datetime};
   $to            = $to_datetime{datetime};
 
-  $err = DbLog_checkTimeformat($from);                                     # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
+  $err = DbLog_checkTimeformat ($from);                                     # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
       Log3 ($name, 1, "$name - wrong date/time format (from: $from) requested by SVG: $err");
       return;
   }
 
-  $err = DbLog_checkTimeformat($to);                                       # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
+  $err = DbLog_checkTimeformat ($to);                                       # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
       Log3 ($name, 1, "$name - wrong date/time format (to: $to) requested by SVG: $err");
       return;
@@ -8022,7 +8026,7 @@ sub DbLog_AddLog {
 
   my ($dev_type,$dev_name,$dev_reading,$read_val,$event,$ut);
   my $memcount;
-  my $ts;
+  my ($ts, $err);
 
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
 
@@ -8128,7 +8132,6 @@ sub DbLog_AddLog {
           my $ctz = AttrVal($name, 'convertTimezone', 'none');                                               # convert time zone
 
           if($ctz ne 'none') {
-              my $err;
               my $params = {
                   name      => $name,
                   dtstring  => $ts,
@@ -8166,20 +8169,19 @@ sub DbLog_AddLog {
 
               Log3 ($name, 2, "$name - error valueFn: ".$@) if($@);
 
-              if($IGNORE) {                                                                                # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
-                 $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$name}{TIME}  = $lastt if($lastt);          # patch Forum:#111423
+              if ($IGNORE) {                                                                                # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
+                 $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$name}{TIME}  = $lastt if($lastt);           # patch Forum:#111423
                  $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$name}{VALUE} = $lastv if(defined $lastv);
                  next;
               }
 
-              my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+              $err = DbLog_checkValidTime ($TIMESTAMP);
 
-              eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-              if (!$@) {
-                  $ts = $TIMESTAMP;
+              if ($err) {
+                  Log3 ($name, 2, "$name - Parameter TIMESTAMP >$TIMESTAMP< got from valueFn is invalid: $err");
               }
               else {
-                  Log3 ($name, 2, "$name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+                  $ts = $TIMESTAMP;
               }
 
               $dev_name     = $DEVICE     if($DEVICE ne '');
@@ -8288,14 +8290,13 @@ sub DbLog_addCacheLine {
           next;
       }
 
-      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+      my $err = DbLog_checkValidTime ($TIMESTAMP);
 
-      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-      if (!$@) {
-          $i_timestamp = $TIMESTAMP;
+      if ($err) {
+          Log3 ($name, 2, "$name - Parameter TIMESTAMP >$TIMESTAMP< got from valueFn is invalid: $err");
       }
       else {
-          Log3 ($name, 2, "$name - Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+          $i_timestamp = $TIMESTAMP;
       }
 
       $i_dev     = $DEVICE     if($DEVICE ne '');
@@ -8786,11 +8787,36 @@ sub DbLog_checkTimeformat {
   @date     = split("-", $datetime[0]);
   @time     = split(":", $datetime[1]);
 
-  eval { timelocal($time[2], $time[1], $time[0], $date[2], $date[1]-1, $date[0]-1900); };
+  eval { timelocal ($time[2], $time[1], $time[0], $date[2], $date[1]-1, $date[0]-1900); };
 
   if ($@) {
       my $err = (split(" at ", $@))[0];
       return $err;
+  }
+
+return;
+}
+
+#################################################################
+#    valide Zeitangabe prüfen
+#################################################################
+sub DbLog_checkValidTime {          
+  my $timestamp = shift;
+  
+  my $esb;
+  
+  my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+  
+  eval { $esb = timelocal ($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+  if ($@) {
+      my @l = split /at/, $@;
+      return $l[0];
+  }
+
+  $esb = fhemTimeLocal ($sec, $min, $hh, $dd, $mm-1, $yyyy-1900);
+
+  if ($esb <= 0) {
+      return "Time limit undershot: $esb";
   }
 
 return;
