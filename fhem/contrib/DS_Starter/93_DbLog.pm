@@ -58,6 +58,7 @@ use vars qw($FW_ME $FW_subdir);                                      # predeclar
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.11.0"  => "02.12.2024 sub _DbLog_SBP_onRun_LogArray revised: insertmode Array - not saved data are print out in Logfile ",
   "5.10.3"  => "01.12.2024 check valid Time limit 1970-01-01 00:00:00 of Event time, Forum: #139847 ", 
   "5.10.2"  => "21.07.2024 _DbLog_copyCache: Copy process changed to minimize memory usage after reopen ", 
   "5.10.1"  => "01.04.2024 _DbLog_plotData: avoid possible uninitialized value \$out_value (SVG: Argument '' isn't numeric) ".
@@ -3146,8 +3147,7 @@ sub _DbLog_SBP_onRun_LogArray {
   my $faref = __DbLog_SBP_fieldArrays ($name, $cdata, $subprocess);
   my $ceti  = scalar keys %{$cdata};
 
-  my ($st,$sth_ih,$sth_ic,$sth_uc,$sqlins,$ins_hist);
-  my ($tuples, $rows);
+  my ($st, $sth_ih, $sth_ic, $sth_uc ,$sqlins, $ins_hist, $tuples);
   my @tuple_status;
 
   my @timestamp = @{$faref->{timestamp}};
@@ -3216,92 +3216,40 @@ sub _DbLog_SBP_onRun_LogArray {
           _DbLog_SBP_dbhPrintError ($dbh);
       }
 
-      eval {  ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \@tuple_status } );
-              1;
-           }
-           or do {
-               $error     = $@;
-               $nins_hist = $ceti;
+      eval {  $tuples = $sth_ih->execute_array ( { ArrayTupleStatus => \@tuple_status } ) };
+           
+      if (!$tuples) {
+          no warnings 'uninitialized';
 
-               _DbLog_SBP_Log3Parent ( { name       => $name,
-                                         level      => 2,
-                                         msg        => "Error table $history - $error",
-                                         oper       => 'log3parent',
-                                         subprocess => $subprocess
-                                       }
-                                     );
+          for my $tuple (0..$ceti-1) {
+              my $status = $tuple_status[$tuple];
+              $status    = [0, "Skipped"] unless defined $status;                    # $status ist "1" wenn insert ok
+              
+              next unless ref $status;
+            
+              _DbLog_SBP_Log3Parent ( { name       => $name,
+                                        level      => 4,
+                                        msg        => "Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."->\nTS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]",
+                                        oper       => 'log3parent',
+                                        subprocess => $subprocess
+                                      }
+                                    );
 
-               if ($useta) {
-                   $rowlback = $cdata;                                                # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+              $event[$tuple]   =~ s/\|/_ESC_/gxs;                                    # escape Pipe "|"
+              $reading[$tuple] =~ s/\|/_ESC_/gxs;
+              $value[$tuple]   =~ s/\|/_ESC_/gxs;
+              $unit[$tuple]    =~ s/\|/_ESC_/gxs;
 
-                   _DbLog_SBP_Log3Parent ( { name       => $name,
-                                             level      => 4,
-                                             msg        => "Transaction is switched on. Transferred data is returned to the cache.",
-                                             oper       => 'log3parent',
-                                             subprocess => $subprocess
-                                           }
-                                         );
-               }
-               else {
-                   _DbLog_SBP_Log3Parent ( { name       => $name,
-                                             level      => 4,
-                                             msg        => "Transaction is switched off. Some or all of the transferred data will be lost. Note the following information.",
-                                             oper       => 'log3parent',
-                                             subprocess => $subprocess
-                                           }
-                                         );
-               }
+              my $nlh = $timestamp[$tuple]."|".$device[$tuple]."|".$type[$tuple]."|".$event[$tuple]."|".$reading[$tuple]."|".$value[$tuple]."|".$unit[$tuple];
 
-               _DbLog_SBP_dbhRaiseError ($dbh);
-               __DbLog_SBP_rollbackOnly ($name, $dbh, $history, $subprocess);
-
-               $ret = {
-                   name     => $name,
-                   msg      => $error,
-                   ot       => 0,
-                   oper     => $operation,
-                   rowlback => $rowlback
-               };
-
-               __DbLog_SBP_sendToParent ($subprocess, $ret);
-
-               return $error;
-           };
-
-      _DbLog_SBP_dbhRaiseError ($dbh);
-      __DbLog_SBP_commitOnly   ($name, $dbh, $history, $subprocess);
-
-      no warnings 'uninitialized';
-
-      for my $tuple (0..$ceti-1) {
-          my $status = $tuple_status[$tuple];
-          $status    = 0 if($status eq "0E0");
-
-          next if($status);                                                      # $status ist "1" wenn insert ok
-
-          _DbLog_SBP_Log3Parent ( { name       => $name,
-                                    level      => 4,
-                                    msg        => "Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."->\nTS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]",
-                                    oper       => 'log3parent',
-                                    subprocess => $subprocess
-                                  }
-                                );
-
-          $event[$tuple]   =~ s/\|/_ESC_/gxs;                                    # escape Pipe "|"
-          $reading[$tuple] =~ s/\|/_ESC_/gxs;
-          $value[$tuple]   =~ s/\|/_ESC_/gxs;
-          $unit[$tuple]    =~ s/\|/_ESC_/gxs;
-
-          my $nlh = $timestamp[$tuple]."|".$device[$tuple]."|".$type[$tuple]."|".$event[$tuple]."|".$reading[$tuple]."|".$value[$tuple]."|".$unit[$tuple];
-
-          push @n2hist, $nlh;
-
-          $nins_hist++;
+              push @n2hist, $nlh;                               # Liste der nicht eingefügten Zeilen
+              $nins_hist++;                                     # Anzahl der nicht eingefügten Zeilen
+          }   
+               
+          use warnings;
       }
 
-      use warnings;
-
-      if (!$nins_hist) {
+      if (!$nins_hist) {                                        # alle Inserts ok
           _DbLog_SBP_Log3Parent ( { name       => $name,
                                     level      => 4,
                                     msg        => "$ceti of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""),
@@ -3309,39 +3257,69 @@ sub _DbLog_SBP_onRun_LogArray {
                                     subprocess => $subprocess
                                   }
                                 );
-      }
-      else {
-          if($usepkh) {
+                                
+          _DbLog_SBP_dbhRaiseError ($dbh);
+          __DbLog_SBP_commitOnly   ($name, $dbh, $history, $subprocess); 
+      }                                                         
+      else {                                                    # Fehler sind aufgetreten
+          my $bkey = 1;
+
+          for my $line (@n2hist) {
+              $rowhref->{$bkey} = $line;
+              $bkey++;
+          }
+          
+          if ($useta) {
+              $rowlback = $cdata;                               # Transaktion ein -> alle Daten zurückgeben und Rollback
+
               _DbLog_SBP_Log3Parent ( { name       => $name,
                                         level      => 3,
-                                        msg        => "INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table history due to PK on columns $pkh",
+                                        msg        => "Transaction mode is activated. No data was saved in table $history, but all data was returned to the cache.",
                                         oper       => 'log3parent',
                                         subprocess => $subprocess
                                       }
                                     );
+          
+               _DbLog_SBP_dbhRaiseError ($dbh);
+               __DbLog_SBP_rollbackOnly ($name, $dbh, $history, $subprocess);
           }
-          else {
+          else {                                    
+              if ($usepkh) {
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 3,
+                                            msg        => "INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table history. PK on columns $pkh is set.",
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
+              }
+              else {
+                  _DbLog_SBP_Log3Parent ( { name       => $name,
+                                            level      => 3,
+                                            msg        => "WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table '$history'",
+                                            oper       => 'log3parent',
+                                            subprocess => $subprocess
+                                          }
+                                        );
+              }
+              
               _DbLog_SBP_Log3Parent ( { name       => $name,
-                                        level      => 2,
-                                        msg        => "WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history",
+                                        level      => 3,
+                                        msg        => "The transaction is disabled.",
                                         oper       => 'log3parent',
                                         subprocess => $subprocess
                                       }
                                     );
-
-              my $bkey = 1;
-
-              for my $line (@n2hist) {
-                  $rowhref->{$bkey} = $line;
-                  $bkey++;
-              }
+              
+          _DbLog_SBP_dbhRaiseError ($dbh);
+          __DbLog_SBP_commitOnly   ($name, $dbh, $history, $subprocess);              
           }
       }
 
       if (defined $rowhref) {                                                           # nicht gespeicherte Datensätze ausgeben
           _DbLog_SBP_Log3Parent ( { name       => $name,
-                                    level      => 2,
-                                    msg        => "The following data was not saved due to causes that may have been previously displayed:",
+                                    level      => 3,
+                                    msg        => "The following data were faulty and are not saved in database table '$history':",
                                     oper       => 'log3parent',
                                     subprocess => $subprocess
                                   }
