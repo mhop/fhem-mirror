@@ -875,6 +875,7 @@ sub getMowerResponse {
     } else {
 
       my $result = eval { JSON::XS->new->utf8( not $::unicodeEncoding )->decode( $data ) };
+
       if ($@) {
 
         Log3( $name, 2, "$iam - JSON error while request: $@");
@@ -882,8 +883,10 @@ sub getMowerResponse {
       } else {
 
         $hash->{helper}{mowers} = $result->{data};
+
         my $maxMower = 0;
         $maxMower = @{$hash->{helper}{mowers}} if ( ref ( $hash->{helper}{mowers} ) eq 'ARRAY' );
+
         if ($maxMower <= $mowerNumber || $mowerNumber < 0 ) {
 
           Log3 $name, 2, "$iam wrong mower number $mowerNumber ($maxMower mower available). Change definition of $name.";
@@ -897,56 +900,11 @@ sub getMowerResponse {
           $foundMower .= "\n" . $i .' => '. $hash->{helper}{mowers}[$i]{attributes}{system}{name} . ' ' . $hash->{helper}{mowers}[$i]{id};
 
         }
+
+        $hash->{helper}{foundMower} = $foundMower;
         Log3 $name, 5, "$iam found $foundMower ";
 
-        if ( defined ( $hash->{helper}{mower}{id} ) && $hash->{helper}{midnightCycle} ) { # update dataset
-
-          $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp};
-          $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mower}{attributes}{mower}{activity};
-          $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions};
-
-        } elsif ( !defined ($hash->{helper}{mower}{id}) ) { # first data set
-
-          $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{metadata}{statusTimestamp};
-          $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{mower}{activity};
-          $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
-          $hash->{helper}{statistics}{numberOfCollisionsOld} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
-
-          if ( $hash->{helper}{mowers}[$mowerNumber]{attributes}{capabilities}{position} ) {
-
-            $hash->{helper}{searchpos} = [ dclone $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions}[0] ];
-
-            if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
-              posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
-            }
-
-          }
-
-        }
-
-        $hash->{helper}{mower} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
-        $hash->{helper}{mower_id} = $hash->{helper}{mower}{id};
-        $hash->{helper}{newdatasets} = 0;
-        
-        if ( $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
-          setDevAttrList( $name );
-        } else {
-          setDevAttrList( $name, $hash->{helper}{no_position_attr} );
-        }
-
-        $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
-
-        calculateStatistics( $hash ) if ( $hash->{helper}{midnightCycle} );
-
-        # Update readings
-        readingsBeginUpdate($hash);
-
-          readingsBulkUpdateIfChanged($hash, 'api_MowerFound', $foundMower );
-          fillReadings( $hash );
-          readingsBulkUpdate($hash, 'device_state', 'connected' );
-
-        readingsEndUpdate($hash, 1);
-
+        processingMowerResponse( $hash );
 
         # schedule new access token
         RemoveInternalTimer( $hash, \&getNewAccessToken );
@@ -962,7 +920,7 @@ sub getMowerResponse {
       }
 
     }
-    
+
   } else {
 
     readingsSingleUpdate( $hash, 'device_state', "error statuscode $statuscode", 1 );
@@ -976,6 +934,67 @@ sub getMowerResponse {
   Log3 $name, 1, "$iam failed retry in $hash->{helper}{retry_interval_getmower} seconds.";
 
   return undef;
+
+}
+
+#########################
+sub processingMowerResponse {
+
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  my $iam = "$type $name processingMowerResponse:";
+  my $mowerNumber = $hash->{helper}{mowerNumber};
+  my $foundMower = defined( $hash->{helper}{foundMower} ) ? $hash->{helper}{foundMower} : undef;
+
+  if ( defined ( $hash->{helper}{mower}{id} ) && $hash->{helper}{midnightCycle} ) { # update dataset
+
+    $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp};
+    $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mower}{attributes}{mower}{activity};
+    $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mower}{attributes}{statistics}{numberOfCollisions};
+
+  } elsif ( !defined ($hash->{helper}{mower}{id}) ) { # first data set
+
+    $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{metadata}{statusTimestamp};
+    $hash->{helper}{mowerold}{attributes}{mower}{activity} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{mower}{activity};
+    $hash->{helper}{mowerold}{attributes}{statistics}{numberOfCollisions} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
+    $hash->{helper}{statistics}{numberOfCollisionsOld} = $hash->{helper}{mowers}[$mowerNumber]{attributes}{statistics}{numberOfCollisions};
+
+    if ( $hash->{helper}{mowers}[$mowerNumber]{attributes}{capabilities}{position} ) {
+
+      $hash->{helper}{searchpos} = [ dclone $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions}[0] ];
+
+      if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
+        posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
+      }
+
+    }
+
+  }
+
+  $hash->{helper}{mower} = dclone( $hash->{helper}{mowers}[$mowerNumber] );
+  $hash->{helper}{mower_id} = $hash->{helper}{mower}{id};
+  $hash->{helper}{newdatasets} = 0;
+  
+  if ( $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
+    setDevAttrList( $name );
+  } else {
+    setDevAttrList( $name, $hash->{helper}{no_position_attr} );
+  }
+
+  $hash->{helper}{storediff} = $hash->{helper}{mower}{attributes}{metadata}{statusTimestamp} - $hash->{helper}{mowerold}{attributes}{metadata}{statusTimestamp};
+
+  calculateStatistics( $hash ) if ( $hash->{helper}{midnightCycle} );
+  $hash->{helper}{midnightCycle} = 0;
+
+  # Update readings
+  readingsBeginUpdate( $hash );
+
+    readingsBulkUpdateIfChanged( $hash, 'api_MowerFound', $foundMower ) if ( $foundMower );
+    fillReadings( $hash );
+    readingsBulkUpdate( $hash, 'device_state', 'connected' );
+
+  readingsEndUpdate( $hash, 1 );
 
 }
 
@@ -3293,7 +3312,7 @@ sub wsRead {
 
       }
 
-      autoDstSync( $hash ) if ( AttrVal( $name, "mowerAutoSyncTime", 0 ) );
+      autoDstSync( $hash ) if ( AttrVal( $name, "mowerAutoSyncTime", 0 ) && $hash->{helper}{mower}{attributes}{metadata}{connected} );
 
     }
 
