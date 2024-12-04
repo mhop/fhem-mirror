@@ -401,26 +401,6 @@ changes
 
 #####################################
 #
-# smartmatch replacement
-# 
-#####################################
-
-# use contains_<type>($scalar, @array) instead of $scalar ~~ @array
-# requires List:Util
-# see https://www.perlmonks.org/?node_id=1067462
-
-sub contains_numeric($@) {
-  my ($scalar, @array) = @_;
-  return any { $_ == $scalar } @array;
-}
-
-sub contains_string($@) {
-  my ($scalar, @array) = @_;
-  return any { $_ eq $scalar } @array;
-}
-
-#####################################
-#
 # human readable time format
 # 
 #####################################
