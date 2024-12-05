@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  93_DbLog: insertmode 0 - improved output of errors in Logfile
  - change:  57_Calendar: remove smartmatch replacement as it is now
                          officially in fhem.pl
  - feature: 93_DbLog: check valid Event Time limit, Forum: #139847
