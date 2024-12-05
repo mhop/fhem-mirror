@@ -243,6 +243,7 @@ FileLog_Switch($)
     $log->{currentlogfile} = $cn;
     return 1 if($log->{READONLY});
     $fh->close() if($fh);
+    restoreDir_mkDir($cn=~m,^/,? "":".", $cn, 1);
     HandleArchiving($log);
     $fh = new IO::File ">>$cn";
     if(!defined($fh)) {
