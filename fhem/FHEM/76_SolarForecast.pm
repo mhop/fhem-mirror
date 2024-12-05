@@ -5526,7 +5526,7 @@ sub Attr {
       if ($init_done && $aName eq 'ctrlInterval') {
           _newCycTime ($hash, time, $aVal);
           my $nct = CurrentVal ($hash, 'nextCycleTime', 0);                                     # gespeicherte nächste CyleTime
-          readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual' : FmtTime($nct)), 0);
+          readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
           return;
       }
   }
@@ -6982,8 +6982,8 @@ sub runTask {
   my ($interval, $disabled, $inactive) = controller ($name);
 
   if (!$interval) {
-      $hash->{MODE} = 'Manual';
-      storeReading ('nextCycletime', 'Manual');
+      $hash->{MODE} = 'Manual / Event-controlled';
+      storeReading ('nextCycletime', 'Manual / Event-controlled');
       return;
   }
 
@@ -7048,14 +7048,14 @@ sub _newCycTime {
   my $interval = shift;
 
   if (!$interval) {
-      $hash->{MODE} = 'Manual';
+      $hash->{MODE} = 'Manual / Event-controlled';
       $data{$hash->{TYPE}}{$hash->{NAME}}{current}{nextCycleTime} = 0;
-      storeReading ('nextCycletime', 'Manual');
+      storeReading ('nextCycletime', 'Manual / Event-controlled');
       return;
   }
 
   my $new       = $t + $interval;                                                # nächste Wiederholungszeit
-  $hash->{MODE} = 'Automatic - next Cycletime: '.FmtTime($new);
+  $hash->{MODE} = 'Automatic / Event-controlled - next planned Cycletime: '.FmtTime($new);
 
   $data{$hash->{TYPE}}{$hash->{NAME}}{current}{nextCycleTime} = $new;
   storeReading ('nextCycletime', FmtTime($new));
