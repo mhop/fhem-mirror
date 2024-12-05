@@ -5463,6 +5463,8 @@ json2nameValue($;$$$$)
       while($in2 =~ m/^\s*"([^"]*)"\s*:\s*(.*)$/s) { # 125340
         my ($name,$val) = ($1,$2);
         ($err,$name) = lStr('"'.$name.'"'); #139807
+        return ($err,undef) if($err);
+        $name = makeReadingName($name);
         ($err,$in2) = eObj(\%r2, $name, $val, $in2, $prefix);
         return ($err,undef) if($err);
         $in2 =~ s/^\s*,\s*//;
