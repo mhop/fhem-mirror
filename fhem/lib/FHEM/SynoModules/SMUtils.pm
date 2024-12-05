@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.27.4  05.12.2024  expand evaljson for SolarForecast
 # 1.27.3  26.10.2024  compatibility to SSCam V 9.12.0
 # 1.27.2  16.03.2024  change checkModVer text output
 # 1.27.1  04.12.2023  change checkModVer
@@ -60,7 +61,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.27.3');
+use version 0.77; our $VERSION = version->declare('1.27.4');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1185,10 +1186,10 @@ sub evaljson {
   if ($nojsonmod) {
       $success = 0;
       Log3 ($name, 1, "$name - ERROR: Perl module 'JSON' is missing. You need to install it.");
-      return ($success,$myjson);
+      return ($success, $myjson);
   }
   
-  eval {decode_json($myjson)
+  eval {decode_json ($myjson)
        } 
        or do {                                                            
           if (($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || 
@@ -1203,7 +1204,7 @@ sub evaljson {
           else {
               $success      = 0;
               my $errorcode = "9000";         
-              my $error     = expErrors($hash, $errorcode);                                         # Fehlertext zum Errorcode ermitteln
+              my $error     = expErrors ($hash, $errorcode);                                        # Fehlertext zum Errorcode ermitteln
               
               if ($error) {          
                   setReadingErrorState ($hash, $error, $errorcode);

@@ -50,6 +50,7 @@ use HttpUtils;
 eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # Debian: sudo apt-get install libjson-perl
 eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval'
 
+use FHEM::SynoModules::ErrCodes qw(:all);                                            # Error Code Modul
 use FHEM::SynoModules::SMUtils qw (checkModVer
                                    evaljson
                                    getClHash
@@ -156,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.39.0" => "04.12.2024  possible asynchron mode for setupMeterDev, setupInverterDevXX ".
+                           "include FHEM::SynoModules::ErrCodes ",
   "1.38.0" => "30.11.2024  optimize data handling, rename getter solApiData to radiationApiData, ".
                            "set setupStringAzimuth, setupStringDeclination is checked due to dependencies to OpenMeteo ".
                            "attr setupRadiationAPI and setupWeatherDev1 can be set largely independently of each other ".
@@ -1339,7 +1342,7 @@ sub Define {
       notes       => \%vNotesIntern,
       useAPI      => 0,
       useSMUtils  => 1,
-      useErrCodes => 0,
+      useErrCodes => 1,
       useCTZ      => 1,
   };
 
@@ -3769,7 +3772,7 @@ sub __VictronVRM_ApiResponseLogin {
       return;
   }
   elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
-      my ($success) = evaljson($hash, $myjson);
+      my ($success) = evaljson ($hash, $myjson);
 
       if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API response';
@@ -5977,6 +5980,7 @@ sub _attrInverterDev {                   ## no critic "not used"
       delete $data{$type}{$name}{inverters}{$in}{ilimit};   
       delete $data{$type}{$name}{inverters}{$in}{iicon};
       delete $data{$type}{$name}{inverters}{$in}{istrings};
+      delete $data{$type}{$name}{inverters}{$in}{iasynchron};
       delete $data{$type}{$name}{inverters}{$in}{ifeed};
   }
   elsif ($paref->{cmd} eq 'del') {
@@ -6338,7 +6342,6 @@ return;
 ###################################################################################
 sub Notify {
   # Es werden nur die Events von Geräten verarbeitet die im Hash $hash->{NOTIFYDEV} gelistet sind (wenn definiert).
-  # Dadurch kann die Menge der Events verringert werden. In sub DbRep_Define angeben.
 
   my $myHash   = shift;
   my $dev_hash = shift;
@@ -6350,20 +6353,61 @@ sub Notify {
   my $events = deviceEvents($dev_hash, 1);
   return if(!$events);
 
-  my $cdref     = CurrentVal ($myHash, 'consumerdevs', '');                               # alle registrierten Consumer und Schaltdevices
+  my $debug = getDebug ($myHash);                                                         # Debug Mode
+  
+  my ($err, $medev, $h, $async);
+    
+  ## Meter Event?
+  #################
+  ($err, $medev, $h) = isDeviceValid ( { name => $myName, obj => 'setupMeterDev', method => 'attr' } );
+  
+  if (!$err) {
+      if ($devName eq $medev) {
+          $async = $h->{asynchron} // 0;
+          
+          if ($debug =~ /notifyHandling/x) {
+              Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of Meter device >$devName< received - asynchronous mode: $async});
+          }          
+          
+          if ($async) {
+              centralTask ($myHash, 1);                                                  # keine Events in SolarForecast außer 'state'
+              return;
+          }
+      }
+  }
+  
+  ## Inverter Event?
+  ####################  
+  for my $in (1..$maxinverter) {
+      $in       = sprintf "%02d", $in;
+      my $iname = InverterVal ($myHash, $in, 'iname', '');
+      
+      if ($devName eq $iname) {
+          my $iasync = InverterVal ($myHash, $in, 'iasynchron', 0);
+
+          if ($debug =~ /notifyHandling/x) {
+              Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of Inverter device >$devName< received - asynchronous mode: $iasync});
+          }
+      
+          if ($iasync) {
+              centralTask ($myHash, 1);                                                  # keine Events in SolarForecast außer 'state'
+              return;
+          }
+      }
+  }
+  
+  ## consumer Event?
+  ####################
+  my $cdref     = CurrentVal ($myHash, 'consumerdevs', '');                              # alle registrierten Consumer und Schaltdevices
   my @consumers = ();
   @consumers    = @{$cdref} if(ref $cdref eq "ARRAY");
-
-  return if(!@consumers);
-
-  my $debug = getDebug ($myHash);                                                         # Debug Mode
-
-  if (grep /^$devName$/, @consumers) {
-      my ($cname, $cindex);
+  
+  if (@consumers && grep /^$devName$/, @consumers) {
+      my ($cname, $cindex, $dswname);
       my $type = $myHash->{TYPE};
 
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$myName}{consumers}}) {
-          my ($err, $cname, $dswname) = getCDnames ($myHash, $c);
+          ($err, $cname, $dswname) = getCDnames ($myHash, $c);
 
           if ($devName eq $cname) {
               $cindex = $c;
@@ -6391,7 +6435,7 @@ sub Notify {
          return;
       }
 
-      my $async    = ConsumerVal ($myHash, $cindex, 'asynchron',      0);
+      $async       = ConsumerVal ($myHash, $cindex, 'asynchron',      0);
       my $rswstate = ConsumerVal ($myHash, $cindex, 'rswstate', 'state');
 
       if ($debug =~ /notifyHandling/x) {
@@ -8785,9 +8829,9 @@ sub _transferInverterValues {
 
       next if(!$pvread || !$edread);
 
-      my $pvuf = $pvunit =~ /^kW$/xi ? 1000 : 1;
-      my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                             # aktuelle Erzeugung (W)
-      $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                                   # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
+      my $pvuf     = $pvunit =~ /^kW$/xi ? 1000 : 1;
+      my $pv       = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                         # aktuelle Erzeugung (W)
+      $pv          = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
 
       my $etuf     = $etunit =~ /^kWh$/xi ? 1000 : 1;
       my $etotal   = ReadingsNum ($indev, $edread, 0) * $etuf;                                         # Erzeugung total (Wh)
@@ -8839,6 +8883,7 @@ sub _transferInverterValues {
       $data{$type}{$name}{inverters}{$in}{ilimit}      = $h->{limit} // 100;                            # Wirkleistungsbegrenzung
       $data{$type}{$name}{inverters}{$in}{iicon}       = $h->{icon}      if($h->{icon});                # Icon des Inverters
       $data{$type}{$name}{inverters}{$in}{istrings}    = $h->{strings}   if($h->{strings});             # dem Inverter zugeordnete Strings
+      $data{$type}{$name}{inverters}{$in}{iasynchron}  = $h->{asynchron} if($h->{asynchron});           # Inverter Mode
       $data{$type}{$name}{inverters}{$in}{ifeed}       = $feed;                                         # Eigenschaften der Energielieferung
       
       $pvsum        += $pv;
@@ -17846,6 +17891,7 @@ sub createAssociatedWith {
       my $medev = AttrVal ($name, 'setupMeterDev', '');                      # Meter Device
       ($ame,$h) = parseParams ($medev);
       $medev    = $ame->[0] // "";
+      push @cd, $medev;
 
       my $badev = AttrVal ($name, 'setupBatteryDev', '');                    # Battery Device
       ($aba,$h) = parseParams ($badev);
@@ -17858,6 +17904,13 @@ sub createAssociatedWith {
           my $dswitch  = $hc->{switchdev} // '';                             # alternatives Schaltdevice
           push @cd, $codev   if($codev);
           push @cd, $dswitch if($dswitch);
+      }
+      
+      for my $in (1..$maxinverter) {                                         # Inverter Devices
+          $in       = sprintf "%02d", $in;
+          my $inc   = AttrVal ($name, "setupInverterDev${in}", "");
+          my ($ind) = parseParams ($inc);
+          push @cd, $ind->[0] if($ind->[0]);
       }
 
       @nd = @cd;
@@ -17876,13 +17929,6 @@ sub createAssociatedWith {
           push @nd, $prd->[0] if($prd->[0]);
       }
       
-      for my $in (1..$maxinverter) {                                        # Inverter Devices
-          $in      = sprintf "%02d", $in;
-          my $inc   = AttrVal ($name, "setupInverterDev${in}", "");
-          my ($ind) = parseParams ($inc);
-          push @nd, $ind->[0] if($ind->[0]);
-      }
-
       my @ndn = ();
 
       for my $e (@nd) {
@@ -20868,6 +20914,7 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>iasynchron </b>     </td><td>Mode of processing received inverter events                      </td></tr>
             <tr><td> <b>ietotal </b>        </td><td>total energy generated by the inverter to date (Wh)              </td></tr>
             <tr><td> <b>ifeed </b>          </td><td>Energy supply characteristics                                    </td></tr>
             <tr><td> <b>igeneration </b>    </td><td>current PV generation (W)                                        </td></tr>
@@ -21689,7 +21736,8 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
-       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b><br>
+       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b> <br><br>
+       
          Display of any readings, set commands and attributes of the device in the graphic header. <br>
          Readings, set commands and attributes of other devices can be displayed by specifying the optional [@Device]. <br>
          The values to be displayed are separated by spaces.
@@ -21737,7 +21785,8 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
-       <li><b>graphicHeaderOwnspecValForm </b><br>
+       <li><b>graphicHeaderOwnspecValForm </b> <br><br>
+       
          The readings to be displayed with the attribute
          <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a> can be manipulated with sprintf and
          other Perl operations.  <br>
@@ -21956,7 +22005,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
        <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; 
-                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...]
+                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt]
                                  [feed=&lt;Delivery type&gt;] [limit=&lt;0..100&gt;]
                                  [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
@@ -21973,30 +22022,42 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                                        </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                       </td></tr>
-           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                                 </td></tr>
-           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.                       </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                           </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                     </td></tr>
-           <tr><td> <b>strings</b>  </td><td>Comma-separated list of the strings assigned to the inverter (optional). The string names                   </td></tr>
-           <tr><td>                 </td><td>are defined in the <a href=“#SolarForecast-attr-setupInverterStrings”>setupInverterStrings</a> attribute.   </td></tr>
-           <tr><td>                 </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                       </td></tr>         
-           <tr><td> <b>feed</b>     </td><td>Defines special properties of the device's energy supply (optional).                                        </td></tr>
-           <tr><td>                 </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                             </td></tr>
-           <tr><td>                 </td><td><b>bat</b> - Solar charger for direct battery charging. Any surplus is fed into the inverter/house network. </td></tr>
-           <tr><td>                 </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                            </td></tr>
-           <tr><td> <b>limit</b>    </td><td>Defines any active power limitation in % (optional).                                                        </td></tr>
-           <tr><td> <b>icon</b>     </td><td>Icon for displaying the inverter in the flow chart (optional)                                               </td></tr>
-           <tr><td>                 </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                     </td></tr>
-           <tr><td>                 </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed          </td></tr>           
+           <tr><td> <b>pv</b>         </td><td>Reading which provides the current PV generation as a positive value                                        </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                       </td></tr>
+           <tr><td>                   </td><td>If the reading violates the specification of a continuously rising counter,                                 </td></tr>
+           <tr><td>                   </td><td>SolarForecast handles this error and reports the situation by means of a log message.                       </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>Einheit</b>    </td><td>the respective unit (W,kW,Wh,kWh)                                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>capacity</b>   </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                     </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>strings</b>    </td><td>Comma-separated list of the strings assigned to the inverter (optional). The string names                   </td></tr>
+           <tr><td>                   </td><td>are defined in the <a href=“#SolarForecast-attr-setupInverterStrings”>setupInverterStrings</a> attribute.   </td></tr>
+           <tr><td>                   </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                       </td></tr>         
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>feed</b>       </td><td>Defines special properties of the device's energy supply (optional).                                        </td></tr>
+           <tr><td>                   </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                             </td></tr>
+           <tr><td>                   </td><td><b>bat</b> - Solar charger for direct battery charging. Any surplus is fed into the inverter/house network. </td></tr>
+           <tr><td>                   </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>limit</b>      </td><td>Defines any active power limitation in % (optional).                                                        </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>icon</b>       </td><td>Icon for displaying the inverter in the flow chart (optional)                                               </td></tr>
+           <tr><td>                   </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                     </td></tr>
+           <tr><td>                   </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed          </td></tr>           
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                 </td></tr>
+           <tr><td>                   </td><td>event processing (asynchronous). (optional)                                                                 </td></tr>
+           <tr><td>                   </td><td><b>0</b> - no data collection after receiving an event from the device (default)                            </td></tr>
+           <tr><td>                   </td><td><b>1</b> - trigger a data collection when an event is received from the device                              </td></tr>
         </table>
        </ul>
        <br>
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 strings=Garage icon=inverter@red:solar
+         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 asynchron=1 strings=Garage icon=inverter@red:solar
        </ul>
        <br>
 
@@ -22023,7 +22084,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-setupMeterDev"></a>
        <li><b>setupMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Unit&gt; contotal=&lt;Readingname&gt;:&lt;Unit&gt;
                             gfeedin=&lt;Readingname&gt;:&lt;Unit&gt; feedtotal=&lt;Readingname&gt;:&lt;Unit&gt;
-                            [conprice=&lt;Field&gt;] [feedprice=&lt;Field&gt;] </b> <br><br>
+                            [conprice=&lt;Field&gt;] [feedprice=&lt;Field&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Defines any device and its readings for measuring energy into or out of the public grid.
        The module assumes that the numeric value of the readings is positive.
@@ -22034,13 +22095,17 @@ to ensure that the system configuration is correct.
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
            <tr><td> <b>gcon</b>       </td><td>Reading which supplies the power currently drawn from the grid                                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>contotal</b>   </td><td>Reading which provides the sum of the energy drawn from the grid (a constantly increasing meter)                          </td></tr>
            <tr><td>                   </td><td>If the counter is reset to '0' at the beginning of the day (daily counter), the module handles this situation accordingly.</td></tr>
            <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>gfeedin</b>    </td><td>Reading which supplies the power currently fed into the grid                                                              </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>feedtotal</b>  </td><td>Reading which provides the sum of the energy fed into the grid (a constantly increasing meter)                            </td></tr>
            <tr><td>                   </td><td>If the counter is reset to '0' at the beginning of the day (daily counter), the module handles this situation accordingly.</td></tr>
            <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>Unit</b>       </td><td>the respective unit (W,kW,Wh,kWh)                                                                                         </td></tr>
            <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>conprice</b>   </td><td>Price for the purchase of one kWh (optional). The &lt;field&gt; can be specified in one of the following variants:        </td></tr>
@@ -22052,6 +22117,12 @@ to ensure that the system configuration is correct.
            <tr><td>                   </td><td>&lt;Remuneration&gt;:&lt;Currency&gt; - Remuneration as a numerical value and its currency                                </td></tr>
            <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Currency&gt; - Reading of the <b>meter device</b> that contains the remuneration : Currency           </td></tr>
            <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Currency&gt; - any device and reading containing the remuneration : Currency           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                               </td></tr>
+           <tr><td>                   </td><td>event processing (asynchronous).                                                                                          </td></tr>
+           <tr><td>                   </td><td><b>0</b> - no data collection after receiving an event from the device (default)                                          </td></tr>
+           <tr><td>                   </td><td><b>1</b> - trigger a data collection when an event is received from the device                                            </td></tr>
+
          </table>
        </ul>
        <br>
@@ -23262,6 +23333,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>iasynchron </b>     </td><td>Modus der Verarbeitung empfangener Inverter-Events                          </td></tr>
             <tr><td> <b>ietotal </b>        </td><td>Stand gesamte bisher erzeugte Energie des Wechselrichters (Wh)              </td></tr>
             <tr><td> <b>ifeed </b>          </td><td>Eigenschaften der Energielieferung                                          </td></tr>
             <tr><td> <b>igeneration </b>    </td><td>aktuelle PV Erzeugung (W)                                                   </td></tr>
@@ -24084,7 +24156,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
-       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b><br>
+       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b> <br><br>
+         
          Anzeige beliebiger Readings, Set-Kommandos und Attribute des SolarForecast Devices im Grafikkopf. <br>
          Durch Angabe des optionalen [@Device] können Readings, Set-Kommandos und Attribute anderer Devices angezeigt werden. <br>
          Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
@@ -24132,7 +24205,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
-       <li><b>graphicHeaderOwnspecValForm </b><br>
+       <li><b>graphicHeaderOwnspecValForm </b> <br><br>
+       
          Die mit dem Attribut <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a> anzuzeigenden
          Readings können mit sprintf und anderen Perl Operationen manipuliert werden. <br>
          Es stehen zwei grundsätzliche, miteinander nicht kombinierbare Möglichkeiten der Notation zur Verfügung. <br>
@@ -24350,7 +24424,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
        <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
-                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...]
+                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt]
                                  [feed=&lt;Liefertyp&gt;] [limit=&lt;0..100&gt;]
                                  [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
@@ -24368,30 +24442,42 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                                        </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)                   </td></tr>
-           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                      </td></tr>
-           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                   </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                         </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt                 </td></tr>
-           <tr><td> <b>strings</b>  </td><td>Komma getrennte Liste der dem Wechselrichter zugeordneten Strings (optional). Die Stringnamen               </td></tr>
-           <tr><td>                 </td><td>werden im Attribut <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a> definiert.   </td></tr>
-           <tr><td>                 </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.           </td></tr>         
-           <tr><td> <b>feed</b>     </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                              </td></tr>
-           <tr><td>                 </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.    </td></tr>
-           <tr><td>                 </td><td><b>bat</b> - Solar-Ladegerät zur Batterie Direktladung. Ein Überschuß wird dem Inverter/Hausnetz zugeführt. </td></tr>
-           <tr><td>                 </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentlich Netz eingespeist                            </td></tr>
-           <tr><td> <b>limit</b>    </td><td>Definiert eine eventuelle Wirkleistungsbeschränkung in % (optional).                                        </td></tr>
-           <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                             </td></tr>
-           <tr><td>                 </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                                   </td></tr>
-           <tr><td>                 </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt         </td></tr>
+           <tr><td> <b>pv</b>         </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                                        </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)                   </td></tr>
+           <tr><td>                   </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                      </td></tr>
+           <tr><td>                   </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                   </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                         </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>capacity</b>   </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt                 </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>strings</b>    </td><td>Komma getrennte Liste der dem Wechselrichter zugeordneten Strings (optional). Die Stringnamen               </td></tr>
+           <tr><td>                   </td><td>werden im Attribut <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a> definiert.   </td></tr>
+           <tr><td>                   </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.           </td></tr>         
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>feed</b>       </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                              </td></tr>
+           <tr><td>                   </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.    </td></tr>
+           <tr><td>                   </td><td><b>bat</b> - Solar-Ladegerät zur Batterie Direktladung. Ein Überschuß wird dem Inverter/Hausnetz zugeführt. </td></tr>
+           <tr><td>                   </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentlich Netz eingespeist                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>limit</b>      </td><td>Definiert eine eventuelle Wirkleistungsbeschränkung in % (optional).                                        </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>icon</b>       </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                             </td></tr>
+           <tr><td>                   </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                                   </td></tr>
+           <tr><td>                   </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt         </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch              </td></tr>
+           <tr><td>                   </td><td>Eventverarbeitung (asynchron). (optional)                                                                   </td></tr>
+           <tr><td>                   </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                              </td></tr>
+           <tr><td>                   </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                                </td></tr>
          </table>
        </ul>
        <br>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 strings=Garage icon=inverter@red:solar
+         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 asynchron=1 strings=Garage icon=inverter@red:solar
        </ul>
        <br>
 
@@ -24418,7 +24504,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-setupMeterDev"></a>
        <li><b>setupMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt;
                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;
-                            [conprice=&lt;Feld&gt;] [feedprice=&lt;Feld&gt;] </b> <br><br>
+                            [conprice=&lt;Feld&gt;] [feedprice=&lt;Feld&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Energiemessung in bzw. aus dem öffentlichen Netz fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings positiv ist.
@@ -24429,13 +24515,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
            <tr><td> <b>gcon</b>       </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert                                                         </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>contotal</b>   </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert (ein sich stetig erhöhender Zähler)                   </td></tr>
            <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), behandelt das Modul diese Situation entsprechend. </td></tr>
-           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
+           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.                                                                  </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert                                                      </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert (ein sich stetig erhöhender Zähler)                </td></tr>
            <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), behandelt das Modul diese Situation entsprechend. </td></tr>
-           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
+           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.                                                                  </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                        </td></tr>
            <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>conprice</b>   </td><td>Preis für den Bezug einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:            </td></tr>
@@ -24443,10 +24533,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das den Preis enthält : Währung                          </td></tr>
            <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches den Preis enthält : Währung         </td></tr>
            <tr><td>                   </td><td>                                                                                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>feedprice</b>  </td><td>Vergütung für die Einspeisung einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:  </td></tr>
            <tr><td>                   </td><td>&lt;Vergütung&gt;:&lt;Währung&gt; - Vergütung als numerischer Wert und dessen Währung                                      </td></tr>
            <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das die Vergütung enthält : Währung                      </td></tr>
            <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches die Vergütung enthält : Währung     </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch                             </td></tr>
+           <tr><td>                   </td><td>Eventverarbeitung (asynchron).                                                                                             </td></tr>
+           <tr><td>                   </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                                             </td></tr>
+           <tr><td>                   </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                                               </td></tr>
         </table>
        </ul>
        <br>
@@ -24764,6 +24860,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "HttpUtils": 0,
         "JSON": 4.020,
         "FHEM::SynoModules::SMUtils": 1.0270,
+        "FHEM::SynoModules::ErrCodes": 1.003009,
         "Time::HiRes": 0,
         "MIME::Base64": 0,
         "Math::Trig": 0,
