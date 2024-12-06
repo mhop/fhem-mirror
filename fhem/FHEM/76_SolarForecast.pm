@@ -6370,7 +6370,7 @@ sub Notify {
           }          
           
           if ($async) {
-              centralTask ($myHash, 1);                                                  # keine Events in SolarForecast außer 'state'
+              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
               return;
           }
       }
@@ -6390,7 +6390,7 @@ sub Notify {
           }
       
           if ($iasync) {
-              centralTask ($myHash, 1);                                                  # keine Events in SolarForecast außer 'state'
+              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
               return;
           }
       }
