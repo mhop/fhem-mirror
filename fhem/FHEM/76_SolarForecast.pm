@@ -157,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.39.1" => "07.12.2024  new control releaseCentralTask, new delHashRefDeep in some cases ".
+                           "possible asynchron mode for setupBatteryDev ",
   "1.39.0" => "04.12.2024  possible asynchron mode for setupMeterDev, setupInverterDevXX ".
                            "include FHEM::SynoModules::ErrCodes ",
   "1.38.0" => "30.11.2024  optimize data handling, rename getter solApiData to radiationApiData, ".
@@ -2121,7 +2123,10 @@ sub _setreset {                          ## no critic "not used"
           $dday = sprintf "%02d", $dday;
           if ($dhour) {
               $dhour = sprintf "%02d", $dhour;
+              
+              delHashRefDeep ($data{$type}{$name}{pvhist}{$dday}{$dhour});
               delete $data{$type}{$name}{pvhist}{$dday}{$dhour};
+              
               Log3 ($name, 3, qq{$name - Day "$dday" hour "$dhour" deleted from pvHistory});
 
               $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
@@ -2135,11 +2140,13 @@ sub _setreset {                          ## no critic "not used"
               delete $paref->{histname};
           }
           else {
+              delHashRefDeep ($data{$type}{$name}{pvhist}{$dday});
               delete $data{$type}{$name}{pvhist}{$dday};
               Log3 ($name, 3, qq{$name - Day "$dday" deleted from pvHistory});
           }
       }
       else {
+          delHashRefDeep ($data{$type}{$name}{pvhist});
           delete $data{$type}{$name}{pvhist};
           Log3 ($name, 3, qq{$name - all days deleted from pvHistory});
       }
@@ -5672,8 +5679,8 @@ sub _attrconsumer {                      ## no critic "not used"
 
   $data{$type}{$name}{current}{consumerCollected} = 0;                                             # Consumer neu sammeln
 
-  InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
-  InternalTimer (gettimeofday()+2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
+  InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
 
 return;
 }
@@ -5918,9 +5925,9 @@ sub _attrProducerDev {                   ## no critic "not used"
       }
   }
 
-  InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -5997,9 +6004,9 @@ sub _attrInverterDev {                   ## no critic "not used"
       }
   }
 
-  InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -6175,6 +6182,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
       delete $data{$type}{$name}{current}{batinstcap};
+      delete $data{$type}{$name}{current}{batasynchron};
   }
 
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
@@ -6355,7 +6363,7 @@ sub Notify {
 
   my $debug = getDebug ($myHash);                                                         # Debug Mode
   
-  my ($err, $medev, $h, $async);
+  my ($err, $medev, $badev, $h, $async);
     
   ## Meter Event?
   #################
@@ -6370,6 +6378,41 @@ sub Notify {
           }          
           
           if ($async) {
+              if (CurrentVal ($myHash, 'ctrunning', 0)) {
+                  if ($debug =~ /notifyHandling/x) {
+                      Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - central task was called from NOTIFY when it is already running ... end this call});
+                  }
+                  
+                  return;
+              }
+              
+              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
+              return;
+          }
+      }
+  }
+  
+  ## Battery Event?
+  ###################
+  ($err, $badev, $h) = isDeviceValid ( { name => $myName, obj => 'setupBatteryDev', method => 'attr' } );
+  
+  if (!$err) {
+      if ($devName eq $badev) {
+          $async = $h->{asynchron} // 0;
+          
+          if ($debug =~ /notifyHandling/x) {
+              Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of Battery device >$devName< received - asynchronous mode: $async});
+          }          
+          
+          if ($async) {
+              if (CurrentVal ($myHash, 'ctrunning', 0)) {
+                  if ($debug =~ /notifyHandling/x) {
+                      Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - central task was called from NOTIFY when it is already running ... end this call});
+                  }
+                  
+                  return;
+              }
+              
               centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
               return;
           }
@@ -6390,6 +6433,14 @@ sub Notify {
           }
       
           if ($iasync) {
+              if (CurrentVal ($myHash, 'ctrunning', 0)) {
+                  if ($debug =~ /notifyHandling/x) {
+                      Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - central task was called from NOTIFY when it is already running ... end this call});
+                  }
+                  
+                  return;
+              }
+              
               centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
               return;
           }
@@ -7014,6 +7065,7 @@ sub runTask {
               Log3 ($name, 1, "$name DEBUG> INFO - runTask starts data collection at the end of an hour");
           }
 
+          releaseCentralTask ($hash);
           centralTask ($hash, 1);
       }
   }
@@ -7028,7 +7080,8 @@ sub runTask {
           if ($debug =~ /collectData/x) {
               Log3 ($name, 1, "$name DEBUG> INFO - runTask starts data collection at the beginning of an hour");
           }
-
+          
+          releaseCentralTask ($hash);
           centralTask ($hash, 1);
       }
   }
@@ -7188,16 +7241,11 @@ sub centralTask {
       $data{$type}{$name}{statusapi}{'?VRM'}{'?API'}{credentials} = $vrmcr;
       delete $data{$type}{$name}{solcastapi}{'?VRM'};
   }
+  
   ##########################################################################################################################
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);                                                           # disabled / inactive
-
-  if (CurrentVal ($hash, 'ctrunning', 0)) {
-      Log3 ($name, 3, "$name - INFO - central task was called when it was already running ... end this call");
-      $data{$type}{$name}{current}{ctrunning} = 0;
-      return;
-  }
 
   if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
       my $ret = createStringConfig ($hash);
@@ -7211,6 +7259,11 @@ sub centralTask {
           return;
       }
   }
+  
+  if (CurrentVal ($hash, 'ctrunning', 0)) {
+      Log3 ($name, 3, "$name - INFO - central task was called when it was already running ... end this call");      
+      return;
+  }
 
   my $t       = time;                                                                          # aktuelle Unix-Zeit
   my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
@@ -7221,6 +7274,8 @@ sub centralTask {
   my $debug   = getDebug ($hash);                                                              # Debug Module
 
   $data{$type}{$name}{current}{ctrunning} = 1;                                                 # Central Task running Statusbit
+
+  InternalTimer (gettimeofday() + 1.2, "FHEM::SolarForecast::releaseCentralTask", $hash, 0);   # Freigabe centralTask 
 
   my $centpars = {
       name    => $name,
@@ -7282,14 +7337,12 @@ sub centralTask {
 
   if ($evt) {
       $centpars->{evt} = $evt;
-      InternalTimer(gettimeofday()+1, "FHEM::SolarForecast::singleUpdateState", {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}}, 0);
+      InternalTimer (gettimeofday() + 1, "FHEM::SolarForecast::singleUpdateState", {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}}, 0);
   }
   else {
       $centpars->{evt} = 1;
       singleUpdateState ( {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}} );
   }
-
-  $data{$type}{$name}{current}{ctrunning} = 0;
 
 return;
 }
@@ -7580,7 +7633,7 @@ sub _collectAllRegConsumers {
           my ($err) = isDeviceValid ( { name => $name, obj => $dswitch, method => 'string' } );
           next if($err);
 
-          push @{$data{$type}{$name}{current}{consumerdevs}}, $dswitch;                           # Switchdevice zusätzlich in CurrentHash eintragen
+          push @{$data{$type}{$name}{current}{consumerdevs}}, $dswitch if($dswitch ne $consumer); # Switchdevice zusätzlich in CurrentHash eintragen
       }
       else {
           $dswitch = $consumer;
@@ -7810,6 +7863,7 @@ sub _specialActivities {
           $data{$type}{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
           delete $data{$type}{$name}{circular}{99}{tdayDvtn};
 
+          delHashRefDeep ($data{$type}{$name}{pvhist}{$day});
           delete $data{$type}{$name}{pvhist}{$day};                                              # den (alten) aktuellen Tag aus History löschen
 
           writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration sichern
@@ -7971,7 +8025,10 @@ sub __delObsoleteAPIData {
   ## Wetter-API Daten löschen
   #############################
   if (keys %{$data{$type}{$name}{weatherapi}}) {
-      delete $data{$type}{$name}{weatherapi}{OpenMeteo}    if($wapi ne 'OpenMeteo');       
+      if ($wapi ne 'OpenMeteo') {
+          delHashRefDeep ($data{$type}{$name}{weatherapi}{OpenMeteo});
+          delete $data{$type}{$name}{weatherapi}{OpenMeteo}; 
+      }      
   }
   
   ## Status-API Daten löschen
@@ -7998,9 +8055,13 @@ sub __delObsoleteAPIData {
           }
       }
 
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ##########################################################################################################################    
+      # 01.12.2024
       for my $idx (keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                      # Wetterindexe löschen (kann später raus)
           delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);
       }
+  #####################################################################################################################
   }
 
   ## veraltete Strings aus Strings-Hash löschen
@@ -9354,9 +9415,10 @@ sub _transferBatteryValues {
   storeReading ('Current_PowerBatOut', (int $pbo).' W');
   storeReading ('Current_BatCharge',   $soc.' %');
 
-  $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
-  $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
-  $data{$type}{$name}{current}{batcharge}   = $soc;                                           # aktuelle Batterieladung
+  $data{$type}{$name}{current}{powerbatin}   = int $pbi;                                      # Hilfshash Wert aktuelle Batterieladung
+  $data{$type}{$name}{current}{powerbatout}  = int $pbo;                                      # Hilfshash Wert aktuelle Batterieentladung
+  $data{$type}{$name}{current}{batcharge}    = $soc;                                          # aktuelle Batterieladung
+  $data{$type}{$name}{current}{batasynchron} = $h->{asynchron} if($h->{asynchron});           # asynchroner Modus = X 
 
   push @{$data{$type}{$name}{current}{socslidereg}}, $soc;                                    # Schieberegister Batterie SOC
   limitArray ($data{$type}{$name}{current}{socslidereg}, $slidenumdef);
@@ -17823,6 +17885,43 @@ return;
 }
 
 ################################################################
+#         Zentralschleife freigeben
+################################################################
+sub releaseCentralTask {
+  my $hash = shift;
+
+  RemoveInternalTimer ($hash, 'FHEM::SolarForecast::releaseCentralTask');
+  
+  $data{$hash->{TYPE}}{$hash->{NAME}}{current}{ctrunning} = 0;
+
+return;
+}
+
+################################################################
+#          Hash Referenz rekursiv löschen
+#
+# Stellt sicher, dass alle verschachtelten Strukturen explizit 
+# gelöscht werden. Dies ist besonders nützlich um 
+# sicherzustellen, dass keine zirkulären Referenzen bestehen, 
+# die die Speicherfreigabe verhindern könnten.
+################################################################
+sub delHashRefDeep {
+  my $href = shift;
+
+  for my $key (keys %{$href}) { 
+      if (ref $href->{$key} eq 'HASH') { 
+          delHashRefDeep ($href->{$key}); 
+      } 
+      
+      delete $href->{$key}; 
+  }
+
+  $href = undef;          # Optional: Garbage Collection erzwingen 
+
+return;
+}
+
+################################################################
 #  erstellt einen Debug-Eintrag im Log
 ################################################################
 sub debugLog {
@@ -17874,28 +17973,29 @@ sub createAssociatedWith {
 
       my $fcdev1 = AttrVal ($name, 'setupWeatherDev1', '');                  # Weather forecast Device 1
       ($afc,$h)  = parseParams ($fcdev1);
-      $fcdev1    = $afc->[0] // "";
+      $fcdev1    = $afc->[0] // '';
 
       my $fcdev2 = AttrVal ($name, 'setupWeatherDev2', '');                  # Weather forecast Device 2
       ($afc,$h)  = parseParams ($fcdev2);
-      $fcdev2    = $afc->[0] // "";
+      $fcdev2    = $afc->[0] // '';
 
       my $fcdev3 = AttrVal ($name, 'setupWeatherDev3', '');                  # Weather forecast Device 3
       ($afc,$h)  = parseParams ($fcdev3);
-      $fcdev3    = $afc->[0] // "";
+      $fcdev3    = $afc->[0] // '';
 
       my $radev = AttrVal ($name, 'setupRadiationAPI', '');                  # Radiation forecast Device
       ($ara,$h) = parseParams ($radev);
-      $radev    = $ara->[0] // "";
+      $radev    = $ara->[0] // '';
 
       my $medev = AttrVal ($name, 'setupMeterDev', '');                      # Meter Device
       ($ame,$h) = parseParams ($medev);
-      $medev    = $ame->[0] // "";
+      $medev    = $ame->[0] // '';
       push @cd, $medev;
 
       my $badev = AttrVal ($name, 'setupBatteryDev', '');                    # Battery Device
       ($aba,$h) = parseParams ($badev);
-      $badev    = $aba->[0] // "";
+      $badev    = $aba->[0] // '';
+      push @cd, $badev;
 
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {     # Consumer Devices
           my $consumer = AttrVal ($name, "consumer${c}", "");
@@ -21960,7 +22060,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-setupBatteryDev"></a>
        <li><b>setupBatteryDev &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
                               [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
-                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;]  </b> <br><br>
+                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data.
        The module assumes that the numerical value of the readings is always positive.
@@ -21979,6 +22079,11 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)  </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                    </td></tr>
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                 </td></tr>
+           <tr><td>                  </td><td>                                                                                                  </td></tr>
+           <tr><td> <b>asynchron</b> </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by       </td></tr>
+           <tr><td>                  </td><td>event processing (asynchronous).                                                                  </td></tr>
+           <tr><td>                  </td><td><b>0</b> - no data collection after receiving an event from the device (default)                  </td></tr>
+           <tr><td>                  </td><td><b>1</b> - trigger a data collection when an event is received from the device                    </td></tr>
          </table>
        </ul>
        <br>
@@ -22122,7 +22227,6 @@ to ensure that the system configuration is correct.
            <tr><td>                   </td><td>event processing (asynchronous).                                                                                          </td></tr>
            <tr><td>                   </td><td><b>0</b> - no data collection after receiving an event from the device (default)                                          </td></tr>
            <tr><td>                   </td><td><b>1</b> - trigger a data collection when an event is received from the device                                            </td></tr>
-
          </table>
        </ul>
        <br>
@@ -24379,7 +24483,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-setupBatteryDev"></a>
        <li><b>setupBatteryDev &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;
                               [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
-                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;]  </b> <br><br>
+                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
@@ -24398,6 +24502,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
            <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
+           <tr><td> <b>asynchron</b> </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch           </td></tr>
+           <tr><td>                  </td><td>Eventverarbeitung (asynchron).                                                                           </td></tr>
+           <tr><td>                  </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                           </td></tr>
+           <tr><td>                  </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                             </td></tr>
          </table>
        </ul>
        <br>

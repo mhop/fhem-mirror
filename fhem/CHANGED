@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 76_SolarForecast: possible asynchron mode Battery Dev, code change
  - feature: 76_SMAInverter.pm: add installer login, code optimized
  - feature: 76_SolarForecast: possible asynchron mode for Meter & Inverter
  - change:  93_DbLog: insertmode 0 - improved output of errors in Logfile
