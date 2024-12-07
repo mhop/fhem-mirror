@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.28.0  07.12.2024  add function delHashRefDeep
 # 1.27.4  05.12.2024  expand evaljson for SolarForecast
 # 1.27.3  26.10.2024  compatibility to SSCam V 9.12.0
 # 1.27.2  16.03.2024  change checkModVer text output
@@ -61,13 +62,14 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.27.4');
+use version 0.77; our $VERSION = version->declare('1.28.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
                      getClHash
                      delClHash
                      delReadings
+                     delHashRefDeep
                      createReadingsFromArray
                      checkModVer
                      addCHANGED
@@ -292,6 +294,30 @@ sub slurpFile {
   }
 
 return ($errorcode, $content);
+}
+
+###############################################################################
+#                     Hash Referenz rekursiv löschen
+#
+#     Stellt sicher, dass alle verschachtelten Strukturen explizit 
+#     gelöscht werden. Dies ist besonders nützlich um 
+#     sicherzustellen, dass keine zirkulären Referenzen bestehen, 
+#     die die Speicherfreigabe verhindern könnten.
+###############################################################################
+sub delHashRefDeep {
+  my $href = shift // carp $carpnohash && return;
+
+  for my $key (keys %{$href}) { 
+      if (ref $href->{$key} eq 'HASH') { 
+          delHashRefDeep ($href->{$key}); 
+      } 
+      
+      delete $href->{$key}; 
+  }
+
+  $href = undef;          # Optional: Garbage Collection erzwingen 
+
+return;
 }
 
 ###############################################################################
