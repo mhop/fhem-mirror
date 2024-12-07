@@ -13,6 +13,7 @@
 #  - Waldmensch for various improvements
 #  - sbfspot (https://sbfspot.codeplex.com/)
 #  - rewritten by Thomas Schoedl (sct14675) with inputs from Volker, waldmensch and DS_Starter
+#  - adopted by MadMax 02.06.2021
 #
 #  Description:
 #  This is an FHEM-Module for SMA Inverters.
@@ -32,6 +33,14 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.28.3" => "01.12.2024  code optimized, remove given",
+  "2.28.2" => "16.11.2024  code optimized, remove switch",
+  "2.28.1" => "15.11.2024  code optimized",
+  "2.28.0" => "10.11.2024  code optimized",
+  "2.27.3" => "09.11.2024  fix read Insulation range",
+  "2.27.2" => "08.11.2024  select Login user/installer",
+  "2.27.1" => "08.11.2024  fix read Insulation",
+  "2.27.0" => "02.11.2024  read Insulation",
   "2.26.0" => "18.08.2024  fix PW Lengs Bug (12 Char)",
   "2.25.3" => "17.08.2024  fix IDC2 bug 3MPP",
   "2.25.2" => "16.08.2024  fix IDC3 bug",
@@ -368,6 +377,7 @@ sub SMAInverter_Initialize($) {
                       "detail-level:0,1,2 " .
 					  "readEnergyMeter-data:0,1 " .
                       "disable:1,0 " .
+					  "installerLogin:1,0 " .
                       "mode:manual,automatic ".
                       "offset ".
                       "suppressSleep:1,0 ".
@@ -403,7 +413,7 @@ sub SMAInverter_Define($$) {
  my $password = SMAInverter_SMAencrypt($Pass);
  $Pass = SMAInverter_SMAdecrypt( $password );
  
- return "passwort longer then 18 char" if(length $Pass > 12); #check 1-12 Chars
+ return "passwort longer then 12 char" if(length $Pass > 12); #check 1-12 Chars
  
  my $name                       = $hash->{NAME};
  $hash->{LASTUPDATE}            = 0;
@@ -734,8 +744,8 @@ sub SMAInverter_getstatusDoParse($) {
      $sup_SpotBatteryUnload,
      $sup_DeviceStatus,
 	 $sup_BatStatus,
-	 $sup_Insulation_1,
-	 $sup_Insulation_2,
+	 $sup_Insulation,
+	 $sup_lower_discharge_limit,
 	 $sup_EM_1,
 	 $sup_EM_2,
 	 $sup_EM_3,
@@ -766,6 +776,7 @@ sub SMAInverter_getstatusDoParse($) {
      $inv_BAT_TEMP, $inv_BAT_TEMP_A, $inv_BAT_TEMP_B, $inv_BAT_TEMP_C,
      $inv_BAT_LOADTODAY, $inv_BAT_LOADTOTAL, $inv_BAT_CAPACITY,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,
 	 $inv_BAT_Manufacturer,
+	 $inv_BAT_lower_discharge_limit,
      $inv_SPOT_FREQ, $inv_SPOT_OPERTM, $inv_SPOT_FEEDTM, $inv_TEMP, $inv_GRIDRELAY, $inv_STATUS,
 	 $inv_BACKUPRELAY, $inv_OperatingStatus, $inv_GeneralOperatingStatus, $inv_WaitingTimeUntilFeedIn, $inv_GridConection, 
 	 $Meter_Grid_FeedIn, $Meter_Grid_Consumation,$Meter_Total_Yield,$Meter_Total_Consumation,
@@ -777,13 +788,14 @@ sub SMAInverter_getstatusDoParse($) {
  my @array;
  my $avg = 0;
  my ($ist,$bst,$irt,$brt,$rt);
- my $INVCLASS = InternalVal($name, "INVCLASS", 0);
- my $INVTYPE  = InternalVal($name, "INVTYPE", 0);
- my $INVTYPE_NAME = ReadingsVal($name,"INV_TYPE",ReadingsVal($name,"device_type",""));
- my $firtRunDay = $hash->{HELPER}{firtRunDay};
- my $readParameter = 0;
- my $INVFWMAIN = InternalVal($name, "INVFWMAIN", 0);
- 
+ my $INVCLASS 					= InternalVal($name, "INVCLASS", 0);
+ my $INVTYPE  					= InternalVal($name, "INVTYPE", 0);
+ my $INVTYPE_NAME 				= ReadingsVal($name,"INV_TYPE",ReadingsVal($name,"device_type",""));
+ my $firtRunDay 				= $hash->{HELPER}{firtRunDay};
+ my $readParameter 				= 0;
+ my $INVFWMAIN 					= InternalVal($name, "INVFWMAIN", 0);
+ my $installer 					= AttrVal($name, "installerLogin", "0");
+  
  Log3 ($name, 4, "$name -> INVCLASS $INVCLASS");
  Log3 ($name, 4, "$name -> INVTYPE $INVTYPE");	
  
@@ -980,8 +992,9 @@ sub SMAInverter_getstatusDoParse($) {
 			#push(@commands, "sup_BatteryInfo_5");    
 		  }
 		  
-		  #push(@commands, "sup_Insulation_1");  # Isolationsüberwachung
-		  #push(@commands, "sup_Insulation_2");  # Isolationsüberwachung
+		  push(@commands, "sup_lower_discharge_limit"); #if($readParameter == 1 && $INVCLASS eq "8009");
+		  
+		  push(@commands, "sup_Insulation") if($installer == 1);  # Isolationsüberwachung
 		  	
 		  push(@commands, "sup_GeneralOperatingStatus");			
 		  push(@commands, "sup_OperatingStatus") if($INVCLASS eq "8009" || $INVTYPE_NAME =~ /SI/xs); 
@@ -1172,18 +1185,19 @@ sub SMAInverter_getstatusDoParse($) {
 			     Log3 ($name, 4, "$name -> EM 4");
                  ($sup_EM_4,$Meter_Grid_FeedIn_PAC1, $Meter_Grid_FeedIn_PAC2, $Meter_Grid_FeedIn_PAC3, $Meter_Grid_Consumation_PAC1, $Meter_Grid_Consumation_PAC2, $Meter_Grid_Consumation_PAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x0046E800, 0x0046EDFF);
              }
-			 elsif ($i eq "sup_Insulation_1") {
-			     Log3 ($name, 4, "$name -> sup_Insulation_1");
-                 ($sup_Insulation_1,$inv_DC_Residual_Current,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51020200, 0x40254E00, 0x40254FFF);
-             }
-			 elsif ($i eq "sup_Insulation_2") {
-			     Log3 ($name, 4, "$name -> sup_Insulation_2");
-                 ($sup_Insulation_2,$inv_DC_insulation,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51020200, 0x00254F00, 0x00254FFF);
+			 elsif ($i eq "sup_Insulation") {
+			     Log3 ($name, 4, "$name -> sup_Insulation");
+                 ($sup_Insulation,$inv_DC_Residual_Current,$inv_DC_insulation,,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51020200, 0x40254E00, 0x40254FFF);
              }
 			 elsif ($i eq "sup_Firmware") {
 			     Log3 ($name, 4, "$name -> sup_Firmware");
                  ($sup_Firmware,$inv_Firmware,$INVFWMAIN,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x58000200, 0x00823400, 0x008234FF);
              }
+			 elsif ($i eq "sup_lower_discharge_limit") {
+			     Log3 ($name, 4, "$name -> sup_lower_discharge_limit");
+                 ($sup_lower_discharge_limit,$inv_BAT_lower_discharge_limit,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x58000000, 0x40895B00, 0x40895BFF);
+             }
+		     else {Log3 ($name, 4, "$name -> sup no case");}
          }
 		 
 		 $INVCLASS = $inv_CLASS if(defined $inv_CLASS);
@@ -1262,449 +1276,229 @@ sub SMAInverter_getstatusDoParse($) {
              use warnings;
          }
 		 
-         if ($sc) {			 # SBFSpot Kompatibilitätsmodus
+		 # SBFSpot Kompatibilitätsmodus 
 		 	 
 			 if($sup_EM_1) {
-		         push(@row_array, "Meter_TOTAL_FeedIn ".($Meter_Total_Yield/1000)."\n")  if ($Meter_Total_Yield ne "-");
-                 push(@row_array, "Meter_TOTAL_Consumation ".($Meter_Total_Consumation/1000)."\n") if ($Meter_Total_Consumation ne "-");
+		         push(@row_array, ($sc?"Meter_TOTAL_FeedIn ".($Meter_Total_Yield/1000):"Meter_TOTAL_FeedIn ".($Meter_Total_Yield))."\n") if ($Meter_Total_Yield ne "-");
+                 push(@row_array, ($sc?"Meter_TOTAL_Consumation ".($Meter_Total_Consumation/1000):"Meter_TOTAL_Consumation ".$Meter_Total_Consumation)."\n") if ($Meter_Total_Consumation ne "-");
 		     }
 			 
 			 if($sup_EM_2) {
-		         push(@row_array, "Meter_TOTAL_Grid_FeedIn ".($Meter_Grid_FeedIn/1000)."\n")  if ($Meter_Grid_FeedIn ne "-");
-                 push(@row_array, "Meter_TOTAL_Grid_Consumation ".($Meter_Grid_Consumation/1000)."\n") if ($Meter_Grid_Consumation ne "-");
+		         push(@row_array, ($sc?"Meter_TOTAL_Grid_FeedIn ".($Meter_Grid_FeedIn/1000):"Meter_TOTAL_Grid_FeedIn ".$Meter_Grid_FeedIn)."\n") if ($Meter_Grid_FeedIn ne "-");
+                 push(@row_array, ($sc?"Meter_TOTAL_Grid_Consumation ".($Meter_Grid_Consumation/1000):"Meter_TOTAL_Grid_Consumation ".$Meter_Grid_Consumation)."\n") if ($Meter_Grid_Consumation ne "-");
 		     }
 			 
 			 if($sup_EM_3) {
-		         push(@row_array, "Meter_Power_Grid_FeedIn ".($Meter_Power_Grid_FeedIn/1000)."\n")  if ($Meter_Power_Grid_FeedIn ne "-");
-                 push(@row_array, "Meter_Power_Grid_Consumation ".($Meter_Power_Grid_Consumation/1000)."\n") if ($Meter_Power_Grid_Consumation ne "-");
+		         push(@row_array, ($sc?"Meter_Power_Grid_FeedIn ".($Meter_Power_Grid_FeedIn/1000):"Meter_Power_Grid_FeedIn ".$Meter_Power_Grid_FeedIn)."\n") if ($Meter_Power_Grid_FeedIn ne "-");
+                 push(@row_array, ($sc?"Meter_Power_Grid_Consumation ".($Meter_Power_Grid_Consumation/1000):"Meter_Power_Grid_Consumation ".$Meter_Power_Grid_Consumation)."\n") if ($Meter_Power_Grid_Consumation ne "-");
 		     }
 			 
 			 if($sup_EM_4) {
-		         push(@row_array, "Meter_Grid_FeedIn_phase_1_pac ".($Meter_Grid_FeedIn_PAC1/1000)."\n") if ($Meter_Grid_FeedIn_PAC1 ne "-");
-                 push(@row_array, "Meter_Grid_FeedIn_phase_2_pac ".($Meter_Grid_FeedIn_PAC2/1000)."\n") if ($Meter_Grid_FeedIn_PAC2 ne "-");
-				 push(@row_array, "Meter_Grid_FeedIn_phase_3_pac ".($Meter_Grid_FeedIn_PAC3/1000)."\n") if ($Meter_Grid_FeedIn_PAC3 ne "-");
+		         push(@row_array, ($sc?"Meter_Grid_FeedIn_phase_1_pac ".($Meter_Grid_FeedIn_PAC1/1000):"Meter_Grid_FeedIn_PAC1 ".($Meter_Grid_FeedIn_PAC1))."\n") if ($Meter_Grid_FeedIn_PAC1 ne "-");
+                 push(@row_array, ($sc?"Meter_Grid_FeedIn_phase_2_pac ".($Meter_Grid_FeedIn_PAC2/1000):"Meter_Grid_FeedIn_PAC2 ".($Meter_Grid_FeedIn_PAC2))."\n") if ($Meter_Grid_FeedIn_PAC2 ne "-");
+				 push(@row_array, ($sc?"Meter_Grid_FeedIn_phase_3_pac ".($Meter_Grid_FeedIn_PAC3/1000):"Meter_Grid_FeedIn_PAC3 ".($Meter_Grid_FeedIn_PAC3))."\n") if ($Meter_Grid_FeedIn_PAC3 ne "-");
 				 
-				 push(@row_array, "Meter_Grid_Consumation_phase_1_pac ".($Meter_Grid_Consumation_PAC1/1000)."\n") if ($Meter_Grid_Consumation_PAC1 ne "-");
-                 push(@row_array, "Meter_Grid_Consumation_phase_2_pac ".($Meter_Grid_Consumation_PAC2/1000)."\n") if ($Meter_Grid_Consumation_PAC2 ne "-");
-				 push(@row_array, "Meter_Grid_Consumation_phase_3_pac ".($Meter_Grid_Consumation_PAC3/1000)."\n") if ($Meter_Grid_Consumation_PAC3 ne "-");
+				 push(@row_array, ($sc?"Meter_Grid_Consumation_phase_1_pac ".($Meter_Grid_Consumation_PAC1/1000):"Meter_Grid_Consumation_PAC1 ".($Meter_Grid_Consumation_PAC1))."\n") if ($Meter_Grid_Consumation_PAC1 ne "-");
+                 push(@row_array, ($sc?"Meter_Grid_Consumation_phase_2_pac ".($Meter_Grid_Consumation_PAC2/1000):"Meter_Grid_Consumation_PAC2 ".($Meter_Grid_Consumation_PAC2))."\n") if ($Meter_Grid_Consumation_PAC2 ne "-");
+				 push(@row_array, ($sc?"Meter_Grid_Consumation_phase_3_pac ".($Meter_Grid_Consumation_PAC3/1000):"Meter_Grid_Consumation_PAC3 ".($Meter_Grid_Consumation_PAC3))."\n") if ($Meter_Grid_Consumation_PAC3 ne "-");
 		     }
 		 
              if($sup_EnergyProduction) {
-                 push(@row_array, "etotal ".($inv_SPOT_ETOTAL/1000)."\n")  if ($inv_SPOT_ETOTAL ne "-");
-                 push(@row_array, "etoday ".($inv_SPOT_ETODAY/1000)."\n") if ($inv_SPOT_ETODAY ne "-");
+                 push(@row_array, ($sc?"etotal ".($inv_SPOT_ETOTAL/1000):"SPOT_ETOTAL ".$inv_SPOT_ETOTAL)."\n")  if ($inv_SPOT_ETOTAL ne "-");
+                 push(@row_array, ($sc?"etoday ".($inv_SPOT_ETODAY/1000):"SPOT_ETODAY ".$inv_SPOT_ETODAY)."\n") if ($inv_SPOT_ETODAY ne "-");
              }
 			 if($sup_PVEnergyProduction) {
-                 push(@row_array, "epvtotal ".($inv_SPOT_EPVTOTAL/1000)."\n")  if ($inv_SPOT_EPVTOTAL ne "-");
-                 push(@row_array, "epvtoday ".($inv_SPOT_EPVTODAY/1000)."\n") if ($inv_SPOT_EPVTODAY ne "-");
+                 push(@row_array, ($sc?"epvtotal ".($inv_SPOT_EPVTOTAL/1000):"SPOT_EPVTOTAL ".$inv_SPOT_EPVTOTAL)."\n")  if ($inv_SPOT_EPVTOTAL ne "-");
+                 push(@row_array, ($sc?"epvtoday ".($inv_SPOT_EPVTODAY/1000):"SPOT_EPVTODAY ".$inv_SPOT_EPVTODAY)."\n") if ($inv_SPOT_EPVTODAY ne "-");
              }
              if($sup_SpotDCPower) {
-                 push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n") if ($inv_SPOT_PDC1 ne "-");
-                 push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n") if ($inv_SPOT_PDC2 ne "-");	
-				 push(@row_array, "string_3_pdc ".sprintf("%.3f",$inv_SPOT_PDC3/1000)."\n") if ($inv_SPOT_PDC3 ne "-");				 
+                 push(@row_array, ($sc?"string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000):"SPOT_PDC1 ".$inv_SPOT_PDC1)."\n") if ($inv_SPOT_PDC1 ne "-");
+                 push(@row_array, ($sc?"string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000):"SPOT_PDC2 ".$inv_SPOT_PDC2)."\n") if ($inv_SPOT_PDC2 ne "-");	
+				 push(@row_array, ($sc?"string_3_pdc ".sprintf("%.3f",$inv_SPOT_PDC3/1000):"SPOT_PDC3 ".$inv_SPOT_PDC3)."\n") if ($inv_SPOT_PDC3 ne "-");				 
              }
 			 if($sup_SpotDCPower_3) {
-				 push(@row_array, "strings_pdc ".sprintf("%.3f",$inv_SPOT_PDC/1000)."\n");
-				 push(@row_array, "state ".sprintf("%.3f",$inv_SPOT_PDC/1000)."\n")  if ($INVCLASS eq "8009");
+				 push(@row_array, ($sc?"strings_pdc ".sprintf("%.3f",$inv_SPOT_PDC/1000):"SPOT_PDC ".$inv_SPOT_PDC)."\n");
+				 push(@row_array, ($sc?"state ".sprintf("%.3f",$inv_SPOT_PDC/1000):"state ".$inv_SPOT_PDC)."\n")  if ($INVCLASS eq "8009");
              }
              if($sup_SpotACPower) {
-                 push(@row_array, "phase_1_pac ".sprintf("%.3f",$inv_SPOT_PAC1/1000)."\n") if ($inv_SPOT_PAC1 ne "-");
-                 push(@row_array, "phase_2_pac ".sprintf("%.3f",$inv_SPOT_PAC2/1000)."\n") if ($inv_SPOT_PAC2 ne "-");
-                 push(@row_array, "phase_3_pac ".sprintf("%.3f",$inv_SPOT_PAC3/1000)."\n") if ($inv_SPOT_PAC3 ne "-");
+                 push(@row_array, ($sc?"phase_1_pac ".sprintf("%.3f",$inv_SPOT_PAC1/1000):"SPOT_PAC1 ".$inv_SPOT_PAC1)."\n") if ($inv_SPOT_PAC1 ne "-");
+                 push(@row_array, ($sc?"phase_2_pac ".sprintf("%.3f",$inv_SPOT_PAC2/1000):"SPOT_PAC2 ".$inv_SPOT_PAC2)."\n") if ($inv_SPOT_PAC2 ne "-");
+                 push(@row_array, ($sc?"phase_3_pac ".sprintf("%.3f",$inv_SPOT_PAC3/1000):"SPOT_PAC3 ".$inv_SPOT_PAC3)."\n") if ($inv_SPOT_PAC3 ne "-");
              }
              if($sup_SpotACTotalPower) {
-                 push(@row_array, "total_pac ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");
-                 push(@row_array, "state ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n") if ($INVCLASS ne "8009");
+                 push(@row_array, ($sc?"total_pac ".sprintf("%.3f",$inv_SPOT_PACTOT/1000):"SPOT_PACTOT ".$inv_SPOT_PACTOT)."\n");
+                 push(@row_array, ($sc?"state ".sprintf("%.3f",$inv_SPOT_PACTOT/1000):"state ".$inv_SPOT_PACTOT)."\n") if ($INVCLASS ne "8009");
              }
              if($sup_ChargeStatus) {
-                 push(@row_array, "chargestatus ".$inv_ChargeStatus."\n"); #TTT
+                 push(@row_array, ($sc?"chargestatus ".$inv_ChargeStatus:"ChargeStatus ".$inv_ChargeStatus)."\n"); #TTT
              }
 
              if($inv_CLASS && $inv_CLASS eq 8007 && defined($inv_SPOT_PACTOT)) {                         # V2.10.1 28.04.2019
                  if($inv_SPOT_PACTOT < 0) {
-                     push(@row_array, "power_out "."0"."\n");
-                     push(@row_array, "power_in ".(-1 * $inv_SPOT_PACTOT)."\n");
+                     push(@row_array, ($sc?"power_out "."0":"POWER_OUT "."0")."\n");
+                     push(@row_array, ($sc?"power_in ".(-1 * $inv_SPOT_PACTOT):"POWER_IN ".(-1 * $inv_SPOT_PACTOT))."\n");
                  } 
                  else {
-                     push(@row_array, "power_out ".$inv_SPOT_PACTOT."\n");
-                     push(@row_array, "power_in "."0"."\n");
+                     push(@row_array, ($sc?"power_out ".$inv_SPOT_PACTOT:"POWER_OUT ".$inv_SPOT_PACTOT)."\n");
+                     push(@row_array, ($sc?"power_in "."0":"POWER_IN "."0")."\n");
                  }
              }
 			 
 			 if($sup_SpotBatteryLoad) {
-				 push(@row_array, "bat_loadtotal ".($inv_BAT_LOADTOTAL/1000)."\n") if ($inv_BAT_LOADTOTAL ne "-");
-				 push(@row_array, "bat_loadtoday ".($inv_BAT_LOADTODAY/1000)."\n") if ($inv_BAT_LOADTODAY ne "-");
+				 push(@row_array, ($sc?"bat_loadtotal ".($inv_BAT_LOADTOTAL/1000):"BAT_LOADTOTAL ".$inv_BAT_LOADTOTAL)."\n") if ($inv_BAT_LOADTOTAL ne "-");
+				 push(@row_array, ($sc?"bat_loadtoday ".($inv_BAT_LOADTODAY/1000):"BAT_LOADTODAY ".$inv_BAT_LOADTODAY)."\n") if ($inv_BAT_LOADTODAY ne "-");
 			 }
 			 if($sup_SpotBatteryUnload) {
-				 push(@row_array, "bat_unloadtotal ".($inv_BAT_UNLOADTOTAL/1000)."\n") if ($inv_BAT_UNLOADTOTAL ne "-");
-				 push(@row_array, "bat_unloadtoday ".($inv_BAT_UNLOADTODAY/1000)."\n") if ($inv_BAT_UNLOADTODAY ne "-");
+				 push(@row_array, ($sc?"bat_unloadtotal ".($inv_BAT_UNLOADTOTAL/1000):"BAT_UNLOADTOTAL ".$inv_BAT_UNLOADTOTAL)."\n") if ($inv_BAT_UNLOADTOTAL ne "-");
+				 push(@row_array, ($sc?"bat_unloadtoday ".($inv_BAT_UNLOADTODAY/1000):"BAT_UNLOADTODAY ".$inv_BAT_UNLOADTODAY)."\n") if ($inv_BAT_UNLOADTODAY ne "-");
 			 }
 
              if($detail_level > 0) {
                  # For Detail Level 1
                  if($sup_SpotDCVoltage) {
-                     push(@row_array, "string_1_udc ".sprintf("%.2f",$inv_SPOT_UDC1)."\n");
-                     push(@row_array, "string_2_udc ".sprintf("%.2f",$inv_SPOT_UDC2)."\n") if($inv_SPOT_UDC2 ne "-");
-					 push(@row_array, "string_3_udc ".sprintf("%.2f",$inv_SPOT_UDC3)."\n") if($inv_SPOT_UDC3 ne "-");	
-                     push(@row_array, "string_1_idc ".sprintf("%.3f",$inv_SPOT_IDC1)."\n");
-                     push(@row_array, "string_2_idc ".sprintf("%.3f",$inv_SPOT_IDC2)."\n") if($inv_SPOT_IDC2 ne "-");
-					 push(@row_array, "string_3_idc ".sprintf("%.3f",$inv_SPOT_IDC3)."\n") if($inv_SPOT_IDC3 ne "-");	
+                     push(@row_array, ($sc?"string_1_udc ":"SPOT_UDC1 ").$inv_SPOT_UDC1."\n") if($inv_SPOT_UDC1 ne "-");
+                     push(@row_array, ($sc?"string_2_udc ":"SPOT_UDC2 ").$inv_SPOT_UDC2."\n") if($inv_SPOT_UDC2 ne "-");
+					 push(@row_array, ($sc?"string_3_udc ":"SPOT_UDC3 ").$inv_SPOT_UDC3."\n") if($inv_SPOT_UDC3 ne "-");	
+                     push(@row_array, ($sc?"string_1_idc ":"SPOT_IDC1 ").$inv_SPOT_IDC1."\n") if($inv_SPOT_IDC1 ne "-");
+                     push(@row_array, ($sc?"string_2_idc ":"SPOT_IDC2 ").$inv_SPOT_IDC2."\n") if($inv_SPOT_IDC2 ne "-");
+					 push(@row_array, ($sc?"string_3_idc ":"SPOT_IDC3 ").$inv_SPOT_IDC3."\n") if($inv_SPOT_IDC3 ne "-");	
                  }
                  if($sup_SpotACVoltage) {
-                     push(@row_array, "phase_1_uac ".sprintf("%.2f",$inv_SPOT_UAC1)."\n") if ($inv_SPOT_UAC1 ne "-");
-                     push(@row_array, "phase_2_uac ".sprintf("%.2f",$inv_SPOT_UAC2)."\n") if ($inv_SPOT_UAC2 ne "-");
-                     push(@row_array, "phase_3_uac ".sprintf("%.2f",$inv_SPOT_UAC3)."\n") if ($inv_SPOT_UAC3 ne "-");
-                     push(@row_array, "phase_1_2_uac ".sprintf("%.3f",$inv_SPOT_UAC1_2)."\n") if ($inv_SPOT_UAC1_2 ne "-");
-                     push(@row_array, "phase_2_3_uac ".sprintf("%.3f",$inv_SPOT_UAC2_3)."\n") if ($inv_SPOT_UAC2_3 ne "-");
-                     push(@row_array, "phase_3_1_uac ".sprintf("%.3f",$inv_SPOT_UAC3_1)."\n") if ($inv_SPOT_UAC3_1 ne "-");
-					 push(@row_array, "cosphi ".sprintf("%.3f",$inv_SPOT_CosPhi)."\n") if ($inv_SPOT_CosPhi ne "-");
+                     push(@row_array, ($sc?"phase_1_uac ":"SPOT_UAC1 ").$inv_SPOT_UAC1."\n") if ($inv_SPOT_UAC1 ne "-");
+                     push(@row_array, ($sc?"phase_2_uac ":"SPOT_UAC2 ").$inv_SPOT_UAC2."\n") if ($inv_SPOT_UAC2 ne "-");
+                     push(@row_array, ($sc?"phase_3_uac ":"SPOT_UAC2 ").$inv_SPOT_UAC3."\n") if ($inv_SPOT_UAC3 ne "-");
+                     push(@row_array, ($sc?"phase_1_2_uac ":"SPOT_UAC1_2 ").sprintf("%.3f",$inv_SPOT_UAC1_2)."\n") if ($inv_SPOT_UAC1_2 ne "-");
+                     push(@row_array, ($sc?"phase_2_3_uac ":"SPOT_UAC2_3 ").sprintf("%.3f",$inv_SPOT_UAC2_3)."\n") if ($inv_SPOT_UAC2_3 ne "-");
+                     push(@row_array, ($sc?"phase_3_1_uac ":"SPOT_UAC3_1 ").sprintf("%.3f",$inv_SPOT_UAC3_1)."\n") if ($inv_SPOT_UAC3_1 ne "-");
+					 push(@row_array, ($sc?"cosphi ":"SPOT_CosPhi ").sprintf("%.3f",$inv_SPOT_CosPhi)."\n") if ($inv_SPOT_CosPhi ne "-");
                  }
 				 if($sup_SpotACCurrent) {
-                     push(@row_array, "phase_1_iac ".sprintf("%.2f",$inv_SPOT_IAC1)."\n") if ($inv_SPOT_IAC1 ne "-");
-                     push(@row_array, "phase_2_iac ".sprintf("%.2f",$inv_SPOT_IAC2)."\n") if ($inv_SPOT_IAC2 ne "-");
-                     push(@row_array, "phase_3_iac ".sprintf("%.2f",$inv_SPOT_IAC3)."\n") if ($inv_SPOT_IAC3 ne "-");
+                     push(@row_array, ($sc?"phase_1_iac ":"SPOT_IAC1 ").sprintf("%.2f",$inv_SPOT_IAC1)."\n") if ($inv_SPOT_IAC1 ne "-");
+                     push(@row_array, ($sc?"phase_2_iac ":"SPOT_IAC2 ").sprintf("%.2f",$inv_SPOT_IAC2)."\n") if ($inv_SPOT_IAC2 ne "-");
+                     push(@row_array, ($sc?"phase_3_iac ":"SPOT_IAC3 ").sprintf("%.2f",$inv_SPOT_IAC3)."\n") if ($inv_SPOT_IAC3 ne "-");
                  }
 				 if($sup_SpotACCurrent_Backup) {
-                     push(@row_array, "phase_backup_1_iac ".sprintf("%.2f",$inv_SPOT_IAC1_Backup)."\n") if ($inv_SPOT_IAC1_Backup ne "-");
-                     push(@row_array, "phase_backup_2_iac ".sprintf("%.2f",$inv_SPOT_IAC2_Backup)."\n") if ($inv_SPOT_IAC2_Backup ne "-");
-                     push(@row_array, "phase_backup_3_iac ".sprintf("%.2f",$inv_SPOT_IAC3_Backup)."\n") if ($inv_SPOT_IAC3_Backup ne "-");
+                     push(@row_array, ($sc?"phase_backup_1_iac ":"SPOT_Backup_IAC1 ").sprintf("%.2f",$inv_SPOT_IAC1_Backup)."\n") if ($inv_SPOT_IAC1_Backup ne "-");
+                     push(@row_array, ($sc?"phase_backup_2_iac ":"SPOT_Backup_IAC2 ").sprintf("%.2f",$inv_SPOT_IAC2_Backup)."\n") if ($inv_SPOT_IAC2_Backup ne "-");
+                     push(@row_array, ($sc?"phase_backup_3_iac ":"SPOT_Backup_IAC3 ").sprintf("%.2f",$inv_SPOT_IAC3_Backup)."\n") if ($inv_SPOT_IAC3_Backup ne "-");
 					 
-					 push(@row_array, "phase_backup_1_pac ".sprintf("%.0f",$inv_SPOT_IAC1_Backup * ReadingsVal($name,"phase_1_uac",""))."\n") if ($inv_SPOT_IAC1_Backup ne "-");
-                     push(@row_array, "phase_backup_2_pac ".sprintf("%.0f",$inv_SPOT_IAC2_Backup * ReadingsVal($name,"phase_2_uac",""))."\n") if ($inv_SPOT_IAC2_Backup ne "-");
-                     push(@row_array, "phase_backup_3_pac ".sprintf("%.0f",$inv_SPOT_IAC3_Backup * ReadingsVal($name,"phase_3_uac",""))."\n") if ($inv_SPOT_IAC3_Backup ne "-");
+					 push(@row_array, ($sc?"phase_backup_1_pac ":"SPOT_Backup_PAC1 ").sprintf("%.0f",$inv_SPOT_IAC1_Backup * $inv_SPOT_UAC1)."\n") if ($inv_SPOT_IAC1_Backup ne "-");
+                     push(@row_array, ($sc?"phase_backup_2_pac ":"SPOT_Backup_PAC2 ").sprintf("%.0f",$inv_SPOT_IAC2_Backup * $inv_SPOT_UAC2)."\n") if ($inv_SPOT_IAC2_Backup ne "-");
+                     push(@row_array, ($sc?"phase_backup_3_pac ":"SPOT_Backup_PAC3 ").sprintf("%.0f",$inv_SPOT_IAC3_Backup * $inv_SPOT_UAC3)."\n") if ($inv_SPOT_IAC3_Backup ne "-");
                  }
                  if($sup_BatteryInfo || $sup_BatteryInfo_2) {
-                     push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
-                     push(@row_array, "bat_idc ".$inv_BAT_IDC."\n");
+                     push(@row_array, ($sc?"bat_udc ":"BAT_UDC ").$inv_BAT_UDC."\n");
+                     push(@row_array, ($sc?"bat_idc ":"BAT_IDC ").$inv_BAT_IDC."\n");
 					 if($INVTYPE_NAME =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)
 					 {
-						push(@row_array, "bat_pdc ".sprintf("%.0f",($inv_BAT_UDC * $inv_BAT_IDC))."\n");
+						push(@row_array, ($sc?"bat_pdc ":"BAT_PDC ").sprintf("%.0f",($inv_BAT_UDC * $inv_BAT_IDC))."\n");
 					 }
                  }
 				 if($sup_BatteryInfo_UDC) {
-                     push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
-					 push(@row_array, "bat_udc_a ".$inv_BAT_UDC_A."\n") if ($inv_BAT_UDC_A ne "-");
-					 push(@row_array, "bat_udc_b ".$inv_BAT_UDC_B."\n") if ($inv_BAT_UDC_B ne "-");
-					 push(@row_array, "bat_udc_c ".$inv_BAT_UDC_C."\n") if ($inv_BAT_UDC_C ne "-");                                                        
+                     push(@row_array, ($sc?"bat_udc ":"BAT_UDC ").$inv_BAT_UDC."\n");
+					 push(@row_array, ($sc?"bat_udc_a ":"BAT_UDC_A ").$inv_BAT_UDC_A."\n") if ($inv_BAT_UDC_A ne "-");
+					 push(@row_array, ($sc?"bat_udc_b ":"BAT_UDC_B ").$inv_BAT_UDC_B."\n") if ($inv_BAT_UDC_B ne "-");
+					 push(@row_array, ($sc?"bat_udc_c ":"BAT_UDC_C ").$inv_BAT_UDC_C."\n") if ($inv_BAT_UDC_C ne "-");                                                        
                  }
 				 if($sup_BatteryInfo_IDC) {
-                     push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");                                                       
-					 push(@row_array, "bat_idc_a ".$inv_BAT_IDC_A."\n") if ($inv_BAT_IDC_A ne "-");
-					 push(@row_array, "bat_idc_b ".$inv_BAT_IDC_B."\n") if ($inv_BAT_IDC_B ne "-");
-					 push(@row_array, "bat_idc_c ".$inv_BAT_IDC_C."\n") if ($inv_BAT_IDC_C ne "-"); 
+                     push(@row_array, ($sc?"bat_udc ":"BAT_IDC ").$inv_BAT_UDC."\n");                                                       
+					 push(@row_array, ($sc?"bat_idc_a ":"BAT_IDC_A ").$inv_BAT_IDC_A."\n") if ($inv_BAT_IDC_A ne "-");
+					 push(@row_array, ($sc?"bat_idc_b ":"BAT_IDC_B ").$inv_BAT_IDC_B."\n") if ($inv_BAT_IDC_B ne "-");
+					 push(@row_array, ($sc?"bat_idc_c ":"BAT_IDC_C ").$inv_BAT_IDC_C."\n") if ($inv_BAT_IDC_C ne "-"); 
                  }
 				 if($sup_BatteryInfo_Capacity) {
-                     push(@row_array, "bat_capacity ".$inv_BAT_CAPACITY."\n"); #TTT
+                     push(@row_array, ($sc?"bat_capacity ":"BAT_CAPACITY ").$inv_BAT_CAPACITY."\n"); #TTT
 				 }
 				 if($sup_BatteryInfo_Charge) {
-                     push(@row_array, "bat_p_charge ".($inv_BAT_P_Charge/1000)."\n"); #TTT
-                     push(@row_array, "bat_p_discharge ".($inv_BAT_P_Discharge/1000)."\n"); #TTT
+                     push(@row_array, ($sc?"bat_p_charge ":"BAT_P_CHARGE ").($inv_BAT_P_Charge/1000)."\n"); #TTT
+                     push(@row_array, ($sc?"bat_p_discharge ":"BAT_P_DISCHARGE ").($inv_BAT_P_Discharge/1000)."\n"); #TTT
 				 }
              }
 
              if($detail_level > 1) {
                  # For Detail Level 2
                  if($sup_BatteryInfo || $sup_BatteryInfo_2) {
-                     push(@row_array, "bat_temp ".$inv_BAT_TEMP."\n");
+                     push(@row_array, ($sc?"bat_temp ":"BAT_TEMP ").$inv_BAT_TEMP."\n");
                  }
 				 if($sup_BatteryInfo) {
-                     push(@row_array, "bat_cycles ".$inv_BAT_CYCLES."\n");
+                     push(@row_array, ($sc?"bat_cycles ":"BAT_CYCLES ").$inv_BAT_CYCLES."\n");
                  }
 				 if($sup_BatteryInfo_4) {
-                     push(@row_array, "bat_rated_capacity ".($inv_BAT_rated_capacity / 1000)."\n");
+                     push(@row_array, ($sc?"bat_rated_capacity ".($inv_BAT_rated_capacity / 1000):"BAT_RATED_CAPACITY ".$inv_BAT_rated_capacity)."\n");
+                 }
+				 
+				 if($sup_lower_discharge_limit) {
+                     push(@row_array, ($sc?"bat_lower_discharge_limit ":"BAT_Lower_discharge_limit ").$inv_BAT_lower_discharge_limit."\n");
                  }
 				 
 				 if($sup_BatteryInfo_TEMP) {
-                     push(@row_array, "bat_temp ".$inv_BAT_TEMP."\n");
-					 push(@row_array, "bat_temp_a ".$inv_BAT_TEMP_A."\n") if ($inv_BAT_TEMP_A ne "-");
-					 push(@row_array, "bat_temp_b ".$inv_BAT_TEMP_B."\n") if ($inv_BAT_TEMP_B ne "-");
-					 push(@row_array, "bat_temp_c ".$inv_BAT_TEMP_C."\n") if ($inv_BAT_TEMP_C ne "-");
+                     push(@row_array, ($sc?"bat_temp ":"BAT_TEMP ").$inv_BAT_TEMP."\n");
+					 push(@row_array, ($sc?"bat_temp_a ":"BAT_TEMP_A ").$inv_BAT_TEMP_A."\n") if ($inv_BAT_TEMP_A ne "-");
+					 push(@row_array, ($sc?"bat_temp_b ":"BAT_TEMP_B ").$inv_BAT_TEMP_B."\n") if ($inv_BAT_TEMP_B ne "-");
+					 push(@row_array, ($sc?"bat_temp_c ":"BAT_TEMP_C ").$inv_BAT_TEMP_C."\n") if ($inv_BAT_TEMP_C ne "-");
                  }
 				 if($sup_BatStatus) {
-                     push(@row_array, "bat_status ".SMAInverter_StatusText($inv_BAT_STATUS)."\n");
+                     push(@row_array, ($sc?"bat_status ":"BAT_STATUS ").SMAInverter_StatusText($inv_BAT_STATUS)."\n");
                  }
                  if($sup_SpotGridFrequency) {
-                     push(@row_array, "grid_freq ".sprintf("%.2f",$inv_SPOT_FREQ)."\n");
+                     push(@row_array, ($sc?"grid_freq ":"SPOT_FREQ ").sprintf("%.2f",$inv_SPOT_FREQ)."\n");
                  }
                  if($sup_TypeLabel) {
-                     push(@row_array, "device_type ".SMAInverter_devtype($inv_TYPE)."\n");
-                     push(@row_array, "device_class ".SMAInverter_classtype($inv_CLASS)."\n");
-                     push(@row_array, "susyid ".$inv_susyid." - SN: ".$inv_serial."\n") if($inv_susyid && $inv_serial);
-                     push(@row_array, "device_name "."SN: ".$inv_serial."\n") if($inv_serial);
-                     push(@row_array, "serial_number ".$inv_serial."\n") if($inv_serial);
+                     push(@row_array, ($sc?"device_type ":"INV_TYPE ").SMAInverter_devtype($inv_TYPE)."\n");
+                     push(@row_array, ($sc?"device_class ":"INV_CLASS ").SMAInverter_classtype($inv_CLASS)."\n");
+                     push(@row_array, ($sc?"susyid ":"SUSyID ").$inv_susyid." - SN: ".$inv_serial."\n") if($inv_susyid && $inv_serial);
+                     push(@row_array, ($sc?"device_name ":"INV_NAME ")."SN: ".$inv_serial."\n") if($inv_serial);
+                     push(@row_array, ($sc?"serial_number ":"Serialnumber ").$inv_serial."\n") if($inv_serial);
                  }
 				 if($sup_Firmware) {
-                     push(@row_array, "device_firmware ".$inv_Firmware."\n");
+                     push(@row_array, ($sc?"device_firmware ":"INV_FIRMWARE ").$inv_Firmware."\n");
                  }
                  if($sup_MaxACPower) {
-                     push(@row_array, "pac_max_phase_1 ".$inv_PACMAX1."\n");
-                     push(@row_array, "pac_max_phase_2 ".$inv_PACMAX2."\n");
-                     push(@row_array, "pac_max_phase_3 ".$inv_PACMAX3."\n");
+                     push(@row_array, ($sc?"pac_max_phase_1 ".($inv_PACMAX1/1000):"INV_PACMAX1 ".$inv_PACMAX1)."\n");
+                     push(@row_array, ($sc?"pac_max_phase_2 ".($inv_PACMAX2/1000):"INV_PACMAX2 ".$inv_PACMAX2)."\n");
+                     push(@row_array, ($sc?"pac_max_phase_3 ".($inv_PACMAX3/1000):"INV_PACMAX3 ".$inv_PACMAX3)."\n");
                  }
                  if($sup_MaxACPower2) {
-                     push(@row_array, "pac_max_phase_1_2 ".$inv_PACMAX1_2."\n");
+                     push(@row_array, ($sc?"pac_max_phase_1_2 ":"INV_PACMAX1_2 ").$inv_PACMAX1_2."\n");
                  }
                  if($sup_InverterTemperature) {
-                     push(@row_array, "device_temperature ".sprintf("%.1f",$inv_TEMP)."\n");
+                     push(@row_array, ($sc?"device_temperature ":"INV_TEMP ").sprintf("%.1f",$inv_TEMP)."\n");
                  }
                  if($sup_OperationTime) {
-                     push(@row_array, "feed-in_time ".$inv_SPOT_FEEDTM."\n");
-                     push(@row_array, "operation_time ".$inv_SPOT_OPERTM."\n");
+                     push(@row_array, ($sc?"feed-in_time ":"SPOT_FEEDTM ").$inv_SPOT_FEEDTM."\n");
+                     push(@row_array, ($sc?"operation_time ":"SPOT_OPERTM ").$inv_SPOT_OPERTM."\n");
                  }
                  if($sup_GridRelayStatus) {
-                     push(@row_array, "gridrelay_status ".SMAInverter_StatusText($inv_GRIDRELAY)."\n");
+                     push(@row_array, ($sc?"gridrelay_status ":"INV_GRIDRELAY ").SMAInverter_StatusText($inv_GRIDRELAY)."\n");
                  }
                  if($sup_DeviceStatus) {
-                     push(@row_array, "device_status ".SMAInverter_StatusText($inv_STATUS)."\n");
+                     push(@row_array, ($sc?"device_status ":"INV_STATUS ").SMAInverter_StatusText($inv_STATUS)."\n");
                  }
 				 
 				 if($sup_BackupRelayStatus) {
-                     push(@row_array, "backuprelay_status ".SMAInverter_StatusText($inv_BACKUPRELAY)."\n");
+                     push(@row_array, ($sc?"backuprelay_status ":"INV_BACKRELAYRELAY ").SMAInverter_StatusText($inv_BACKUPRELAY)."\n");
                  }
 				 if($sup_GridConection) {
-                     push(@row_array, "GridConection ".SMAInverter_StatusText($inv_GridConection)."\n");
+                     push(@row_array, ($sc?"GridConection ":"INV_GridConection ").SMAInverter_StatusText($inv_GridConection)."\n");
                  }
 				 
 				 if($sup_OperatingStatus) {
-                     push(@row_array, "operating_status ".SMAInverter_StatusText($inv_OperatingStatus)."\n");
+                     push(@row_array, ($sc?"operating_status ":"INV_OperatingStatus ").SMAInverter_StatusText($inv_OperatingStatus)."\n");
                  }
 				 if($sup_GeneralOperatingStatus) {
-                     push(@row_array, "general_operating_status ".SMAInverter_StatusText($inv_GeneralOperatingStatus)."\n");
+                     push(@row_array, ($sc?"general_operating_status ":"INV_GeneralOperatingStatus ").SMAInverter_StatusText($inv_GeneralOperatingStatus)."\n");
                  }
 				 if($sup_WaitingTimeUntilFeedIn) {
-                     push(@row_array, "waiting_time_until_feed_in ".$inv_WaitingTimeUntilFeedIn."\n");
-                 }
-             }
-             if($detail_level > 2) {
-				if($sup_Insulation_1) {
-                     push(@row_array, "device_dc_insulation ".$inv_DC_insulation."\n");
-                }
-			    if($sup_Insulation_2) {
-                     push(@row_array, "device_dc_residual_current ".$inv_DC_Residual_Current."\n");
-                }
-			 }
-         } 
-         else {                                                                                # kein SBFSpot Compatibility Mode
-             
-			 if($sup_EM_1) {
-		         push(@row_array, "Meter_TOTAL_FeedIn ".$Meter_Total_Yield."\n") if ($Meter_Total_Yield ne "-");
-                 push(@row_array, "Meter_TOTAL_Consumation ".$Meter_Total_Consumation."\n") if ($Meter_Total_Consumation ne "-");
-		     }
-			 
-			 if($sup_EM_2) {
-		         push(@row_array, "Meter_TOTAL_Grid_FeedIn ".$Meter_Grid_FeedIn."\n") if ($Meter_Grid_FeedIn ne "-");
-                 push(@row_array, "Meter_TOTAL_Grid_Consumation ".$Meter_Grid_Consumation."\n") if ($Meter_Grid_Consumation ne "-");
-		     }
-			 
-			 if($sup_EM_3) {
-		         push(@row_array, "Meter_Power_Grid_FeedIn ".($Meter_Power_Grid_FeedIn)."\n") if ($Meter_Power_Grid_FeedIn ne "-");
-                 push(@row_array, "Meter_Power_Grid_Consumation ".($Meter_Power_Grid_Consumation)."\n") if ($Meter_Power_Grid_Consumation ne "-");
-		     }
-			 
-			 if($sup_EM_4) {
-		         push(@row_array, "Meter_Grid_FeedIn_PAC1 ".($Meter_Grid_FeedIn_PAC1)."\n") if ($Meter_Grid_FeedIn_PAC1 ne "-");
-                 push(@row_array, "Meter_Grid_FeedIn_PAC2 ".($Meter_Grid_FeedIn_PAC2)."\n") if ($Meter_Grid_FeedIn_PAC2 ne "-");
-				 push(@row_array, "Meter_Grid_FeedIn_PAC3 ".($Meter_Grid_FeedIn_PAC3)."\n") if ($Meter_Grid_FeedIn_PAC3 ne "-");
-				 
-				 push(@row_array, "Meter_Grid_Consumation_PAC1 ".($Meter_Grid_Consumation_PAC1)."\n") if ($Meter_Grid_Consumation_PAC1 ne "-");
-                 push(@row_array, "Meter_Grid_Consumation_PAC2 ".($Meter_Grid_Consumation_PAC2)."\n") if ($Meter_Grid_Consumation_PAC2 ne "-");
-				 push(@row_array, "Meter_Grid_Consumation_PAC3 ".($Meter_Grid_Consumation_PAC3)."\n") if ($Meter_Grid_Consumation_PAC3 ne "-");
-		     }
-			 
-			 if($sup_EnergyProduction) {
-                 push(@row_array, "SPOT_ETOTAL ".$inv_SPOT_ETOTAL."\n") if ($inv_SPOT_ETOTAL ne "-");
-                 push(@row_array, "SPOT_ETODAY ".$inv_SPOT_ETODAY."\n") if ($inv_SPOT_ETODAY ne "-");
-             }
-			 if($sup_PVEnergyProduction) {
-                 push(@row_array, "SPOT_EPVTOTAL ".$inv_SPOT_EPVTOTAL."\n") if ($inv_SPOT_EPVTOTAL ne "-");
-                 push(@row_array, "SPOT_EPVTODAY ".$inv_SPOT_EPVTODAY."\n") if ($inv_SPOT_EPVTODAY ne "-");
-             }
-             if($sup_SpotDCPower) {
-                 push(@row_array, "SPOT_PDC1 ".$inv_SPOT_PDC1."\n") if ($inv_SPOT_PDC1 ne "-");
-                 push(@row_array, "SPOT_PDC2 ".$inv_SPOT_PDC2."\n") if ($inv_SPOT_PDC2 ne "-");	
-				 push(@row_array, "SPOT_PDC3 ".$inv_SPOT_PDC3."\n") if ($inv_SPOT_PDC3 ne "-");	
-             }
-			 if($sup_SpotDCPower_3) {
-				 push(@row_array, "SPOT_PDC ".($inv_SPOT_PDC)."\n");
-				 push(@row_array, "state ".$inv_SPOT_PDC."\n")  if ($INVCLASS eq "8009");
-             }
-             if($sup_SpotACPower) {
-                 push(@row_array, "SPOT_PAC1 ".$inv_SPOT_PAC1."\n") if ($inv_SPOT_PAC1 ne "-");
-                 push(@row_array, "SPOT_PAC2 ".$inv_SPOT_PAC2."\n") if ($inv_SPOT_PAC2 ne "-");
-                 push(@row_array, "SPOT_PAC3 ".$inv_SPOT_PAC3."\n") if ($inv_SPOT_PAC3 ne "-");
-             }
-             if($sup_SpotACTotalPower) {
-                 push(@row_array, "SPOT_PACTOT ".$inv_SPOT_PACTOT."\n");
-                 push(@row_array, "state ".$inv_SPOT_PACTOT."\n")  if ($INVCLASS ne "8009");
-             }
-             if($sup_ChargeStatus) {
-                 push(@row_array, "ChargeStatus ".$inv_ChargeStatus."\n");
-             }
-             if($inv_CLASS && $inv_CLASS eq 8007 && defined($inv_SPOT_PACTOT)) {               # V2.10.1 28.04.2019
-                 if($inv_SPOT_PACTOT < 0) {
-                     push(@row_array, "POWER_OUT "."0"."\n");
-                     push(@row_array, "POWER_IN ".(-1 * $inv_SPOT_PACTOT)."\n");
-                 } 
-                 else {
-                     push(@row_array, "POWER_OUT ".$inv_SPOT_PACTOT."\n");
-                     push(@row_array, "POWER_IN "."0"."\n");
-                 }
-             }
-			 
-			 if($sup_SpotBatteryLoad) {
-				 push(@row_array, "BAT_LOADTOTAL ".$inv_BAT_LOADTOTAL."\n") if ($inv_BAT_LOADTOTAL ne "-");
-				 push(@row_array, "BAT_LOADTODAY ".$inv_BAT_LOADTODAY."\n") if ($inv_BAT_LOADTODAY ne "-");
-			 }
-			 
-			 if($sup_SpotBatteryUnload) {
-				 push(@row_array, "BAT_UNLOADTOTAL ".$inv_BAT_UNLOADTOTAL."\n") if ($inv_BAT_UNLOADTOTAL ne "-");
-				 push(@row_array, "BAT_UNLOADTODAY ".$inv_BAT_UNLOADTODAY."\n") if ($inv_BAT_UNLOADTODAY ne "-");
-			 }
-			 
-             if($detail_level > 0) {
-                 # For Detail Level 1
-                 if($sup_SpotDCVoltage) {
-                     push(@row_array, "SPOT_UDC1 ".$inv_SPOT_UDC1."\n");
-                     push(@row_array, "SPOT_UDC2 ".$inv_SPOT_UDC2."\n") if($inv_SPOT_UDC2 ne "-");
-					 push(@row_array, "SPOT_UDC3 ".$inv_SPOT_UDC3."\n") if($inv_SPOT_UDC3 ne "-");
-                     push(@row_array, "SPOT_IDC1 ".$inv_SPOT_IDC1."\n");
-                     push(@row_array, "SPOT_IDC2 ".$inv_SPOT_IDC2."\n") if($inv_SPOT_IDC2 ne "-");
-					 push(@row_array, "SPOT_IDC3 ".$inv_SPOT_IDC3."\n") if($inv_SPOT_IDC3 ne "-");
-                 }
-                 if($sup_SpotACVoltage) {
-                     push(@row_array, "SPOT_UAC1 ".$inv_SPOT_UAC1."\n") if ($inv_SPOT_UAC1 ne "-");
-                     push(@row_array, "SPOT_UAC2 ".$inv_SPOT_UAC2."\n") if ($inv_SPOT_UAC2 ne "-");
-                     push(@row_array, "SPOT_UAC3 ".$inv_SPOT_UAC3."\n") if ($inv_SPOT_UAC3 ne "-");
-                     push(@row_array, "SPOT_UAC1_2 ".sprintf("%.3f",$inv_SPOT_UAC1_2)."\n") if ($inv_SPOT_UAC1_2 ne "-");
-                     push(@row_array, "SPOT_UAC2_3 ".sprintf("%.3f",$inv_SPOT_UAC2_3)."\n") if ($inv_SPOT_UAC2_3 ne "-");
-                     push(@row_array, "SPOT_UAC3_1 ".sprintf("%.3f",$inv_SPOT_UAC3_1)."\n") if ($inv_SPOT_UAC3_1 ne "-");
-					 push(@row_array, "SPOT_CosPhi ".sprintf("%.3f",$inv_SPOT_CosPhi)."\n") if ($inv_SPOT_CosPhi ne "-");
-                 }
-				 if($sup_SpotACCurrent) {
-                     push(@row_array, "SPOT_IAC1 ".sprintf("%.2f",$inv_SPOT_IAC1)."\n") if ($inv_SPOT_IAC1 ne "-");
-                     push(@row_array, "SPOT_IAC2 ".sprintf("%.2f",$inv_SPOT_IAC2)."\n") if ($inv_SPOT_IAC2 ne "-");
-                     push(@row_array, "SPOT_IAC3 ".sprintf("%.2f",$inv_SPOT_IAC3)."\n") if ($inv_SPOT_IAC3 ne "-");
-                 }
-				 if($sup_SpotACCurrent_Backup) {
-                     push(@row_array, "SPOT_Backup_IAC1 ".sprintf("%.2f",$inv_SPOT_IAC1_Backup)."\n") if ($inv_SPOT_IAC1_Backup ne "-");
-                     push(@row_array, "SPOT_Backup_IAC2 ".sprintf("%.2f",$inv_SPOT_IAC2_Backup)."\n") if ($inv_SPOT_IAC2_Backup ne "-");
-                     push(@row_array, "SPOT_Backup_IAC3 ".sprintf("%.2f",$inv_SPOT_IAC3_Backup)."\n") if ($inv_SPOT_IAC3_Backup ne "-");
-					 
-					 push(@row_array, "SPOT_Backup_PAC1 ".sprintf("%.0f",$inv_SPOT_IAC1_Backup * ReadingsVal($name,"SPOT_UAC1",""))."\n") if ($inv_SPOT_IAC1_Backup ne "-");
-                     push(@row_array, "SPOT_Backup_PAC2 ".sprintf("%.0f",$inv_SPOT_IAC2_Backup * ReadingsVal($name,"SPOT_UAC2",""))."\n") if ($inv_SPOT_IAC2_Backup ne "-");
-                     push(@row_array, "SPOT_Backup_PAC3 ".sprintf("%.0f",$inv_SPOT_IAC3_Backup * ReadingsVal($name,"SPOT_UAC3",""))."\n") if ($inv_SPOT_IAC3_Backup ne "-");
-                 }
-                 if($sup_BatteryInfo || $sup_BatteryInfo_2) {
-                     push(@row_array, "BAT_UDC ".  $inv_BAT_UDC."\n");                                                     
-                     push(@row_array, "BAT_IDC ".  $inv_BAT_IDC."\n"); 
-					 if($INVTYPE_NAME =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)
-					 {
-						push(@row_array, "BAT_PDC ".sprintf("%.0f",($inv_BAT_UDC * $inv_BAT_IDC))."\n");
-					 }					 
-                 }
-				 if($sup_BatteryInfo_UDC) {
-                     push(@row_array, "BAT_UDC ".  $inv_BAT_UDC."\n");
-					 push(@row_array, "BAT_UDC_A ".$inv_BAT_UDC_A."\n") if ($inv_BAT_UDC_A ne "-");
-					 push(@row_array, "BAT_UDC_B ".$inv_BAT_UDC_B."\n") if ($inv_BAT_UDC_B ne "-");
-					 push(@row_array, "BAT_UDC_C ".$inv_BAT_UDC_C."\n") if ($inv_BAT_UDC_C ne "-");                                                                                       
-                 }
-				 if($sup_BatteryInfo_IDC) {                                                      
-                     push(@row_array, "BAT_IDC ".  $inv_BAT_IDC."\n");
-					 push(@row_array, "BAT_IDC_A ".$inv_BAT_IDC_A."\n") if ($inv_BAT_IDC_A ne "-");
-					 push(@row_array, "BAT_IDC_B ".$inv_BAT_IDC_B."\n") if ($inv_BAT_IDC_B ne "-");
-					 push(@row_array, "BAT_IDC_C ".$inv_BAT_IDC_C."\n") if ($inv_BAT_IDC_C ne "-");                                
-                 }
-				 
-				 if($sup_BatteryInfo_Capacity) {
-					push(@row_array, "BAT_CAPACITY ".$inv_BAT_CAPACITY."\n") if ($inv_BAT_CAPACITY ne "-"); #TTT
-			     }
-				 
-				 if($sup_BatteryInfo_Charge) {
-                     push(@row_array, "BAT_P_CHARGE ".$inv_BAT_P_Charge."\n"); #TTT
-                     push(@row_array, "BAT_P_DISCHARGE ".$inv_BAT_P_Discharge."\n"); #TTT
-				 }
-             }
-
-             if($detail_level > 1) {
-                 # For Detail Level 2
-                 if($sup_BatteryInfo || $sup_BatteryInfo_2) {
-                     push(@row_array, "BAT_TEMP ".  $inv_BAT_TEMP."\n");
-                 }
-				 if($sup_BatteryInfo) {
-                     push(@row_array, "BAT_CYCLES ".$inv_BAT_CYCLES."\n");
-                 }
-				 if($sup_BatteryInfo_4) {
-                     push(@row_array, "BAT_RATED_CAPACITY ".$inv_BAT_rated_capacity."\n");
-                 }
-				 if($sup_BatteryInfo_TEMP) {
-                     push(@row_array, "BAT_TEMP ".  $inv_BAT_TEMP."\n");
-					 push(@row_array, "BAT_TEMP_A ".$inv_BAT_TEMP_A."\n") if ($inv_BAT_TEMP_A ne "-");
-					 push(@row_array, "BAT_TEMP_B ".$inv_BAT_TEMP_B."\n") if ($inv_BAT_TEMP_B ne "-");
-					 push(@row_array, "BAT_TEMP_C ".$inv_BAT_TEMP_C."\n") if ($inv_BAT_TEMP_C ne "-");
-                 }
-				 if($sup_BatStatus) {
-                     push(@row_array, "BAT_STATUS ".SMAInverter_StatusText($inv_BAT_STATUS)."\n");
-                 }
-                 if($sup_SpotGridFrequency) {
-                     push(@row_array, "SPOT_FREQ ".$inv_SPOT_FREQ."\n");
-                 }
-                 if($sup_TypeLabel) {
-                     push(@row_array, "INV_TYPE ".    SMAInverter_devtype($inv_TYPE)."\n");
-                     push(@row_array, "INV_CLASS ".   SMAInverter_classtype($inv_CLASS)."\n");
-                     push(@row_array, "SUSyID ".      $inv_susyid."\n") if($inv_susyid);
-                     push(@row_array, "Serialnumber ".$inv_serial."\n") if($inv_serial);
-                 }
-				 if($sup_Firmware) {
-                     push(@row_array, "INV_FIRMWARE ".$inv_Firmware."\n");
-                 }
-                 if($sup_MaxACPower) {
-                     push(@row_array, "INV_PACMAX1 ".$inv_PACMAX1."\n");
-                     push(@row_array, "INV_PACMAX2 ".$inv_PACMAX2."\n");
-                     push(@row_array, "INV_PACMAX3 ".$inv_PACMAX3."\n");
-                 }
-                 if($sup_MaxACPower2) {
-                     push(@row_array, "INV_PACMAX1_2 ".$inv_PACMAX1_2."\n");
-                 }
-                 if($sup_InverterTemperature) {
-                     push(@row_array, "INV_TEMP ".$inv_TEMP."\n");
-                 }
-                 if($sup_OperationTime) {
-                     push(@row_array, "SPOT_FEEDTM ".$inv_SPOT_FEEDTM."\n");
-                     push(@row_array, "SPOT_OPERTM ".$inv_SPOT_OPERTM."\n");
-                 }
-                 if($sup_GridRelayStatus) {
-                     push(@row_array, "INV_GRIDRELAY ".SMAInverter_StatusText($inv_GRIDRELAY)."\n");
-                 }
-                 if($sup_DeviceStatus) {
-                     push(@row_array, "INV_STATUS ".SMAInverter_StatusText($inv_STATUS)."\n");
+                     push(@row_array, ($sc?"waiting_time_until_feed_in ":"INV_WaitingTimeUntilFeedIn ").$inv_WaitingTimeUntilFeedIn."\n");
                  }
 
-				 if($sup_BackupRelayStatus) {
-                     push(@row_array, "INV_BACKRELAYRELAY ".SMAInverter_StatusText($inv_BACKUPRELAY)."\n");
-                 }
-				 if($sup_GridConection) {
-                     push(@row_array, "INV_GridConection ".SMAInverter_StatusText($inv_GridConection)."\n");
-                 }
-				 
-				 if($sup_OperatingStatus) {
-                     push(@row_array, "INV_OperatingStatus ".SMAInverter_StatusText($inv_OperatingStatus)."\n");
-                 }
-				 if($sup_GeneralOperatingStatus) {
-                     push(@row_array, "INV_GeneralOperatingStatus ".SMAInverter_StatusText($inv_GeneralOperatingStatus)."\n");
-                 }
-				 if($sup_WaitingTimeUntilFeedIn) {
-                     push(@row_array, "INV_WaitingTimeUntilFeedIn ".$inv_WaitingTimeUntilFeedIn."\n");
-                 }
-             }
-			 
-			 if($detail_level > 2) {
-				if($sup_Insulation_1) {
-                     push(@row_array, "INV_DC_Insulation ".$inv_DC_insulation."\n");
+				if($sup_Insulation) {
+                     push(@row_array, ($sc?"device_dc_insulation ":"INV_DC_Insulation ").$inv_DC_insulation."\n") if ($inv_DC_insulation ne "-");
                 }
-			    if($sup_Insulation_2) {
-                     push(@row_array, "INV_DC_Residual_Current ".$inv_DC_Residual_Current."\n");
+			    if($sup_Insulation) {
+                     push(@row_array, ($sc?"device_dc_residual_current ":"INV_DC_Residual_Current ").$inv_DC_Residual_Current."\n") if ($inv_DC_Residual_Current ne "-");
                 }
 			 }
-         }
      } 
      else {
          # Login failed/not possible
@@ -1851,11 +1645,13 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_BAT_TEMP, $inv_BAT_TEMP_A, $inv_BAT_TEMP_B, $inv_BAT_TEMP_C,
      $inv_BAT_LOADTODAY, $inv_BAT_LOADTOTAL, $inv_BAT_CAPACITY,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,
 	 $inv_BAT_rated_capacity, $inv_BAT_STATUS,
+	 $inv_BAT_lower_discharge_limit,
      $inv_SPOT_FREQ, $inv_SPOT_OPERTM, $inv_SPOT_FEEDTM, $inv_TEMP, $inv_GRIDRELAY, $inv_STATUS,
 	 $inv_BACKUPRELAY, $inv_OperatingStatus, $inv_GeneralOperatingStatus, $inv_WaitingTimeUntilFeedIn, $inv_GridConection,
 	 $Meter_Grid_FeedIn, $Meter_Grid_Consumation, $Meter_Total_FeedIn, $Meter_Total_Consumation,
 	 $Meter_Power_Grid_FeedIn, $Meter_Power_Grid_Consumation,
-	 $Meter_Grid_FeedIn_PAC1, $Meter_Grid_FeedIn_PAC2, $Meter_Grid_FeedIn_PAC3, $Meter_Grid_Consumation_PAC1, $Meter_Grid_Consumation_PAC2, $Meter_Grid_Consumation_PAC3);
+	 $Meter_Grid_FeedIn_PAC1, $Meter_Grid_FeedIn_PAC2, $Meter_Grid_FeedIn_PAC3, $Meter_Grid_Consumation_PAC1, $Meter_Grid_Consumation_PAC2, $Meter_Grid_Consumation_PAC3,
+	 $inv_DC_insulation, $inv_DC_Residual_Current);
  my $mysusyid       = $hash->{HELPER}{MYSUSYID};
  my $myserialnumber = $hash->{HELPER}{MYSERIALNUMBER};
  my ($cmd, $myID, $target_ID, $spkt_ID, $cmd_ID);
@@ -1958,722 +1754,742 @@ sub SMAInverter_SMAcommand($$$$$) {
  $data_ID = unpack("v*", substr $data, 55, 2);
  Log3 ($name, 5, "$name - Data identifier $data_ID");
 
-#Meter
-
- if($data_ID eq 0x4624) {
-     if (length($data) >= 66) {
-         $Meter_Grid_FeedIn = unpack("V*", substr($data, 62, 4));
+     #Meter
+	 if ($data_ID == 0x4624) { 
+		 if (length($data) >= 66) {
+			 $Meter_Grid_FeedIn = unpack("V*", substr($data, 62, 4));
+			 
+			 if(($Meter_Grid_FeedIn eq -2147483648) || ($Meter_Grid_FeedIn eq 0xFFFFFFFF) || $Meter_Grid_FeedIn <= 0) {$Meter_Grid_FeedIn = "-"; }
+		 } 
+		 else {
+			 Log3 ($name, 3, "$name - WARNING - Meter_Grid_FeedIn wasn't deliverd ... set it to \"0\" !");
+			 $Meter_Grid_FeedIn = "-";
+		 }
 		 
-		 if(($Meter_Grid_FeedIn eq -2147483648) || ($Meter_Grid_FeedIn eq 0xFFFFFFFF) || $Meter_Grid_FeedIn <= 0) {$Meter_Grid_FeedIn = "-"; }
-     } 
-     else {
-         Log3 ($name, 3, "$name - WARNING - Meter_Grid_FeedIn wasn't deliverd ... set it to \"0\" !");
-         $Meter_Grid_FeedIn = "-";
-     }
-	 
-	 if (length($data) >= 82) {
-         $Meter_Grid_Consumation = unpack("V*", substr($data, 78, 4));
+		 if (length($data) >= 82) {
+			 $Meter_Grid_Consumation = unpack("V*", substr($data, 78, 4));
+			 
+			 if(($Meter_Grid_Consumation eq -2147483648) || ($Meter_Grid_Consumation eq 0xFFFFFFFF) || $Meter_Grid_Consumation <= 0) {$Meter_Grid_Consumation = "-"; }
+		 } 
+		 else {
+			 Log3 ($name, 3, "$name - WARNING - Meter_Grid_Consumation wasn't deliverd ... set it to \"0\" !");
+			 $Meter_Grid_Consumation = "-";
+		 }
 		 
-		 if(($Meter_Grid_Consumation eq -2147483648) || ($Meter_Grid_Consumation eq 0xFFFFFFFF) || $Meter_Grid_Consumation <= 0) {$Meter_Grid_Consumation = "-"; }
-     } 
-     else {
-         Log3 ($name, 3, "$name - WARNING - Meter_Grid_Consumation wasn't deliverd ... set it to \"0\" !");
-         $Meter_Grid_Consumation = "-";
-     }
-	 
-     Log3 $name, 5, "$name - Data Meter_Grid_FeedIn=$Meter_Grid_FeedIn and Meter_Grid_Consumation=$Meter_Grid_Consumation";
-     return (1,$Meter_Grid_FeedIn,$Meter_Grid_Consumation,$inv_susyid,$inv_serial);
- }
- 
-  if($data_ID eq 0x4691) {
-     if (length($data) >= 66) {
-         $Meter_Grid_FeedIn = unpack("V*", substr($data, 62, 4));
-		 
-		 if(($Meter_Grid_FeedIn eq -2147483648) || ($Meter_Grid_FeedIn eq 0xFFFFFFFF) || $Meter_Grid_FeedIn <= 0) {$Meter_Grid_FeedIn = "-"; }
-     } 
-     else {
-         Log3 ($name, 3, "$name - WARNING - Meter_Grid_FeedIn wasn't deliverd ... set it to \"0\" !");
-         $Meter_Grid_FeedIn = "-";
-     }
-	 
-	 if (length($data) >= 82) {
-         $Meter_Grid_Consumation = unpack("V*", substr($data, 78, 4));
-		 
-		 if(($Meter_Grid_Consumation eq -2147483648) || ($Meter_Grid_Consumation eq 0xFFFFFFFF) || $Meter_Grid_Consumation <= 0) {$Meter_Grid_Consumation = "-"; }
-     } 
-     else {
-         Log3 ($name, 3, "$name - WARNING - Meter_Grid_Consumation wasn't deliverd ... set it to \"0\" !");
-         $Meter_Grid_Consumation = "-";
-     }
-	 
-     Log3 $name, 5, "$name - Data Meter_Grid_FeedIn=$Meter_Grid_FeedIn and Meter_Grid_Consumation=$Meter_Grid_Consumation";
-     return (1,$Meter_Grid_FeedIn,$Meter_Grid_Consumation,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0x4636) {
-     if (length($data) >= 66) {
-         $Meter_Power_Grid_FeedIn = unpack("V*", substr($data, 62, 4));
-		 
-		 if(($Meter_Power_Grid_FeedIn eq -2147483648) || ($Meter_Power_Grid_FeedIn eq 0xFFFFFFFF) || $Meter_Power_Grid_FeedIn < 0) {$Meter_Grid_FeedIn = "-"; }
-     } 
-     else {
-         Log3 ($name, 3, "$name - WARNING - Meter_Power_Grid_FeedIn wasn't deliverd ... set it to \"0\" !");
-         $Meter_Grid_FeedIn = "-";
-     }
-	 
-	 if (length($data) >= 94) {
-         $Meter_Power_Grid_Consumation = unpack("V*", substr($data, 90, 4));
-		 
-		 if(($Meter_Power_Grid_Consumation eq -2147483648) || ($Meter_Power_Grid_Consumation eq 0xFFFFFFFF) || $Meter_Power_Grid_Consumation < 0) {$Meter_Power_Grid_Consumation = "-"; }
-     } 
-     else {
-         Log3 ($name, 3, "$name - WARNING - Meter_Power_Grid_Consumation wasn't deliverd ... set it to \"0\" !");
-         $Meter_Grid_Consumation = "-";
-     }
-	 
-     Log3 $name, 5, "$name - Data Meter_Power_Grid_FeedIn=$Meter_Power_Grid_FeedIn and Meter_Power_Grid_Consumation=$Meter_Power_Grid_Consumation";
-     return (1,$Meter_Power_Grid_FeedIn,$Meter_Power_Grid_Consumation,$inv_susyid,$inv_serial);
- }
- 
-  if($data_ID eq 0x46e8) {
-	 $Meter_Grid_FeedIn_PAC1 = unpack("l*", substr $data, 62, 4);
-     if($Meter_Grid_FeedIn_PAC1 eq -2147483648) {$Meter_Grid_FeedIn_PAC1 = "-"; }   # Catch 0x80000000 as 0 value
-     $Meter_Grid_FeedIn_PAC2 = unpack("l*", substr $data, 90, 4);
-     if($Meter_Grid_FeedIn_PAC2 eq -2147483648) {$Meter_Grid_FeedIn_PAC2 = "-"; }   # Catch 0x80000000 as 0 value
-     $Meter_Grid_FeedIn_PAC3 = unpack("l*", substr $data, 118, 4);
-     if($Meter_Grid_FeedIn_PAC3 eq -2147483648) {$Meter_Grid_FeedIn_PAC3 = "-"; }   # Catch 0x80000000 as 0 value
-     Log3 $name, 5, "$name - Found Data Meter_Grid_FeedIn_PAC1=$Meter_Grid_FeedIn_PAC1 and Meter_Grid_FeedIn_PAC2=$Meter_Grid_FeedIn_PAC2 and Meter_Grid_FeedIn_PAC3=$Meter_Grid_FeedIn_PAC3";
-	 
-	 $Meter_Grid_Consumation_PAC1 = unpack("l*", substr $data, 146, 4);
-     if($Meter_Grid_Consumation_PAC1 eq -2147483648) {$Meter_Grid_Consumation_PAC1 = "-"; }   # Catch 0x80000000 as 0 value
-     $Meter_Grid_Consumation_PAC2 = unpack("l*", substr $data, 174, 4);
-     if($Meter_Grid_Consumation_PAC2 eq -2147483648) {$Meter_Grid_Consumation_PAC2 = "-"; }   # Catch 0x80000000 as 0 value
-     $Meter_Grid_Consumation_PAC3 = unpack("l*", substr $data, 202, 4);
-     if($Meter_Grid_Consumation_PAC3 eq -2147483648) {$Meter_Grid_Consumation_PAC3 = "-"; }   # Catch 0x80000000 as 0 value
-     Log3 $name, 5, "$name - Found Data Meter_Grid_Consumation_PAC1=$Meter_Grid_Consumation_PAC1 and Meter_Grid_Consumation_PAC2=$Meter_Grid_Consumation_PAC2 and Meter_Grid_Consumation_PAC3=$Meter_Grid_Consumation_PAC3";
-
-     return (1,$Meter_Grid_FeedIn_PAC1,$Meter_Grid_FeedIn_PAC2,$Meter_Grid_FeedIn_PAC3,$Meter_Grid_Consumation_PAC1,$Meter_Grid_Consumation_PAC2,$Meter_Grid_Consumation_PAC3,$inv_susyid,$inv_serial);
- }
-#Meter end
-
- if($data_ID eq 0x8234) {
-     $inv_Firmware = hex(unpack("H*", substr $data, 81, 1));
-	 my $INVFWMAIN = $inv_Firmware;
-	 $inv_Firmware = $inv_Firmware .".". hex(unpack("H*", substr $data, 80, 1));
-	 $inv_Firmware = $inv_Firmware .".". hex(unpack("H*", substr $data, 79, 1));
-	 
-	 my $inv_Firmware_X = hex(unpack("H*", substr $data, 78, 1));
-	 
-	 if($inv_Firmware_X == 4)
-	 {
-		$inv_Firmware = $inv_Firmware ." R";
-	 }
-	 else
-	 {
-	    $inv_Firmware = $inv_Firmware ." ?".$inv_Firmware_X;
+		 Log3 $name, 5, "$name - Data Meter_Grid_FeedIn=$Meter_Grid_FeedIn and Meter_Grid_Consumation=$Meter_Grid_Consumation";
+		 return (1,$Meter_Grid_FeedIn,$Meter_Grid_Consumation,$inv_susyid,$inv_serial);
 	 }
 	 
-     Log3 $name, 5, "$name - Found Data Firmware=$inv_Firmware data=$data";
-     return (1,$inv_Firmware,$INVFWMAIN,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x2601) {
-     if (length($data) >= 66) {
-         $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
+	 elsif ($data_ID == 0x4691) {
+		 if (length($data) >= 66) {
+			 $Meter_Grid_FeedIn = unpack("V*", substr($data, 62, 4));
+			 
+			 if(($Meter_Grid_FeedIn eq -2147483648) || ($Meter_Grid_FeedIn eq 0xFFFFFFFF) || $Meter_Grid_FeedIn <= 0) {$Meter_Grid_FeedIn = "-"; }
+		 } 
+		 else {
+			 Log3 ($name, 3, "$name - WARNING - Meter_Grid_FeedIn wasn't deliverd ... set it to \"0\" !");
+			 $Meter_Grid_FeedIn = "-";
+		 }
 		 
-		 if(($inv_SPOT_ETOTAL eq -2147483648) || ($inv_SPOT_ETOTAL eq 0xFFFFFFFF) || $inv_SPOT_ETOTAL <= 0) {$inv_SPOT_ETOTAL = "-"; }
-     } 
-     else {
-         Log3 ($name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !");
-         $inv_SPOT_ETOTAL = "-";
-     }
-
-     $inv_SPOT_ETODAY = "-";
-     if (length($data) >= 82) {
-         $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
+		 if (length($data) >= 82) {
+			 $Meter_Grid_Consumation = unpack("V*", substr($data, 78, 4));
+			 
+			 if(($Meter_Grid_Consumation eq -2147483648) || ($Meter_Grid_Consumation eq 0xFFFFFFFF) || $Meter_Grid_Consumation <= 0) {$Meter_Grid_Consumation = "-"; }
+		 } 
+		 else {
+			 Log3 ($name, 3, "$name - WARNING - Meter_Grid_Consumation wasn't deliverd ... set it to \"0\" !");
+			 $Meter_Grid_Consumation = "-";
+		 }
 		 
-		 if(($inv_SPOT_ETODAY eq -2147483648) || ($inv_SPOT_ETODAY eq 0xFFFFFFFF) || $inv_SPOT_ETODAY <= 0) {$inv_SPOT_ETODAY = "-"; }
-     }
-	 
-     if($inv_SPOT_ETODAY eq "-" && $inv_SPOT_ETOTAL ne "-") {
-         # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
-         Log3 ($name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...");
-         my $etotold = ReadingsNum($name, ".etotal_yesterday", 0);
-         
-         if($etotold && $inv_SPOT_ETOTAL > $etotold) {
-             $inv_SPOT_ETODAY = $inv_SPOT_ETOTAL - $etotold;
-             Log3 ($name, 3, "$name - ETODAY calculated successfully !");
-         } 
-         else {
-             Log3 ($name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !");
-             $inv_SPOT_ETODAY = "-";
-         }
-     }
-
-     Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
-     return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
- }
- #PV Ertrag
-  if($data_ID eq 0x46C3) {
-     if (length($data) >= 66) {
-         $inv_SPOT_EPVTOTAL = unpack("V*", substr($data, 62, 4));
-		 
-		 if(($inv_SPOT_EPVTOTAL eq -2147483648) || ($inv_SPOT_EPVTOTAL eq 0xFFFFFFFF) || $inv_SPOT_EPVTOTAL <= 0) {$inv_SPOT_EPVTOTAL = "-"; }
-     } 
-     else {
-         Log3 ($name, 3, "$name - WARNING - EPVTOTAL wasn't deliverd ... set it to \"0\" !");
-         $inv_SPOT_EPVTOTAL = "-";
-     }
-
-     $inv_SPOT_EPVTODAY = "-";
-     if (length($data) >= 82) {
-         $inv_SPOT_EPVTODAY = unpack("V*", substr ($data, 78, 4));
-		 
-		 if(($inv_SPOT_EPVTODAY eq -2147483648) || ($inv_SPOT_EPVTODAY eq 0xFFFFFFFF) || $inv_SPOT_EPVTODAY <= 0) {$inv_SPOT_EPVTODAY = "-"; }
-     }
-	 
-     if($inv_SPOT_EPVTODAY eq "-" && $inv_SPOT_EPVTOTAL ne "-") {
-         # EPVTODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
-         Log3 ($name, 3, "$name - EPVTODAY wasn't delivered from inverter, try to calculate it ...");
-         my $etotold = ReadingsNum($name, ".epvtotal_yesterday", 0);
-         
-         if($etotold && $inv_SPOT_EPVTOTAL > $etotold) {
-             $inv_SPOT_EPVTODAY = $inv_SPOT_EPVTOTAL - $etotold;
-             Log3 ($name, 3, "$name - EPVTODAY calculated successfully !");
-         } 
-         else {
-             Log3 ($name, 3, "$name - WARNING - unable to calculate EPVTODAY ... set it to \"0\" !");
-             $inv_SPOT_EPVTODAY = "-";
-         }
-     }
-
-     Log3 $name, 5, "$name - Data SPOT_EPVTOTAL=$inv_SPOT_EPVTOTAL and SPOT_EPVTODAY=$inv_SPOT_EPVTODAY";
-     return (1,$inv_SPOT_EPVTODAY,$inv_SPOT_EPVTOTAL,$inv_susyid,$inv_serial);
-  }
-
- if($data_ID eq 0x4967) {
-     if (length($data) >= 66) {
-         $inv_BAT_LOADTOTAL = unpack("V*", substr($data, 62, 4));
-		 
-		 if(($inv_BAT_LOADTOTAL eq -2147483648) || ($inv_BAT_LOADTOTAL eq 0xFFFFFFFF) || $inv_BAT_LOADTOTAL <= 0) {$inv_BAT_LOADTOTAL = "-"; }
-     } 
-     else {
-         Log3 $name, 3, "$name - WARNING - BATTERYLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
-         $inv_BAT_LOADTOTAL = "-";
-     }
-
-     $inv_BAT_LOADTODAY = "-";
-     if (length($data) >= 82) {
-         $inv_BAT_LOADTODAY = unpack("V*", substr ($data, 78, 4));
-		 
-		 if(($inv_BAT_LOADTODAY eq -2147483648) || ($inv_BAT_LOADTODAY eq 0xFFFFFFFF) || $inv_BAT_LOADTODAY <= 0) {$inv_BAT_LOADTODAY = "-"; }
-     } 
-	 
-     if($inv_BAT_LOADTODAY eq "-" && $inv_BAT_LOADTOTAL ne "-")  {
-         # BATTERYLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
-         Log3 $name, 3, "$name - BATTERYLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
-         my $bltotold = ReadingsNum($name, ".bat_loadtotal_yesterday", 0);
-         
-         if($bltotold && $inv_BAT_LOADTOTAL > $bltotold) {
-             $inv_BAT_LOADTODAY = $inv_BAT_LOADTOTAL - $bltotold;
-             Log3 $name, 3, "$name - BATTERYLOAD_TODAY calculated successfully !";
-         } 
-         else {
-             Log3 $name, 3, "$name - WARNING - unable to calculate BATTERYLOAD_TODAY ... set it to \"0\" !";
-             $inv_BAT_LOADTODAY = "-";
-         }
-     }
-
-     Log3 $name, 5, "$name - Data BAT_LOADTOTAL=$inv_BAT_LOADTOTAL and BAT_LOADTODAY=$inv_BAT_LOADTODAY";
-     return (1,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0x4968) {
-     if (length($data) >= 66) {
-         $inv_BAT_UNLOADTOTAL = unpack("V*", substr($data, 62, 4));
-		 
-		 if(($inv_BAT_UNLOADTOTAL eq -2147483648) || ($inv_BAT_UNLOADTOTAL eq 0xFFFFFFFF) || $inv_BAT_UNLOADTOTAL <= 0) {$inv_BAT_UNLOADTOTAL = "-"; }
-     } 
-     else {
-         Log3 $name, 3, "$name - WARNING - BATTERYUNLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
-         $inv_BAT_UNLOADTOTAL = "-";
-     }
-
-     $inv_BAT_UNLOADTODAY = "-";
-     if (length($data) >= 82) {
-         $inv_BAT_UNLOADTODAY = unpack("V*", substr ($data, 78, 4));
-		 
-		 if(($inv_BAT_UNLOADTODAY eq -2147483648) || ($inv_BAT_UNLOADTODAY eq 0xFFFFFFFF) || $inv_BAT_UNLOADTODAY <= 0) {$inv_BAT_UNLOADTODAY = "-"; }
-     } 
-	 
-     if($inv_BAT_UNLOADTODAY eq "-" && $inv_BAT_UNLOADTOTAL ne "-")  {
-         # BATTERYUNLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
-         Log3 $name, 3, "$name - BATTERYUNLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
-         my $bultotold = ReadingsNum($name, ".bat_unloadtotal_yesterday", 0);
-         
-         if($bultotold && $inv_BAT_UNLOADTOTAL > $bultotold) {
-             $inv_BAT_UNLOADTODAY = $inv_BAT_UNLOADTOTAL - $bultotold;
-             Log3 $name, 3, "$name - BATTERYUNLOAD_TODAY calculated successfully !";
-         } 
-         else {
-             Log3 $name, 3, "$name - WARNING - unable to calculate BATTERYUNLOAD_TODAY ... set it to \"0\" !";
-             $inv_BAT_UNLOADTODAY = "-";
-         }
-     }
-
-     Log3 $name, 3, "$name - Data BAT_UNLOADTOTAL=$inv_BAT_UNLOADTOTAL and BAT_UNLOADTODAY=$inv_BAT_UNLOADTODAY";
-     return (1,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x251E) {
-     $inv_SPOT_PDC1 = unpack("l*", substr $data, 62, 4);
-	 #$inv_SPOT_PDC1 = (abs($inv_SPOT_PDC1) eq 2147483648) ? 0 : $inv_SPOT_PDC1;
-	 if(($inv_SPOT_PDC1 eq -2147483648) || ($inv_SPOT_PDC1 eq 0xFFFFFFFF)) {$inv_SPOT_PDC1 = "-"; }
-	 
-     if($size < 90) {$inv_SPOT_PDC2 = "-"; }  else {
-		$inv_SPOT_PDC2 = unpack("l*", substr $data, 90, 4);
-		#$inv_SPOT_PDC2 = (abs($inv_SPOT_PDC2) eq 2147483648) ? 0 : $inv_SPOT_PDC2;
-		if(($inv_SPOT_PDC2 eq -2147483648) || ($inv_SPOT_PDC2 eq 0xFFFFFFFF)) {$inv_SPOT_PDC2 = "-"; }
-	 } # catch short response, in case PDC2 not supported
-	 if($size < 118) {$inv_SPOT_PDC3 = "-"; } else {
-		$inv_SPOT_PDC3 = unpack("l*", substr $data, 118, 4); 
-		#$inv_SPOT_PDC3 = (abs($inv_SPOT_PDC3) eq 2147483648) ? 0 : $inv_SPOT_PDC3;
-		if(($inv_SPOT_PDC3 eq -2147483648) || ($inv_SPOT_PDC3 eq 0xFFFFFFFF)) {$inv_SPOT_PDC3 = "-"; }
-	 } # catch short response, in case PDC3 not supported
-	 
-     Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1, SPOT_PDC2=$inv_SPOT_PDC2 and SPOT_PDC3=$inv_SPOT_PDC3";
-     return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0x46C2) {
-     #$inv_SPOT_PDC = unpack("V*", substr $data, 62, 4);
-     #$inv_SPOT_PDC = ($inv_SPOT_PDC == 2147483648) ? 0 : $inv_SPOT_PDC;
-	 $inv_SPOT_PDC = unpack("l*", substr $data, 62, 4);
-	 if(($inv_SPOT_PDC eq -2147483648) || ($inv_SPOT_PDC eq 0xFFFFFFFF)) {$inv_SPOT_PDC = "-"; }
-     Log3 $name, 5, "$name - Found Data SPOT_PDC=$inv_SPOT_PDC";
-     return (1,$inv_SPOT_PDC,$inv_susyid,$inv_serial);
- } 
-  
- if($data_ID eq 0x4640) {
-     $inv_SPOT_PAC1 = unpack("l*", substr $data, 62, 4);
-     if($inv_SPOT_PAC1 eq -2147483648) {$inv_SPOT_PAC1 = "-"; }   # Catch 0x80000000 as 0 value
-     $inv_SPOT_PAC2 = unpack("l*", substr $data, 90, 4);
-     if($inv_SPOT_PAC2 eq -2147483648) {$inv_SPOT_PAC2 = "-"; }   # Catch 0x80000000 as 0 value
-     $inv_SPOT_PAC3 = unpack("l*", substr $data, 118, 4);
-     if($inv_SPOT_PAC3 eq -2147483648) {$inv_SPOT_PAC3 = "-"; }   # Catch 0x80000000 as 0 value
-     Log3 $name, 5, "$name - Found Data SPOT_PAC1=$inv_SPOT_PAC1 and SPOT_PAC2=$inv_SPOT_PAC2 and SPOT_PAC3=$inv_SPOT_PAC3";
-     return (1,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x411E) {
-     $inv_PACMAX1 = unpack("V*", substr $data, 62, 4);
-     $inv_PACMAX2 = unpack("V*", substr $data, 90, 4);
-     $inv_PACMAX3 = unpack("V*", substr $data, 118, 4);
-     Log3 $name, 5, "$name - Found Data INV_PACMAX1=$inv_PACMAX1 and INV_PACMAX2=$inv_PACMAX2 and INV_PACMAX3=$inv_PACMAX3";
-     return (1,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x832A) {
-     $inv_PACMAX1_2 = unpack("V*", substr $data, 62, 4);
-     Log3 $name, 5, "$name - Found Data INV_PACMAX1_2=$inv_PACMAX1_2";
-     return (1,$inv_PACMAX1_2,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x263F) {
-     $inv_SPOT_PACTOT = unpack("l*", substr $data, 62, 4);
-     if($inv_SPOT_PACTOT eq -2147483648) {$inv_SPOT_PACTOT = 0; }   # Catch 0x80000000 as 0 value
-     
-     Log3 $name, 5, "$name - Found Data SPOT_PACTOT=$inv_SPOT_PACTOT";
-     return (1,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x295A) {
-     $inv_ChargeStatus = unpack("V*", substr $data, 62, 4);
-     Log3 $name, 5, "$name - Found Data Battery Charge Status=$inv_ChargeStatus";
-     return (1,$inv_ChargeStatus,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x696E) {
-     $inv_BAT_CAPACITY = unpack("V*", substr $data, 62, 4);
-     Log3 $name, 5, "$name - Found Data Battery Capacity =$inv_BAT_CAPACITY"; #TTT
-     return (1,$inv_BAT_CAPACITY,$inv_susyid,$inv_serial);
- }
- if($data_ID eq 0x451F) {
-     $inv_SPOT_UDC1 = unpack("l*", substr $data, 62, 4);
-     # catch shorter responses in case not second string supported
-     if($size < 146) {
-        $inv_SPOT_UDC2 = "-";
-		$inv_SPOT_UDC3 = "-";
-        $inv_SPOT_IDC1 = unpack("l*", substr $data, 90, 4);
-        $inv_SPOT_IDC2 = "-";
-		$inv_SPOT_IDC3 = "-";
-     } elsif($size < 194) {
-        $inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
-		$inv_SPOT_UDC3 = "-";
-        $inv_SPOT_IDC1 = unpack("l*", substr $data, 118, 4);
-        $inv_SPOT_IDC2 = unpack("l*", substr $data, 146, 4);
-		$inv_SPOT_IDC3 = "-";
-     } else {
-		$inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
-		$inv_SPOT_UDC3 = unpack("l*", substr $data, 118, 4);
-        $inv_SPOT_IDC1 = unpack("l*", substr $data, 146, 4);
-        $inv_SPOT_IDC2 = unpack("l*", substr $data, 174, 4);
-		$inv_SPOT_IDC3 = unpack("l*", substr $data, 202, 4);
-     }
-     if(($inv_SPOT_UDC1 eq -2147483648) || ($inv_SPOT_UDC1 eq 0xFFFFFFFF)) {$inv_SPOT_UDC1 = 0; } elsif($inv_SPOT_UDC1 ne "-") {$inv_SPOT_UDC1 = $inv_SPOT_UDC1 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UDC2 eq -2147483648) || ($inv_SPOT_UDC2 eq 0xFFFFFFFF)) {$inv_SPOT_UDC2 = 0; } elsif($inv_SPOT_UDC2 ne "-") {$inv_SPOT_UDC2 = $inv_SPOT_UDC2 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if(($inv_SPOT_UDC3 eq -2147483648) || ($inv_SPOT_UDC3 eq 0xFFFFFFFF)) {$inv_SPOT_UDC3 = 0; } elsif($inv_SPOT_UDC3 ne "-") {$inv_SPOT_UDC3 = $inv_SPOT_UDC3 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IDC1 eq -2147483648) || ($inv_SPOT_IDC1 eq 0xFFFFFFFF)) {$inv_SPOT_IDC1 = 0; } elsif($inv_SPOT_IDC1 ne "-") {$inv_SPOT_IDC1 = $inv_SPOT_IDC1 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IDC2 eq -2147483648) || ($inv_SPOT_IDC2 eq 0xFFFFFFFF)) {$inv_SPOT_IDC2 = 0; } elsif($inv_SPOT_IDC2 ne "-") {$inv_SPOT_IDC2 = $inv_SPOT_IDC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IDC3 eq -2147483648) || ($inv_SPOT_IDC3 eq 0xFFFFFFFF)) {$inv_SPOT_IDC3 = 0; } elsif($inv_SPOT_IDC3 ne "-") {$inv_SPOT_IDC3 = $inv_SPOT_IDC3 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 
-     Log3 $name, 5, "$name - Found Data SPOT_UDC1=$inv_SPOT_UDC1, SPOT_UDC2=$inv_SPOT_UDC2, SPOT_UDC3=$inv_SPOT_UDC3, SPOT_IDC1=$inv_SPOT_IDC1, SPOT_IDC2=$inv_SPOT_IDC2 and SPOT_IDC3=$inv_SPOT_IDC3";
-     return (1,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_UDC3,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_SPOT_IDC3,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x4648) {
-     $inv_SPOT_UAC1 = unpack("l*", substr $data, 62, 4);
-     $inv_SPOT_UAC2 = unpack("l*", substr $data, 90, 4);
-     $inv_SPOT_UAC3 = unpack("l*", substr $data, 118, 4);
-	 if($size >= 230) {
-		$inv_SPOT_UAC1_2 = unpack("l*", substr $data, 146, 4);
-		$inv_SPOT_UAC2_3 = unpack("l*", substr $data, 174, 4);
-		$inv_SPOT_UAC3_1 = unpack("l*", substr $data, 202, 4);
-	 }
-	 else
-	 {
-		$inv_SPOT_UAC1_2 = "-";
-		$inv_SPOT_UAC2_3 = "-";
-		$inv_SPOT_UAC3_1 = "-";
+		 Log3 $name, 5, "$name - Data Meter_Grid_FeedIn=$Meter_Grid_FeedIn and Meter_Grid_Consumation=$Meter_Grid_Consumation";
+		 return (1,$Meter_Grid_FeedIn,$Meter_Grid_Consumation,$inv_susyid,$inv_serial);
 	 }
 	 
-	 if($size >= 230) {
-		 $inv_SPOT_CosPhi = unpack("l*", substr $data, 230, 4);
-		 if(($inv_SPOT_CosPhi eq -2147483648) || ($inv_SPOT_CosPhi eq 0xFFFFFFFF)) {$inv_SPOT_CosPhi = "-"; } else {$inv_SPOT_CosPhi = $inv_SPOT_CosPhi / 100; }
+	 elsif ($data_ID == 0x4636) {
+		 if (length($data) >= 66) {
+			 $Meter_Power_Grid_FeedIn = unpack("V*", substr($data, 62, 4));
+			 
+			 if(($Meter_Power_Grid_FeedIn eq -2147483648) || ($Meter_Power_Grid_FeedIn eq 0xFFFFFFFF) || $Meter_Power_Grid_FeedIn < 0) {$Meter_Grid_FeedIn = "-"; }
+		 } 
+		 else {
+			 Log3 ($name, 3, "$name - WARNING - Meter_Power_Grid_FeedIn wasn't deliverd ... set it to \"0\" !");
+			 $Meter_Grid_FeedIn = "-";
+		 }
+		 
+		 if (length($data) >= 94) {
+			 $Meter_Power_Grid_Consumation = unpack("V*", substr($data, 90, 4));
+			 
+			 if(($Meter_Power_Grid_Consumation eq -2147483648) || ($Meter_Power_Grid_Consumation eq 0xFFFFFFFF) || $Meter_Power_Grid_Consumation < 0) {$Meter_Power_Grid_Consumation = "-"; }
+		 } 
+		 else {
+			 Log3 ($name, 3, "$name - WARNING - Meter_Power_Grid_Consumation wasn't deliverd ... set it to \"0\" !");
+			 $Meter_Grid_Consumation = "-";
+		 }
+		 
+		 Log3 $name, 5, "$name - Data Meter_Power_Grid_FeedIn=$Meter_Power_Grid_FeedIn and Meter_Power_Grid_Consumation=$Meter_Power_Grid_Consumation";
+		 return (1,$Meter_Power_Grid_FeedIn,$Meter_Power_Grid_Consumation,$inv_susyid,$inv_serial);
 	 }
-	 else
-	 {
-		$inv_SPOT_CosPhi = "-";
+	 
+	  elsif ($data_ID == 0x46e8) {
+		 $Meter_Grid_FeedIn_PAC1 = unpack("l*", substr $data, 62, 4);
+		 if($Meter_Grid_FeedIn_PAC1 eq -2147483648) {$Meter_Grid_FeedIn_PAC1 = "-"; }   # Catch 0x80000000 as 0 value
+		 $Meter_Grid_FeedIn_PAC2 = unpack("l*", substr $data, 90, 4);
+		 if($Meter_Grid_FeedIn_PAC2 eq -2147483648) {$Meter_Grid_FeedIn_PAC2 = "-"; }   # Catch 0x80000000 as 0 value
+		 $Meter_Grid_FeedIn_PAC3 = unpack("l*", substr $data, 118, 4);
+		 if($Meter_Grid_FeedIn_PAC3 eq -2147483648) {$Meter_Grid_FeedIn_PAC3 = "-"; }   # Catch 0x80000000 as 0 value
+		 Log3 $name, 5, "$name - Found Data Meter_Grid_FeedIn_PAC1=$Meter_Grid_FeedIn_PAC1 and Meter_Grid_FeedIn_PAC2=$Meter_Grid_FeedIn_PAC2 and Meter_Grid_FeedIn_PAC3=$Meter_Grid_FeedIn_PAC3";
+		 
+		 $Meter_Grid_Consumation_PAC1 = unpack("l*", substr $data, 146, 4);
+		 if($Meter_Grid_Consumation_PAC1 eq -2147483648) {$Meter_Grid_Consumation_PAC1 = "-"; }   # Catch 0x80000000 as 0 value
+		 $Meter_Grid_Consumation_PAC2 = unpack("l*", substr $data, 174, 4);
+		 if($Meter_Grid_Consumation_PAC2 eq -2147483648) {$Meter_Grid_Consumation_PAC2 = "-"; }   # Catch 0x80000000 as 0 value
+		 $Meter_Grid_Consumation_PAC3 = unpack("l*", substr $data, 202, 4);
+		 if($Meter_Grid_Consumation_PAC3 eq -2147483648) {$Meter_Grid_Consumation_PAC3 = "-"; }   # Catch 0x80000000 as 0 value
+		 Log3 $name, 5, "$name - Found Data Meter_Grid_Consumation_PAC1=$Meter_Grid_Consumation_PAC1 and Meter_Grid_Consumation_PAC2=$Meter_Grid_Consumation_PAC2 and Meter_Grid_Consumation_PAC3=$Meter_Grid_Consumation_PAC3";
+
+		 return (1,$Meter_Grid_FeedIn_PAC1,$Meter_Grid_FeedIn_PAC2,$Meter_Grid_FeedIn_PAC3,$Meter_Grid_Consumation_PAC1,$Meter_Grid_Consumation_PAC2,$Meter_Grid_Consumation_PAC3,$inv_susyid,$inv_serial);
+	 }
+	#Meter end
+
+	 elsif ($data_ID == 0x8234) {
+		 $inv_Firmware = hex(unpack("H*", substr $data, 81, 1));
+		 my $INVFWMAIN = $inv_Firmware;
+		 $inv_Firmware = $inv_Firmware .".". hex(unpack("H*", substr $data, 80, 1));
+		 $inv_Firmware = $inv_Firmware .".". hex(unpack("H*", substr $data, 79, 1));
+		 
+		 my $inv_Firmware_X = hex(unpack("H*", substr $data, 78, 1));
+		 
+		 if($inv_Firmware_X == 4)
+		 {
+			$inv_Firmware = $inv_Firmware ." R";
+		 }
+		 else
+		 {
+			$inv_Firmware = $inv_Firmware ." ?".$inv_Firmware_X;
+		 }
+		 
+		 Log3 $name, 5, "$name - Found Data Firmware=$inv_Firmware data=$data";
+		 return (1,$inv_Firmware,$INVFWMAIN,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x2601) {
+		 if (length($data) >= 66) {
+			 $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
+			 
+			 if(($inv_SPOT_ETOTAL eq -2147483648) || ($inv_SPOT_ETOTAL eq 0xFFFFFFFF) || $inv_SPOT_ETOTAL <= 0) {$inv_SPOT_ETOTAL = "-"; }
+		 } 
+		 else {
+			 Log3 ($name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !");
+			 $inv_SPOT_ETOTAL = "-";
+		 }
+
+		 $inv_SPOT_ETODAY = "-";
+		 if (length($data) >= 82) {
+			 $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
+			 
+			 if(($inv_SPOT_ETODAY eq -2147483648) || ($inv_SPOT_ETODAY eq 0xFFFFFFFF) || $inv_SPOT_ETODAY <= 0) {$inv_SPOT_ETODAY = "-"; }
+		 }
+		 
+		 if($inv_SPOT_ETODAY eq "-" && $inv_SPOT_ETOTAL ne "-") {
+			 # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
+			 Log3 ($name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...");
+			 my $etotold = ReadingsNum($name, ".etotal_yesterday", 0);
+			 
+			 if($etotold && $inv_SPOT_ETOTAL > $etotold) {
+				 $inv_SPOT_ETODAY = $inv_SPOT_ETOTAL - $etotold;
+				 Log3 ($name, 3, "$name - ETODAY calculated successfully !");
+			 } 
+			 else {
+				 Log3 ($name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !");
+				 $inv_SPOT_ETODAY = "-";
+			 }
+		 }
+
+		 Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
+		 return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
+	 }
+	 #PV Ertrag
+	  elsif ($data_ID == 0x46C3) {
+		 if (length($data) >= 66) {
+			 $inv_SPOT_EPVTOTAL = unpack("V*", substr($data, 62, 4));
+			 
+			 if(($inv_SPOT_EPVTOTAL eq -2147483648) || ($inv_SPOT_EPVTOTAL eq 0xFFFFFFFF) || $inv_SPOT_EPVTOTAL <= 0) {$inv_SPOT_EPVTOTAL = "-"; }
+		 } 
+		 else {
+			 Log3 ($name, 3, "$name - WARNING - EPVTOTAL wasn't deliverd ... set it to \"0\" !");
+			 $inv_SPOT_EPVTOTAL = "-";
+		 }
+
+		 $inv_SPOT_EPVTODAY = "-";
+		 if (length($data) >= 82) {
+			 $inv_SPOT_EPVTODAY = unpack("V*", substr ($data, 78, 4));
+			 
+			 if(($inv_SPOT_EPVTODAY eq -2147483648) || ($inv_SPOT_EPVTODAY eq 0xFFFFFFFF) || $inv_SPOT_EPVTODAY <= 0) {$inv_SPOT_EPVTODAY = "-"; }
+		 }
+		 
+		 if($inv_SPOT_EPVTODAY eq "-" && $inv_SPOT_EPVTOTAL ne "-") {
+			 # EPVTODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
+			 Log3 ($name, 3, "$name - EPVTODAY wasn't delivered from inverter, try to calculate it ...");
+			 my $etotold = ReadingsNum($name, ".epvtotal_yesterday", 0);
+			 
+			 if($etotold && $inv_SPOT_EPVTOTAL > $etotold) {
+				 $inv_SPOT_EPVTODAY = $inv_SPOT_EPVTOTAL - $etotold;
+				 Log3 ($name, 3, "$name - EPVTODAY calculated successfully !");
+			 } 
+			 else {
+				 Log3 ($name, 3, "$name - WARNING - unable to calculate EPVTODAY ... set it to \"0\" !");
+				 $inv_SPOT_EPVTODAY = "-";
+			 }
+		 }
+
+		 Log3 $name, 5, "$name - Data SPOT_EPVTOTAL=$inv_SPOT_EPVTOTAL and SPOT_EPVTODAY=$inv_SPOT_EPVTODAY";
+		 return (1,$inv_SPOT_EPVTODAY,$inv_SPOT_EPVTOTAL,$inv_susyid,$inv_serial);
+	  }
+
+	 elsif ($data_ID == 0x4967) {
+		 if (length($data) >= 66) {
+			 $inv_BAT_LOADTOTAL = unpack("V*", substr($data, 62, 4));
+			 
+			 if(($inv_BAT_LOADTOTAL eq -2147483648) || ($inv_BAT_LOADTOTAL eq 0xFFFFFFFF) || $inv_BAT_LOADTOTAL <= 0) {$inv_BAT_LOADTOTAL = "-"; }
+		 } 
+		 else {
+			 Log3 $name, 3, "$name - WARNING - BATTERYLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
+			 $inv_BAT_LOADTOTAL = "-";
+		 }
+
+		 $inv_BAT_LOADTODAY = "-";
+		 if (length($data) >= 82) {
+			 $inv_BAT_LOADTODAY = unpack("V*", substr ($data, 78, 4));
+			 
+			 if(($inv_BAT_LOADTODAY eq -2147483648) || ($inv_BAT_LOADTODAY eq 0xFFFFFFFF) || $inv_BAT_LOADTODAY <= 0) {$inv_BAT_LOADTODAY = "-"; }
+		 } 
+		 
+		 if($inv_BAT_LOADTODAY eq "-" && $inv_BAT_LOADTOTAL ne "-")  {
+			 # BATTERYLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
+			 Log3 $name, 3, "$name - BATTERYLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
+			 my $bltotold = ReadingsNum($name, ".bat_loadtotal_yesterday", 0);
+			 
+			 if($bltotold && $inv_BAT_LOADTOTAL > $bltotold) {
+				 $inv_BAT_LOADTODAY = $inv_BAT_LOADTOTAL - $bltotold;
+				 Log3 $name, 3, "$name - BATTERYLOAD_TODAY calculated successfully !";
+			 } 
+			 else {
+				 Log3 $name, 3, "$name - WARNING - unable to calculate BATTERYLOAD_TODAY ... set it to \"0\" !";
+				 $inv_BAT_LOADTODAY = "-";
+			 }
+		 }
+
+		 Log3 $name, 5, "$name - Data BAT_LOADTOTAL=$inv_BAT_LOADTOTAL and BAT_LOADTODAY=$inv_BAT_LOADTODAY";
+		 return (1,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial);
 	 }
 	 
-     if(($inv_SPOT_UAC1 eq -2147483648) || ($inv_SPOT_UAC1 eq 0xFFFFFFFF) || $inv_SPOT_UAC1 < 0) {$inv_SPOT_UAC1 = "-"; } else {$inv_SPOT_UAC1 = $inv_SPOT_UAC1 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC2 eq -2147483648) || ($inv_SPOT_UAC2 eq 0xFFFFFFFF) || $inv_SPOT_UAC2 < 0) {$inv_SPOT_UAC2 = "-"; } else {$inv_SPOT_UAC2 = $inv_SPOT_UAC2 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC3 eq -2147483648) || ($inv_SPOT_UAC3 eq 0xFFFFFFFF) || $inv_SPOT_UAC3 < 0) {$inv_SPOT_UAC3 = "-"; } else {$inv_SPOT_UAC3 = $inv_SPOT_UAC3 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if($size >= 230) {
-		if(($inv_SPOT_UAC1_2 eq -2147483648) || ($inv_SPOT_UAC1_2 eq 0xFFFFFFFF) || $inv_SPOT_UAC1_2 < 0) {$inv_SPOT_UAC1_2 = "-"; } else {$inv_SPOT_UAC1_2 = $inv_SPOT_UAC1_2 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-		if(($inv_SPOT_UAC2_3 eq -2147483648) || ($inv_SPOT_UAC2_3 eq 0xFFFFFFFF) || $inv_SPOT_UAC2_3 < 0) {$inv_SPOT_UAC2_3 = "-"; } else {$inv_SPOT_UAC2_3 = $inv_SPOT_UAC2_3 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-		if(($inv_SPOT_UAC3_1 eq -2147483648) || ($inv_SPOT_UAC3_1 eq 0xFFFFFFFF) || $inv_SPOT_UAC3_1 < 0) {$inv_SPOT_UAC3_1 = "-"; } else {$inv_SPOT_UAC3_1 = $inv_SPOT_UAC3_1 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     }
-     Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and inv_SPOT_UAC1_2=$inv_SPOT_UAC1_2 and inv_SPOT_UAC2_3=$inv_SPOT_UAC2_3 and inv_SPOT_UAC3_1=$inv_SPOT_UAC3_1 and inv_SPOT_CosPhi=$inv_SPOT_CosPhi";
-     return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_UAC1_2,$inv_SPOT_UAC2_3,$inv_SPOT_UAC3_1,$inv_SPOT_CosPhi,$inv_susyid,$inv_serial);
- }
- 
-  if($data_ID eq 0x4653) {
-     $inv_SPOT_IAC1 = unpack("l*", substr $data, 62, 4);
-     $inv_SPOT_IAC2 = unpack("l*", substr $data, 90, 4);
-     $inv_SPOT_IAC3 = unpack("l*", substr $data, 118, 4);
-	 
-     if(($inv_SPOT_IAC1 eq -2147483648) || ($inv_SPOT_IAC1 eq 0xFFFFFFFF) || $inv_SPOT_IAC1 < 0) {$inv_SPOT_IAC1 = "-"; } else {$inv_SPOT_IAC1 = $inv_SPOT_IAC1 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IAC2 eq -2147483648) || ($inv_SPOT_IAC2 eq 0xFFFFFFFF) || $inv_SPOT_IAC2 < 0) {$inv_SPOT_IAC2 = "-"; } else {$inv_SPOT_IAC2 = $inv_SPOT_IAC2 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IAC3 eq -2147483648) || ($inv_SPOT_IAC3 eq 0xFFFFFFFF) || $inv_SPOT_IAC3 < 0) {$inv_SPOT_IAC3 = "-"; } else {$inv_SPOT_IAC3 = $inv_SPOT_IAC3 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+	 elsif ($data_ID == 0x4968) {
+		 if (length($data) >= 66) {
+			 $inv_BAT_UNLOADTOTAL = unpack("V*", substr($data, 62, 4));
+			 
+			 if(($inv_BAT_UNLOADTOTAL eq -2147483648) || ($inv_BAT_UNLOADTOTAL eq 0xFFFFFFFF) || $inv_BAT_UNLOADTOTAL <= 0) {$inv_BAT_UNLOADTOTAL = "-"; }
+		 } 
+		 else {
+			 Log3 $name, 3, "$name - WARNING - BATTERYUNLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
+			 $inv_BAT_UNLOADTOTAL = "-";
+		 }
 
-     Log3 $name, 5, "$name - Found Data inv_SPOT_IAC1=$inv_SPOT_IAC1 and inv_SPOT_IAC2=$inv_SPOT_IAC2 and inv_SPOT_IAC3=$inv_SPOT_IAC3";
-     return (1,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0x5746) {
-     $inv_SPOT_IAC1_Backup = unpack("l*", substr $data, 62, 4);
-     $inv_SPOT_IAC2_Backup = unpack("l*", substr $data, 90, 4);
-     $inv_SPOT_IAC3_Backup = unpack("l*", substr $data, 118, 4);
-	 
-     if(($inv_SPOT_IAC1_Backup eq -2147483648) || ($inv_SPOT_IAC1_Backup eq 0xFFFFFFFF) || $inv_SPOT_IAC1_Backup < 0) {$inv_SPOT_IAC1_Backup = "-"; } else {$inv_SPOT_IAC1_Backup = $inv_SPOT_IAC1_Backup / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IAC2_Backup eq -2147483648) || ($inv_SPOT_IAC2_Backup eq 0xFFFFFFFF) || $inv_SPOT_IAC2_Backup < 0) {$inv_SPOT_IAC2_Backup = "-"; } else {$inv_SPOT_IAC2_Backup = $inv_SPOT_IAC2_Backup / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IAC3_Backup eq -2147483648) || ($inv_SPOT_IAC3_Backup eq 0xFFFFFFFF) || $inv_SPOT_IAC3_Backup < 0) {$inv_SPOT_IAC3_Backup = "-"; } else {$inv_SPOT_IAC3_Backup = $inv_SPOT_IAC3_Backup / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 $inv_BAT_UNLOADTODAY = "-";
+		 if (length($data) >= 82) {
+			 $inv_BAT_UNLOADTODAY = unpack("V*", substr ($data, 78, 4));
+			 
+			 if(($inv_BAT_UNLOADTODAY eq -2147483648) || ($inv_BAT_UNLOADTODAY eq 0xFFFFFFFF) || $inv_BAT_UNLOADTODAY <= 0) {$inv_BAT_UNLOADTODAY = "-"; }
+		 } 
+		 
+		 if($inv_BAT_UNLOADTODAY eq "-" && $inv_BAT_UNLOADTOTAL ne "-")  {
+			 # BATTERYUNLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
+			 Log3 $name, 3, "$name - BATTERYUNLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
+			 my $bultotold = ReadingsNum($name, ".bat_unloadtotal_yesterday", 0);
+			 
+			 if($bultotold && $inv_BAT_UNLOADTOTAL > $bultotold) {
+				 $inv_BAT_UNLOADTODAY = $inv_BAT_UNLOADTOTAL - $bultotold;
+				 Log3 $name, 3, "$name - BATTERYUNLOAD_TODAY calculated successfully !";
+			 } 
+			 else {
+				 Log3 $name, 3, "$name - WARNING - unable to calculate BATTERYUNLOAD_TODAY ... set it to \"0\" !";
+				 $inv_BAT_UNLOADTODAY = "-";
+			 }
+		 }
 
-     Log3 $name, 5, "$name - Found Data inv_SPOT_IAC1_Backup=$inv_SPOT_IAC1_Backup and inv_SPOT_IAC2_Backup=$inv_SPOT_IAC2_Backup and inv_SPOT_IAC3_Backup=$inv_SPOT_IAC3_Backup";
-     return (1,$inv_SPOT_IAC1_Backup,$inv_SPOT_IAC2_Backup,$inv_SPOT_IAC3_Backup,$inv_susyid,$inv_serial);
- }
- 
- if ($data_ID eq 0x8937) {
-
-     $inv_BAT_rated_capacity   = unpack("V*", substr $data, 78, 4);
-     
-     Log3 $name, 5, "$name - Found Data and inv_BAT_rated_capacity=$inv_BAT_rated_capacity";
-     return (1,$inv_BAT_rated_capacity,$inv_susyid,$inv_serial);
- }
- 
- if ($data_ID eq 0x4969) {
-
-     $inv_BAT_P_Charge   	= unpack("V*", substr $data, 62, 4);
-     $inv_BAT_P_Discharge   = unpack("V*", substr $data, 90, 4);
-	 
-     Log3 $name, 5, "$name - Found Data inv_BAT_P_Charge=$inv_BAT_P_Charge and inv_BAT_P_Discharge=$inv_BAT_P_Discharge";
-     return (1,$inv_BAT_P_Charge,$inv_BAT_P_Discharge,$inv_susyid,$inv_serial);
- }
- 
- if ($data_ID eq 0x495B && $INVTYPE_NAME =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs) {
-
-     $inv_BAT_TEMP   = unpack("V*", substr $data, 62, 4) / 10;
-     $inv_BAT_UDC    = unpack("V*", substr $data, 90, 4) / 100;
-     $inv_BAT_IDC    = unpack("l*", substr $data, 118, 4);
-     
-     if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
-         $inv_BAT_IDC = "-"; 
-     } 
-     else { 
-         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
-     }
-     
-     Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC (STPxxSE)";
-     return (1,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
- }
- elsif ($data_ID eq 0x495B && $INVTYPE_NAME =~ /SBS(1\.5|2\.0|2\.5)/xs) {
-
-     $inv_BAT_TEMP   = unpack("V*", substr $data, 62, 4) / 10;
-     $inv_BAT_UDC    = unpack("V*", substr $data, 90, 4) / 100;
-     $inv_BAT_IDC    = unpack("l*", substr $data, 118, 4);
-     
-     if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
-         $inv_BAT_IDC = "-"; 
-     } 
-     else { 
-         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
-     }
-     
-     Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC (SBS1.5-2.5)";
-     return (1,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
- }
- elsif($data_ID eq 0x495B) {
-     $count = 0;
-	 $inv_BAT_TEMP = 0;
-	 $inv_BAT_TEMP_A = unpack("V*", substr $data, 62, 4);
-     $inv_BAT_TEMP_B = unpack("V*", substr $data, 90, 4);
-     $inv_BAT_TEMP_C = unpack("V*", substr $data, 118, 4);
-	 if(($inv_BAT_TEMP_A eq -2147483648) || ($inv_BAT_TEMP_A eq 0x80000000) || $inv_BAT_TEMP_A < 0) {$inv_BAT_TEMP_A = "-"; } else {$inv_BAT_TEMP_A = $inv_BAT_TEMP_A / 10; $count = $count + 1; $inv_BAT_TEMP = $inv_BAT_TEMP + $inv_BAT_TEMP_A;}
-	 if(($inv_BAT_TEMP_B eq -2147483648) || ($inv_BAT_TEMP_B eq 0x80000000) || $inv_BAT_TEMP_B < 0) {$inv_BAT_TEMP_B = "-"; } else {$inv_BAT_TEMP_B = $inv_BAT_TEMP_B / 10; $count = $count + 1; $inv_BAT_TEMP = $inv_BAT_TEMP + $inv_BAT_TEMP_B;}
-	 if(($inv_BAT_TEMP_C eq -2147483648) || ($inv_BAT_TEMP_C eq 0x80000000) || $inv_BAT_TEMP_C < 0) {$inv_BAT_TEMP_C = "-"; } else {$inv_BAT_TEMP_C = $inv_BAT_TEMP_C / 10; $count = $count + 1; $inv_BAT_TEMP = $inv_BAT_TEMP + $inv_BAT_TEMP_C;}
-	 
-	 $inv_BAT_TEMP = $inv_BAT_TEMP / $count;
-	 
-	 Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_TEMP_A=$inv_BAT_TEMP_A and BAT_TEMP_B=$inv_BAT_TEMP_B and BAT_TEMP_C=$inv_BAT_TEMP_C";
-	 return (1,$inv_BAT_TEMP,$inv_BAT_TEMP_A,$inv_BAT_TEMP_B,$inv_BAT_TEMP_C,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0x495C) {
-	 $count = 0;
-	 $inv_BAT_UDC = 0;
-	 $inv_BAT_UDC_A = unpack("V*", substr $data, 62, 4);
-     $inv_BAT_UDC_B = unpack("V*", substr $data, 90, 4);
-     $inv_BAT_UDC_C = unpack("V*", substr $data, 118, 4);
-	 if(($inv_BAT_UDC_A eq -2147483648) || ($inv_BAT_UDC_A eq 0xFFFFFFFF) || $inv_BAT_UDC_A < 0) {$inv_BAT_UDC_A = "-"; } else {$inv_BAT_UDC_A = $inv_BAT_UDC_A / 100; $count = $count + 1; $inv_BAT_UDC = $inv_BAT_UDC + $inv_BAT_UDC_A;}
-	 if(($inv_BAT_UDC_B eq -2147483648) || ($inv_BAT_UDC_B eq 0xFFFFFFFF) || $inv_BAT_UDC_B < 0) {$inv_BAT_UDC_B = "-"; } else {$inv_BAT_UDC_B = $inv_BAT_UDC_B / 100; $count = $count + 1; $inv_BAT_UDC = $inv_BAT_UDC + $inv_BAT_UDC_B;}
-	 if(($inv_BAT_UDC_C eq -2147483648) || ($inv_BAT_UDC_C eq 0xFFFFFFFF) || $inv_BAT_UDC_C < 0) {$inv_BAT_UDC_C = "-"; } else {$inv_BAT_UDC_C = $inv_BAT_UDC_C / 100; $count = $count + 1; $inv_BAT_UDC = $inv_BAT_UDC + $inv_BAT_UDC_C;}
-	 
-	 $inv_BAT_UDC = $inv_BAT_UDC / $count;
-	 
-	 Log3 $name, 5, "$name - Found Data and BAT_UDC=$inv_BAT_UDC and BAT_UDC_A=$inv_BAT_UDC_A and BAT_UDC_B=$inv_BAT_UDC_B and BAT_UDC_C=$inv_BAT_UDC_C";
-	 return (1,$inv_BAT_UDC,$inv_BAT_UDC_A,$inv_BAT_UDC_B,$inv_BAT_UDC_C,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x495D) {
-	 $count = 0;
-	 $inv_BAT_IDC = 0;
-	 $inv_BAT_IDC_A = unpack("l*", substr $data, 62, 4);
-     $inv_BAT_IDC_B = unpack("l*", substr $data, 90, 4);
-     $inv_BAT_IDC_C = unpack("l*", substr $data, 118, 4);
-	 if(($inv_BAT_IDC_A eq -2147483648) || ($inv_BAT_IDC_A eq 0x80000000)) {$inv_BAT_IDC_A = "-"; } else {$inv_BAT_IDC_A = $inv_BAT_IDC_A / 1000; $count = $count + 1; $inv_BAT_IDC = $inv_BAT_IDC + $inv_BAT_IDC_A;}
-	 if(($inv_BAT_IDC_B eq -2147483648) || ($inv_BAT_IDC_B eq 0x80000000)) {$inv_BAT_IDC_B = "-"; } else {$inv_BAT_IDC_B = $inv_BAT_IDC_B / 1000; $count = $count + 1; $inv_BAT_IDC = $inv_BAT_IDC + $inv_BAT_IDC_B;}
-	 if(($inv_BAT_IDC_C eq -2147483648) || ($inv_BAT_IDC_C eq 0x80000000)) {$inv_BAT_IDC_C = "-"; } else {$inv_BAT_IDC_C = $inv_BAT_IDC_C / 1000; $count = $count + 1; $inv_BAT_IDC = $inv_BAT_IDC + $inv_BAT_IDC_C;}
-	 
-	 #$inv_BAT_IDC = $inv_BAT_IDC / $count;
-	 
-	 Log3 $name, 5, "$name - Found Data and BAT_IDC=$inv_BAT_IDC and BAT_IDC_A=$inv_BAT_IDC_A and BAT_IDC_B=$inv_BAT_IDC_B and BAT_IDC_C=$inv_BAT_IDC_C";
-	 return (1,$inv_BAT_IDC,$inv_BAT_IDC_A,$inv_BAT_IDC_B,$inv_BAT_IDC_C,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0x491E) {
-     $inv_BAT_CYCLES = unpack("V*", substr $data, 62, 4);
-     $inv_BAT_TEMP   = unpack("V*", substr $data, 90, 4) / 10;
-     $inv_BAT_UDC    = unpack("V*", substr $data, 118, 4) / 100;
-     $inv_BAT_IDC    = unpack("l*", substr $data, 146, 4);
-     
-     if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
-         $inv_BAT_IDC = 0; 
-     } 
-     else { 
-         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
-     }
-     
-     Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
-     return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0x495F) {
- 
-     $inv_BAT_CYCLES = unpack("V*", substr $data, 62, 4);
-	 $inv_BAT_TEMP = unpack("V*", substr $data, 90, 4) / 10;
-	 $inv_BAT_UDC = unpack("V*", substr $data, 118, 4) / 100;
-	 $inv_BAT_IDC = unpack("l*", substr $data, 146, 4);
-	 
-     if($inv_BAT_IDC eq -2147483648) {                                                          # Catch 0x80000000 as 0 value
-         $inv_BAT_IDC = "-"; 
-     } 
-     else { 
-         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
-     } 	
-	 
-     Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
-	 return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0x2377) {
-     $inv_TEMP = unpack("l*", substr $data, 62, 4);
-     
-     if($inv_TEMP eq -2147483648) {                                                             # Catch 0x80000000 as 0 value
-         $inv_TEMP = 0; 
-     } 
-     else { 
-         $inv_TEMP = $inv_TEMP / 100;
-     }
-     
-     Log3 $name, 5, "$name - Found Data Inverter Temp=$inv_TEMP";
-     return (1,$inv_TEMP,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x462E) {
-     $inv_SPOT_OPERTM = int(unpack("V*", substr $data, 62, 4) / 36) / 100;
-	 if($size > 78) {
-		$inv_SPOT_FEEDTM = int(unpack("V*", substr $data, 78, 4) / 36) / 100;
-		
-		Log3 $name, 5, "$name - Found Data SPOT_OPERTM=$inv_SPOT_OPERTM and SPOT_FEEDTM=$inv_SPOT_FEEDTM";
-		return (1,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial);
+		 Log3 $name, 3, "$name - Data BAT_UNLOADTOTAL=$inv_BAT_UNLOADTOTAL and BAT_UNLOADTODAY=$inv_BAT_UNLOADTODAY";
+		 return (1,$inv_BAT_UNLOADTODAY,$inv_BAT_UNLOADTOTAL,$inv_susyid,$inv_serial);
 	 }
-     else
-	 {
-		Log3 $name, 5, "$name - Found Data SPOT_OPERTM=$inv_SPOT_OPERTM and SPOT_FEEDTM=--";
-		return (1,$inv_SPOT_OPERTM,0,$inv_susyid,$inv_serial);
+
+	 elsif ($data_ID == 0x251E) {
+		 $inv_SPOT_PDC1 = unpack("l*", substr $data, 62, 4);
+		 #$inv_SPOT_PDC1 = (abs($inv_SPOT_PDC1) eq 2147483648) ? 0 : $inv_SPOT_PDC1;
+		 if(($inv_SPOT_PDC1 eq -2147483648) || ($inv_SPOT_PDC1 eq 0xFFFFFFFF)) {$inv_SPOT_PDC1 = "-"; }
+		 
+		 if($size < 90) {$inv_SPOT_PDC2 = "-"; }  else {
+			$inv_SPOT_PDC2 = unpack("l*", substr $data, 90, 4);
+			#$inv_SPOT_PDC2 = (abs($inv_SPOT_PDC2) eq 2147483648) ? 0 : $inv_SPOT_PDC2;
+			if(($inv_SPOT_PDC2 eq -2147483648) || ($inv_SPOT_PDC2 eq 0xFFFFFFFF)) {$inv_SPOT_PDC2 = "-"; }
+		 } # catch short response, in case PDC2 not supported
+		 if($size < 118) {$inv_SPOT_PDC3 = "-"; } else {
+			$inv_SPOT_PDC3 = unpack("l*", substr $data, 118, 4); 
+			#$inv_SPOT_PDC3 = (abs($inv_SPOT_PDC3) eq 2147483648) ? 0 : $inv_SPOT_PDC3;
+			if(($inv_SPOT_PDC3 eq -2147483648) || ($inv_SPOT_PDC3 eq 0xFFFFFFFF)) {$inv_SPOT_PDC3 = "-"; }
+		 } # catch short response, in case PDC3 not supported
+		 
+		 Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1, SPOT_PDC2=$inv_SPOT_PDC2 and SPOT_PDC3=$inv_SPOT_PDC3";
+		 return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_susyid,$inv_serial);
 	 }
- }
-
- if($data_ID eq 0x4657) {
-     $inv_SPOT_FREQ = unpack("V*", substr $data, 62, 4);
-     if(($inv_SPOT_FREQ eq -2147483648) || ($inv_SPOT_FREQ eq 0xFFFFFFFF)) {$inv_SPOT_FREQ = 0; } else {$inv_SPOT_FREQ = $inv_SPOT_FREQ / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     Log3 $name, 5, "$name - Found Data SPOT_FREQ=$inv_SPOT_FREQ";
-     return (1,$inv_SPOT_FREQ,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x821E) {
-     $inv_CLASS = unpack("V*", substr $data, 102, 4) & 0x00FFFFFF;
-     $i = 142;                                                                                  # start address of INV_TYPE
-     $inv_TYPE = 0;                                                                             # initialize to unknown inverter type
-     do {
-        $temp = unpack("V*", substr $data, $i, 4);
-        if(($temp & 0xFF000000) eq 0x01000000) { $inv_TYPE = $temp & 0x00FFFFFF; }              # in some models a catalogue is transmitted, right model marked with: 0x01000000 OR INV_Type
-        $i = $i+4;
-     } while ((unpack("V*", substr $data, $i, 4) ne 0x00FFFFFE) && ($i<$size));                 # 0x00FFFFFE is the end marker for attributes
-
-     Log3 $name, 5, "$name - Found Data CLASS=$inv_CLASS and TYPE=$inv_TYPE";
-     return (1,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x4164) {
-     $i = 0;
-     $temp = 0;
-     $inv_GRIDRELAY = 0x00FFFFFD;                                                               # Code for No Information;
-     do {
-         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
-         if(($temp & 0xFF000000) ne 0) { $inv_GRIDRELAY = $temp & 0x00FFFFFF; }
-         $i = $i + 1;
-     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
-         Log3 $name, 5, "$name - Found Data INV_GRIDRELAY=$inv_GRIDRELAY";
-         return (1,$inv_GRIDRELAY,$inv_susyid,$inv_serial);
- }
-
- if($data_ID eq 0x2148) {
-     $i = 0;
-     $temp = 0;
-     $inv_STATUS = 0x00FFFFFD;      # Code for No Information;
-     do {
-         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
-         if(($temp & 0xFF000000) ne 0) { $inv_STATUS = $temp & 0x00FFFFFF; }
-         $i = $i + 1;
-     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));    # 0x00FFFFFE is the end marker for attributes
-         Log3 $name, 5, "$name - Found Data inv_STATUS=$inv_STATUS";
-         return (1,$inv_STATUS,$inv_susyid,$inv_serial);
- }
- 
- if($data_ID eq 0x414D) {
-     $i = 0;
-     $temp = 0;
-     $inv_BAT_STATUS = 0x00FFFFFD;      # Code for No Information;
-     do {
-         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
-         if(($temp & 0xFF000000) ne 0) { $inv_BAT_STATUS = $temp & 0x00FFFFFF; }
-         $i = $i + 1;
-     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));    # 0x00FFFFFE is the end marker for attributes
-         Log3 $name, 5, "$name - Found Data inv_BAT_STATUS=$inv_BAT_STATUS";
-         return (1,$inv_BAT_STATUS,$inv_susyid,$inv_serial);
- } 
-
- if($data_ID eq 0x4125) {
-     $i = 0;
-     $temp = 0;
-     $inv_BACKUPRELAY = 0x00FFFFFD;                                                               # Code for No Information;
-     do {
-         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
-         if(($temp & 0xFF000000) ne 0) { $inv_BACKUPRELAY = $temp & 0x00FFFFFF; }
-         $i = $i + 1;
-     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
-         Log3 $name, 5, "$name - Found Data inv_BACKUPRELAY=$inv_BACKUPRELAY";
-         return (1,$inv_BACKUPRELAY,$inv_susyid,$inv_serial);
- }	
-
- if($data_ID eq 0x46A6) {
-     $i = 0;
-     $temp = 0;
-     $inv_GridConection = 0x00FFFFFD;                                                               # Code for No Information;
-     do {
-         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
-         if(($temp & 0xFF000000) ne 0) { $inv_GridConection = $temp & 0x00FFFFFF; }
-         $i = $i + 1;
-     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
-         Log3 $name, 5, "$name - Found Data inv_GridConection=$inv_GridConection";
-         return (1,$inv_GridConection,$inv_susyid,$inv_serial);
- }	
 	 
- if($data_ID eq 0x412b) {
-     $i = 0;
-     $temp = 0;
-     $inv_OperatingStatus = 0x00FFFFFD;                                                               # Code for No Information;
-     do {
-         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
-         if(($temp & 0xFF000000) ne 0) { $inv_OperatingStatus = $temp & 0x00FFFFFF; }
-         $i = $i + 1;
-     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
-         Log3 $name, 5, "$name - Found Data inv_OperatingStatus=$inv_OperatingStatus";
-         return (1,$inv_OperatingStatus,$inv_susyid,$inv_serial);
- }	 
- 
-  if($data_ID eq 0x4128) {
-     $i = 0;
-     $temp = 0;
-     $inv_GeneralOperatingStatus = 0x00FFFFFD;                                                               # Code for No Information;
-     do {
-         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
-         if(($temp & 0xFF000000) ne 0) { $inv_GeneralOperatingStatus = $temp & 0x00FFFFFF; }
-         $i = $i + 1;
-     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
-         Log3 $name, 5, "$name - Found Data inv_GeneralOperatingStatus=$inv_GeneralOperatingStatus";
-         return (1,$inv_GeneralOperatingStatus,$inv_susyid,$inv_serial);
- }	 
- 
- if($data_ID eq 0x4166) {
+	 elsif ($data_ID == 0x46C2) {
+		 #$inv_SPOT_PDC = unpack("V*", substr $data, 62, 4);
+		 #$inv_SPOT_PDC = ($inv_SPOT_PDC == 2147483648) ? 0 : $inv_SPOT_PDC;
+		 $inv_SPOT_PDC = unpack("l*", substr $data, 62, 4);
+		 if(($inv_SPOT_PDC eq -2147483648) || ($inv_SPOT_PDC eq 0xFFFFFFFF)) {$inv_SPOT_PDC = "-"; }
+		 Log3 $name, 5, "$name - Found Data SPOT_PDC=$inv_SPOT_PDC";
+		 return (1,$inv_SPOT_PDC,$inv_susyid,$inv_serial);
+	 } 
+	  
+	 elsif ($data_ID == 0x4640) {
+		 $inv_SPOT_PAC1 = unpack("l*", substr $data, 62, 4);
+		 if($inv_SPOT_PAC1 eq -2147483648) {$inv_SPOT_PAC1 = "-"; }   # Catch 0x80000000 as 0 value
+		 $inv_SPOT_PAC2 = unpack("l*", substr $data, 90, 4);
+		 if($inv_SPOT_PAC2 eq -2147483648) {$inv_SPOT_PAC2 = "-"; }   # Catch 0x80000000 as 0 value
+		 $inv_SPOT_PAC3 = unpack("l*", substr $data, 118, 4);
+		 if($inv_SPOT_PAC3 eq -2147483648) {$inv_SPOT_PAC3 = "-"; }   # Catch 0x80000000 as 0 value
+		 Log3 $name, 5, "$name - Found Data SPOT_PAC1=$inv_SPOT_PAC1 and SPOT_PAC2=$inv_SPOT_PAC2 and SPOT_PAC3=$inv_SPOT_PAC3";
+		 return (1,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial);
+	 }
 
-     $inv_WaitingTimeUntilFeedIn = unpack("l*", substr $data, 62, 4);
-     Log3 $name, 5, "$name - Found Data inv_WaitingTimeUntilFeedIn=$inv_WaitingTimeUntilFeedIn";
-     return (1,$inv_WaitingTimeUntilFeedIn,$inv_susyid,$inv_serial);
- }		
+	 elsif ($data_ID == 0x411E) {
+		 $inv_PACMAX1 = unpack("V*", substr $data, 62, 4);
+		 $inv_PACMAX2 = unpack("V*", substr $data, 90, 4);
+		 $inv_PACMAX3 = unpack("V*", substr $data, 118, 4);
+		 Log3 $name, 5, "$name - Found Data INV_PACMAX1=$inv_PACMAX1 and INV_PACMAX2=$inv_PACMAX2 and INV_PACMAX3=$inv_PACMAX3";
+		 return (1,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial);
+	 }
 
+	 elsif ($data_ID == 0x832A) {
+		 $inv_PACMAX1_2 = unpack("V*", substr $data, 62, 4);
+		 Log3 $name, 5, "$name - Found Data INV_PACMAX1_2=$inv_PACMAX1_2";
+		 return (1,$inv_PACMAX1_2,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x263F) {
+		 $inv_SPOT_PACTOT = unpack("l*", substr $data, 62, 4);
+		 if($inv_SPOT_PACTOT eq -2147483648) {$inv_SPOT_PACTOT = 0; }   # Catch 0x80000000 as 0 value
+		 
+		 Log3 $name, 5, "$name - Found Data SPOT_PACTOT=$inv_SPOT_PACTOT";
+		 return (1,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x295A) {
+		 $inv_ChargeStatus = unpack("V*", substr $data, 62, 4);
+		 Log3 $name, 5, "$name - Found Data Battery Charge Status=$inv_ChargeStatus";
+		 return (1,$inv_ChargeStatus,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x696E) {
+		 $inv_BAT_CAPACITY = unpack("V*", substr $data, 62, 4);
+		 Log3 $name, 5, "$name - Found Data Battery Capacity =$inv_BAT_CAPACITY"; #TTT
+		 return (1,$inv_BAT_CAPACITY,$inv_susyid,$inv_serial);
+	 }
+	 elsif ($data_ID == 0x451F) {
+		 $inv_SPOT_UDC1 = unpack("l*", substr $data, 62, 4);
+		 # catch shorter responses in case not second string supported
+		 if($size < 146) {
+			$inv_SPOT_UDC2 = "-";
+			$inv_SPOT_UDC3 = "-";
+			$inv_SPOT_IDC1 = unpack("l*", substr $data, 90, 4);
+			$inv_SPOT_IDC2 = "-";
+			$inv_SPOT_IDC3 = "-";
+		 } elsif($size < 194) {
+			$inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
+			$inv_SPOT_UDC3 = "-";
+			$inv_SPOT_IDC1 = unpack("l*", substr $data, 118, 4);
+			$inv_SPOT_IDC2 = unpack("l*", substr $data, 146, 4);
+			$inv_SPOT_IDC3 = "-";
+		 } else {
+			$inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
+			$inv_SPOT_UDC3 = unpack("l*", substr $data, 118, 4);
+			$inv_SPOT_IDC1 = unpack("l*", substr $data, 146, 4);
+			$inv_SPOT_IDC2 = unpack("l*", substr $data, 174, 4);
+			$inv_SPOT_IDC3 = unpack("l*", substr $data, 202, 4);
+		 }
+		 if(($inv_SPOT_UDC1 eq -2147483648) || ($inv_SPOT_UDC1 eq 0xFFFFFFFF)) {$inv_SPOT_UDC1 = 0; } elsif($inv_SPOT_UDC1 ne "-") {$inv_SPOT_UDC1 = $inv_SPOT_UDC1 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_UDC2 eq -2147483648) || ($inv_SPOT_UDC2 eq 0xFFFFFFFF)) {$inv_SPOT_UDC2 = 0; } elsif($inv_SPOT_UDC2 ne "-") {$inv_SPOT_UDC2 = $inv_SPOT_UDC2 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_UDC3 eq -2147483648) || ($inv_SPOT_UDC3 eq 0xFFFFFFFF)) {$inv_SPOT_UDC3 = 0; } elsif($inv_SPOT_UDC3 ne "-") {$inv_SPOT_UDC3 = $inv_SPOT_UDC3 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_IDC1 eq -2147483648) || ($inv_SPOT_IDC1 eq 0xFFFFFFFF)) {$inv_SPOT_IDC1 = 0; } elsif($inv_SPOT_IDC1 ne "-") {$inv_SPOT_IDC1 = $inv_SPOT_IDC1 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_IDC2 eq -2147483648) || ($inv_SPOT_IDC2 eq 0xFFFFFFFF)) {$inv_SPOT_IDC2 = 0; } elsif($inv_SPOT_IDC2 ne "-") {$inv_SPOT_IDC2 = $inv_SPOT_IDC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_IDC3 eq -2147483648) || ($inv_SPOT_IDC3 eq 0xFFFFFFFF)) {$inv_SPOT_IDC3 = 0; } elsif($inv_SPOT_IDC3 ne "-") {$inv_SPOT_IDC3 = $inv_SPOT_IDC3 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 
+		 Log3 $name, 5, "$name - Found Data SPOT_UDC1=$inv_SPOT_UDC1, SPOT_UDC2=$inv_SPOT_UDC2, SPOT_UDC3=$inv_SPOT_UDC3, SPOT_IDC1=$inv_SPOT_IDC1, SPOT_IDC2=$inv_SPOT_IDC2 and SPOT_IDC3=$inv_SPOT_IDC3";
+		 return (1,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_UDC3,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_SPOT_IDC3,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x4648) {
+		 $inv_SPOT_UAC1 = unpack("l*", substr $data, 62, 4);
+		 $inv_SPOT_UAC2 = unpack("l*", substr $data, 90, 4);
+		 $inv_SPOT_UAC3 = unpack("l*", substr $data, 118, 4);
+		 if($size >= 230) {
+			$inv_SPOT_UAC1_2 = unpack("l*", substr $data, 146, 4);
+			$inv_SPOT_UAC2_3 = unpack("l*", substr $data, 174, 4);
+			$inv_SPOT_UAC3_1 = unpack("l*", substr $data, 202, 4);
+		 }
+		 else
+		 {
+			$inv_SPOT_UAC1_2 = "-";
+			$inv_SPOT_UAC2_3 = "-";
+			$inv_SPOT_UAC3_1 = "-";
+		 }
+		 
+		 if($size >= 230) {
+			 $inv_SPOT_CosPhi = unpack("l*", substr $data, 230, 4);
+			 if(($inv_SPOT_CosPhi eq -2147483648) || ($inv_SPOT_CosPhi eq 0xFFFFFFFF)) {$inv_SPOT_CosPhi = "-"; } else {$inv_SPOT_CosPhi = $inv_SPOT_CosPhi / 100; }
+		 }
+		 else
+		 {
+			$inv_SPOT_CosPhi = "-";
+		 }
+		 
+		 if(($inv_SPOT_UAC1 eq -2147483648) || ($inv_SPOT_UAC1 eq 0xFFFFFFFF) || $inv_SPOT_UAC1 < 0) {$inv_SPOT_UAC1 = "-"; } else {$inv_SPOT_UAC1 = $inv_SPOT_UAC1 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_UAC2 eq -2147483648) || ($inv_SPOT_UAC2 eq 0xFFFFFFFF) || $inv_SPOT_UAC2 < 0) {$inv_SPOT_UAC2 = "-"; } else {$inv_SPOT_UAC2 = $inv_SPOT_UAC2 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_UAC3 eq -2147483648) || ($inv_SPOT_UAC3 eq 0xFFFFFFFF) || $inv_SPOT_UAC3 < 0) {$inv_SPOT_UAC3 = "-"; } else {$inv_SPOT_UAC3 = $inv_SPOT_UAC3 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if($size >= 230) {
+			if(($inv_SPOT_UAC1_2 eq -2147483648) || ($inv_SPOT_UAC1_2 eq 0xFFFFFFFF) || $inv_SPOT_UAC1_2 < 0) {$inv_SPOT_UAC1_2 = "-"; } else {$inv_SPOT_UAC1_2 = $inv_SPOT_UAC1_2 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+			if(($inv_SPOT_UAC2_3 eq -2147483648) || ($inv_SPOT_UAC2_3 eq 0xFFFFFFFF) || $inv_SPOT_UAC2_3 < 0) {$inv_SPOT_UAC2_3 = "-"; } else {$inv_SPOT_UAC2_3 = $inv_SPOT_UAC2_3 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+			if(($inv_SPOT_UAC3_1 eq -2147483648) || ($inv_SPOT_UAC3_1 eq 0xFFFFFFFF) || $inv_SPOT_UAC3_1 < 0) {$inv_SPOT_UAC3_1 = "-"; } else {$inv_SPOT_UAC3_1 = $inv_SPOT_UAC3_1 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 }
+		 Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and inv_SPOT_UAC1_2=$inv_SPOT_UAC1_2 and inv_SPOT_UAC2_3=$inv_SPOT_UAC2_3 and inv_SPOT_UAC3_1=$inv_SPOT_UAC3_1 and inv_SPOT_CosPhi=$inv_SPOT_CosPhi";
+		 return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_UAC1_2,$inv_SPOT_UAC2_3,$inv_SPOT_UAC3_1,$inv_SPOT_CosPhi,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x4653) {
+		 $inv_SPOT_IAC1 = unpack("l*", substr $data, 62, 4);
+		 $inv_SPOT_IAC2 = unpack("l*", substr $data, 90, 4);
+		 $inv_SPOT_IAC3 = unpack("l*", substr $data, 118, 4);
+		 
+		 if(($inv_SPOT_IAC1 eq -2147483648) || ($inv_SPOT_IAC1 eq 0xFFFFFFFF) || $inv_SPOT_IAC1 < 0) {$inv_SPOT_IAC1 = "-"; } else {$inv_SPOT_IAC1 = $inv_SPOT_IAC1 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_IAC2 eq -2147483648) || ($inv_SPOT_IAC2 eq 0xFFFFFFFF) || $inv_SPOT_IAC2 < 0) {$inv_SPOT_IAC2 = "-"; } else {$inv_SPOT_IAC2 = $inv_SPOT_IAC2 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_IAC3 eq -2147483648) || ($inv_SPOT_IAC3 eq 0xFFFFFFFF) || $inv_SPOT_IAC3 < 0) {$inv_SPOT_IAC3 = "-"; } else {$inv_SPOT_IAC3 = $inv_SPOT_IAC3 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+
+		 Log3 $name, 5, "$name - Found Data inv_SPOT_IAC1=$inv_SPOT_IAC1 and inv_SPOT_IAC2=$inv_SPOT_IAC2 and inv_SPOT_IAC3=$inv_SPOT_IAC3";
+		 return (1,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x5746) {
+		 $inv_SPOT_IAC1_Backup = unpack("l*", substr $data, 62, 4);
+		 $inv_SPOT_IAC2_Backup = unpack("l*", substr $data, 90, 4);
+		 $inv_SPOT_IAC3_Backup = unpack("l*", substr $data, 118, 4);
+		 
+		 if(($inv_SPOT_IAC1_Backup eq -2147483648) || ($inv_SPOT_IAC1_Backup eq 0xFFFFFFFF) || $inv_SPOT_IAC1_Backup < 0) {$inv_SPOT_IAC1_Backup = "-"; } else {$inv_SPOT_IAC1_Backup = $inv_SPOT_IAC1_Backup / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_IAC2_Backup eq -2147483648) || ($inv_SPOT_IAC2_Backup eq 0xFFFFFFFF) || $inv_SPOT_IAC2_Backup < 0) {$inv_SPOT_IAC2_Backup = "-"; } else {$inv_SPOT_IAC2_Backup = $inv_SPOT_IAC2_Backup / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 if(($inv_SPOT_IAC3_Backup eq -2147483648) || ($inv_SPOT_IAC3_Backup eq 0xFFFFFFFF) || $inv_SPOT_IAC3_Backup < 0) {$inv_SPOT_IAC3_Backup = "-"; } else {$inv_SPOT_IAC3_Backup = $inv_SPOT_IAC3_Backup / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+
+		 Log3 $name, 5, "$name - Found Data inv_SPOT_IAC1_Backup=$inv_SPOT_IAC1_Backup and inv_SPOT_IAC2_Backup=$inv_SPOT_IAC2_Backup and inv_SPOT_IAC3_Backup=$inv_SPOT_IAC3_Backup";
+		 return (1,$inv_SPOT_IAC1_Backup,$inv_SPOT_IAC2_Backup,$inv_SPOT_IAC3_Backup,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x8937) {
+		 $inv_BAT_rated_capacity   = unpack("V*", substr $data, 78, 4);
+		 
+		 Log3 $name, 5, "$name - Found Data and inv_BAT_rated_capacity=$inv_BAT_rated_capacity";
+		 return (1,$inv_BAT_rated_capacity,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x895b) {
+		 $inv_BAT_lower_discharge_limit   = unpack("V*", substr $data, 78, 4);
+		 
+		 Log3 $name, 5, "$name - Found Data and inv_BAT_lower_discharge_limit=$inv_BAT_lower_discharge_limit";
+		 return (1,$inv_BAT_lower_discharge_limit,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x4969) {
+		 $inv_BAT_P_Charge   	= unpack("V*", substr $data, 62, 4);
+		 $inv_BAT_P_Discharge   = unpack("V*", substr $data, 90, 4);
+		 
+		 Log3 $name, 5, "$name - Found Data inv_BAT_P_Charge=$inv_BAT_P_Charge and inv_BAT_P_Discharge=$inv_BAT_P_Discharge";
+		 return (1,$inv_BAT_P_Charge,$inv_BAT_P_Discharge,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x495B) {
+		 if ($INVTYPE_NAME =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs) {
+
+			 $inv_BAT_TEMP   = unpack("V*", substr $data, 62, 4) / 10;
+			 $inv_BAT_UDC    = unpack("V*", substr $data, 90, 4) / 100;
+			 $inv_BAT_IDC    = unpack("l*", substr $data, 118, 4);
+			 
+			 if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
+				 $inv_BAT_IDC = "-"; 
+			 } 
+			 else { 
+				 $inv_BAT_IDC = $inv_BAT_IDC / 1000;
+			 }
+			 
+			 Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC (STPxxSE)";
+			 return (1,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
+		 }
+		 elsif ($INVTYPE_NAME =~ /SBS(1\.5|2\.0|2\.5)/xs) {
+
+			 $inv_BAT_TEMP   = unpack("V*", substr $data, 62, 4) / 10;
+			 $inv_BAT_UDC    = unpack("V*", substr $data, 90, 4) / 100;
+			 $inv_BAT_IDC    = unpack("l*", substr $data, 118, 4);
+			 
+			 if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
+				 $inv_BAT_IDC = "-"; 
+			 } 
+			 else { 
+				 $inv_BAT_IDC = $inv_BAT_IDC / 1000;
+			 }
+			 
+			 Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC (SBS1.5-2.5)";
+			 return (1,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
+		 }
+		 else{
+			 $count = 0;
+			 $inv_BAT_TEMP = 0;
+			 $inv_BAT_TEMP_A = unpack("V*", substr $data, 62, 4);
+			 $inv_BAT_TEMP_B = unpack("V*", substr $data, 90, 4);
+			 $inv_BAT_TEMP_C = unpack("V*", substr $data, 118, 4);
+			 if(($inv_BAT_TEMP_A eq -2147483648) || ($inv_BAT_TEMP_A eq 0x80000000) || $inv_BAT_TEMP_A < 0) {$inv_BAT_TEMP_A = "-"; } else {$inv_BAT_TEMP_A = $inv_BAT_TEMP_A / 10; $count = $count + 1; $inv_BAT_TEMP = $inv_BAT_TEMP + $inv_BAT_TEMP_A;}
+			 if(($inv_BAT_TEMP_B eq -2147483648) || ($inv_BAT_TEMP_B eq 0x80000000) || $inv_BAT_TEMP_B < 0) {$inv_BAT_TEMP_B = "-"; } else {$inv_BAT_TEMP_B = $inv_BAT_TEMP_B / 10; $count = $count + 1; $inv_BAT_TEMP = $inv_BAT_TEMP + $inv_BAT_TEMP_B;}
+			 if(($inv_BAT_TEMP_C eq -2147483648) || ($inv_BAT_TEMP_C eq 0x80000000) || $inv_BAT_TEMP_C < 0) {$inv_BAT_TEMP_C = "-"; } else {$inv_BAT_TEMP_C = $inv_BAT_TEMP_C / 10; $count = $count + 1; $inv_BAT_TEMP = $inv_BAT_TEMP + $inv_BAT_TEMP_C;}
+			 
+			 $inv_BAT_TEMP = $inv_BAT_TEMP / $count;
+			 
+			 Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_TEMP_A=$inv_BAT_TEMP_A and BAT_TEMP_B=$inv_BAT_TEMP_B and BAT_TEMP_C=$inv_BAT_TEMP_C";
+			 return (1,$inv_BAT_TEMP,$inv_BAT_TEMP_A,$inv_BAT_TEMP_B,$inv_BAT_TEMP_C,$inv_susyid,$inv_serial);
+		 }
+	 }
+	 
+	 elsif ($data_ID == 0x495C) {
+		 $count = 0;
+		 $inv_BAT_UDC = 0;
+		 $inv_BAT_UDC_A = unpack("V*", substr $data, 62, 4);
+		 $inv_BAT_UDC_B = unpack("V*", substr $data, 90, 4);
+		 $inv_BAT_UDC_C = unpack("V*", substr $data, 118, 4);
+		 if(($inv_BAT_UDC_A eq -2147483648) || ($inv_BAT_UDC_A eq 0xFFFFFFFF) || $inv_BAT_UDC_A < 0) {$inv_BAT_UDC_A = "-"; } else {$inv_BAT_UDC_A = $inv_BAT_UDC_A / 100; $count = $count + 1; $inv_BAT_UDC = $inv_BAT_UDC + $inv_BAT_UDC_A;}
+		 if(($inv_BAT_UDC_B eq -2147483648) || ($inv_BAT_UDC_B eq 0xFFFFFFFF) || $inv_BAT_UDC_B < 0) {$inv_BAT_UDC_B = "-"; } else {$inv_BAT_UDC_B = $inv_BAT_UDC_B / 100; $count = $count + 1; $inv_BAT_UDC = $inv_BAT_UDC + $inv_BAT_UDC_B;}
+		 if(($inv_BAT_UDC_C eq -2147483648) || ($inv_BAT_UDC_C eq 0xFFFFFFFF) || $inv_BAT_UDC_C < 0) {$inv_BAT_UDC_C = "-"; } else {$inv_BAT_UDC_C = $inv_BAT_UDC_C / 100; $count = $count + 1; $inv_BAT_UDC = $inv_BAT_UDC + $inv_BAT_UDC_C;}
+		 
+		 $inv_BAT_UDC = $inv_BAT_UDC / $count;
+		 
+		 Log3 $name, 5, "$name - Found Data and BAT_UDC=$inv_BAT_UDC and BAT_UDC_A=$inv_BAT_UDC_A and BAT_UDC_B=$inv_BAT_UDC_B and BAT_UDC_C=$inv_BAT_UDC_C";
+		 return (1,$inv_BAT_UDC,$inv_BAT_UDC_A,$inv_BAT_UDC_B,$inv_BAT_UDC_C,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x495D) {
+		 $count = 0;
+		 $inv_BAT_IDC = 0;
+		 $inv_BAT_IDC_A = unpack("l*", substr $data, 62, 4);
+		 $inv_BAT_IDC_B = unpack("l*", substr $data, 90, 4);
+		 $inv_BAT_IDC_C = unpack("l*", substr $data, 118, 4);
+		 if(($inv_BAT_IDC_A eq -2147483648) || ($inv_BAT_IDC_A eq 0x80000000)) {$inv_BAT_IDC_A = "-"; } else {$inv_BAT_IDC_A = $inv_BAT_IDC_A / 1000; $count = $count + 1; $inv_BAT_IDC = $inv_BAT_IDC + $inv_BAT_IDC_A;}
+		 if(($inv_BAT_IDC_B eq -2147483648) || ($inv_BAT_IDC_B eq 0x80000000)) {$inv_BAT_IDC_B = "-"; } else {$inv_BAT_IDC_B = $inv_BAT_IDC_B / 1000; $count = $count + 1; $inv_BAT_IDC = $inv_BAT_IDC + $inv_BAT_IDC_B;}
+		 if(($inv_BAT_IDC_C eq -2147483648) || ($inv_BAT_IDC_C eq 0x80000000)) {$inv_BAT_IDC_C = "-"; } else {$inv_BAT_IDC_C = $inv_BAT_IDC_C / 1000; $count = $count + 1; $inv_BAT_IDC = $inv_BAT_IDC + $inv_BAT_IDC_C;}
+		 
+		 #$inv_BAT_IDC = $inv_BAT_IDC / $count;
+		 
+		 Log3 $name, 5, "$name - Found Data and BAT_IDC=$inv_BAT_IDC and BAT_IDC_A=$inv_BAT_IDC_A and BAT_IDC_B=$inv_BAT_IDC_B and BAT_IDC_C=$inv_BAT_IDC_C";
+		 return (1,$inv_BAT_IDC,$inv_BAT_IDC_A,$inv_BAT_IDC_B,$inv_BAT_IDC_C,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x491E) {
+		 $inv_BAT_CYCLES = unpack("V*", substr $data, 62, 4);
+		 $inv_BAT_TEMP   = unpack("V*", substr $data, 90, 4) / 10;
+		 $inv_BAT_UDC    = unpack("V*", substr $data, 118, 4) / 100;
+		 $inv_BAT_IDC    = unpack("l*", substr $data, 146, 4);
+		 
+		 if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
+			 $inv_BAT_IDC = 0; 
+		 } 
+		 else { 
+			 $inv_BAT_IDC = $inv_BAT_IDC / 1000;
+		 }
+		 
+		 Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
+		 return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x495F) {
+	 
+		 $inv_BAT_CYCLES = unpack("V*", substr $data, 62, 4);
+		 $inv_BAT_TEMP = unpack("V*", substr $data, 90, 4) / 10;
+		 $inv_BAT_UDC = unpack("V*", substr $data, 118, 4) / 100;
+		 $inv_BAT_IDC = unpack("l*", substr $data, 146, 4);
+		 
+		 if($inv_BAT_IDC eq -2147483648) {                                                          # Catch 0x80000000 as 0 value
+			 $inv_BAT_IDC = "-"; 
+		 } 
+		 else { 
+			 $inv_BAT_IDC = $inv_BAT_IDC / 1000;
+		 } 	
+		 
+		 Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
+		 return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x2377) {
+		 $inv_TEMP = unpack("l*", substr $data, 62, 4);
+		 
+		 if($inv_TEMP eq -2147483648) {                                                             # Catch 0x80000000 as 0 value
+			 $inv_TEMP = 0; 
+		 } 
+		 else { 
+			 $inv_TEMP = $inv_TEMP / 100;
+		 }
+		 
+		 Log3 $name, 5, "$name - Found Data Inverter Temp=$inv_TEMP";
+		 return (1,$inv_TEMP,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x462E) {
+		 $inv_SPOT_OPERTM = int(unpack("V*", substr $data, 62, 4) / 36) / 100;
+		 if($size > 78) {
+			$inv_SPOT_FEEDTM = int(unpack("V*", substr $data, 78, 4) / 36) / 100;
+			
+			Log3 $name, 5, "$name - Found Data SPOT_OPERTM=$inv_SPOT_OPERTM and SPOT_FEEDTM=$inv_SPOT_FEEDTM";
+			return (1,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial);
+		 }
+		 else
+		 {
+			Log3 $name, 5, "$name - Found Data SPOT_OPERTM=$inv_SPOT_OPERTM and SPOT_FEEDTM=--";
+			return (1,$inv_SPOT_OPERTM,0,$inv_susyid,$inv_serial);
+		 }
+	 }
+
+	 elsif ($data_ID == 0x4657) {
+		 $inv_SPOT_FREQ = unpack("V*", substr $data, 62, 4);
+		 if(($inv_SPOT_FREQ eq -2147483648) || ($inv_SPOT_FREQ eq 0xFFFFFFFF)) {$inv_SPOT_FREQ = 0; } else {$inv_SPOT_FREQ = $inv_SPOT_FREQ / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+		 Log3 $name, 5, "$name - Found Data SPOT_FREQ=$inv_SPOT_FREQ";
+		 return (1,$inv_SPOT_FREQ,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x821E) {
+		 $inv_CLASS = unpack("V*", substr $data, 102, 4) & 0x00FFFFFF;
+		 $i = 142;                                                                                  # start address of INV_TYPE
+		 $inv_TYPE = 0;                                                                             # initialize to unknown inverter type
+		 do {
+			$temp = unpack("V*", substr $data, $i, 4);
+			if(($temp & 0xFF000000) eq 0x01000000) { $inv_TYPE = $temp & 0x00FFFFFF; }              # in some models a catalogue is transmitted, right model marked with: 0x01000000 OR INV_Type
+			$i = $i+4;
+		 } while ((unpack("V*", substr $data, $i, 4) ne 0x00FFFFFE) && ($i<$size));                 # 0x00FFFFFE is the end marker for attributes
+
+		 Log3 $name, 5, "$name - Found Data CLASS=$inv_CLASS and TYPE=$inv_TYPE";
+		 return (1,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x4164) {
+		 $i = 0;
+		 $temp = 0;
+		 $inv_GRIDRELAY = 0x00FFFFFD;                                                               # Code for No Information;
+		 do {
+			 $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+			 if(($temp & 0xFF000000) ne 0) { $inv_GRIDRELAY = $temp & 0x00FFFFFF; }
+			 $i = $i + 1;
+		 } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
+			 Log3 $name, 5, "$name - Found Data INV_GRIDRELAY=$inv_GRIDRELAY";
+			 return (1,$inv_GRIDRELAY,$inv_susyid,$inv_serial);
+	 }
+
+	 elsif ($data_ID == 0x2148) {
+		 $i = 0;
+		 $temp = 0;
+		 $inv_STATUS = 0x00FFFFFD;      # Code for No Information;
+		 do {
+			 $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+			 if(($temp & 0xFF000000) ne 0) { $inv_STATUS = $temp & 0x00FFFFFF; }
+			 $i = $i + 1;
+		 } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));    # 0x00FFFFFE is the end marker for attributes
+			 Log3 $name, 5, "$name - Found Data inv_STATUS=$inv_STATUS";
+			 return (1,$inv_STATUS,$inv_susyid,$inv_serial);
+	 }
+	 
+	 elsif ($data_ID == 0x414D) {
+		 $i = 0;
+		 $temp = 0;
+		 $inv_BAT_STATUS = 0x00FFFFFD;      # Code for No Information;
+		 do {
+			 $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+			 if(($temp & 0xFF000000) ne 0) { $inv_BAT_STATUS = $temp & 0x00FFFFFF; }
+			 $i = $i + 1;
+		 } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));    # 0x00FFFFFE is the end marker for attributes
+			 Log3 $name, 5, "$name - Found Data inv_BAT_STATUS=$inv_BAT_STATUS";
+			 return (1,$inv_BAT_STATUS,$inv_susyid,$inv_serial);
+	 } 
+
+	 elsif ($data_ID == 0x4125) {
+		 $i = 0;
+		 $temp = 0;
+		 $inv_BACKUPRELAY = 0x00FFFFFD;                                                               # Code for No Information;
+		 do {
+			 $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+			 if(($temp & 0xFF000000) ne 0) { $inv_BACKUPRELAY = $temp & 0x00FFFFFF; }
+			 $i = $i + 1;
+		 } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
+			 Log3 $name, 5, "$name - Found Data inv_BACKUPRELAY=$inv_BACKUPRELAY";
+			 return (1,$inv_BACKUPRELAY,$inv_susyid,$inv_serial);
+	 }	
+
+	 elsif ($data_ID == 0x46A6) {
+		 $i = 0;
+		 $temp = 0;
+		 $inv_GridConection = 0x00FFFFFD;                                                               # Code for No Information;
+		 do {
+			 $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+			 if(($temp & 0xFF000000) ne 0) { $inv_GridConection = $temp & 0x00FFFFFF; }
+			 $i = $i + 1;
+		 } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
+			 Log3 $name, 5, "$name - Found Data inv_GridConection=$inv_GridConection";
+			 return (1,$inv_GridConection,$inv_susyid,$inv_serial);
+	 }	
+		 
+	 elsif ($data_ID == 0x412b) {
+		 $i = 0;
+		 $temp = 0;
+		 $inv_OperatingStatus = 0x00FFFFFD;                                                               # Code for No Information;
+		 do {
+			 $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+			 if(($temp & 0xFF000000) ne 0) { $inv_OperatingStatus = $temp & 0x00FFFFFF; }
+			 $i = $i + 1;
+		 } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
+			 Log3 $name, 5, "$name - Found Data inv_OperatingStatus=$inv_OperatingStatus";
+			 return (1,$inv_OperatingStatus,$inv_susyid,$inv_serial);
+	 }	 
+	 
+	 elsif ($data_ID == 0x4128) {
+		 $i = 0;
+		 $temp = 0;
+		 $inv_GeneralOperatingStatus = 0x00FFFFFD;                                                               # Code for No Information;
+		 do {
+			 $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+			 if(($temp & 0xFF000000) ne 0) { $inv_GeneralOperatingStatus = $temp & 0x00FFFFFF; }
+			 $i = $i + 1;
+		 } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
+			 Log3 $name, 5, "$name - Found Data inv_GeneralOperatingStatus=$inv_GeneralOperatingStatus";
+			 return (1,$inv_GeneralOperatingStatus,$inv_susyid,$inv_serial);
+	 }	
+
+	 elsif ($data_ID == 0x254e) {
+		 $inv_DC_Residual_Current = unpack("V*", substr $data, 62, 4);
+		 $inv_DC_insulation = unpack("V*", substr $data, 90, 4);
+		 
+		 if(($inv_DC_Residual_Current eq 2147483648) || ($inv_DC_Residual_Current eq 0xFFFFFFFF) || $inv_DC_Residual_Current < 0) {$inv_DC_Residual_Current = "-"; } else {$inv_DC_Residual_Current = $inv_DC_Residual_Current / 1000;}
+		 if(($inv_DC_insulation eq 2147483648) || ($inv_DC_insulation eq 0xFFFFFFFF) || $inv_DC_insulation < 0) {$inv_DC_insulation = "-"; }
+		 
+		 
+		 Log3 $name, 5, "$name - Found Data inv_DC_Residual_Current=$inv_DC_Residual_Current and inv_DC_insulation=$inv_DC_insulation";
+		 return (1,$inv_DC_Residual_Current,$inv_DC_insulation,$inv_susyid,$inv_serial);
+	 } 
+	 
+	 elsif ($data_ID == 0x4166) {
+		 $inv_WaitingTimeUntilFeedIn = unpack("l*", substr $data, 62, 4);
+		 Log3 $name, 5, "$name - Found Data inv_WaitingTimeUntilFeedIn=$inv_WaitingTimeUntilFeedIn";
+		 return (1,$inv_WaitingTimeUntilFeedIn,$inv_susyid,$inv_serial);
+	 }
+
+	 else {
+		Log3 $name, 5, "$name - no case";
+     }	 
 
 return 0;
 }
@@ -2695,14 +2511,16 @@ sub SMAInverter_SMAlogon($$$) {
  my ($socket,$data,$size);
 
  # Seriennummer und SuSyID des Ziel-WR setzen
- my $default_target_susyid = $hash->{HELPER}{DEFAULT_TARGET_SUSYID};
- my $default_target_serial = $hash->{HELPER}{DEFAULT_TARGET_SERIAL};
- my $target_susyid = AttrVal($name, "target-susyid", $default_target_susyid);
- my $target_serial = AttrVal($name, "target-serial", $default_target_serial);
-
+ my $default_target_susyid 	= $hash->{HELPER}{DEFAULT_TARGET_SUSYID};
+ my $default_target_serial 	= $hash->{HELPER}{DEFAULT_TARGET_SERIAL};
+ my $target_susyid 			= AttrVal($name, "target-susyid", $default_target_susyid);
+ my $target_serial 			= AttrVal($name, "target-serial", $default_target_serial);
+ my $installer 				= AttrVal($name, "installerLogin", "0");
+ 
  #Encode the password
  $pass = SMAInverter_SMAdecrypt( $pass );
- my $encpasswd = "888888888888888888888888"; # template for password
+ my $encpasswd 	= "888888888888888888888888"; # template for password user
+ $encpasswd 	= "BBBBBBBBBBBBBBBBBBBBBBBB" if($installer == 1); # template for password installer
  for my $index (0..(length $pass) - 1 )        # encode password
  {
     if ( (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1))) < 256 ) {
@@ -2720,10 +2538,13 @@ sub SMAInverter_SMAlogon($$$) {
  $target_ID = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$target_serial));
  $pkt_ID    = 0x8001;   # Reset to 0x8001
  $spkt_ID   = SMAInverter_ByteOrderShort(sprintf("%04X",$pkt_ID));
-
+ my $user 	= "07000000";
+ $user 		= "0A000000" if($installer == 1);
  #Logon command
- $cmd_ID = "0C04FDFF" . "07000000" . "84030000";  # Logon command + User group "User" + (maybe) Timeout
-
+ $cmd_ID = "0C04FDFF" . $user . "84030000";  # Logon command + User group "User" + (maybe) Timeout
+ 
+ #$encpasswd = "0b111cebf0edebedecdcbbbb";
+ 
  #build final command to send
  $cmd = $cmdheader . $pktlength . $esignature . $target_ID . "0001" . $myID . "0001" . "00000000" . $spkt_ID . $cmd_ID . $timestmp . "00000000" . $encpasswd . "00000000";
 
@@ -2742,7 +2563,9 @@ sub SMAInverter_SMAlogon($$$) {
  # Send Data
  $data = pack("H*",$cmd);
  $socket->send($data);
- Log3 $name, 4, "$name - Send login to $host on Port 9522 with password $pass ";
+ my $loginas = "user";
+ $loginas = "installer" if($installer == 1);
+ Log3 $name, 4, "$name - Send login to $host on Port 9522 with password $pass as $loginas";
  Log3 $name, 5, "$name - Send: $cmd ";
 
  # Receive Data and do a first check regarding length
@@ -3202,7 +3025,12 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
     Setup timeout of inverter data request in seconds. (default 60)
   </li>
   <br>
-
+  
+  <a name="installerLogin"></a>
+  <li><b>installerLogin </b><br>
+    Logging in as an installer is required to read some parameters and instantaneous values. (default 0)
+  </li>
+  <br>
 </ul>
 
 <b>Readings</b>
@@ -3271,6 +3099,8 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>INV_OperatingStatus / operating_status</b> 	:  operating status from the Inverter (Parallel grid operation/Backup) (only Hybrid-Inverter)</li>
 <li><b>INV_STATUS / device_status</b>       		:  Inverter Status </li>
 <li><b>INV_FIRMWARE / device_firmware</b>       	:  Inverter firmware version </li>
+<li><b>INV_DC_Insulation / device_dc_insulation</b> :  Insulation resistance in ohms on the DC side (only as Installer)</li>
+<li><b>INV_DC_Residual_Current / device_dc_residual_current</b>:  Fault current in amperes on the DC side (only as Installer)</li>
 <li><b>SPOT_BACKUP_IAC1 / phase_backup_1_iac</b>    :  Backup current phase L1 </li>
 <li><b>SPOT_BACKUP_IAC2 / phase_backup_2_iac</b>    :  Backup current phase L2 </li>
 <li><b>SPOT_BACKUP_IAC3 / phase_backup_3_iac</b>    :  Backup current phase L3 </li>
@@ -3481,6 +3311,11 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
   </li>
   <br>
 
+  <a name="installerLogin"></a>
+  <li><b>installerLogin </b><br>
+    Einloggen als Installateur, wird benötig um manche Parameter und Momentanwerte zu lesen. (default 0)
+  </li>
+  <br>
 </ul>
 
 <b>Readings</b>
@@ -3549,6 +3384,8 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>INV_OperatingStatus / operating_status</b> 	:  Betriebsstatus des Wechselrichters (Netzparallelbetrieb/Backup) (bei Hybridwechselrichtern)</li>
 <li><b>INV_STATUS / device_status</b>       		:  Wechselrichter Status </li>
 <li><b>INV_FIRMWARE / device_firmware</b>       	:  Wechselrichter Firmwareversion </li>
+<li><b>INV_DC_Insulation / device_dc_insulation</b> :  Isolationswiderstand in Ohm der DC Seite (nur als Installateur zu lesen)</li>
+<li><b>INV_DC_Residual_Current / device_dc_residual_current</b>:  Fehlerstrom in Ampere der DC Seite (nur als Installateur zu lesen)</li>
 <li><b>SPOT_BACKUP_IAC1 / phase_backup_1_iac</b>    :  Backup Strom phase L1 </li>
 <li><b>SPOT_BACKUP_IAC2 / phase_backup_2_iac</b>    :  Backup Strom phase L2 </li>
 <li><b>SPOT_BACKUP_IAC3 / phase_backup_3_iac</b>    :  Backup Strom phase L3 </li>
@@ -3593,7 +3430,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.26.0",
+  "version": "v2.28.3",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
