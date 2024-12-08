@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.28.1  08.12.2024  fix delHashRefDeep
 # 1.28.0  07.12.2024  add function delHashRefDeep
 # 1.27.4  05.12.2024  expand evaljson for SolarForecast
 # 1.27.3  26.10.2024  compatibility to SSCam V 9.12.0
@@ -62,7 +63,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.28.0');
+use version 0.77; our $VERSION = version->declare('1.28.1');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -306,13 +307,15 @@ return ($errorcode, $content);
 ###############################################################################
 sub delHashRefDeep {
   my $href = shift // carp $carpnohash && return;
-
-  for my $key (keys %{$href}) { 
-      if (ref $href->{$key} eq 'HASH') { 
-          delHashRefDeep ($href->{$key}); 
-      } 
-      
-      delete $href->{$key}; 
+  
+  if (ref $href eq 'HASH') {
+      for my $key (keys %{$href}) { 
+          if (ref $href->{$key} eq 'HASH') { 
+              delHashRefDeep ($href->{$key}); 
+          } 
+          
+          delete $href->{$key}; 
+      }
   }
 
   $href = undef;          # Optional: Garbage Collection erzwingen 
