@@ -50,6 +50,7 @@ use HttpUtils;
 eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # Debian: sudo apt-get install libjson-perl
 eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval'
 
+use FHEM::SynoModules::ErrCodes qw(:all);                                            # Error Code Modul
 use FHEM::SynoModules::SMUtils qw (checkModVer
                                    evaljson
                                    getClHash
@@ -156,9 +157,15 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.39.2" => "08.12.2024  rollout delHashRefDeep, extended consumer key 'mode' by device/reading combination ",
+  "1.39.1" => "07.12.2024  new control releaseCentralTask, new delHashRefDeep in some cases ".
+                           "possible asynchron mode for setupBatteryDev ",
+  "1.39.0" => "04.12.2024  possible asynchron mode for setupMeterDev, setupInverterDevXX ".
+                           "include FHEM::SynoModules::ErrCodes ",
   "1.38.0" => "30.11.2024  optimize data handling, rename getter solApiData to radiationApiData, ".
                            "set setupStringAzimuth, setupStringDeclination is checked due to dependencies to OpenMeteo ".
-                           "attr setupRadiationAPI and setupWeatherDev1 can be set largely independently of each other ",
+                           "attr setupRadiationAPI and setupWeatherDev1 can be set largely independently of each other ".
+                           "rename sub SolCastAPIVal to RadiationAPIVal ",
   "1.37.9" => "29.11.2024  activate StatusAPI-Hash, Separation of radiation API-data, API-state data, weather-API data ",
   "1.37.8" => "28.11.2024  edit commref, func _searchCacheFiles for renaming Cache files when device is renamed ".
                            "_saveEnergyConsumption: extended for Debug collectData, preparation of weatherApiData ".
@@ -425,8 +432,8 @@ my $epiecMaxCycles = 10;                                                        
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
 my $defmintime     = 60;                                                            # default Einplanungsdauer in Minuten
-my $defctype       = "other";                                                       # default Verbrauchertyp
-my $defcmode       = "can";                                                         # default Planungsmode der Verbraucher
+my $defctype       = 'other';                                                       # default Verbrauchertyp
+my $defcmode       = 'can';                                                         # default Planungsmode der Verbraucher
 my $defpopercent   = 1.0;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
 my $defhyst        = 0;                                                             # default Hysterese
 
@@ -1057,31 +1064,31 @@ my %hef = (                                                                     
 );
 
 my %hcsr = (                                                                                                                               # Funktiontemplate zur Erstellung optionaler Statistikreadings
-  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
-  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => '-'         },
-  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => '-'         },
-  response_message            => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => '-'         },
-  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 'apimaxreq' },
-  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 0           },
-  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 0           },
-  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 'apimaxreq' },
-  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,  par => '',                  unit => '',     def => 'apimaxreq' },
-  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
-  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
-  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => '-'         },
-  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },
-  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,    par => 'tdConFcTillSunset', unit => ' Wh',  def => 0           },
-  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,   par => 99,                  unit => '',     def => '-'         },
-  SunHours_Remain             => { fnr => 4, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
-  SunMinutes_Remain           => { fnr => 4, fn => \&CurrentVal,    par => '',                  unit => '',     def => 0           },
-  dayAfterTomorrowPVforecast  => { fnr => 4, fn => \&SolCastAPIVal, par => 'pv_estimate50',     unit => '',     def => 0           },
-  todayGridFeedIn             => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  todayGridConsumption        => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  todayBatIn                  => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  todayBatOut                 => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => 0           },
-  daysUntilBatteryCare        => { fnr => 4, fn => \&CircularVal,   par => 99,                  unit => '',     def => '-'         },
-  todayConsumptionForecast    => { fnr => 4, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => '-'         },
-  conForecastTillNextSunrise  => { fnr => 4, fn => \&NexthoursVal,  par => 'confc',             unit => ' Wh',  def => 0           },
+  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
+  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
+  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
+  response_message            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
+  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
+  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },
+  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },
+  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
+  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
+  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
+  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
+  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
+  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },
+  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', unit => ' Wh',  def => 0           },
+  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  unit => '',     def => '-'         },
+  SunHours_Remain             => { fnr => 4, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
+  SunMinutes_Remain           => { fnr => 4, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },
+  dayAfterTomorrowPVforecast  => { fnr => 4, fn => \&RadiationAPIVal, par => 'pv_estimate50',     unit => '',     def => 0           },
+  todayGridFeedIn             => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
+  todayGridConsumption        => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
+  todayBatIn                  => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
+  todayBatOut                 => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
+  daysUntilBatteryCare        => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => '-'         },
+  todayConsumptionForecast    => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => '-'         },
+  conForecastTillNextSunrise  => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => 0           },
 );
 
   for my $csr (1..$maxconsumer) {
@@ -1338,7 +1345,7 @@ sub Define {
       notes       => \%vNotesIntern,
       useAPI      => 0,
       useSMUtils  => 1,
-      useErrCodes => 0,
+      useErrCodes => 1,
       useCTZ      => 1,
   };
 
@@ -1415,6 +1422,7 @@ sub _readCacheFile {
           my $valid = $dtree->isa('AI::DecisionTree');
 
           if ($valid) {
+              delHashRefDeep ($data{$type}{$name}{aidectree}{aitrained});
               delete $data{$type}{$name}{aidectree}{aitrained};
               $data{$type}{$name}{aidectree}{aitrained}  = $dtree;
               $data{$type}{$name}{current}{aitrainstate} = 'ok';
@@ -1433,6 +1441,7 @@ sub _readCacheFile {
       my ($err, $data) = fileRetrieve ($file);
 
       if (!$err && $data) {
+          delHashRefDeep ($data{$type}{$name}{aidectree}{airaw});
           delete $data{$type}{$name}{aidectree}{airaw};
           $data{$type}{$name}{aidectree}{airaw}     = $data;
           $data{$type}{$name}{current}{aitrawstate} = 'ok';
@@ -1446,6 +1455,7 @@ sub _readCacheFile {
       my ($err, $statapi) = fileRetrieve ($file);
 
       if (!$err && $statapi) {
+          delHashRefDeep ($data{$type}{$name}{statusapi});
           delete $data{$type}{$name}{statusapi};
           $data{$type}{$name}{statusapi} = $statapi;
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
@@ -1458,6 +1468,7 @@ sub _readCacheFile {
       my ($err, $wthtapi) = fileRetrieve ($file);
 
       if (!$err && $wthtapi) {
+          delHashRefDeep ($data{$type}{$name}{weatherapi});
           delete $data{$type}{$name}{weatherapi};
           $data{$type}{$name}{weatherapi} = $wthtapi;
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
@@ -1470,6 +1481,7 @@ sub _readCacheFile {
       my ($err, $dwdc) = fileRetrieve ($file);
 
       if (!$err && $dwdc) {
+          delHashRefDeep ($data{$type}{$name}{dwdcatalog});
           delete $data{$type}{$name}{dwdcatalog};
           $data{$type}{$name}{dwdcatalog} = $dwdc;
           debugLog ($paref, 'dwdComm', qq{$title restored});
@@ -1791,6 +1803,7 @@ sub _setVictronCredentials {                 ## no critic "not used"
   my ($a,$h) = parseParams ($arg);
 
   if ($a->[0] && $a->[0] eq 'delete') {
+      delHashRefDeep ($data{$type}{$name}{statusapi}{'?VRM'});
       delete $data{$type}{$name}{statusapi}{'?VRM'};
       $msg = qq{Credentials for the Victron VRM API are deleted. };
   }
@@ -2117,7 +2130,10 @@ sub _setreset {                          ## no critic "not used"
           $dday = sprintf "%02d", $dday;
           if ($dhour) {
               $dhour = sprintf "%02d", $dhour;
+              
+              delHashRefDeep ($data{$type}{$name}{pvhist}{$dday}{$dhour});
               delete $data{$type}{$name}{pvhist}{$dday}{$dhour};
+              
               Log3 ($name, 3, qq{$name - Day "$dday" hour "$dhour" deleted from pvHistory});
 
               $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
@@ -2131,11 +2147,13 @@ sub _setreset {                          ## no critic "not used"
               delete $paref->{histname};
           }
           else {
+              delHashRefDeep ($data{$type}{$name}{pvhist}{$dday});
               delete $data{$type}{$name}{pvhist}{$dday};
               Log3 ($name, 3, qq{$name - Day "$dday" deleted from pvHistory});
           }
       }
       else {
+          delHashRefDeep ($data{$type}{$name}{pvhist});
           delete $data{$type}{$name}{pvhist};
           Log3 ($name, 3, qq{$name - all days deleted from pvHistory});
       }
@@ -2279,6 +2297,7 @@ sub _setreset {                          ## no critic "not used"
           Log3 ($name, 3, qq{$name - roofIdentPair: pair key "$pk" deleted});
       }
       else {
+          delHashRefDeep ($data{$type}{$name}{statusapi}{'?IdPair'});
           delete $data{$type}{$name}{statusapi}{'?IdPair'};
           Log3($name, 3, qq{$name - roofIdentPair: all pair keys deleted});
       }
@@ -2879,7 +2898,7 @@ sub __solCast_ApiResponse {
               $period   = $jdata->{'forecasts'}[$k]{'period'};                                           # -> dann bereits beim letzten Abruf gespeicherte Daten der aktuellen Stunde durch 2 teilen damit
               $period   =~ s/.*(\d\d).*/$1/;                                                             # -> die neuen Daten (in dem Fall nur die einer halben Stunde) im nächsten Schritt addiert werden
 
-              my $est50 = SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0) / (60/$period);
+              my $est50 = RadiationAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0) / (60/$period);
               $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = sprintf "%.0f", $est50 if($est50);
 
               $k++;
@@ -2912,7 +2931,7 @@ sub __solCast_ApiResponse {
           if ($debug =~ /apiProcess/x) {                                                                     # nur für Debugging
               if (exists $data{$type}{$name}{solcastapi}{$string}{$starttmstr}) {
                   Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - Start Date/Time: }. $starttmstr);
-                  Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - pv_estimate50 add: }.$pvest50.qq{, contains already: }.SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
+                  Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - pv_estimate50 add: }.$pvest50.qq{, contains already: }.RadiationAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
               }
           }
 
@@ -3768,7 +3787,7 @@ sub __VictronVRM_ApiResponseLogin {
       return;
   }
   elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
-      my ($success) = evaljson($hash, $myjson);
+      my ($success) = evaljson ($hash, $myjson);
 
       if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API response';
@@ -5522,7 +5541,7 @@ sub Attr {
       if ($init_done && $aName eq 'ctrlInterval') {
           _newCycTime ($hash, time, $aVal);
           my $nct = CurrentVal ($hash, 'nextCycleTime', 0);                                     # gespeicherte nächste CyleTime
-          readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual' : FmtTime($nct)), 0);
+          readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
           return;
       }
   }
@@ -5584,7 +5603,19 @@ sub _attrconsumer {                      ## no critic "not used"
       }
 
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
-          return qq{The mode "$h->{mode}" isn't allowed!};
+          if ($h->{mode} =~ /.*:.*/xs) {
+              my ($dv, $rd) = split ':', $h->{mode};
+              ($err)        = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );         
+              return $err if($err);
+              
+              my $mode = ReadingsVal ($dv, $rd, '');
+              if ($mode !~ /^(?:can|must)$/xs) {
+                  return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode";
+              }
+          }
+          else {
+              return qq{The mode "$h->{mode}" isn't allowed!};
+          }
       }
 
       my $valid;
@@ -5668,8 +5699,8 @@ sub _attrconsumer {                      ## no critic "not used"
 
   $data{$type}{$name}{current}{consumerCollected} = 0;                                             # Consumer neu sammeln
 
-  InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
-  InternalTimer (gettimeofday()+2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
+  InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
 
 return;
 }
@@ -5914,9 +5945,9 @@ sub _attrProducerDev {                   ## no critic "not used"
       }
   }
 
-  InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -5976,6 +6007,7 @@ sub _attrInverterDev {                   ## no critic "not used"
       delete $data{$type}{$name}{inverters}{$in}{ilimit};   
       delete $data{$type}{$name}{inverters}{$in}{iicon};
       delete $data{$type}{$name}{inverters}{$in}{istrings};
+      delete $data{$type}{$name}{inverters}{$in}{iasynchron};
       delete $data{$type}{$name}{inverters}{$in}{ifeed};
   }
   elsif ($paref->{cmd} eq 'del') {
@@ -5992,9 +6024,9 @@ sub _attrInverterDev {                   ## no critic "not used"
       }
   }
 
-  InternalTimer (gettimeofday()+0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -6170,6 +6202,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
       delete $data{$type}{$name}{current}{batinstcap};
+      delete $data{$type}{$name}{current}{batasynchron};
   }
 
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
@@ -6337,7 +6370,6 @@ return;
 ###################################################################################
 sub Notify {
   # Es werden nur die Events von Geräten verarbeitet die im Hash $hash->{NOTIFYDEV} gelistet sind (wenn definiert).
-  # Dadurch kann die Menge der Events verringert werden. In sub DbRep_Define angeben.
 
   my $myHash   = shift;
   my $dev_hash = shift;
@@ -6349,20 +6381,104 @@ sub Notify {
   my $events = deviceEvents($dev_hash, 1);
   return if(!$events);
 
-  my $cdref     = CurrentVal ($myHash, 'consumerdevs', '');                               # alle registrierten Consumer und Schaltdevices
+  my $debug = getDebug ($myHash);                                                         # Debug Mode
+  
+  my ($err, $medev, $badev, $h, $async);
+    
+  ## Meter Event?
+  #################
+  ($err, $medev, $h) = isDeviceValid ( { name => $myName, obj => 'setupMeterDev', method => 'attr' } );
+  
+  if (!$err) {
+      if ($devName eq $medev) {
+          $async = $h->{asynchron} // 0;
+          
+          if ($debug =~ /notifyHandling/x) {
+              Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of Meter device >$devName< received - asynchronous mode: $async});
+          }          
+          
+          if ($async) {
+              if (CurrentVal ($myHash, 'ctrunning', 0)) {
+                  if ($debug =~ /notifyHandling/x) {
+                      Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - central task was called from NOTIFY when it is already running ... end this call});
+                  }
+                  
+                  return;
+              }
+              
+              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
+              return;
+          }
+      }
+  }
+  
+  ## Battery Event?
+  ###################
+  ($err, $badev, $h) = isDeviceValid ( { name => $myName, obj => 'setupBatteryDev', method => 'attr' } );
+  
+  if (!$err) {
+      if ($devName eq $badev) {
+          $async = $h->{asynchron} // 0;
+          
+          if ($debug =~ /notifyHandling/x) {
+              Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of Battery device >$devName< received - asynchronous mode: $async});
+          }          
+          
+          if ($async) {
+              if (CurrentVal ($myHash, 'ctrunning', 0)) {
+                  if ($debug =~ /notifyHandling/x) {
+                      Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - central task was called from NOTIFY when it is already running ... end this call});
+                  }
+                  
+                  return;
+              }
+              
+              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
+              return;
+          }
+      }
+  }
+  
+  ## Inverter Event?
+  ####################  
+  for my $in (1..$maxinverter) {
+      $in       = sprintf "%02d", $in;
+      my $iname = InverterVal ($myHash, $in, 'iname', '');
+      
+      if ($devName eq $iname) {
+          my $iasync = InverterVal ($myHash, $in, 'iasynchron', 0);
+
+          if ($debug =~ /notifyHandling/x) {
+              Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of Inverter device >$devName< received - asynchronous mode: $iasync});
+          }
+      
+          if ($iasync) {
+              if (CurrentVal ($myHash, 'ctrunning', 0)) {
+                  if ($debug =~ /notifyHandling/x) {
+                      Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - central task was called from NOTIFY when it is already running ... end this call});
+                  }
+                  
+                  return;
+              }
+              
+              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
+              return;
+          }
+      }
+  }
+  
+  ## consumer Event?
+  ####################
+  my $cdref     = CurrentVal ($myHash, 'consumerdevs', '');                              # alle registrierten Consumer und Schaltdevices
   my @consumers = ();
   @consumers    = @{$cdref} if(ref $cdref eq "ARRAY");
-
-  return if(!@consumers);
-
-  my $debug = getDebug ($myHash);                                                         # Debug Mode
-
-  if (grep /^$devName$/, @consumers) {
-      my ($cname, $cindex);
+  
+  if (@consumers && grep /^$devName$/, @consumers) {
+      my ($cname, $cindex, $dswname);
       my $type = $myHash->{TYPE};
 
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$myName}{consumers}}) {
-          my ($err, $cname, $dswname) = getCDnames ($myHash, $c);
+          ($err, $cname, $dswname) = getCDnames ($myHash, $c);
 
           if ($devName eq $cname) {
               $cindex = $c;
@@ -6390,7 +6506,7 @@ sub Notify {
          return;
       }
 
-      my $async    = ConsumerVal ($myHash, $cindex, 'asynchron',      0);
+      $async       = ConsumerVal ($myHash, $cindex, 'asynchron',      0);
       my $rswstate = ConsumerVal ($myHash, $cindex, 'rswstate', 'state');
 
       if ($debug =~ /notifyHandling/x) {
@@ -6474,6 +6590,7 @@ sub Rename {
   my $type = (split '::', __PACKAGE__)[1];
   
   $data{$type}{$new_name} = $data{$type}{$old_name};
+  delHashRefDeep ($data{$type}{$old_name});
   delete $data{$type}{$old_name}; 
 
   my @ftd = _searchCacheFiles ($old_name);
@@ -6557,6 +6674,7 @@ sub Delete {
 
   my $type = $hash->{TYPE};
 
+  delHashRefDeep ($data{$type}{$name});
   delete $data{$type}{$name};
 
 return;
@@ -6697,6 +6815,7 @@ sub delConsumerFromMem {
       }
   }
 
+  delHashRefDeep ($data{$type}{$name}{consumers}{$c});
   delete $data{$type}{$name}{consumers}{$c};
 
   Log3 ($name, 3, qq{$name - Consumer "$c - $calias" deleted from memory});
@@ -6937,8 +7056,8 @@ sub runTask {
   my ($interval, $disabled, $inactive) = controller ($name);
 
   if (!$interval) {
-      $hash->{MODE} = 'Manual';
-      storeReading ('nextCycletime', 'Manual');
+      $hash->{MODE} = 'Manual / Event-controlled';
+      storeReading ('nextCycletime', 'Manual / Event-controlled');
       return;
   }
 
@@ -6969,6 +7088,7 @@ sub runTask {
               Log3 ($name, 1, "$name DEBUG> INFO - runTask starts data collection at the end of an hour");
           }
 
+          releaseCentralTask ($hash);
           centralTask ($hash, 1);
       }
   }
@@ -6983,7 +7103,8 @@ sub runTask {
           if ($debug =~ /collectData/x) {
               Log3 ($name, 1, "$name DEBUG> INFO - runTask starts data collection at the beginning of an hour");
           }
-
+          
+          releaseCentralTask ($hash);
           centralTask ($hash, 1);
       }
   }
@@ -7003,14 +7124,14 @@ sub _newCycTime {
   my $interval = shift;
 
   if (!$interval) {
-      $hash->{MODE} = 'Manual';
+      $hash->{MODE} = 'Manual / Event-controlled';
       $data{$hash->{TYPE}}{$hash->{NAME}}{current}{nextCycleTime} = 0;
-      storeReading ('nextCycletime', 'Manual');
+      storeReading ('nextCycletime', 'Manual / Event-controlled');
       return;
   }
 
   my $new       = $t + $interval;                                                # nächste Wiederholungszeit
-  $hash->{MODE} = 'Automatic - next Cycletime: '.FmtTime($new);
+  $hash->{MODE} = 'Automatic / Event-controlled - next planned Cycletime: '.FmtTime($new);
 
   $data{$hash->{TYPE}}{$hash->{NAME}}{current}{nextCycleTime} = $new;
   storeReading ('nextCycletime', FmtTime($new));
@@ -7101,8 +7222,8 @@ sub centralTask {
   ##########################################################################################################################    
   if (exists $data{$type}{$name}{solcastapi}{'?IdPair'}) {                             # 29.11.2024
       for my $pk (keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}}) {                
-          my $apikey = SolCastAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
-          my $rtid   = SolCastAPIVal ($hash, '?IdPair', $pk, 'rtid', '');
+          my $apikey = RadiationAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
+          my $rtid   = RadiationAPIVal ($hash, '?IdPair', $pk, 'rtid', '');
           
           if ($apikey && $rtid) {
               $data{$type}{$name}{statusapi}{'?IdPair'}{$pk}{rtid}   = $rtid;
@@ -7117,7 +7238,7 @@ sub centralTask {
       my ($rapi, $wapi) = getStatusApiName ($hash); 
       
       for my $key (keys %{$data{$type}{$name}{solcastapi}{'?All'}{'?All'}}) {         
-          my $val = SolCastAPIVal ($hash, '?All', '?All', $key, '');
+          my $val = RadiationAPIVal ($hash, '?All', '?All', $key, '');
           
           if ($rapi && $val) {
               $data{$type}{$name}{statusapi}{$rapi}{'?All'}{$key} = $val;
@@ -7138,21 +7259,16 @@ sub centralTask {
  
   delete $data{$type}{$name}{solcastapi}{'?All'} if(!keys %{$data{$type}{$name}{solcastapi}{'?All'}});
   
-  my $vrmcr = SolCastAPIVal ($hash, '?VRM', '?API', 'credentials', '');               # 29.11.2024
+  my $vrmcr = RadiationAPIVal ($hash, '?VRM', '?API', 'credentials', '');               # 29.11.2024
   if ($vrmcr) {
       $data{$type}{$name}{statusapi}{'?VRM'}{'?API'}{credentials} = $vrmcr;
       delete $data{$type}{$name}{solcastapi}{'?VRM'};
   }
+  
   ##########################################################################################################################
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);                                                           # disabled / inactive
-
-  if (CurrentVal ($hash, 'ctrunning', 0)) {
-      Log3 ($name, 3, "$name - INFO - central task was called when it was already running ... end this call");
-      $data{$type}{$name}{current}{ctrunning} = 0;
-      return;
-  }
 
   if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
       my $ret = createStringConfig ($hash);
@@ -7166,6 +7282,11 @@ sub centralTask {
           return;
       }
   }
+  
+  if (CurrentVal ($hash, 'ctrunning', 0)) {
+      Log3 ($name, 3, "$name - INFO - central task was called when it was already running ... end this call");      
+      return;
+  }
 
   my $t       = time;                                                                          # aktuelle Unix-Zeit
   my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
@@ -7176,6 +7297,8 @@ sub centralTask {
   my $debug   = getDebug ($hash);                                                              # Debug Module
 
   $data{$type}{$name}{current}{ctrunning} = 1;                                                 # Central Task running Statusbit
+
+  InternalTimer (gettimeofday() + 1.2, "FHEM::SolarForecast::releaseCentralTask", $hash, 0);   # Freigabe centralTask 
 
   my $centpars = {
       name    => $name,
@@ -7237,14 +7360,12 @@ sub centralTask {
 
   if ($evt) {
       $centpars->{evt} = $evt;
-      InternalTimer(gettimeofday()+1, "FHEM::SolarForecast::singleUpdateState", {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}}, 0);
+      InternalTimer (gettimeofday() + 1, "FHEM::SolarForecast::singleUpdateState", {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}}, 0);
   }
   else {
       $centpars->{evt} = 1;
       singleUpdateState ( {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}} );
   }
-
-  $data{$type}{$name}{current}{ctrunning} = 0;
 
 return;
 }
@@ -7258,6 +7379,7 @@ sub createStringConfig {                 ## no critic "not used"
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
+  delHashRefDeep ($data{$type}{$name}{strings});
   delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
   $data{$type}{$name}{current}{allStringsFullfilled} = 0;
 
@@ -7535,7 +7657,7 @@ sub _collectAllRegConsumers {
           my ($err) = isDeviceValid ( { name => $name, obj => $dswitch, method => 'string' } );
           next if($err);
 
-          push @{$data{$type}{$name}{current}{consumerdevs}}, $dswitch;                           # Switchdevice zusätzlich in CurrentHash eintragen
+          push @{$data{$type}{$name}{current}{consumerdevs}}, $dswitch if($dswitch ne $consumer); # Switchdevice zusätzlich in CurrentHash eintragen
       }
       else {
           $dswitch = $consumer;
@@ -7765,6 +7887,7 @@ sub _specialActivities {
           $data{$type}{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
           delete $data{$type}{$name}{circular}{99}{tdayDvtn};
 
+          delHashRefDeep ($data{$type}{$name}{pvhist}{$day});
           delete $data{$type}{$name}{pvhist}{$day};                                              # den (alten) aktuellen Tag aus History löschen
 
           writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration sichern
@@ -7926,7 +8049,10 @@ sub __delObsoleteAPIData {
   ## Wetter-API Daten löschen
   #############################
   if (keys %{$data{$type}{$name}{weatherapi}}) {
-      delete $data{$type}{$name}{weatherapi}{OpenMeteo}    if($wapi ne 'OpenMeteo');       
+      if ($wapi ne 'OpenMeteo') {
+          delHashRefDeep ($data{$type}{$name}{weatherapi}{OpenMeteo});
+          delete $data{$type}{$name}{weatherapi}{OpenMeteo}; 
+      }      
   }
   
   ## Status-API Daten löschen
@@ -7953,9 +8079,13 @@ sub __delObsoleteAPIData {
           }
       }
 
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ##########################################################################################################################    
+      # 01.12.2024
       for my $idx (keys %{$data{$type}{$name}{solcastapi}{'?All'}}) {                      # Wetterindexe löschen (kann später raus)
           delete $data{$type}{$name}{solcastapi}{'?All'}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);
       }
+  #####################################################################################################################
   }
 
   ## veraltete Strings aus Strings-Hash löschen
@@ -7990,6 +8120,7 @@ sub _transferWeatherValues {
 
   my $type = $paref->{type};
 
+  delHashRefDeep ($data{$type}{$name}{weatherdata});
   delete $data{$type}{$name}{weatherdata};                                                     # Wetterdaten Hash löschen
 
   $paref->{apiu}   = $apiu;                                                                    # API wird verwendet
@@ -8340,7 +8471,7 @@ sub _transferAPIRadiationValues {
       my $nhtstr           = 'NextHour'.sprintf "%02d", $num;
       my ($wtday, $wthour) = $wantdt =~ /(\d{2})\s(\d{2}):/xs;
       my $hod              = sprintf "%02d", int $wthour + 1;                                              # Stunde des Tages
-      my $rad1h            = SolCastAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
+      my $rad1h            = RadiationAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
 
       $paref->{wantdt} = $wantdt;
       $paref->{wantts} = $wantts;
@@ -8556,7 +8687,7 @@ sub __calcPVestimates {
       }
 
       $peak  *= 1000;
-      my $est = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0);
+      my $est = RadiationAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0);
       my $pv  = sprintf "%.1f", ($est * $hc);                                                         # Korrekturfaktor anwenden
 
       my $invcap = 0;
@@ -8784,9 +8915,9 @@ sub _transferInverterValues {
 
       next if(!$pvread || !$edread);
 
-      my $pvuf = $pvunit =~ /^kW$/xi ? 1000 : 1;
-      my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                             # aktuelle Erzeugung (W)
-      $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                                   # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
+      my $pvuf     = $pvunit =~ /^kW$/xi ? 1000 : 1;
+      my $pv       = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                         # aktuelle Erzeugung (W)
+      $pv          = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
 
       my $etuf     = $etunit =~ /^kWh$/xi ? 1000 : 1;
       my $etotal   = ReadingsNum ($indev, $edread, 0) * $etuf;                                         # Erzeugung total (Wh)
@@ -8838,6 +8969,7 @@ sub _transferInverterValues {
       $data{$type}{$name}{inverters}{$in}{ilimit}      = $h->{limit} // 100;                            # Wirkleistungsbegrenzung
       $data{$type}{$name}{inverters}{$in}{iicon}       = $h->{icon}      if($h->{icon});                # Icon des Inverters
       $data{$type}{$name}{inverters}{$in}{istrings}    = $h->{strings}   if($h->{strings});             # dem Inverter zugeordnete Strings
+      $data{$type}{$name}{inverters}{$in}{iasynchron}  = $h->{asynchron} if($h->{asynchron});           # Inverter Mode
       $data{$type}{$name}{inverters}{$in}{ifeed}       = $feed;                                         # Eigenschaften der Energielieferung
       
       $pvsum        += $pv;
@@ -9308,9 +9440,10 @@ sub _transferBatteryValues {
   storeReading ('Current_PowerBatOut', (int $pbo).' W');
   storeReading ('Current_BatCharge',   $soc.' %');
 
-  $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
-  $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
-  $data{$type}{$name}{current}{batcharge}   = $soc;                                           # aktuelle Batterieladung
+  $data{$type}{$name}{current}{powerbatin}   = int $pbi;                                      # Hilfshash Wert aktuelle Batterieladung
+  $data{$type}{$name}{current}{powerbatout}  = int $pbo;                                      # Hilfshash Wert aktuelle Batterieentladung
+  $data{$type}{$name}{current}{batcharge}    = $soc;                                          # aktuelle Batterieladung
+  $data{$type}{$name}{current}{batasynchron} = $h->{asynchron} if($h->{asynchron});           # asynchroner Modus = X 
 
   push @{$data{$type}{$name}{current}{socslidereg}}, $soc;                                    # Schieberegister Batterie SOC
   limitArray ($data{$type}{$name}{current}{socslidereg}, $slidenumdef);
@@ -10350,7 +10483,7 @@ sub ___doPlanning {
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - epiece1: $epiece1});
 
-  my $mode         = ConsumerVal ($hash, $c, 'mode',          'can');
+  my $mode         = getConsumerPlanningMode ($hash, $c);                                              # Planungsmode 'can' oder 'must'
   my $calias       = ConsumerVal ($hash, $c, 'alias',            '');
   my $mintime      = ConsumerVal ($hash, $c, 'mintime', $defmintime);                                  # Einplanungsdauer
   my $oldplanstate = ConsumerVal ($hash, $c, 'planstate',        '');                                  # V. 1.35.0
@@ -10891,8 +11024,8 @@ sub ___switchConsumerOn {
   }
 
   if ($auto && $oncom && $swoncond && !$swoffcond && !$iilt &&                                    # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
-      $simpCstat =~ /planned|priority|starting/xs && $isInTime) {                                 # Verbraucher Start ist geplant && Startzeit überschritten
-      my $mode   = ConsumerVal ($hash, $c, "mode", $defcmode);                                    # Consumer Planungsmode
+        $simpCstat =~ /planned|priority|starting/xs && $isInTime) {                               # Verbraucher Start ist geplant && Startzeit überschritten
+      my $mode   = getConsumerPlanningMode        ($hash, $c);                                    # Planungsmode 'can' oder 'must'
       my $enable = ___enableSwitchByBatPrioCharge ($paref);                                       # Vorrangladung Batterie ?
 
       debugLog ($paref, "consumerSwitching${c}", qq{Consumer switch enable by battery state: $enable});
@@ -10967,9 +11100,9 @@ sub ___switchConsumerOff {
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
   my $auto    = ConsumerVal ($hash, $c, "auto",              1);
   my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
-  my $mode    = ConsumerVal ($hash, $c, "mode",      $defcmode);                                  # Consumer Planungsmode
   my $hyst    = ConsumerVal ($hash, $c, "hysteresis", $defhyst);                                  # Hysterese
 
+  my $mode                     = getConsumerPlanningMode ($hash, $c);                             # Planungsmode 'can' oder 'must'
   my $offcom                   = ConsumerVal        ($hash, $c, 'offcom', '');                    # Set Command für "off"
   my ($swoffcond,$infoff,$err) = isAddSwitchOffCond ($hash, $c);                                  # zusätzliche Switch off Bedingung
   my $simpCstat                = simplifyCstate     ($pstate);
@@ -17777,6 +17910,43 @@ return;
 }
 
 ################################################################
+#         Zentralschleife freigeben
+################################################################
+sub releaseCentralTask {
+  my $hash = shift;
+
+  RemoveInternalTimer ($hash, 'FHEM::SolarForecast::releaseCentralTask');
+  
+  $data{$hash->{TYPE}}{$hash->{NAME}}{current}{ctrunning} = 0;
+
+return;
+}
+
+################################################################
+#          Hash Referenz rekursiv löschen
+#
+# Stellt sicher, dass alle verschachtelten Strukturen explizit 
+# gelöscht werden. Dies ist besonders nützlich um 
+# sicherzustellen, dass keine zirkulären Referenzen bestehen, 
+# die die Speicherfreigabe verhindern könnten.
+################################################################
+sub delHashRefDeep {
+  my $href = shift;
+
+  for my $key (keys %{$href}) { 
+      if (ref $href->{$key} eq 'HASH') { 
+          delHashRefDeep ($href->{$key}); 
+      } 
+      
+      delete $href->{$key}; 
+  }
+
+  $href = undef;          # Optional: Garbage Collection erzwingen 
+
+return;
+}
+
+################################################################
 #  erstellt einen Debug-Eintrag im Log
 ################################################################
 sub debugLog {
@@ -17828,27 +17998,29 @@ sub createAssociatedWith {
 
       my $fcdev1 = AttrVal ($name, 'setupWeatherDev1', '');                  # Weather forecast Device 1
       ($afc,$h)  = parseParams ($fcdev1);
-      $fcdev1    = $afc->[0] // "";
+      $fcdev1    = $afc->[0] // '';
 
       my $fcdev2 = AttrVal ($name, 'setupWeatherDev2', '');                  # Weather forecast Device 2
       ($afc,$h)  = parseParams ($fcdev2);
-      $fcdev2    = $afc->[0] // "";
+      $fcdev2    = $afc->[0] // '';
 
       my $fcdev3 = AttrVal ($name, 'setupWeatherDev3', '');                  # Weather forecast Device 3
       ($afc,$h)  = parseParams ($fcdev3);
-      $fcdev3    = $afc->[0] // "";
+      $fcdev3    = $afc->[0] // '';
 
       my $radev = AttrVal ($name, 'setupRadiationAPI', '');                  # Radiation forecast Device
       ($ara,$h) = parseParams ($radev);
-      $radev    = $ara->[0] // "";
+      $radev    = $ara->[0] // '';
 
       my $medev = AttrVal ($name, 'setupMeterDev', '');                      # Meter Device
       ($ame,$h) = parseParams ($medev);
-      $medev    = $ame->[0] // "";
+      $medev    = $ame->[0] // '';
+      push @cd, $medev;
 
       my $badev = AttrVal ($name, 'setupBatteryDev', '');                    # Battery Device
       ($aba,$h) = parseParams ($badev);
-      $badev    = $aba->[0] // "";
+      $badev    = $aba->[0] // '';
+      push @cd, $badev;
 
       for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {     # Consumer Devices
           my $consumer = AttrVal ($name, "consumer${c}", "");
@@ -17857,6 +18029,13 @@ sub createAssociatedWith {
           my $dswitch  = $hc->{switchdev} // '';                             # alternatives Schaltdevice
           push @cd, $codev   if($codev);
           push @cd, $dswitch if($dswitch);
+      }
+      
+      for my $in (1..$maxinverter) {                                         # Inverter Devices
+          $in       = sprintf "%02d", $in;
+          my $inc   = AttrVal ($name, "setupInverterDev${in}", "");
+          my ($ind) = parseParams ($inc);
+          push @cd, $ind->[0] if($ind->[0]);
       }
 
       @nd = @cd;
@@ -17875,13 +18054,6 @@ sub createAssociatedWith {
           push @nd, $prd->[0] if($prd->[0]);
       }
       
-      for my $in (1..$maxinverter) {                                        # Inverter Devices
-          $in      = sprintf "%02d", $in;
-          my $inc   = AttrVal ($name, "setupInverterDev${in}", "");
-          my ($ind) = parseParams ($inc);
-          push @nd, $ind->[0] if($ind->[0]);
-      }
-
       my @ndn = ();
 
       for my $e (@nd) {
@@ -17906,6 +18078,44 @@ sub createAssociatedWith {
   }
 
 return;
+}
+
+################################################################
+#  Funktion liefert den Planungsmodus eines Verbrauchers
+#  mode kann sein:
+#       can
+#       must
+################################################################
+sub getConsumerPlanningMode {
+  my $hash = shift;
+  my $c    = shift;
+
+  my $name = $hash->{NAME};
+  my $mode = ConsumerVal ($hash, $c, 'mode', $defcmode);                                    # Consumer Planungsmode
+
+  if ($mode =~ /^(?:can|must)$/xs) {
+      return $mode;
+  }
+  
+  ## Mode kann über Device:Reading gesteuert sein
+  #################################################
+  my ($dv, $rd) = split ':', $mode;
+  my ($err)     = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );
+
+  if ($err) {
+      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to '$defcmode' mode.});
+      return $defcmode;
+  }
+  
+  $err  = q{};
+  $mode = ReadingsVal ($dv, $rd, '');
+  
+  if ($mode !~ /^(?:can|must)$/xs) {
+      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to '$defcmode' mode.});
+      return $defcmode;
+  }
+
+return $mode;
 }
 
 ################################################################
@@ -19583,7 +19793,7 @@ return $def;
 # Usage:
 # StringVal ($hash, $strg, $key, $def)
 #
-# $strg:        - Name des Strings aus setupStringPeak
+# $strg:        - Name des Strings aus setupInverterStrings
 # $key:  peak   - Peakleistung aus setupStringPeak
 #        tilt   - Neigungswinkel der Module aus setupStringDeclination
 #        dir    - Ausrichtung der Module als Azimut-Bezeichner (N,NE,E,SE,S,SW,W,NW)
@@ -19820,7 +20030,7 @@ return $def;
 ##########################################################################################################################################################
 # Wert des solcastapi-Hash zurückliefern
 # Usage:
-# SolCastAPIVal ($hash, $tring, $ststr, $key, $def)
+# RadiationAPIVal ($hash, $tring, $ststr, $key, $def)
 #
 # $tring:  Stringname aus "setupInverterStrings" (?All für allg. Werte)
 # $ststr:  Startzeit der Form YYYY-MM-DD hh:00:00
@@ -19829,9 +20039,9 @@ return $def;
 # $def:    Defaultwert
 #
 # Sonderabfragen:
-# SolCastAPIVal ($hash, '?All', $ststr, 'Rad1h', $def) - Globalstrahlung mit Startzeit ohne Stringbezug
+# RadiationAPIVal ($hash, '?All', $ststr, 'Rad1h', $def) - Globalstrahlung mit Startzeit ohne Stringbezug
 ##########################################################################################################################################################
-sub SolCastAPIVal {
+sub RadiationAPIVal {
   my $hash   = shift;
   my $string = shift;
   my $ststr  = shift;
@@ -20867,6 +21077,7 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>iasynchron </b>     </td><td>Mode of processing received inverter events                      </td></tr>
             <tr><td> <b>ietotal </b>        </td><td>total energy generated by the inverter to date (Wh)              </td></tr>
             <tr><td> <b>ifeed </b>          </td><td>Energy supply characteristics                                    </td></tr>
             <tr><td> <b>igeneration </b>    </td><td>current PV generation (W)                                        </td></tr>
@@ -21062,124 +21273,125 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-            <tr><td> <b>type</b>           </td><td>Type of consumer. The following types are allowed:                                                                                             </td></tr>
-            <tr><td>                       </td><td><b>dishwasher</b>     - Consumer is a dishwasher                                                                                               </td></tr>
-            <tr><td>                       </td><td><b>dryer</b>          - Consumer is a tumble dryer                                                                                             </td></tr>
-            <tr><td>                       </td><td><b>washingmachine</b> - Consumer is a washing machine                                                                                          </td></tr>
-            <tr><td>                       </td><td><b>heater</b>         - Consumer is a heating rod                                                                                              </td></tr>
-            <tr><td>                       </td><td><b>charger</b>        - Consumer is a charging device (battery, car, bicycle, etc.)                                                            </td></tr>
-            <tr><td>                       </td><td><b>other</b>          - Consumer is none of the above types                                                                                    </td></tr>
-            <tr><td>                       </td><td><b>noSchedule</b>     - there is no scheduling or automatic switching for the consumer.                                                        </td></tr>
+            <tr><td> <b>type</b>           </td><td>Type of consumer. The following types are allowed:                                                                                                </td></tr>
+            <tr><td>                       </td><td><b>dishwasher</b>     - Consumer is a dishwasher                                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>dryer</b>          - Consumer is a tumble dryer                                                                                                </td></tr>
+            <tr><td>                       </td><td><b>washingmachine</b> - Consumer is a washing machine                                                                                             </td></tr>
+            <tr><td>                       </td><td><b>heater</b>         - Consumer is a heating rod                                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>charger</b>        - Consumer is a charging device (battery, car, bicycle, etc.)                                                               </td></tr>
+            <tr><td>                       </td><td><b>other</b>          - Consumer is none of the above types                                                                                       </td></tr>
+            <tr><td>                       </td><td><b>noSchedule</b>     - there is no scheduling or automatic switching for the consumer.                                                           </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                                                    Display functions or manual switching are available.                                                                                           </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>power</b>          </td><td>nominal power consumption of the consumer (see data sheet) in W                                                                                </td></tr>
-            <tr><td>                       </td><td>(can be set to "0")                                                                                                                            </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.   </td></tr>
-            <tr><td>                       </td><td>The key is useful for consumers where energy measurement and switching is carried out with different devices                                   </td></tr>
-            <tr><td>                       </td><td>e.g. Homematic or readingsProxy. If switchdev is specified, the keys on, off, swstate, auto, asynchronous refer to this device.                </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>mode</b>           </td><td>Consumer planning mode (optional). Allowed are:                                                                                                </td></tr>
-            <tr><td>                       </td><td><b>can</b>  - Scheduling takes place at the time when there is probably enough PV surplus available (default).                                 </td></tr>
-            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The consumer is not started at the time of planning if the PV surplus is insufficient.        </td></tr>
-            <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                         </td></tr>
+                                                    Display functions or manual switching are available.                                                                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>power</b>          </td><td>nominal power consumption of the consumer (see data sheet) in W                                                                                   </td></tr>
+            <tr><td>                       </td><td>(can be set to "0")                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.      </td></tr>
+            <tr><td>                       </td><td>The key is useful for consumers where energy measurement and switching is carried out with different devices                                      </td></tr>
+            <tr><td>                       </td><td>e.g. Homematic or readingsProxy. If switchdev is specified, the keys on, off, swstate, auto, asynchronous refer to this device.                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>mode</b>           </td><td>Consumer planning mode (optional). Allowed are:                                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>can</b>  - Scheduling takes place at the time when there is probably enough PV surplus available (default).                                    </td></tr>
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The consumer is not started at the time of planning if the PV surplus is insufficient.           </td></tr>
+            <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                            </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The load is started even if there is insufficient PV surplus, provided that
-                                                    a set "swoncond" condition is met and "swoffcond" is not met.                                                                                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>icon</b>           </td><td>Icon and, if applicable, its color for displaying the consumer in the overview graphic (optional)                                              </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>mintime</b>        </td><td>Scheduling duration (minutes or "SunPath") of the consumer. (optional)                                                                         </td></tr>
-            <tr><td>                       </td><td>By specifying <b>SunPath</b>, planning is done according to sunrise and sunset.                                                                </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - scheduling takes place from sunrise to sunset.                                 </td></tr>
-            <tr><td>                       </td><td> Optionally, a positive / negative shift (minutes) of the planning time regarding sunrise or sunset can be specified.                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td>                       </td><td>If mintime is not specified, a standard scheduling duration according to the following table is used.                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td>                       </td><td><b>Default mintime by consumer type:</b>                                                                                                       </td></tr>
-            <tr><td>                       </td><td>- dishwasher: 180 minutes                                                                                                                      </td></tr>
-            <tr><td>                       </td><td>- dryer: 90 minutes                                                                                                                            </td></tr>
-            <tr><td>                       </td><td>- washingmachine: 120 minutes                                                                                                                  </td></tr>
-            <tr><td>                       </td><td>- heater: 240 minutes                                                                                                                          </td></tr>
-            <tr><td>                       </td><td>- charger: 120 minutes                                                                                                                         </td></tr>
-            <tr><td>                       </td><td>- other: 60 minutes                                                                                                                            </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>on</b>             </td><td>Set command for switching on the consumer (optional)                                                                                           </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>off</b>            </td><td>Set command for switching off the consumer (optional)                                                                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>swstate</b>        </td><td>Reading which indicates the switching status of the consumer (default: 'state').                                                               </td></tr>
-            <tr><td>                       </td><td><b>on-Regex</b> - regular expression for the state 'on' (default: 'on')                                                                        </td></tr>
-            <tr><td>                       </td><td><b>off-Regex</b> - regular expression for the state 'off' (default: 'off')                                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command     </td></tr>.
-            <tr><td>                       </td><td>by polling within a data collection interval (synchronous) or additionally by event processing (asynchronous).                                 </td></tr>
-            <tr><td>                       </td><td><b>0</b> - only synchronous processing of switching states (default)                                                                           </td></tr>
-            <tr><td>                       </td><td><b>1</b> - additional asynchronous processing of switching states through event processing                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Schedule start time consumer not before specified time 'hour[:minute]' (optional)                                                              </td></tr>
-            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Schedule start time consumer not after specified time 'hour[:minute]' (optional)                                                               </td></tr>
-            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>auto</b>           </td><td>Reading in the consumer device which enables or blocks the switching of the consumer (optional)                                                </td></tr>
-            <tr><td>                       </td><td>If the key switchdev is given, the reading is set and evaluated in this device.                                                                </td></tr>
-            <tr><td>                       </td><td>Reading value = 1 - switching enabled (default), 0: switching blocked                                                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Reading:Unit (W/kW) which provides the current energy consumption (optional)                                                                   </td></tr>
-            <tr><td>                       </td><td>:&lt;Threshold&gt; (W) - From this power reference on, the consumer is considered active. The specification is optional (default: 0)           </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>Reading:Unit (Wh/kWh) of the consumer device that supplies the sum of the consumed energy (optional)                                           </td></tr>
-            <tr><td>                       </td><td>:&lt;Threshold&gt (Wh) - From this energy consumption per hour, the consumption is considered valid. Optional specification (default: 0)       </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>swoncond</b>       </td><td>Condition that must also be fulfilled in order to switch on the consumer (optional). The scheduled cycle is started.                           </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device to supply the additional switch-on condition                                                                            </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading for delivery of the additional switch-on condition                                                                    </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>swoffcond</b>      </td><td>priority condition to switch off the consumer (optional). The scheduled cycle is stopped.                                                      </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device to supply the priority switch-off condition                                                                             </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading for the delivery of the priority switch-off condition                                                                 </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                       </td></tr>
-            <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                       </td></tr>
-            <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                  </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device to deliver the condition                                                                                                </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading which contains the condition                                                                                          </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>interruptable</b>  </td><td>defines the possible interruption options for the consumer after it has been started (optional)                                                </td></tr>
-            <tr><td>                       </td><td><b>0</b> - Load is not temporarily switched off even if the PV surplus falls below the required energy (default)                               </td></tr>
-            <tr><td>                       </td><td><b>1</b> - Load is temporarily switched off if the PV surplus falls below the required energy                                                  </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading:Regex[:Hysteresis]</b> - Load is temporarily interrupted if the value of the specified                                       </td></tr>
-            <tr><td>                       </td><td>Device:Readings match on the regex or if is insufficient PV surplus (if power not equal to 0).                                                 </td></tr>
-            <tr><td>                       </td><td>If the value no longer matches, the interrupted load is switched on again if there is sufficient                                               </td></tr>
-            <tr><td>                       </td><td>PV surplus provided (if power is not 0).                                                                                                       </td></tr>
-            <tr><td>                       </td><td>If the optional <b>hysteresis</b> is specified, the hysteresis value is subtracted from the reading value and the regex is then applied.       </td></tr>
-            <tr><td>                       </td><td>If this and the original reading value match, the consumer is temporarily interrupted.                                                         </td></tr>
-            <tr><td>                       </td><td>The consumer is continued if both the original and the subtracted readings value do not (or no longer) match.                                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>locktime</b>       </td><td>Blocking times in seconds for switching the consumer (optional).                                                                               </td></tr>
-            <tr><td>                       </td><td><b>offlt</b> - Blocking time in seconds after the consumer has been switched off or interrupted                                                </td></tr>
-            <tr><td>                       </td><td><b>onlt</b> - Blocking time in seconds after the consumer has been switched on or continued                                                    </td></tr>
-            <tr><td>                       </td><td>The consumer is only switched again when the corresponding blocking time has elapsed.                                                          </td></tr>
-            <tr><td>                       </td><td><b>Note:</b> The 'locktime' switch is only effective in automatic mode.                                                                        </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>noshow</b>         </td><td>Hide or show consumers in graphic (optional).                                                                                                  </td></tr>
-            <tr><td>                       </td><td><b>0</b> - the consumer is displayed (default)                                                                                                 </td></tr>
-            <tr><td>                       </td><td><b>1</b> - the consumer is hidden                                                                                                              </td></tr>
-            <tr><td>                       </td><td><b>2</b> - the consumer is hidden in the consumer legend                                                                                       </td></tr>
-            <tr><td>                       </td><td><b>3</b> - the consumer is hidden in the flow chart                                                                                            </td></tr>
-            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading in the consumer or optionally an alternative device.                                                         </td></tr>
-            <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                   </td></tr>
-            <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>exconfc</b>        </td><td>Use of the consumer's recorded energy consumption to create the consumption forecast (optional).                                               </td></tr>
-            <tr><td>                       </td><td><b>0</b> - the consumer's historical energy consumption is used to create the consumption forecast (default)                                   </td></tr>
-            <tr><td>                       </td><td><b>1</b> - the consumer's historical energy consumption is excluded from the consumption forecast.                                             </td></tr>
+                                                    a set "swoncond" condition is met and "swoffcond" is not met.                                                                                     </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading combination to be able to change the planning mode dynamically. The reading must return 'can' or 'must'.   </td></tr>            
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>icon</b>           </td><td>Icon and, if applicable, its color for displaying the consumer in the overview graphic (optional)                                                 </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>mintime</b>        </td><td>Scheduling duration (minutes or "SunPath") of the consumer. (optional)                                                                            </td></tr>
+            <tr><td>                       </td><td>By specifying <b>SunPath</b>, planning is done according to sunrise and sunset.                                                                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - scheduling takes place from sunrise to sunset.                                    </td></tr>
+            <tr><td>                       </td><td> Optionally, a positive / negative shift (minutes) of the planning time regarding sunrise or sunset can be specified.                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td>                       </td><td>If mintime is not specified, a standard scheduling duration according to the following table is used.                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>Default mintime by consumer type:</b>                                                                                                          </td></tr>
+            <tr><td>                       </td><td>- dishwasher: 180 minutes                                                                                                                         </td></tr>
+            <tr><td>                       </td><td>- dryer: 90 minutes                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>- washingmachine: 120 minutes                                                                                                                     </td></tr>
+            <tr><td>                       </td><td>- heater: 240 minutes                                                                                                                             </td></tr>
+            <tr><td>                       </td><td>- charger: 120 minutes                                                                                                                            </td></tr>
+            <tr><td>                       </td><td>- other: 60 minutes                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>on</b>             </td><td>Set command for switching on the consumer (optional)                                                                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>off</b>            </td><td>Set command for switching off the consumer (optional)                                                                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Reading which indicates the switching status of the consumer (default: 'state').                                                                  </td></tr>
+            <tr><td>                       </td><td><b>on-Regex</b> - regular expression for the state 'on' (default: 'on')                                                                           </td></tr>
+            <tr><td>                       </td><td><b>off-Regex</b> - regular expression for the state 'off' (default: 'off')                                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command        </td></tr>.
+            <tr><td>                       </td><td>by polling within a data collection interval (synchronous) or additionally by event processing (asynchronous).                                    </td></tr>
+            <tr><td>                       </td><td><b>0</b> - only synchronous processing of switching states (default)                                                                              </td></tr>
+            <tr><td>                       </td><td><b>1</b> - additional asynchronous processing of switching states through event processing                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Schedule start time consumer not before specified time 'hour[:minute]' (optional)                                                                 </td></tr>
+            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Schedule start time consumer not after specified time 'hour[:minute]' (optional)                                                                  </td></tr>
+            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>auto</b>           </td><td>Reading in the consumer device which enables or blocks the switching of the consumer (optional)                                                   </td></tr>
+            <tr><td>                       </td><td>If the key switchdev is given, the reading is set and evaluated in this device.                                                                   </td></tr>
+            <tr><td>                       </td><td>Reading value = 1 - switching enabled (default), 0: switching blocked                                                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Reading:Unit (W/kW) which provides the current energy consumption (optional)                                                                      </td></tr>
+            <tr><td>                       </td><td>:&lt;Threshold&gt; (W) - From this power reference on, the consumer is considered active. The specification is optional (default: 0)              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>Reading:Unit (Wh/kWh) of the consumer device that supplies the sum of the consumed energy (optional)                                              </td></tr>
+            <tr><td>                       </td><td>:&lt;Threshold&gt (Wh) - From this energy consumption per hour, the consumption is considered valid. Optional specification (default: 0)          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>swoncond</b>       </td><td>Condition that must also be fulfilled in order to switch on the consumer (optional). The scheduled cycle is started.                              </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device to supply the additional switch-on condition                                                                               </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading for delivery of the additional switch-on condition                                                                       </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>swoffcond</b>      </td><td>priority condition to switch off the consumer (optional). The scheduled cycle is stopped.                                                         </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device to supply the priority switch-off condition                                                                                </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading for the delivery of the priority switch-off condition                                                                    </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                          </td></tr>
+            <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                          </td></tr>
+            <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                     </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device to deliver the condition                                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading which contains the condition                                                                                             </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>interruptable</b>  </td><td>defines the possible interruption options for the consumer after it has been started (optional)                                                   </td></tr>
+            <tr><td>                       </td><td><b>0</b> - Load is not temporarily switched off even if the PV surplus falls below the required energy (default)                                  </td></tr>
+            <tr><td>                       </td><td><b>1</b> - Load is temporarily switched off if the PV surplus falls below the required energy                                                     </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading:Regex[:Hysteresis]</b> - Load is temporarily interrupted if the value of the specified                                          </td></tr>
+            <tr><td>                       </td><td>Device:Readings match on the regex or if is insufficient PV surplus (if power not equal to 0).                                                    </td></tr>
+            <tr><td>                       </td><td>If the value no longer matches, the interrupted load is switched on again if there is sufficient                                                  </td></tr>
+            <tr><td>                       </td><td>PV surplus provided (if power is not 0).                                                                                                          </td></tr>
+            <tr><td>                       </td><td>If the optional <b>hysteresis</b> is specified, the hysteresis value is subtracted from the reading value and the regex is then applied.          </td></tr>
+            <tr><td>                       </td><td>If this and the original reading value match, the consumer is temporarily interrupted.                                                            </td></tr>
+            <tr><td>                       </td><td>The consumer is continued if both the original and the subtracted readings value do not (or no longer) match.                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>locktime</b>       </td><td>Blocking times in seconds for switching the consumer (optional).                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>offlt</b> - Blocking time in seconds after the consumer has been switched off or interrupted                                                   </td></tr>
+            <tr><td>                       </td><td><b>onlt</b> - Blocking time in seconds after the consumer has been switched on or continued                                                       </td></tr>
+            <tr><td>                       </td><td>The consumer is only switched again when the corresponding blocking time has elapsed.                                                             </td></tr>
+            <tr><td>                       </td><td><b>Note:</b> The 'locktime' switch is only effective in automatic mode.                                                                           </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>noshow</b>         </td><td>Hide or show consumers in graphic (optional).                                                                                                     </td></tr>
+            <tr><td>                       </td><td><b>0</b> - the consumer is displayed (default)                                                                                                    </td></tr>
+            <tr><td>                       </td><td><b>1</b> - the consumer is hidden                                                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>2</b> - the consumer is hidden in the consumer legend                                                                                          </td></tr>
+            <tr><td>                       </td><td><b>3</b> - the consumer is hidden in the flow chart                                                                                               </td></tr>
+            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading in the consumer or optionally an alternative device.                                                            </td></tr>
+            <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                      </td></tr>
+            <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>exconfc</b>        </td><td>Use of the consumer's recorded energy consumption to create the consumption forecast (optional).                                                  </td></tr>
+            <tr><td>                       </td><td><b>0</b> - the consumer's historical energy consumption is used to create the consumption forecast (default)                                      </td></tr>
+            <tr><td>                       </td><td><b>1</b> - the consumer's historical energy consumption is excluded from the consumption forecast.                                                </td></tr>
          </table>
          </ul>
        <br>
@@ -21688,7 +21900,8 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
-       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b><br>
+       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b> <br><br>
+       
          Display of any readings, set commands and attributes of the device in the graphic header. <br>
          Readings, set commands and attributes of other devices can be displayed by specifying the optional [@Device]. <br>
          The values to be displayed are separated by spaces.
@@ -21736,7 +21949,8 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
-       <li><b>graphicHeaderOwnspecValForm </b><br>
+       <li><b>graphicHeaderOwnspecValForm </b> <br><br>
+       
          The readings to be displayed with the attribute
          <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a> can be manipulated with sprintf and
          other Perl operations.  <br>
@@ -21910,7 +22124,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-setupBatteryDev"></a>
        <li><b>setupBatteryDev &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
                               [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
-                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;]  </b> <br><br>
+                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data.
        The module assumes that the numerical value of the readings is always positive.
@@ -21929,6 +22143,11 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)  </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                    </td></tr>
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                 </td></tr>
+           <tr><td>                  </td><td>                                                                                                  </td></tr>
+           <tr><td> <b>asynchron</b> </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by       </td></tr>
+           <tr><td>                  </td><td>event processing (asynchronous).                                                                  </td></tr>
+           <tr><td>                  </td><td><b>0</b> - no data collection after receiving an event from the device (default)                  </td></tr>
+           <tr><td>                  </td><td><b>1</b> - trigger a data collection when an event is received from the device                    </td></tr>
          </table>
        </ul>
        <br>
@@ -21955,7 +22174,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
        <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; 
-                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...]
+                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt]
                                  [feed=&lt;Delivery type&gt;] [limit=&lt;0..100&gt;]
                                  [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
@@ -21972,30 +22191,42 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>       </td><td>Reading which provides the current PV generation as a positive value                                        </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                       </td></tr>
-           <tr><td>                 </td><td>If the reading violates the specification of a continuously rising counter,                                 </td></tr>
-           <tr><td>                 </td><td>SolarForecast handles this error and reports the situation by means of a log message.                       </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>the respective unit (W,kW,Wh,kWh)                                                                           </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                     </td></tr>
-           <tr><td> <b>strings</b>  </td><td>Comma-separated list of the strings assigned to the inverter (optional). The string names                   </td></tr>
-           <tr><td>                 </td><td>are defined in the <a href=“#SolarForecast-attr-setupInverterStrings”>setupInverterStrings</a> attribute.   </td></tr>
-           <tr><td>                 </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                       </td></tr>         
-           <tr><td> <b>feed</b>     </td><td>Defines special properties of the device's energy supply (optional).                                        </td></tr>
-           <tr><td>                 </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                             </td></tr>
-           <tr><td>                 </td><td><b>bat</b> - Solar charger for direct battery charging. Any surplus is fed into the inverter/house network. </td></tr>
-           <tr><td>                 </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                            </td></tr>
-           <tr><td> <b>limit</b>    </td><td>Defines any active power limitation in % (optional).                                                        </td></tr>
-           <tr><td> <b>icon</b>     </td><td>Icon for displaying the inverter in the flow chart (optional)                                               </td></tr>
-           <tr><td>                 </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                     </td></tr>
-           <tr><td>                 </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed          </td></tr>           
+           <tr><td> <b>pv</b>         </td><td>Reading which provides the current PV generation as a positive value                                        </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                       </td></tr>
+           <tr><td>                   </td><td>If the reading violates the specification of a continuously rising counter,                                 </td></tr>
+           <tr><td>                   </td><td>SolarForecast handles this error and reports the situation by means of a log message.                       </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>Einheit</b>    </td><td>the respective unit (W,kW,Wh,kWh)                                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>capacity</b>   </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                     </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>strings</b>    </td><td>Comma-separated list of the strings assigned to the inverter (optional). The string names                   </td></tr>
+           <tr><td>                   </td><td>are defined in the <a href=“#SolarForecast-attr-setupInverterStrings”>setupInverterStrings</a> attribute.   </td></tr>
+           <tr><td>                   </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                       </td></tr>         
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>feed</b>       </td><td>Defines special properties of the device's energy supply (optional).                                        </td></tr>
+           <tr><td>                   </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                             </td></tr>
+           <tr><td>                   </td><td><b>bat</b> - Solar charger for direct battery charging. Any surplus is fed into the inverter/house network. </td></tr>
+           <tr><td>                   </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>limit</b>      </td><td>Defines any active power limitation in % (optional).                                                        </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>icon</b>       </td><td>Icon for displaying the inverter in the flow chart (optional)                                               </td></tr>
+           <tr><td>                   </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                     </td></tr>
+           <tr><td>                   </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed          </td></tr>           
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                 </td></tr>
+           <tr><td>                   </td><td>event processing (asynchronous). (optional)                                                                 </td></tr>
+           <tr><td>                   </td><td><b>0</b> - no data collection after receiving an event from the device (default)                            </td></tr>
+           <tr><td>                   </td><td><b>1</b> - trigger a data collection when an event is received from the device                              </td></tr>
         </table>
        </ul>
        <br>
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 strings=Garage icon=inverter@red:solar
+         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 asynchron=1 strings=Garage icon=inverter@red:solar
        </ul>
        <br>
 
@@ -22022,7 +22253,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-setupMeterDev"></a>
        <li><b>setupMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Unit&gt; contotal=&lt;Readingname&gt;:&lt;Unit&gt;
                             gfeedin=&lt;Readingname&gt;:&lt;Unit&gt; feedtotal=&lt;Readingname&gt;:&lt;Unit&gt;
-                            [conprice=&lt;Field&gt;] [feedprice=&lt;Field&gt;] </b> <br><br>
+                            [conprice=&lt;Field&gt;] [feedprice=&lt;Field&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Defines any device and its readings for measuring energy into or out of the public grid.
        The module assumes that the numeric value of the readings is positive.
@@ -22033,13 +22264,17 @@ to ensure that the system configuration is correct.
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
            <tr><td> <b>gcon</b>       </td><td>Reading which supplies the power currently drawn from the grid                                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>contotal</b>   </td><td>Reading which provides the sum of the energy drawn from the grid (a constantly increasing meter)                          </td></tr>
            <tr><td>                   </td><td>If the counter is reset to '0' at the beginning of the day (daily counter), the module handles this situation accordingly.</td></tr>
            <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>gfeedin</b>    </td><td>Reading which supplies the power currently fed into the grid                                                              </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>feedtotal</b>  </td><td>Reading which provides the sum of the energy fed into the grid (a constantly increasing meter)                            </td></tr>
            <tr><td>                   </td><td>If the counter is reset to '0' at the beginning of the day (daily counter), the module handles this situation accordingly.</td></tr>
            <tr><td>                   </td><td>In this case, a message is displayed in the log with verbose 3.                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>Unit</b>       </td><td>the respective unit (W,kW,Wh,kWh)                                                                                         </td></tr>
            <tr><td>                   </td><td>                                                                                                                          </td></tr>
            <tr><td> <b>conprice</b>   </td><td>Price for the purchase of one kWh (optional). The &lt;field&gt; can be specified in one of the following variants:        </td></tr>
@@ -22051,6 +22286,11 @@ to ensure that the system configuration is correct.
            <tr><td>                   </td><td>&lt;Remuneration&gt;:&lt;Currency&gt; - Remuneration as a numerical value and its currency                                </td></tr>
            <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Currency&gt; - Reading of the <b>meter device</b> that contains the remuneration : Currency           </td></tr>
            <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Currency&gt; - any device and reading containing the remuneration : Currency           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                               </td></tr>
+           <tr><td>                   </td><td>event processing (asynchronous).                                                                                          </td></tr>
+           <tr><td>                   </td><td><b>0</b> - no data collection after receiving an event from the device (default)                                          </td></tr>
+           <tr><td>                   </td><td><b>1</b> - trigger a data collection when an event is received from the device                                            </td></tr>
          </table>
        </ul>
        <br>
@@ -23261,6 +23501,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>iasynchron </b>     </td><td>Modus der Verarbeitung empfangener Inverter-Events                          </td></tr>
             <tr><td> <b>ietotal </b>        </td><td>Stand gesamte bisher erzeugte Energie des Wechselrichters (Wh)              </td></tr>
             <tr><td> <b>ifeed </b>          </td><td>Eigenschaften der Energielieferung                                          </td></tr>
             <tr><td> <b>igeneration </b>    </td><td>aktuelle PV Erzeugung (W)                                                   </td></tr>
@@ -23478,6 +23719,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                   </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß sofern eine
                                                     gesetzte "swoncond" Bedingung erfüllt und "swoffcond" nicht erfüllt ist.                                                                           </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading Kombination um den Planungsmodus dynamisch ändern zu können. Das Reading muß 'can' oder 'must' zurückgeben. </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon und ggf. dessen Farbe zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
@@ -24083,7 +24325,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
-       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b><br>
+       <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b> <br><br>
+         
          Anzeige beliebiger Readings, Set-Kommandos und Attribute des SolarForecast Devices im Grafikkopf. <br>
          Durch Angabe des optionalen [@Device] können Readings, Set-Kommandos und Attribute anderer Devices angezeigt werden. <br>
          Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
@@ -24131,7 +24374,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
-       <li><b>graphicHeaderOwnspecValForm </b><br>
+       <li><b>graphicHeaderOwnspecValForm </b> <br><br>
+       
          Die mit dem Attribut <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a> anzuzeigenden
          Readings können mit sprintf und anderen Perl Operationen manipuliert werden. <br>
          Es stehen zwei grundsätzliche, miteinander nicht kombinierbare Möglichkeiten der Notation zur Verfügung. <br>
@@ -24304,7 +24548,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-setupBatteryDev"></a>
        <li><b>setupBatteryDev &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;
                               [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
-                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;]  </b> <br><br>
+                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
@@ -24323,6 +24567,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
            <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
+           <tr><td> <b>asynchron</b> </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch           </td></tr>
+           <tr><td>                  </td><td>Eventverarbeitung (asynchron).                                                                           </td></tr>
+           <tr><td>                  </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                           </td></tr>
+           <tr><td>                  </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                             </td></tr>
          </table>
        </ul>
        <br>
@@ -24349,7 +24598,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
        <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; 
-                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...]
+                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt]
                                  [feed=&lt;Liefertyp&gt;] [limit=&lt;0..100&gt;]
                                  [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
@@ -24367,30 +24616,42 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                                        </td></tr>
-           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)                   </td></tr>
-           <tr><td>                 </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                      </td></tr>
-           <tr><td>                 </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                   </td></tr>
-           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                         </td></tr>
-           <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt                 </td></tr>
-           <tr><td> <b>strings</b>  </td><td>Komma getrennte Liste der dem Wechselrichter zugeordneten Strings (optional). Die Stringnamen               </td></tr>
-           <tr><td>                 </td><td>werden im Attribut <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a> definiert.   </td></tr>
-           <tr><td>                 </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.           </td></tr>         
-           <tr><td> <b>feed</b>     </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                              </td></tr>
-           <tr><td>                 </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.    </td></tr>
-           <tr><td>                 </td><td><b>bat</b> - Solar-Ladegerät zur Batterie Direktladung. Ein Überschuß wird dem Inverter/Hausnetz zugeführt. </td></tr>
-           <tr><td>                 </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentlich Netz eingespeist                            </td></tr>
-           <tr><td> <b>limit</b>    </td><td>Definiert eine eventuelle Wirkleistungsbeschränkung in % (optional).                                        </td></tr>
-           <tr><td> <b>icon</b>     </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                             </td></tr>
-           <tr><td>                 </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                                   </td></tr>
-           <tr><td>                 </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt         </td></tr>
+           <tr><td> <b>pv</b>         </td><td>Reading welches die aktuelle PV-Erzeugung als positiven Wert liefert                                        </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)                   </td></tr>
+           <tr><td>                   </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                      </td></tr>
+           <tr><td>                   </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                   </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                         </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>capacity</b>   </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt                 </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>strings</b>    </td><td>Komma getrennte Liste der dem Wechselrichter zugeordneten Strings (optional). Die Stringnamen               </td></tr>
+           <tr><td>                   </td><td>werden im Attribut <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a> definiert.   </td></tr>
+           <tr><td>                   </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.           </td></tr>         
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>feed</b>       </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                              </td></tr>
+           <tr><td>                   </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.    </td></tr>
+           <tr><td>                   </td><td><b>bat</b> - Solar-Ladegerät zur Batterie Direktladung. Ein Überschuß wird dem Inverter/Hausnetz zugeführt. </td></tr>
+           <tr><td>                   </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentlich Netz eingespeist                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>limit</b>      </td><td>Definiert eine eventuelle Wirkleistungsbeschränkung in % (optional).                                        </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>icon</b>       </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional)                                             </td></tr>
+           <tr><td>                   </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                                   </td></tr>
+           <tr><td>                   </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt         </td></tr>
+           <tr><td>                   </td><td>                                                                                                            </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch              </td></tr>
+           <tr><td>                   </td><td>Eventverarbeitung (asynchron). (optional)                                                                   </td></tr>
+           <tr><td>                   </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                              </td></tr>
+           <tr><td>                   </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                                </td></tr>
          </table>
        </ul>
        <br>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 strings=Garage icon=inverter@red:solar
+         attr &lt;name&gt; setupInverterDev01 STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 asynchron=1 strings=Garage icon=inverter@red:solar
        </ul>
        <br>
 
@@ -24417,7 +24678,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-setupMeterDev"></a>
        <li><b>setupMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt;
                             gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;
-                            [conprice=&lt;Feld&gt;] [feedprice=&lt;Feld&gt;] </b> <br><br>
+                            [conprice=&lt;Feld&gt;] [feedprice=&lt;Feld&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Energiemessung in bzw. aus dem öffentlichen Netz fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings positiv ist.
@@ -24428,13 +24689,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
            <tr><td> <b>gcon</b>       </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert                                                         </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>contotal</b>   </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert (ein sich stetig erhöhender Zähler)                   </td></tr>
            <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), behandelt das Modul diese Situation entsprechend. </td></tr>
-           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
+           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.                                                                  </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert                                                      </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert (ein sich stetig erhöhender Zähler)                </td></tr>
            <tr><td>                   </td><td>Wird der Zähler zu Beginn des Tages auf '0' zurückgesetzt (Tageszähler), behandelt das Modul diese Situation entsprechend. </td></tr>
-           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.             </td></tr>
+           <tr><td>                   </td><td>In diesem Fall erfolgt eine Meldung im Log mit verbose 3.                                                                  </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                        </td></tr>
            <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>conprice</b>   </td><td>Preis für den Bezug einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:            </td></tr>
@@ -24442,10 +24707,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das den Preis enthält : Währung                          </td></tr>
            <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches den Preis enthält : Währung         </td></tr>
            <tr><td>                   </td><td>                                                                                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
            <tr><td> <b>feedprice</b>  </td><td>Vergütung für die Einspeisung einer kWh (optional). Die Angabe &lt;Feld&gt; ist in einer der folgenden Varianten möglich:  </td></tr>
            <tr><td>                   </td><td>&lt;Vergütung&gt;:&lt;Währung&gt; - Vergütung als numerischer Wert und dessen Währung                                      </td></tr>
            <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das die Vergütung enthält : Währung                      </td></tr>
            <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches die Vergütung enthält : Währung     </td></tr>
+           <tr><td>                   </td><td>                                                                                                                           </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch                             </td></tr>
+           <tr><td>                   </td><td>Eventverarbeitung (asynchron).                                                                                             </td></tr>
+           <tr><td>                   </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                                             </td></tr>
+           <tr><td>                   </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                                               </td></tr>
         </table>
        </ul>
        <br>
@@ -24763,6 +25034,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "HttpUtils": 0,
         "JSON": 4.020,
         "FHEM::SynoModules::SMUtils": 1.0270,
+        "FHEM::SynoModules::ErrCodes": 1.003009,
         "Time::HiRes": 0,
         "MIME::Base64": 0,
         "Math::Trig": 0,
