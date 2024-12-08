@@ -15,10 +15,10 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = '1.5.10';
+my $HOMEMODE_version = '1.5.11';
 my $HOMEMODE_Daytimes = '05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night';
 my $HOMEMODE_Seasons = '03.01|spring 06.01|summer 09.01|autumn 12.01|winter';
-my $HOMEMODE_UserModes = 'gotosleep,awoken,asleep';
+my $HOMEMODE_UserModes = 'gotosleep,awoke n,asleep';
 my $HOMEMODE_UserModesAll = $HOMEMODE_UserModes.',home,absent,gone';
 my $HOMEMODE_AlarmModes = 'disarm,confirm,armhome,armnight,armaway';
 my $HOMEMODE_Locations = 'arrival,home,bed,underway,wayhome';
@@ -46,7 +46,7 @@ sub HOMEMODE_Define($$)
   my ($hash,$def) = @_;
   my @args = split ' ',$def;
   my ($name,$type,$resdev) = @args;
-  $HOMEMODE_de = AttrVal('global','language','EN') eq 'DE' || AttrVal($name,'HomeLanguage','EN' eq 'DE') ? 1 : 0;
+  $HOMEMODE_de = AttrVal('global','language','EN') eq 'DE' || AttrVal($name,'HomeLanguage','EN') eq 'DE' ? 1 : 0;
   my $trans;
   if (@args < 2 || @args > 3)
   {
@@ -2510,7 +2510,7 @@ sub HOMEMODE_execCMDs($$;$)
   my $name = $hash->{NAME};
   my $cmd = HOMEMODE_replacePlaceholders($hash,$cmds,$resident);
   my $err = AnalyzeCommandChain(undef,$cmd);
-  if ($err && $err !~ /^Deleted.reading|Wrote.configuration|good|Scheduled.for.sending.after.WAKEUP/)
+  if ($err && $err !~ /^Deleted.reading|Wrote.configuration|good|Scheduled.for.sending.after.WAKEUP|ledsetting/)
   {
     Log3 $name,3,"$name: error: $err";
     Log3 $name,3,"$name: error in command: $cmd";
