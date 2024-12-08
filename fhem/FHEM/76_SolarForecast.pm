@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.39.2" => "08.12.2024  rollout delHashRefDeep, extended consumer key 'mode' by device/reading combination ",
   "1.39.1" => "07.12.2024  new control releaseCentralTask, new delHashRefDeep in some cases ".
                            "possible asynchron mode for setupBatteryDev ",
   "1.39.0" => "04.12.2024  possible asynchron mode for setupMeterDev, setupInverterDevXX ".
@@ -431,8 +432,8 @@ my $epiecMaxCycles = 10;                                                        
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
 my $defmintime     = 60;                                                            # default Einplanungsdauer in Minuten
-my $defctype       = "other";                                                       # default Verbrauchertyp
-my $defcmode       = "can";                                                         # default Planungsmode der Verbraucher
+my $defctype       = 'other';                                                       # default Verbrauchertyp
+my $defcmode       = 'can';                                                         # default Planungsmode der Verbraucher
 my $defpopercent   = 1.0;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
 my $defhyst        = 0;                                                             # default Hysterese
 
@@ -1421,6 +1422,7 @@ sub _readCacheFile {
           my $valid = $dtree->isa('AI::DecisionTree');
 
           if ($valid) {
+              delHashRefDeep ($data{$type}{$name}{aidectree}{aitrained});
               delete $data{$type}{$name}{aidectree}{aitrained};
               $data{$type}{$name}{aidectree}{aitrained}  = $dtree;
               $data{$type}{$name}{current}{aitrainstate} = 'ok';
@@ -1439,6 +1441,7 @@ sub _readCacheFile {
       my ($err, $data) = fileRetrieve ($file);
 
       if (!$err && $data) {
+          delHashRefDeep ($data{$type}{$name}{aidectree}{airaw});
           delete $data{$type}{$name}{aidectree}{airaw};
           $data{$type}{$name}{aidectree}{airaw}     = $data;
           $data{$type}{$name}{current}{aitrawstate} = 'ok';
@@ -1452,6 +1455,7 @@ sub _readCacheFile {
       my ($err, $statapi) = fileRetrieve ($file);
 
       if (!$err && $statapi) {
+          delHashRefDeep ($data{$type}{$name}{statusapi});
           delete $data{$type}{$name}{statusapi};
           $data{$type}{$name}{statusapi} = $statapi;
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
@@ -1464,6 +1468,7 @@ sub _readCacheFile {
       my ($err, $wthtapi) = fileRetrieve ($file);
 
       if (!$err && $wthtapi) {
+          delHashRefDeep ($data{$type}{$name}{weatherapi});
           delete $data{$type}{$name}{weatherapi};
           $data{$type}{$name}{weatherapi} = $wthtapi;
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
@@ -1476,6 +1481,7 @@ sub _readCacheFile {
       my ($err, $dwdc) = fileRetrieve ($file);
 
       if (!$err && $dwdc) {
+          delHashRefDeep ($data{$type}{$name}{dwdcatalog});
           delete $data{$type}{$name}{dwdcatalog};
           $data{$type}{$name}{dwdcatalog} = $dwdc;
           debugLog ($paref, 'dwdComm', qq{$title restored});
@@ -1797,6 +1803,7 @@ sub _setVictronCredentials {                 ## no critic "not used"
   my ($a,$h) = parseParams ($arg);
 
   if ($a->[0] && $a->[0] eq 'delete') {
+      delHashRefDeep ($data{$type}{$name}{statusapi}{'?VRM'});
       delete $data{$type}{$name}{statusapi}{'?VRM'};
       $msg = qq{Credentials for the Victron VRM API are deleted. };
   }
@@ -2290,6 +2297,7 @@ sub _setreset {                          ## no critic "not used"
           Log3 ($name, 3, qq{$name - roofIdentPair: pair key "$pk" deleted});
       }
       else {
+          delHashRefDeep ($data{$type}{$name}{statusapi}{'?IdPair'});
           delete $data{$type}{$name}{statusapi}{'?IdPair'};
           Log3($name, 3, qq{$name - roofIdentPair: all pair keys deleted});
       }
@@ -5595,7 +5603,19 @@ sub _attrconsumer {                      ## no critic "not used"
       }
 
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
-          return qq{The mode "$h->{mode}" isn't allowed!};
+          if ($h->{mode} =~ /.*:.*/xs) {
+              my ($dv, $rd) = split ':', $h->{mode};
+              ($err)        = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );         
+              return $err if($err);
+              
+              my $mode = ReadingsVal ($dv, $rd, '');
+              if ($mode !~ /^(?:can|must)$/xs) {
+                  return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode";
+              }
+          }
+          else {
+              return qq{The mode "$h->{mode}" isn't allowed!};
+          }
       }
 
       my $valid;
@@ -6570,6 +6590,7 @@ sub Rename {
   my $type = (split '::', __PACKAGE__)[1];
   
   $data{$type}{$new_name} = $data{$type}{$old_name};
+  delHashRefDeep ($data{$type}{$old_name});
   delete $data{$type}{$old_name}; 
 
   my @ftd = _searchCacheFiles ($old_name);
@@ -6653,6 +6674,7 @@ sub Delete {
 
   my $type = $hash->{TYPE};
 
+  delHashRefDeep ($data{$type}{$name});
   delete $data{$type}{$name};
 
 return;
@@ -6793,6 +6815,7 @@ sub delConsumerFromMem {
       }
   }
 
+  delHashRefDeep ($data{$type}{$name}{consumers}{$c});
   delete $data{$type}{$name}{consumers}{$c};
 
   Log3 ($name, 3, qq{$name - Consumer "$c - $calias" deleted from memory});
@@ -7356,6 +7379,7 @@ sub createStringConfig {                 ## no critic "not used"
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
+  delHashRefDeep ($data{$type}{$name}{strings});
   delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
   $data{$type}{$name}{current}{allStringsFullfilled} = 0;
 
@@ -8096,6 +8120,7 @@ sub _transferWeatherValues {
 
   my $type = $paref->{type};
 
+  delHashRefDeep ($data{$type}{$name}{weatherdata});
   delete $data{$type}{$name}{weatherdata};                                                     # Wetterdaten Hash löschen
 
   $paref->{apiu}   = $apiu;                                                                    # API wird verwendet
@@ -10458,7 +10483,7 @@ sub ___doPlanning {
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - epiece1: $epiece1});
 
-  my $mode         = ConsumerVal ($hash, $c, 'mode',          'can');
+  my $mode         = getConsumerPlanningMode ($hash, $c);                                              # Planungsmode 'can' oder 'must'
   my $calias       = ConsumerVal ($hash, $c, 'alias',            '');
   my $mintime      = ConsumerVal ($hash, $c, 'mintime', $defmintime);                                  # Einplanungsdauer
   my $oldplanstate = ConsumerVal ($hash, $c, 'planstate',        '');                                  # V. 1.35.0
@@ -10999,8 +11024,8 @@ sub ___switchConsumerOn {
   }
 
   if ($auto && $oncom && $swoncond && !$swoffcond && !$iilt &&                                    # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
-      $simpCstat =~ /planned|priority|starting/xs && $isInTime) {                                 # Verbraucher Start ist geplant && Startzeit überschritten
-      my $mode   = ConsumerVal ($hash, $c, "mode", $defcmode);                                    # Consumer Planungsmode
+        $simpCstat =~ /planned|priority|starting/xs && $isInTime) {                               # Verbraucher Start ist geplant && Startzeit überschritten
+      my $mode   = getConsumerPlanningMode        ($hash, $c);                                    # Planungsmode 'can' oder 'must'
       my $enable = ___enableSwitchByBatPrioCharge ($paref);                                       # Vorrangladung Batterie ?
 
       debugLog ($paref, "consumerSwitching${c}", qq{Consumer switch enable by battery state: $enable});
@@ -11075,9 +11100,9 @@ sub ___switchConsumerOff {
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
   my $auto    = ConsumerVal ($hash, $c, "auto",              1);
   my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
-  my $mode    = ConsumerVal ($hash, $c, "mode",      $defcmode);                                  # Consumer Planungsmode
   my $hyst    = ConsumerVal ($hash, $c, "hysteresis", $defhyst);                                  # Hysterese
 
+  my $mode                     = getConsumerPlanningMode ($hash, $c);                             # Planungsmode 'can' oder 'must'
   my $offcom                   = ConsumerVal        ($hash, $c, 'offcom', '');                    # Set Command für "off"
   my ($swoffcond,$infoff,$err) = isAddSwitchOffCond ($hash, $c);                                  # zusätzliche Switch off Bedingung
   my $simpCstat                = simplifyCstate     ($pstate);
@@ -17908,12 +17933,14 @@ return;
 sub delHashRefDeep {
   my $href = shift;
 
-  for my $key (keys %{$href}) { 
-      if (ref $href->{$key} eq 'HASH') { 
-          delHashRefDeep ($href->{$key}); 
-      } 
-      
-      delete $href->{$key}; 
+  if (ref $href eq 'HASH') {
+      for my $key (keys %{$href}) { 
+          if (ref $href->{$key} eq 'HASH') { 
+              delHashRefDeep ($href->{$key}); 
+          } 
+          
+          delete $href->{$key}; 
+      }
   }
 
   $href = undef;          # Optional: Garbage Collection erzwingen 
@@ -18053,6 +18080,44 @@ sub createAssociatedWith {
   }
 
 return;
+}
+
+################################################################
+#  Funktion liefert den Planungsmodus eines Verbrauchers
+#  mode kann sein:
+#       can
+#       must
+################################################################
+sub getConsumerPlanningMode {
+  my $hash = shift;
+  my $c    = shift;
+
+  my $name = $hash->{NAME};
+  my $mode = ConsumerVal ($hash, $c, 'mode', $defcmode);                                    # Consumer Planungsmode
+
+  if ($mode =~ /^(?:can|must)$/xs) {
+      return $mode;
+  }
+  
+  ## Mode kann über Device:Reading gesteuert sein
+  #################################################
+  my ($dv, $rd) = split ':', $mode;
+  my ($err)     = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );
+
+  if ($err) {
+      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to '$defcmode' mode.});
+      return $defcmode;
+  }
+  
+  $err  = q{};
+  $mode = ReadingsVal ($dv, $rd, '');
+  
+  if ($mode !~ /^(?:can|must)$/xs) {
+      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to '$defcmode' mode.});
+      return $defcmode;
+  }
+
+return $mode;
 }
 
 ################################################################
@@ -21210,124 +21275,125 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-            <tr><td> <b>type</b>           </td><td>Type of consumer. The following types are allowed:                                                                                             </td></tr>
-            <tr><td>                       </td><td><b>dishwasher</b>     - Consumer is a dishwasher                                                                                               </td></tr>
-            <tr><td>                       </td><td><b>dryer</b>          - Consumer is a tumble dryer                                                                                             </td></tr>
-            <tr><td>                       </td><td><b>washingmachine</b> - Consumer is a washing machine                                                                                          </td></tr>
-            <tr><td>                       </td><td><b>heater</b>         - Consumer is a heating rod                                                                                              </td></tr>
-            <tr><td>                       </td><td><b>charger</b>        - Consumer is a charging device (battery, car, bicycle, etc.)                                                            </td></tr>
-            <tr><td>                       </td><td><b>other</b>          - Consumer is none of the above types                                                                                    </td></tr>
-            <tr><td>                       </td><td><b>noSchedule</b>     - there is no scheduling or automatic switching for the consumer.                                                        </td></tr>
+            <tr><td> <b>type</b>           </td><td>Type of consumer. The following types are allowed:                                                                                                </td></tr>
+            <tr><td>                       </td><td><b>dishwasher</b>     - Consumer is a dishwasher                                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>dryer</b>          - Consumer is a tumble dryer                                                                                                </td></tr>
+            <tr><td>                       </td><td><b>washingmachine</b> - Consumer is a washing machine                                                                                             </td></tr>
+            <tr><td>                       </td><td><b>heater</b>         - Consumer is a heating rod                                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>charger</b>        - Consumer is a charging device (battery, car, bicycle, etc.)                                                               </td></tr>
+            <tr><td>                       </td><td><b>other</b>          - Consumer is none of the above types                                                                                       </td></tr>
+            <tr><td>                       </td><td><b>noSchedule</b>     - there is no scheduling or automatic switching for the consumer.                                                           </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                                                    Display functions or manual switching are available.                                                                                           </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>power</b>          </td><td>nominal power consumption of the consumer (see data sheet) in W                                                                                </td></tr>
-            <tr><td>                       </td><td>(can be set to "0")                                                                                                                            </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.   </td></tr>
-            <tr><td>                       </td><td>The key is useful for consumers where energy measurement and switching is carried out with different devices                                   </td></tr>
-            <tr><td>                       </td><td>e.g. Homematic or readingsProxy. If switchdev is specified, the keys on, off, swstate, auto, asynchronous refer to this device.                </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>mode</b>           </td><td>Consumer planning mode (optional). Allowed are:                                                                                                </td></tr>
-            <tr><td>                       </td><td><b>can</b>  - Scheduling takes place at the time when there is probably enough PV surplus available (default).                                 </td></tr>
-            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The consumer is not started at the time of planning if the PV surplus is insufficient.        </td></tr>
-            <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                         </td></tr>
+                                                    Display functions or manual switching are available.                                                                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>power</b>          </td><td>nominal power consumption of the consumer (see data sheet) in W                                                                                   </td></tr>
+            <tr><td>                       </td><td>(can be set to "0")                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.      </td></tr>
+            <tr><td>                       </td><td>The key is useful for consumers where energy measurement and switching is carried out with different devices                                      </td></tr>
+            <tr><td>                       </td><td>e.g. Homematic or readingsProxy. If switchdev is specified, the keys on, off, swstate, auto, asynchronous refer to this device.                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>mode</b>           </td><td>Consumer planning mode (optional). Allowed are:                                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>can</b>  - Scheduling takes place at the time when there is probably enough PV surplus available (default).                                    </td></tr>
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The consumer is not started at the time of planning if the PV surplus is insufficient.           </td></tr>
+            <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                            </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The load is started even if there is insufficient PV surplus, provided that
-                                                    a set "swoncond" condition is met and "swoffcond" is not met.                                                                                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>icon</b>           </td><td>Icon and, if applicable, its color for displaying the consumer in the overview graphic (optional)                                              </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>mintime</b>        </td><td>Scheduling duration (minutes or "SunPath") of the consumer. (optional)                                                                         </td></tr>
-            <tr><td>                       </td><td>By specifying <b>SunPath</b>, planning is done according to sunrise and sunset.                                                                </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - scheduling takes place from sunrise to sunset.                                 </td></tr>
-            <tr><td>                       </td><td> Optionally, a positive / negative shift (minutes) of the planning time regarding sunrise or sunset can be specified.                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td>                       </td><td>If mintime is not specified, a standard scheduling duration according to the following table is used.                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td>                       </td><td><b>Default mintime by consumer type:</b>                                                                                                       </td></tr>
-            <tr><td>                       </td><td>- dishwasher: 180 minutes                                                                                                                      </td></tr>
-            <tr><td>                       </td><td>- dryer: 90 minutes                                                                                                                            </td></tr>
-            <tr><td>                       </td><td>- washingmachine: 120 minutes                                                                                                                  </td></tr>
-            <tr><td>                       </td><td>- heater: 240 minutes                                                                                                                          </td></tr>
-            <tr><td>                       </td><td>- charger: 120 minutes                                                                                                                         </td></tr>
-            <tr><td>                       </td><td>- other: 60 minutes                                                                                                                            </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>on</b>             </td><td>Set command for switching on the consumer (optional)                                                                                           </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>off</b>            </td><td>Set command for switching off the consumer (optional)                                                                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>swstate</b>        </td><td>Reading which indicates the switching status of the consumer (default: 'state').                                                               </td></tr>
-            <tr><td>                       </td><td><b>on-Regex</b> - regular expression for the state 'on' (default: 'on')                                                                        </td></tr>
-            <tr><td>                       </td><td><b>off-Regex</b> - regular expression for the state 'off' (default: 'off')                                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command     </td></tr>.
-            <tr><td>                       </td><td>by polling within a data collection interval (synchronous) or additionally by event processing (asynchronous).                                 </td></tr>
-            <tr><td>                       </td><td><b>0</b> - only synchronous processing of switching states (default)                                                                           </td></tr>
-            <tr><td>                       </td><td><b>1</b> - additional asynchronous processing of switching states through event processing                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Schedule start time consumer not before specified time 'hour[:minute]' (optional)                                                              </td></tr>
-            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Schedule start time consumer not after specified time 'hour[:minute]' (optional)                                                               </td></tr>
-            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>auto</b>           </td><td>Reading in the consumer device which enables or blocks the switching of the consumer (optional)                                                </td></tr>
-            <tr><td>                       </td><td>If the key switchdev is given, the reading is set and evaluated in this device.                                                                </td></tr>
-            <tr><td>                       </td><td>Reading value = 1 - switching enabled (default), 0: switching blocked                                                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Reading:Unit (W/kW) which provides the current energy consumption (optional)                                                                   </td></tr>
-            <tr><td>                       </td><td>:&lt;Threshold&gt; (W) - From this power reference on, the consumer is considered active. The specification is optional (default: 0)           </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>Reading:Unit (Wh/kWh) of the consumer device that supplies the sum of the consumed energy (optional)                                           </td></tr>
-            <tr><td>                       </td><td>:&lt;Threshold&gt (Wh) - From this energy consumption per hour, the consumption is considered valid. Optional specification (default: 0)       </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>swoncond</b>       </td><td>Condition that must also be fulfilled in order to switch on the consumer (optional). The scheduled cycle is started.                           </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device to supply the additional switch-on condition                                                                            </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading for delivery of the additional switch-on condition                                                                    </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>swoffcond</b>      </td><td>priority condition to switch off the consumer (optional). The scheduled cycle is stopped.                                                      </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device to supply the priority switch-off condition                                                                             </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading for the delivery of the priority switch-off condition                                                                 </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                       </td></tr>
-            <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                       </td></tr>
-            <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                  </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device to deliver the condition                                                                                                </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading which contains the condition                                                                                          </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>interruptable</b>  </td><td>defines the possible interruption options for the consumer after it has been started (optional)                                                </td></tr>
-            <tr><td>                       </td><td><b>0</b> - Load is not temporarily switched off even if the PV surplus falls below the required energy (default)                               </td></tr>
-            <tr><td>                       </td><td><b>1</b> - Load is temporarily switched off if the PV surplus falls below the required energy                                                  </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading:Regex[:Hysteresis]</b> - Load is temporarily interrupted if the value of the specified                                       </td></tr>
-            <tr><td>                       </td><td>Device:Readings match on the regex or if is insufficient PV surplus (if power not equal to 0).                                                 </td></tr>
-            <tr><td>                       </td><td>If the value no longer matches, the interrupted load is switched on again if there is sufficient                                               </td></tr>
-            <tr><td>                       </td><td>PV surplus provided (if power is not 0).                                                                                                       </td></tr>
-            <tr><td>                       </td><td>If the optional <b>hysteresis</b> is specified, the hysteresis value is subtracted from the reading value and the regex is then applied.       </td></tr>
-            <tr><td>                       </td><td>If this and the original reading value match, the consumer is temporarily interrupted.                                                         </td></tr>
-            <tr><td>                       </td><td>The consumer is continued if both the original and the subtracted readings value do not (or no longer) match.                                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>locktime</b>       </td><td>Blocking times in seconds for switching the consumer (optional).                                                                               </td></tr>
-            <tr><td>                       </td><td><b>offlt</b> - Blocking time in seconds after the consumer has been switched off or interrupted                                                </td></tr>
-            <tr><td>                       </td><td><b>onlt</b> - Blocking time in seconds after the consumer has been switched on or continued                                                    </td></tr>
-            <tr><td>                       </td><td>The consumer is only switched again when the corresponding blocking time has elapsed.                                                          </td></tr>
-            <tr><td>                       </td><td><b>Note:</b> The 'locktime' switch is only effective in automatic mode.                                                                        </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>noshow</b>         </td><td>Hide or show consumers in graphic (optional).                                                                                                  </td></tr>
-            <tr><td>                       </td><td><b>0</b> - the consumer is displayed (default)                                                                                                 </td></tr>
-            <tr><td>                       </td><td><b>1</b> - the consumer is hidden                                                                                                              </td></tr>
-            <tr><td>                       </td><td><b>2</b> - the consumer is hidden in the consumer legend                                                                                       </td></tr>
-            <tr><td>                       </td><td><b>3</b> - the consumer is hidden in the flow chart                                                                                            </td></tr>
-            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading in the consumer or optionally an alternative device.                                                         </td></tr>
-            <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                   </td></tr>
-            <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                               </td></tr>
-            <tr><td> <b>exconfc</b>        </td><td>Use of the consumer's recorded energy consumption to create the consumption forecast (optional).                                               </td></tr>
-            <tr><td>                       </td><td><b>0</b> - the consumer's historical energy consumption is used to create the consumption forecast (default)                                   </td></tr>
-            <tr><td>                       </td><td><b>1</b> - the consumer's historical energy consumption is excluded from the consumption forecast.                                             </td></tr>
+                                                    a set "swoncond" condition is met and "swoffcond" is not met.                                                                                     </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading combination to be able to change the planning mode dynamically. The reading must return 'can' or 'must'.   </td></tr>            
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>icon</b>           </td><td>Icon and, if applicable, its color for displaying the consumer in the overview graphic (optional)                                                 </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>mintime</b>        </td><td>Scheduling duration (minutes or "SunPath") of the consumer. (optional)                                                                            </td></tr>
+            <tr><td>                       </td><td>By specifying <b>SunPath</b>, planning is done according to sunrise and sunset.                                                                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - scheduling takes place from sunrise to sunset.                                    </td></tr>
+            <tr><td>                       </td><td> Optionally, a positive / negative shift (minutes) of the planning time regarding sunrise or sunset can be specified.                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td>                       </td><td>If mintime is not specified, a standard scheduling duration according to the following table is used.                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>Default mintime by consumer type:</b>                                                                                                          </td></tr>
+            <tr><td>                       </td><td>- dishwasher: 180 minutes                                                                                                                         </td></tr>
+            <tr><td>                       </td><td>- dryer: 90 minutes                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>- washingmachine: 120 minutes                                                                                                                     </td></tr>
+            <tr><td>                       </td><td>- heater: 240 minutes                                                                                                                             </td></tr>
+            <tr><td>                       </td><td>- charger: 120 minutes                                                                                                                            </td></tr>
+            <tr><td>                       </td><td>- other: 60 minutes                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>on</b>             </td><td>Set command for switching on the consumer (optional)                                                                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>off</b>            </td><td>Set command for switching off the consumer (optional)                                                                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Reading which indicates the switching status of the consumer (default: 'state').                                                                  </td></tr>
+            <tr><td>                       </td><td><b>on-Regex</b> - regular expression for the state 'on' (default: 'on')                                                                           </td></tr>
+            <tr><td>                       </td><td><b>off-Regex</b> - regular expression for the state 'off' (default: 'off')                                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command        </td></tr>.
+            <tr><td>                       </td><td>by polling within a data collection interval (synchronous) or additionally by event processing (asynchronous).                                    </td></tr>
+            <tr><td>                       </td><td><b>0</b> - only synchronous processing of switching states (default)                                                                              </td></tr>
+            <tr><td>                       </td><td><b>1</b> - additional asynchronous processing of switching states through event processing                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Schedule start time consumer not before specified time 'hour[:minute]' (optional)                                                                 </td></tr>
+            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Schedule start time consumer not after specified time 'hour[:minute]' (optional)                                                                  </td></tr>
+            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code enclosed in {...} that returns hh[:mm].                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>auto</b>           </td><td>Reading in the consumer device which enables or blocks the switching of the consumer (optional)                                                   </td></tr>
+            <tr><td>                       </td><td>If the key switchdev is given, the reading is set and evaluated in this device.                                                                   </td></tr>
+            <tr><td>                       </td><td>Reading value = 1 - switching enabled (default), 0: switching blocked                                                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Reading:Unit (W/kW) which provides the current energy consumption (optional)                                                                      </td></tr>
+            <tr><td>                       </td><td>:&lt;Threshold&gt; (W) - From this power reference on, the consumer is considered active. The specification is optional (default: 0)              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>Reading:Unit (Wh/kWh) of the consumer device that supplies the sum of the consumed energy (optional)                                              </td></tr>
+            <tr><td>                       </td><td>:&lt;Threshold&gt (Wh) - From this energy consumption per hour, the consumption is considered valid. Optional specification (default: 0)          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>swoncond</b>       </td><td>Condition that must also be fulfilled in order to switch on the consumer (optional). The scheduled cycle is started.                              </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device to supply the additional switch-on condition                                                                               </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading for delivery of the additional switch-on condition                                                                       </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>swoffcond</b>      </td><td>priority condition to switch off the consumer (optional). The scheduled cycle is stopped.                                                         </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device to supply the priority switch-off condition                                                                                </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading for the delivery of the priority switch-off condition                                                                    </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                          </td></tr>
+            <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                          </td></tr>
+            <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                     </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device to deliver the condition                                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading which contains the condition                                                                                             </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>interruptable</b>  </td><td>defines the possible interruption options for the consumer after it has been started (optional)                                                   </td></tr>
+            <tr><td>                       </td><td><b>0</b> - Load is not temporarily switched off even if the PV surplus falls below the required energy (default)                                  </td></tr>
+            <tr><td>                       </td><td><b>1</b> - Load is temporarily switched off if the PV surplus falls below the required energy                                                     </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading:Regex[:Hysteresis]</b> - Load is temporarily interrupted if the value of the specified                                          </td></tr>
+            <tr><td>                       </td><td>Device:Readings match on the regex or if is insufficient PV surplus (if power not equal to 0).                                                    </td></tr>
+            <tr><td>                       </td><td>If the value no longer matches, the interrupted load is switched on again if there is sufficient                                                  </td></tr>
+            <tr><td>                       </td><td>PV surplus provided (if power is not 0).                                                                                                          </td></tr>
+            <tr><td>                       </td><td>If the optional <b>hysteresis</b> is specified, the hysteresis value is subtracted from the reading value and the regex is then applied.          </td></tr>
+            <tr><td>                       </td><td>If this and the original reading value match, the consumer is temporarily interrupted.                                                            </td></tr>
+            <tr><td>                       </td><td>The consumer is continued if both the original and the subtracted readings value do not (or no longer) match.                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>locktime</b>       </td><td>Blocking times in seconds for switching the consumer (optional).                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>offlt</b> - Blocking time in seconds after the consumer has been switched off or interrupted                                                   </td></tr>
+            <tr><td>                       </td><td><b>onlt</b> - Blocking time in seconds after the consumer has been switched on or continued                                                       </td></tr>
+            <tr><td>                       </td><td>The consumer is only switched again when the corresponding blocking time has elapsed.                                                             </td></tr>
+            <tr><td>                       </td><td><b>Note:</b> The 'locktime' switch is only effective in automatic mode.                                                                           </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>noshow</b>         </td><td>Hide or show consumers in graphic (optional).                                                                                                     </td></tr>
+            <tr><td>                       </td><td><b>0</b> - the consumer is displayed (default)                                                                                                    </td></tr>
+            <tr><td>                       </td><td><b>1</b> - the consumer is hidden                                                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>2</b> - the consumer is hidden in the consumer legend                                                                                          </td></tr>
+            <tr><td>                       </td><td><b>3</b> - the consumer is hidden in the flow chart                                                                                               </td></tr>
+            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading in the consumer or optionally an alternative device.                                                            </td></tr>
+            <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                      </td></tr>
+            <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>exconfc</b>        </td><td>Use of the consumer's recorded energy consumption to create the consumption forecast (optional).                                                  </td></tr>
+            <tr><td>                       </td><td><b>0</b> - the consumer's historical energy consumption is used to create the consumption forecast (default)                                      </td></tr>
+            <tr><td>                       </td><td><b>1</b> - the consumer's historical energy consumption is excluded from the consumption forecast.                                                </td></tr>
          </table>
          </ul>
        <br>
@@ -23655,6 +23721,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                   </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß sofern eine
                                                     gesetzte "swoncond" Bedingung erfüllt und "swoffcond" nicht erfüllt ist.                                                                           </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading Kombination um den Planungsmodus dynamisch ändern zu können. Das Reading muß 'can' oder 'must' zurückgeben. </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon und ggf. dessen Farbe zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
