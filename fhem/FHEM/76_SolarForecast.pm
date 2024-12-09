@@ -157,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.39.3" => "09.12.2024  fix mode in consumerXX-Reading if mode is device/reading combination, show Mode in ".
+                           "consumer legend mouse-over ",
   "1.39.2" => "08.12.2024  rollout delHashRefDeep, extended consumer key 'mode' by device/reading combination ",
   "1.39.1" => "07.12.2024  new control releaseCentralTask, new delHashRefDeep in some cases ".
                            "possible asynchron mode for setupBatteryDev ",
@@ -340,25 +342,6 @@ my %vNotesIntern = (
   "1.6.2"  => "07.01.2024  optimize battery management ",
   "1.6.1"  => "04.01.2024  new sub  __setPhysLogSwState, edit ___setConsumerPlanningState, boost performance of _collectAllRegConsumers ".
                            "CurrentVal ctrunning - Central Task running Statusbit, edit comref ",
-  "1.6.0"  => "22.12.2023  store daily batmaxsoc in pvHistory, new attr ctrlBatSocManagement, reading Battery_OptimumTargetSoC ".
-                           "currentBatteryDev: new optional key 'cap', adapt cloud2bin,temp2bin,rain2bin ".
-                           "minor internal changes, isAddSwitchOffCond: change hysteresis algo, ctrlDebug: new entry batteryManagement ".
-                           "check longitude, latitude in general audit, use coordinates (if set) for sun calc ",
-  "1.5.1"  => "07.12.2023  function _getftui can now process arguments (compatibility to new ftui widgets), plant check ".
-                           "reviews SolarForecast widget files ",
-  "1.5.0"  => "05.12.2023  new getter ftuiFramefiles ",
-  "1.4.3"  => "03.12.2023  hidden set or attr commands in user specific header area when called by 'get ... html' ".
-                           "plantConfig: check module update in repo ",
-  "1.4.2"  => "02.12.2023  ___getFWwidget: codechange ___getFWwidget using __widgetFallback function ",
-  "1.4.1"  => "01.12.2023  ___getFWwidget: adjust for FHEMWEB feature forum:#136019 ",
-  "1.4.0"  => "29.11.2023  graphicHeaderOwnspec: can manage attr / sets of other devs by <attr|set>@<dev> ",
-  "1.3.0"  => "27.11.2023  new Attr graphicHeaderOwnspecValForm ",
-  "1.2.0"  => "25.11.2023  graphicHeaderOwnspec: show readings of other devs by <reaging>@<dev>, Set/reset batteryTrigger ",
-  "1.1.3"  => "24.11.2023  rename reset arguments according possible adjustable textField width ",
-  "1.1.2"  => "20.11.2023  ctrlDebug Adjustment of column width, must have new fhemweb.js Forum:#135850 ",
-  "1.1.1"  => "19.11.2023  graphicHeaderOwnspec: fix ignoring the last element of allsets/allattr ",
-  "1.1.0"  => "14.11.2023  graphicHeaderOwnspec: possible add set/attr commands, new setter consumerNewPlanning ",
-  "1.0.10" => "31.10.2023  fix warnings, edit comref ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -826,13 +809,13 @@ my %hqtxt = (                                                                # H
   wexso  => { EN => qq{switched externally},
               DE => qq{von extern umgeschaltet}                                                                             },
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
-              DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                   },
+              DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                                                 },
   strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please note the warnings (<W>).},
-              DE => qq{Sieht ganz gut aus &#128528;, die Anlagenkonfiguration ist prinzipiell in Ordnung. Bitte beachten Sie die Warnungen (<W>).}             },
+              DE => qq{Sieht ganz gut aus &#128528;, die Anlagenkonfiguration ist prinzipiell in Ordnung. Bitte beachten Sie die Warnungen (<W>).}                                           },
   strnok => { EN => qq{Oh no &#128577;, the system configuration is incorrect. Please check the settings and notes!},
-              DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                       },
-  pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
-              DE => qq{Planungsstatus:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden}    },
+              DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                                                     },
+  pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Mode:&nbsp;<mode><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
+              DE => qq{Planungsstatus:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Modus:&nbsp;<mode><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden} },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -928,8 +911,8 @@ my %htitles = (                                                                 
                 DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                          },
   dumtxt   => { EN => qq{Consumption that cannot be allocated to registered consumers},
                 DE => qq{Verbrauch der den registrierten Verbrauchern nicht zugeordnet werden kann}                }, 
-  pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
-                DE => qq{Planungsstatus:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}                      },
+  pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nMode:&nbsp;<mode>\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
+                DE => qq{Planungsstatus:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nModus:&nbsp;<mode>\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}  },
   ainuse   => { EN => qq{AI Perl module is installed, but the AI support is not used.\nRun 'set <NAME> plantConfiguration check' for hints.},
                 DE => qq{KI Perl Modul ist installiert, aber die KI Unterst&uuml;tzung wird nicht verwendet.\nPr&uuml;fen sie 'set <NAME> plantConfiguration check' f&uuml;r Hinweise.} },
   arsrad2o => { EN => qq{API query successful but the radiation values are outdated.\nCheck the plant with 'set <NAME> plantConfiguration check'.},
@@ -10030,7 +10013,7 @@ sub _manageConsumerData {
               delete $data{$type}{$name}{consumers}{$c}{avgenergy};
           }
 
-          $data{$type}{$name}{consumers}{$c}{runtimeAvgDay} = sprintf "%.2f", (($runhours / $dnum) * 60);            # Durchschnittslaufzeit am Tag in Minuten
+          $data{$type}{$name}{consumers}{$c}{runtimeAvgDay} = sprintf "%.2f", (($runhours / $dnum) * 60);         # Durchschnittslaufzeit am Tag in Minuten
       }
 
       ## Consumer Schaltstatus und Schaltzeit für Readings ermitteln
@@ -10042,7 +10025,7 @@ sub _manageConsumerData {
       $data{$type}{$name}{consumers}{$c}{state}   = $costate;
       my ($pstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
       my ($iilt,$rlt) = isInLocktime ($paref);                                                                    # Sperrzeit Status ermitteln
-      my $mode        = ConsumerVal ($hash, $c, 'mode', 'can');
+      my $mode        = getConsumerPlanningMode ($hash, $c);                                                      # Planungsmode 'can' oder 'must'
       my $constate    = "name='$alias' state='$costate'";
       $constate      .= " mode='$mode' planningstate='$pstate'";
       $constate      .= " remainLockTime='$rlt'" if($rlt);
@@ -10508,7 +10491,7 @@ sub ___doPlanning {
   $paref->{mintime}  = $mintime;
   $paref->{stopdiff} = $stopdiff;
 
-  if ($mode eq "can") {                                                                                # Verbraucher kann geplant werden
+  if ($mode eq 'can') {                                                                                # Verbraucher kann geplant werden
       if ($debug =~ /consumerPlanning/x) {
           for my $m (sort{$a<=>$b} keys %mtimes) {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus expected: $mtimes{$m}{spexp}, }.
@@ -11030,7 +11013,7 @@ sub ___switchConsumerOn {
 
       debugLog ($paref, "consumerSwitching${c}", qq{Consumer switch enable by battery state: $enable});
 
-      if ($mode eq "can" && !$enable) {                                                           # Batterieladung - keine Verbraucher "Einschalten" Freigabe
+      if ($mode eq 'can' && !$enable) {                                                           # Batterieladung - keine Verbraucher "Einschalten" Freigabe
           $paref->{ps} = "priority charging battery";
 
           ___setConsumerPlanningState ($paref);
@@ -13850,10 +13833,12 @@ sub _graphicConsumerLegend {
       my ($planstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
       $supplmnt                                      = '-' if(!$supplmnt);
       my ($iilt,$rlt)                                = isInLocktime ($paref);                         # Sperrzeit Status ermitteln
-
+      my $mode                                       = getConsumerPlanningMode ($hash, $c);           # Planungsmode 'can' oder 'must'
+      
       my $pstate      = $caicon eq "times"    ? $hqtxt{pstate}{$lang}  : $htitles{pstate}{$lang};
       my $surplusinfo = isConsRcmd($hash, $c) ? $htitles{splus}{$lang} : $htitles{nosplus}{$lang};
 
+      $pstate =~ s/<mode>/$mode/xs;
       $pstate =~ s/<pstate>/$planstate/xs;
       $pstate =~ s/<supplmnt>/$supplmnt/xs;
       $pstate =~ s/<start>/$starttime/xs;
