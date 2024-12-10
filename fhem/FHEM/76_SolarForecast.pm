@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.39.4" => "10.12.2024  fix Check Rooftop and Roof Ident Pair Settings (SolCast) ",
   "1.39.3" => "09.12.2024  fix mode in consumerXX-Reading if mode is device/reading combination, show Mode in ".
                            "consumer legend mouse-over ",
   "1.39.2" => "08.12.2024  rollout delHashRefDeep, extended consumer key 'mode' by device/reading combination ",
@@ -1157,6 +1158,7 @@ my %hfspvh = (
 # $data{$type}{$name}{consumers}                                                 # Consumer Hash
 # $data{$type}{$name}{inverters}                                                 # Inverter Hash
 # $data{$type}{$name}{producers}                                                 # non-PV Producer Hash
+# $data{$type}{$name}{batteries}                                                 # Battery Hash
 # $data{$type}{$name}{strings}                                                   # Stringkonfiguration Hash
 # $data{$type}{$name}{solcastapi}                                                # Zwischenspeicher API-Solardaten
 # $data{$type}{$name}{weatherapi}                                                # Zwischenspeicher API-Wetterdaten
@@ -6175,12 +6177,14 @@ sub _attrBatteryDev {                    ## no critic "not used"
       readingsDelete    ($hash, 'Current_BatCharge');
       deleteReadingspec ($hash, 'Battery_.*');
       undef @{$data{$type}{$name}{current}{socslidereg}};
+      
       delete $data{$type}{$name}{circular}{99}{lastTsMaxSocRchd};
       delete $data{$type}{$name}{circular}{99}{nextTsMaxSocChge};
       delete $data{$type}{$name}{circular}{99}{initdaybatintot};
       delete $data{$type}{$name}{circular}{99}{initdaybatouttot};
       delete $data{$type}{$name}{circular}{99}{batintot};
       delete $data{$type}{$name}{circular}{99}{batouttot};
+      
       delete $data{$type}{$name}{current}{powerbatout};
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
@@ -7212,9 +7216,10 @@ sub centralTask {
               $data{$type}{$name}{statusapi}{'?IdPair'}{$pk}{rtid}   = $rtid;
               $data{$type}{$name}{statusapi}{'?IdPair'}{$pk}{apikey} = $apikey;
               
-              delete $data{$type}{$name}{solcastapi}{'?IdPair'};
+              delete $data{$type}{$name}{solcastapi}{'?IdPair'}{$pk};
           }
       }
+      delete $data{$type}{$name}{solcastapi}{'?IdPair'};
   }
   
   if (exists $data{$type}{$name}{solcastapi}{'?All'}{'?All'}) {                         # 29.11.2024                    
@@ -17352,7 +17357,7 @@ sub checkPlantConfig {
           my $rtid   = StatusAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
           my $apikey = StatusAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
 
-          if(!$rtid || !$apikey) {
+          if (!$rtid || !$apikey) {
               my $res  = qq{String "$is" has no Roof Ident Pair "$pk" defined or has no Rooftop-ID and/or SolCast-API key assigned. <br>};
               my $note = qq{Set the Roof Ident Pair "$pk" with "set $name roofIdentPair". <br>};
 
@@ -17361,10 +17366,13 @@ sub checkPlantConfig {
               $result->{'Roof Ident Pair Settings'}{note}   .= $note;
               $result->{'Roof Ident Pair Settings'}{fault}   = 1;
           }
-          else {
-              $result->{'Roof Ident Pair Settings'}{result}  = $hqtxt{fulfd}{$lang} if(!$result->{'Roof Ident Pair Settings'}{fault});
+          else {              
               $result->{'Roof Ident Pair Settings'}{note}   .= qq{checked "$is" Roof Ident Pair "$pk":<br>rtid=$rtid, apikey=$apikey <br>};
           }
+      }
+      
+      if (!$result->{'Roof Ident Pair Settings'}{fault}) {
+          $result->{'Roof Ident Pair Settings'}{result} = $hqtxt{fulfd}{$lang};
       }
   }
 
