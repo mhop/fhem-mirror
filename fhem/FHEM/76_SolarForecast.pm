@@ -157,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.39.5" => "12.12.2024  __createAdditionalEvents: Warning in fhem Log if 'AllPVforecastsToEvent' events not created ".
+                           "Notify: create cetralTask Events ",
   "1.39.4" => "10.12.2024  fix Check Rooftop and Roof Ident Pair Settings (SolCast) ",
   "1.39.3" => "09.12.2024  fix mode in consumerXX-Reading if mode is device/reading combination, show Mode in ".
                            "consumer legend mouse-over ",
@@ -6393,7 +6395,7 @@ sub Notify {
                   return;
               }
               
-              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
+              centralTask ($myHash, 1);                                                  
               return;
           }
       }
@@ -6420,7 +6422,7 @@ sub Notify {
                   return;
               }
               
-              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
+              centralTask ($myHash, 1);                                                  
               return;
           }
       }
@@ -6448,7 +6450,7 @@ sub Notify {
                   return;
               }
               
-              centralTask ($myHash, 0);                                                  # keine Events in SolarForecast außer 'state'
+              centralTask ($myHash, 1);                                                  
               return;
           }
       }
@@ -8009,16 +8011,23 @@ sub __createAdditionalEvents  {
   my $name  = $paref->{name};
   my $type  = $paref->{type};
   my $hash  = $defs{$name};
+  
+  my $done  = 0;
 
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
       my $nhts = NexthoursVal ($hash, $idx, 'starttime', undef);
       my $nhfc = NexthoursVal ($hash, $idx, 'pvfc',      undef);
       next if(!defined $nhts || !defined $nhfc);
 
+      $done        = 1;
       my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
       storeReading ('AllPVforecastsToEvent', "$nhfc Wh", $dt." ".$h.":59:59");
   }
-
+  
+  if (!$done) {
+      Log3 ($name, 2, "$name - WARNING - Events of 'AllPVforecastsToEvent' were not created due to no data in 'nexthours'");
+  }
+  
 return;
 }
 
@@ -19721,10 +19730,10 @@ sub NexthoursVal {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  if(defined($data{$type}{$name}{nexthours})              &&
-     defined($data{$type}{$name}{nexthours}{$nhr})        &&
-     defined($data{$type}{$name}{nexthours}{$nhr}{$key})) {
-     return  $data{$type}{$name}{nexthours}{$nhr}{$key};
+  if (defined ($data{$type}{$name}{nexthours})              &&
+      defined ($data{$type}{$name}{nexthours}{$nhr})        &&
+      defined ($data{$type}{$name}{nexthours}{$nhr}{$key})) {
+      return  $data{$type}{$name}{nexthours}{$nhr}{$key};
   }
 
 return $def;
