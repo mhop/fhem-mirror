@@ -8559,9 +8559,13 @@ sub EnOcean_Parse($$) {
       # set alarm timer
       EnOcean_ReadingsDelete($hash, 'alarm', 'reset', 1);
       RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
-      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
-      InternalTimer(gettimeofday() + $wakeUpCycle * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
-
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
+        #InternalTimer(gettimeofday() + $wakeUpCycle * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
+        my $signOfLifeInterval = AttrVal($name, "signOfLifeInterval", 1);
+        $signOfLifeInterval = $wakeUpCycle if ($signOfLifeInterval < $wakeUpCycle);
+        InternalTimer(gettimeofday() + $signOfLifeInterval * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
+      }
       my $actionCmd = AttrVal($name, "rcvRespAction", undef);
       if (defined $actionCmd) {
         my %specials = ("%ACTUATORSTATE" => (($db[2] & 1) ? "obstructed" : "ok"),
@@ -8975,6 +8979,17 @@ sub EnOcean_Parse($$) {
         $wakeUpCycle = 50 if ($wakeUpCycle < 50);
       }
 
+      # set alarm timer
+      EnOcean_ReadingsDelete($hash, 'alarm', 'reset', 1);
+      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
+        #InternalTimer(gettimeofday() + $wakeUpCycleInv{$wakeUpCycle} * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
+        my $signOfLifeInterval = AttrVal($name, "signOfLifeInterval", 1);
+        $signOfLifeInterval = $wakeUpCycleInv{$wakeUpCycle} if ($signOfLifeInterval < $wakeUpCycleInv{$wakeUpCycle});
+        InternalTimer(gettimeofday() + $signOfLifeInterval * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
+      }
+
       my $actionCmd = AttrVal($name, "rcvRespAction", undef);
       if (defined $actionCmd) {
         my %specials = ("%BATTERY" => $battery,
@@ -9267,11 +9282,16 @@ sub EnOcean_Parse($$) {
       readingsSingleUpdate($hash, 'wakeUpCycle', $wakeUpCycle, 1);
       # set alarm timer
       EnOcean_ReadingsDelete($hash, 'alarm', 'reset', 1);
-      if ($waitingCmds ne "standby") {
-        RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+      if ($waitingCmds ne "standby" && AttrVal($name, "signOfLife", 'on') eq 'on') {
         @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
-        InternalTimer(gettimeofday() + ($wakeUpCycle < 600 ? 600 : $wakeUpCycle) * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
+        #InternalTimer(gettimeofday() + ($wakeUpCycle < 600 ? 600 : $wakeUpCycle) * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
+        my $signOfLifeInterval = AttrVal($name, "signOfLifeInterval", 1);
+        $signOfLifeInterval = $wakeUpCycle if ($signOfLifeInterval < $wakeUpCycle);
+        $signOfLifeInterval = 600 if ($signOfLifeInterval < 600);
+        InternalTimer(gettimeofday() + $signOfLifeInterval * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
       }
+
       my $actionCmd = AttrVal($name, "rcvRespAction", undef);
       if (defined $actionCmd) {
         my %specials = ("%ACTUATORSTATE" => (($db[0] & 1) ? "obstructed" : "ok"),
@@ -20035,7 +20055,11 @@ sub EnOcean_Delete($$) {
     created by autocreate. To control the device, it must be bidirectional paired,
     see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.<br>
     The command is not sent until the device wakes up and sends a message, usually
-    every 10 minutes.
+    every 10 minutes.<br>
+    A monitoring period can be set for signOfLife telegrams of the actor, see
+    <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
+    Default is "on" and an interval of the wakeUpCycle value. If the <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>
+    is less than the wakeUpCycle value, the interval is set to the wakeUpCycle value.
     </li>
     <br><br>
 
@@ -20100,7 +20124,11 @@ sub EnOcean_Delete($$) {
     The OEM version of the Holter SmartDrive MX has an internal PID controller. This function is activated by
     attr <device> model Holter_OEM and attr <device> pidCtrl off.<br>
     The command is not sent until the device wakes up and sends a message, usually
-    every 5 minutes.
+    every 5 minutes.<br>
+    A monitoring period can be set for signOfLife telegrams of the actor, see
+    <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
+    Default is "on" and an interval of the wakeUpCycle value. If the <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>
+    is less than the wakeUpCycle value, the interval is set to the wakeUpCycle value.
     </li>
     <br><br>
 
@@ -20162,7 +20190,11 @@ sub EnOcean_Delete($$) {
     The actuator has an internal PID controller. This function is activated by
     attr <device> pidCtrl off.<br>
     The command is not sent until the device wakes up and sends a message, usually
-    every 2 to 10 minutes.
+    every 2 to 10 minutes.<br>
+    A monitoring period can be set for signOfLife telegrams of the actor, see
+    <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
+    Default is "on" and an interval of the wakeUpCycle value. If the <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>
+    is less than the wakeUpCycle value, the interval is set to the wakeUpCycle value.
     </li>
     <br><br>
 
@@ -23150,7 +23182,7 @@ sub EnOcean_Delete($$) {
         <a href="#EnOcean-attr-windSpeedWindy">windSpeedWindy</a>,
         <a href="#EnOcean-attr-windSpeedWindyDelay">windSpeedWindyDelay</a>.<br>
         Execution of custom alarm commands, see <a href="#EnOcean-attr-customCmdAlarmOff">customCmdAlarmOff</a>,
-        <a href="#EnOcean-attr-customCmdAlarmOn">customCmdAlarmOn</a>, <a href="#EnOcean-attr-signOfLife">signOfLife</a> ([signOfLive] = on is default) and
+        <a href="#EnOcean-attr-customCmdAlarmOn">customCmdAlarmOn</a>, <a href="#EnOcean-attr-signOfLife">signOfLife</a> ([signOfLife] = on is default) and
         <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 660 is default).<br>
         Execution of custom up and down commands that can be triggered by the readings dayNight, isRaining, isStormy,
         isSunny, isSunnyEast, isSunnySouth, isSunnyWest and isWindy, see <a href="#EnOcean-attr-customCmdDown">customCmdDown</a> and
