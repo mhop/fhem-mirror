@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.28.2  15.12.2024  change delHashRefDeep
 # 1.28.1  08.12.2024  fix delHashRefDeep
 # 1.28.0  07.12.2024  add function delHashRefDeep
 # 1.27.4  05.12.2024  expand evaljson for SolarForecast
@@ -63,7 +64,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.28.1');
+use version 0.77; our $VERSION = version->declare('1.28.2');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -317,8 +318,6 @@ sub delHashRefDeep {
           delete $href->{$key}; 
       }
   }
-
-  $href = undef;          # Optional: Garbage Collection erzwingen 
 
 return;
 }
