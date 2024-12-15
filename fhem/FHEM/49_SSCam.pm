@@ -193,6 +193,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.4" => "15.12.2024  fix Attr pollcaminfoall ",
   "9.12.3" => "08.12.2024  rollout delHashRefDeep, edit comref, internal code changed, replace some special data by local owndata ",
   "9.12.2" => "26.11.2024  Bugfix PATH in hvada & hsimu ",
   "9.12.1" => "25.11.2024  set COMPATIBILITY to 9.2.1, attr customSVSversion new option 9.2.0 ",
@@ -714,6 +715,7 @@ my %hsimu = (                                                              # Fun
 
 # Standardvariablen und Forward-Deklaration
 my %owndata;
+my $polldef           = 0;                                 # default Pollingwert, 0 = kein Polling
 my $defSlim           = 3;                                 # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
 my $sgnum             = '1,2,3,4,5,6,7,8,9,10';            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
@@ -1517,7 +1519,7 @@ sub Attr {
         }
         elsif ($init_done == 1) {                                                            # snapgallery regelmäßig neu einlesen wenn Polling ein
             return qq{When you want activate "snapGalleryBoost", you have to set the attribute "pollcaminfoall" first because of the functionality depends on retrieving snapshots periodical.}
-               if(!AttrVal ($name, 'pollcaminfoall', 0));
+               if(!AttrVal ($name, 'pollcaminfoall', $polldef));
 
             $hash->{HELPER}{GETSNAPGALLERY} = 1;
             my $slim  = AttrVal ($name, 'snapGalleryNumber', $defSlim);                      # Anzahl der abzurufenden Snaps
@@ -1581,10 +1583,10 @@ sub Attr {
     }
 
     if ($aName =~ m/pollcaminfoall/ && $init_done == 1) {
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::__getCaminfoAll"          );
-        InternalTimer       (gettimeofday()+1.0, "FHEM::SSCam::__getCaminfoAll", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::wdpollcaminfo"            );
-        InternalTimer       (gettimeofday()+1.5, "FHEM::SSCam::wdpollcaminfo",   $hash, 0);
+        RemoveInternalTimer ($hash,                "FHEM::SSCam::__getCaminfoAll"          );
+        InternalTimer       (gettimeofday() + 1.0, "FHEM::SSCam::__getCaminfoAll", $hash, 0);
+        RemoveInternalTimer ($hash,                "FHEM::SSCam::wdpollcaminfo"            );
+        InternalTimer       (gettimeofday() + 1.5, "FHEM::SSCam::wdpollcaminfo",   $hash, 0);
     }
 
     if ($aName =~ m/pollnologging/ && $init_done == 1) {
@@ -1594,11 +1596,7 @@ sub Attr {
 
     if ($cmd eq 'set') {
         if ($aName =~ m/httptimeout|snapGalleryColumns|rectime|pollcaminfoall/x) {
-            unless ($aVal =~ /^\d+$/x) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
-        }
-
-        if ($aName =~ m/pollcaminfoall/x) {
-            return "The value of \"$aName\" has to be greater than 10 seconds." if($aVal <= 10);
+            unless ($aVal =~ /^\d+$/x) {return " The Value for $aName is not valid. Use only figures 1-9";}
         }
 
         if ($aName =~ m/cacheServerParam/x) {
@@ -2213,6 +2211,7 @@ sub _setcreateStreamDev {                ## no critic "not used"
       my $c = qq{The device shows the last snapshot of camera device "$name". \n}.
               qq{If you always want to see the newest snapshot, please set attribute "pollcaminfoall" in camera device "$name".\n}.
               qq{Set also attribute "snapGallerySize = Full" in camera device "$name" to retrieve snapshots in original resolution.};
+      
       CommandAttr($hash->{CL},"$livedev comment $c");
   }
 
@@ -4773,8 +4772,8 @@ sub __getCaminfoAll {
         __getSvsLog        ($hash);
     }
 
-    my $pcia = AttrVal ($name, 'pollcaminfoall', 0);
-    my $pnl  = AttrVal ($name, 'pollnologging',  0);
+    my $pcia = AttrVal ($name, 'pollcaminfoall', $polldef);
+    my $pnl  = AttrVal ($name, 'pollnologging',         0);
 
     if ($pcia) {
         my $new = gettimeofday() + $pcia;
@@ -12336,9 +12335,9 @@ sub wdpollcaminfo {
     my $name          = $hash->{NAME};
     my $camname       = $hash->{CAMNAME};
     
-    my $pcia          = AttrVal ($name,    'pollcaminfoall'  ,0);
-    my $pnl           = AttrVal ($name,    'pollnologging',   0);
-    my $lang          = AttrVal ('global', 'language',     'EN');
+    my $pcia          = AttrVal ($name,    'pollcaminfoall', $polldef);
+    my $pnl           = AttrVal ($name,    'pollnologging',         0);
+    my $lang          = AttrVal ('global', 'language',           'EN');
     my $watchdogtimer = 60 + rand(30);
 
     RemoveInternalTimer($hash, "FHEM::SSCam::wdpollcaminfo");
@@ -12355,9 +12354,9 @@ sub wdpollcaminfo {
     }
 
     if ($pcia && !IsDisabled($name)) {                                                              # Polling prüfen
-        if (ReadingsVal($name, "PollState", "Active") eq "Inactive") {
-            readingsSingleUpdate($hash,"PollState","Active",1);                                     # Polling ist jetzt aktiv
-            readingsSingleUpdate($hash,"state","polling",1) if(!IsModelCam($hash));                 # Polling-state bei einem SVS-Device setzten
+        if (ReadingsVal ($name, "PollState", "Active") eq "Inactive") {
+            readingsSingleUpdate ($hash, 'PollState', 'Active',  1);                                # Polling ist jetzt aktiv
+            readingsSingleUpdate ($hash, 'state',     'polling', 1) if(!IsModelCam($hash));         # Polling-state bei einem SVS-Device setzten
             
             Log3($name, 3, "$name - Polling of $camname is activated - Pollinginterval: $pcia s");
             
@@ -13893,9 +13892,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li><br>
 
   <a id="SSCam-attr-pollcaminfoall"></a>
-  <li><b>pollcaminfoall</b><br>
-    Interval of the automatic property query (polling) of the device (&lt;= 10: no polling, &gt; 10: polling with interval) 
+  <li><b>pollcaminfoall &lt;Integer >= 0&gt; </b><br>
+    Interval of the automatic data query (polling) of the device. If the value '0' or the attribute is not set, there is no 
+    automatic polling. <br>
+    (default: 0)
     <br><br>
+    
     <b>Note:</b> It is strongly recommended to keep the polling to get the full functionality of the module.
     <br> 
   </li><br>
@@ -15974,7 +15976,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 
   <a id="SSCam-attr-loginRetries"></a>
   <li><b>loginRetries</b><br>
-    Setzt die Anzahl der Login-Wiederholungen im Fehlerfall (default = 3)   </li><br>
+    Setzt die Anzahl der Login-Wiederholungen im Fehlerfall. <br>
+    (default: 3)   
+  </li><br>
 
   <a id="SSCam-attr-noQuotesForSID"></a>
   <li><b>noQuotesForSID</b><br>
@@ -15985,9 +15989,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li><br>
 
   <a id="SSCam-attr-pollcaminfoall"></a>
-  <li><b>pollcaminfoall</b><br>
-    Intervall der automatischen Eigenschaftsabfrage (Polling) des Gerätes (&lt;= 10: kein Polling, &gt; 10: Polling mit Intervall) 
+  <li><b>pollcaminfoall &lt;Ganzzahl >= 0&gt; </b><br>
+    Intervall der automatischen Datenabfrage (Polling) des Gerätes. Ist der Wert '0' oder das Attribut nicht gesetzt, erfolgt
+    kein automatisches Polling. <br>
+    (default: 0)
     <br><br>
+    
     <b>Hinweis:</b> Es wird dringend empfohlen das Polling beizubehalten um den vollen Funktionsumfang des Moduls zu erhalten.
     <br> 
   </li><br>
