@@ -234,7 +234,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		F => 3, S => 'ACTUAL_TEMPERATURE', C => '', V => '', P => 1
 	},
 	'WINMATIC' => {
-		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
+		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0,lock:-0.5', P => 2
 	}
 );
 
