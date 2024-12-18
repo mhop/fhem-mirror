@@ -354,7 +354,6 @@ my %vNotesIntern = (
 
 ## Standardvariablen
 ######################
-my %owndata;                                                                        # zentraler Store temporäre Daten
 my @da;                                                                             # zentraler temporärer Readings-Store
 my $deflang        = 'EN';                                                          # default Sprache wenn nicht konfiguriert
 my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
