@@ -93,6 +93,8 @@
 #
 # 2024-04-05    remove smartmatch issues
 #
+# 2024-12-20    1.0.0.11 - add some patches for better startup (thx to Beta-User)
+#
 ####################################################################################################
 =cut
 
@@ -105,7 +107,7 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%modules);
 
-my $PID20_Version = "1.0.0.10";
+my $PID20_Version = "1.0.0.11";
 sub PID20_Calc($);
 ########################################
 sub PID20_Log($$$)
@@ -193,18 +195,28 @@ sub PID20_Define($$$)
   my ( $hash, $def ) = @_;
   my @a       = split( "[ \t][ \t]*", $def );
   my $name    = $a[0];
-  my $err     = 0;
-  my $reFloat = '^([\\+,\\-]?\\d+\\.?\d*$)';    # gleitpunkt
   if ( @a != 4 )
   {
     return "wrong syntax: define &lt;name&gt; PID20 " 
     . "&lt;sensor&gt;:reading:[regexp] &lt;actor&gt;[:cmd] ";
   }
+  return if !$init_done;
+  return PID20_Check($hash, $a[2], $a[3]);
+}
+
+sub PID20_Check($$$)
+{ my ( $hash, $sensorinfo, $actorinfo ) = @_;
+   
   ###################
   # Sensor
-  my ( $sensor, $reading, $regexp ) = split( ":", $a[2], 3 );
+  my ( $sensor, $reading, $regexp ) = split( ":", $sensorinfo, 3 );
+  my $msg;
 
   # if sensor unkonwn
+  my $name = $hash->{NAME};
+
+  my $err     = 0;
+
   if ( !$defs{$sensor} )
   {
     my $msg = "$name: Unknown sensor device $sensor specified";
@@ -214,27 +226,28 @@ sub PID20_Define($$$)
   }
 
   # if reading of sender is unknown
-  if ( ReadingsVal( $sensor, $reading, 'unknown' ) eq 'unkown' )
+  if ( ReadingsVal( $sensor, $reading, 'unknownReading' ) eq 'unkownReading' )
   {
-    my $msg = "$name: Unknown reading $reading for sensor device $sensor specified";
-    PID20_Log $hash, 1, $msg;
-    #return $msg;
+    $msg = "$name: Unknown reading $reading for sensor device $sensor specified";
+    #PID20_Log $hash, 1, $msg;
     $err = 1;
   }
+  #my $reFloat = '^([\\+,\\-]?\\d+\\.?\d*$)';    # gleitpunkt
 
   # defaults for regexp
   if ( !$regexp )
   {
-    $regexp = $reFloat;
+    #$regexp = $reFloat;
+	$regexp = '^([\\+,\\-]?\\d+\\.?\d*$)';
   }
 
   # Actor
-  my ( $actor, $cmd ) = split( ":", $a[3], 2 );
+  my ( $actor, $cmd ) = split( ":", $actorinfo, 2 );
   if ( !$defs{$actor} )
   {
-    my $msg = "$name: Unknown actor device $actor specified";
-    PID20_Log $hash, 1, $msg;
-    #return $msg;
+    $msg .= '\n' if $msg; 
+	  $msg .= "$name: Unknown actor device $actor specified";
+    #PID20_Log $hash, 1, $msg;
     $err = 1;
   }
 
@@ -252,10 +265,12 @@ sub PID20_Define($$$)
     RemoveInternalTimer($name);
     InternalTimer( gettimeofday() + 10, 'PID20_Calc', $name, 0 );
   } else {
+    PID20_Log $hash, 1, $msg;
     readingsSingleUpdate( $hash, 'state', 'PID defined with errors! See logfile for details.', 0 );
   }
-  return undef;
+  return $msg;
 }
+
 ########################################
 sub PID20_Undef($$)
 {
@@ -275,6 +290,17 @@ sub PID20_Notify($$)
 
   # no action if disabled
   return if IsDisabled($name);
+  
+  if ( $dev->{NAME} eq 'global' ) {
+    my $events = $dev->{CHANGED};
+    return if !$events; # Some previous notify deleted the array.
+    for my $evnt(@{$events}){
+      if ($evnt =~ m/INITIALIZED|REREADCFG/){
+        my ($sensorinfo, $actorinfo) = split m{\s+}xms, $hash->{DEF};
+        return PID20_Check($hash, $sensorinfo, $actorinfo );
+      }
+    }
+  }
 
   return if ( $dev->{NAME} ne $sensorName );
   my $sensorReadingName = $hash->{helper}{reading};
