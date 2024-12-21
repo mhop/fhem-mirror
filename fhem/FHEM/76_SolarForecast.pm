@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.39.8" => "21.12.2024  prepare of new consumer key 'surpmeth', _batSocTarget: improve care SoC management when dark doldrums ",
   "1.39.7" => "18.12.2024  ConsumptionRecommended calc method medianArray, change local owndata to global data ",
   "1.39.6" => "17.12.2024  replace global data-store by local owndata-store, remove sub _composeRemoteObj, delHashRefDeep removed ".
                            "add current key (array) 'surplusslidereg' + sub avgArray, batteryManagement: fix care SoC management ",
@@ -5427,7 +5428,7 @@ sub _attrconsumer {                      ## no critic "not used"
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
           if ($h->{mode} =~ /.*:.*/xs) {
               my ($dv, $rd) = split ':', $h->{mode};
-              ($err)        = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );         
+              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );         
               return $err if($err);
               
               my $mode = ReadingsVal ($dv, $rd, '');
@@ -5437,6 +5438,21 @@ sub _attrconsumer {                      ## no critic "not used"
           }
           else {
               return qq{The mode "$h->{mode}" isn't allowed!};
+          }
+      }
+      
+      if (exists $h->{surpmeth}) {
+          if ($h->{surpmeth} =~ /.*:.*/xs) {
+              my ($dv, $rd) = split ':', $h->{surpmeth};
+              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );         
+              return $err if($err);
+              
+              if (!isNumeric( ReadingsVal ($dv, $rd, '') )) {
+                  return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid numeric value";
+              }
+          }
+          elsif ($h->{surpmeth} !~ /^[1-9]$|^1[0-9]$|^20$|^median$/xs) {
+              return qq{The surpmeth "$h->{surpmeth}" is wrong. It must contain a '<device>:<reading>', 'median' or integer value '1 .. 20'.};
           }
       }
 
@@ -7605,7 +7621,7 @@ sub _collectAllRegConsumers {
       }
 
       my $interruptable = 0;
-      my ($hyst);
+      my $hyst;
       if (exists $hc->{interruptable} && $hc->{interruptable} ne '0') {
           $interruptable         = $hc->{interruptable};
           ($interruptable,$hyst) = $interruptable =~ /(.*):(.*)$/xs if($interruptable ne '1');
@@ -7626,7 +7642,7 @@ sub _collectAllRegConsumers {
       my $clt;
       if (exists $hc->{locktime}) {
           $clt = $hc->{locktime};
-      }
+      }      
 
       delete $data{$name}{consumers}{$c}{sunriseshift};
       delete $data{$name}{consumers}{$c}{sunsetshift};
@@ -7658,6 +7674,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                 # Arbeitsweise FHEM Consumer Device
       $data{$name}{consumers}{$c}{noshow}            = $noshow             // 0;                 # ausblenden in Grafik
       $data{$name}{consumers}{$c}{exconfc}           = $exconfc            // 0;                 # Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+      $data{$name}{consumers}{$c}{surpmeth}          = $hc->{surpmeth}     // 1;                 # Ermittlungsmethode des PV-Überschusses, default=1 -> direkte Messung
       $data{$name}{consumers}{$c}{locktime}          = $clt                // '0:0';             # Sperrzeit im Automatikmodus ('offlt:onlt')
       $data{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';              # Regex für 'ein'
       $data{$name}{consumers}{$c}{offreg}            = $offreg             // 'off';             # Regex für 'aus'
@@ -7672,9 +7689,9 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{spignorecondregex} = $spignorecondregex  // q{};               # Regex der Ignore Bedingung
       $data{$name}{consumers}{$c}{interruptable}     = $interruptable;                           # Ein-Zustand des Verbrauchers ist unterbrechbar
       $data{$name}{consumers}{$c}{hysteresis}        = $hyst               // $defhyst;          # Hysterese
-      $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift  if(defined $riseshift);       # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
-      $data{$name}{consumers}{$c}{sunsetshift}       = $setshift   if(defined $setshift);        # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
-      $data{$name}{consumers}{$c}{icon}              = $hc->{icon} if(defined $hc->{icon});      # Icon für den Verbraucher
+      $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift     if(defined $riseshift);    # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
+      $data{$name}{consumers}{$c}{sunsetshift}       = $setshift      if(defined $setshift);     # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+      $data{$name}{consumers}{$c}{icon}              = $hc->{icon}    if(defined $hc->{icon});   # Icon für den Verbraucher
   }
 
   $data{$name}{current}{consumerCollected} = 1;
@@ -9364,7 +9381,7 @@ sub _batSocTarget {
   my $batcharge  = CurrentVal  ($hash, 'batcharge',                0);                       # aktuelle Ladung in %
   my $batinstcap = CurrentVal  ($hash, 'batinstcap',               0);                       # installierte Batteriekapazität Wh
   my $cgbt       = AttrVal     ($name, 'ctrlBatSocManagement', undef);
-
+    
   if ($cgbt && !$batinstcap) {
       Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement is active, but the required key 'cap' is not setup in setupBatteryDev. Exit.");
       return;
@@ -9380,61 +9397,83 @@ sub _batSocTarget {
   delete $paref->{careCycle};
 
   my $nt         = '';
-  my $chargereq  = 0;                                                             # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
+  my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
   my $target     = $lowSoc;
-  my $yday       = strftime "%d", localtime($t - 86400);                          # Vortag  (range 01 to 31)
-  my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc',       0);           # gespeicherter max. SOC des Vortages
-  my $batysetsoc = HistoryVal ($hash, $yday, 99, 'batsetsoc', $lowSoc);           # gespeicherter SOC Sollwert des Vortages
-
+  my $yday       = strftime "%d", localtime($t - 86400);                                    # Vortag  (range 01 to 31)
+  my $tdconsset  = CurrentVal ($hash, 'tdConFcTillSunset',          0);                     # Verbrauch bis Sonnenuntergang Wh
+  my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc',       0);                     # gespeicherter max. SOC des Vortages
+  my $batysetsoc = HistoryVal ($hash, $yday, 99, 'batsetsoc', $lowSoc);                     # gespeicherter SOC Sollwert des Vortages
+  my $whneed     = ($maxsoc / 100 * $batinstcap) - ($batcharge / 100 * $batinstcap);        # benötigte Ladeenergie in Wh bis $maxsoc
+  $whneed        = sprintf "%.0f", $whneed;
+  
   $target = $batymaxsoc <  $maxsoc ? $batysetsoc + $batSocChgDay :
             $batymaxsoc >= $maxsoc ? $batysetsoc - $batSocChgDay :
-            $batysetsoc;                                                          # neuer Min SOC für den laufenden Tag
+            $batysetsoc;                                                                    # neuer Min SOC für den laufenden Tag
 
   debugLog ($paref, 'batteryManagement', "SoC calc Step1 - compare with SoC history -> preliminary new Target: $target %");
 
   ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)
   ###########################################################################
   my $sunset  = CurrentVal ($hash, 'sunsetTodayTs', $t);
-  my $delayts = $sunset - 5400;                                                   # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
+  my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
   my $la      = '';
   my $careSoc = $target;
-  
-  if ($t > $delayts) {
-      my $ntsmsc    = CircularVal ($hash, 99, 'nextTsMaxSocChge', $t);
-      my $days2care = ceil        (($ntsmsc - $t) / 86400);                       # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
 
+  my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);                 # PV Prognose morgen
+  my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',            0);                 # PV Prognose Rest heute
+  my $pvexpect = $pvfctm > $pvfctd ? $pvfctm : $pvfctd - $tdconsset;                       # erwartete (Rest) PV-Leistung des Tages
+  $pvexpect    = $pvexpect > 0 ? $pvexpect : 0;                                            # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
+  
+  my $ntsmsc    = CircularVal ($hash, 99, 'nextTsMaxSocChge', $t);
+  my $days2care = floor       (($ntsmsc - $t) / 86400);                                    # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
+
+  my $docare   = 0;                                                                        # keine Zwangsanwendung care SoC
+  
+  if ($t > $delayts || $pvexpect < $whneed || !$days2care) {
       $paref->{days2care} = $days2care;
       __batSaveSocKeyFigures ($paref);
       delete $paref->{days2care};
 
-      $careSoc = $maxsoc - ($days2care * $batSocChgDay);                                       # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
-      $target  = $careSoc < $target ? $target : $careSoc;                                      # resultierender Target-SoC unter Berücksichtigung $caresoc
-      $la      = "calculate care SoC ($days2care days) -> Target: $target %";
+      $careSoc = $maxsoc - ($days2care * $batSocChgDay);                                   # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
+      $careSoc = $careSoc < $lowSoc ? $lowSoc : $careSoc;
+      
+      if ($careSoc >= $target) {
+          $target = $careSoc;                                                              # resultierender Target-SoC unter Berücksichtigung $caresoc
+          $docare = 1;                                                                     # Zwangsanwendung care SoC
+      }
+      
+      $la = "calc care SoC -> Remaining days until care SoC: $days2care, Target: $target %";
   }
   else {
       $nt = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-      $la = "calculate care SoC -> calculation & activation postponed to after $nt";
+      $la = "calc care SoC -> use preliminary Target: $target % (care SoC calculation & activation postponed to after $nt)";
   }
 
+  debugLog ($paref, 'batteryManagement', "SoC calc Step2 - basics -> docare: $docare, care SoC: $careSoc %, E expect: $pvexpect Wh, need for care SoC: $whneed Wh");
   debugLog ($paref, 'batteryManagement', "SoC calc Step2 - $la");
 
   ## Aufladewahrscheinlichkeit beachten
   #######################################
-  my $pvfctm     = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);               # PV Prognose morgen
-  my $pvfctd     = ReadingsNum ($name, 'RestOfDayPVforecast',            0);               # PV Prognose Rest heute
-  my $csopt      = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);               # aktuelles SoC Optimum
-
-  my $pvexpect   = $pvfctm > $pvfctd ? $pvfctm : $pvfctd;
-  my $cantarget  = 100 - (100 / $batinstcap) * $pvexpect;                                  # berechneter möglicher Min SOC nach Berücksichtigung Ladewahrscheinlichkeit
-
-  my $newtarget  = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);          # Abgleich möglicher Min SOC gg. berechneten Min SOC
+  my $csopt     = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);                # aktuelles SoC Optimum
+  my $cantarget = sprintf "%.0f", (100 - (100 / $batinstcap * $pvexpect));                 # berechneter max. möglicher SOC nach Berücksichtigung Ladewahrscheinlichkeit
+  my $newtarget = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);           # Abgleich möglicher Min SOC gg. berechneten Min SOC
+  
+  debugLog ($paref, 'batteryManagement', "SoC calc Step3 - basics -> cantarget: $cantarget %, newtarget: $newtarget %");
+  
+  if ($newtarget > $careSoc) {
+      $docare = 0;                                                                         # keine Zwangsanwendung care SoC
+  }
+  else {
+      $newtarget = $careSoc;
+  }
+  
   my $logadd     = '';
 
   if ($newtarget > $csopt && $t > $delayts) {                                              # Erhöhung des SoC (wird ab Sonnenuntergang angewendet)
       $target = $newtarget;
       $logadd = "(new target > $csopt % and Sunset has passed)";
   }
-  elsif ($newtarget > $csopt && $t <= $delayts) {                                          # bisheriges Optimum bleibt vorerst
+  elsif ($newtarget > $csopt && $t <= $delayts && !$docare) {                              # bisheriges Optimum bleibt vorerst
       $target = $csopt;
       $nt     = (timestampToTimestring ($delayts, $paref->{lang}))[0];
       $logadd = "(new target $newtarget % is activated after $nt)";
@@ -9448,19 +9487,16 @@ sub _batSocTarget {
       $logadd = "(no change)";
   }
 
-  debugLog ($paref, 'batteryManagement', "SoC calc Step3 - charging probability -> Target: $target % ".$logadd);
+  debugLog ($paref, 'batteryManagement', "SoC calc Step3 - charging probability -> docare: $docare, Target: $target % ".$logadd);
 
   ## low/up-Grenzen beachten
   ############################
-  $target = $target > $upSoc  ? $upSoc  :
+  $target = $docare           ? $target :
+            $target > $upSoc  ? $upSoc  :
             $target < $lowSoc ? $lowSoc :
             $target;
-  
-  if ($t > $delayts) {                                                                     # evtl. Aktivierung Pflegesock nach Sonnenuntergang 
-      $target = $careSoc > $target ? $careSoc : $target;
-  }
 
-  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - observe low/up limits -> Target: $target %".($careSoc > $target ? " (activation of care SoC $careSoc % is postponed)" : ''));
+  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - observe low/up limits -> docare: $docare, Target: $target %");
 
   ## auf 5er Schritte anpassen (40,45,50,...)
   #############################################
@@ -9469,7 +9505,7 @@ sub _batSocTarget {
   my $add = $rmn <= 2.5 ? 0 : 5;
   $target = ($flo * 5) + $add;
 
-  debugLog ($paref, 'batteryManagement', "SoC calc Step5 - rounding the SoC to steps of 5 -> Target: $target %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step5 - rounding the SoC to steps of 5 % -> Target: $target %");
 
   ## Zwangsladeanforderung
   ##########################
@@ -9512,7 +9548,7 @@ sub __batSaveSocKeyFigures {
   my $paref     = shift;
   my $name      = $paref->{name};
   my $type      = $paref->{type};
-  my $t         = $paref->{t};                                                               # aktuelle Zeit
+  my $t         = $paref->{t};                                                            # aktuelle Zeit
   my $careCycle = $paref->{careCycle} // $carecycledef;
 
   if (defined $paref->{days2care}) {
@@ -10802,12 +10838,8 @@ sub __setConsRcmdState {
   my $ccr        = AttrVal          ($name, 'ctrlConsRecommendReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
   my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $nompower;                          # resultierender Verbauch nach Einschaltung Consumer
   
-  my $method     = 'Median';
-  my $splref     = CurrentVal ($hash, 'surplusslidereg', '');
-  
   # $surplusval kann undef sein! -> dann letzten Wert isConsumptionRecommended behalten
-  my $surplusval = $method eq 'Median' ? medianArray ($splref) :                          # Median des Energieüberschußes 
-                   avgArray ($splref, 6);                                                 # Durchschnitt Energieüberschuß der letzten X Messungen
+  my ($method, $surplusval) = determSurplus ($hash, $c);                                  # Consumer spezifische Ermittlung des Energieüberschußes 
   
   if ($debug =~ /consumerSwitching${c}/x) {      
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
@@ -10815,11 +10847,11 @@ sub __setConsRcmdState {
                          (defined $surplusval ? $surplusval : 'undef'));
   }
   
-  my ($spignore, $info, $err) = isSurplusIgnoCond ($hash, $c, $debug);                    # Vorhandensein PV Überschuß ignorieren ?
+  my ($spignore, $info, $err) = isSurplusIgnoCond ($hash, $c, $debug);                    # PV Überschuß ignorieren?
   Log3 ($name, 1, "$name - $err") if($err);
   
   if (!$nompower || $surplus - $rescons > 0 || $spignore) {
-      $data{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                       # Einschalten des Consumers günstig bzw. Freigabe für "on" von Überschußseite erteilt
+      $data{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                          # Einschalten des Consumers günstig bzw. Freigabe für "on" von Überschußseite erteilt
   }
   else {
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = 0;
@@ -17641,6 +17673,65 @@ return $out;
 }
 
 ################################################################
+#  Ermittelt den PV Überschuß nach verschiedenen Verfahren
+#  ($surpmeth). Auswertung des Schieberegisters surplusslidereg.
+# 
+#  $surpmeth = 1       - der aktuell gemessene Überschuß
+#  $surpmeth = 2 .. 20 - Durchschnitt der letzten X Messungen
+#  $surpmeth = median  - Median der vorhandenen Überschußwerte
+#
+#  Rückgabe:  PV Überschuß oder undef
+#
+################################################################
+sub determSurplus {
+  my $hash = shift;                                                    
+  my $c    = shift;
+
+  my $surpmeth = ConsumerVal ($hash, $c, 'surpmeth', 1);
+  my $splref   = CurrentVal  ($hash, 'surplusslidereg', '');
+  my $name     =  $hash->{NAME};
+  my $method   = 'default';
+  my $surplus;
+  
+  if ($surpmeth eq 'median') {                                            # Median der Werte in surplusslidereg
+      $surplus = medianArray ($splref);
+      $method  = 'median';
+  }
+  elsif ($surpmeth =~ /^[1-9]$|^1[0-9]$|^20$/xs) {
+      if ($surpmeth == 1) {
+          $surplus = CurrentVal ($hash, 'surplus', 0);                    # aktueller Energieüberschuß
+          $method  = 'median';
+      }
+      else {                                                              # Average Ermittlung, kann undef sein
+          $surplus = avgArray ($splref, $surpmeth);
+          $method  = "average:$surpmeth";
+      }
+  }
+  elsif ($surpmeth =~ /.*:.*/xs) {
+      my ($dv, $rd) = split ':', $surpmeth;
+      my ($err)     = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+      
+      if ($err) {
+          Log3 ($name, 1, qq{$name - ERROR of consumer $c key 'surpmeth':  $err (fall back to default Surplus determination)});
+          $surplus = CurrentVal ($hash, 'surplus', 0);                    # aktueller Energieüberschuß
+          $method  = 'default';
+      }
+      else {
+          $surplus = ReadingsNum ($dv, $rd, '');
+          $method  = "$dv:$rd";
+         
+          if (!isNumeric ($surplus)) {
+              Log3 ($name, 1, qq{$name - ERROR of consumer $c key 'surpmeth': Device $dv / Reading $rd is not numeric (fall back to default Surplus determination)});
+              $surplus = CurrentVal ($hash, 'surplus', 0);                # aktueller Energieüberschuß
+              $method  = 'default';
+          }
+      }
+  }
+
+return ($method, $surplus);
+}
+
+################################################################
 #  Array auf eine festgelegte Anzahl Elemente beschränken,
 #  Das älteste Element wird entfernt
 #
@@ -21478,15 +21569,15 @@ to ensure that the system configuration is correct.
 
          <table>
          <colgroup> <col width="2%"> <col width="98%"> </colgroup>
-            <tr><td> 1. </td><td>Starting from 'lowSoc', the minimum SoC is increased by 5% on the following day but not higher than                    </td></tr>
-            <tr><td>    </td><td>'upSoC', if 'maxSoC' has not been reached on the current day.                                                          </td></tr>
-            <tr><td> 2. </td><td>If 'maxSoC' is reached (again) on the current day, the minimum SoC is reduced by 5%, but not lower than 'lowSoc'.      </td></tr>
-            <tr><td> 3. </td><td>Minimum SoC is reduced so that the predicted PV energy of the current or following day                                 </td></tr>
-            <tr><td>    </td><td>can be absorbed by the battery. Minimum SoC is not reduced lower than 'lowSoc'.                                        </td></tr>
-            <tr><td> 4. </td><td>The module records the last point in time at the 'maxSoC' level in order to ensure a charge to 'maxSoC'                </td></tr>
-            <tr><td>    </td><td>at least every 'careCycle' days. For this purpose, the optimized SoC is changed depending on the remaining days        </td></tr>
-            <tr><td>    </td><td>until the next 'careCycle' point in such a way that 'maxSoC' is mathematically achieved by a daily 5% SoC increase     </td></tr>
-            <tr><td>    </td><td>at the 'careCycle' time point. If 'maxSoC' is reached in the meantime, the 'careCycle' period starts again.            </td></tr>
+            <tr><td> 1. </td><td>Starting from 'lowSoc', the minimum SoC is increased by 5% on the following day but not higher than                         </td></tr>
+            <tr><td>    </td><td>'upSoC', if 'maxSoC' has not been reached on the current day.                                                               </td></tr>
+            <tr><td> 2. </td><td>If 'maxSoC' is reached (again), the minimum SoC is reduced by 5%, but not lower than 'lowSoc'.                              </td></tr>
+            <tr><td> 3. </td><td>Minimum SoC is reduced to the extent that the predicted PV energy for the current or following                              </td></tr>
+            <tr><td>    </td><td>day can be absorbed by the battery. Minimum SoC is typically reduced to 'upSoc' and not lower than 'lowSoc'.                </td></tr>
+            <tr><td> 4. </td><td>The module records the last point in time at the 'maxSoC' level in order to ensure a charge to 'maxSoC'                     </td></tr>
+            <tr><td>    </td><td>at least every 'careCycle' days. For this purpose, the optimized SoC is changed depending on the remaining days             </td></tr>
+            <tr><td>    </td><td>until the next 'careCycle' point in such a way that 'maxSoC' is mathematically achieved by a daily 5% SoC increase          </td></tr>
+            <tr><td>    </td><td>at the 'careCycle' time point. If 'maxSoC' is reached in the meantime, the 'careCycle' period starts again.                 </td></tr>
          </table>
          <br>
 
@@ -23903,15 +23994,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <table>
          <colgroup> <col width="2%"> <col width="98%"> </colgroup>
-            <tr><td> 1. </td><td>Ausgehend von 'lowSoc' wird der Mindest-SoC am folgenden Tag um 5%, aber nicht höher als                               </td></tr>
-            <tr><td>    </td><td>'upSoC' inkrementiert, sofern am laufenden Tag 'maxSoC' nicht erreicht wurde.                                          </td></tr>
-            <tr><td> 2. </td><td>Wird am laufenden Tag 'maxSoC' (wieder) erreicht, wird Mindest-SoC um 5%, aber nicht tiefer als 'lowSoc', verringert.  </td></tr>
-            <tr><td> 3. </td><td>Mindest-SoC wird soweit verringert, dass die prognostizierte PV Energie des aktuellen bzw. des folgenden Tages         </td></tr>
-            <tr><td>    </td><td>von der Batterie aufgenommen werden kann. Mindest-SoC wird nicht tiefer als 'lowSoc' verringert.                       </td></tr>
-            <tr><td> 4. </td><td>Das Modul erfasst den letzten Zeitpunkt am 'maxSoC'-Level, um eine Ladung auf 'maxSoC' mindestens alle 'careCycle'     </td></tr>
-            <tr><td>    </td><td>Tage zu realisieren. Zu diesem Zweck wird der optimierte SoC in Abhängigkeit der Resttage bis zum nächsten             </td></tr>
-            <tr><td>    </td><td>'careCycle' Zeitpunkt derart verändert, dass durch eine tägliche 5% SoC-Steigerung 'maxSoC' am 'careCycle' Zeitpunkt   </td></tr>
-            <tr><td>    </td><td>rechnerisch erreicht wird. Wird zwischenzeitlich 'maxSoC' erreicht, beginnt der 'careCycle' Zeitraum erneut.           </td></tr>
+            <tr><td> 1. </td><td>Ausgehend von 'lowSoc' wird der Mindest-SoC kurz vor Sonnenuntergang um 5% inkrementiert sofern am laufenden               </td></tr>
+            <tr><td>    </td><td>Tag 'maxSoC' nicht erreicht wurde und die PV-Prognose keinen hinreichenden Ertrag des kommenden Tages vorhersagt.          </td></tr>
+            <tr><td> 2. </td><td>Wird 'maxSoC' (wieder) erreicht, wird Mindest-SoC um 5%, aber nicht tiefer als 'lowSoc', verringert.                       </td></tr>
+            <tr><td> 3. </td><td>Mindest-SoC wird soweit verringert, dass die prognostizierte PV Energie des aktuellen bzw. des folgenden Tages             </td></tr>
+            <tr><td>    </td><td>von der Batterie aufgenommen werden kann. Mindest-SoC wird typisch auf 'upSoc' und nicht tiefer als 'lowSoc' verringert.   </td></tr>
+            <tr><td> 4. </td><td>Das Modul erfasst den letzten Zeitpunkt am 'maxSoC'-Level, um eine Ladung auf 'maxSoC' mindestens alle 'careCycle'         </td></tr>
+            <tr><td>    </td><td>Tage zu realisieren. Zu diesem Zweck wird der optimierte SoC in Abhängigkeit der Resttage bis zum nächsten                 </td></tr>
+            <tr><td>    </td><td>'careCycle' Zeitpunkt derart verändert, dass durch eine tägliche 5% SoC-Steigerung 'maxSoC' am 'careCycle' Zeitpunkt       </td></tr>
+            <tr><td>    </td><td>rechnerisch erreicht wird. Wird zwischenzeitlich 'maxSoC' erreicht, beginnt der 'careCycle' Zeitraum erneut.               </td></tr>
          </table>
          <br>
 
