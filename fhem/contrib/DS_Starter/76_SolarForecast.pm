@@ -9577,8 +9577,8 @@ sub _batChargeRecmd {
   
   for my $in (1..$maxinverter) {                           
       $in      = sprintf "%02d", $in;
-      my $feed = InverterVal ($hash, $in, 'ifeed', '');
-      next if(!$feed || $feed eq 'grid');                                                    # Inverter 'Grid' ausschließen
+      my $feed = InverterVal ($hash, $in, 'ifeed', 'default');
+      next if($feed eq 'grid');                                                              # Inverter 'Grid' ausschließen
       
       my $iname = InverterVal ($hash, $in, 'iname',        '');
       my $icap  = InverterVal ($hash, $in, 'invertercap',   0);
@@ -10836,7 +10836,10 @@ sub __setConsRcmdState {
   my ($spignore, $info, $err) = isSurplusIgnoCond ($hash, $c, $debug);                    # PV Überschuß ignorieren?
   Log3 ($name, 1, "$name - $err") if($err);
   
-  if (!$nompower || $surplus - $rescons > 0 || $spignore) {
+  if (!defined $surplus) {                                                                # $surplus kann undef sein! -> dann bisherigen isConsumptionRecommended verwenden
+      $data{$name}{consumers}{$c}{isConsumptionRecommended} = ReadingsVal ($name, "consumer${c}_ConsumptionRecommended", 0);
+  }
+  elsif (!$nompower || $surplus - $rescons > 0 || $spignore) {
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                          # Einschalten des Consumers günstig bzw. Freigabe für "on" von Überschußseite erteilt
   }
   else {
@@ -17715,7 +17718,7 @@ sub determSurplus {
       }
   }
   
-  if (!defined $surplus || $fallback) {                                    # Fehlerkorrektur
+  if ($fallback) {                                                        # Fall Back 
       $surplus = CurrentVal ($hash, 'surplus', 0);                        
       $method  = $method." but fallback to 'default'";
   }
@@ -21434,7 +21437,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>default</b> - the PV surplus is read directly from the 'Current_Surplus' reading. (default)                                                    </td></tr>
             <tr><td>                       </td><td><b>median</b> - the median of the last PV surplus measurements (max. 20) is used.                                                                 </td></tr>
             <tr><td>                       </td><td><b>2 .. 20</b> - the PV surplus used is calculated from the average of the specified number of measured values.                                   </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading combination that provides a numerical PV surplus value determined or calculated by the user.               </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading combination that provides a numerical PV surplus value in Watt determined or calculated by the user.       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>                       
             <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                          </td></tr>
             <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                          </td></tr>
@@ -23862,7 +23865,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>default</b> - der PV-Überschuß wird aus dem Reading 'Current_Surplus' direkt ausgelesen. (default)                                              </td></tr>
             <tr><td>                       </td><td><b>median</b> - es wird der Median der letzten PV-Überschuß Messungen (max. 20) verwendet.                                                         </td></tr>
             <tr><td>                       </td><td><b>2 .. 20</b> - der verwendete PV-Überschuß wird als Durchschnitt der angegebenen Anzahl Meßwerte gebildet.                                       </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading-Kombination die einen vom Nutzer bestimmten bzw. berechneten numerischen PV-Überschuß Wert liefert.         </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading-Kombination die einen vom Nutzer bestimmten bzw. berechneten numerischen PV-Überschuß in Watt liefert.      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>           
             <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen fehlenden PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend                      </td></tr>
             <tr><td>                       </td><td>der Planung eingeschaltet auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                                   </td></tr>
