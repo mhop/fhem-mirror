@@ -158,6 +158,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.40.0" => "21.12.2024  new consumer key 'surpmeth' to calculate surplus in various variants for cunsumer switching ",
   "1.39.8" => "21.12.2024  prepare of new consumer key 'surpmeth', _batSocTarget: improve care SoC management when dark doldrums ",
   "1.39.7" => "18.12.2024  ConsumptionRecommended calc method medianArray, change local owndata to global data ",
   "1.39.6" => "17.12.2024  replace global data-store by local owndata-store, remove sub _composeRemoteObj, delHashRefDeep removed ".
@@ -337,19 +338,6 @@ my %vNotesIntern = (
   "1.10.0" => "24.01.2024  consumerXX: notbefore, notafter format extended to hh[:mm], new sub checkCode, checkhhmm ",
   "1.9.0"  => "23.01.2024  modify disable, add operationMode: active/inactive ",
   "1.8.0"  => "22.01.2024  add 'noLearning' Option to Setter pvCorrectionFactor_Auto ",
-  "1.7.1"  => "20.01.2024  optimize battery management ",
-  "1.7.0"  => "18.01.2024  Changeover Start centralTask completely to runTask, ".
-                           "aiAddRawData: Weekday from pvHistory not taken into account greater than current day  ".
-                           "__reviewSwitchTime: new function for review consumer planning state ".
-                           "___switchonTimelimits: The current time is taken into account during planning ".
-                           "take info-tag into consumerxx Reading ".
-                           "fix deletion of currentBatteryDev, currentInverterDev, currentMeterDev ",
-  "1.6.5"  => "10.01.2024  new function runTask in ReadyFn to run centralTask definitely at end/begin of an hour ",
-  "1.6.4"  => "09.01.2024  fix get Automatic State, use key switchdev for auto-Reading if switchdev is set in consumer attr ",
-  "1.6.3"  => "08.01.2024  optimize battery management once more ",
-  "1.6.2"  => "07.01.2024  optimize battery management ",
-  "1.6.1"  => "04.01.2024  new sub  __setPhysLogSwState, edit ___setConsumerPlanningState, boost performance of _collectAllRegConsumers ".
-                           "CurrentVal ctrunning - Central Task running Statusbit, edit comref ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -5451,8 +5439,8 @@ sub _attrconsumer {                      ## no critic "not used"
                   return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid numeric value";
               }
           }
-          elsif ($h->{surpmeth} !~ /^[1-9]$|^1[0-9]$|^20$|^median$/xs) {
-              return qq{The surpmeth "$h->{surpmeth}" is wrong. It must contain a '<device>:<reading>', 'median' or integer value '1 .. 20'.};
+          elsif ($h->{surpmeth} !~ /^[2-9]$|^1[0-9]$|^20$|^median$|^default$/xs) {
+              return qq{The surpmeth "$h->{surpmeth}" is wrong. It must contain a '<device>:<reading>', 'median', 'default' or an integer value of '2 .. 20'.};
           }
       }
 
@@ -7674,7 +7662,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                 # Arbeitsweise FHEM Consumer Device
       $data{$name}{consumers}{$c}{noshow}            = $noshow             // 0;                 # ausblenden in Grafik
       $data{$name}{consumers}{$c}{exconfc}           = $exconfc            // 0;                 # Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
-      $data{$name}{consumers}{$c}{surpmeth}          = $hc->{surpmeth}     // 1;                 # Ermittlungsmethode des PV-Überschusses, default=1 -> direkte Messung
+      $data{$name}{consumers}{$c}{surpmeth}          = $hc->{surpmeth}     // 'default';         # Ermittlungsmethode des PV-Überschusses, default -> direkte Messung
       $data{$name}{consumers}{$c}{locktime}          = $clt                // '0:0';             # Sperrzeit im Automatikmodus ('offlt:onlt')
       $data{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';              # Regex für 'ein'
       $data{$name}{consumers}{$c}{offreg}            = $offreg             // 'off';             # Regex für 'aus'
@@ -9455,8 +9443,8 @@ sub _batSocTarget {
   ## Aufladewahrscheinlichkeit beachten
   #######################################
   my $csopt     = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);                # aktuelles SoC Optimum
-  my $cantarget = sprintf "%.0f", (100 - (100 / $batinstcap * $pvexpect));                 # berechneter max. möglicher SOC nach Berücksichtigung Ladewahrscheinlichkeit
-  my $newtarget = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);           # Abgleich möglicher Min SOC gg. berechneten Min SOC
+  my $cantarget = sprintf "%.0f", (100 - (100 / $batinstcap) * $pvexpect);                 # berechneter max. möglicher Minimum-SOC nach Berücksichtigung Ladewahrscheinlichkeit
+  my $newtarget = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);           # Abgleich möglicher Minimum-SOC gg. berechneten Minimum-SOC
   
   debugLog ($paref, 'batteryManagement', "SoC calc Step3 - basics -> cantarget: $cantarget %, newtarget: $newtarget %");
   
@@ -9589,8 +9577,8 @@ sub _batChargeRecmd {
   
   for my $in (1..$maxinverter) {                           
       $in      = sprintf "%02d", $in;
-      my $feed = InverterVal ($hash, $in, 'ifeed', '');
-      next if(!$feed || $feed eq 'grid');                                                    # Inverter 'Grid' ausschließen
+      my $feed = InverterVal ($hash, $in, 'ifeed', 'default');
+      next if($feed eq 'grid');                                                              # Inverter 'Grid' ausschließen
       
       my $iname = InverterVal ($hash, $in, 'iname',        '');
       my $icap  = InverterVal ($hash, $in, 'invertercap',   0);
@@ -10833,24 +10821,25 @@ sub __setConsRcmdState {
   my $debug = $paref->{debug};
 
   my $hash       = $defs{$name};
-  my $surplus    = CurrentVal       ($hash, 'surplus',                    0);             # aktueller Energieüberschuß
   my $nompower   = ConsumerVal      ($hash, $c, 'power',                  0);             # Consumer nominale Leistungsaufnahme (W)
   my $ccr        = AttrVal          ($name, 'ctrlConsRecommendReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
   my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $nompower;                          # resultierender Verbauch nach Einschaltung Consumer
   
-  # $surplusval kann undef sein! -> dann letzten Wert isConsumptionRecommended behalten
-  my ($method, $surplusval) = determSurplus ($hash, $c);                                  # Consumer spezifische Ermittlung des Energieüberschußes 
-  
+  my ($method, $surplus) = determSurplus ($hash, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes 
+
   if ($debug =~ /consumerSwitching${c}/x) {      
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - ConsumptionRecommended calc method: $method, value: }.
-                         (defined $surplusval ? $surplusval : 'undef'));
+                         (defined $surplus ? $surplus : 'undef'));
   }
   
   my ($spignore, $info, $err) = isSurplusIgnoCond ($hash, $c, $debug);                    # PV Überschuß ignorieren?
   Log3 ($name, 1, "$name - $err") if($err);
   
-  if (!$nompower || $surplus - $rescons > 0 || $spignore) {
+  if (!defined $surplus) {                                                                # $surplus kann undef sein! -> dann bisherigen isConsumptionRecommended verwenden
+      $data{$name}{consumers}{$c}{isConsumptionRecommended} = ReadingsVal ($name, "consumer${c}_ConsumptionRecommended", 0);
+  }
+  elsif (!$nompower || $surplus - $rescons > 0 || $spignore) {
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                          # Einschalten des Consumers günstig bzw. Freigabe für "on" von Überschußseite erteilt
   }
   else {
@@ -17672,60 +17661,66 @@ sub checkPlantConfig {
 return $out;
 }
 
-################################################################
+#####################################################################
 #  Ermittelt den PV Überschuß nach verschiedenen Verfahren
 #  ($surpmeth). Auswertung des Schieberegisters surplusslidereg.
 # 
-#  $surpmeth = 1       - der aktuell gemessene Überschuß
+#  $surpmeth = default - der aktuell gemessene Überschuß
 #  $surpmeth = 2 .. 20 - Durchschnitt der letzten X Messungen
 #  $surpmeth = median  - Median der vorhandenen Überschußwerte
+#  $surpmeth = <Device>:<Reading> - Device/Reading Kombination
+#                                   die einen berechneten
+#                                   User spezifischen PV-Überschuß
+#                                   liefert
 #
-#  Rückgabe:  PV Überschuß oder undef
+#  Rückgabe:  PV Überschuß
 #
-################################################################
+#####################################################################
 sub determSurplus {
   my $hash = shift;                                                    
   my $c    = shift;
 
-  my $surpmeth = ConsumerVal ($hash, $c, 'surpmeth', 1);
-  my $splref   = CurrentVal  ($hash, 'surplusslidereg', '');
+  my $surpmeth = ConsumerVal ($hash, $c, 'surpmeth', 'default');
+  my $splref   = CurrentVal  ($hash, 'surplusslidereg',     '');
   my $name     =  $hash->{NAME};
   my $method   = 'default';
-  my $surplus;
   
-  if ($surpmeth eq 'median') {                                            # Median der Werte in surplusslidereg
+  my ($surplus, $fallback);
+  
+  if ($surpmeth eq 'median') {                                            # Median der Werte in surplusslidereg, !kann UNDEF sein!
       $surplus = medianArray ($splref);
       $method  = 'median';
   }
-  elsif ($surpmeth =~ /^[1-9]$|^1[0-9]$|^20$/xs) {
-      if ($surpmeth == 1) {
-          $surplus = CurrentVal ($hash, 'surplus', 0);                    # aktueller Energieüberschuß
-          $method  = 'median';
-      }
-      else {                                                              # Average Ermittlung, kann undef sein
-          $surplus = avgArray ($splref, $surpmeth);
-          $method  = "average:$surpmeth";
-      }
+  elsif ($surpmeth eq 'default') {                                        # aktueller Energieüberschuß
+      $surplus = CurrentVal ($hash, 'surplus', 0);                   
+      $method  = 'default';
+  }
+  elsif ($surpmeth =~ /^[2-9]$|^1[0-9]$|^20$/xs) {                                              
+      $surplus = avgArray ($splref, $surpmeth);                           # Average Ermittlung, !kann UNDEF sein!
+      $method  = "average:$surpmeth";
   }
   elsif ($surpmeth =~ /.*:.*/xs) {
       my ($dv, $rd) = split ':', $surpmeth;
+      $method       = "$dv:$rd";
       my ($err)     = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
       
       if ($err) {
+          $fallback = 1;
           Log3 ($name, 1, qq{$name - ERROR of consumer $c key 'surpmeth':  $err (fall back to default Surplus determination)});
-          $surplus = CurrentVal ($hash, 'surplus', 0);                    # aktueller Energieüberschuß
-          $method  = 'default';
       }
       else {
           $surplus = ReadingsNum ($dv, $rd, '');
-          $method  = "$dv:$rd";
          
           if (!isNumeric ($surplus)) {
+              $fallback = 1;
               Log3 ($name, 1, qq{$name - ERROR of consumer $c key 'surpmeth': Device $dv / Reading $rd is not numeric (fall back to default Surplus determination)});
-              $surplus = CurrentVal ($hash, 'surplus', 0);                # aktueller Energieüberschuß
-              $method  = 'default';
           }
       }
+  }
+  
+  if ($fallback) {                                                        # Fall Back 
+      $surplus = CurrentVal ($hash, 'surplus', 0);                        
+      $method  = $method." but fallback to 'default'";
   }
 
 return ($method, $surplus);
@@ -17789,7 +17784,7 @@ return $avg;
 sub medianArray {
   my $aref = shift;
   
-  return if(ref $aref ne 'ARRAY' || !scalar @{$aref});
+  return undef if(ref $aref ne 'ARRAY' || !scalar @{$aref});
   
   my $enum   = scalar @{$aref};                                         # Anzahl der Elemente im Array 
   my @sorted = sortTopicNum ('asc', @{$aref});
@@ -21311,12 +21306,12 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                             <br>
-                         [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]                   <br>
-                         [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                   <br>
-                         [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Unit&gt;[:&lt;Threshold&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Threshold&gt]] <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                                <br>
+                         [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]                                      <br>
+                         [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                      <br>
+                         [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Unit&gt;[:&lt;Threshold&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Threshold&gt]]                    <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
-                         [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] [exconfc=&lt;Option&gt] </b><br>
+                         [surpmeth=&lt;Option&gt] [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] [exconfc=&lt;Option&gt] </b><br>
                          <br>
 
         Registers a consumer &lt;Device Name&gt; with the SolarForecast Device. In this case, &lt;Device Name&gt;
@@ -21438,6 +21433,12 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>Reading</b> - Reading for the delivery of the priority switch-off condition                                                                    </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>surpmeth</b>       </td><td>The possible options define the procedure for determining the PV surplus. (optional)                                                              </td></tr>
+            <tr><td>                       </td><td><b>default</b> - the PV surplus is read directly from the 'Current_Surplus' reading. (default)                                                    </td></tr>
+            <tr><td>                       </td><td><b>median</b> - the median of the last PV surplus measurements (max. 20) is used.                                                                 </td></tr>
+            <tr><td>                       </td><td><b>2 .. 20</b> - the PV surplus used is calculated from the average of the specified number of measured values.                                   </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading combination that provides a numerical PV surplus value in Watt determined or calculated by the user.       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>                       
             <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                          </td></tr>
             <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                          </td></tr>
             <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                     </td></tr>
@@ -23734,12 +23735,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                                                <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                                <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]                                    <br>
                          [notbefore=&lt;Ausdruck&gt;] [notafter=&lt;Ausdruck&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                          <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]]         <br>
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] <br>
-                         [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] [exconfc=&lt;Option&gt] </b><br>
+                         [surpmeth=&lt;Option&gt] [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] [exconfc=&lt;Option&gt]  </b><br>
                          <br>
 
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
@@ -23860,6 +23861,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                          </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>surpmeth</b>       </td><td>Die möglichen Optionen legen das Verfahren zur Ermittlung des PV-Überschusses fest. (optional)                                                     </td></tr>
+            <tr><td>                       </td><td><b>default</b> - der PV-Überschuß wird aus dem Reading 'Current_Surplus' direkt ausgelesen. (default)                                              </td></tr>
+            <tr><td>                       </td><td><b>median</b> - es wird der Median der letzten PV-Überschuß Messungen (max. 20) verwendet.                                                         </td></tr>
+            <tr><td>                       </td><td><b>2 .. 20</b> - der verwendete PV-Überschuß wird als Durchschnitt der angegebenen Anzahl Meßwerte gebildet.                                       </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - Device/Reading-Kombination die einen vom Nutzer bestimmten bzw. berechneten numerischen PV-Überschuß in Watt liefert.      </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>           
             <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen fehlenden PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend                      </td></tr>
             <tr><td>                       </td><td>der Planung eingeschaltet auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                                   </td></tr>
             <tr><td>                       </td><td><b>ACHTUNG:</b> Die Verwendung beider Schlüssel <I>spignorecond</I> und <I>interruptable</I> kann zu einem unerwünschten Verhalten führen!         </td></tr>
