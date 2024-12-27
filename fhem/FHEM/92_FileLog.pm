@@ -183,6 +183,7 @@ FileLog_Define($@)
   eval { "Hallo" =~ m/^$a[3]$/ };
   return "Bad regexp: $@" if($@);
 
+  $hash->{READONLY} = 1 if($a[3] eq $hash->{NAME});
   my @t = localtime;
   my $f = ResolveDateWildcards($a[2], @t);
   if(!$hash->{READONLY}) {
