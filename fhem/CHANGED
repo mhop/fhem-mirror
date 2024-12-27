@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  88_HMCCU: Role STATUS_INDICATOR
  - feature: 76_SolarForecast: consumer key surpmeth - various surplus variants
  - change:  76_SolarForecast: improve Bat careSoC management when dark doldrums
  - change:  76_SolarForecast: prepare for further development

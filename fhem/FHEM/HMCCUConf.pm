@@ -197,6 +197,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
 	},
+	'STATUS_INDICATOR' => {
+		F => 3, S => 'STATE', C => 'STATE', V => 'on:true,off:false', P => 2
+	},
 	'SWITCH' => {
 		F => 3, S => 'STATE', C => 'STATE', V => 'on:true,off:false', P => 2
 	},	
@@ -543,6 +546,13 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'SMOKE_DETECTOR' => {
 		'command' => 'V:SMOKE_DETECTOR_COMMAND:#command'
 	},
+	'STATUS_INDICATOR' => {
+		'on' => 'V:STATE:1',
+		'off' => 'V:STATE:0',
+		'on-for-timer' => 'V:ON_TIME:?duration V:STATE:1',
+		'on-till' => 'V:ON_TIME:?time V:STATE:1',
+		'toggle' => 'V:STATE:0,1'
+	},
 	'SWITCH' => {
 		'on' => 'V:STATE:1',
 		'off' => 'V:STATE:0',
@@ -697,6 +707,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'webCmd' => 'pct:open:close:stop',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
+	'STATUS_INDICATOR' => {
+		'cmdIcon' => 'on:general_an off:general_aus'
+	},
 	'SWITCH' => {
 		'cmdIcon' => 'on:general_an off:general_aus'
 	},
@@ -805,20 +818,23 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'ALARM_SWITCH_VIRTUAL_RECEIVER' => {
 		'STATE' => { '0' => 'ok', '1' => 'alarm', 'false' => 'ok', 'true' => 'alarm' }
 	},
+	'STATUS_INDICATOR' => {
+		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' }
+	},
 	'SWITCH' => {
-		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' },
+		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' }
 	},
 	'SWITCH_PANIC' => {
-		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' },
+		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' }
 	},
 	'SWITCH_SENSOR' => {
-		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' },
+		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' }
 	},
 	'SWITCH_TRANSMITTER' => {
-		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' },
+		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' }
 	},
 	'SWITCH_VIRTUAL_RECEIVER' => {
-		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' },
+		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' }
 	},
 	'BLIND' => {
 		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'closed' => '0', 'open' => '100' },
