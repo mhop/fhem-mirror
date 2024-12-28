@@ -158,7 +158,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.40.0" => "21.12.2024  new consumer key 'surpmeth' to calculate surplus in various variants for cunsumer switching ",
+  "1.41.0" => "28.12.2024  _batSocTarget: minor code change,  change setupBatteryDev to setupBatteryDev01, getter valBattery ", 
+  "1.40.0" => "21.12.2024  new consumer key 'surpmeth' to calculate surplus in various variants for consumer switching ",
   "1.39.8" => "21.12.2024  prepare of new consumer key 'surpmeth', _batSocTarget: improve care SoC management when dark doldrums ",
   "1.39.7" => "18.12.2024  ConsumptionRecommended calc method medianArray, change local owndata to global data ",
   "1.39.6" => "17.12.2024  replace global data-store by local owndata-store, remove sub _composeRemoteObj, delHashRefDeep removed ".
@@ -404,6 +405,7 @@ my $tempcoeffdef   = -0.45;                                                     
 my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
 my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
 
+my $maxbatteries   = 1;                                                             # maximale Anzahl der möglichen Batterien
 my $maxconsumer    = 16;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
 my $maxproducer    = 3;                                                             # maximale Anzahl der möglichen anderen Produzenten (Attribut)
 my $maxinverter    = 3;                                                             # maximale Anzahl der möglichen Inverter
@@ -515,7 +517,7 @@ my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicWeatherColor graphicWeatherColorNight
-                   setupMeterDev setupBatteryDev setupInverterStrings setupRadiationAPI setupStringPeak
+                   setupMeterDev setupInverterStrings setupRadiationAPI setupStringPeak
                    setupRoofTops
                  );
 
@@ -523,6 +525,11 @@ for my $cn (1..$maxconsumer) {
   $cn = sprintf "%02d", $cn;
   push @aconfigs, "consumer${cn}";                            # Anlagenkonfiguration: add Consumer Attribute
   push @dd,       "consumerSwitching${cn}";                   # ctrlDebug: add specific Consumer
+}
+
+for my $bn (1..$maxbatteries) {
+  $bn = sprintf "%02d", $bn;
+  push @aconfigs, "setupBatteryDev${bn}";                     # Anlagenkonfiguration: add Battery Attribute
 }
 
 for my $in (1..$maxinverter) {
@@ -580,6 +587,7 @@ my %hget = (                                                                # Ha
   data               => { fn => \&_getdata,                     needcred => 0 },
   html               => { fn => \&_gethtml,                     needcred => 0 },
   ftui               => { fn => \&_getftui,                     needcred => 0 },
+  valBattery         => { fn => \&_getlistvalBattery,           needcred => 0 },
   valCurrent         => { fn => \&_getlistCurrent,              needcred => 0 },
   valInverter        => { fn => \&_getlistvalInverter,          needcred => 0 },
   valProducer        => { fn => \&_getlistvalProducer,          needcred => 0 },
@@ -608,8 +616,6 @@ my %hattr = (                                                                # H
   setupWeatherDev2          => { fn => \&_attrWeatherDev          },
   setupWeatherDev3          => { fn => \&_attrWeatherDev          },
   setupMeterDev             => { fn => \&_attrMeterDev            },
-  setupBatteryDev           => { fn => \&_attrBatteryDev          },
-  setupInverterDev          => { fn => \&_attrInverterDev         },
   setupInverterStrings      => { fn => \&_attrInverterStrings     },
   setupRadiationAPI         => { fn => \&_attrRadiationAPI        },
   setupStringPeak           => { fn => \&_attrStringPeak          },
@@ -617,6 +623,11 @@ my %hattr = (                                                                # H
   flowGraphicControl        => { fn => \&_attrflowGraphicControl  },
 );
 
+  for my $bn (1..$maxbatteries) {
+      $bn = sprintf "%02d", $bn;
+      $hattr{'setupBatteryDev'.$bn}{fn} = \&_attrBatteryDev;
+  }
+  
   for my $in (1..$maxinverter) {
       $in = sprintf "%02d", $in;
       $hattr{'setupInverterDev'.$in}{fn} = \&_attrInverterDev;
@@ -1179,11 +1190,16 @@ sub Initialize {
   my $srd = join ",", sort keys (%hcsr);
   my $gbc = 'pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,gridfeedin,feedincome';
 
-  my ($consumer, $setupprod, $setupinv, @allc);
+  my ($consumer, $setupbat, $setupprod, $setupinv, @allc);
   for my $c (1..$maxconsumer) {
       $c         = sprintf "%02d", $c;
       $consumer .= "consumer${c}:textField-long ";
       push @allc, $c;
+  }
+  
+  for my $bn (1..$maxbatteries) {
+      $bn        = sprintf "%02d", $bn;
+      $setupbat .= "setupBatteryDev${bn}:textField-long ";
   }
 
   for my $in (1..$maxinverter) {
@@ -1276,9 +1292,9 @@ sub Initialize {
                                 "setupWeatherDev2 ".
                                 "setupWeatherDev3 ".
                                 "setupRoofTops ".
-                                "setupBatteryDev:textField-long ".
                                 "setupRadiationAPI ".
                                 "setupStringPeak ".
+                                $setupbat.
                                 $setupinv.
                                 $setupprod.
                                 $consumer.
@@ -1295,11 +1311,8 @@ sub Initialize {
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
-   $hash->{AttrRenameMap} = { "graphicBeamHeight"  => "graphicBeamHeightLevel1",     # 07.05.24
-                              "ctrlWeatherDev1"    => "setupWeatherDev1",            # 20.08.24
-                              "ctrlWeatherDev2"    => "setupWeatherDev2",
-                              "ctrlWeatherDev3"    => "setupWeatherDev3",
-                              "setupInverterDev"   => "setupInverterDev01",          # 11.10.24
+   $hash->{AttrRenameMap} = { "setupBatteryDev"   => "setupBatteryDev01",          # 28.12.24
+                              "setupInverterDev"  => "setupInverterDev01",          # 11.10.24
                             };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -2318,6 +2331,7 @@ sub Get {
 
   my @pha  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{pvhist}};
   my @vcm  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{consumers}};
+  my @vba  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{batteries}};
   my @vin  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{inverters}};
   my @vpn  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{producers}};
   my @vst  = sort keys %{$data{$name}{strings}};
@@ -2325,11 +2339,13 @@ sub Get {
   my $hol  = join ",", @ho;
   my $pvl  = join ",", @pha;
   my $cml  = join ",", @vcm;
+  my $bal  = join ",", @vba;
   my $inl  = join ",", @vin;
   my $pnl  = join ",", @vpn;
   my $str  = join ",", @vst;
 
   my $getlist = "Unknown argument $opt, choose one of ".
+                "valBattery:#,$bal ".
                 "valConsumerMaster:#,$cml ".
                 "valInverter:#,$inl ".
                 "valProducer:#,$pnl ".
@@ -4519,6 +4535,21 @@ return $ret;
 }
 
 ###############################################################
+#                       Getter valBattery
+###############################################################
+sub _getlistvalBattery {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $arg   = $paref->{arg};
+  my $hash  = $defs{$name};
+
+  my $ret = listDataPool   ($hash, 'batteries', $arg);
+  $ret   .= lineFromSpaces ($ret, 30);
+
+return $ret;
+}
+
+###############################################################
 #                       Getter valConsumerMaster
 ###############################################################
 sub _getlistvalConsumerMaster {
@@ -5302,8 +5333,8 @@ sub Attr {
 
   if ($aName eq 'ctrlBatSocManagement' && $init_done) {
       if ($cmd eq 'set') {
-          return qq{Define the key 'cap' with "attr $name setupBatteryDev" before this attribute in the correct form.}
-                 if(!CurrentVal($hash, 'batinstcap', 0));                                             # https://forum.fhem.de/index.php?msg=1310930
+          return qq{Define the key 'cap' with "attr $name setupBatteryDev01" before this attribute in the correct form.}
+                 if(!BatteryVal ($hash, '01', 'binstcap', 0));                    # https://forum.fhem.de/index.php?msg=1310930
 
           my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $aVal);
 
@@ -5836,9 +5867,7 @@ sub _attrInverterDev {                   ## no critic "not used"
       delete $data{$name}{inverters}{$in}{ifeed};
   }
   elsif ($paref->{cmd} eq 'del') {
-      for my $k (keys %{$data{$name}{inverters}}) {
-          delete $data{$name}{inverters}{$k} if($k eq $in);
-      }
+      delete $data{$name}{inverters}{$in};
       
       readingsDelete ($hash, 'Current_PV');
       undef @{$data{$name}{current}{genslidereg}};
@@ -5992,7 +6021,8 @@ sub _attrBatteryDev {                    ## no critic "not used"
 
   return if(!$init_done);
 
-  my $hash  = $defs{$name};
+  my $hash = $defs{$name};
+  my $bn   = (split 'setupBatteryDev', $aName)[1];
 
   if ($paref->{cmd} eq 'set') {
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
@@ -6010,6 +6040,8 @@ sub _attrBatteryDev {                    ## no critic "not used"
       if ($h->{pin} eq "-pout" && $h->{pout} eq "-pin") {
           return qq{Incorrect input. It is not allowed that the keys pin and pout refer to each other.};
       }
+      
+      delete $data{$name}{batteries}{$bn}{basynchron};
   }
   elsif ($paref->{cmd} eq 'del') {
       readingsDelete    ($hash, 'Current_PowerBatIn');
@@ -6025,11 +6057,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{circular}{99}{batintot};
       delete $data{$name}{circular}{99}{batouttot};
       
-      delete $data{$name}{current}{powerbatout};
-      delete $data{$name}{current}{powerbatin};
-      delete $data{$name}{current}{batcharge};
-      delete $data{$name}{current}{batinstcap};
-      delete $data{$name}{current}{batasynchron};
+      delete $data{$name}{batteries}{$bn};
   }
 
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
@@ -6210,7 +6238,7 @@ sub Notify {
 
   my $debug = getDebug ($myHash);                                                         # Debug Mode
   
-  my ($err, $medev, $badev, $h, $async);
+  my ($err, $medev, $bname, $iname, $h, $async);
     
   ## Meter Event?
   #################
@@ -6241,11 +6269,12 @@ sub Notify {
   
   ## Battery Event?
   ###################
-  ($err, $badev, $h) = isDeviceValid ( { name => $myName, obj => 'setupBatteryDev', method => 'attr' } );
+  for my $bn (1..$maxbatteries) {
+      $bn    = sprintf "%02d", $bn;
+      $bname = BatteryVal ($myHash, $bn, 'bname', '');
   
-  if (!$err) {
-      if ($devName eq $badev) {
-          $async = $h->{asynchron} // 0;
+      if ($devName eq $bname) {
+          $async = BatteryVal ($myHash, $bn, 'basynchron', 0);
           
           if ($debug =~ /notifyHandling/x) {
               Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of Battery device >$devName< received - asynchronous mode: $async});
@@ -6264,22 +6293,23 @@ sub Notify {
               return;
           }
       }
+      
   }
   
   ## Inverter Event?
   ####################  
   for my $in (1..$maxinverter) {
-      $in       = sprintf "%02d", $in;
-      my $iname = InverterVal ($myHash, $in, 'iname', '');
+      $in    = sprintf "%02d", $in;
+      $iname = InverterVal ($myHash, $in, 'iname', '');
       
       if ($devName eq $iname) {
-          my $iasync = InverterVal ($myHash, $in, 'iasynchron', 0);
+          $async = InverterVal ($myHash, $in, 'iasynchron', 0);
 
           if ($debug =~ /notifyHandling/x) {
-              Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of Inverter device >$devName< received - asynchronous mode: $iasync});
+              Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - Event of Inverter device >$devName< received - asynchronous mode: $async});
           }
       
-          if ($iasync) {
+          if ($async) {
               if (CurrentVal ($myHash, 'ctrunning', 0)) {
                   if ($debug =~ /notifyHandling/x) {
                       Log3 ($myName, 1, qq{$myName DEBUG> notifyHandling - central task was called from NOTIFY when it is already running ... end this call});
@@ -6302,7 +6332,6 @@ sub Notify {
   
   if (@consumers && grep /^$devName$/, @consumers) {
       my ($cname, $cindex, $dswname);
-      my $type = $myHash->{TYPE};
 
       for my $c (sort{$a<=>$b} keys %{$data{$myName}{consumers}}) {
           ($err, $cname, $dswname) = getCDnames ($myHash, $c);
@@ -7286,6 +7315,9 @@ sub centralTask {
       Log3 ($name, 3, "$name - INFO - central task was called when it was already running ... end this call");      
       return;
   }
+  
+  $data{$name}{current}{ctrunning} = 1;                                                        # Central Task running Statusbit
+  InternalTimer (gettimeofday() + 1.2, "FHEM::SolarForecast::releaseCentralTask", $hash, 0);   # Freigabe centralTask
 
   my $t       = time;                                                                          # aktuelle Unix-Zeit
   my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
@@ -7293,11 +7325,7 @@ sub centralTask {
   my $minute  = strftime "%M",       localtime($t);                                            # aktuelle Minute (00-59)
   my $day     = strftime "%d",       localtime($t);                                            # aktueller Tag (range 01 .. 31)
   my $dayname = strftime "%a",       localtime($t);                                            # aktueller Wochentagsname
-  my $debug   = getDebug ($hash);                                                              # Debug Module
-
-  $data{$name}{current}{ctrunning} = 1;                                                     # Central Task running Statusbit
-
-  InternalTimer (gettimeofday() + 1.2, "FHEM::SolarForecast::releaseCentralTask", $hash, 0);   # Freigabe centralTask 
+  my $debug   = getDebug ($hash);                                                              # Debug Module 
 
   my $centpars = {
       name    => $name,
@@ -8435,9 +8463,9 @@ sub _transferInverterValues {
   storeReading ('Current_PV', $pvsum.' W');
   storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PVreal', $ethishoursum.' Wh'.$warn);
   
-  $data{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishoursum;                                       # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+  $data{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishoursum;                                          # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
   
-  push @{$data{$name}{current}{genslidereg}}, $pvsum;                                                         # Schieberegister PV Erzeugung
+  push @{$data{$name}{current}{genslidereg}}, $pvsum;                                                            # Schieberegister PV Erzeugung
   limitArray ($data{$name}{current}{genslidereg}, $slidenummax);
 
   writeToHistory ( { paref => $paref, key => 'pvrl', val => $ethishoursum, hour => $nhour, valid => $aln } );    # valid=1: beim Learning berücksichtigen, 0: nicht
@@ -9197,157 +9225,173 @@ sub _transferBatteryValues {
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
 
-  my $hash              = $defs{$name};
-  my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev', method => 'attr' } );
-  return if($err);
+  my $hash = $defs{$name};
+  my $num  = 0;
+  my $socsum;
+  
+  for my $bn (1..$maxbatteries) {
+      $bn = sprintf "%02d", $bn;
+  
+      my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
+      next if($err);
 
-  my $type = $paref->{type};
+      $num++;
 
-  my ($pin,$piunit)    = split ":", $h->{pin};                                                # Readingname/Unit für aktuelle Batterieladung
-  my ($pou,$pounit)    = split ":", $h->{pout};                                               # Readingname/Unit für aktuelle Batterieentladung
-  my ($bin,$binunit)   = split ":", $h->{intotal}  // "-:-";                                  # Readingname/Unit der total in die Batterie eingespeisten Energie (Zähler)
-  my ($bout,$boutunit) = split ":", $h->{outtotal} // "-:-";                                  # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
-  my $batchr           = $h->{charge} // "";                                                  # Readingname Ladezustand Batterie
-  my $instcap          = $h->{cap};                                                           # numerischer Wert (Wh) oder Readingname installierte Batteriekapazität
+      my ($pin,$piunit)    = split ":", $h->{pin};                                                # Readingname/Unit für aktuelle Batterieladung
+      my ($pou,$pounit)    = split ":", $h->{pout};                                               # Readingname/Unit für aktuelle Batterieentladung
+      my ($bin,$binunit)   = split ":", $h->{intotal}  // "-:-";                                  # Readingname/Unit der total in die Batterie eingespeisten Energie (Zähler)
+      my ($bout,$boutunit) = split ":", $h->{outtotal} // "-:-";                                  # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
+      my $batchr           = $h->{charge} // "";                                                  # Readingname Ladezustand Batterie
+      my $instcap          = $h->{cap};                                                           # numerischer Wert (Wh) oder Readingname installierte Batteriekapazität
 
-  return if(!$pin || !$pou);
+      return if(!$pin || !$pou);
 
-  $pounit   //= $piunit;
-  $piunit   //= $pounit;
-  $boutunit //= $binunit;
-  $binunit  //= $boutunit;
+      $pounit   //= $piunit;
+      $piunit   //= $pounit;
+      $boutunit //= $binunit;
+      $binunit  //= $boutunit;
 
-  my $piuf    = $piunit   =~ /^kW$/xi  ? 1000 : 1;
-  my $pouf    = $pounit   =~ /^kW$/xi  ? 1000 : 1;
-  my $binuf   = $binunit  =~ /^kWh$/xi ? 1000 : 1;
-  my $boutuf  = $boutunit =~ /^kWh$/xi ? 1000 : 1;
+      my $piuf    = $piunit   =~ /^kW$/xi  ? 1000 : 1;
+      my $pouf    = $pounit   =~ /^kW$/xi  ? 1000 : 1;
+      my $binuf   = $binunit  =~ /^kWh$/xi ? 1000 : 1;
+      my $boutuf  = $boutunit =~ /^kWh$/xi ? 1000 : 1;
 
-  my $pbo     = ReadingsNum ($badev, $pou,    0) * $pouf;                                      # aktuelle Batterieentladung (W)
-  my $pbi     = ReadingsNum ($badev, $pin,    0) * $piuf;                                      # aktueller Batterieladung (W)
-  my $btotout = ReadingsNum ($badev, $bout,   0) * $boutuf;                                    # totale Batterieentladung (Wh)
-  my $btotin  = ReadingsNum ($badev, $bin,    0) * $binuf;                                     # totale Batterieladung (Wh)
-  my $soc     = ReadingsNum ($badev, $batchr, 0);
+      my $pbo     = ReadingsNum ($badev, $pou,    0) * $pouf;                                      # aktuelle Batterieentladung (W)
+      my $pbi     = ReadingsNum ($badev, $pin,    0) * $piuf;                                      # aktueller Batterieladung (W)
+      my $btotout = ReadingsNum ($badev, $bout,   0) * $boutuf;                                    # totale Batterieentladung (Wh)
+      my $btotin  = ReadingsNum ($badev, $bin,    0) * $binuf;                                     # totale Batterieladung (Wh)
+      my $soc     = ReadingsNum ($badev, $batchr, 0);
 
-  if ($instcap) {
-      if (!isNumeric ($instcap)) {                                                             # wenn $instcap Reading Wert abfragen
-          my ($bcapr,$bcapunit) = split ':', $instcap;
-          $bcapunit           //= 'Wh';
-          $instcap              = ReadingsNum ($badev, $bcapr, 0);
-          $instcap              = $instcap * ($bcapunit =~ /^kWh$/xi ? 1000 : 1);
+      if ($instcap) {
+          if (!isNumeric ($instcap)) {                                                             # wenn $instcap Reading Wert abfragen
+              my ($bcapr,$bcapunit) = split ':', $instcap;
+              $bcapunit           //= 'Wh';
+              $instcap              = ReadingsNum ($badev, $bcapr, 0);
+              $instcap              = $instcap * ($bcapunit =~ /^kWh$/xi ? 1000 : 1);
+          }
+
+          $data{$name}{batteries}{$bn}{binstcap} = $instcap;                                     # installierte Batteriekapazität
+      }
+      else {
+          delete $data{$name}{batteries}{$bn}{binstcap};
       }
 
-      $data{$name}{current}{batinstcap} = $instcap;                                     # installierte Batteriekapazität
+      my $debug = $paref->{debug};
+      if ($debug =~ /collectData/x) {
+          Log3 ($name, 1, "$name DEBUG> collect Battery data: device=$badev =>");
+          Log3 ($name, 1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
+      }
+
+      my $params;
+
+      if ($pin eq "-pout") {                                                                       # Spezialfall pin bei neg. pout
+          $params = {
+              dev  => $badev,
+              rdg  => $pou,
+              rdgf => $pouf
+          };
+
+          ($pbo,$pbi) = substSpecialCases ($params);
+      }
+
+      if ($pou eq "-pin") {                                                                        # Spezialfall pout bei neg. pin
+          $params = {
+              dev  => $badev,
+              rdg  => $pin,
+              rdgf => $piuf
+          };
+
+          ($pbi,$pbo) = substSpecialCases ($params);
+      }
+
+      # Batterielade, -entladeenergie in Circular speichern
+      #######################################################
+      if (!defined CircularVal ($hash, 99, 'initdaybatintot', undef)) {
+          $data{$name}{circular}{99}{initdaybatintot} = $btotin;                                                # total Batterieladung zu Tagbeginn (Wh)
+      }
+
+      if (!defined CircularVal ($hash, 99, 'initdaybatouttot', undef)) {                                        # total Batterieentladung zu Tagbeginn (Wh)
+          $data{$name}{circular}{99}{initdaybatouttot} = $btotout;
+      }
+
+      $data{$name}{circular}{99}{batintot}  = $btotin;                                                          # aktuell total Batterieladung
+      $data{$name}{circular}{99}{batouttot} = $btotout;                                                         # aktuell total Batterieentladung
+
+      my $nhour = $chour+1;
+
+      
+      # Batterieladung aktuelle Stunde in pvHistory speichern
+      #########################################################
+      my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batintotal", undef);                 # totale Batterieladung zu Beginn einer Stunde
+      my $batinthishour;
+
+      if (!defined $histbatintot) {                                                                             # totale Batterieladung der aktuelle Stunde gesetzt?
+          writeToHistory ( { paref => $paref, key => 'batintotal', val => $btotin, hour => $nhour } );
+
+          my $bitot      = CurrentVal ($hash, "batintotal", $btotin);
+          $batinthishour = int ($btotin - $bitot);
+      }
+      else {
+          $batinthishour = int ($btotin - $histbatintot);
+      }
+
+      $batinthishour = 0 if($batinthishour < 0);
+
+      $data{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;                                  # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      writeToHistory ( { paref => $paref, key => 'batinthishour', val => $batinthishour, hour => $nhour } );
+
+      
+      # Batterieentladung aktuelle Stunde in pvHistory speichern
+      ############################################################
+      my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'batouttotal', undef);              # totale Betterieladung zu Beginn einer Stunde
+      my $batoutthishour;
+
+      if (!defined $histbatouttot) {                                                                           # totale Betterieladung der aktuelle Stunde gesetzt?
+          writeToHistory ( { paref => $paref, key => 'batouttotal', val => $btotout, hour => $nhour } );
+
+          my $botot       = CurrentVal ($hash, 'batouttotal', $btotout);
+          $batoutthishour = int ($btotout - $botot);
+      }
+      else {
+          $batoutthishour = int ($btotout - $histbatouttot);
+      }
+
+      $batoutthishour = 0 if($batoutthishour < 0);
+
+      $data{$name}{circular}{sprintf("%02d",$nhour)}{batout} = $batoutthishour;                                # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      writeToHistory ( { paref => $paref, key => 'batoutthishour', val => $batoutthishour, hour => $nhour } );
+
+      
+      # täglichen max. SOC in pvHistory speichern
+      #############################################
+      my $batmaxsoc = HistoryVal ($hash, $day, 99, 'batmaxsoc', 0);                                            # gespeicherter max. SOC des Tages
+
+      if ($soc >= $batmaxsoc) {
+          writeToHistory ( { paref => $paref, key => 'batmaxsoc', val => $soc, hour => 99 } );
+      }
+
+      ######
+
+      storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatIn', $batinthishour.' Wh');
+      storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatOut', $batoutthishour.' Wh');
+      storeReading ('Current_PowerBatIn',  (int $pbi).' W');
+      storeReading ('Current_PowerBatOut', (int $pbo).' W');
+      storeReading ('Current_BatCharge',   $soc.' %');
+      
+      $data{$name}{batteries}{$bn}{bname}       = $badev;                                  # Batterie Devicename            
+      $data{$name}{batteries}{$bn}{balias}      = AttrVal ($badev, 'alias', $badev);       # Alias Batterie Device
+      $data{$name}{batteries}{$bn}{bpowerin}    = int $pbi;                                # momentane Batterieladung
+      $data{$name}{batteries}{$bn}{bpowerout}   = int $pbo;                                # momentane Batterieentladung
+      $data{$name}{batteries}{$bn}{bcharge}     = $soc;                                    # aktuelle Batterieladung
+      $data{$name}{batteries}{$bn}{basynchron}  = $h->{asynchron} // 0;                    # asynchroner Modus = X 
+      
+      $socsum += $soc;
   }
-  else {
-      delete $data{$name}{current}{batinstcap};
+  
+  if ($num) {
+      push @{$data{$name}{current}{socslidereg}}, $socsum / $num;                          # Schieberegister average SOC aller Batterien
+      limitArray ($data{$name}{current}{socslidereg}, $slidenummax);
   }
-
-  my $debug = $paref->{debug};
-  if ($debug =~ /collectData/x) {
-      Log3 ($name, 1, "$name DEBUG> collect Battery data: device=$badev =>");
-      Log3 ($name, 1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
-  }
-
-  my $params;
-
-  if ($pin eq "-pout") {                                                                       # Spezialfall pin bei neg. pout
-      $params = {
-          dev  => $badev,
-          rdg  => $pou,
-          rdgf => $pouf
-      };
-
-      ($pbo,$pbi) = substSpecialCases ($params);
-  }
-
-  if ($pou eq "-pin") {                                                                        # Spezialfall pout bei neg. pin
-      $params = {
-          dev  => $badev,
-          rdg  => $pin,
-          rdgf => $piuf
-      };
-
-      ($pbi,$pbo) = substSpecialCases ($params);
-  }
-
-  # Batterielade-, enladeenergie in Circular speichern
-  ######################################################
-  if (!defined CircularVal ($hash, 99, 'initdaybatintot', undef)) {
-      $data{$name}{circular}{99}{initdaybatintot} = $btotin;                            # total Batterieladung zu Tagbeginn (Wh)
-  }
-
-  if (!defined CircularVal ($hash, 99, 'initdaybatouttot', undef)) {                       # total Batterieentladung zu Tagbeginn (Wh)
-      $data{$name}{circular}{99}{initdaybatouttot} = $btotout;
-  }
-
-  $data{$name}{circular}{99}{batintot}  = $btotin;                                      # aktuell total Batterieladung
-  $data{$name}{circular}{99}{batouttot} = $btotout;                                     # aktuell total Batterieentladung
-
-  my $nhour = $chour+1;
-
-  # Batterieladung aktuelle Stunde in pvHistory speichern
-  #########################################################
-  my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batintotal", undef);    # totale Batterieladung zu Beginn einer Stunde
-  my $batinthishour;
-
-  if (!defined $histbatintot) {                                                                # totale Batterieladung der aktuelle Stunde gesetzt?
-      writeToHistory ( { paref => $paref, key => 'batintotal', val => $btotin, hour => $nhour } );
-
-      my $bitot      = CurrentVal ($hash, "batintotal", $btotin);
-      $batinthishour = int ($btotin - $bitot);
-  }
-  else {
-      $batinthishour = int ($btotin - $histbatintot);
-  }
-
-  $batinthishour = 0 if($batinthishour < 0);
-
-  $data{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;                    # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-  writeToHistory ( { paref => $paref, key => 'batinthishour', val => $batinthishour, hour => $nhour } );
-
-  # Batterieentladung aktuelle Stunde in pvHistory speichern
-  ############################################################
-  my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'batouttotal', undef);   # totale Betterieladung zu Beginn einer Stunde
-  my $batoutthishour;
-
-  if (!defined $histbatouttot) {                                                                # totale Betterieladung der aktuelle Stunde gesetzt?
-      writeToHistory ( { paref => $paref, key => 'batouttotal', val => $btotout, hour => $nhour } );
-
-      my $botot       = CurrentVal ($hash, 'batouttotal', $btotout);
-      $batoutthishour = int ($btotout - $botot);
-  }
-  else {
-      $batoutthishour = int ($btotout - $histbatouttot);
-  }
-
-  $batoutthishour = 0 if($batoutthishour < 0);
-
-  $data{$name}{circular}{sprintf("%02d",$nhour)}{batout} = $batoutthishour;                # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-  writeToHistory ( { paref => $paref, key => 'batoutthishour', val => $batoutthishour, hour => $nhour } );
-
-  # täglichen max. SOC in pvHistory speichern
-  #############################################
-  my $batmaxsoc = HistoryVal ($hash, $day, 99, 'batmaxsoc', 0);                               # gespeicherter max. SOC des Tages
-
-  if ($soc >= $batmaxsoc) {
-      writeToHistory ( { paref => $paref, key => 'batmaxsoc', val => $soc, hour => 99 } );
-  }
-
-  ######
-
-  storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatIn', $batinthishour.' Wh');
-  storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatOut', $batoutthishour.' Wh');
-  storeReading ('Current_PowerBatIn',  (int $pbi).' W');
-  storeReading ('Current_PowerBatOut', (int $pbo).' W');
-  storeReading ('Current_BatCharge',   $soc.' %');
-
-  $data{$name}{current}{powerbatin}   = int $pbi;                                      # Hilfshash Wert aktuelle Batterieladung
-  $data{$name}{current}{powerbatout}  = int $pbo;                                      # Hilfshash Wert aktuelle Batterieentladung
-  $data{$name}{current}{batcharge}    = $soc;                                          # aktuelle Batterieladung
-  $data{$name}{current}{batasynchron} = $h->{asynchron} if($h->{asynchron});           # asynchroner Modus = X 
-
-  push @{$data{$name}{current}{socslidereg}}, $soc;                                    # Schieberegister Batterie SOC
-  limitArray ($data{$name}{current}{socslidereg}, $slidenummax);
 
 return;
 }
@@ -9358,7 +9402,6 @@ return;
 sub _batSocTarget {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $t     = $paref->{t};                                                                   # aktuelle Zeit
 
   return if(!isBatteryUsed ($name));
@@ -9366,8 +9409,8 @@ sub _batSocTarget {
   my $hash       = $defs{$name};
   my $oldd2care  = CircularVal ($hash, 99, 'days2care',            0);
   my $ltsmsr     = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
-  my $batcharge  = CurrentVal  ($hash, 'batcharge',                0);                       # aktuelle Ladung in %
-  my $batinstcap = CurrentVal  ($hash, 'batinstcap',               0);                       # installierte Batteriekapazität Wh
+  my $batcharge  = BatteryVal  ($hash, '01', 'bcharge',            0);                       # aktuelle Ladung in %
+  my $batinstcap = BatteryVal  ($hash, '01', 'binstcap',           0);                       # installierte Batteriekapazität Wh
   my $cgbt       = AttrVal     ($name, 'ctrlBatSocManagement', undef);
     
   if ($cgbt && !$batinstcap) {
@@ -9484,7 +9527,8 @@ sub _batSocTarget {
             $target < $lowSoc ? $lowSoc :
             $target;
 
-  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - observe low/up limits -> docare: $docare, Target: $target %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - basics -> docare: $docare, lowSoc: $lowSoc %, upSoc: $upSoc %");
+  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - observe low/up limits -> Target: $target %");
 
   ## auf 5er Schritte anpassen (40,45,50,...)
   #############################################
@@ -9569,8 +9613,8 @@ sub _batChargeRecmd {
   my $tomconfc = ReadingsNum ($name, 'Tomorrow_ConsumptionForecast', 0); 
   
   my $pvCu     = ReadingsNum ($name, 'Current_PV',                   0);                     # aktuelle PV Erzeugung
-  my $batcap   = CurrentVal  ($hash, 'batinstcap',                   0);                     # installierte Batteriekapazität Wh
-  my $soc      = CurrentVal  ($hash, 'batcharge',                    0);                     # aktueller SOC (%)
+  my $batcap   = BatteryVal  ($hash, '01', 'binstcap',               0);                     # installierte Batteriekapazität Wh
+  my $soc      = BatteryVal  ($hash, '01', 'bcharge',                0);                     # aktuelle Ladung in %                    # aktueller SOC (%)
   my $curcon   = ReadingsNum ($name, 'Current_Consumption',          0);                     # aktueller Verbrauch
   
   my $inpmax   = 0;
@@ -9750,14 +9794,14 @@ sub _createSummaries {
 
   my $pvre = int $todaySumRe->{PV};
 
-  push @{$data{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                             # Schieberegister 4h Summe Forecast
+  push @{$data{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                                # Schieberegister 4h Summe Forecast
   limitArray ($data{$name}{current}{h4fcslidereg}, $slidenummax);
 
   my $gcon    = CurrentVal ($hash, 'gridconsumption',         0);                                       # aktueller Netzbezug
   my $tconsum = CurrentVal ($hash, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
   my $gfeedin = CurrentVal ($hash, 'gridfeedin',              0);
-  my $batin   = CurrentVal ($hash, 'powerbatin',              0);                                       # aktuelle Batterieladung
-  my $batout  = CurrentVal ($hash, 'powerbatout',             0);                                       # aktuelle Batterieentladung
+  my $batin   = BatteryVal ($hash, '01', 'bpowerin',          0);                                       # momentane Batterieladung
+  my $batout  = BatteryVal ($hash, '01', 'bpowerout',         0);                                       # momentane Batterieentladung
   
   my $pvgen   = 0;
   my $pv2grid = 0;                                                                                      # PV-Erzeugung zu Grid-only
@@ -11400,8 +11444,8 @@ sub ___enableSwitchByBatPrioCharge {
 
   return $ena if(!$pcb || !$badev);                                          # Freigabe Schalten Consumer wenn kein Prefered Battery/Soll-Ladung 0 oder keine Batterie installiert
 
-  my $cbcharge = CurrentVal ($hash, "batcharge", 0);                         # aktuelle Batterieladung
-  $ena         = 0 if($cbcharge < $pcb);                                     # keine Freigabe wenn Batterieladung kleiner Soll-Ladung
+  my $bcharge = BatteryVal  ($hash, '01', 'bcharge', 0);                     # aktuelle Ladung in %
+  $ena        = 0 if($bcharge < $pcb);                                       # keine Freigabe wenn Batterieladung kleiner Soll-Ladung
 
 return $ena;
 }
@@ -16611,11 +16655,12 @@ sub listDataPool {
       }
   }
 
-  if ($htol =~ /consumers|inverters|producers|strings/xs) {
+  if ($htol =~ /consumers|inverters|producers|strings|batteries/xs) {
       my $sub = $htol eq 'consumers' ? \&ConsumerVal :
                 $htol eq 'inverters' ? \&InverterVal :
                 $htol eq 'producers' ? \&ProducerVal :
                 $htol eq 'strings'   ? \&StringVal   :
+                $htol eq 'batteries' ? \&BatteryVal  :
                 '';
       
       $h = $data{$name}{$htol};                
@@ -16635,8 +16680,13 @@ sub listDataPool {
           next if($par && $idx ne $par);
           my ($cret, $s1);
           my $sp1 = _ldpspaces ($idx, q{});
-
+          
           for my $ckey (sort keys %{$h->{$idx}}) {
+              if (ref $h->{$idx}{$ckey} eq 'ARRAY') {
+                 my $aser = join " ",@{$h->{$idx}{$ckey}};
+                 $cret .= ($s1 ? $sp1 : "").$ckey." => ".$aser."\n";
+              }
+              
               if (ref $h->{$idx}{$ckey} eq 'HASH') {
                   my $hk = qq{};
                   for my $f (sort {$a<=>$b} keys %{$h->{$idx}{$ckey}}) {
@@ -16648,7 +16698,8 @@ sub listDataPool {
               else {
                   $cret .= ($s1 ? $sp1 : "").$ckey." => ". &{$sub} ($hash, $idx, $ckey, "")."\n";
               }
-              $s1  = 1;
+              
+              $s1 = 1;
           }
           $sq .= $idx." => ".$cret."\n";
       }
@@ -18050,12 +18101,7 @@ sub createAssociatedWith {
       $medev    = $ame->[0] // '';
       push @cd, $medev;
 
-      my $badev = AttrVal ($name, 'setupBatteryDev', '');                    # Battery Device
-      ($aba,$h) = parseParams ($badev);
-      $badev    = $aba->[0] // '';
-      push @cd, $badev;
-
-      for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {     # Consumer Devices
+      for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {            # Consumer Devices
           my $consumer = AttrVal ($name, "consumer${c}", "");
           my ($ac,$hc) = parseParams ($consumer);
           my $codev    = $ac->[0]         // '';
@@ -18064,9 +18110,16 @@ sub createAssociatedWith {
           push @cd, $dswitch if($dswitch);
       }
       
+      for my $bn (1..$maxbatteries) {                                        # Battery Devices
+          $bn       = sprintf "%02d", $bn;
+          my $badev = AttrVal ($name, "setupBatteryDev${bn}", '');
+          my ($aba) = parseParams ($badev);
+          push @cd, $aba->[0] if($aba->[0]);
+      }
+      
       for my $in (1..$maxinverter) {                                         # Inverter Devices
           $in       = sprintf "%02d", $in;
-          my $inc   = AttrVal ($name, "setupInverterDev${in}", "");
+          my $inc   = AttrVal ($name, "setupInverterDev${in}", '');
           my ($ind) = parseParams ($inc);
           push @cd, $ind->[0] if($ind->[0]);
       }
@@ -18078,7 +18131,6 @@ sub createAssociatedWith {
       push @nd, $fcdev3 if($fcdev3 && $fcdev3 !~ /-API/xs);
       push @nd, $radev  if($radev  && $radev  !~ /-API/xs);
       push @nd, $medev;
-      push @nd, $badev;
 
       for my $prn (1..$maxproducer) {                                       # Producer Devices
           $prn      = sprintf "%02d", $prn;
@@ -18623,11 +18675,18 @@ return ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0);
 ################################################################
 sub isBatteryUsed {
   my $name = shift;
+  
+  my $valid;
 
-  my ($err) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev', method => 'attr' } );
-  return if($err);
+  for my $bn (1..$maxbatteries) {
+      $bn = sprintf "%02d", $bn;
+      my ($err) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
+      next if($err);
+      
+      $valid = 1;
+  }
 
-return 1;
+return $valid;
 }
 
 ################################################################
@@ -19809,8 +19868,6 @@ return $def;
 # $key: aiinitstate          - Initialisierungsstatus der KI
 #       aitrainstate         - Traisningsstatus der KI
 #       aiaddistate          - Add Instanz Status der KI
-#       batcharge            - Bat SOC in %
-#       batinstcap           - installierte Batteriekapazität in Wh
 #       ctrunning            - aktueller Ausführungsstatus des Central Task
 #       dwdRad1hAge          - Alter des Rad1h Wertes als Datumstring
 #       dwdRad1hAgeTS        - Alter des Rad1h Wertes als Unix Timestamp
@@ -19823,8 +19880,6 @@ return $def;
 #       consumerdevs         - alle registrierten Consumerdevices (Array)
 #       consumerCollected    - Statusbit Consumer Attr gesammelt und ausgewertet
 #       gridconsumption      - aktueller Netzbezug
-#       powerbatin           - Batterie Ladeleistung
-#       powerbatout          - Batterie Entladeleistung
 #       temp                 - aktuelle Außentemperatur
 #       surplus              - aktueller PV Überschuß
 #       tomorrowconsumption  - Verbrauch des kommenden Tages
@@ -20027,6 +20082,42 @@ sub ConsumerVal {
       defined $data{$name}{consumers}{$co}        &&
       defined $data{$name}{consumers}{$co}{$key}) {
       return  $data{$name}{consumers}{$co}{$key};
+  }
+
+return $def;
+}
+
+###################################################################################################
+# Wert des Batterie-Hash zurückliefern
+# Usage:
+# BatteryVal ($hash or $name, $bn, $key, $def)
+#
+# $bn:  Batterie Nummer (01,02,03,...)
+# $key: balias       - Alias des Batterie Devices
+#       bname        - Name des Batterie Devices
+#       basynchron   - Asynchron Modus
+#       bcharge      - Bat SOC in %
+#       binstcap     - installierte Batteriekapazität in Wh
+#       bpowerin     - Batterie momentane Ladeleistung
+#       bpowerout    - Batterie momentane Entladeleistung
+#
+# $def: Defaultwert
+#
+###################################################################################################
+sub BatteryVal {
+  my $name = shift;
+  my $bn   = shift;
+  my $key  = shift;
+  my $def  = shift;
+
+  if (ref $name eq 'HASH') {
+      $name = $name->{NAME};
+  }
+
+  if (defined $data{$name}{batteries}             &&
+      defined $data{$name}{batteries}{$bn}        &&
+      defined $data{$name}{batteries}{$bn}{$key}) {
+      return  $data{$name}{batteries}{$bn}{$key};
   }
 
 return $def;
@@ -20289,7 +20380,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>setupRadiationAPI </b>     </td><td>DWD_OpenData Device or API for the delivery of radiation data.                </td></tr>
             <tr><td> <b>setupInverterDevXX</b>     </td><td>Device which provides PV performance data                                     </td></tr>
             <tr><td> <b>setupMeterDev</b>          </td><td>Device which supplies network I/O data                                        </td></tr>
-            <tr><td> <b>setupBatteryDev</b>        </td><td>Device which provides battery performance data (if available)                 </td></tr>
+            <tr><td> <b>setupBatteryDevXX</b>      </td><td>Device which provides battery performance data (if available)                 </td></tr>
             <tr><td> <b>setupInverterStrings</b>   </td><td>Identifier of the existing plant strings                                      </td></tr>
             <tr><td> <b>setupStringAzimuth</b>     </td><td>Azimuth of the plant strings                                                  </td></tr>
             <tr><td> <b>setupStringPeak</b>        </td><td>the DC peak power of the plant strings                                        </td></tr>
@@ -20372,6 +20463,7 @@ to ensure that the system configuration is correct.
       <li><b>batteryTrigger &lt;1on&gt;=&lt;Value&gt; &lt;1off&gt;=&lt;Value&gt; [&lt;2on&gt;=&lt;Value&gt; &lt;2off&gt;=&lt;Value&gt; ...] </b> <br><br>
 
       Generates triggers when the battery charge exceeds or falls below certain values (SoC in %). <br>
+      The SoC used is formed as an average of the SoCs of all defined battery devices. <br>
       If the last three SoC measurements exceed a defined <b>Xon-Bedingung</b>, the reading <b>batteryTrigger_X = on</b>
       is created/set. <br>
       If the last three SoC measurements fall below a defined <b>Xoff-Bedingung</b>, the reading
@@ -21105,6 +21197,28 @@ to ensure that the system configuration is correct.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-get-valBattery"></a>
+      <li><b>valBattery </b> <br><br>
+      Shows the operating values determined for the selected battery or all defined battery devices.  <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+            <tr><td> <b>bname </b>          </td><td>Name of the device                                                           </td></tr>
+            <tr><td> <b>balias </b>         </td><td>Alias of the device                                                          </td></tr>
+            <tr><td> <b>basynchron </b>     </td><td>Mode of processing received battery events                                   </td></tr>
+            <tr><td> <b>bcharge </b>        </td><td>SOC (State of Charge) of the battery (%)                                     </td></tr>
+            <tr><td> <b>binstcap </b>       </td><td>installed battery capacity (Wh)                                              </td></tr>
+            <tr><td> <b>bpowerin </b>       </td><td>current charging power (W)                                                   </td></tr>
+            <tr><td> <b>bpowerout </b>      </td><td>current discharge power (W)                                                  </td></tr>
+		 </table>
+      </ul>
+
+      </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-get-valConsumerMaster"></a>
@@ -21542,7 +21656,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlBatSocManagement"></a>
        <li><b>ctrlBatSocManagement lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] </b> <br><br>
-         If a battery device (setupBatteryDev) is installed, this attribute activates the battery SoC management. <br>
+         If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC management. <br>
          The <b>Battery_OptimumTargetSoC</b> reading contains the optimum minimum SoC calculated by the module. <br>
          The <b>Battery_ChargeRequest</b> reading is set to '1' if the current SoC has fallen below the minimum SoC. <br>
          In this case, the battery should be forcibly charged, possibly with mains power. <br>
@@ -21764,11 +21878,11 @@ to ensure that the system configuration is correct.
          <br>
 
          <ul>
-         <b>Beispiel: </b> <br>
+         <b>Example: </b> <br>
             {                                                                                           <br>
-              my $batdev = (split " ", AttrVal ($name, 'setupBatteryDev', ''))[0];                      <br>
-              my $pvfc   = ReadingsNum ($name, 'RestOfDayPVforecast',          0);                      <br>
-              my $cofc   = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0);                      <br>
+              my $batdev = (split " ", AttrVal ($name, 'setupBatteryDev01', ''))[0];                    <br>
+              my $pvfc   = ReadingsNum ($name, 'RestOfDayPVforecast',            0);                    <br>
+              my $cofc   = ReadingsNum ($name, 'RestOfDayConsumptionForecast',   0);                    <br>
               my $diff   = $pvfc - $cofc;                                                               <br>
                                                                                                         <br>
               storeReading ('userFn_Battery_device',  $batdev);                                         <br>
@@ -22204,10 +22318,10 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-setupBatteryDev"></a>
-       <li><b>setupBatteryDev &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
-                              [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
-                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
+       <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
+       <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
+                                cap=&lt;Option&gt; [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
+                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data.
        The module assumes that the numerical value of the readings is always positive.
@@ -22247,7 +22361,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh
        </ul>
        <br>
 
@@ -22711,7 +22825,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>setupRadiationAPI </b>     </td><td>DWD_OpenData Device bzw. API zur Lieferung von Strahlungsdaten                 </td></tr>
             <tr><td> <b>setupInverterDevXX</b>     </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
             <tr><td> <b>setupMeterDev</b>          </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
-            <tr><td> <b>setupBatteryDev</b>        </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
+            <tr><td> <b>setupBatteryDevXX</b>      </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
             <tr><td> <b>setupInverterStrings</b>   </td><td>Bezeichner der vorhandenen Anlagenstrings                                      </td></tr>
             <tr><td> <b>setupStringAzimuth</b>     </td><td>Ausrichtung (Azimut) der Anlagenstrings                                        </td></tr>
             <tr><td> <b>setupStringPeak</b>        </td><td>die DC-Peakleistung der Anlagenstrings                                         </td></tr>
@@ -22793,6 +22907,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>batteryTrigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br><br>
 
       Generiert Trigger bei Über- bzw. Unterschreitung bestimmter Batterieladungswerte (SoC in %). <br>
+      Der verwendete SoC wird als Durchschnitt der SoC's aller definierten Batterie Geräte gebildet. <br>
       Überschreiten die letzten drei SoC-Messungen eine definierte <b>Xon-Bedingung</b>, wird das Reading
       <b>batteryTrigger_X = on</b> erstellt/gesetzt. <br>
       Unterschreiten die letzten drei SoC-Messungen eine definierte <b>Xoff-Bedingung</b>, wird das Reading
@@ -23536,6 +23651,28 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-get-valBattery"></a>
+      <li><b>valBattery </b> <br><br>
+      Zeigt die ermittelten Betriebswerte der ausgewählten Batterie oder aller definierten Batteriegeräte.  <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+            <tr><td> <b>bname </b>          </td><td>Name des Gerätes                                                            </td></tr>
+            <tr><td> <b>balias </b>         </td><td>Alias des Gerätes                                                           </td></tr>
+            <tr><td> <b>basynchron </b>     </td><td>Modus der Verarbeitung empfangener Batterie-Events                          </td></tr>
+            <tr><td> <b>bcharge </b>        </td><td>SOC (State of Charge) der Batterie (%)                                      </td></tr>
+            <tr><td> <b>binstcap </b>       </td><td>installierte Batteriekapazität (Wh)                                         </td></tr>
+            <tr><td> <b>bpowerin </b>       </td><td>momentane Ladeleistung (W)                                                  </td></tr>
+            <tr><td> <b>bpowerout </b>      </td><td>momentane Entladeleistung (W)                                               </td></tr>
+		 </table>
+      </ul>
+
+      </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-get-valConsumerMaster"></a>
@@ -23589,8 +23726,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>ifeed </b>          </td><td>Eigenschaften der Energielieferung                                          </td></tr>
             <tr><td> <b>igeneration </b>    </td><td>aktuelle PV Erzeugung (W)                                                   </td></tr>
             <tr><td> <b>iicon </b>          </td><td>die evtl. festgelegten Icons zur Darstellung des Gerätes in der Grafik      </td></tr>
-            <tr><td> <b>ialias </b>         </td><td>Alias des Devices                                                           </td></tr>
-            <tr><td> <b>iname </b>          </td><td>Name des Devices                                                            </td></tr>
+            <tr><td> <b>ialias </b>         </td><td>Alias des Gerätes                                                           </td></tr>
+            <tr><td> <b>iname </b>          </td><td>Name des Gerätes                                                            </td></tr>
             <tr><td> <b>invertercap </b>    </td><td>die nominale Leistung (W) des Wechselrichters (falls definiert)             </td></tr>
             <tr><td> <b>istrings </b>       </td><td>Liste der dem Wechselrichter zugeordneten Strings (falls definiert)         </td></tr>
 		 </table>
@@ -23612,8 +23749,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pfeed </b>          </td><td>Eigenschaften der Energielieferung                                          </td></tr>
             <tr><td> <b>pgeneration </b>    </td><td>aktuelle Leistung (W)                                                       </td></tr>
             <tr><td> <b>picon </b>          </td><td>die evtl. festgelegten Icons zur Darstellung des Gerätes in der Grafik      </td></tr>
-            <tr><td> <b>palias </b>         </td><td>Alias des Devices                                                           </td></tr>
-            <tr><td> <b>pname </b>          </td><td>Name des Devices                                                            </td></tr>
+            <tr><td> <b>palias </b>         </td><td>Alias des Gerätes                                                           </td></tr>
+            <tr><td> <b>pname </b>          </td><td>Name des Gerätes                                                            </td></tr>
 		 </table>
       </ul>
 
@@ -23971,7 +24108,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-ctrlBatSocManagement"></a>
        <li><b>ctrlBatSocManagement lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] </b> <br><br>
-         Sofern ein Batterie Device (setupBatteryDev) installiert ist, aktiviert dieses Attribut das Batterie
+         Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
          SoC-Management. <br>
          Das Reading <b>Battery_OptimumTargetSoC</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
          Das Reading <b>Battery_ChargeRequest</b> wird auf '1' gesetzt, wenn der aktuelle SoC unter den Mindest-SoC gefallen
@@ -24197,9 +24334,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <b>Beispiel: </b> <br>
             {                                                                                           <br>
-              my $batdev = (split " ", AttrVal ($name, 'setupBatteryDev', ''))[0];                      <br>
-              my $pvfc   = ReadingsNum ($name, 'RestOfDayPVforecast',          0);                      <br>
-              my $cofc   = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0);                      <br>
+              my $batdev = (split " ", AttrVal ($name, 'setupBatteryDev01', ''))[0];                    <br>
+              my $pvfc   = ReadingsNum ($name, 'RestOfDayPVforecast',            0);                    <br>
+              my $cofc   = ReadingsNum ($name, 'RestOfDayConsumptionForecast',   0);                    <br>
               my $diff   = $pvfc - $cofc;                                                               <br>
                                                                                                         <br>
               storeReading ('userFn_Battery_device',  $batdev);                                         <br>
@@ -24634,10 +24771,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-setupBatteryDev"></a>
-       <li><b>setupBatteryDev &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;
-                              [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
-                              cap=&lt;Option&gt; [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
+       <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
+       <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; 
+                                cap=&lt;Option&gt; [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
+                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
@@ -24677,7 +24814,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh
        </ul>
        <br>
 
