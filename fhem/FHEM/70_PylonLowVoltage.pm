@@ -121,6 +121,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "1.2.1"  => "29.12.2024 manageUpdate: use random time delay ",
   "1.2.0"  => "05.10.2024 _composeAddr: bugfix of effective battaery addressing ",
   "1.1.0"  => "25.08.2024 manage time shift for active gateway connections of all defined  devices ",
   "1.0.0"  => "24.08.2024 implement pylon groups ",
@@ -527,18 +528,16 @@ sub manageUpdate {
       InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);                # Wiederholungsintervall
 
       $hash->{OPMODE}            = 'Automatic';
-      $readings->{nextCycletime} = FmtTime($new);
+      $readings->{nextCycletime} = FmtTime ($new);
   }
   
   delete $hash->{HELPER}{BKRUNNING} if(defined $hash->{HELPER}{BKRUNNING} && $hash->{HELPER}{BKRUNNING}{pid} =~ /DEAD/xs);
  
   for my $dev ( devspec2array ('TYPE=PylonLowVoltage') ) {
-      if (defined $defs{$dev}->{HELPER}{BKRUNNING} || defined $defs{$dev}->{HELPER}{GWSESSION}) {
-          $hash->{POSTPONED} += 1;
-          
+      if (defined $defs{$dev}->{HELPER}{BKRUNNING} || defined $defs{$dev}->{HELPER}{GWSESSION}) {          
           RemoveInternalTimer ($hash);
-          $new = gettimeofday() + 1;
-          InternalTimer (gettimeofday() + 1, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0); 
+          $new = gettimeofday() + rand (6);
+          InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0); 
           
           $readings->{nextCycletime} = FmtTime ($new);
           $readings->{state}         = "cycle postponed due to active gateway connection of $dev";

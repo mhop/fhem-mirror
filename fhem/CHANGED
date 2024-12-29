@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  70_PylonLowVoltage: internal code change (use random time delay)
  - feature: 76_SolarForecast: change Attr setupBatteryDev to setupBatteryDev01, 
                               new getter valBattery
  - bugfix:  88_HMCCU: Role STATUS_INDICATOR
