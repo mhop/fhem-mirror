@@ -158,6 +158,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.41.1" => "29.12.2024  ctrlStatisticReadings: change daysUntilBatteryCare to daysUntilBatteryCare_XX until max batteries ".
+                           "todayBatIn to todayBatIn_XX until max batteries, todayBatOut to todayBatOut_XX until max batteries ",
   "1.41.0" => "28.12.2024  _batSocTarget: minor code change,  change setupBatteryDev to setupBatteryDev01, getter valBattery ", 
   "1.40.0" => "21.12.2024  new consumer key 'surpmeth' to calculate surplus in various variants for consumer switching ",
   "1.39.8" => "21.12.2024  prepare of new consumer key 'surpmeth', _batSocTarget: improve care SoC management when dark doldrums ",
@@ -1075,9 +1077,6 @@ my %hcsr = (                                                                    
   dayAfterTomorrowPVforecast  => { fnr => 4, fn => \&RadiationAPIVal, par => 'pv_estimate50',     unit => '',     def => 0           },
   todayGridFeedIn             => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
   todayGridConsumption        => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
-  todayBatIn                  => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
-  todayBatOut                 => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
-  daysUntilBatteryCare        => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => '-'         },
   todayConsumptionForecast    => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => '-'         },
   conForecastTillNextSunrise  => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => 0           },
 );
@@ -1096,6 +1095,28 @@ my %hcsr = (                                                                    
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{par}  = 'runtimeAvgDay';
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{unit} = ' min';
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{def}  = 0;
+  }
+  
+  for my $bn (1..$maxbatteries) {
+      $bn                                      = sprintf "%02d", $bn;
+      
+      $hcsr{'daysUntilBatteryCare_'.$bn}{fnr}  = 4;
+      $hcsr{'daysUntilBatteryCare_'.$bn}{fn}   = \&CircularVal;
+      $hcsr{'daysUntilBatteryCare_'.$bn}{par}  = 99;
+      $hcsr{'daysUntilBatteryCare_'.$bn}{unit} = '';
+      $hcsr{'daysUntilBatteryCare_'.$bn}{def}  = '-';
+      
+      $hcsr{'todayBatIn_'.$bn}{fnr}  = 4;
+      $hcsr{'todayBatIn_'.$bn}{fn}   = \&CircularVal;
+      $hcsr{'todayBatIn_'.$bn}{par}  = 99;
+      $hcsr{'todayBatIn_'.$bn}{unit} = '';
+      $hcsr{'todayBatIn_'.$bn}{def}  = 0; 
+
+      $hcsr{'todayBatOut_'.$bn}{fnr}  = 4;
+      $hcsr{'todayBatOut_'.$bn}{fn}   = \&CircularVal;
+      $hcsr{'todayBatOut_'.$bn}{par}  = 99;
+      $hcsr{'todayBatOut_'.$bn}{unit} = '';
+      $hcsr{'todayBatOut_'.$bn}{def}  = 0;       
   }
 
 # Funktiontemplate zur Speicherung von Werten in pvHistory
@@ -6052,10 +6073,11 @@ sub _attrBatteryDev {                    ## no critic "not used"
       
       delete $data{$name}{circular}{99}{lastTsMaxSocRchd};
       delete $data{$name}{circular}{99}{nextTsMaxSocChge};
-      delete $data{$name}{circular}{99}{initdaybatintot};
-      delete $data{$name}{circular}{99}{initdaybatouttot};
-      delete $data{$name}{circular}{99}{batintot};
-      delete $data{$name}{circular}{99}{batouttot};
+      delete $data{$name}{circular}{99}{'initdaybatintot'.$bn};
+      delete $data{$name}{circular}{99}{'initdaybatouttot'.$bn};
+      delete $data{$name}{circular}{99}{'batintot'.$bn};
+      delete $data{$name}{circular}{99}{'batouttot'.$bn};
+      delete $data{$name}{circular}{99}{'days2care'.$bn};
       
       delete $data{$name}{batteries}{$bn};
   }
@@ -7250,6 +7272,14 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################    
+  
+  delete $data{$name}{circular}{99}{days2care};                                 # 29.12.2024
+  
+  $data{$name}{circular}{99}{initdaybatintot01} = delete $data{$name}{circular}{99}{initdaybatintot} if(defined $data{$name}{circular}{99}{initdaybatintot});   # 29.12.2024
+  $data{$name}{circular}{99}{initdaybatouttot01} = delete $data{$name}{circular}{99}{initdaybatouttot} if(defined $data{$name}{circular}{99}{initdaybatouttot});   # 29.12.2024
+  $data{$name}{circular}{99}{batintot01}        = delete $data{$name}{circular}{99}{batintot} if(defined $data{$name}{circular}{99}{batintot});                 # 29.12.2024
+  $data{$name}{circular}{99}{batouttot01}        = delete $data{$name}{circular}{99}{batouttot} if(defined $data{$name}{circular}{99}{batouttot});                 # 29.12.2024
+  
   if (exists $data{$name}{solcastapi}{'?IdPair'}) {                             # 29.11.2024
       for my $pk (keys %{$data{$name}{solcastapi}{'?IdPair'}}) {                
           my $apikey = RadiationAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
@@ -7802,12 +7832,16 @@ sub _specialActivities {
 
           delete $data{$name}{circular}{99}{initdayfeedin};
           delete $data{$name}{circular}{99}{initdaygcon};
-          delete $data{$name}{circular}{99}{initdaybatintot};
-          delete $data{$name}{circular}{99}{initdaybatouttot};
           delete $data{$name}{current}{sunriseToday};
           delete $data{$name}{current}{sunriseTodayTs};
           delete $data{$name}{current}{sunsetToday};
           delete $data{$name}{current}{sunsetTodayTs};
+          
+          for my $bn (1..$maxbatteries) {
+              $bn = sprintf "%02d", $bn;
+              delete $data{$name}{circular}{99}{'initdaybatintot'.$bn};
+              delete $data{$name}{circular}{99}{'initdaybatouttot'.$bn};
+          }
 
           $data{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
           delete $data{$name}{circular}{99}{tdayDvtn};
@@ -9306,18 +9340,18 @@ sub _transferBatteryValues {
 
       # Batterielade, -entladeenergie in Circular speichern
       #######################################################
-      if (!defined CircularVal ($hash, 99, 'initdaybatintot', undef)) {
-          $data{$name}{circular}{99}{initdaybatintot} = $btotin;                                                # total Batterieladung zu Tagbeginn (Wh)
+      if (!defined CircularVal ($hash, 99, 'initdaybatintot'.$bn, undef)) {
+          $data{$name}{circular}{99}{'initdaybatintot'.$bn} = $btotin;                                          # total Batterieladung zu Tagbeginn (Wh)
       }
 
-      if (!defined CircularVal ($hash, 99, 'initdaybatouttot', undef)) {                                        # total Batterieentladung zu Tagbeginn (Wh)
-          $data{$name}{circular}{99}{initdaybatouttot} = $btotout;
+      if (!defined CircularVal ($hash, 99, 'initdaybatouttot'.$bn, undef)) {                                    # total Batterieentladung zu Tagbeginn (Wh)
+          $data{$name}{circular}{99}{'initdaybatouttot'.$bn} = $btotout;
       }
 
-      $data{$name}{circular}{99}{batintot}  = $btotin;                                                          # aktuell total Batterieladung
-      $data{$name}{circular}{99}{batouttot} = $btotout;                                                         # aktuell total Batterieentladung
+      $data{$name}{circular}{99}{'batintot'.$bn}  = $btotin;                                                    # aktuell total Batterieladung (Wh)
+      $data{$name}{circular}{99}{'batouttot'.$bn} = $btotout;                                                   # aktuell total Batterieentladung (Wh)
 
-      my $nhour = $chour+1;
+      my $nhour = $chour + 1;
 
       
       # Batterieladung aktuelle Stunde in pvHistory speichern
@@ -9327,17 +9361,15 @@ sub _transferBatteryValues {
 
       if (!defined $histbatintot) {                                                                             # totale Batterieladung der aktuelle Stunde gesetzt?
           writeToHistory ( { paref => $paref, key => 'batintotal', val => $btotin, hour => $nhour } );
-
-          my $bitot      = CurrentVal ($hash, "batintotal", $btotin);
-          $batinthishour = int ($btotin - $bitot);
+          $batinthishour = 0;
       }
       else {
           $batinthishour = int ($btotin - $histbatintot);
       }
 
-      $batinthishour = 0 if($batinthishour < 0);
-
+      $batinthishour                                        = 0 if($batinthishour < 0);
       $data{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;                                  # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      
       writeToHistory ( { paref => $paref, key => 'batinthishour', val => $batinthishour, hour => $nhour } );
 
       
@@ -9348,16 +9380,13 @@ sub _transferBatteryValues {
 
       if (!defined $histbatouttot) {                                                                           # totale Betterieladung der aktuelle Stunde gesetzt?
           writeToHistory ( { paref => $paref, key => 'batouttotal', val => $btotout, hour => $nhour } );
-
-          my $botot       = CurrentVal ($hash, 'batouttotal', $btotout);
-          $batoutthishour = int ($btotout - $botot);
+          $batoutthishour = 0;
       }
       else {
           $batoutthishour = int ($btotout - $histbatouttot);
       }
 
-      $batoutthishour = 0 if($batoutthishour < 0);
-
+      $batoutthishour                                        = 0 if($batoutthishour < 0);
       $data{$name}{circular}{sprintf("%02d",$nhour)}{batout} = $batoutthishour;                                # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       writeToHistory ( { paref => $paref, key => 'batoutthishour', val => $batoutthishour, hour => $nhour } );
 
@@ -9402,157 +9431,166 @@ return;
 sub _batSocTarget {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $t     = $paref->{t};                                                                   # aktuelle Zeit
+  my $t     = $paref->{t};                                                                        # aktuelle Zeit
 
   return if(!isBatteryUsed ($name));
-
-  my $hash       = $defs{$name};
-  my $oldd2care  = CircularVal ($hash, 99, 'days2care',            0);
-  my $ltsmsr     = CircularVal ($hash, 99, 'lastTsMaxSocRchd', undef);
-  my $batcharge  = BatteryVal  ($hash, '01', 'bcharge',            0);                       # aktuelle Ladung in %
-  my $batinstcap = BatteryVal  ($hash, '01', 'binstcap',           0);                       # installierte Batteriekapazität Wh
-  my $cgbt       = AttrVal     ($name, 'ctrlBatSocManagement', undef);
-    
-  if ($cgbt && !$batinstcap) {
-      Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement is active, but the required key 'cap' is not setup in setupBatteryDev. Exit.");
-      return;
-  }
-
-  __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $batcharge >= $maxSoCdef || $oldd2care < 0);
-
-  my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $cgbt);
-  return if(!$lowSoc ||!$upSoc);
-
-  $paref->{careCycle} = $careCycle;
-  __batSaveSocKeyFigures ($paref) if($batcharge >= $maxsoc);
-  delete $paref->{careCycle};
-
-  my $nt         = '';
-  my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
-  my $target     = $lowSoc;
-  my $yday       = strftime "%d", localtime($t - 86400);                                    # Vortag  (range 01 to 31)
-  my $tdconsset  = CurrentVal ($hash, 'tdConFcTillSunset',          0);                     # Verbrauch bis Sonnenuntergang Wh
-  my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc',       0);                     # gespeicherter max. SOC des Vortages
-  my $batysetsoc = HistoryVal ($hash, $yday, 99, 'batsetsoc', $lowSoc);                     # gespeicherter SOC Sollwert des Vortages
-  my $whneed     = ($maxsoc / 100 * $batinstcap) - ($batcharge / 100 * $batinstcap);        # benötigte Ladeenergie in Wh bis $maxsoc
-  $whneed        = sprintf "%.0f", $whneed;
   
-  $target = $batymaxsoc <  $maxsoc ? $batysetsoc + $batSocChgDay :
-            $batymaxsoc >= $maxsoc ? $batysetsoc - $batSocChgDay :
-            $batysetsoc;                                                                    # neuer Min SOC für den laufenden Tag
-
-  debugLog ($paref, 'batteryManagement', "SoC calc Step1 - compare with SoC history -> preliminary new Target: $target %");
-
-  ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)
-  ###########################################################################
-  my $sunset  = CurrentVal ($hash, 'sunsetTodayTs', $t);
-  my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
-  my $la      = '';
-  my $careSoc = $target;
-
-  my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);                 # PV Prognose morgen
-  my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',            0);                 # PV Prognose Rest heute
-  my $pvexpect = $pvfctm > $pvfctd ? $pvfctm : $pvfctd - $tdconsset;                       # erwartete (Rest) PV-Leistung des Tages
-  $pvexpect    = $pvexpect > 0 ? $pvexpect : 0;                                            # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
+  my $hash = $defs{$name};
   
-  my $ntsmsc    = CircularVal ($hash, 99, 'nextTsMaxSocChge', $t);
-  my $days2care = floor       (($ntsmsc - $t) / 86400);                                    # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
-
-  my $docare   = 0;                                                                        # keine Zwangsanwendung care SoC
+  for my $bn (1..$maxbatteries) {
+      $bn = sprintf "%02d", $bn;
   
-  if ($t > $delayts || $pvexpect < $whneed || !$days2care) {
-      $paref->{days2care} = $days2care;
-      __batSaveSocKeyFigures ($paref);
-      delete $paref->{days2care};
+      my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
+      next if($err);
 
-      $careSoc = $maxsoc - ($days2care * $batSocChgDay);                                   # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
-      $careSoc = $careSoc < $lowSoc ? $lowSoc : $careSoc;
+      my $oldd2care  = CircularVal ($hash, 99, 'days2care'.$bn,          0);
+      my $ltsmsr     = CircularVal ($hash, 99, 'lastTsMaxSocRchd',   undef);
+      my $batcharge  = BatteryVal  ($hash, $bn, 'bcharge',               0);                     # aktuelle Ladung in %
+      my $batinstcap = BatteryVal  ($hash, $bn, 'binstcap',              0);                     # installierte Batteriekapazität Wh
+      my $cgbt       = AttrVal     ($name, 'ctrlBatSocManagement',   undef);
+        
+      if ($cgbt && !$batinstcap) {
+          Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement is active, but the required key 'cap' is not setup in setupBatteryDev. Exit.");
+          return;
+      }
+
+      my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $cgbt);
+      return if(!$lowSoc ||!$upSoc);
       
-      if ($careSoc >= $target) {
-          $target = $careSoc;                                                              # resultierender Target-SoC unter Berücksichtigung $caresoc
-          $docare = 1;                                                                     # Zwangsanwendung care SoC
+      $paref->{batnmb}    = $bn;
+      $paref->{careCycle} = $careCycle;
+      
+      __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $batcharge >= $maxsoc || $batcharge >= $maxSoCdef || $oldd2care < 0);
+
+      my $nt         = '';
+      my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
+      my $target     = $lowSoc;
+      my $yday       = strftime "%d", localtime($t - 86400);                                    # Vortag  (range 01 to 31)
+      my $tdconsset  = CurrentVal ($hash, 'tdConFcTillSunset',          0);                     # Verbrauch bis Sonnenuntergang Wh
+      my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc',       0);                     # gespeicherter max. SOC des Vortages
+      my $batysetsoc = HistoryVal ($hash, $yday, 99, 'batsetsoc', $lowSoc);                     # gespeicherter SOC Sollwert des Vortages
+      my $whneed     = ($maxsoc / 100 * $batinstcap) - ($batcharge / 100 * $batinstcap);        # benötigte Ladeenergie in Wh bis $maxsoc
+      $whneed        = sprintf "%.0f", $whneed;
+      
+      $target = $batymaxsoc <  $maxsoc ? $batysetsoc + $batSocChgDay :
+                $batymaxsoc >= $maxsoc ? $batysetsoc - $batSocChgDay :
+                $batysetsoc;                                                                    # neuer Min SOC für den laufenden Tag
+
+      debugLog ($paref, 'batteryManagement', "SoC Bat $bn Step1 - compare with SoC history -> preliminary new Target: $target %");
+
+      ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)
+      ###########################################################################
+      my $sunset  = CurrentVal ($hash, 'sunsetTodayTs', $t);
+      my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
+      my $la      = '';
+      my $careSoc = $target;
+
+      my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);                 # PV Prognose morgen
+      my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',            0);                 # PV Prognose Rest heute
+      my $pvexpect = $pvfctm > $pvfctd ? $pvfctm : $pvfctd - $tdconsset;                       # erwartete (Rest) PV-Leistung des Tages
+      $pvexpect    = $pvexpect > 0 ? $pvexpect : 0;                                            # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
+      
+      my $ntsmsc    = CircularVal ($hash, 99, 'nextTsMaxSocChge', $t);
+      my $days2care = floor       (($ntsmsc - $t) / 86400);                                    # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
+      my $docare    = 0;                                                                       # keine Zwangsanwendung care SoC
+      
+      if ($t > $delayts || $pvexpect < $whneed || !$days2care) {
+          $paref->{days2care} = $days2care;
+          __batSaveSocKeyFigures ($paref);
+          delete $paref->{days2care};
+
+          $careSoc = $maxsoc - ($days2care * $batSocChgDay);                                   # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
+          $careSoc = $careSoc < $lowSoc ? $lowSoc : $careSoc;
+          
+          if ($careSoc >= $target) {
+              $target = $careSoc;                                                              # resultierender Target-SoC unter Berücksichtigung $caresoc
+              $docare = 1;                                                                     # Zwangsanwendung care SoC
+          }
+          
+          $la = "calc care SoC -> Remaining days until care SoC: $days2care, Target: $target %";
+      }
+      else {
+          $nt = (timestampToTimestring ($delayts, $paref->{lang}))[0];
+          $la = "calc care SoC -> use preliminary Target: $target % (care SoC calculation & activation postponed to after $nt)";
+      }
+
+      debugLog ($paref, 'batteryManagement', "SoC Bat $bn Step2 - basics -> docare: $docare, care SoC: $careSoc %, E expect: $pvexpect Wh, need for care SoC: $whneed Wh");
+      debugLog ($paref, 'batteryManagement', "SoC Bat $bn Step2 - $la");
+
+      ## Aufladewahrscheinlichkeit beachten
+      #######################################
+      my $csopt     = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);                # aktuelles SoC Optimum
+      my $cantarget = sprintf "%.0f", (100 - (100 / $batinstcap) * $pvexpect);                 # berechneter max. möglicher Minimum-SOC nach Berücksichtigung Ladewahrscheinlichkeit
+      my $newtarget = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);           # Abgleich möglicher Minimum-SOC gg. berechneten Minimum-SOC
+      
+      debugLog ($paref, 'batteryManagement', "SoC Bat $bn Step3 - basics -> cantarget: $cantarget %, newtarget: $newtarget %");
+      
+      if ($newtarget > $careSoc) {
+          $docare = 0;                                                                         # keine Zwangsanwendung care SoC
+      }
+      else {
+          $newtarget = $careSoc;
       }
       
-      $la = "calc care SoC -> Remaining days until care SoC: $days2care, Target: $target %";
+      my $logadd     = '';
+
+      if ($newtarget > $csopt && $t > $delayts) {                                              # Erhöhung des SoC (wird ab Sonnenuntergang angewendet)
+          $target = $newtarget;
+          $logadd = "(new target > $csopt % and Sunset has passed)";
+      }
+      elsif ($newtarget > $csopt && $t <= $delayts && !$docare) {                              # bisheriges Optimum bleibt vorerst
+          $target = $csopt;
+          $nt     = (timestampToTimestring ($delayts, $paref->{lang}))[0];
+          $logadd = "(new target $newtarget % is activated after $nt)";
+      }
+      elsif ($newtarget < $csopt) {                                                            # Targetminderung sofort umsetzen -> Freiplatz für Ladeprognose
+          $target = $newtarget;
+          $logadd = "(new target < current Target SoC $csopt)";
+      }
+      else {                                                                                   # bisheriges Optimum bleibt
+          $target = $newtarget;
+          $logadd = "(no change)";
+      }
+
+      debugLog ($paref, 'batteryManagement', "SoC Bat $bn Step3 - charging probability -> docare: $docare, Target: $target % ".$logadd);
+
+      ## low/up-Grenzen beachten
+      ############################
+      $target = $docare           ? $target :
+                $target > $upSoc  ? $upSoc  :
+                $target < $lowSoc ? $lowSoc :
+                $target;
+
+      debugLog ($paref, 'batteryManagement', "SoC Bat $bn Step4 - basics -> docare: $docare, lowSoc: $lowSoc %, upSoc: $upSoc %");
+      debugLog ($paref, 'batteryManagement', "SoC Bat $bn Step4 - observe low/up limits -> Target: $target %");
+
+      ## auf 5er Schritte anpassen (40,45,50,...)
+      #############################################
+      my $flo = floor ($target / 5);
+      my $rmn = $target - ($flo * 5);
+      my $add = $rmn <= 2.5 ? 0 : 5;
+      $target = ($flo * 5) + $add;
+
+      debugLog ($paref, 'batteryManagement', "SoC Bat $bn Step5 - rounding the SoC to steps of 5 % -> Target: $target %");
+
+      ## Zwangsladeanforderung
+      ##########################
+      if ($batcharge < $target) {
+          $chargereq = 1;
+      }
+
+      debugLog ($paref, 'batteryManagement', "SoC Bat $bn Step6 - force charging request: ".
+                        ($chargereq ? 'yes (battery charge is below minimum SoC)' : 'no (Battery is sufficiently charged)'));
+
+      ## pvHistory/Readings schreiben
+      #################################
+      writeToHistory ( { paref => $paref, key => 'batsetsoc', val => $target, hour => 99 } );
+      storeReading   ('Battery_OptimumTargetSoC', $target.' %');
+      storeReading   ('Battery_ChargeRequest',      $chargereq);
+      
+      delete $paref->{batnmb};
+      delete $paref->{careCycle};
   }
-  else {
-      $nt = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-      $la = "calc care SoC -> use preliminary Target: $target % (care SoC calculation & activation postponed to after $nt)";
-  }
-
-  debugLog ($paref, 'batteryManagement', "SoC calc Step2 - basics -> docare: $docare, care SoC: $careSoc %, E expect: $pvexpect Wh, need for care SoC: $whneed Wh");
-  debugLog ($paref, 'batteryManagement', "SoC calc Step2 - $la");
-
-  ## Aufladewahrscheinlichkeit beachten
-  #######################################
-  my $csopt     = ReadingsNum ($name, 'Battery_OptimumTargetSoC', $lowSoc);                # aktuelles SoC Optimum
-  my $cantarget = sprintf "%.0f", (100 - (100 / $batinstcap) * $pvexpect);                 # berechneter max. möglicher Minimum-SOC nach Berücksichtigung Ladewahrscheinlichkeit
-  my $newtarget = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);           # Abgleich möglicher Minimum-SOC gg. berechneten Minimum-SOC
-  
-  debugLog ($paref, 'batteryManagement', "SoC calc Step3 - basics -> cantarget: $cantarget %, newtarget: $newtarget %");
-  
-  if ($newtarget > $careSoc) {
-      $docare = 0;                                                                         # keine Zwangsanwendung care SoC
-  }
-  else {
-      $newtarget = $careSoc;
-  }
-  
-  my $logadd     = '';
-
-  if ($newtarget > $csopt && $t > $delayts) {                                              # Erhöhung des SoC (wird ab Sonnenuntergang angewendet)
-      $target = $newtarget;
-      $logadd = "(new target > $csopt % and Sunset has passed)";
-  }
-  elsif ($newtarget > $csopt && $t <= $delayts && !$docare) {                              # bisheriges Optimum bleibt vorerst
-      $target = $csopt;
-      $nt     = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-      $logadd = "(new target $newtarget % is activated after $nt)";
-  }
-  elsif ($newtarget < $csopt) {                                                            # Targetminderung sofort umsetzen -> Freiplatz für Ladeprognose
-      $target = $newtarget;
-      $logadd = "(new target < current Target SoC $csopt)";
-  }
-  else {                                                                                   # bisheriges Optimum bleibt
-      $target = $newtarget;
-      $logadd = "(no change)";
-  }
-
-  debugLog ($paref, 'batteryManagement', "SoC calc Step3 - charging probability -> docare: $docare, Target: $target % ".$logadd);
-
-  ## low/up-Grenzen beachten
-  ############################
-  $target = $docare           ? $target :
-            $target > $upSoc  ? $upSoc  :
-            $target < $lowSoc ? $lowSoc :
-            $target;
-
-  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - basics -> docare: $docare, lowSoc: $lowSoc %, upSoc: $upSoc %");
-  debugLog ($paref, 'batteryManagement', "SoC calc Step4 - observe low/up limits -> Target: $target %");
-
-  ## auf 5er Schritte anpassen (40,45,50,...)
-  #############################################
-  my $flo = floor ($target / 5);
-  my $rmn = $target - ($flo * 5);
-  my $add = $rmn <= 2.5 ? 0 : 5;
-  $target = ($flo * 5) + $add;
-
-  debugLog ($paref, 'batteryManagement', "SoC calc Step5 - rounding the SoC to steps of 5 % -> Target: $target %");
-
-  ## Zwangsladeanforderung
-  ##########################
-  if ($batcharge < $target) {
-      $chargereq = 1;
-  }
-
-  debugLog ($paref, 'batteryManagement', "SoC calc Step6 - force charging request: ".
-                    ($chargereq ? 'yes (battery charge is below minimum SoC)' : 'no (Battery is sufficiently charged)'));
-
-  ## pvHistory/Readings schreiben
-  #################################
-  writeToHistory ( { paref => $paref, key => 'batsetsoc', val => $target, hour => 99 } );
-  storeReading   ('Battery_OptimumTargetSoC', $target.' %');
-  storeReading   ('Battery_ChargeRequest',      $chargereq);
 
 return;
 }
@@ -9579,12 +9617,12 @@ return ($lowSoc, $upSoc, $maxsoc, $careCycle);
 sub __batSaveSocKeyFigures {
   my $paref     = shift;
   my $name      = $paref->{name};
-  my $type      = $paref->{type};
+  my $bn        = $paref->{batnmb};                                                       # Batterienummer (01, 02, ...)
   my $t         = $paref->{t};                                                            # aktuelle Zeit
-  my $careCycle = $paref->{careCycle} // $carecycledef;
+  my $careCycle = $paref->{careCycle};
 
   if (defined $paref->{days2care}) {
-      $data{$name}{circular}{99}{days2care} = $paref->{days2care};                        # verbleibende Tage bis zum Pflege-SoC erreicht werden soll
+      $data{$name}{circular}{99}{'days2care'.$bn} = $paref->{days2care};                  # verbleibende Tage bis zum Pflege-SoC erreicht werden soll
       return;
   }
 
@@ -12276,8 +12314,9 @@ sub _genStatisticReadings {
               storeReading ('statistic_'.$kpi, $rtaitr);
           }
 
-          if ($kpi eq 'daysUntilBatteryCare') {
-              my $d2c = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'days2care', $def);
+          if ($kpi =~ /daysUntilBatteryCare_/xs) {
+              my $bn = (split "_", $kpi)[1];                                                          # Batterienummer extrahieren
+              my $d2c = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'days2care'.$bn, $def);
 
               storeReading ('statistic_'.$kpi, $d2c);
           }
@@ -12300,26 +12339,28 @@ sub _genStatisticReadings {
               storeReading ('statistic_'.$kpi, (sprintf "%.1f", $dgcon).' Wh');
           }
 
-          if ($kpi eq 'todayBatIn') {
-              my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot', $def);     # initialer Tagesstartwert Batterie In total
-              my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot',   $def);          # aktuelles total Batterie In
+          if ($kpi =~ /todayBatIn_/xs) {
+              my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
+              my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot'.$bn, $def);     # initialer Tagesstartwert Batterie In total
+              my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot'.$bn,   $def);          # aktuell total Batterieladung (Wh)
 
               my $dbi = $cbitot - $idbitot;
 
               storeReading ('statistic_'.$kpi, (sprintf "%.1f", $dbi).' Wh');
           }
 
-          if ($kpi eq 'todayBatOut') {
-              my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot', $def);     # initialer Tagesstartwert Batterie Out total
-              my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot',   $def);          # aktuelles total Batterie Out
+          if ($kpi =~ /todayBatOut_/xs) {
+              my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
+              my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot'.$bn, $def);    # initialer Tagesstartwert Batterie Out total
+              my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot'.$bn,   $def);         # aktuelles total Batterie Out
 
               my $dbo = $cbotot - $idbotot;
 
               storeReading ('statistic_'.$kpi, (sprintf "%.1f", $dbo).' Wh');
           }
 
-          if ($kpi eq 'dayAfterTomorrowPVforecast') {                                                  # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
-              my $dayaftertomorrow = strftime "%Y-%m-%d", localtime($t + 172800);                      # Datum von Übermorgen
+          if ($kpi eq 'dayAfterTomorrowPVforecast') {                                                      # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
+              my $dayaftertomorrow = strftime "%Y-%m-%d", localtime($t + 172800);                          # Datum von Übermorgen
               my @allstrings       = split ",", AttrVal ($name, 'setupInverterStrings', '');
               my $fcsumdat         = 0;
               my $type             = $paref->{type};
@@ -16736,15 +16777,10 @@ sub listDataPool {
           my $ydayDvtn = CircularVal ($hash, $idx, 'ydayDvtn',            '-');
           my $ltsmsr   = CircularVal ($hash, $idx, 'lastTsMaxSocRchd',    '-');
           my $ntsmsc   = CircularVal ($hash, $idx, 'nextTsMaxSocChge',    '-');
-          my $dtocare  = CircularVal ($hash, $idx, 'days2care',           '-');
           my $fitot    = CircularVal ($hash, $idx, 'feedintotal',         '-');
           my $idfi     = CircularVal ($hash, $idx, 'initdayfeedin',       '-');
           my $gcontot  = CircularVal ($hash, $idx, 'gridcontotal',        '-');
           my $idgcon   = CircularVal ($hash, $idx, 'initdaygcon',         '-');
-          my $idbitot  = CircularVal ($hash, $idx, 'initdaybatintot',     '-');
-          my $bitot    = CircularVal ($hash, $idx, 'batintot',            '-');
-          my $idbotot  = CircularVal ($hash, $idx, 'initdaybatouttot',    '-');
-          my $botot    = CircularVal ($hash, $idx, 'batouttot',           '-');
           my $rtaitr   = CircularVal ($hash, $idx, 'runTimeTrainAI',      '-');
           my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
           my $airn     = CircularVal ($hash, $idx, 'aiRulesNumber',       '-');
@@ -16759,23 +16795,18 @@ sub listDataPool {
           $sq .= "\n" if($sq);
 
           if ($idx != 99) {
+              my $prdl;
+              for my $pn (1..$maxproducer) {                                              # alle Producer
+                  $pn       = sprintf "%02d", $pn;
+                  my $pprl  = CircularVal ($hash, $idx, 'pprl'.$pn, '-'); 
+                  $prdl    .= ', ' if($prdl);
+                  $prdl    .= "pprl${pn}: $pprl";
+              }
+              
               $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl\n";
               $sq .= "      batin: $batin, batout: $batout, confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c\n";
               $sq .= "      temp: $temp, wid: $wid, wtxt: $wtxt\n";
-              
-              my $prdl;
-              for my $pn (1..$maxproducer) {                                              # + alle Producer
-                  $pn       = sprintf "%02d", $pn;
-                  my $pprl  = CircularVal ($hash, $idx, 'pprl'.$pn, '-');
-                  
-                  if (defined $pprl) {
-                      $prdl .= ', ' if($prdl);
-                      $prdl .= "pprl${pn}: $pprl";
-                  }
-              }
-              
-              $sq .= "      $prdl\n" if($prdl);
-
+              $sq .= "      $prdl\n";
               $sq .= "      pvcorrf: $pvcf\n";
               $sq .= "      quality: $cfq\n";
               $sq .= "      pvrlsum: $pvrs\n";
@@ -16783,12 +16814,43 @@ sub listDataPool {
               $sq .= "      dnumsum: $dnus";
           }
           else {
+              my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7);
+              for my $bn (1..$maxbatteries) {                                            # alle Batterien
+                  $bn = sprintf "%02d", $bn;
+                  my $idbintot = CircularVal ($hash, $idx, 'initdaybatintot'. $bn, '-');
+                  my $idboutot = CircularVal ($hash, $idx, 'initdaybatouttot'.$bn, '-');
+                  my $bintot   = CircularVal ($hash, $idx, 'batintot'.        $bn, '-');
+                  my $boutot   = CircularVal ($hash, $idx, 'batouttot'.       $bn, '-');
+                  my $lstmsr   = CircularVal ($hash, $idx, 'lastTsMaxSocRchd'.$bn, '-');
+                  my $ntsmsc   = CircularVal ($hash, $idx, 'nextTsMaxSocChge'.$bn, '-');
+                  my $dtocare  = CircularVal ($hash, $idx, 'days2care'.       $bn, '-');
+                  $batvl1     .= ', ' if($batvl1);
+                  $batvl1     .= "initdaybatintot${bn}: $idbintot";
+                  $batvl2     .= ', ' if($batvl2);
+                  $batvl2     .= "initdaybatouttot${bn}: $idboutot";
+                  $batvl3     .= ', ' if($batvl3);
+                  $batvl3     .= "batintot${bn}: $bintot";
+                  $batvl4     .= ', ' if($batvl4);
+                  $batvl4     .= "batouttot${bn}: $boutot";
+                  $batvl5     .= ', ' if($batvl5);
+                  $batvl5     .= "lastTsMaxSocRchd${bn}: $lstmsr";
+                  $batvl6     .= ', ' if($batvl6);
+                  $batvl6     .= "nextTsMaxSocChge${bn}: $ntsmsc";
+                  $batvl7     .= ', ' if($batvl7);
+                  $batvl7     .= "days2care${bn}: $dtocare";
+              }
+              
               $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn \n";
               $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi \n";
               $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon \n";
-              $sq .= "      batintot: $bitot, initdaybatintot: $idbitot \n";
-              $sq .= "      batouttot: $botot, initdaybatouttot: $idbotot \n";
-              $sq .= "      lastTsMaxSocRchd: $ltsmsr, nextTsMaxSocChge: $ntsmsc, days2care: $dtocare \n";
+              $sq .= "      $batvl1\n";
+              $sq .= "      $batvl2\n";
+              $sq .= "      $batvl3\n";
+              $sq .= "      $batvl4\n";
+              $sq .= "      $batvl5\n";
+              $sq .= "      $batvl6\n";
+              $sq .= "      $batvl7\n";
+              $sq .= "      lastTsMaxSocRchd: $ltsmsr, nextTsMaxSocChge: $ntsmsc \n";
               $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, aiRulesNumber: $airn \n";
               $sq .= "      attrInvChangedTs: $aicts \n";
           }
@@ -19602,7 +19664,7 @@ return;
 #             confc       - Vorhersage Hausverbrauch (Wh)
 #             gcons       - realer Netzbezug
 #             gfeedin     - reale Netzeinspeisung
-#             batintotal  - totale Batterieladung (Wh)
+#             batintotal  - totale Batterieladung (Wh) zu Beginn der Stunde
 #             batin       - Batterieladung der Stunde (Wh)
 #             batouttotal - totale Batterieentladung (Wh)
 #             batout      - Batterieentladung der Stunde (Wh)
@@ -19652,37 +19714,37 @@ return $def;
 #    CircularVal ($hash or $name, $hod, $key, $def)
 #
 #    $hod: Stunde des Tages (01,02,...,24) bzw. 99 (besondere Verwendung)
-#    $key:    pvrl             - realer PV Ertrag
-#             pvfc             - PV Vorhersage
-#             pvrlsum          - Summe PV Ertrag über die gesamte Laufzeit
-#             pvfcsum          - Summe PV Prognose über die gesamte Laufzeit
-#             dnumsum          - Anzahl der Tage der Durchschnittsberechnung über die gesamte Laufzeit
-#             confc            - Vorhersage Hausverbrauch (Wh)
-#             gcons            - realer Netzbezug
-#             gfeedin          - reale Netzeinspeisung
-#             batin            - Batterieladung (Wh)
-#             batout           - Batterieentladung (Wh)
-#             weatherid        - DWD Wetter id
-#             weathertxt       - DWD Wetter Text
-#             wcc              - DWD Wolkendichte
-#             rr1c             - Gesamtniederschlag (1-stündig) letzte 1 Stunde kg/m2
-#             temp             - Außentemperatur
-#             pvcorrf          - PV Autokorrekturfaktoren (HASH),
+#    $key:    pvrl               - realer PV Ertrag
+#             pvfc               - PV Vorhersage
+#             pvrlsum            - Summe PV Ertrag über die gesamte Laufzeit
+#             pvfcsum            - Summe PV Prognose über die gesamte Laufzeit
+#             dnumsum            - Anzahl der Tage der Durchschnittsberechnung über die gesamte Laufzeit
+#             confc              - Vorhersage Hausverbrauch (Wh)
+#             gcons              - realer Netzbezug
+#             gfeedin            - reale Netzeinspeisung
+#             batin              - Batterieladung (Wh)
+#             batout             - Batterieentladung (Wh)
+#             weatherid          - DWD Wetter id
+#             weathertxt         - DWD Wetter Text
+#             wcc                - DWD Wolkendichte
+#             rr1c               - Gesamtniederschlag (1-stündig) letzte 1 Stunde kg/m2
+#             temp               - Außentemperatur
+#             pvcorrf            - PV Autokorrekturfaktoren (HASH),
 #                                - <Sonne Altitude>.<Cloudcover>
-#             lastTsMaxSocRchd - Timestamp des letzten Erreichens von SoC >= maxSoC
-#             nextTsMaxSocChge - Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
-#             days2care        - verbleibende Tage bis der Batterie Pflege-SoC (default $maxSoCdef) erreicht sein soll
-#             tdayDvtn         - heutige Abweichung PV Prognose/Erzeugung in %
-#             ydayDvtn         - gestrige Abweichung PV Prognose/Erzeugung in %
-#             initdayfeedin    - initialer Wert für "gridfeedin" zu Beginn des Tages (Wh)
-#             feedintotal      - Einspeisung PV Energie total (Wh)
-#             initdaygcon      - initialer Wert für "gcon" zu Beginn des Tages (Wh)
-#             initdaybatintot  - initialer Wert für Batterie intotal zu Beginn des Tages (Wh)
-#             batintot         - Batterie intotal (Wh)
-#             initdaybatouttot - initialer Wert für Batterie outtotal zu Beginn des Tages (Wh)
-#             batouttot        - Batterie outtotal (Wh)
-#             gridcontotal     - Netzbezug total (Wh)
-#             aiRulesNumber    - Anzahl der Regeln in der trainierten KI-Instanz
+#             lastTsMaxSocRchd   - Timestamp des letzten Erreichens von SoC >= maxSoC
+#             nextTsMaxSocChge   - Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
+#             days2careXX        - verbleibende Tage bis der Batterie XX Pflege-SoC (default $maxSoCdef) erreicht sein soll
+#             tdayDvtn           - heutige Abweichung PV Prognose/Erzeugung in %
+#             ydayDvtn           - gestrige Abweichung PV Prognose/Erzeugung in %
+#             initdayfeedin      - initialer Wert für "gridfeedin" zu Beginn des Tages (Wh)
+#             feedintotal        - Einspeisung PV Energie total (Wh)
+#             initdaygcon        - initialer Wert für "gcon" zu Beginn des Tages (Wh)
+#             initdaybatintotXX  - initialer Wert für Batterie intotal zu Beginn des Tages (Wh)
+#             batintotXX         - aktuell total Batterieladung XX (Wh)
+#             initdaybatouttotXX - initialer Wert für Batterie outtotal zu Beginn des Tages (Wh)
+#             batouttotXX        - aktuell total Batterieentladung (Wh)
+#             gridcontotal       - Netzbezug total (Wh)
+#             aiRulesNumber      - Anzahl der Regeln in der trainierten KI-Instanz
 #
 #    $def: Defaultwert
 #
@@ -21100,10 +21162,10 @@ to ensure that the system configuration is correct.
             <tr><td> <b>attrInvChangedTs</b>    </td><td>Timestamp of the last change to the inverter device definition                                                        </td></tr>
             <tr><td> <b>batin</b>               </td><td>Battery charge (Wh)                                                                                                   </td></tr>
             <tr><td> <b>batout</b>              </td><td>Battery discharge (Wh)                                                                                                </td></tr>
-            <tr><td> <b>batouttot</b>           </td><td>total energy drawn from the battery (Wh)                                                                              </td></tr>
-            <tr><td> <b>batintot</b>            </td><td>total energy charged into the battery (Wh)                                                                            </td></tr>
+            <tr><td> <b>batouttotXX</b>         </td><td>total energy drawn from the battery XX (Wh)                                                                              </td></tr>
+            <tr><td> <b>batintotXX</b>          </td><td>current total energy charged into the battery XX (Wh)                                                                 </td></tr>
             <tr><td> <b>confc</b>               </td><td>expected energy consumption (Wh)                                                                                      </td></tr>
-            <tr><td> <b>days2care</b>           </td><td>remaining days until the battery maintenance SoC (default 95%) is reached                                             </td></tr>
+            <tr><td> <b>days2careXX</b>         </td><td>remaining days until the battery XX maintenance SoC (default 95%) is reached                                          </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Number of days per cloudy area over the entire term                                                                   </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>total PV energy fed into the public grid (Wh)                                                                         </td></tr>
             <tr><td> <b>gcon</b>                </td><td>real power drawn from the electricity grid                                                                            </td></tr>
@@ -21111,8 +21173,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>gridcontotal</b>        </td><td>total energy drawn from the public grid (Wh)                                                                          </td></tr>
             <tr><td> <b>initdayfeedin</b>       </td><td>initial PV feed-in value at the beginning of the current day (Wh)                                                     </td></tr>
             <tr><td> <b>initdaygcon</b>         </td><td>initial grid reference value at the beginning of the current day (Wh)                                                 </td></tr>
-            <tr><td> <b>initdaybatintot</b>     </td><td>initial value of the total energy charged into the battery at the beginning of the current day. (Wh)                  </td></tr>
-            <tr><td> <b>initdaybatouttot</b>    </td><td>initial value of the total energy drawn from the battery at the beginning of the current day. (Wh)                    </td></tr>
+            <tr><td> <b>initdaybatintotXX</b>   </td><td>initial value of the total energy charged into the battery XX at the beginning of the current day. (Wh)               </td></tr>
+            <tr><td> <b>initdaybatouttotXX</b>  </td><td>initial value of the total energy drawn from the battery XX at the beginning of the current day. (Wh)                 </td></tr>
             <tr><td> <b>lastTsMaxSocRchd</b>    </td><td>Timestamp of last achievement of battery SoC >= maxSoC (default 95%)                                                  </td></tr>
             <tr><td> <b>nextTsMaxSocChge</b>    </td><td>Timestamp by which the battery should reach maxSoC at least once                                                      </td></tr>
             <tr><td> <b>pvapifc</b>             </td><td>expected PV generation (Wh) of the API used                                                                           </td></tr>
@@ -21838,7 +21900,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>currentAPIinterval</b>         </td><td>the current polling interval of the selected radiation data API in seconds                                           </td></tr>
             <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>the running time (minutes) of the consumer "XX" since the last switch-on. (last running cycle)                       </td></tr>
             <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>provides the forecast of PV generation for the day after tomorrow (if available) without autocorrection (raw data)   </td></tr>
-            <tr><td> <b>daysUntilBatteryCare</b>       </td><td>Days until the next battery maintenance (reaching the charge 'maxSoC' from attribute ctrlBatSocManagement)           </td></tr>
+            <tr><td> <b>daysUntilBatteryCare_XX</b>    </td><td>Days until the next battery XX maintenance (reaching the charge 'maxSoC' from attribute ctrlBatSocManagement)        </td></tr>
             <tr><td> <b>lastretrieval_time</b>         </td><td>the last retrieval time of the selected radiation data API                                                           </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>    </td><td>the timestamp of the last retrieval time of the selected radiation data API                                          </td></tr>
             <tr><td> <b>response_message</b>           </td><td>the last status message of the selected radiation data API                                                           </td></tr>
@@ -21859,8 +21921,8 @@ to ensure that the system configuration is correct.
             <tr><td>                                   </td><td>A call can contain multiple API requests.                                                                            </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>the number of radiation data API calls still possible on the current day                                             </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>the number of radiation data API requests still possible on the current day                                          </td></tr>
-            <tr><td> <b>todayBatIn</b>                 </td><td>the energy charged into the battery on the current day                                                               </td></tr>
-            <tr><td> <b>todayBatOut</b>                </td><td>the energy taken from the battery on the current day                                                                 </td></tr>
+            <tr><td> <b>todayBatInXX</b>               </td><td>the energy charged into the battery XX on the current day                                                            </td></tr>
+            <tr><td> <b>todayBatOutXX</b>              </td><td>the energy taken from the battery XX on the current day                                                              </td></tr>
          </table>
          </ul>
        <br>
@@ -23554,10 +23616,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>attrInvChangedTs</b>    </td><td>Zeitstempel der letzten Änderung der Inverter Gerätedefinition                                                            </td></tr>
             <tr><td> <b>batin</b>               </td><td>Batterieladung (Wh)                                                                                                       </td></tr>
             <tr><td> <b>batout</b>              </td><td>Batterieentladung (Wh)                                                                                                    </td></tr>
-            <tr><td> <b>batouttot</b>           </td><td>total aus der Batterie entnommene Energie (Wh)                                                                            </td></tr>
-            <tr><td> <b>batintot</b>            </td><td>total in die Batterie geladene Energie (Wh)                                                                               </td></tr>
+            <tr><td> <b>batouttotXX</b>         </td><td>aktuell total aus der Batterie XX entnommene Energie (Wh)                                                                 </td></tr>
+            <tr><td> <b>batintotXX</b>          </td><td>aktuell total in die Batterie XX geladene Energie (Wh)                                                                    </td></tr>
             <tr><td> <b>confc</b>               </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
-            <tr><td> <b>days2care</b>           </td><td>verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll                                            </td></tr>
+            <tr><td> <b>days2careXX</b>         </td><td>verbleibende Tage bis der Batterie XX Pflege-SoC (default 95%) erreicht sein soll                                         </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit                                                               </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
             <tr><td> <b>gcon</b>                </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
@@ -23565,8 +23627,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>gridcontotal</b>        </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                         </td></tr>
             <tr><td> <b>initdayfeedin</b>       </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                             </td></tr>
             <tr><td> <b>initdaygcon</b>         </td><td>initialer Netzbezugswert zu Beginn des aktuellen Tages (Wh)                                                               </td></tr>
-            <tr><td> <b>initdaybatintot</b>     </td><td>initialer Wert der total in die Batterie geladenen Energie zu Beginn des aktuellen Tages (Wh)                             </td></tr>
-            <tr><td> <b>initdaybatouttot</b>    </td><td>initialer Wert der total aus der Batterie entnommenen Energie zu Beginn des aktuellen Tages (Wh)                          </td></tr>
+            <tr><td> <b>initdaybatintotXX</b>   </td><td>initialer Wert der total in die Batterie XX geladenen Energie zu Beginn des aktuellen Tages (Wh)                          </td></tr>
+            <tr><td> <b>initdaybatouttotXX</b>  </td><td>initialer Wert der total aus der Batterie XX entnommenen Energie zu Beginn des aktuellen Tages (Wh)                       </td></tr>
             <tr><td> <b>lastTsMaxSocRchd</b>    </td><td>Timestamp des letzten Erreichens von Batterie SoC >= maxSoC (default 95%)                                                 </td></tr>
             <tr><td> <b>nextTsMaxSocChge</b>    </td><td>Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll                                                 </td></tr>
             <tr><td> <b>pvapifc</b>             </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                                                           </td></tr>
@@ -24292,7 +24354,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der gewählten Strahlungsdaten-API in Sekunden                                       </td></tr>
             <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>die Laufzeit (Minuten) des Verbrauchers "XX" seit dem letzten Einschalten. (letzter Laufzyklus)                 </td></tr>
             <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>liefert die Vorhersage der PV Erzeugung für Übermorgen (sofern verfügbar) ohne Autokorrektur (Rohdaten).        </td></tr>
-            <tr><td> <b>daysUntilBatteryCare</b>       </td><td>Tage bis zur nächsten Batteriepflege (Erreichen der Ladung 'maxSoC' aus Attribut ctrlBatSocManagement)          </td></tr>
+            <tr><td> <b>daysUntilBatteryCare_XX</b>    </td><td>Tage bis zur nächsten Batterie XX Pflege (Erreichen der Ladung 'maxSoC' aus Attribut ctrlBatSocManagement)      </td></tr>
             <tr><td> <b>lastretrieval_time</b>         </td><td>der letzte Abrufzeitpunkt der gewählten Strahlungsdaten-API                                                     </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>    </td><td>der Timestamp der letzen Abrufzeitpunkt der gewählten Strahlungsdaten-API                                       </td></tr>
             <tr><td> <b>response_message</b>           </td><td>die letzte Statusmeldung der gewählten Strahlungsdaten-API                                                      </td></tr>
@@ -24313,8 +24375,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                   </td><td>Ein Call kann mehrere API Requests enthalten.                                                                   </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Calls                                        </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Requests                                     </td></tr>
-            <tr><td> <b>todayBatIn</b>                 </td><td>die am aktuellen Tag in die Batterie geladene Energie                                                           </td></tr>
-            <tr><td> <b>todayBatOut</b>                </td><td>die am aktuellen Tag aus der Batterie entnommene Energie                                                        </td></tr>
+            <tr><td> <b>todayBatInXX</b>               </td><td>die am aktuellen Tag in die Batterie XX geladene Energie                                                        </td></tr>
+            <tr><td> <b>todayBatOutXX</b>              </td><td>die am aktuellen Tag aus der Batterie XX entnommene Energie                                                     </td></tr>
          </table>
          </ul>
        <br>
