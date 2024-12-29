@@ -1020,8 +1020,8 @@ sub AggrIntDoIf
           $num++;
           push (@devices,$devname);
         } elsif (defined $value) {
+          $num++;
           if ($type eq "sum" or $type eq "average") {
-            $num++;
             push (@devices,$devname);
             $sum+=$number;
           } elsif ($type eq "max") {
@@ -1035,7 +1035,6 @@ sub AggrIntDoIf
                 @devices=($devname);
               }
           } elsif ($type eq "median") {
-            $num++;
             push @median_values, $number;
             push (@devices,$devname);
           }
@@ -7409,6 +7408,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_Indirekten_Zeitangaben">Indirekten Zeitangaben</a><br>
   <a href="#DOIF_Zeitsteuerung_mit_Zeitberechnung">Zeitsteuerung mit Zeitberechnung</a><br>
   <a href="#DOIF_Intervall-Timer">Intervall-Timer</a><br>
+  <a href="#DOIF_Zeitsteuerung_alle_X_Tage">Zeittrigger alle X Tage</a><br>
   <a href="#DOIF_Kombination_von_Ereignis_und_Zeitsteuerung_mit_logischen_Abfragen">Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</a><br>
   <a href="#DOIF_Zeitintervalle_Readings_und_Status_ohne_Trigger">Zeitintervalle, Readings und Status ohne Trigger</a><br>
   <a href="#DOIF_Nutzung_von_Readings_Status_oder_Internals_im_Ausfuehrungsteil">Nutzung von Readings, Status oder Internals im Ausführungsteil</a><br>
@@ -8259,7 +8259,7 @@ DOELSEIF ([([23:00]+int(rand(600)))])<br>
 <br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
 <code>define di_light DOIF<br>
-{[({sunset()}+900+int(rand(600)))];fhem_set"lamp on"}<br>
+{[({sunset()}+900+int(rand(600)))];;fhem_set"lamp on"}<br>
 {[([23:00]+int(rand(600)))];;fhem_set"lamp off"}<br>
 </code><br>
 <br>
@@ -8293,7 +8293,7 @@ Für die Zeitberechnung wird der Perlinterpreter benutzt, daher sind für die Be
 <br>
 Syntax:<br>
 <br>
-[<code>&lt;begin&gt-&lt;end&gt,&lt;relative timer&gt]</code><br>
+<code>[&lt;begin&gt-&lt;end&gt,&lt;relative timer&gt]</code><br>
 <br>
 Innerhalb des definierten Zeitintervalls, triggert der definierte Timer. Außerhalb des Zeitintervall wird kein Timer gesetzt.<br>
 <br>
@@ -8303,7 +8303,7 @@ Innerhalb des definierten Zeitintervalls, triggert der definierte Timer. Außerh
 attr di_pump do always </code><br>
 <br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
-<code>define di_pump DOIF {[08:00-22:00,+:30];fhem_set"pump on-for-timer 300"}</code><br>
+<code>define di_pump DOIF {[08:00-22:00,+:30];;fhem_set"pump on-for-timer 300"}</code><br>
 <br>
 Es wird um 08:00, 08:30, 09:00, ..., 21:30 Uhr die Anweisung ausgeführt. Um 22:00 wird das letzte Mal getriggert, das Zeitintervall ist zu diesem Zeitpunkt nicht mehr wahr.<br>
 <br>
@@ -8313,7 +8313,24 @@ Es lassen sich ebenso indirekte Timer, Timer-Funktionen, Zeitberechnungen sowie 
 attr di_rand_lamp do always</code><br>
 <br>
 <a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
-<code>define di_rand_lamp DOIF {[{sunset()}-[end:state],+(rand(600)+900)|Sa So];fhem_set"lamp on-for-timer 300"}</code><br>
+<code>define di_rand_lamp DOIF {[{sunset()}-[end:state],+(rand(600)+900)|Sa So];;fhem_set"lamp on-for-timer 300"}</code><br>
+<br>
+<a name="DOIF_Zeitsteuerung_alle_X_Tage"></a><br>
+<b>Zeittrigger alle X Tage</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+Mit Hilfe der Zeitberechnung kann ein Zeitpunkt statt täglich alle X Tage triggern.<br>
+<br>
+Syntax:<br>
+<br>
+<code>[([&lt;time&gt;]+&lt;days&gt;*[24:00])]</code><br>
+<br>
+<u>Anwendungsbeispiel</u>: Alle zwei Tage sollen Pflanzen um 21:00 Uhr gewässert werden:<br>
+<br>
+<code>define di_water_plants DOIF ([([21:00]+2*[24:00])])(set water on-for-timer 60)<br>
+attr di_water_plants do always </code><br>
+<br>
+<a href="#DOIF_Perl_Modus"><b>Perl-Modus</b>:</a><br>
+<code>define di_water_plants DOIF {[([21:00]+2*[24:00])];;fhem_set"water on-for-timer 60"}</code><br>
 <br>
 <a name="DOIF_Kombination_von_Ereignis_und_Zeitsteuerung_mit_logischen_Abfragen"></a><br>
 <b>Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
