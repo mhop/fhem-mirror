@@ -838,15 +838,21 @@ FileLog_Get($@)
   } else {
     my $linf;
     if($inf eq "CURRENT") {
-      if($from =~ m/^(....-..-..)_(..:..:..)/) { 
-        my ($from_ymd, $from_hms) = ($1,$2);
+      my ($from_ymd, $from_hms);
+      if($from =~ m/^(....-..-..)$/ ||
+         $from =~ m/^(....-..-..)_(..:..:..)/)  {
+
+        my $from_ymd = $1;
+        my $from_hms = $2 ? $2 : "00:00:00";
         $linf = ResolveDateWildcards($hash->{logfile},
                         localtime(time_str2num("$from_ymd $from_hms")));
 
         if(AttrVal($name, "createGluedFile", 0)) {
           $to = (split(" ", TimeNow()))[0] if($to eq "9"); # Special
-          if($to =~ m/^(....-..-..)_(..:..:..)/) {
-            my ($to_ymd, $to_hms) = ($1,$2);
+          if($to =~ m/^(....-..-..)$/ ||
+             $to =~ m/^(....-..-..)_(..:..:..)/) {
+            my $to_ymd = $1;
+            my $to_hms = $2 ? $2 : "23:59:59";
             my $linf_to = ResolveDateWildcards($hash->{logfile},
                             localtime(time_str2num("$to_ymd $to_hms")));
             if($linf ne $linf_to){  # append each file into a temporary one
