@@ -49,7 +49,6 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                       
 use FHEM::SynoModules::SMUtils qw(
                                   getClHash
                                   delClHash
-                                  delHashRefDeep
                                   trim
                                   moduleVersion
                                   sortVersion
@@ -193,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.5" => "30.12.2024  remove delHashRefDeep ",
   "9.12.4" => "15.12.2024  fix Attr pollcaminfoall ",
   "9.12.3" => "08.12.2024  rollout delHashRefDeep, edit comref, internal code changed, replace some special data by local owndata ",
   "9.12.2" => "26.11.2024  Bugfix PATH in hvada & hsimu ",
@@ -1100,7 +1100,6 @@ sub Delete {
 
     CommandDelete($hash->{CL},"TYPE=SSCamSTRM:FILTER=PARENT=$name");   # alle zugeordneten Streaming-Devices löschen falls vorhanden
 
-    delHashRefDeep ($data{SSCam}{$name});
     delete $data{SSCam}{$name};                                        # internen Cache löschen
 
 return;
@@ -1458,7 +1457,6 @@ sub Attr {
                     cache ($name, "c_destroy");                                                # CHI-Cache löschen/entfernen
                 }
                 else {
-                    delHashRefDeep ($data{SSCam}{$name});
                     delete $data{SSCam}{$name};                                                # internen Cache löschen
                 }
             }
@@ -5953,7 +5951,6 @@ sub camOp_Parse {
                 my $ret             = q{};
                 $ret                = &{$hparse{$OpMode}{fn}} ($params);
 
-                delHashRefDeep ($owndata{TMPDA});
                 delete $owndata{TMPDA};
                 
                 return if($ret);
@@ -6044,7 +6041,6 @@ sub camOp_Parse {
                 $hash->{HELPER}{HLSSTREAM} = "inactive";
                 Log3($name, 3, "$name - HLS Streaming of camera \"$name\" deactivated for reactivation");
                 
-                delHashRefDeep ($owndata{TMPDA});
                 delete $owndata{TMPDA};
                 
                 delActiveToken ($hash);                                                                 # Token freigeben vor hlsactivate
@@ -6063,7 +6059,6 @@ sub camOp_Parse {
                    Log3 ($name, 2, "$name - Snap-ID \"LastSnapId\" isn't set. Filename can't be retrieved");
                    delActiveToken ($hash);                                                              # Token freigeben vor hlsactivate
                    
-                   delHashRefDeep ($owndata{TMPDA});
                    delete $owndata{TMPDA};
                    
                    return;
@@ -6156,7 +6151,6 @@ sub camOp_Parse {
             if ($errorcode =~ /105/x) {
                Log3 ($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
                
-               delHashRefDeep ($owndata{TMPDA});
                delete $owndata{TMPDA};
                
                return login ($hash, $hash->{HELPER}{API}, \&camOp);
@@ -6165,7 +6159,6 @@ sub camOp_Parse {
             Log3 ($name, 2, "$name - ERROR - Operation $OpMode not successful. Cause: $errorcode - $error");
        }
 
-       delHashRefDeep ($owndata{TMPDA});
        delete $owndata{TMPDA};
    }
 
@@ -7321,7 +7314,6 @@ sub __saveLastSnapToCache {
   my $paref = shift;
   my $name  = $paref->{name};
 
-  delHashRefDeep ($data{SSCam}{$name}{LASTSNAP});
   delete $data{SSCam}{$name}{LASTSNAP};
   
   return if(!exists $owndata{TMPDA}->{data}{data}[0]{imageData});                  # kein Snap vorhanden
@@ -7483,7 +7475,6 @@ sub __insertSnapsToCache {
 
   my ($cache, $createdTm);
   
-  delHashRefDeep ($data{SSCam}{$name}{SNAPHASH});
   delete $data{SSCam}{$name}{SNAPHASH};                                                             # vorhandenen Snaphash löschen
 
   while ($owndata{TMPDA}{'data'}{'data'}[$i]) {
@@ -8397,7 +8388,6 @@ sub _streamDevLASTSNAP {                                       ## no critic 'not
       $ret .= "<td> <br> <b> $cause </b> <br><br></td>";
   }
 
-  delHashRefDeep ($data{SSCam}{$camname}{TMPLSN});
   delete $data{SSCam}{$camname}{TMPLSN};
 
 return $ret;
@@ -9879,7 +9869,6 @@ sub prepareSendData {
        my $cache = cache($name, "c_init");                                                    # Cache initialisieren (im SVS Device)
 
        if (!$cache || $cache eq "internal" ) {
-           delHashRefDeep ($owndata{RS});
            delete $owndata{RS};
 
            for my $key (keys %{$asref}) {                                                     # Referenz zum summarischen Hash einsetzen
@@ -11765,25 +11754,21 @@ sub cleanData {
   if (AttrVal ($name, 'cacheType', 'internal') eq 'internal') {                                # internes Caching
       if ($tac) {
           if (exists $owndata{RS}{$tac}) {
-              delHashRefDeep ($owndata{RS}{$tac});
               delete $owndata{RS}{$tac};
               $del = 1;
           }
 
           if (exists $owndata{SENDRECS}{$tac}) {
-              delHashRefDeep ($owndata{SENDRECS}{$tac});
               delete $owndata{SENDRECS}{$tac};
               $del = 1;
           }
 
           if (exists $owndata{SENDSNAPS}{$tac}) {
-              delHashRefDeep ($owndata{SENDSNAPS}{$tac});
               delete $owndata{SENDSNAPS}{$tac};
               $del = 1;
           }
 
           if (exists $owndata{PARAMS}{$tac}) {
-              delHashRefDeep ($owndata{PARAMS}{$tac});
               delete $owndata{PARAMS}{$tac};
               $del = 1;
           }
@@ -11797,15 +11782,9 @@ sub cleanData {
               }
           }
           
-          delHashRefDeep ($owndata{SENDCOUNT}{$tac});
           delete $owndata{SENDCOUNT}{$tac};
       }
-      else {
-          delHashRefDeep ($owndata{RS});
-          delHashRefDeep ($owndata{SENDRECS});
-          delHashRefDeep ($owndata{SENDSNAPS});
-          delHashRefDeep ($owndata{PARAMS});
-          
+      else {          
           delete $owndata{RS};
           delete $owndata{SENDRECS};
           delete $owndata{SENDSNAPS};
