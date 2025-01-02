@@ -33,6 +33,9 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.29.2" => "31.12.2024  fix Bug STP X, fix STP TypeName",
+  "2.29.1" => "14.12.2024  bat_pwr whith detail-level 0, fix detail-level 0 bug",
+  "2.29.0" => "09.12.2024  get Data detail-level",
   "2.28.3" => "01.12.2024  code optimized, remove given",
   "2.28.2" => "16.11.2024  code optimized, remove switch",
   "2.28.1" => "15.11.2024  code optimized",
@@ -332,9 +335,10 @@ my %SMAInverter_devtypes = (
 19049 => "STP6.0SE (SUNNY TRIPOWER 6.0 SE)",
 19050 => "STP8.0SE (SUNNY TRIPOWER 8.0 SE)",
 19051 => "STP10.0SE (SUNNY TRIPOWER 10.0 SE)",
-9490 => "STP X 50-12 (SUNNY TRIPOWER X 50-12)",
+9492 => "STP X 50-12 (SUNNY TRIPOWER X 50-12)",
 9491 => "STP X 50-15 (SUNNY TRIPOWER X 50-15)",
-9492 => "STP X 50-20 (SUNNY TRIPOWER X 50-20)",
+9490 => "STP X 50-17 (SUNNY TRIPOWER X 50-17)",
+9489 => "STP X 50-20 (SUNNY TRIPOWER X 50-20)",
 9488 => "STP X 50-25 (SUNNY TRIPOWER X 50-25)",
 );
 
@@ -475,14 +479,16 @@ sub SMAInverter_Get($$) {
  return "\"get X\" needs at least an argument" if ( @a < 2 );
  my $name = shift @a;
  my $opt  = shift @a;
+ my $vel_1  = shift @a;
  my $timeout  = AttrVal($name, "timeout", 60);
 
  my  $getlist = "Unknown argument $opt, choose one of ".
-                "data:noArg ";
+                "data:-,0,1,2 ";
 
  return "module is disabled" if(IsDisabled($name));
 
  if ($opt eq "data") {
+	 $hash->{detailLevel} = $vel_1;
      SMAInverter_GetData($hash);
  } else {
      return "$getlist";
@@ -914,7 +920,12 @@ sub SMAInverter_getstatusDoParse($) {
      $ist = [gettimeofday];
 
      # Get the current attributes
-     my $detail_level  = AttrVal($name, "detail-level", 0);
+	 my $detail_level  		= InternalVal($name, "detailLevel", "");
+	 $detail_level  		= AttrVal($name, "detail-level", 0) if ($detail_level eq "" || $detail_level eq "-");
+	 $hash->{detailLevel} 	= "";
+     
+	 Log3 $name, 4, "$name - detail-level: ".$detail_level;
+	 
      my $readEnergyMeter_data  = AttrVal($name, "readEnergyMeter-data", 0);
 	  
      # Aufbau Command-Array
@@ -932,6 +943,21 @@ sub SMAInverter_getstatusDoParse($) {
 		push(@commands, "sup_SpotBatteryUnload");       	# Check BatteryUnload
 	 }
 	 
+	 if ($INVTYPE_NAME =~ /SBS(6\.0|5\.0|3\.7)/xs)
+	 {
+		push(@commands, "sup_BatteryInfo_UDC");     # Check BatteryInfo Voltage
+		push(@commands, "sup_BatteryInfo_IDC");     # Check BatteryInfo current
+	 }
+	 elsif ($INVTYPE_NAME =~ /SBS(1\.5|2\.0|2\.5)/xs || $INVCLASS eq "8009")
+	 {
+		push(@commands, "sup_BatteryInfo_2");     # Check BatteryInfo Voltage
+		push(@commands, "sup_BatteryInfo_Charge");
+	 }
+	 elsif($INVCLASS eq "8009" || $INVCLASS eq "8007")
+	 {
+		push(@commands, "sup_BatteryInfo");        	# Check BatteryInfo 
+	 }
+	 
 	 push(@commands, "sup_PVEnergyProduction") if($INVCLASS eq "8009");    						# Check PV-EnergyProduction (Hybrid Inverter)
      push(@commands, "sup_SpotDCPower_3")      if($INVCLASS eq "8009" || $INVCLASS eq "8001");  # SpotDCPower summary
 	 
@@ -947,21 +973,6 @@ sub SMAInverter_getstatusDoParse($) {
 		 if($INVCLASS eq "8009")
 		 {
 			push(@commands, "sup_SpotACCurrentBackup");   # Check BatteryInfo 
-		 }
-		  
-		 if ($INVTYPE_NAME =~ /SBS(6\.0|5\.0|3\.7)/xs)
-		 {
-			push(@commands, "sup_BatteryInfo_UDC");     # Check BatteryInfo Voltage
-			push(@commands, "sup_BatteryInfo_IDC");     # Check BatteryInfo current
-		 }
-		 elsif ($INVTYPE_NAME =~ /SBS(1\.5|2\.0|2\.5)/xs || $INVCLASS eq "8009")
-		 {
-			push(@commands, "sup_BatteryInfo_2");     # Check BatteryInfo Voltage
-			push(@commands, "sup_BatteryInfo_Charge");
-		 }
-		 elsif($INVCLASS eq "8009" || $INVCLASS eq "8007")
-		 {
-			push(@commands, "sup_BatteryInfo");        	# Check BatteryInfo 
 		 }
      }
 
@@ -992,7 +1003,7 @@ sub SMAInverter_getstatusDoParse($) {
 			#push(@commands, "sup_BatteryInfo_5");    
 		  }
 		  
-		  push(@commands, "sup_lower_discharge_limit"); #if($readParameter == 1 && $INVCLASS eq "8009");
+		  push(@commands, "sup_lower_discharge_limit") if($readParameter == 1 && $INVCLASS eq "8009");
 		  
 		  push(@commands, "sup_Insulation") if($installer == 1);  # Isolationsüberwachung
 		  	
@@ -1276,7 +1287,10 @@ sub SMAInverter_getstatusDoParse($) {
              use warnings;
          }
 		 
-		 # SBFSpot Kompatibilitätsmodus 
+			 if($sup_TypeLabel) {
+				 push(@row_array, ($sc?"device_type ":"INV_TYPE ").SMAInverter_devtype($inv_TYPE)."\n");
+				 push(@row_array, ($sc?"device_class ":"INV_CLASS ").SMAInverter_classtype($inv_CLASS)."\n");
+			 }
 		 	 
 			 if($sup_EM_1) {
 		         push(@row_array, ($sc?"Meter_TOTAL_FeedIn ".($Meter_Total_Yield/1000):"Meter_TOTAL_FeedIn ".($Meter_Total_Yield))."\n") if ($Meter_Total_Yield ne "-");
@@ -1352,6 +1366,18 @@ sub SMAInverter_getstatusDoParse($) {
 				 push(@row_array, ($sc?"bat_unloadtotal ".($inv_BAT_UNLOADTOTAL/1000):"BAT_UNLOADTOTAL ".$inv_BAT_UNLOADTOTAL)."\n") if ($inv_BAT_UNLOADTOTAL ne "-");
 				 push(@row_array, ($sc?"bat_unloadtoday ".($inv_BAT_UNLOADTODAY/1000):"BAT_UNLOADTODAY ".$inv_BAT_UNLOADTODAY)."\n") if ($inv_BAT_UNLOADTODAY ne "-");
 			 }
+			 
+			 if($sup_BatteryInfo || $sup_BatteryInfo_2) {
+				 if($INVTYPE_NAME =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)
+				 {
+					push(@row_array, ($sc?"bat_pdc ".(sprintf("%.0f",($inv_BAT_UDC * $inv_BAT_IDC))/1000):"BAT_PDC ".sprintf("%.0f",($inv_BAT_UDC * $inv_BAT_IDC)))."\n") if ($inv_BAT_UNLOADTOTAL ne "-");
+				 }
+			 }
+			 
+			 if($sup_BatteryInfo_Charge) {
+				 push(@row_array, ($sc?"bat_p_charge ".($inv_BAT_P_Charge/1000):"BAT_P_CHARGE ".($inv_BAT_P_Charge))."\n"); #TTT
+				 push(@row_array, ($sc?"bat_p_discharge ".($inv_BAT_P_Discharge/1000):"BAT_P_DISCHARGE ".($inv_BAT_P_Discharge))."\n"); #TTT
+			 }
 
              if($detail_level > 0) {
                  # For Detail Level 1
@@ -1382,17 +1408,13 @@ sub SMAInverter_getstatusDoParse($) {
                      push(@row_array, ($sc?"phase_backup_2_iac ":"SPOT_Backup_IAC2 ").sprintf("%.2f",$inv_SPOT_IAC2_Backup)."\n") if ($inv_SPOT_IAC2_Backup ne "-");
                      push(@row_array, ($sc?"phase_backup_3_iac ":"SPOT_Backup_IAC3 ").sprintf("%.2f",$inv_SPOT_IAC3_Backup)."\n") if ($inv_SPOT_IAC3_Backup ne "-");
 					 
-					 push(@row_array, ($sc?"phase_backup_1_pac ":"SPOT_Backup_PAC1 ").sprintf("%.0f",$inv_SPOT_IAC1_Backup * $inv_SPOT_UAC1)."\n") if ($inv_SPOT_IAC1_Backup ne "-");
-                     push(@row_array, ($sc?"phase_backup_2_pac ":"SPOT_Backup_PAC2 ").sprintf("%.0f",$inv_SPOT_IAC2_Backup * $inv_SPOT_UAC2)."\n") if ($inv_SPOT_IAC2_Backup ne "-");
-                     push(@row_array, ($sc?"phase_backup_3_pac ":"SPOT_Backup_PAC3 ").sprintf("%.0f",$inv_SPOT_IAC3_Backup * $inv_SPOT_UAC3)."\n") if ($inv_SPOT_IAC3_Backup ne "-");
+					 push(@row_array, ($sc?"phase_backup_1_pac ".sprintf("%.3f",$inv_SPOT_IAC1_Backup * $inv_SPOT_UAC1 /1000):"SPOT_Backup_PAC1 ".sprintf("%.0f",$inv_SPOT_IAC1_Backup * $inv_SPOT_UAC1))."\n") if ($inv_SPOT_IAC1_Backup ne "-");
+					 push(@row_array, ($sc?"phase_backup_2_pac ".sprintf("%.3f",$inv_SPOT_IAC2_Backup * $inv_SPOT_UAC2 /1000):"SPOT_Backup_PAC2 ".sprintf("%.0f",$inv_SPOT_IAC2_Backup * $inv_SPOT_UAC2))."\n") if ($inv_SPOT_IAC2_Backup ne "-");
+					 push(@row_array, ($sc?"phase_backup_3_pac ".sprintf("%.3f",$inv_SPOT_IAC3_Backup * $inv_SPOT_UAC3 /1000):"SPOT_Backup_PAC3 ".sprintf("%.0f",$inv_SPOT_IAC3_Backup * $inv_SPOT_UAC3))."\n") if ($inv_SPOT_IAC3_Backup ne "-");
                  }
                  if($sup_BatteryInfo || $sup_BatteryInfo_2) {
                      push(@row_array, ($sc?"bat_udc ":"BAT_UDC ").$inv_BAT_UDC."\n");
                      push(@row_array, ($sc?"bat_idc ":"BAT_IDC ").$inv_BAT_IDC."\n");
-					 if($INVTYPE_NAME =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)
-					 {
-						push(@row_array, ($sc?"bat_pdc ":"BAT_PDC ").sprintf("%.0f",($inv_BAT_UDC * $inv_BAT_IDC))."\n");
-					 }
                  }
 				 if($sup_BatteryInfo_UDC) {
                      push(@row_array, ($sc?"bat_udc ":"BAT_UDC ").$inv_BAT_UDC."\n");
@@ -1408,10 +1430,6 @@ sub SMAInverter_getstatusDoParse($) {
                  }
 				 if($sup_BatteryInfo_Capacity) {
                      push(@row_array, ($sc?"bat_capacity ":"BAT_CAPACITY ").$inv_BAT_CAPACITY."\n"); #TTT
-				 }
-				 if($sup_BatteryInfo_Charge) {
-                     push(@row_array, ($sc?"bat_p_charge ":"BAT_P_CHARGE ").($inv_BAT_P_Charge/1000)."\n"); #TTT
-                     push(@row_array, ($sc?"bat_p_discharge ":"BAT_P_DISCHARGE ").($inv_BAT_P_Discharge/1000)."\n"); #TTT
 				 }
              }
 
@@ -1444,8 +1462,6 @@ sub SMAInverter_getstatusDoParse($) {
                      push(@row_array, ($sc?"grid_freq ":"SPOT_FREQ ").sprintf("%.2f",$inv_SPOT_FREQ)."\n");
                  }
                  if($sup_TypeLabel) {
-                     push(@row_array, ($sc?"device_type ":"INV_TYPE ").SMAInverter_devtype($inv_TYPE)."\n");
-                     push(@row_array, ($sc?"device_class ":"INV_CLASS ").SMAInverter_classtype($inv_CLASS)."\n");
                      push(@row_array, ($sc?"susyid ":"SUSyID ").$inv_susyid." - SN: ".$inv_serial."\n") if($inv_susyid && $inv_serial);
                      push(@row_array, ($sc?"device_name ":"INV_NAME ")."SN: ".$inv_serial."\n") if($inv_serial);
                      push(@row_array, ($sc?"serial_number ":"Serialnumber ").$inv_serial."\n") if($inv_serial);
@@ -3430,7 +3446,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.28.3",
+  "version": "v2.29.2",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
