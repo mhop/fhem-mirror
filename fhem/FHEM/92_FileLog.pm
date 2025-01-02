@@ -206,6 +206,8 @@ FileLog_Define($@)
     FileLog_initEMI($hash, "addLog", undef, 1);
     my $mi = $hash->{addLogMinInterval};
     InternalTimer(time()+$mi, "FileLog_addLog", $hash, 0) if($mi);
+    delete($hash->{READINGS}{linesInTheFile})
+      if($hash->{READONLY} && $hash->{READINGS});
   }, $hash);
 
   return undef;
@@ -478,7 +480,8 @@ FileLog_Set($@)
       $fh->close() if($fh);
       if($cmd eq "clear") {
         $fh = new IO::File(">$cn");
-        setReadingsVal($hash, "linesInTheFile", 0, TimeNow());
+        setReadingsVal($hash, "linesInTheFile", 0, TimeNow())
+          if(!$hash->{READONLY});
       } else {
         $fh = new IO::File(">>$cn");
       }
@@ -558,6 +561,8 @@ FileLog_Set($@)
     CommandDelete(undef, $victim);
 
   }
+  Log3 $me, 3, "set ".join(" ",@a);
+  
   return undef;
 }
 
