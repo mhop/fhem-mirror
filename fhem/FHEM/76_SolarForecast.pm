@@ -158,6 +158,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.41.4" => "02.01.2025  minor change of Logtext, new special Readings BatPowerIn_Sum, BatPowerOut_Sum ".
+                           "rename ctrlStatisticReadings to ctrlSpecialReadings ",
   "1.41.3" => "01.01.2025  write/read battery values 0 .. maxbatteries to/from pvhistrory ".
                            "change ctrlBatSocManagement to ctrlBatSocManagement01 ",
   "1.41.2" => "30.12.2024  __setConsRcmdState: more Debug Info, change Reading: Current_BatCharge -> Current_BatCharge_XX ".
@@ -515,7 +517,7 @@ my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    ctrlAIdataStorageDuration ctrlBackupFilesKeep
                    ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
                    ctrlLanguage ctrlNextDayForecastReadings ctrlShowLink ctrlSolCastAPImaxReq
-                   ctrlSolCastAPIoptimizeReq ctrlStatisticReadings ctrlUserExitFn
+                   ctrlSolCastAPIoptimizeReq ctrlSpecialReadings ctrlUserExitFn
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    disable
                    flowGraphicControl graphicBeamWidth
@@ -621,7 +623,7 @@ my %hget = (                                                                # Ha
 my %hattr = (                                                                # Hash für Attr-Funktion
   consumer                  => { fn => \&_attrconsumer            },
   ctrlConsRecommendReadings => { fn => \&_attrcreateConsRecRdgs   },
-  ctrlStatisticReadings     => { fn => \&_attrcreateStatisticRdgs },
+  ctrlSpecialReadings       => { fn => \&_attrcreateSpecialRdgs   },
   ctrlDebug                 => { fn => \&_attrctrlDebug           },
   setupWeatherDev1          => { fn => \&_attrWeatherDev          },
   setupWeatherDev2          => { fn => \&_attrWeatherDev          },
@@ -1081,6 +1083,8 @@ my %hcsr = (                                                                    
   allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },
   todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', unit => ' Wh',  def => 0           },
   runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  unit => '',     def => '-'         },
+  BatPowerIn_Sum              => { fnr => 4, fn => \&CurrentVal,      par => 'bpowerinsum',       unit => ' W',   def => '-'         },
+  BatPowerOut_Sum             => { fnr => 4, fn => \&CurrentVal,      par => 'bpoweroutsum',      unit => ' W',   def => '-'         }, 
   SunHours_Remain             => { fnr => 4, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
   SunMinutes_Remain           => { fnr => 4, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },
   dayAfterTomorrowPVforecast  => { fnr => 4, fn => \&RadiationAPIVal, par => 'pv_estimate50',     unit => '',     def => 0           },
@@ -1307,7 +1311,7 @@ sub Initialize {
                                 "ctrlShowLink:1,0 ".
                                 "ctrlSolCastAPImaxReq:selectnumbers,5,5,60,0,lin ".
                                 "ctrlSolCastAPIoptimizeReq:1,0 ".
-                                "ctrlStatisticReadings:multiple-strict,$srd ".
+                                "ctrlSpecialReadings:multiple-strict,$srd ".
                                 "ctrlUserExitFn:textField-long ".
                                 "disable:1,0 ".
                                 "flowGraphicControl:textField-long ".
@@ -1369,8 +1373,9 @@ sub Initialize {
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
-   $hash->{AttrRenameMap} = { "setupBatteryDev"      => "setupBatteryDev01",          # 28.12.24
-                              "ctrlBatSocManagement" => "ctrlBatSocManagement01",     # 01.01.25
+   $hash->{AttrRenameMap} = { "setupBatteryDev"       => "setupBatteryDev01",          # 28.12.24
+                              "ctrlBatSocManagement"  => "ctrlBatSocManagement01",     # 01.01.25
+                              "ctrlStatisticReadings" => "ctrlSpecialReadings",        # 02.01.25
                             };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -5639,9 +5644,9 @@ return;
 }
 
 ################################################################
-#               Attr ctrlStatisticReadings
+#               Attr ctrlSpecialReadings 
 ################################################################
-sub _attrcreateStatisticRdgs {           ## no critic "not used"
+sub _attrcreateSpecialRdgs {             ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $aName = $paref->{aName};
@@ -7331,6 +7336,7 @@ sub centralTask {
   readingsDelete    ($hash, 'Battery_ChargeRecommended');                       # 30.12.2024
   deleteReadingspec ($hash, 'Today_.*_BatIn');                                  # 30.12.2024 
   deleteReadingspec ($hash, 'Today_.*_BatOut');                                 # 30.12.2024  
+  deleteReadingspec ($hash, 'statistic_.*');                                    # 02.01.2025
   
   for my $ck (keys %{$data{$name}{circular}}) {                                 # 30.12.2024
       $data{$name}{circular}{$ck}{batin01}  = delete $data{$name}{circular}{$ck}{batin}  if(defined $data{$name}{circular}{$ck}{batin});
@@ -7481,7 +7487,7 @@ sub centralTask {
   _calcValueImproves          ($centpars);                                            # neue Korrekturfaktor/Qualität und berechnen und speichern, AI anreichern
   _saveEnergyConsumption      ($centpars);                                            # Energie Hausverbrauch speichern
   _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
-  _genStatisticReadings       ($centpars);                                            # optionale Statistikreadings erstellen
+  _genSpecialReadings         ($centpars);                                            # optionale Statistikreadings erstellen
 
   userExit                    ($centpars);                                            # User spezifische Funktionen ausführen
   setTimeTracking             ($hash, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
@@ -8522,7 +8528,7 @@ sub _transferInverterValues {
           $ethishour = int ($etotal - $histetot);
           
           if (defined $h->{capacity} && $ethishour > 2 * $h->{capacity}) {                             # Schutz vor plötzlichem Anstieg von 0 auf mehr als doppelte WR-Kapazität
-              Log3 ($name, 1, "$name - WARNING - The generated PV of Inverter '$indev' is much more higher than inverter capacity. It seems to be a failure and Energy Total is reinitialized.");
+              Log3 ($name, 1, "$name - WARNING - The generated PV of Inverter '$indev' is much more higher than capacity set in inverter key 'capacity'. It seems to be a failure and Energy Total is reinitialized.");
               $warn = ' (WARNING: too much generated PV was registered - see log file)';
 
               writeToHistory ( { paref => $paref, key => 'etotali'.$in, val => $etotal, hour => $nhour } );
@@ -9230,10 +9236,10 @@ sub _transferMeterValues {
   my $ftuf    = $ftunit =~ /^kWh$/xi ? 1000 : 1;
   my $fitotal = ReadingsNum ($medev, $ft, 0) * $ftuf;                                                # Einspeisung total (Wh)
 
-  $data{$name}{circular}{99}{gridcontotal}   = $gctotal;                                          # Total Netzbezug speichern
-  $data{$name}{circular}{99}{feedintotal}    = $fitotal;                                          # Total Feedin speichern
-  $data{$name}{current}{gridconsumption} = int $gco;                                          # Current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-  $data{$name}{current}{gridfeedin}      = int $gfin;                                         # Wert current grid Feed in
+  $data{$name}{circular}{99}{gridcontotal}   = $gctotal;                                             # Total Netzbezug speichern
+  $data{$name}{circular}{99}{feedintotal}    = $fitotal;                                             # Total Feedin speichern
+  $data{$name}{current}{gridconsumption} = int $gco;                                                 # Current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  $data{$name}{current}{gridfeedin}      = int $gfin;                                                # Wert current grid Feed in
 
   debugLog ($paref, "collectData", "collect Meter data - device: $medev =>");
   debugLog ($paref, "collectData", "gcon: $gco W, gfeedin: $gfin W, contotal: $gctotal Wh, feedtotal: $fitotal Wh");
@@ -9333,9 +9339,14 @@ sub _transferBatteryValues {
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
 
-  my $hash = $defs{$name};
-  my $num  = 0;
+  my $hash   = $defs{$name};
+  my $num    = 0;
+  my $pbisum = 0;
+  my $pbosum = 0;
   my $socsum;
+  
+  delete $data{$name}{current}{bpowerinsum};       
+  delete $data{$name}{current}{bpoweroutsum};                  
   
   for my $bn (1..$maxbatteries) {
       $bn = sprintf "%02d", $bn;
@@ -9364,14 +9375,14 @@ sub _transferBatteryValues {
       my $binuf   = $binunit  =~ /^kWh$/xi ? 1000 : 1;
       my $boutuf  = $boutunit =~ /^kWh$/xi ? 1000 : 1;
 
-      my $pbo     = ReadingsNum ($badev, $pou,    0) * $pouf;                                      # aktuelle Batterieentladung (W)
-      my $pbi     = ReadingsNum ($badev, $pin,    0) * $piuf;                                      # aktueller Batterieladung (W)
-      my $btotout = ReadingsNum ($badev, $bout,   0) * $boutuf;                                    # totale Batterieentladung (Wh)
-      my $btotin  = ReadingsNum ($badev, $bin,    0) * $binuf;                                     # totale Batterieladung (Wh)
-      my $soc     = ReadingsNum ($badev, $batchr, 0);
+      my $pbo     = int (ReadingsNum ($badev, $pou, 0) * $pouf);                                 # aktuelle Batterieentladung (W)
+      my $pbi     = int (ReadingsNum ($badev, $pin, 0) * $piuf);                                 # aktueller Batterieladung (W)
+      my $btotout = ReadingsNum ($badev, $bout,     0) * $boutuf;                                # totale Batterieentladung (Wh)
+      my $btotin  = ReadingsNum ($badev, $bin,      0) * $binuf;                                 # totale Batterieladung (Wh)
+      my $soc     = ReadingsNum ($badev, $batchr,   0);
 
       if ($instcap) {
-          if (!isNumeric ($instcap)) {                                                             # wenn $instcap Reading Wert abfragen
+          if (!isNumeric ($instcap)) {                                                           # wenn $instcap Reading Wert abfragen
               my ($bcapr,$bcapunit) = split ':', $instcap;
               $bcapunit           //= 'Wh';
               $instcap              = ReadingsNum ($badev, $bcapr, 0);
@@ -9478,23 +9489,28 @@ sub _transferBatteryValues {
 
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatIn_'. $bn, $batinthishour. ' Wh');
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatOut_'.$bn, $batoutthishour.' Wh');
-      storeReading ('Current_PowerBatIn_'. $bn, (int $pbi).' W');
-      storeReading ('Current_PowerBatOut_'.$bn, (int $pbo).' W');
-      storeReading ('Current_BatCharge_'.  $bn,       $soc.' %');
+      storeReading ('Current_PowerBatIn_'. $bn, $pbi.' W');
+      storeReading ('Current_PowerBatOut_'.$bn, $pbo.' W');
+      storeReading ('Current_BatCharge_'.  $bn, $soc.' %');
       
       $data{$name}{batteries}{$bn}{bname}       = $badev;                                  # Batterie Devicename            
       $data{$name}{batteries}{$bn}{balias}      = AttrVal ($badev, 'alias', $badev);       # Alias Batterie Device
-      $data{$name}{batteries}{$bn}{bpowerin}    = int $pbi;                                # momentane Batterieladung
-      $data{$name}{batteries}{$bn}{bpowerout}   = int $pbo;                                # momentane Batterieentladung
+      $data{$name}{batteries}{$bn}{bpowerin}    = $pbi;                                    # momentane Batterieladung
+      $data{$name}{batteries}{$bn}{bpowerout}   = $pbo;                                    # momentane Batterieentladung
       $data{$name}{batteries}{$bn}{bcharge}     = $soc;                                    # aktuelle Batterieladung
       $data{$name}{batteries}{$bn}{basynchron}  = $h->{asynchron} // 0;                    # asynchroner Modus = X 
       
       $socsum += $soc;
+      $pbisum += $pbi;
+      $pbosum += $pbo;
   }
-  
+    
   if ($num) {
       push @{$data{$name}{current}{socslidereg}}, $socsum / $num;                          # Schieberegister average SOC aller Batterien
       limitArray ($data{$name}{current}{socslidereg}, $slidenummax);
+  
+      $data{$name}{current}{bpowerinsum}  = $pbisum;                                       # summarische laufende Batterieladung
+      $data{$name}{current}{bpoweroutsum} = $pbosum;                                       # summarische laufende Batterieentladung
   }
 
 return;
@@ -9583,14 +9599,14 @@ sub _batSocTarget {
               $docare = 1;                                                                     # Zwangsanwendung care SoC
           }
           
-          $la = "calc care SoC -> Remaining days until care SoC: $days2care, Target: $target %";
+          $la = "calc care SoC -> docare: $docare, care SoC: $careSoc %, Remaining days until care SoC: $days2care, Target: $target %";
       }
       else {
           $nt = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-          $la = "calc care SoC -> use preliminary Target: $target % (care SoC calculation & activation postponed to after $nt)";
+          $la = "calc care SoC -> docare: $docare, care SoC: $careSoc %, use preliminary Target: $target % (care SoC calculation & activation postponed to after $nt)";
       }
 
-      debugLog ($paref, 'batteryManagement', "Bat $bn SoC Step2 - basics -> docare: $docare, care SoC: $careSoc %, E expect: $pvexpect Wh, need until maxsoc: $whneed Wh");
+      debugLog ($paref, 'batteryManagement', "Bat $bn SoC Step2 - basics -> Energy expected for charging: $pvexpect Wh, need until maxsoc: $whneed Wh");
       debugLog ($paref, 'batteryManagement', "Bat $bn SoC Step2 - $la");
 
       ## Aufladewahrscheinlichkeit beachten
@@ -9969,7 +9985,7 @@ sub _createSummaries {
   $data{$name}{current}{tdConFcTillSunset}   = $tdConFcTillSunset;
   $data{$name}{current}{surplus}             = $surplus;
   
-  push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                          # Schieberegister PV Überschuß
+  push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
   limitArray ($data{$name}{current}{surplusslidereg}, $splslidenummax);
 
   storeReading ('Current_GridFeedIn',           (int $gfeedin).       ' W');                            # V 1.37.0
@@ -12340,21 +12356,22 @@ return;
 }
 
 ################################################################
-#    optionale Statistikreadings erstellen
+#    optionale "special" Readings erstellen
 ################################################################
-sub _genStatisticReadings {
+sub _genSpecialReadings {
   my $paref = shift;
   my $name  = $paref->{name};
   my $t     = $paref->{t};              # aktueller UNIX Timestamp
 
   my $hash = $defs{$name};
   my @srd  = sort keys (%hcsr);
-  my @csr  = split ',', AttrVal ($name, 'ctrlStatisticReadings', '');
+  my @csr  = split ',', AttrVal ($name, 'ctrlSpecialReadings', '');
+  my $prpo = 'special';
 
   for my $item (@srd) {
       next if(grep /^$item$/, @csr);
-      readingsDelete    ($hash, 'statistic_'.$item);
-      deleteReadingspec ($hash, 'statistic_'.$item.'_.*') if($item eq 'todayConsumptionForecast');
+      readingsDelete    ($hash, $prpo.'_'.$item);
+      deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'todayConsumptionForecast');
   }
 
   return if(!@csr);
@@ -12366,8 +12383,8 @@ sub _genStatisticReadings {
       my $par = $hcsr{$kpi}{par};
 
       if (!defined $def || !defined $par) {
-          Log3 ($name, 1, "$name - ERROR in Application - attribute ctrlStatisticReadings KPI '$kpi' has no Parameter or default value set. Set the attribute again or inform Maintainer.");
-        next;
+          Log3 ($name, 1, "$name - ERROR in Application - attribute ctrlSpecialReadings KPI '$kpi' has no Parameter or default value set. Set the attribute again or inform Maintainer.");
+          next;
       }
 
       if ($def eq 'apimaxreq') {
@@ -12378,16 +12395,16 @@ sub _genStatisticReadings {
 
       if ($hcsr{$kpi}{fnr} == 1) {
           
-          storeReading ('statistic_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $rapi, '?All', $kpi, $def));
+          storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $rapi, '?All', $kpi, $def));
       }
 
       if ($hcsr{$kpi}{fnr} == 2) {
           $par = $kpi if(!$par);
-          storeReading ('statistic_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $par, $def).$hcsr{$kpi}{unit});
+          storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $par, $def).$hcsr{$kpi}{unit});
       }
 
       if ($hcsr{$kpi}{fnr} == 3) {
-          storeReading ('statistic_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def).$hcsr{$kpi}{unit});
+          storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def).$hcsr{$kpi}{unit});
       }
 
       if ($hcsr{$kpi}{fnr} == 4) {
@@ -12396,7 +12413,7 @@ sub _genStatisticReadings {
               my $shr = ($ss - $t) / 3600;
               $shr    = $shr < 0 ? 0 : $shr;
 
-              storeReading ('statistic_'.$kpi, sprintf "%.2f", $shr);
+              storeReading ($prpo.'_'.$kpi, sprintf "%.2f", $shr);
           }
 
           if ($kpi eq 'SunMinutes_Remain') {
@@ -12404,20 +12421,27 @@ sub _genStatisticReadings {
               my $smr = ($ss - $t) / 60;
               $smr    = $smr < 0 ? 0 : $smr;
 
-              storeReading ('statistic_'.$kpi, sprintf "%.0f", $smr);
+              storeReading ($prpo.'_'.$kpi, sprintf "%.0f", $smr);
           }
 
           if ($kpi eq 'runTimeTrainAI') {
               my $rtaitr = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def);
 
-              storeReading ('statistic_'.$kpi, $rtaitr);
+              storeReading ($prpo.'_'.$kpi, $rtaitr);
+          }
+          
+          if ($kpi =~ /BatPower(In|Out)_Sum/xs) {
+              my $bsum = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $def);
+              $bsum   .= $bsum eq $def ? '' : $hcsr{$kpi}{unit};
+
+              storeReading ($prpo.'_'.$kpi, $bsum);
           }
 
           if ($kpi =~ /daysUntilBatteryCare_/xs) {
               my $bn = (split "_", $kpi)[1];                                                          # Batterienummer extrahieren
               my $d2c = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'days2care'.$bn, $def);
 
-              storeReading ('statistic_'.$kpi, $d2c);
+              storeReading ($prpo.'_'.$kpi, $d2c);
           }
 
           if ($kpi eq 'todayGridFeedIn') {
@@ -12426,7 +12450,7 @@ sub _genStatisticReadings {
 
               my $dfi  = $cfi - $idfi;
 
-              storeReading ('statistic_'.$kpi, (sprintf "%.1f", $dfi).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dfi).' Wh');
           }
 
           if ($kpi eq 'todayGridConsumption') {
@@ -12435,7 +12459,7 @@ sub _genStatisticReadings {
 
               my $dgcon  = $cgcon - $idgcon;
 
-              storeReading ('statistic_'.$kpi, (sprintf "%.1f", $dgcon).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dgcon).' Wh');
           }
 
           if ($kpi =~ /todayBatIn_/xs) {
@@ -12445,7 +12469,7 @@ sub _genStatisticReadings {
 
               my $dbi = $cbitot - $idbitot;
 
-              storeReading ('statistic_'.$kpi, (sprintf "%.1f", $dbi).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbi).' Wh');
           }
 
           if ($kpi =~ /todayBatOut_/xs) {
@@ -12455,7 +12479,7 @@ sub _genStatisticReadings {
 
               my $dbo = $cbotot - $idbotot;
 
-              storeReading ('statistic_'.$kpi, (sprintf "%.1f", $dbo).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbo).' Wh');
           }
 
           if ($kpi eq 'dayAfterTomorrowPVforecast') {                                                      # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
@@ -12476,10 +12500,10 @@ sub _genStatisticReadings {
               }
 
               if ($fcsumdat) {
-                  storeReading ('statistic_'.$kpi, (int $fcsumdat). ' Wh');
+                  storeReading ($prpo.'_'.$kpi, (int $fcsumdat). ' Wh');
               }
               else {
-                  storeReading ('statistic_'.$kpi, $fcsumdat. ' (no data available)');
+                  storeReading ($prpo.'_'.$kpi, $fcsumdat. ' (no data available)');
               }
           }
 
@@ -12487,26 +12511,26 @@ sub _genStatisticReadings {
               my $c = (split "_", $kpi)[1];                                                          # Consumer Nummer extrahieren
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
-                  readingsDelete ($hash, 'statistic_currentRunMtsConsumer_'.$c);
+                  readingsDelete ($hash, $prpo.'_currentRunMtsConsumer_'.$c);
                   return;
               }
 
               my $mion = &{$hcsr{$kpi}{fn}} ($hash, $c, $hcsr{$kpi}{par}, $def);
 
-              storeReading ('statistic_'.$kpi, (sprintf "%.0f", $mion).$hcsr{$kpi}{unit});
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $mion).$hcsr{$kpi}{unit});
           }
 
           if ($kpi =~ /runTimeAvgDayConsumer_/xs) {
               my $c = (split "_", $kpi)[1];                                                          # Consumer Nummer extrahieren
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
-                  readingsDelete ($hash, 'statistic_runTimeAvgDayConsumer_'.$c);
+                  readingsDelete ($hash, $prpo.'_runTimeAvgDayConsumer_'.$c);
                   return;
               }
 
               my $radc = &{$hcsr{$kpi}{fn}} ($hash, $c, $hcsr{$kpi}{par}, $def);
 
-              storeReading ('statistic_'.$kpi, $radc.$hcsr{$kpi}{unit});
+              storeReading ($prpo.'_'.$kpi, $radc.$hcsr{$kpi}{unit});
           }
 
           if ($kpi eq 'todayConsumptionForecast') {
@@ -12519,7 +12543,7 @@ sub _genStatisticReadings {
                  my $hod   = NexthoursVal ($hash, $idx, 'hourofday', '01');
                  my $confc = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
 
-                 storeReading ('statistic_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
+                 storeReading ($prpo.'_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
              }
           }
 
@@ -12552,7 +12576,7 @@ sub _genStatisticReadings {
 
              $confc    = $confc / $mhrs * $mtsr;
 
-             storeReading ('statistic_'.$kpi, ($confc ? (sprintf "%.0f", $confc).$hcsr{$kpi}{unit} : '-'));
+             storeReading ($prpo.'_'.$kpi, ($confc ? (sprintf "%.0f", $confc).$hcsr{$kpi}{unit} : '-'));
           }
       }
   }
@@ -22025,14 +22049,16 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlStatisticReadings"></a>
-       <li><b>ctrlStatisticReadings </b><br>
+       <a id="SolarForecast-attr-ctrlSpecialReadings"></a>
+       <li><b>ctrlSpecialReadings </b><br>
          Readings are created for the selected key figures and indicators with the
-         naming scheme 'statistic_&lt;indicator&gt;'. Selectable key figures / indicators are: <br><br>
+         naming scheme 'special_&lt;indicator&gt;'. Selectable key figures / indicators are: <br><br>
 
          <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+            <tr><td> <b>BatPowerIn_Sum</b>             </td><td>the sum of the current battery charging power of all defined battery devices                                         </td></tr>
+            <tr><td> <b>BatPowerOut_Sum</b>            </td><td>the sum of the current battery discharge power of all defined battery devices                                        </td></tr>          
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Fulfillment status of error-free generation of all strings                                                           </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Consumption forecast from current hour to the coming sunrise                                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>the current polling interval of the selected radiation data API in seconds                                           </td></tr>
@@ -22323,13 +22349,13 @@ to ensure that the system configuration is correct.
             <tr><td>                                         </td><td>current&amp;nbsp;Gridconsumption:Current_GridConsumption                                </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>#                                                                                       </td></tr>
-            <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:statistic_todayConForecastTillSunset                  </td></tr>
-            <tr><td>                                         </td><td>PV&amp;nbsp;Day&amp;nbsp;after&amp;nbsp;tomorrow:statistic_dayAfterTomorrowPVforecast   </td></tr>
+            <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:special_todayConForecastTillSunset                  </td></tr>
+            <tr><td>                                         </td><td>PV&amp;nbsp;Day&amp;nbsp;after&amp;nbsp;tomorrow:special_dayAfterTomorrowPVforecast   </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>#Battery                                                                                </td></tr>
-            <tr><td>                                         </td><td>in&amp;nbsp;today:statistic_todayBatIn                                                  </td></tr>
-            <tr><td>                                         </td><td>out&amp;nbsp;today:statistic_todayBatOut                                                </td></tr>
+            <tr><td>                                         </td><td>in&amp;nbsp;today:special_todayBatIn                                                  </td></tr>
+            <tr><td>                                         </td><td>out&amp;nbsp;today:special_todayBatOut                                                </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>#Settings                                                                               </td></tr>
@@ -24479,14 +24505,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlStatisticReadings"></a>
-       <li><b>ctrlStatisticReadings </b><br>
+       <a id="SolarForecast-attr-ctrlSpecialReadings"></a>
+       <li><b>ctrlSpecialReadings </b><br>
          Für die ausgewählten Kennzahlen und Indikatoren werden Readings mit dem
-         Namensschema 'statistic_&lt;Indikator&gt;' erstellt. Auswählbare Kennzahlen / Indikatoren sind: <br><br>
+         Namensschema 'special_&lt;Indikator&gt;' erstellt. Auswählbare Kennzahlen / Indikatoren sind: <br><br>
 
          <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+            <tr><td> <b>BatPowerIn_Sum</b>             </td><td>die Summe der momentanen Batterieladeleistung aller definierten Batterie Geräte                                 </td></tr>
+            <tr><td> <b>BatPowerOut_Sum</b>            </td><td>die Summe der momentanen Batterieentladeleistung aller definierten Batterie Geräte                              </td></tr>          
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Verbrauchsprognose von aktueller Stunde bis zum kommenden Sonnenaufgang                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der gewählten Strahlungsdaten-API in Sekunden                                       </td></tr>
@@ -24777,13 +24805,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                         </td><td>aktueller&amp;nbsp;Netzbezug:Current_GridConsumption                          </td></tr>
             <tr><td>                                         </td><td>:                                                                             </td></tr>
             <tr><td>                                         </td><td>#                                                                             </td></tr>
-            <tr><td>                                         </td><td>CO&amp;nbsp;bis&amp;nbsp;Sonnenuntergang:statistic_todayConForecastTillSunset </td></tr>
-            <tr><td>                                         </td><td>PV&amp;nbsp;Übermorgen:statistic_dayAfterTomorrowPVforecast                   </td></tr>
+            <tr><td>                                         </td><td>CO&amp;nbsp;bis&amp;nbsp;Sonnenuntergang:special_todayConForecastTillSunset   </td></tr>
+            <tr><td>                                         </td><td>PV&amp;nbsp;Übermorgen:special_dayAfterTomorrowPVforecast                     </td></tr>
             <tr><td>                                         </td><td>InverterRelay:gridrelay_status@MySTP_5000                                     </td></tr>
             <tr><td>                                         </td><td>:                                                                             </td></tr>
             <tr><td>                                         </td><td>#Batterie                                                                     </td></tr>
-            <tr><td>                                         </td><td>in&amp;nbsp;heute:statistic_todayBatIn                                        </td></tr>
-            <tr><td>                                         </td><td>out&amp;nbsp;heute:statistic_todayBatOut                                      </td></tr>
+            <tr><td>                                         </td><td>in&amp;nbsp;heute:special_todayBatIn                                          </td></tr>
+            <tr><td>                                         </td><td>out&amp;nbsp;heute:special_todayBatOut                                        </td></tr>
             <tr><td>                                         </td><td>:                                                                             </td></tr>
             <tr><td>                                         </td><td>:                                                                             </td></tr>
             <tr><td>                                         </td><td>#Settings                                                                     </td></tr>
