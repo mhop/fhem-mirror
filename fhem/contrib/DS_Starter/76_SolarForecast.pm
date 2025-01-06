@@ -15672,7 +15672,7 @@ sub __substituteIcon {
       my $socicon;
       
       if (defined $soc) {
-          $soctxt  = "\nSOC: ".$soc;
+          $soctxt  = "\nSOC: ".$soc." %";
           $socicon = $soc >= 95 ? 'measure_battery_100' :
                      $soc >= 75 ? 'measure_battery_75'  :
                      $soc >= 50 ? 'measure_battery_50'  :
