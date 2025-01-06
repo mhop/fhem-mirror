@@ -15680,21 +15680,27 @@ sub __substituteIcon {
                      'measure_battery_0';
       }
       
-      $ircmd    = $ircmd    ? $ircmd    : $bicondef;
-      $icharge  = $icharge  ? $icharge  : $bicondef;
-      $idischrg = $idischrg ? $idischrg : $bicondef;
-      $inorcmd  = $inorcmd  ? $inorcmd  : $bicondef;      
+      $ircmd    = $ircmd    ? $ircmd    : '';
+      $inorcmd  = $inorcmd  ? $inorcmd  : '';
+      $icharge  = $icharge  ? $icharge  : '';
+      $idischrg = $idischrg ? $idischrg : '';      
       
       if (defined $flag) {                                                               # Empfehlungszeitraum                                                             
           if ($flag) {                                                                   # Ladeempfehlung
               ($icon, $color) = split '@', $ircmd;
-              $icon           = $icon ? $icon : $bicondef;                               # nur Farbe angegeben              
+              $icon           = $icon    ? $icon    : 
+                                $socicon ? $socicon :
+                                $bicondef;                                               # nur Farbe angegeben  
+                                
               $color        //= $biccolrcddef;
               $pretxt         = "$msg1\n".$htitles{bcharrcd}{$lang};
           }
           else {                                                                         # keine Ladeempfehlung
               ($icon, $color) = split '@', $inorcmd;
-              $icon           = $icon ? $icon : $bicondef;                               # nur Farbe angegeben              
+              $icon           = $icon    ? $icon    : 
+                                $socicon ? $socicon :
+                                $bicondef;                                               # nur Farbe angegeben  
+                                
               $color        //= $biccolnrcddef;
               $pretxt         = "$msg1\n".$htitles{bncharcd}{$lang};
           }
@@ -15703,13 +15709,19 @@ sub __substituteIcon {
       if (defined $pcurr) {                                                              # aktueller Zusatnd                                      
            if ($pcurr > 0) {                                                             # Batterie wird aufgeladen
                ($icon, $color) = split '@', $icharge;
-               $icon           = $icon ? $icon : $bicondef;                              # nur Farbe angegeben
+               $icon           = $icon    ? $icon    : 
+                                 $socicon ? $socicon :
+                                 $bicondef;                                              # nur Farbe angegeben
+                                 
                $color        //= $bchgiconcoldef;
                $txt            = "$pretxt\nStatus: ".$htitles{ischawth}{$lang}.' '.$pcurr.' W'.$soctxt;
            }
            elsif ($pcurr < 0) {                                                          # Batterie wird entladen
                ($icon, $color) = split '@', $idischrg;
-               $icon           = $icon ? $icon : $bicondef;                              # nur Farbe angegeben
+               $icon           = $icon    ? $icon    : 
+                                 $socicon ? $socicon :
+                                 $bicondef;                                              # nur Farbe angegeben
+                                 
                $color        //= $bdchiconcoldef;  
                $txt            = "$pretxt\nStatus: ".$htitles{isdchawt}{$lang}.' '.(abs $pcurr).' W'.$soctxt;               
            }
