@@ -14921,10 +14921,10 @@ sub __batRcmdOnBeam {
           $status             = $status ? "Status: $status" : '';
           
           my ($image, $title) = !defined $hfcg->{$i}{'rcdchargebat'.$bn} ? ('','') :
-                                $hfcg->{$i}{'rcdchargebat'.$bn}          ? (FW_makeImage ($bicon,''),  $balias.'\n'.$htitles{bcharrcd}{$lang}) : 
-                                ('', $balias.'\n'.$htitles{bncharcd}{$lang});
+                                $hfcg->{$i}{'rcdchargebat'.$bn}          ? (FW_makeImage ($bicon,''),  "$balias\n".$htitles{bcharrcd}{$lang}."\n$status") : 
+                                ('', "$balias\n".$htitles{bncharcd}{$lang}."\n$status");
           
-          $ret .= "<td title='$title\n$status' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
+          $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
       }
       
       $ret .= "<td class='solarfc'></td></tr>" if($ret);                                                  # freier Platz am Ende der Icon Zeile
