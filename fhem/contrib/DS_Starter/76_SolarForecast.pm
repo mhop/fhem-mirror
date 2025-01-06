@@ -15665,7 +15665,7 @@ sub __substituteIcon {
       }
   }
   elsif ($ptyp eq 'battery') {                                                           # Icon Batterie 
-      my ($ircmd, $icharge, $idischrg, $inorcmd) = split ':', BatteryVal ($hash, $pn, 'bicon', $bicondef);
+      my ($ircmd, $icharge, $idischrg, $inorcmd) = split ':', BatteryVal ($hash, $pn, 'bicon', '');
             
       my $soctxt = '';
       my $pretxt = '';
@@ -15692,8 +15692,8 @@ sub __substituteIcon {
                                 $socicon ? $socicon :
                                 $bicondef;                                               # nur Farbe angegeben  
                                 
-              $color        //= $biccolrcddef;
-              $pretxt         = "$msg1\n".$htitles{bcharrcd}{$lang};
+              $color  //= $biccolrcddef;
+              $pretxt   = "$msg1\n".$htitles{bcharrcd}{$lang};
           }
           else {                                                                         # keine Ladeempfehlung
               ($icon, $color) = split '@', $inorcmd;
@@ -15701,8 +15701,8 @@ sub __substituteIcon {
                                 $socicon ? $socicon :
                                 $bicondef;                                               # nur Farbe angegeben  
                                 
-              $color        //= $biccolnrcddef;
-              $pretxt         = "$msg1\n".$htitles{bncharcd}{$lang};
+              $color  //= $biccolnrcddef;
+              $pretxt   = "$msg1\n".$htitles{bncharcd}{$lang};
           }
       }
       
@@ -15713,8 +15713,8 @@ sub __substituteIcon {
                                  $socicon ? $socicon :
                                  $bicondef;                                              # nur Farbe angegeben
                                  
-               $color        //= $bchgiconcoldef;
-               $txt            = "$pretxt\nStatus: ".$htitles{ischawth}{$lang}.' '.$pcurr.' W'.$soctxt;
+               $color //= $bchgiconcoldef;
+               $txt     = "$pretxt\nStatus: ".$htitles{ischawth}{$lang}.' '.$pcurr.' W'.$soctxt;
            }
            elsif ($pcurr < 0) {                                                          # Batterie wird entladen
                ($icon, $color) = split '@', $idischrg;
@@ -15722,11 +15722,17 @@ sub __substituteIcon {
                                  $socicon ? $socicon :
                                  $bicondef;                                              # nur Farbe angegeben
                                  
-               $color        //= $bdchiconcoldef;  
-               $txt            = "$pretxt\nStatus: ".$htitles{isdchawt}{$lang}.' '.(abs $pcurr).' W'.$soctxt;               
+               $color //= $bdchiconcoldef;  
+               $txt     = "$pretxt\nStatus: ".$htitles{isdchawt}{$lang}.' '.(abs $pcurr).' W'.$soctxt;               
            }
-           else {
-               $txt = "$pretxt\nStatus: Standby".$soctxt;
+           else {                                                                        # Standby
+               ($icon, $color) = split '@', $ircmd;
+               $icon           = $icon    ? $icon    : 
+                                 $socicon ? $socicon :
+                                 $bicondef;                                              # nur Farbe angegeben  
+                                
+               $color //= $biccolrcddef;
+               $txt     = "$pretxt\nStatus: Standby".$soctxt;
            }
       }
       else {                                                                             # zukünftiger Zeitraum (Prognose)
