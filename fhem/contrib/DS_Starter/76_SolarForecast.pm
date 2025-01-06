@@ -126,7 +126,6 @@ BEGIN {
           ReplaceEventMap
           readingFnAttributes
           setKeyValue
-          sortTopicNum
           sunrise_abs_dat
           sunset_abs_dat
           FW_cmd
@@ -158,9 +157,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.42.0" => "05.01.2025  change socslidereg to batsocslidereg, _batChargeRecmd: add value to nexthours ".
+  "1.42.0" => "06.01.2025  change socslidereg to batsocslidereg, _batChargeRecmd: add value to nexthours ".
                            "entryGraphic: enrich hfcg hash, __normDecPlaces: use it from/to battery, ".
-                           "setupBatteryDevXX : new icon & show key, maxbatteries set to 3 ",
+                           "setupBatteryDevXX : new icon & show key, colour of icon can be changed separately, maxbatteries set to 3 ".
+                           "medianArray: switch to simpel array sort, Task 1: delete Weather-API status data at night ",
   "1.41.4" => "02.01.2025  minor change of Logtext, new special Readings BatPowerIn_Sum, BatPowerOut_Sum ".
                            "rename ctrlStatisticReadings to ctrlSpecialReadings ",
   "1.41.3" => "01.01.2025  write/read battery values 0 .. maxbatteries to/from pvhistrory ".
@@ -458,9 +458,10 @@ my $prodicondef    = 'sani_garden_pump';                                        
 my $cicondef       = 'light_light_dim_100';                                         # default Consumer-Icon
 my $ciconcoldef    = 'darkorange';                                                  # default Consumer-Icon Färbung
 my $bicondef       = 'measure_battery_75';                                          # default Batterie-Icon
-my $biconcoldef    = 'grey';                                                        # default inaktive Batterie-Icon Färbung
-my $bchgiconcoldef = 'green';                                                       # default 'Aufladen' Batterie-Icon Färbung
-my $bdchiconcoldef = 'darkorange';                                                  # default 'Entladen' Batterie-Icon Färbung
+my $biccolrcddef   = 'grey';                                                        # default Batterie-Icon Färbung bei Ladeempfehlung und Inaktivität
+my $biccolnrcddef  = '#cccccc';                                                     # default Batterie-Icon Färbung bei fehlender Ladeempfehlung
+my $bchgiconcoldef = 'darkorange';                                                  # default 'Aufladen' Batterie-Icon Färbung
+my $bdchiconcoldef = '#b32400';                                                     # default 'Entladen' Batterie-Icon Färbung
 my $homeicondef    = 'control_building_control@grey';                               # default Home-Icon
 my $nodeicondef    = 'virtualbox';                                                  # default Knoten-Icon
 my $invicondef     = 'weather_sun';                                                 # default Inverter-icon
@@ -7336,7 +7337,7 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################    
-  
+
   delete $data{$name}{circular}{99}{days2care};                                 # 29.12.2024
   
   $data{$name}{circular}{99}{initdaybatintot01}  = delete $data{$name}{circular}{99}{initdaybatintot}  if(defined $data{$name}{circular}{99}{initdaybatintot});     # 29.12.2024
@@ -7926,7 +7927,8 @@ sub _specialActivities {
           }
 
           my ($rapi, $wapi) = getStatusApiName ($hash); 
-          delete $data{$name}{statusapi}{$rapi}{'?All'} if($rapi);
+          delete $data{$name}{statusapi}{$rapi}{'?All'} if($rapi);                                # Radiation-API Statusdaten (Tageszähler) löschen 
+          delete $data{$name}{statusapi}{$wapi}{'?All'} if($wapi);                                # V 1.42.0 - Weather-API Statusdaten (Tageszähler) löschen 
 
           delete $data{$name}{circular}{99}{initdayfeedin};
           delete $data{$name}{circular}{99}{initdaygcon};
@@ -8134,7 +8136,7 @@ sub __delObsoleteAPIData {
   if (keys %{$data{$name}{solcastapi}}) {
       my $refts = timestringToTimestamp ($date.' 00:00:00');                               # Referenztimestring
 
-      for my $idx (sort keys %{$data{$name}{solcastapi}}) {                             # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
+      for my $idx (sort keys %{$data{$name}{solcastapi}}) {                                # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
           for my $scd (sort keys %{$data{$name}{solcastapi}{$idx}}) {
               my $ds = timestringToTimestamp ($scd);
               delete $data{$name}{solcastapi}{$idx}{$scd} if($ds && $ds < $refts);
@@ -14865,7 +14867,7 @@ sub __batRcmdOnBeam {
           $hfcg->{$kdx}{'rcdchargebat'.$bn} = $hh->{$ds}{$ts}{'rcdchargebat'.$bn} if(defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn});
       }
   }
-    
+    #$hfcg->{9}{'rcdchargebat01'} = 0;
   ## Werte in Anzeigehash einfügen
   ##################################
   my $m     = $paref->{modulo} % 2;
@@ -14897,32 +14899,34 @@ sub __batRcmdOnBeam {
           my $balias    = BatteryVal ($name, $bn, 'balias', $bname);
           my $bpowerin  = BatteryVal ($name, $bn, 'bpowerin',    0);
           my $bpowerout = BatteryVal ($name, $bn, 'bpowerout',   0);
-          my $bpower    = 0;
           
           my $day_str   = $hfcg->{$i}{day_str};
           my $time_str  = $hfcg->{$i}{time_str};
+          
+          my ($soc, $bpower);
           
           if ($day_str eq $day && $time_str eq $chour) {                                              # akt. Leistung nur für aktuelle Stunde
               $bpower = $bpowerin  ? $bpowerin      :
                         $bpowerout ? 0 - $bpowerout :                                                 # __substituteIcon: bpowerout als NEGATIVEN Wert übergeben!
                         0;
+                        
+              $soc    = BatteryVal ($name, $bn, 'bcharge', 0);
           }
           
-          my ($bicon, $status) = __substituteIcon ( { name  => $name,                                 # Icon / Status des Batterie Devices
+          my ($bicon, $title) = __substituteIcon ( { name  => $name,                                  # Icon / Status des Batterie Devices
                                                       pn    => $bn,
                                                       ptyp  => 'battery',
+                                                      flag  => $hfcg->{$i}{'rcdchargebat'.$bn},
+                                                      msg1  => $balias,
+                                                      soc   => $soc,
                                                       pcurr => $bpower,                                            
                                                       lang  => $lang
                                                     }
                                                   ); 
                                                  
-          debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): $bpower W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : '-'));
-  
-          $status             = $status ? "Status: $status" : '';
+          debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): ".(defined $bpower ? $bpower : '-')." W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : '-'));
           
-          my ($image, $title) = !defined $hfcg->{$i}{'rcdchargebat'.$bn} ? ('','') :
-                                $hfcg->{$i}{'rcdchargebat'.$bn}          ? (FW_makeImage ($bicon,''),  "$balias\n".$htitles{bcharrcd}{$lang}."\n$status") : 
-                                ('', "$balias\n".$htitles{bncharcd}{$lang}."\n$status");
+          my $image = defined $hfcg->{$i}{'rcdchargebat'.$bn} ? FW_makeImage ($bicon) : '';
           
           $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
       }
@@ -15631,6 +15635,9 @@ return $ret;
 #       und setze ggf. Ersatzwerte
 #       ptyp    - Typ der Entität
 #       $pn     - Positionsnummer (01...max)
+#       flag    - ein beliebiges Statusflag zur Auswertung
+#       msg1    - Text zur freien Verwendung
+#       soc     - der SOC bei Batterien
 #       $don    - Day or Night
 #       $pcurr  - aktuelle Leistung / Verbrauch
 ################################################################
@@ -15640,6 +15647,9 @@ sub __substituteIcon {
   my $hash  = $paref->{hash} // $defs{$name};
   my $ptyp  = $paref->{ptyp};
   my $pn    = $paref->{pn};
+  my $msg1  = $paref->{msg1};
+  my $flag  = $paref->{flag};
+  my $soc   = $paref->{soc};
   my $don   = $paref->{don};
   my $pcurr = $paref->{pcurr};
   my $lang  = $paref->{lang};
@@ -15655,27 +15665,61 @@ sub __substituteIcon {
       }
   }
   elsif ($ptyp eq 'battery') {                                                           # Icon Batterie 
-      my ($iinact, $icharge, $idischrg) = split ':', BatteryVal ($hash, $pn, 'bicon', $bicondef);
+      my ($ircmd, $icharge, $idischrg, $inorcmd) = split ':', BatteryVal ($hash, $pn, 'bicon', $bicondef);
+            
+      my $soctxt = '';
+      my $pretxt = '';
+      my $socicon;
       
-      $iinact         = $iinact   ? $iinact   : $bicondef;
-      $icharge        = $icharge  ? $icharge  : $iinact;
-      $idischrg       = $idischrg ? $idischrg : $iinact;
-      ($icon, $color) = split '@', $iinact;                                              # default
-      
-      if ($pcurr) {                                                                      
-           if ($pcurr > 0) {                                                             # Batterie wird aufgeladen
-               ($icon, $color) = split '@', $icharge;
-               $color        //= $bchgiconcoldef;
-               $txt            = $htitles{ischawth}{$lang}.' '.$pcurr.' W';
-           }
-           else {                                                                        # Batterie wird entladen
-               ($icon, $color) = split '@', $idischrg;
-               $color        //= $bdchiconcoldef;  
-               $txt            = $htitles{isdchawt}{$lang}.' '.(abs $pcurr).' W';               
-           }
+      if (defined $soc) {
+          $soctxt  = "\nSOC: ".$soc;
+          $socicon = $soc >= 95 ? 'measure_battery_100' :
+                     $soc >= 75 ? 'measure_battery_75'  :
+                     $soc >= 50 ? 'measure_battery_50'  :
+                     $soc >= 25 ? 'measure_battery_25'  :
+                     'measure_battery_0';
       }
       
-      $color //= $biconcoldef;
+      $ircmd    = $ircmd    ? $ircmd    : $bicondef;
+      $icharge  = $icharge  ? $icharge  : $bicondef;
+      $idischrg = $idischrg ? $idischrg : $bicondef;
+      $inorcmd  = $inorcmd  ? $inorcmd  : $bicondef;      
+      
+      if (defined $flag) {                                                               # Empfehlungszeitraum                                                             
+          if ($flag) {                                                                   # Ladeempfehlung
+              ($icon, $color) = split '@', $ircmd;
+              $icon           = $icon ? $icon : $bicondef;                               # nur Farbe angegeben              
+              $color        //= $biccolrcddef;
+              $pretxt         = "$msg1\n".$htitles{bcharrcd}{$lang};
+          }
+          else {                                                                         # keine Ladeempfehlung
+              ($icon, $color) = split '@', $inorcmd;
+              $icon           = $icon ? $icon : $bicondef;                               # nur Farbe angegeben              
+              $color        //= $biccolnrcddef;
+              $pretxt         = "$msg1\n".$htitles{bncharcd}{$lang};
+          }
+      }
+      
+      if (defined $pcurr) {                                                              # aktueller Zusatnd                                      
+           if ($pcurr > 0) {                                                             # Batterie wird aufgeladen
+               ($icon, $color) = split '@', $icharge;
+               $icon           = $icon ? $icon : $bicondef;                              # nur Farbe angegeben
+               $color        //= $bchgiconcoldef;
+               $txt            = "$pretxt\nStatus: ".$htitles{ischawth}{$lang}.' '.$pcurr.' W'.$soctxt;
+           }
+           elsif ($pcurr < 0) {                                                          # Batterie wird entladen
+               ($icon, $color) = split '@', $idischrg;
+               $icon           = $icon ? $icon : $bicondef;                              # nur Farbe angegeben
+               $color        //= $bdchiconcoldef;  
+               $txt            = "$pretxt\nStatus: ".$htitles{isdchawt}{$lang}.' '.(abs $pcurr).' W'.$soctxt;               
+           }
+           else {
+               $txt = "$pretxt\nStatus: Standby".$soctxt;
+           }
+      }
+      else {                                                                             # zukünftiger Zeitraum (Prognose)
+          $txt = $pretxt.$soctxt;
+      }
   }
   elsif ($ptyp eq 'producer') {                                                          # Icon Producer
       ($icon, $color) = split '@', ProducerVal ($hash, $pn, 'picon', $prodicondef); 
@@ -18301,8 +18345,8 @@ sub medianArray {
   return undef if(ref $aref ne 'ARRAY' || !scalar @{$aref});
   
   my $enum   = scalar @{$aref};                                         # Anzahl der Elemente im Array 
-  my @sorted = sortTopicNum ('asc', @{$aref});
-  
+  my @sorted = sort { $a <=> $b } @{$aref};                             # Numerisch aufsteigend
+
   if ($enum % 2) {                                                      # Array enthält ungerade Anzahl Elemente
       return $sorted[$enum/2];                                          # ungerade Elemente -> Median Element steht in der Mitte von @sorted
   }
@@ -22790,7 +22834,7 @@ to ensure that the system configuration is correct.
        <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
                                 cap=&lt;Option&gt; [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
                                 [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]         <br>
-                                [icon=&lt;inactive&gt;[@&lt;Color&gt;][:&lt;charge&gt;[@&lt;Color&gt;]][:&lt;discharge&gt;[@&lt;Color&gt;]]] </b> <br><br>
+                                [[icon=&lt;recomm&gt;@&lt;Color&gt;]:[&lt;charge&gt;@&lt;Color&gt;]:[&lt;discharge&gt;@&lt;Color&gt;]:[&lt;omit&gt;@&lt;Color&gt;]]  </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data.
        The module assumes that the numerical value of the readings is always positive.
@@ -22810,10 +22854,12 @@ to ensure that the system configuration is correct.
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                                </td></tr>
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                             </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
-           <tr><td> <b>icon</b>      </td><td>Icon and, if applicable, colour for displaying the battery in the bar chart (optional)                        </td></tr>
-           <tr><td>                  </td><td><b>&lt;inactive&gt;</b> - Charging is recommended but inactive (no charging or discharging)                   </td></tr>
-           <tr><td>                  </td><td><b>&lt;charge&gt;</b> - the battery is currently being charged                                                </td></tr>
-		   <tr><td>                  </td><td><b>&lt;discharge&gt;</b> - the battery is currently being discharged                                          </td></tr>
+           <tr><td> <b>icon</b>      </td><td>Icon and/or (only) colour for displaying the battery in the bar chart (optional)                              </td></tr>
+           <tr><td>                  </td><td>The colour can be specified as a name (e.g. blue) or HEX value (e.g. #d9d9d9).                                </td></tr>
+           <tr><td>                  </td><td><b>&lt;recomm&gt;</b> - Charging is recommended but inactive (no charging or discharging)                     </td></tr>
+           <tr><td>                  </td><td><b>&lt;charge&gt;</b> - is used when the battery is currently being charged                                   </td></tr>
+		   <tr><td>                  </td><td><b>&lt;discharge&gt;</b> - is used when the battery is currently being discharged                             </td></tr>
+           <tr><td>                  </td><td><b>&lt;omit&gt;</b> - is used when charging is not recommended                                                </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>show</b>      </td><td>Control of the battery display in the bar graph (optional)                                                    </td></tr>
            <tr><td>                  </td><td><b>0</b> - no display of the device (default)                                                                 </td></tr>
@@ -22839,7 +22885,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh icon=measure_battery_50@grey:measure_battery_100@green:measure_battery_100@red
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
        </ul>
        <br>
 
@@ -25256,7 +25302,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; 
                                 cap=&lt;Option&gt; [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
                                 [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]     <br>
-                                [icon=&lt;inaktiv&gt;[@&lt;Farbe&gt;][:&lt;aufladen&gt;[@&lt;Farbe&gt;]][:&lt;entladen&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
+                                [[icon=&lt;empfohlen&gt;@&lt;Farbe&gt;]:[&lt;aufladen&gt;@&lt;Farbe&gt;]:[&lt;entladen&gt;@&lt;Farbe&gt;]:[icon=&lt;unterlassen&gt;@&lt;Farbe&gt;]]  </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
        Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
@@ -25276,10 +25322,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
            <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
-           <tr><td> <b>icon</b>      </td><td>Icon und ggf. Farbe zur Darstellung der Batterie in der Balkengrafik (optional)                          </td></tr>
-           <tr><td>                  </td><td><b>&lt;inaktiv&gt;</b> - die Aufladung ist empfohlen aber inaktiv (kein Aufladen oder Entladen)          </td></tr>
-           <tr><td>                  </td><td><b>&lt;aufladen&gt;</b> - die Batterie wird aktuell aufgeladen                                           </td></tr>
-		   <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - die Batterie wird aktuell entladen                                             </td></tr>
+           <tr><td> <b>icon</b>      </td><td>Icon und/oder (nur) Farbe zur Darstellung der Batterie in der Balkengrafik (optional)                    </td></tr>
+           <tr><td>                  </td><td>Die Farbe kann als Name (z.B. blue) oder HEX-Wert (z.B. #d9d9d9) angegeben werden.                       </td></tr>
+           <tr><td>                  </td><td><b>&lt;empfohlen&gt;</b> - die Aufladung ist empfohlen aber inaktiv (kein Aufladen oder Entladen)        </td></tr>
+           <tr><td>                  </td><td><b>&lt;aufladen&gt;</b> - wird verwendet wenn die Batterie aktuell aufgeladen wird                       </td></tr>
+		   <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - wird verwendet wenn die Batterie aktuell entladen wird                         </td></tr>
+           <tr><td>                  </td><td><b>&lt;unterlassen&gt;</b> - wird verwendet wenn die Aufladung nicht empfohlen ist                       </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>show</b>      </td><td>Steuerung der Anzeige der Batterie in der Balkengrafik (optional)                                        </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Anzeige des Gerätes (default)                                                           </td></tr>
@@ -25305,7 +25353,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh icon=measure_battery_50@grey:measure_battery_100@green:measure_battery_100@red
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
        </ul>
        <br>
 
