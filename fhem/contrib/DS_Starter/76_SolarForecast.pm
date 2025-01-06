@@ -14445,7 +14445,7 @@ sub _beamGraphic {
   my $beam1cont  = $paref->{beam1cont};
   my $beam2cont  = $paref->{beam2cont};
 
-  $lotype  = 'single' if($beam1cont eq $beam2cont);          # User Auswahl Layout überschreiben bei gleichen Beamcontent !
+  $lotype = 'single' if($beam1cont eq $beam2cont);           # User Auswahl Layout überschreiben bei gleichen Beamcontent !
 
   # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
   # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
@@ -14883,9 +14883,9 @@ sub __batRcmdOnBeam {
       
       my $ii  = 0;
       $ret   .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                 # freier Platz am Anfang     
-      
+
       for my $i (0..($maxhours * 2) - 1) {
-          if (!$show_night && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
+          if (!$show_night && $hfcg->{$i}{weather} > 99 && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
               debugLog ($paref, 'graphic', "Battery $bn recommandation pos >$i< skipped due to don't show night condition") if($ii < $maxhours);
               next;
           };
@@ -14919,15 +14919,16 @@ sub __batRcmdOnBeam {
           debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): $bpower W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : '-'));
   
           $status             = $status ? "Status: $status" : '';
-          my ($image, $title) = !defined $hfcg->{$i}{'rcdchargebat'.$bn} ? ('','') :
-                                $hfcg->{$i}{'rcdchargebat'.$bn}          ? (FW_makeImage ($bicon,''),  $htitles{bcharrcd}{$lang}) : 
-                                ('', $htitles{bncharcd}{$lang});
           
-          $ret .= "<td title='$balias\n$title\n$status' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
+          my ($image, $title) = !defined $hfcg->{$i}{'rcdchargebat'.$bn} ? ('','') :
+                                $hfcg->{$i}{'rcdchargebat'.$bn}          ? (FW_makeImage ($bicon,''),  $balias.'\n'.$htitles{bcharrcd}{$lang}) : 
+                                ('', $balias.'\n'.$htitles{bncharcd}{$lang});
+          
+          $ret .= "<td title='$title\n$status' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
       }
+      
+      $ret .= "<td class='solarfc'></td></tr>" if($ret);                                                  # freier Platz am Ende der Icon Zeile
   }
-  
-  $ret .= "<td class='solarfc'></td></tr>" if($ret);                                                  # freier Platz am Ende der Icon Zeile
 
 return $ret;
 }
@@ -22809,10 +22810,10 @@ to ensure that the system configuration is correct.
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                                </td></tr>
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                             </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
-           <tr><td> <b>icon</b>      </td><td>Icon for displaying the battery in the bar chart (optional)                                                   </td></tr>
-           <tr><td>                  </td><td><b>&lt;inactive&gt;</b> - Icon and possibly colour during inactivity (no charging or discharging)             </td></tr>
-           <tr><td>                  </td><td><b>&lt;charge&gt;</b> - Icon and possibly colour when the battery is charging                                 </td></tr>
-		   <tr><td>                  </td><td><b>&lt;discharge&gt;</b> - Icon and possibly colour when the battery is discharged                            </td></tr>
+           <tr><td> <b>icon</b>      </td><td>Icon and, if applicable, colour for displaying the battery in the bar chart (optional)                        </td></tr>
+           <tr><td>                  </td><td><b>&lt;inactive&gt;</b> - Charging is recommended but inactive (no charging or discharging)                   </td></tr>
+           <tr><td>                  </td><td><b>&lt;charge&gt;</b> - the battery is currently being charged                                                </td></tr>
+		   <tr><td>                  </td><td><b>&lt;discharge&gt;</b> - the battery is currently being discharged                                          </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>show</b>      </td><td>Control of the battery display in the bar graph (optional)                                                    </td></tr>
            <tr><td>                  </td><td><b>0</b> - no display of the device (default)                                                                 </td></tr>
@@ -25275,10 +25276,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
            <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
-           <tr><td> <b>icon</b>      </td><td>Icon zur Darstellung der Batterie in der Balkengrafik (optional)                                         </td></tr>
-           <tr><td>                  </td><td><b>&lt;inaktiv&gt;</b> - Icon und ggf. Farbe bei Inaktivität (kein Aufladen oder Entladen)               </td></tr>
-           <tr><td>                  </td><td><b>&lt;aufladen&gt;</b> - Icon und ggf. Farbe wenn die Batterie aufgeladen wird                          </td></tr>
-		   <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - Icon und ggf. Farbe wenn die Batterie entladen wird                            </td></tr>
+           <tr><td> <b>icon</b>      </td><td>Icon und ggf. Farbe zur Darstellung der Batterie in der Balkengrafik (optional)                          </td></tr>
+           <tr><td>                  </td><td><b>&lt;inaktiv&gt;</b> - die Aufladung ist empfohlen aber inaktiv (kein Aufladen oder Entladen)          </td></tr>
+           <tr><td>                  </td><td><b>&lt;aufladen&gt;</b> - die Batterie wird aktuell aufgeladen                                           </td></tr>
+		   <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - die Batterie wird aktuell entladen                                             </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>show</b>      </td><td>Steuerung der Anzeige der Batterie in der Balkengrafik (optional)                                        </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Anzeige des Gerätes (default)                                                           </td></tr>
