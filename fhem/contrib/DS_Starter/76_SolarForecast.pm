@@ -161,7 +161,7 @@ my %vNotesIntern = (
                            "entryGraphic: enrich hfcg hash, __normDecPlaces: use it from/to battery, ".
                            "setupBatteryDevXX : new icon & show key, colour of icon can be changed separately, maxbatteries set to 3 ".
                            "medianArray: switch to simpel array sort, Task 1: delete Weather-API status data at night ".
-                           "add SoC forecast to NextHours store ",
+                           "add SoC forecast to NextHours store, Battery bar chart: display of the device in the bar chart level 1 or 2 ",
   "1.41.4" => "02.01.2025  minor change of Logtext, new special Readings BatPowerIn_Sum, BatPowerOut_Sum ".
                            "rename ctrlStatisticReadings to ctrlSpecialReadings ",
   "1.41.3" => "01.01.2025  write/read battery values 0 .. maxbatteries to/from pvhistrory ".
@@ -12760,7 +12760,6 @@ sub entryGraphic {
       fsize          => AttrNum    ($name, 'graphicSpaceSize',                  24),
       maxVal         => AttrNum    ($name, 'graphicBeam1MaxVal',                 0),                # dyn. Anpassung der Balkenhöhe oder statisch ?
       show_night     => AttrNum    ($name, 'graphicShowNight',                   0),                # alle Balken (Spalten) anzeigen ?
-      show_bat       => 1,                                                                          # Freischaltung Anzeige Batterie
       show_diff      => AttrVal    ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
       weather        => AttrNum    ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
       colorw         => AttrVal    ($name, 'graphicWeatherColor',      $wthcolddef),                # Wetter Icon Farbe Tag
@@ -12843,10 +12842,11 @@ sub entryGraphic {
   #########################
   if ($gsel =~ /both/xs || $gsel =~ /forecast/xs) {
       my %hfcg1;
+      $paref->{chartlvl} = 1;                                                                              # Balkengrafik Ebene 1
 
       ## Werte aktuelle Stunde
       ##########################
-      $paref->{hfcg}     = \%hfcg1;                                                                        # (hfcg = hash forecast graphic)
+      $paref->{hfcg}     = \%hfcg1;                                                                        # hfcg = hash forecast graphic
       $paref->{thishour} = _beamGraphicFirstHour ($paref);
 
       ## get consumer list and display it in Graphics
@@ -12870,6 +12870,7 @@ sub entryGraphic {
 
           $hfcg2{barcount}    = $hfcg1{barcount};                                                          # Anzahl Balken der Ebene1 zur Begrenzung Ebene 2 übernehmen
 
+          $paref->{chartlvl}  = 2;                                                                         # Balkengrafik Ebene 2
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
           $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',              $b3coldef);
@@ -12878,7 +12879,6 @@ sub entryGraphic {
           $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',      $b4fontcoldef);
           $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height});
           $paref->{weather}   = 0;
-          $paref->{show_bat}  = 0;
 
           # Werte aktuelle Stunde
           ##########################
@@ -14444,7 +14444,6 @@ sub _beamGraphic {
   my $hfcg       = $paref->{hfcg};
   my $maxhours   = $paref->{maxhours};
   my $weather    = $paref->{weather};
-  my $show_bat   = $paref->{show_bat};                       # Ladeempfehlungen anzeigen?
   my $show_night = $paref->{show_night};                     # alle Balken (Spalten) anzeigen ?
   my $show_diff  = $paref->{show_diff};                      # zusätzliche Anzeige $di{} in allen Typen
   my $lotype     = $paref->{lotype};
@@ -14475,7 +14474,7 @@ sub _beamGraphic {
   my $barcount = $hfcg->{barcount} // 9999;                                                                     # Anzahl Balken der vorangegangenen Ebene zur Begrenzung dieser Ebene
   my $ret      = q{};
   $ret        .= __weatherOnBeam ($paref) if($weather);
-  $ret        .= __batRcmdOnBeam ($paref) if($show_bat);
+  $ret        .= __batRcmdOnBeam ($paref);
   my $m        = $paref->{modulo} % 2;
 
   if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
@@ -14784,12 +14783,13 @@ sub __weatherOnBeam {
   my $width      = $paref->{width};
   my $lang       = $paref->{lang};
 
-  my $ret = q{};
-  my $m   = $paref->{modulo} % 2;
+  my $barcount = $hfcg->{barcount} // 9999;                                                                  # Anzahl Balken der vorangegangenen Ebene zur Begrenzung dieser Ebene
+  my $m        = $paref->{modulo} % 2;
+  my $ret      = q{};
+  $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                       # freier Platz am Anfang
+
   my $ii  = 0;
-
-  $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                              # freier Platz am Anfang
-
+  
   for my $i (0..($maxhours * 2) - 1) {
       last if (!defined ($hfcg->{$i}{weather}));
 
@@ -14807,7 +14807,7 @@ sub __weatherOnBeam {
       };
                                                                                                              
       $ii++;                                                                                                 # wieviele Stunden Icons haben sind beechnet?
-      last if($ii > $maxhours);
+      last if($ii > $maxhours || $ii > $barcount);
                                                                                                              # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
       my ($icon_name, $title) = $hfcg->{$i}{weather} > 100                            ?
                                 weather_icon ($name, $lang, $hfcg->{$i}{weather}-100) :
@@ -14891,7 +14891,7 @@ sub __batRcmdOnBeam {
   ## Werte in Anzeigehash einfügen
   ##################################
   my $m     = $paref->{modulo} % 2;
-  my $day   = strftime "%d", localtime($t);                                                           # aktueller Tag (range 01 .. 31)
+  my $day   = strftime "%d", localtime($t);                                                           # aktueller Tag (range 01 .. 31) 
   my $chour = strftime "%H", localtime($t);                                                           # aktuelle Stunde in 24h format (00-23) 
   my $ret   = q{};
   
@@ -14901,11 +14901,12 @@ sub __batRcmdOnBeam {
       next if($err);
       
       my $bshow = BatteryVal ($name, $bn, 'bshowingraph', 0);
-      next if(!$bshow);
+      next if($bshow != $paref->{chartlvl});                                                          # Anzeige nur auf Grafikebene "chartlvl"
       
-      my $ii  = 0;
-      $ret   .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                 # freier Platz am Anfang     
-
+      my $barcount = $hfcg->{barcount} // 9999;                                                       # Anzahl Balken der vorangegangenen Ebene zur Begrenzung dieser Ebene
+      $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                            # freier Platz am Anfang     
+      my $ii       = 0;
+      
       for my $i (0..($maxhours * 2) - 1) {
           if (!$show_night && $hfcg->{$i}{weather} > 99 && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
               debugLog ($paref, 'graphic', "Battery $bn recommandation pos >$i< skipped due to don't show night condition") if($ii < $maxhours);
@@ -14913,7 +14914,7 @@ sub __batRcmdOnBeam {
           };
           
           $ii++;                                                                                      # wieviele Stunden Icons sind bisher beechnet?
-          last if($ii > $maxhours);
+          last if($ii > $maxhours || $ii > $barcount);
           
           my $bname     = BatteryVal ($name, $bn, 'bname',      '');
           my $balias    = BatteryVal ($name, $bn, 'balias', $bname);
@@ -22912,7 +22913,8 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>show</b>      </td><td>Control of the battery display in the bar graph (optional)                                                    </td></tr>
            <tr><td>                  </td><td><b>0</b> - no display of the device (default)                                                                 </td></tr>
-           <tr><td>                  </td><td><b>1</b> - display of the device                                                                              </td></tr>
+           <tr><td>                  </td><td><b>1</b> - Display of the device in the bar chart level 1                                                     </td></tr>
+           <tr><td>                  </td><td><b>2</b> - Display of the device in the bar chart level 2                                                     </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>asynchron</b> </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                   </td></tr>
            <tr><td>                  </td><td>event processing (asynchronous).                                                                              </td></tr>
@@ -25381,7 +25383,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>show</b>      </td><td>Steuerung der Anzeige der Batterie in der Balkengrafik (optional)                                        </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Anzeige des Gerätes (default)                                                           </td></tr>
-           <tr><td>                  </td><td><b>1</b> - Anzeige des Gerätes                                                                           </td></tr>
+           <tr><td>                  </td><td><b>1</b> - Anzeige des Gerätes in der Balkengrafik Ebene 1                                               </td></tr>
+           <tr><td>                  </td><td><b>2</b> - Anzeige des Gerätes in der Balkengrafik Ebene 2                                               </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>asynchron</b> </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch           </td></tr>
            <tr><td>                  </td><td>Eventverarbeitung (asynchron).                                                                           </td></tr>
