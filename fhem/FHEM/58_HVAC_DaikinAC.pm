@@ -28,6 +28,7 @@ use Blocking;
 # REMINDER: Don't forget to update version number in META.json info at bottom of file
 #
 our %HVAC_DaikinAC_VERSION = (
+  "1.0.10"  => "07.01.2025  Added demand control feature (power limitation)",
   "1.0.9"  => "28.05.2020  Added on and off shortcut commands, as expected by for example the Alexa module",
   "1.0.8"  => "21.04.2020  Initial checkin into FHEM repository. Fixed some syntax errors in documentation HTML. No code changes",
   "1.0.7"  => "11.04.2020  Added two examples to define Usage error and documentation; add interval and interval_powered attributes on startup for clarity; Poll daily and monthly power usage statistics once per hour, so that the current days and current months usage are represented correctly",
@@ -194,14 +195,16 @@ sub HVAC_DaikinAC_Write {
 	my $hash	= $defs{$name};
 	Log3 ($name, 5, "$name HVAC_DaikinAC_Write($s): starting");
 
-	my ($chmode, $pow, $f_mode, $stemp, $shum, $f_rate, $f_dir) = (
+	my ($chmode, $pow, $f_mode, $stemp, $shum, $f_rate, $f_dir, $demand_control, $demand_control_limit) = (
 		0,
 		$defs{$name}{"READINGS"}{"pow"}{"VAL"},
 		$defs{$name}{"READINGS"}{"f_mode"}{"VAL"},
 		$defs{$name}{"READINGS"}{"stemp"}{"VAL"},
 		$defs{$name}{"READINGS"}{"shum"}{"VAL"},
 		$defs{$name}{"READINGS"}{"f_rate"}{"VAL"},
-		$defs{$name}{"READINGS"}{"f_dir"}{"VAL"}
+		$defs{$name}{"READINGS"}{"f_dir"}{"VAL"},
+		$defs{$name}{"READINGS"}{"demand_control"}{"VAL"} || 0,
+		$defs{$name}{"READINGS"}{"demand_control_limit"}{"VAL"} || 0
 	);
 
 	# Process changes provided in $s
@@ -228,6 +231,56 @@ sub HVAC_DaikinAC_Write {
 		};
 		$key eq "reboot" && $val == 1 && do {
 			$q = sprintf($q . "common/reboot");
+			last SWITCH;
+		};
+		$key eq "demand_control" && do {
+			my $en_demand=0;
+			my $mode=0;
+			SWITCH2: {
+				$demand_control eq "on" && do {
+					$en_demand=1;
+					$mode=0;
+					last SWITCH2;
+				};
+				$demand_control eq "auto" && do {
+					$en_demand=1;
+					$mode=2;
+					last SWITCH2;
+				};
+				$demand_control eq "timer" && do {
+					$en_demand=1;
+					$mode=1;
+					last SWITCH2;
+				};
+			};
+			SWITCH2: {
+				$val eq "0" && do {
+					$en_demand=0;
+					last SWITCH2;
+				};
+				$val eq "1" && do {
+					$en_demand=1;
+					$mode=0;
+					last SWITCH2;
+				};
+				$val eq "2" && do {
+					$en_demand=1;
+					$mode=2;
+					last SWITCH2;
+				};
+				# Any other value must be a percentage
+				$en_demand=1;
+				$mode=0;
+				$demand_control_limit=int($val/5)*5;
+				$demand_control_limit=40 if $demand_control_limit < 40;
+				$demand_control_limit=100 if $demand_control_limit > 100;
+			};
+
+			$q = sprintf($q . "aircon/set_demand_control?en_demand=%d&mode=%d&max_pow=%d&type=1&moc=0&tuc=0&wec=0&thc=0&frc=0&sac=0&suc=0",
+				$en_demand,
+				$mode,
+				$demand_control_limit
+			);
 			last SWITCH;
 		};
 
@@ -446,6 +499,14 @@ sub HVAC_DaikinAC_Set($@) {
 			$s = sprintf("econo=%d", $val eq "off" || !$val?0:1);
 			last SWITCH;
 		};
+		$cmd eq "demand_control" && do {
+			my $val = shift @a or 1;
+			$val = 0 if $val eq "off";
+			$val = 1 if $val eq "on";
+			$val = 2 if $val eq "auto";
+			$s = sprintf("demand_control=%d", $val);
+			last SWITCH;
+		};
 		$cmd eq "streamer" && do {
 			my $val = shift @a or 1;
 			$s = sprintf("streamer=%d", $val eq "off" || !$val?0:1);
@@ -475,6 +536,7 @@ usage:
 		"rate:".join(',', map{$HVAC_DaikinAC_RATE{$_}} keys %HVAC_DaikinAC_RATE) . " " .
 		"powerful:on,off" . " " .
 		"econo:on,off" . " " .
+		"demand_control:on,auto,off,0,1,2,40,45,50,55,60,65,70,75,80,85,90,95,100" . " " .
 		"streamer:on,off" . " " .
 		"reboot:nodata" . " " .
 		"shum:slider,0,5,100" . " " .
@@ -610,7 +672,7 @@ sub HVAC_DaikinAC_StartPoll($) {
 # Return: true is successfull, false otherwise
 #
 sub HVAC_DaikinAC_Parse {
-	my ($name, $r, $s, $l) = @_;
+	my ($name, $r, $s, $l, $simple) = @_;
 	my @F = split ',', $s;
 	my %L = map { $_ => 1 } split(/,/, $l);
 
@@ -627,6 +689,7 @@ sub HVAC_DaikinAC_Parse {
 		my ($key, $val) = split(/=/, $_, 2);
 		next if !exists($L{$key});
 		SWITCH: {
+			last SWITCH if $simple;
 			$key eq "mode" && do {
 				our %HVAC_DaikinAC_MODE;
 				$r->{"mode"} = $HVAC_DaikinAC_MODE{$val} || 'unknown';
@@ -925,6 +988,27 @@ sub HVAC_DaikinAC_Poll($) {
 	};
 	$r->{"sensor_info"} = $s->content if AttrVal($name, "rawdata", 0);
 
+	#
+	# demand control info (power limit feature)
+	#
+        $req = HTTP::Request->new('GET', 'http://' . $hash->{"HOST"} . "/aircon/get_demand_control");
+        $s = $ua->request($req);
+	my $demand = {};
+	HVAC_DaikinAC_Parse($name, $demand, $s->content, "en_demand,mode,type,max_pow", 1) or do {
+		$r->{"ERR"}="Invalid response on get_demand_control: " . $s->content;
+		goto POLL_END;
+	};
+	if ($demand->{"type"}) {
+		$r->{"demand_control_limit"} = $demand->{"max_pow"} || 100;
+		$r->{"demand_control"} = "off" if !$demand->{"en_demand"};
+		$r->{"demand_control"} = "timer" if $demand->{"en_demand"} && $demand->{"mode"} == 1;
+		$r->{"demand_control"} = "on" if $demand->{"en_demand"} && $demand->{"mode"} == 0;
+		$r->{"demand_control"} = "auto" if $demand->{"en_demand"} && $demand->{"mode"} == 2;
+	} else {
+		$r->{"demand_control_limit"} = 100;
+		$r->{"demand_control"} = "unsupported";
+	}
+	$r->{"get_demand_control"} = $s->content if AttrVal($name, "rawdata", 0);
 
 	Log3($name, 5, "$name HVAC_DaikinAC_Poll(): poll done");
 	Log3($name, 5, "$name HVAC_DaikinAC_Poll(): return " . encode_json($r));
@@ -1116,6 +1200,8 @@ when turned off and 60 seconds when the unit is powered on.</li>
    <li><b>adv</b>: List of currently active additional settings, slash seperated (2=powerful, 13=streamer)</li>
    <li><b>powerful</b>: [ on | off ] Current status of "Powerful" special mode (powerful ventilation, automatically turned off by unit after 20 mins)</li>
    <li><b>econo</b>: [ on | off ] Current status of "Econo" special mode (econo mode)</li>
+   <li><b>demand_control</b>: [ on | off | auto | timer | unsupported ] Current status of "Demand control" (power limitation) feature. Returns "unsupported" if the feature is not available for this unit. In that case, the limit is always 100%</li>
+   <li><b>demand_control_limit</b>: Current / stored limit for the demand control power limitation feature. Limit is only applicable/active when demand_control is set to on. Otherwise, it simply is the stored limit that will become the active limit is "demand_control on" is set.</li>
    <li><b>streamer</b>: [ on | off ] Current status of "Streamer" special mode (ionized air cleaner)</li>
    <li><b>cmpfreq</b>: Current compressor frequency in number of revolutions per second</li>
    <li><b>cmpfreq_max</b>: Maximum compressor frequency observed since creation</li>
@@ -1208,6 +1294,10 @@ attr [devicename] devStateIcon off.*:control_standby@gray on.*cool:frost@blue on
    <li><b>powerful</b>: [ on | off ] Activate or deactivate powerful mode if unit supports remote activation. Older models will not support this option, even though the powerful mode is present and can be controlled through the IR remote.</li>
    <li><b>streamer</b>: [ on | off ] Activate or deactivate ion streamer mode if present</li>
    <li><b>econo</b>: [ on | off ] Activate or deactivate econo mode if present and units supports remote activation</li>
+   <li><b>demand_control</b>: [ on auto off 0 1 40-100 ] Activate or deactivate demand control (power limitation) mode. On restores previous used limit. Off turns the
+limit off. Auto sets automatic control for the limitation feature. No documentation is available from Daikin on exactly what the auto mode does. A percentage
+between 40 and 100 sets the feature to "on" and the limit to the specified percentage. A value lower than 40% is invalid. Setting to 0 is equivalent to setting
+off. Setting to 1 is equivalent to setting the feature on and restoring the previous limit. </li>
    <li><b>reboot</b>: Reboots the units' wifi module</li>
   </ul>
 
@@ -1263,7 +1353,7 @@ attr [devicename] devStateIcon off.*:control_standby@gray on.*cool:frost@blue on
     "Heating",
     "Cooling"
   ],
-  "version": "v1.0.9",
+  "version": "v1.0.10",
   "release_status": "stable",
   "author": [
     "Roel Bouwman (roel@bouwman.net)"
