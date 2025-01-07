@@ -1158,6 +1158,7 @@ Supported adapters are:
  </ul>
 
 <p>
+ <a id="HVAC_DaikinAC-define"><a>
  <b>Define</b>
  <p>
    <code>define &lt;name&gt; HVAC_DaikinAC &lt;hostname or ip&gt; [interval] [interval_powered]</code>
@@ -1252,13 +1253,19 @@ when turned off and 60 seconds when the unit is powered on.</li>
 	</ul>
 
 <p>
+ <a id="HVAC_DaikinAC-attr"><a>
  <b>Attributes</b>
  <ul>
+   <a id="HVAC_DaikinAC-attr-disable"></a>
    <li><b>disable</b>: [ 0 | 1 ] If set to 1, disable all polling. Set will not be possible on a disabled device. If you just need to stop automatic polls, use the "interval" attribute</li>
+   <a id="HVAC_DaikinAC-attr-interval"></a>
    <li><b>interval</b>: Set the polling interval (in seconds). This will override the interval as set in the define command. If set to "0", no more scheduled polling will happen. However, the device will be polled one time directly following a "set" command so that the requested change is reflected in the readings. A poll can also be forced by issuing the "set refresh" command. Keep in mind that any change in ambient or outside temperature will not be reflected in FHEM. Also, any changes resulting from a control action that was initiated through another channel (e.g. the remote control or Daikin's online controller) will not be reflected in the FHEM device readings.</li>
+   <a id="HVAC_DaikinAC-attr-interval_powered"></a>
    <li><b>interval_powered</b>: Set the polling interval (in seconds) in case the unit is turned on.</li>
+   <a id="HVAC_DaikinAC-attr-pwrconsumption"></a>
    <li><b>pwrconsumption</b>: [ 0 | 1 ] If set to 1, power consumption data is read from the unit and stored in the readings specified above. This is not supported by older units, who will return all 0 readings for power usage. All consumption data is represented in kWh, as a floating point number with a precision of 1/10 kWh. For all of the the pwr_period_last readings readings to be correctly updated, automatic polling must be enabled with an interval of at most 3600 seconds (1 hour).</li>
 
+   <a id="HVAC_DaikinAC-attr-rawdata"></a>
    <li><b>rawdata</b>: [ 0 | 1 ] If set to 1, 4 extra readings will be generated:
 	<ul>
 	 <li><b>basic_info</b>: Raw data from get_basic_info request (on new define or after "set refresh")</li>
@@ -1266,6 +1273,7 @@ when turned off and 60 seconds when the unit is powered on.</li>
 	 <li><b>sensor_info</b>: Raw data from get_sensor_info request (on each poll or after set command)</li>
 	 <li><b>control_info</b>: Raw data from get_control_info request (on each poll or after set command)</li>
 	</ul></li>
+   <a id="HVAC_DaikinAC-attr-timeout"></a>
    <li><b>timeout</b>: Sets the request timeout - default 5 seconds. Any request to the airconditioner will be aborted after this interval and readings will not be updated. Only set to a higher value if you have a very slow or unreliable network connection to the airconditioner and you are aware of what you are doing. A value as low a 1 second should work just fine under normal circumstances.</li>
  </ul>
 
@@ -1280,6 +1288,7 @@ attr [devicename] devStateIcon off.*:control_standby@gray on.*cool:frost@blue on
 
 <p>
 
+ <a id="HVAC_DaikinAC-set"><a>
  <b>Set</b>
   <ul>
    <li><b>refresh</b>: Force immediate poll of device - will also request and update version and device info</li>
@@ -1303,6 +1312,7 @@ off. Setting to 1 is equivalent to setting the feature on and restoring the prev
 
 <p>
 
+ <a id="HVAC_DaikinAC-get"><a>
  <b>Get</b>
   <ul>
     No parameters at this time
