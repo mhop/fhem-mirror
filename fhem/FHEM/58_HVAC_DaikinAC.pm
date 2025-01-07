@@ -1006,7 +1006,7 @@ sub HVAC_DaikinAC_Poll($) {
 		$r->{"demand_control"} = "auto" if $demand->{"en_demand"} && $demand->{"mode"} == 2;
 	} else {
 		$r->{"demand_control_limit"} = 100;
-		$r->{"demand_control"} = "unsupported";
+		$r->{"demand_control"} = "NOTSUPPORT";
 	}
 	$r->{"get_demand_control"} = $s->content if AttrVal($name, "rawdata", 0);
 
@@ -1200,7 +1200,7 @@ when turned off and 60 seconds when the unit is powered on.</li>
    <li><b>adv</b>: List of currently active additional settings, slash seperated (2=powerful, 13=streamer)</li>
    <li><b>powerful</b>: [ on | off ] Current status of "Powerful" special mode (powerful ventilation, automatically turned off by unit after 20 mins)</li>
    <li><b>econo</b>: [ on | off ] Current status of "Econo" special mode (econo mode)</li>
-   <li><b>demand_control</b>: [ on | off | auto | timer | unsupported ] Current status of "Demand control" (power limitation) feature. Returns "unsupported" if the feature is not available for this unit. In that case, the limit is always 100%</li>
+   <li><b>demand_control</b>: [ on | off | auto | timer | NOTSUPPORT ] Current status of "Demand control" (power limitation) feature. Returns "NOTSUPPORT" if the feature is not available for this unit. In that case, the limit is always 100%</li>
    <li><b>demand_control_limit</b>: Current / stored limit for the demand control power limitation feature. Limit is only applicable/active when demand_control is set to on. Otherwise, it simply is the stored limit that will become the active limit is "demand_control on" is set.</li>
    <li><b>streamer</b>: [ on | off ] Current status of "Streamer" special mode (ionized air cleaner)</li>
    <li><b>cmpfreq</b>: Current compressor frequency in number of revolutions per second</li>
