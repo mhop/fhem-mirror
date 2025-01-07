@@ -157,10 +157,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.42.0" => "06.01.2025  change socslidereg to batsocslidereg, _batChargeRecmd: add value to nexthours ".
+  "1.42.0" => "07.01.2025  change socslidereg to batsocslidereg, _batChargeRecmd: add value to nexthours ".
                            "entryGraphic: enrich hfcg hash, __normDecPlaces: use it from/to battery, ".
                            "setupBatteryDevXX : new icon & show key, colour of icon can be changed separately, maxbatteries set to 3 ".
-                           "medianArray: switch to simpel array sort, Task 1: delete Weather-API status data at night ",
+                           "medianArray: switch to simpel array sort, Task 1: delete Weather-API status data at night ".
+                           "add SoC forecast to NextHours store ",
   "1.41.4" => "02.01.2025  minor change of Logtext, new special Readings BatPowerIn_Sum, BatPowerOut_Sum ".
                            "rename ctrlStatisticReadings to ctrlSpecialReadings ",
   "1.41.3" => "01.01.2025  write/read battery values 0 .. maxbatteries to/from pvhistrory ".
@@ -9815,18 +9816,28 @@ sub _batChargeRecmd {
   
   debugLog ($paref, 'batteryManagement', "Bat XX Charge Rcmd - Summary Power limit of all Inverter (except feed 'grid'): $inplim W");
   
-  for my $bn (1..$maxbatteries) {
+  ## Schleife über alle Batterien
+  #################################
+  for my $bn (1..$maxbatteries) {                                                                # für jede Batterie
       $bn = sprintf "%02d", $bn;
   
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
   
-      my $batinstcap = BatteryVal ($hash, $bn, 'binstcap', 0);                                   # installierte Batteriekapazität Wh
-      my $soc        = BatteryVal ($hash, $bn, 'bcharge',  0);                                   # aktuelle Ladung in %
+      my $batinstcap = BatteryVal  ($hash, $bn, 'binstcap', 0);                                  # installierte Batteriekapazität Wh
+      my $soc        = BatteryVal  ($hash, $bn, 'bcharge',  0);                                  # aktuelle Ladung in %
+      my $batoptsoc  = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                  # aktueller optimierter SoC
                   
       if (!$inplim || !$batinstcap) {
           debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation are not met. Exit.");
           return;
+      }
+      
+      my $cgbt   = AttrVal ($name, 'ctrlBatSocManagement'.$bn, undef);
+      my $lowSoc = 0;
+      
+      if ($cgbt) {
+          ($lowSoc) = __parseAttrBatSoc ($name, $cgbt);
       }
       
       debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - Installed Battery capacity: $batinstcap Wh");
@@ -9859,21 +9870,27 @@ sub _batChargeRecmd {
           
           $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
           
-          ## Ladeempfehlung
-          ###################
-          if ( $whneed + $sfmargin >= $spday  ) {$rcmd = 1}                                      # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+          ## SOC-Prognose und Ladeempfehlung
+          ####################################
+          my $progsoc = sprintf "%.0f", (100 / $batinstcap * ($batinstcap - $whneed));           # Prognose SoC
+          $progsoc    = $progsoc < $lowSoc    ? $lowSoc    : 
+                        $progsoc < $batoptsoc ? $batoptsoc :
+                        $progsoc;       
+          
+          if ( $whneed + $sfmargin >= $spday  )      {$rcmd = 1}                                 # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
           if ( !$num && $pvCu - $curcon >= $inplim ) {$rcmd = 1}                                 # Ladeempfehlung wenn akt. PV Leistung >= WR-Leistungsbegrenzung
 
-          my $msg = "(E need: $whneed Wh -> Surplus Day: $spday Wh, Curr PV: $pvCu W, Curr Consumption: $curcon W, Limit: $inplim W)";
+          my $msg = "(SoC forecast: $progsoc, need: $whneed Wh -> Surplus Day: $spday Wh, Curr PV: $pvCu W, Curr Consumption: $curcon W, Limit: $inplim W)";
           
           if ($num) {
-              $msg = "(need: $whneed Wh -> Surplus Day: $spday Wh)";
+              $msg = "(SoC forecast: $progsoc, need: $whneed Wh -> Surplus Day: $spday Wh)";
           }
           else {
               storeReading ('Battery_ChargeRecommended_'.$bn, $rcmd);                            # Reading nur für aktuelle Stunde
           }
           
           $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $rcmd;
+          $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
           
           debugLog ($paref, 'batteryManagement', "Bat $bn Charge activation $stt -> $rcmd $msg");
           
@@ -9892,7 +9909,7 @@ sub _batChargeRecmd {
               }
           }
           
-          $whneed -= sprintf "%.0f", ($pvfc - $confc);
+          $whneed -= sprintf "%.0f", ($rcmd ? $pvfc - $confc : 0);                               # PV Prognose nur einbeziehen wenn Ladeempfehlung                               
           $whneed  = $whneed < 0 ? 0 : $whneed; 
       }
   }
@@ -14848,7 +14865,9 @@ sub __batRcmdOnBeam {
           next if(!defined $stt || !defined $rcdc);
           
           my (undef,undef,$day_str,$time_str) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
+          
           $hh->{$day_str}{$time_str}{'rcdchargebat'.$bn} = $rcdc;
+          $hh->{$day_str}{$time_str}{'soc'.$bn}          = NexthoursVal ($name, $idx, 'soc'.$bn, undef);
       }
   }
   
@@ -14865,6 +14884,7 @@ sub __batRcmdOnBeam {
           $ds = sprintf "%02d", $ds;
           
           $hfcg->{$kdx}{'rcdchargebat'.$bn} = $hh->{$ds}{$ts}{'rcdchargebat'.$bn} if(defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn});
+          $hfcg->{$kdx}{'soc'.$bn}          = $hh->{$ds}{$ts}{'soc'.$bn}          if(defined $hh->{$ds}{$ts}{'soc'.$bn});
       }
   }
     #$hfcg->{9}{'rcdchargebat01'} = 0;
@@ -14902,8 +14922,9 @@ sub __batRcmdOnBeam {
           
           my $day_str   = $hfcg->{$i}{day_str};
           my $time_str  = $hfcg->{$i}{time_str};
+          my $soc       = $hfcg->{$i}{'soc'.$bn};
           
-          my ($soc, $bpower);
+          my ($bpower);
           
           if ($day_str eq $day && $time_str eq $chour) {                                              # akt. Leistung nur für aktuelle Stunde
               $bpower = $bpowerin  ? $bpowerin      :
@@ -14924,7 +14945,9 @@ sub __batRcmdOnBeam {
                                                     }
                                                   ); 
                                                  
-          debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): ".(defined $bpower ? $bpower : '-')." W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : '-'));
+          debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): ".(defined $bpower ? $bpower : 'undef').
+                                       " W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : 'undef').
+                                       ", SoC: ".(defined $hfcg->{$i}{'soc'.$bn} ? $hfcg->{$i}{'soc'.$bn} : 'undef')." %");
           
           my $image = defined $hfcg->{$i}{'rcdchargebat'.$bn} ? FW_makeImage ($bicon) : '';
           
@@ -15672,11 +15695,13 @@ sub __substituteIcon {
       my $socicon;
       
       if (defined $soc) {
-          $soctxt  = "\nSOC: ".$soc." %";
-          $socicon = $soc >= 95 ? 'measure_battery_100' :
-                     $soc >= 75 ? 'measure_battery_75'  :
-                     $soc >= 50 ? 'measure_battery_50'  :
-                     $soc >= 25 ? 'measure_battery_25'  :
+          $soctxt  = defined $pcurr ? "\nSoC: ".$soc." %" : 
+                     "\nSoC Prognose: ".$soc." %";                                       # defined pcurr? -> aktuelle Stunde
+          
+          $socicon = $soc >= 80 ? 'measure_battery_100' :
+                     $soc >= 60 ? 'measure_battery_75'  :
+                     $soc >= 40 ? 'measure_battery_50'  :  
+                     $soc >= 20 ? 'measure_battery_25'  :
                      'measure_battery_0';
       }
       
@@ -17339,12 +17364,15 @@ sub listDataPool {
           my $sunaz   = NexthoursVal ($name, $idx, 'sunaz',            '-');
           my $sunalt  = NexthoursVal ($name, $idx, 'sunalt',           '-');
           
-          my ($rcdbat);
+          my ($rcdbat, $socs);
           for my $bn (1..$maxbatteries) {                                            # alle Batterien
               $bn = sprintf "%02d", $bn;
               my $rcdcharge = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, '-');
+              my $socxx     = NexthoursVal ($name, $idx, 'soc'.$bn, '-');
               $rcdbat      .= ', ' if($rcdbat);
               $rcdbat      .= "rcdchargebat${bn}: $rcdcharge";
+              $socs        .= ', ' if($socs);
+              $socs        .= "soc${bn}: $socxx";
           }
 
           $sq        .= "\n" if($sq);
@@ -17358,6 +17386,8 @@ sub listDataPool {
           $sq        .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt";
           $sq        .= "\n              ";
           $sq        .= "rrange: $rrange, crange: $crang, correff: $pvcorrf";
+          $sq        .= "\n              ";
+          $sq        .= $socs;
           $sq        .= "\n              ";
           $sq        .= $rcdbat;
       }
@@ -21547,6 +21577,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>rcdchargebatXX</b>  </td><td>Charging recommendation for battery XX (1 - Yes, 0 - No)                        </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Total precipitation during the last hour kg/m2                                  </td></tr>
             <tr><td> <b>rrange</b>          </td><td>range of total rain                                                             </td></tr>
+            <tr><td> <b>socXX</b>           </td><td>current (NextHour00) or predicted SoC of battery XX                             </td></tr>
             <tr><td> <b>weatherid</b>       </td><td>ID of the predicted weather                                                     </td></tr>
             <tr><td> <b>wcc</b>             </td><td>predicted degree of cloudiness                                                  </td></tr>
          </table>
@@ -22873,7 +22904,7 @@ to ensure that the system configuration is correct.
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                             </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>icon</b>      </td><td>Icon and/or (only) colour for displaying the battery in the bar chart (optional)                              </td></tr>
-           <tr><td>                  </td><td>The colour can be specified as a name (e.g. blue) or HEX value (e.g. #d9d9d9).                                </td></tr>
+           <tr><td>                  </td><td>The colour can be specified as an identifier (e.g. blue) or HEX value (e.g. #d9d9d9).                         </td></tr>
            <tr><td>                  </td><td><b>&lt;recomm&gt;</b> - Charging is recommended but inactive (no charging or discharging)                     </td></tr>
            <tr><td>                  </td><td><b>&lt;charge&gt;</b> - is used when the battery is currently being charged                                   </td></tr>
 		   <tr><td>                  </td><td><b>&lt;discharge&gt;</b> - is used when the battery is currently being discharged                             </td></tr>
@@ -24016,6 +24047,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>rcdchargebatXX</b>  </td><td>Aufladeempfehlung für Batterie XX (1 - Ja, 0 - Nein)                                     </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                           </td></tr>
             <tr><td> <b>rrange</b>          </td><td>Bereich des Gesamtniederschlags                                                          </td></tr>
+            <tr><td> <b>socXX</b>           </td><td>aktueller (NextHour00) oder prognostizierter SoC der Batterie XX                         </td></tr>
             <tr><td> <b>weatherid</b>       </td><td>ID des vorhergesagten Wetters                                                            </td></tr>
             <tr><td> <b>wcc</b>             </td><td>vorhergesagter Grad der Bewölkung                                                        </td></tr>
          </table>
@@ -25341,7 +25373,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>icon</b>      </td><td>Icon und/oder (nur) Farbe zur Darstellung der Batterie in der Balkengrafik (optional)                    </td></tr>
-           <tr><td>                  </td><td>Die Farbe kann als Name (z.B. blue) oder HEX-Wert (z.B. #d9d9d9) angegeben werden.                       </td></tr>
+           <tr><td>                  </td><td>Die Farbe kann als Bezeichner (z.B. blue) oder HEX-Wert (z.B. #d9d9d9) angegeben werden.                 </td></tr>
            <tr><td>                  </td><td><b>&lt;empfohlen&gt;</b> - die Aufladung ist empfohlen aber inaktiv (kein Aufladen oder Entladen)        </td></tr>
            <tr><td>                  </td><td><b>&lt;aufladen&gt;</b> - wird verwendet wenn die Batterie aktuell aufgeladen wird                       </td></tr>
 		   <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - wird verwendet wenn die Batterie aktuell entladen wird                         </td></tr>
