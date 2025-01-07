@@ -15018,9 +15018,9 @@ sub _flowGraphic {
       $bat2home      += $bat2homepow if(defined $bat2homepow);
       
       push @batsoc, ReadingsNum ($name, 'Current_BatCharge_'.$bn, 0);
-  }
+  } 
   
-  $soc = avgArray (\@batsoc, scalar @batsoc) if(@batsoc);
+  $soc = avgArray (\@batsoc, scalar @batsoc) if(@batsoc); 
   
   if (!defined $batin && !defined $bat2home) {
       $hasbat   = 0;
@@ -15028,6 +15028,14 @@ sub _flowGraphic {
       $bat2home = 0;
       $soc      = 0;
   }
+  
+  ## Resultierende von Laden und Entladen berechnen
+  ###################################################
+  my $x     = $batin - $bat2home;                                              # können theoretisch gleich groß sein -> 0 setzen und Resultierende neu berechnen
+  $batin    = 0;
+  $bat2home = 0;
+  
+  if ($x > 0) { $batin = $x; } else { $bat2home = abs $x; }                    # es darf nur $batin ODER $bat2home mit einem Wert > 0 geben
   
   my $bat_color = $soc < 26 ? "$stna bat25" :
                   $soc < 76 ? "$stna bat50" :
@@ -15078,6 +15086,37 @@ sub _flowGraphic {
       }
   }
   
+  ## Batterie Werte verarbeiten
+  ###############################
+  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";            # cgc current GridConsumption
+  my $bat2home_style  = $bat2home  ? "$stna active_normal" : "$stna inactive";
+  my $cgc_direction   = "M250,515 L670,590";                                                         
+
+  if ($bat2home) {                                                                        # Batterie wird entladen
+      my $cgfo = $node2grid - $pv2node;                                                   # pv2node -> PV-Erzeugung Inverter für das Hausnetz
+
+      if ($cgfo > 1) {
+          $grid2home_style = "$stna active_normal";
+          $cgc_direction   = "M670,590 L250,515";
+          $node2grid      -= $cgfo;
+          $cgc             = $cgfo;
+      }
+  }
+ 
+  my $bat2home_direction = "M1200,515 L730,590";
+  my $node2bat           = $batin;
+
+  if ($batin) {                                                                          # Batterie wird geladen
+      my $home2bat = $batin - ($pv2node + $pv2bat);
+
+      if ($home2bat > 1) {                                                               # Batterieladung wird anteilig aus Hausnetz geladen
+          $node2bat           -= $home2bat;
+          $bat2home_style      = "$stna active_sig";
+          $bat2home_direction  = "M730,590 L1200,515";
+          $bat2home            = $home2bat;
+      }
+  }
+  
   ## Producer Koordninaten Steuerhash
   #####################################
   my ($togrid, $tonode, $tobat) = __sortProducer ($pdcr);                      # lfn Producer sortiert nach ptyp und feed
@@ -15104,37 +15143,6 @@ sub _flowGraphic {
   my $consumercount   = keys %{$cnsmr};
   my @consumers       = sort{$a<=>$b} keys %{$cnsmr};  
   
-  ## Batterie Werte verarbeiten
-  ###############################
-  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";            # cgc current GridConsumption
-  my $bat2home_style  = $bat2home  ? "$stna active_normal" : "$stna inactive";
-  my $cgc_direction   = "M250,515 L670,590";                                                         
-
-  if ($bat2home) {                                                                        # Batterie wird ins Haus entladen
-      my $cgfo = $node2grid - $pv2node;
-
-      if ($cgfo > 1) {
-          $grid2home_style = "$stna active_normal";
-          $cgc_direction   = "M670,590 L250,515";
-          $node2grid      -= $cgfo;
-          $cgc             = $cgfo;
-      }
-  }
- 
-  my $bat2home_direction = "M1200,515 L730,590";
-  my $node2bat           = $batin;
-
-  if ($batin) {                                                             # Batterie wird geladen
-      my $home2bat = $batin - ($pv2node + $pv2bat);
-
-      if ($home2bat > 1) {                                                  # Batterieladung wird anteilig aus Hausnetz geladen
-          $node2bat           -= $home2bat;
-          $bat2home_style      = "$stna active_sig";
-          $bat2home_direction  = "M730,590 L1200,515";
-          $bat2home            = $home2bat;
-      }
-  }
-
   ## Werte / SteuerungVars anpassen
   ###################################
   my $pnodesum  = __normDecPlaces ($ppall + $pv2node);                      # Erzeugung Summe im Knoten
