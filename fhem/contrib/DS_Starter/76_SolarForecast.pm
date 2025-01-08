@@ -905,6 +905,10 @@ my %htitles = (                                                                 
                 DE => qq{reale PV-Erzeugung}                                                                       },
   pvgenefc => { EN => qq{forecasted PV generation},
                 DE => qq{prognostizierte PV-Erzeugung}                                                             },
+  onlybatw => { EN => qq{Battery},
+                DE => qq{Batterie}                                                                                 },
+  socofbat => { EN => qq{State of Charge battery},
+                DE => qq{Ladung Batterie}                                                                          },                
   bcharrcd => { EN => qq{Charging recommendation (activate release for charging the battery if necessary)},
                 DE => qq{Ladeempfehlung (evtl. Freigabe zum Laden der Batterie aktivieren)}                        }, 
   bncharcd => { EN => qq{No charging recommendation (possibly deactivate release for charging the battery)},
@@ -12900,8 +12904,6 @@ sub entryGraphic {
       if ($paref->{beam3cont} || $paref->{beam4cont}) {                                                    # Balkengrafik Ebene 2
           my %hfcg2;
 
-          $hfcg2{barcount}    = $hfcg1{barcount};                                                          # Anzahl Balken der Ebene1 zur Begrenzung Ebene 2 übernehmen
-
           $paref->{chartlvl}  = 2;                                                                         # Balkengrafik Ebene 2
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
@@ -14334,7 +14336,8 @@ sub _beamGraphicFirstHour {
                          $beam1cont eq 'consumption'         ? $htitles{enconsrl}{$lang}." ($kw)"  :
                          $beam1cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
                          $beam1cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
-                         $beam1cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
+                         $beam1cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :         
+                         $beam1cont =~ /batsocforecast_/xs   ? $htitles{socofbat}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
                          '';
   $hfcg->{0}{beam2txt} = $beam2cont eq 'pvForecast'          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
                          $beam2cont eq 'pvReal'              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
@@ -14344,6 +14347,7 @@ sub _beamGraphicFirstHour {
                          $beam2cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
                          $beam2cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
                          $beam2cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
+                         $beam2cont =~ /batsocforecast_/xs   ? $htitles{socofbat}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
                          '';
                          
   $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
@@ -14526,6 +14530,7 @@ sub _beamGraphic {
   my $minDif     = $paref->{minDif};
   my $beam1cont  = $paref->{beam1cont};
   my $beam2cont  = $paref->{beam2cont};
+  my $barcount   = $paref->{barcount} // 9999;               # Sync Anzahl Balken dieser Ebene mit voriger Ebene
 
   $lotype = 'single' if($beam1cont eq $beam2cont);           # User Auswahl Layout überschreiben bei gleichen Beamcontent !
 
@@ -14535,7 +14540,6 @@ sub _beamGraphic {
 
   my ($val, $z2, $z3, $z4, $he, $titz2, $titz3);
 
-  my $barcount = $hfcg->{barcount} // 9999;                                                                     # Anzahl Balken der vorangegangenen Ebene zur Begrenzung dieser Ebene
   my $ret      = q{};
   $ret        .= __weatherOnBeam ($paref) if($weather);
   $ret        .= __batRcmdOnBeam ($paref);
@@ -14546,10 +14550,16 @@ sub _beamGraphic {
 
       my $ii = 0;
 
-      for my $i (0..($maxhours * 2) - 1) {                                                                      # gleiche Bedingung wie oben
-          next if(!$show_night && $hfcg->{$i}{weather} > 99
-                               && !$hfcg->{$i}{beam1}
-                               && !$hfcg->{$i}{beam2});
+      for my $i (0..($maxhours * 2) - 1) {                                                                      # gleiche Bedingung wie oben          
+          if (!$show_night && $hfcg->{$i}{weather} > 99 && 
+              !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
+              next;
+          }
+          
+          if (!$show_night && $hfcg->{$i}{weather} > 99) {
+              $paref->{barsync}{$i} = 1;
+          }
+          
           $ii++;                                                                                                # wieviele Stunden haben wir bisher angezeigt ?
           last if($ii > $maxhours || $ii > $barcount);                                                          # vorzeitiger Abbruch
 
@@ -14571,14 +14581,20 @@ sub _beamGraphic {
 
   my $ii = 0;
 
-  for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben
-      next if(!$show_night && $hfcg->{$i}{weather} > 99
-                           && !$hfcg->{$i}{beam1}
-                           && !$hfcg->{$i}{beam2});
+  for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben    
+      if (!$show_night && $hfcg->{$i}{weather} > 99 && 
+          !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
+          next;
+      }
+      
+      if (!$show_night && $hfcg->{$i}{weather} > 99) {
+          $paref->{barsync}{$i} = 1;
+      }
+      
       $ii++;
       last if($ii > $maxhours || $ii > $barcount);
 
-      $hfcg->{barcount} = $ii;                                                                                  # Anzahl Balken zur Begrenzung der nächsten Ebene registrieren
+      $paref->{barcount} = $ii;                                                                                 # Anzahl Balken zur Begrenzung der nächsten Ebene registrieren
 
       $height = 200 if(!$height);                                                                               # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
       $maxVal = 1   if(!int $maxVal);                                                                           # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen
@@ -14846,11 +14862,11 @@ sub __weatherOnBeam {
   my $colorwn    = $paref->{colorwn};                        # Wetter Icon Farbe Nacht
   my $width      = $paref->{width};
   my $lang       = $paref->{lang};
-
-  my $barcount = $hfcg->{barcount} // 9999;                                                                  # Anzahl Balken der vorangegangenen Ebene zur Begrenzung dieser Ebene
-  my $m        = $paref->{modulo} % 2;
-  my $ret      = q{};
-  $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                       # freier Platz am Anfang
+  my $barcount   = $paref->{barcount} // 9999;               # Sync Anzahl Balken dieser Ebene mit voriger Ebene
+  
+  my $m   = $paref->{modulo} % 2;
+  my $ret = q{};
+  $ret    .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                           # freier Platz am Anfang
 
   my $ii  = 0;
   
@@ -14862,11 +14878,9 @@ sub __weatherOnBeam {
 
       debugLog ($paref, 'graphic', "weather id beam number >$i< (start hour $hfcg->{$i}{time_str}): wid $hfcg->{$i}{weather} / wcc $wcc") if($ii < $maxhours);
 
-      if (!$show_night && $hfcg->{$i}{weather} > 99                                                          # Lässt Nachticons aber noch durch wenn es einen Wert gibt
-                       && !$hfcg->{$i}{beam1}
-                       && !$hfcg->{$i}{beam2}) {
-
-          debugLog ($paref, 'graphic', "weather id >$i< don't show night condition ... is skipped") if($ii < $maxhours);
+      if (!$show_night && $hfcg->{$i}{weather} > 99 && 
+          !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {                                                      # Lässt Nachticons aber noch durch wenn es einen Wert gibt
+          debugLog ($paref, 'graphic', "Weather position >$i< is skipped (condition ‘no night display’)") if($ii < $maxhours);
           next;
       };
                                                                                                              
@@ -14918,6 +14932,7 @@ sub __batRcmdOnBeam {
   my $lang       = $paref->{lang};
   my $hfcg       = $paref->{hfcg};
   my $t          = $paref->{t};
+  my $barcount   = $paref->{barcount} // 9999;                                   # Sync Anzahl Balken dieser Ebene mit voriger Ebene
   
   my $hh;
 
@@ -14967,12 +14982,12 @@ sub __batRcmdOnBeam {
       my $bshow = BatteryVal ($name, $bn, 'bshowingraph', 0);
       next if($bshow != $paref->{chartlvl});                                                          # Anzeige nur auf Grafikebene "chartlvl"
       
-      my $barcount = $hfcg->{barcount} // 9999;                                                       # Anzahl Balken der vorangegangenen Ebene zur Begrenzung dieser Ebene
       $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                            # freier Platz am Anfang     
       my $ii       = 0;
       
       for my $i (0..($maxhours * 2) - 1) {
-          if (!$show_night && $hfcg->{$i}{weather} > 99 && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
+          if (!$show_night && $hfcg->{$i}{weather} > 99 && 
+              !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
               debugLog ($paref, 'graphic', "Battery $bn recommandation pos >$i< skipped due to don't show night condition") if($ii < $maxhours);
               next;
           };
@@ -15791,7 +15806,7 @@ sub __substituteIcon {
                                 $bicondef;                                               # nur Farbe angegeben  
                                 
               $color  //= $biccolrcddef;
-              $pretxt   = "$msg1\n".$htitles{bcharrcd}{$lang};
+              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bcharrcd}{$lang};
           }
           else {                                                                         # keine Ladeempfehlung
               ($icon, $color) = split '@', $inorcmd;
@@ -15800,7 +15815,7 @@ sub __substituteIcon {
                                 $bicondef;                                               # nur Farbe angegeben  
                                 
               $color  //= $biccolnrcddef;
-              $pretxt   = "$msg1\n".$htitles{bncharcd}{$lang};
+              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bncharcd}{$lang};
           }
       }
       
