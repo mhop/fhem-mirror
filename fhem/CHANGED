@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 76_SolarForecast: version 1.42.0 with some new features & fixes
  - change:  76_SolarForecast: Attr ctrlStatisticReadings to ctrlSpecialReadings
                               old 'statistics_.*' readings to 'special_.*',
                               special Readings BatPowerIn_Sum, BatPowerOut_Sum
