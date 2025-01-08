@@ -161,7 +161,9 @@ my %vNotesIntern = (
                            "entryGraphic: enrich hfcg hash, __normDecPlaces: use it from/to battery, ".
                            "setupBatteryDevXX : new icon & show key, colour of icon can be changed separately, maxbatteries set to 3 ".
                            "medianArray: switch to simpel array sort, Task 1: delete Weather-API status data at night ".
-                           "add SoC forecast to NextHours store, Battery bar chart: display of the device in the bar chart level 1 or 2 ",
+                           "add SoC forecast to NextHours store, Battery bar chart: display of the device in the bar chart level 1 or 2 ".
+                           "add batsocXX to pvHistory, add batsocforecast_XX to Attr graphicBeamXContent ".
+                           " _addDynAttr: add graphicBeamXContent at runtime, attr ctrlBackupFilesKeep can set to 0 ",
   "1.41.4" => "02.01.2025  minor change of Logtext, new special Readings BatPowerIn_Sum, BatPowerOut_Sum ".
                            "rename ctrlStatisticReadings to ctrlSpecialReadings ",
   "1.41.3" => "01.01.2025  write/read battery values 0 .. maxbatteries to/from pvhistrory ".
@@ -1231,6 +1233,11 @@ my %hfspvh = (
       $hfspvh{'batsetsoc'.$bn}{storname}      = 'batsetsoc'.$bn;
       $hfspvh{'batsetsoc'.$bn}{validkey}      = undef;
       $hfspvh{'batsetsoc'.$bn}{fpar}          = undef;
+      
+      $hfspvh{'batsoc'.$bn}{fn}               = \&_storeVal;                  # aktueller SOC für Tag / Stunde
+      $hfspvh{'batsoc'.$bn}{storname}         = 'batsoc'.$bn;
+      $hfspvh{'batsoc'.$bn}{validkey}         = undef;
+      $hfspvh{'batsoc'.$bn}{fpar}             = undef;
   }
 
 
@@ -1266,7 +1273,6 @@ sub Initialize {
 
   my $hod = join ",", map { sprintf "%02d", $_} (1..24);
   my $srd = join ",", sort keys (%hcsr);
-  my $gbc = 'pvReal,pvForecast,consumption,consumptionForecast,gridconsumption,energycosts,gridfeedin,feedincome';
 
   my ($consumer, $setupbat, $ctrlbatsm, $setupprod, $setupinv, @allc);
   for my $c (1..$maxconsumer) {
@@ -1335,14 +1341,14 @@ sub Initialize {
                                 "graphicBeamHeightLevel1 ".
                                 "graphicBeamHeightLevel2 ".
                                 "graphicBeamWidth:slider,20,5,100 ".
+                                "graphicBeam1Content: ".
+                                "graphicBeam2Content: ".
+                                "graphicBeam3Content: ".
+                                "graphicBeam4Content: ".
                                 "graphicBeam1Color:colorpicker,RGB ".
                                 "graphicBeam2Color:colorpicker,RGB ".
                                 "graphicBeam3Color:colorpicker,RGB ".
                                 "graphicBeam4Color:colorpicker,RGB ".
-                                "graphicBeam1Content:$gbc ".
-                                "graphicBeam2Content:$gbc ".
-                                "graphicBeam3Content:$gbc ".
-                                "graphicBeam4Content:$gbc ".
                                 "graphicBeam1FontColor:colorpicker,RGB ".
                                 "graphicBeam2FontColor:colorpicker,RGB ".
                                 "graphicBeam3FontColor:colorpicker,RGB ".
@@ -1378,6 +1384,9 @@ sub Initialize {
                                 $consumer.
                                 $ctrlbatsm.
                                 $readingFnAttributes;
+                                
+  ## Hinweis:   graphicBeamXContent wird in _addDynAttr hinzugefügt 
+  
                     
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################                    
@@ -6643,7 +6652,7 @@ sub periodicWriteMemcache {
  
   $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." whole Operating Memory";
 
-  Log3 ($name, 4, "$name - The working memory >circular pvhist solcastapi< has been saved to persistance");
+  Log3 ($name, 4, "$name - The working memory >circular, pvhist, solcastapi, statusapi, weatherapi< has been saved to persistance");
 
   if ($bckp) {
       my $tstr = (timestampToTimestring (0))[2];
@@ -7254,14 +7263,14 @@ return;
 
 ################################################################
 #       neue Attribute zur Laufzeit hinzufügen
-# Device spezifische ".AttrList" überschreibt Modul AttrList !
+# Device spezifische ".AttrList" überschreibt Modul AttrList!
+# relevant für CPU Auslastung!!
 ################################################################
-sub _addDynAttr {
+sub _addDynAttr {                       
   my $hash = shift;
+  my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  ## Attr setupWeatherDevX zur Laufzeit hinzufügen
-  #################################################
   my $adwds  = '';
   my @alldwd = devspec2array ("TYPE=DWD_OpenData");
   $adwds     = join ",", @alldwd if(@alldwd);
@@ -7276,12 +7285,15 @@ sub _addDynAttr {
                  
   push @fcdevs, @alldwd if(@alldwd);
   my $rdd = join ",", @fcdevs;
-
-  my @deva   = split " ", $modules{$type}{AttrList};
-
-  my $atd = 'setupWeatherDev|setupRadiationAPI';
-  @deva   = grep {!/$atd/} @deva;
-
+  
+  ## Attributhüllen entfernen
+  #############################
+  my @deva = split " ", $modules{$type}{AttrList};
+  my $atd  = 'setupWeatherDev|setupRadiationAPI|graphicBeam*Content';
+  @deva    = grep {!/$atd/} @deva;
+  
+  ## Attr setupWeatherDevX / setupRadiationAPI zur Laufzeit hinzufügen
+  ######################################################################
   for my $step (1..$weatherDevMax) {
       if ($step == 1) {
           push @deva, ($adwds ? "setupWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" :
@@ -7293,7 +7305,25 @@ sub _addDynAttr {
   }
 
   push @deva, "setupRadiationAPI:$rdd ";
-
+  
+  ## Attr graphicBeamXContent zur Laufzeit hinzufügen
+  #####################################################
+  my $gbc = '';
+  if (isBatteryUsed ($name)) {
+      for my $bn (1..$maxbatteries) {                                          
+          $bn   = sprintf "%02d", $bn;
+          $gbc .= 'batsocforecast_'.$bn.',';
+      }
+  }
+  $gbc .= ',' if(!$gbc);
+  $gbc .= 'consumption,consumptionForecast,energycosts,feedincome,gridconsumption,gridfeedin,pvForecast,pvReal';
+  
+  push @deva, "graphicBeam1Content:$gbc"; 
+  push @deva, "graphicBeam2Content:$gbc";  
+  push @deva, "graphicBeam3Content:$gbc"; 
+  push @deva, "graphicBeam4Content:$gbc";
+  
+  
   $hash->{".AttrList"} = join " ", @deva;
 
 return;
@@ -8008,7 +8038,10 @@ sub _specialActivities {
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
 
           __deletePvCorffReadings ($paref);                                                 # Readings der pvCorrectionFactor-Steuerung löschen
-          periodicWriteMemcache   ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen
+          
+          if (AttrVal ($name, 'ctrlBackupFilesKeep', 3)) {
+              periodicWriteMemcache ($hash, 'bckp');                                        # Backup Files erstellen und alte Versionen löschen (unterbleibt bei ctrlBackupFilesKeep == 0)
+          }
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
       }
@@ -9462,7 +9495,6 @@ sub _transferBatteryValues {
 
       my $nhour = $chour + 1;
 
-      
       # Batterieladung aktuelle Stunde in pvHistory speichern
       #########################################################
       my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'batintotal'.$bn, undef);             # totale Batterieladung zu Beginn einer Stunde
@@ -9481,7 +9513,6 @@ sub _transferBatteryValues {
       
       writeToHistory ( { paref => $paref, key => 'batinthishour'.$bn, val => $batinthishour, hour => $nhour } );
 
-      
       # Batterieentladung aktuelle Stunde in pvHistory speichern
       ############################################################
       my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'batouttotal'.$bn, undef);          # totale Betterieladung zu Beginn einer Stunde
@@ -9500,7 +9531,6 @@ sub _transferBatteryValues {
       
       writeToHistory ( { paref => $paref, key => 'batoutthishour'.$bn, val => $batoutthishour, hour => $nhour } );
 
-      
       # täglichen max. SOC in pvHistory speichern
       #############################################
       my $batmaxsoc = HistoryVal ($hash, $day, 99, 'batmaxsoc'.$bn, 0);                                        # gespeicherter max. SOC des Tages
@@ -9525,6 +9555,8 @@ sub _transferBatteryValues {
       $data{$name}{batteries}{$bn}{basynchron}   = $h->{asynchron} // 0;                    # asynchroner Modus = X
       $data{$name}{batteries}{$bn}{bicon}        = $h->{icon} if($h->{icon});               # Batterie Icon
       $data{$name}{batteries}{$bn}{bshowingraph} = $h->{show} // 0;                         # Batterie in Balkengrafik anzeigen 
+      
+      writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, hour => $nhour } );  
       
       $socsum += $soc;
       $pbisum += $pbi;
@@ -9873,8 +9905,8 @@ sub _batChargeRecmd {
           ## SOC-Prognose und Ladeempfehlung
           ####################################
           my $progsoc = sprintf "%.0f", (100 / $batinstcap * ($batinstcap - $whneed));           # Prognose SoC
-          $progsoc    = $progsoc < $lowSoc    ? $lowSoc    : 
-                        $progsoc < $batoptsoc ? $batoptsoc :
+          $progsoc    = $progsoc < $batoptsoc ? $batoptsoc :
+                        $progsoc < $lowSoc    ? $lowSoc    :
                         $progsoc;       
           
           if ( $whneed + $sfmargin >= $spday  )      {$rcmd = 1}                                 # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
@@ -14213,18 +14245,19 @@ sub _beamGraphicFirstHour {
   my $lang      = $paref->{lang};
   my $kw        = $paref->{kw};
 
-  my $day;
+  my ($day, $bn);
 
   my $hash                             = $defs{$name};
   my $stt                              = NexthoursVal ($hash, 'NextHour00', 'starttime', '0000-00-00 24');
   my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
 
   my ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8);
+  my $hbsocs;
 
   $thishour++;
 
   $hfcg->{0}{time_str} = $thishour;
-  $thishour            = int($thishour);                                                           # keine führende Null
+  $thishour            = int($thishour);                                                            # keine führende Null
 
   $hfcg->{0}{time}     = $thishour;
   $hfcg->{0}{day_str}  = $day_str;
@@ -14233,50 +14266,59 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{mktime}   = fhemTimeLocal (0,0,$thishour,$day,int($month)-1,$year-1900);               # gleich die Unix Zeit dazu holen
   $hfcg->{0}{time}    += $offset;
 
-  if ($hfcg->{0}{time} < 0) {
+  if ($hfcg->{0}{time} < 0) {                                                                       # Tageswechsel: day muss jetzt neu berechnet werden !
       $hfcg->{0}{time}   += 24;
-      my $n_day           = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));   # Achtung : Tageswechsel - day muss jetzt neu berechnet werden !
+      my $n_day           = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));   
       $hfcg->{0}{day}     = int($n_day);
       $hfcg->{0}{day_str} = $n_day;
   }
 
-  $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time});
+  $hfcg->{0}{time_str} = sprintf '%02d', $hfcg->{0}{time};
+  
+  $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
+  $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
+  $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
+  $hfcg->{0}{sunaz}   = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
 
   $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
   $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
   $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
   $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
   $val5 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
-  $val6 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'conprice',  0) *
-                           $val3 / 1000);                                                                          # Energiekosten der Stunde
+  $val6 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
   $val7 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gfeedin', 0);
-  $val8 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) *
-                           $val7 / 1000);                                                                          # Einspeisevergütung der Stunde
-
-  $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
-  $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
-  $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
-  $hfcg->{0}{sunaz}   = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
-
-  $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
-  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 :
-                         ($beam1cont eq 'pvReal')              ? $val2 :
-                         ($beam1cont eq 'gridconsumption')     ? $val3 :
-                         ($beam1cont eq 'consumptionForecast') ? $val4 :
-                         ($beam1cont eq 'consumption')         ? $val5 :
-                         ($beam1cont eq 'energycosts')         ? $val6 :
-                         ($beam1cont eq 'gridfeedin')          ? $val7 :
-                         ($beam1cont eq 'feedincome')          ? $val8 :
+  $val8 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
+  
+  ## Batterien Selektionshash erstellen
+  #######################################
+  for my $bn (1..$maxbatteries) {                                                                                          
+      $bn               = sprintf "%02d", $bn;
+      $hbsocs->{0}{$bn} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0);
+  }
+    
+  ## Zuordnung Werte zu den Balken entsprechend Selektion
+  #########################################################  
+  $hfcg->{0}{beam1}    = $beam1cont eq 'pvForecast'          ? $val1 :
+                         $beam1cont eq 'pvReal'              ? $val2 :
+                         $beam1cont eq 'gridconsumption'     ? $val3 :
+                         $beam1cont eq 'consumptionForecast' ? $val4 :
+                         $beam1cont eq 'consumption'         ? $val5 :
+                         $beam1cont eq 'energycosts'         ? $val6 :
+                         $beam1cont eq 'gridfeedin'          ? $val7 :
+                         $beam1cont eq 'feedincome'          ? $val8 :         
+                         $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{0}{(split '_', $beam1cont)[1]} :
                          undef;
-  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
-                         ($beam2cont eq 'pvReal')              ? $val2 :
-                         ($beam2cont eq 'gridconsumption')     ? $val3 :
-                         ($beam2cont eq 'consumptionForecast') ? $val4 :
-                         ($beam2cont eq 'consumption')         ? $val5 :
-                         ($beam2cont eq 'energycosts')         ? $val6 :
-                         ($beam2cont eq 'gridfeedin')          ? $val7 :
-                         ($beam2cont eq 'feedincome')          ? $val8 :
-                         undef;
+                         
+  $hfcg->{0}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
+                         $beam2cont eq 'pvReal'              ? $val2 :
+                         $beam2cont eq 'gridconsumption'     ? $val3 :
+                         $beam2cont eq 'consumptionForecast' ? $val4 :
+                         $beam2cont eq 'consumption'         ? $val5 :
+                         $beam2cont eq 'energycosts'         ? $val6 :
+                         $beam2cont eq 'gridfeedin'          ? $val7 :
+                         $beam2cont eq 'feedincome'          ? $val8 :
+                         $beam2cont =~ /batsocforecast_/xs   ? $hbsocs->{0}{(split '_', $beam2cont)[1]} :
+                         undef;                                           
 
   $hfcg->{0}{beam1}  //= 0;
   $hfcg->{0}{beam2}  //= 0;
@@ -14285,24 +14327,26 @@ sub _beamGraphicFirstHour {
   my $epc = CurrentVal ($hash, 'ePurchasePriceCcy', 0);
   my $efc = CurrentVal ($hash, 'eFeedInTariffCcy',  0);
 
-  $hfcg->{0}{beam1txt} = ($beam1cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
-                         ($beam1cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
-                         ($beam1cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang}." ($kw)"  :
-                         ($beam1cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang}." ($kw)"  :
-                         ($beam1cont eq 'consumption')         ? $htitles{enconsrl}{$lang}." ($kw)"  :
-                         ($beam1cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." ($epc)" :
-                         ($beam1cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
-                         ($beam1cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." ($efc)" :
+  $hfcg->{0}{beam1txt} = $beam1cont eq 'pvForecast'          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
+                         $beam1cont eq 'pvReal'              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
+                         $beam1cont eq 'gridconsumption'     ? $htitles{enppubgd}{$lang}." ($kw)"  :
+                         $beam1cont eq 'consumptionForecast' ? $htitles{enconsfc}{$lang}." ($kw)"  :
+                         $beam1cont eq 'consumption'         ? $htitles{enconsrl}{$lang}." ($kw)"  :
+                         $beam1cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
+                         $beam1cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
+                         $beam1cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
                          '';
-  $hfcg->{0}{beam2txt} = ($beam2cont eq 'pvForecast')          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
-                         ($beam2cont eq 'pvReal')              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
-                         ($beam2cont eq 'gridconsumption')     ? $htitles{enppubgd}{$lang}." ($kw)"  :
-                         ($beam2cont eq 'consumptionForecast') ? $htitles{enconsfc}{$lang}." ($kw)"  :
-                         ($beam2cont eq 'consumption')         ? $htitles{enconsrl}{$lang}." ($kw)"  :
-                         ($beam2cont eq 'energycosts')         ? $htitles{enpchcst}{$lang}." ($epc)" :
-                         ($beam2cont eq 'gridfeedin')          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
-                         ($beam2cont eq 'feedincome')          ? $htitles{rengfeed}{$lang}." ($efc)" :
+  $hfcg->{0}{beam2txt} = $beam2cont eq 'pvForecast'          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
+                         $beam2cont eq 'pvReal'              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
+                         $beam2cont eq 'gridconsumption'     ? $htitles{enppubgd}{$lang}." ($kw)"  :
+                         $beam2cont eq 'consumptionForecast' ? $htitles{enconsfc}{$lang}." ($kw)"  :
+                         $beam2cont eq 'consumption'         ? $htitles{enconsrl}{$lang}." ($kw)"  :
+                         $beam2cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
+                         $beam2cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
+                         $beam2cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
                          '';
+                         
+  $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
 
 return $thishour;
 }
@@ -14324,6 +14368,7 @@ sub _beamGraphicRemainingHours {
   $maxVal //= $hfcg->{0}{beam1};                                                                        # Startwert wenn kein Wert bereits via attr vorgegeben ist
 
   my ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8);
+  my $hbsocs;
 
   my $hash   = $defs{$name};
   my $maxCon = $hfcg->{0}{beam1};
@@ -14345,27 +14390,33 @@ sub _beamGraphicRemainingHours {
 
       if ($offset < 0) {
           if ($i <= abs($offset)) {                                                                     # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !
-              my $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset+$i)));         # V0.49.4
+              my $ds = strftime "%d", localtime ($hfcg->{0}{mktime} - (3600 * abs($offset+$i)));        # V0.49.4
 
               if ($hfcg->{$i}{time} == 24) {                                                            # Sonderfall Mitternacht                      
-                  $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset-$i+1))));      
+                  $ds = strftime "%d", localtime ($hfcg->{0}{mktime} - (3600 * (abs($offset-$i+1))));      
               }
+              
+              $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
+              $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
+              $hfcg->{$i}{sunalt}  = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'sunalt',    '-');
+              $hfcg->{$i}{sunaz}   = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'sunaz',     '-');
               
               $val1 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvfc',  0);
               $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
               $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
               $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
               $val5 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'con',   0);
-              $val6 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);     # Energiekosten der Stunde
+              $val6 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
               $val7 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gfeedin', 0);
-              $val8 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);     # Einspeisevergütung der Stunde
+              $val8 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
 
-
-              $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
-              $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
-              $hfcg->{$i}{sunalt}  = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'sunalt',    '-');
-              $hfcg->{$i}{sunaz}   = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'sunaz',     '-');
-              
+              ## Batterien Selektionshash erstellen
+              #######################################  
+              for my $bn (1..$maxbatteries) {                                                                                     
+                  $bn                = sprintf "%02d", $bn;
+                  $hbsocs->{$i}{$bn} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0);
+              }              
+                            
               $hfcg->{$i}{day_str} = $ds;
               $hfcg->{$i}{day}     = int($ds);
           }
@@ -14377,52 +14428,65 @@ sub _beamGraphicRemainingHours {
           $nh = sprintf '%02d', $i;
       }
 
-      if (defined $nh) {
-          $val1                = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',        0);
-          $val4                = NexthoursVal ($hash, 'NextHour'.$nh, 'confc',       0);
+      if (defined $nh) {          
           $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, 'weatherid', 999);
           $hfcg->{$i}{wcc}     = NexthoursVal ($hash, 'NextHour'.$nh, 'wcc',       '-');
           $hfcg->{$i}{sunalt}  = NexthoursVal ($hash, 'NextHour'.$nh, 'sunalt',    '-');
           $hfcg->{$i}{sunaz}   = NexthoursVal ($hash, 'NextHour'.$nh, 'sunaz',     '-');
-          
           my $stt              = NexthoursVal ($hash, 'NextHour'.$nh, 'starttime', '');
-          my $day_str          = ($stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs)[2];
+          
+          $val1 = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',        0);
+          $val4 = NexthoursVal ($hash, 'NextHour'.$nh, 'confc',       0);
+          
+          ## Batterien Selektionshash anreichern
+          ########################################
+          for my $bn (1..$maxbatteries) {                                                                                     
+              $bn                = sprintf "%02d", $bn;
+              $hbsocs->{$i}{$bn} = NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0);
+          }
+              
+          my $day_str = ($stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs)[2];
           
           if ($day_str) {
               $hfcg->{$i}{day_str} = $day_str;
-              $hfcg->{$i}{day}     = int($day_str);
+              $hfcg->{$i}{day}     = int $day_str;
           }
       }
+      
+      ## Zuordnung Werte zu den Balken entsprechend Selektion
+      #########################################################      
+      $hfcg->{$i}{beam1}    = $beam1cont eq 'pvForecast'          ? $val1 :
+                              $beam1cont eq 'pvReal'              ? $val2 :
+                              $beam1cont eq 'gridconsumption'     ? $val3 :
+                              $beam1cont eq 'consumptionForecast' ? $val4 :
+                              $beam1cont eq 'consumption'         ? $val5 :
+                              $beam1cont eq 'energycosts'         ? $val6 :
+                              $beam1cont eq 'gridfeedin'          ? $val7 :
+                              $beam1cont eq 'feedincome'          ? $val8 :
+                              $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam1cont)[1]} :
+                              undef;
+                              
+      $hfcg->{$i}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
+                              $beam2cont eq 'pvReal'              ? $val2 :
+                              $beam2cont eq 'gridconsumption'     ? $val3 :
+                              $beam2cont eq 'consumptionForecast' ? $val4 :
+                              $beam2cont eq 'consumption'         ? $val5 :
+                              $beam2cont eq 'energycosts'         ? $val6 :
+                              $beam2cont eq 'gridfeedin'          ? $val7 :
+                              $beam2cont eq 'feedincome'          ? $val8 :
+                              $beam2cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam2cont)[1]} :
+                              undef;
 
       $hfcg->{$i}{time_str} = sprintf ('%02d', $hfcg->{$i}{time}-1).$hourstyle;
       
-      $hfcg->{$i}{beam1}    = ($beam1cont eq 'pvForecast')          ? $val1 :
-                              ($beam1cont eq 'pvReal')              ? $val2 :
-                              ($beam1cont eq 'gridconsumption')     ? $val3 :
-                              ($beam1cont eq 'consumptionForecast') ? $val4 :
-                              ($beam1cont eq 'consumption')         ? $val5 :
-                              ($beam1cont eq 'energycosts')         ? $val6 :
-                              ($beam1cont eq 'gridfeedin')          ? $val7 :
-                              ($beam1cont eq 'feedincome')          ? $val8 :
-                              undef;
-      $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast')          ? $val1 :
-                              ($beam2cont eq 'pvReal')              ? $val2 :
-                              ($beam2cont eq 'gridconsumption')     ? $val3 :
-                              ($beam2cont eq 'consumptionForecast') ? $val4 :
-                              ($beam2cont eq 'consumption')         ? $val5 :
-                              ($beam2cont eq 'energycosts')         ? $val6 :
-                              ($beam2cont eq 'gridfeedin')          ? $val7 :
-                              ($beam2cont eq 'feedincome')          ? $val8 :
-                              undef;
-
       $hfcg->{$i}{beam1} //= 0;
       $hfcg->{$i}{beam2} //= 0;
       $hfcg->{$i}{diff}    = $hfcg->{$i}{beam1} - $hfcg->{$i}{beam2};
 
-      $maxVal = $hfcg->{$i}{beam1} if ($hfcg->{$i}{beam1} > $maxVal);
-      $maxCon = $hfcg->{$i}{beam2} if ($hfcg->{$i}{beam2} > $maxCon);
-      $maxDif = $hfcg->{$i}{diff}  if ($hfcg->{$i}{diff}  > $maxDif);
-      $minDif = $hfcg->{$i}{diff}  if ($hfcg->{$i}{diff}  < $minDif);
+      $maxVal = $hfcg->{$i}{beam1} if($hfcg->{$i}{beam1} > $maxVal);
+      $maxCon = $hfcg->{$i}{beam2} if($hfcg->{$i}{beam2} > $maxCon);
+      $maxDif = $hfcg->{$i}{diff}  if($hfcg->{$i}{diff}  > $maxDif);
+      $minDif = $hfcg->{$i}{diff}  if($hfcg->{$i}{diff}  < $minDif);
   }
 
   my $back = {
@@ -16677,7 +16741,7 @@ return $ridx;
 }
 
 ################################################################
-#    einen Schlüssel-Wert in die pvHistory schreiben
+# einen Schlüssel-Wert in die pvHistory schreiben
 # $valid - Wert für Valid-Key festgelegt in $hfspvh Hash
 # z.B. pvrlvd = 1: beim Learning berücksichtigen, 0: nicht
 ################################################################
@@ -17005,7 +17069,7 @@ sub listDataPool {
               $prdl .= "pprl${pn}: $pprl";
           }
           
-          my ($btotin, $batin, $btotout, $batout, $batmsoc, $batssoc);
+          my ($btotin, $batin, $btotout, $batout, $batmsoc, $batssoc, $batsoc);
           for my $bn (1..$maxbatteries) {                                            # + alle Batterien
               $bn          = sprintf "%02d", $bn;
               my $hbtotin  = HistoryVal ($name, $day, $key, 'batintotal'.$bn,  '-');
@@ -17014,6 +17078,7 @@ sub listDataPool {
               my $hbatout  = HistoryVal ($name, $day, $key, 'batout'.$bn,      '-');
               my $hbatmsoc = HistoryVal ($name, $day, $key, 'batmaxsoc'.$bn,   '-');
               my $hbatssoc = HistoryVal ($name, $day, $key, 'batsetsoc'.$bn,   '-');
+              my $hbatsoc  = HistoryVal ($name, $day, $key, 'batsoc'.$bn,      '-');
               
               if ($export eq 'csv') {
                   $hexp->{$day}{$key}{"BatteryInTotal${bn}"}  = $hbtotin;
@@ -17022,6 +17087,7 @@ sub listDataPool {
                   $hexp->{$day}{$key}{"BatteryOut${bn}"}      = $hbatout;
                   $hexp->{$day}{$key}{"BatteryMaxSoc${bn}"}   = $hbatmsoc;
                   $hexp->{$day}{$key}{"BatterySetSoc${bn}"}   = $hbatssoc;
+                  $hexp->{$day}{$key}{"BatterySoc${bn}"}      = $hbatsoc;
               }
               
               $btotin  .= ', ' if($btotin);
@@ -17036,6 +17102,8 @@ sub listDataPool {
               $batmsoc .= "batmaxsoc${bn}: $hbatmsoc";
               $batssoc .= ', ' if($batssoc);
               $batssoc .= "batsetsoc${bn}: $hbatssoc";
+              $batsoc .= ', ' if($batsoc);
+              $batsoc .= "batsoc${bn}: $hbatsoc";
           }
           
           $ret .= "\n      " if($ret);
@@ -17060,6 +17128,8 @@ sub listDataPool {
           $ret .= $btotin                                        if($key ne '99');
           $ret .= "\n            "                               if($key ne '99');
           $ret .= $btotout                                       if($key ne '99');
+          $ret .= "\n            "                               if($key ne '99');
+          $ret .= $batsoc                                        if($key ne '99');
           $ret .= "\n            "                               if($key ne '99');
     
           $ret .= $batin;
@@ -21615,8 +21685,9 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batinXX</b>        </td><td>Charge of battery XX within the hour (Wh)                                                                                </td></tr>
             <tr><td> <b>batouttotalXX</b>  </td><td>total battery XX discharge (Wh) at the beginning of the hour                                                             </td></tr>
             <tr><td> <b>batoutXX</b>       </td><td>Discharge of battery XX within the hour (Wh)                                                                             </td></tr>
-            <tr><td> <b>batmaxsocXX</b>    </td><td>maximum SOC (%) of battery XX of the day                                                                                 </td></tr>
-            <tr><td> <b>batsetsocXX</b>    </td><td>optimum SOC setpoint (%) of battery XX  for the day                                                                      </td></tr>
+            <tr><td> <b>batsocXX</b>       </td><td>State of charge SOC (%) of battery XX at the end of the hour                                                             </td></tr>
+            <tr><td> <b>batmaxsocXX</b>    </td><td>Maximum SOC (%) achieved by battery XX on the day                                                                        </td></tr>
+            <tr><td> <b>batsetsocXX</b>    </td><td>Optimum SOC setpoint (%) of battery XX  for the day                                                                      </td></tr>       
             <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                                         </td></tr>
             <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                                                </td></tr>
             <tr><td> <b>conprice</b>       </td><td>Price for the purchase of one kWh. The currency of the price is defined in the setupMeterDev.                            </td></tr>
@@ -22217,6 +22288,8 @@ to ensure that the system configuration is correct.
        <li><b>ctrlBackupFilesKeep &lt;Integer&gt; </b><br>
          Defines the number of generations of backup files
          (see also <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>). <br>
+         If ctrlBackupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place. <br>
+         Manual execution with the aforementioned set command is still possible. <br>
          (default: 3)
        </li>
        <br>
@@ -22595,8 +22668,8 @@ to ensure that the system configuration is correct.
        <li><b>graphicBeamXContent </b><br>
          Defines the content of the bars to be displayed in the bar charts.
          The bar charts are available in two levels. <br>
-         Level 1 is preset by default. The content is determined by the attributes graphicBeam1Content and
-         graphicBeam2Content. <br>
+         Level 1 is preset by default. 
+         The content is determined by the attributes graphicBeam1Content and graphicBeam2Content. <br>
          Level 2 can be activated by setting the attributes graphicBeam3Content and graphicBeam4Content. <br>
          The attributes graphicBeam1Content and graphicBeam3Content represent the primary beams, the attributes
          graphicBeam2Content and graphicBeam4Content attributes represent the secondary beams of the
@@ -22606,14 +22679,15 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>batsocforecast_XX</b>   </td><td>the predicted and historically achieved SOC (%) of the battery XX                                      </td></tr>
             <tr><td> <b>consumption</b>         </td><td>Energy consumption                                                                                     </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>forecasted energy consumption                                                                          </td></tr>
             <tr><td> <b>energycosts</b>         </td><td>Cost of energy purchased from the grid. The currency is defined in the setupMeterDev, key conprice.    </td></tr>
             <tr><td> <b>feedincome</b>          </td><td>Remuneration for feeding into the grid. The currency is defined in the setupMeterDev, key feedprice.   </td></tr>
             <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the public grid                                                                   </td></tr>
             <tr><td> <b>gridfeedin</b>          </td><td>Feed into the public grid                                                                              </td></tr>
-            <tr><td> <b>pvReal</b>              </td><td>real PV generation (default for graphicBeam1Content)                                                   </td></tr>
             <tr><td> <b>pvForecast</b>          </td><td>predicted PV generation (default for graphicBeam2Content)                                              </td></tr>
+            <tr><td> <b>pvReal</b>              </td><td>real PV generation (default for graphicBeam1Content)                                                   </td></tr>
          </table>
          </ul>
          <br>
@@ -24086,7 +24160,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batinXX</b>         </td><td>Ladung der Batterie XX innerhalb der Stunde (Wh)                                                   </td></tr>
             <tr><td> <b>batouttotalXX</b>   </td><td>Gesamtentladung der Batterie XX (Wh) zu Beginn der Stunde                                          </td></tr>
             <tr><td> <b>batoutXX</b>        </td><td>Entladung der Batterie XX innerhalb der Stunde (Wh)                                                </td></tr>
-            <tr><td> <b>batmaxsocXX</b>     </td><td>maximaler SOC (%) der Batterie XX des Tages                                                        </td></tr>
+            <tr><td> <b>batsocXX</b>        </td><td>Ladezustand SOC (%) der Batterie XX am Ende der Stunde                                             </td></tr>
+            <tr><td> <b>batmaxsocXX</b>     </td><td>maximal erreichter SOC (%) der Batterie XX an dem Tag                                              </td></tr>
             <tr><td> <b>batsetsocXX</b>     </td><td>optimaler SOC Sollwert (%) der Batterie XX für den Tag                                             </td></tr>
             <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total von ConsumerXX                                                              </td></tr>
             <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)        </td></tr>
@@ -24687,6 +24762,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>ctrlBackupFilesKeep &lt;Ganzzahl&gt;</b><br>
          Legt die Anzahl der Generationen von Sicherungsdateien
          (siehe <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>) fest. <br>
+         Ist ctrlBackupFilesKeep explit auf '0' gesetzt, erfolgt keine automatische Generierung und Bereinigung von Sicherungsdateien. <br>
+         Eine manuelle Ausführung mit dem genannten Set-Kommando ist weiterhin möglich. <br>
          (default: 3)
        </li>
        <br>
@@ -25066,10 +25143,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>graphicBeamXContent </b><br>
          Legt den darzustellenden Inhalt der Balken in den Balkendiagrammen fest.
          Die Balkendiagramme sind in zwei Ebenen verfügbar. <br>
-         Die Ebene 1 ist im Standard voreingestellt. Der Inhalt durch die Attribute graphicBeam1Content und
-         graphicBeam2Content bestimmt. <br>
-         Die Ebene 2 kann durch Setzen der Attribute graphicBeam3Content und graphicBeam4Content zugeschaltet
-         werden. <br>
+         Die Ebene 1 ist im Standard voreingestellt. 
+         Der Inhalt wird durch die Attribute graphicBeam1Content und graphicBeam2Content bestimmt. <br>
+         Die Ebene 2 kann durch Setzen der Attribute graphicBeam3Content und graphicBeam4Content aktiviert werden. <br>
          Die Attribute graphicBeam1Content und graphicBeam3Content stellen die primären Balken, die Attribute
          graphicBeam2Content und graphicBeam4Content die sekundären Balken der jeweiligen Ebene dar.
          <br><br>
@@ -25077,14 +25153,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+            <tr><td> <b>batsocforecast_XX</b>   </td><td>der prognostizierte und in der Vergangenheit erreichte SOC (%) der Batterie XX                               </td></tr>
             <tr><td> <b>consumption</b>         </td><td>Energieverbrauch                                                                                             </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch                                                                            </td></tr>
             <tr><td> <b>energycosts</b>         </td><td>Kosten des Energiebezuges aus dem Netz. Die Währung ist im setupMeterDev, Schlüssel conprice, definiert.     </td></tr>
             <tr><td> <b>feedincome</b>          </td><td>Vergütung für die Netzeinspeisung. Die Währung ist im setupMeterDev, Schlüssel feedprice, definiert.         </td></tr>
             <tr><td> <b>gridconsumption</b>     </td><td>Energiebezug aus dem öffentlichen Netz                                                                       </td></tr>
             <tr><td> <b>gridfeedin</b>          </td><td>Einspeisung in das öffentliche Netz                                                                          </td></tr>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default für graphicBeam1Content)                                                         </td></tr>
             <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default für graphicBeam2Content)                                               </td></tr>
+            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default für graphicBeam1Content)                                                         </td></tr>
          </table>
          </ul>
          <br>
