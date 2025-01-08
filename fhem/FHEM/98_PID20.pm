@@ -288,8 +288,8 @@ sub PID20_Notify($$)
   my $sensorName = $hash->{helper}{sensor};
   my $DEBUG      = AttrVal( $name, 'pidDebugNotify', '0' ) eq '1';
 
-  # no action if disabled
-  return if IsDisabled($name);
+  # no action if disabled or FHEM not initialized
+  return if (IsDisabled($name) || !$init_done);
   
   if ( $dev->{NAME} eq 'global' ) {
     my $events = $dev->{CHANGED};
