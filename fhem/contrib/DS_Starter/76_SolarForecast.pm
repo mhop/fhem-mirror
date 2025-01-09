@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.43.0" => "09.01.2025   ",
   "1.42.0" => "07.01.2025  change socslidereg to batsocslidereg, _batChargeRecmd: add value to nexthours ".
                            "entryGraphic: enrich hfcg hash, __normDecPlaces: use it from/to battery, ".
                            "setupBatteryDevXX : new icon & show key, colour of icon can be changed separately, maxbatteries set to 3 ".
@@ -1369,7 +1370,7 @@ sub Initialize {
                                 "graphicLayoutType:single,double,diff ".
                                 "graphicSelect:both,flow,forecast,none ".
                                 "graphicShowDiff:no,top,bottom ".
-                                "graphicShowNight:1,0 ".
+                                "graphicShowNight:1,0,01 ".
                                 "graphicShowWeather:1,0 ".
                                 "graphicSpaceSize ".
                                 "graphicWeatherColor:colorpicker,RGB ".
@@ -12755,12 +12756,17 @@ sub entryGraphic {
 
   # Parameter f. Anzeige extrahieren
   ###################################
-  my $width    = AttrNum ($name, 'graphicBeamWidth',    20);                               # zu klein ist nicht problematisch
-  my $maxhours = AttrNum ($name, 'graphicHourCount',    24);
-  my $alias    = AttrVal ($name, 'alias',            $name);                               # Linktext als Aliasname oder Devicename setzen
-  my $w        = $width * $maxhours;                                                       # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
-  my $offset   = -1 * AttrNum ($name, 'graphicHistoryHour', $histhourdef);
-  my $dlink    = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
+  my $width      = AttrNum ($name, 'graphicBeamWidth',    20);                             # zu klein ist nicht problematisch
+  my $maxhours   = AttrNum ($name, 'graphicHourCount',    24);
+  my $alias      = AttrVal ($name, 'alias',            $name);                             # Linktext als Aliasname oder Devicename setzen
+  
+  AttrVal ($name, 'graphicShowNight', 0) =~ /(.)(.)?/xs;
+  my $show_night = $1 // 0;
+  my $layersync  = $2 // 0;
+  
+  my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
+  my $offset     = -1 * AttrNum ($name, 'graphicHistoryHour', $histhourdef);
+  my $dlink      = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
 
   if (!$gsel) {
       $gsel = AttrVal ($name, 'graphicSelect', 'both');                                    # Auswahl der anzuzeigenden Grafiken
@@ -12795,7 +12801,8 @@ sub entryGraphic {
       width          => $width,
       fsize          => AttrNum    ($name, 'graphicSpaceSize',                  24),
       maxVal         => AttrNum    ($name, 'graphicBeam1MaxVal',                 0),                # dyn. Anpassung der Balkenhöhe oder statisch ?
-      show_night     => AttrNum    ($name, 'graphicShowNight',                   0),                # alle Balken (Spalten) anzeigen ?
+      layersync      => $layersync,                                                                 # Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen                                                             
+      show_night     => $show_night,                                                                # alle Balken (Spalten) anzeigen ?
       show_diff      => AttrVal    ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
       weather        => AttrNum    ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
       colorw         => AttrVal    ($name, 'graphicWeatherColor',      $wthcolddef),                # Wetter Icon Farbe Tag
@@ -14551,14 +14558,19 @@ sub _beamGraphic {
       my $ii = 0;
 
       for my $i (0..($maxhours * 2) - 1) {                                                                      # gleiche Bedingung wie oben          
-          if (!$show_night && $hfcg->{$i}{weather} > 99 && 
-              !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
-              next;
-          }
+          next if(__doSkipNightSync ($name, $paref, $i));
           
-          if (!$show_night && $hfcg->{$i}{weather} > 99) {
-              $paref->{barsync}{$i} = 1;
-          }
+          #if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {
+          #    next;
+          #}
+      
+          #if (!$paref->{show_night} && $paref->{hfcg}{$i}{weather} > 99  && !$paref->{hfcg}{$i}{beam1} && 
+          #    !$paref->{hfcg}{beam2} && !$paref->{noSkip}{$i}) {
+          #    $paref->{skip}{$i} = 1;
+          #    next;
+          #}
+          
+          #$paref->{noSkip}{$i} = 1;
           
           $ii++;                                                                                                # wieviele Stunden haben wir bisher angezeigt ?
           last if($ii > $maxhours || $ii > $barcount);                                                          # vorzeitiger Abbruch
@@ -14567,7 +14579,7 @@ sub _beamGraphic {
 
           if ($val ne '&nbsp;') {                                                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
           $val = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
-                 $val > 0              ? '+'.$val          :
+                 $val > 0              ? '+'  .$val        :
                  $val;                                                                                          # negative Zahlen in Fettschrift, 0 aber ohne +
           }
 
@@ -14582,14 +14594,18 @@ sub _beamGraphic {
   my $ii = 0;
 
   for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben    
-      if (!$show_night && $hfcg->{$i}{weather} > 99 && 
-          !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
-          next;
-      }
+      next if(__doSkipNightSync ($name, $paref, $i));
+      #if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {
+      #    next;
+      #}
       
-      if (!$show_night && $hfcg->{$i}{weather} > 99) {
-          $paref->{barsync}{$i} = 1;
-      }
+      #if (!$paref->{show_night} && $paref->{hfcg}{$i}{weather} > 99  && !$paref->{hfcg}{$i}{beam1} && 
+      #    !$paref->{hfcg}{$i}{beam2} && !$paref->{noSkip}{$i}) {
+      #    $paref->{skip}{$i} = 1;
+      #    next;
+      #}
+      
+      #$paref->{noSkip}{$i} = 1;
       
       $ii++;
       last if($ii > $maxhours || $ii > $barcount);
@@ -14849,6 +14865,42 @@ sub _beamGraphic {
 return $ret;
 }
 
+############################################################################################
+#  liefert Signal ob Werte angezeigt werden sollen obwohl 
+#  die Nachtstunden nicht angezeigt werden sowie die 
+#  bei Synchronisation der nachfolgenden Balkendiagramm-Ebenen
+#  mit Balkendiagramm-Ebene 1
+#
+#  skip          = 0 - Wert soll angezeigt werden
+#  skip          = 1 - Wert soll nicht angezeigt werden
+#  paref->skip   = 1 - Synchronisation Anzeige des Balkens in nächsten Ebenen verhindern
+#  paref->noSkip = 1 - Synchronisation Anzeige des Balkens in nächsten Ebenen erzwingen
+#
+############################################################################################
+sub __doSkipNightSync {                       
+  my $name  = shift;
+  my $paref = shift;
+  my $i     = shift;
+  
+  my $skip = 0;
+  
+  if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {             
+     $skip = 1 if($paref->{layersync});                                           # Anwendung bei Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen                     
+  }
+  elsif (!$paref->{show_night}      &&  $paref->{hfcg}{$i}{weather} > 99  && 
+         !$paref->{hfcg}{$i}{beam1} && !$paref->{hfcg}{beam2}             && 
+         !$paref->{noSkip}{$i}) {
+      
+      $paref->{skip}{$i} = 1 if($paref->{layersync});                             # Anwendung bei Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen
+      $skip              = 1;
+  }
+  else {
+      $paref->{noSkip}{$i} = 1 if($paref->{layersync});                           # Anwendung bei Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen
+  }
+  
+return $skip;
+}
+
 ################################################################
 #                   Wetter Icon Zeile
 ################################################################
@@ -14878,11 +14930,24 @@ sub __weatherOnBeam {
 
       debugLog ($paref, 'graphic', "weather id beam number >$i< (start hour $hfcg->{$i}{time_str}): wid $hfcg->{$i}{weather} / wcc $wcc") if($ii < $maxhours);
 
-      if (!$show_night && $hfcg->{$i}{weather} > 99 && 
-          !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {                                                      # Lässt Nachticons aber noch durch wenn es einen Wert gibt
-          debugLog ($paref, 'graphic', "Weather position >$i< is skipped (condition ‘no night display’)") if($ii < $maxhours);
-          next;
-      };
+      my $skip = __doSkipNightSync ($name, $paref, $i);
+      
+      if ($skip) {
+          debugLog ($paref, 'graphic', "Weather position >$i< is skipped due to don't show night condition") if($ii < $maxhours);
+          next;          
+      }
+      
+      #if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {
+      #    next;
+      #}
+          
+      #if (!$paref->{show_night} && $paref->{hfcg}{$i}{weather} > 99  && !$paref->{hfcg}{$i}{beam1} && 
+      #    !$paref->{hfcg}{$i}{beam2} && !$paref->{noSkip}{$i}) {                                                      
+      #    debugLog ($paref, 'graphic', "Weather position >$i< is skipped (condition ‘no night display’)") if($ii < $maxhours);
+      #    next;
+      #};
+      
+      #$paref->{noSkip}{$i} = 1;
                                                                                                              
       $ii++;                                                                                                 # wieviele Stunden Icons haben sind beechnet?
       last if($ii > $maxhours || $ii > $barcount);
@@ -14904,7 +14969,7 @@ sub __weatherOnBeam {
           debugLog ($paref, "graphic", "unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
       }
 
-      $icon_name .= $hfcg->{$i}{weather} < 100 ? '@'.$colorw  : '@'.$colorwn;
+      $icon_name .= $hfcg->{$i}{weather} < 100 ? '@'.$colorw : '@'.$colorwn;
       my $val     = FW_makeImage ($icon_name) // q{};
 
       if ($val =~ /title="$icon_name"/xs) {                                                                  # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
@@ -14984,13 +15049,26 @@ sub __batRcmdOnBeam {
       
       $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                            # freier Platz am Anfang     
       my $ii       = 0;
-      
+            
       for my $i (0..($maxhours * 2) - 1) {
-          if (!$show_night && $hfcg->{$i}{weather} > 99 && 
-              !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2}) {
+          my $skip = __doSkipNightSync ($name, $paref, $i);
+          
+          if ($skip) {
               debugLog ($paref, 'graphic', "Battery $bn recommandation pos >$i< skipped due to don't show night condition") if($ii < $maxhours);
-              next;
-          };
+              next;          
+          }
+          
+          #if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {
+          #    next;
+          #}
+      
+          #if (!$paref->{show_night} && $paref->{hfcg}{$i}{weather} > 99  && !$paref->{hfcg}{$i}{beam1} && 
+          #    !$paref->{hfcg}{$i}{beam2} && !$paref->{noSkip}{$i}) {
+          #    debugLog ($paref, 'graphic', "Battery $bn recommandation pos >$i< skipped due to don't show night condition") if($ii < $maxhours);
+          #    next;
+          #};
+          
+          #$paref->{noSkip}{$i} = 1;
           
           $ii++;                                                                                      # wieviele Stunden Icons sind bisher beechnet?
           last if($ii > $maxhours || $ii > $barcount);
@@ -22922,7 +23000,7 @@ to ensure that the system configuration is correct.
 
          <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
             <tr><td> <b>both</b>       </td><td>displays the header, consumer legend, energy flow and prediction graph (default)        </td></tr>
             <tr><td> <b>flow</b>       </td><td>displays the header, the consumer legend and energy flow graphic                        </td></tr>
             <tr><td> <b>forecast</b>   </td><td>displays the header, the consumer legend and the prediction graphic                     </td></tr>
@@ -22942,10 +23020,19 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicShowNight"></a>
        <li><b>graphicShowNight </b><br>
-         Show/hide the night hours without values in the bar chart. <br>
-         If the selected bar contents contain a value in the night hours, these bars are also displayed if
-         graphicShowNight=0. <br>
-         (default: 0 (hide))
+         Display or hide the night hours in the bar chart.
+         <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="5%"> <col width="95%"> </colgroup>
+            <tr><td> <b>0</b>   </td><td>No display of night hours if no value is to be displayed (default)            </td></tr>
+            <tr><td>            </td><td>If the selected content contains a value, these bars are still displayed.     </td></tr>
+            <tr><td> <b>01</b>  </td><td>Like ‘0’, but time synchronisation takes place between the bars               </td></tr>
+            <tr><td>            </td><td>of level 1 and the subsequent bar chart level.                                </td></tr>
+            <tr><td> <b>1</b>   </td><td>The night hours are always displayed                                          </td></tr>
+         </table>
+         </ul>
        </li>
        <br>
 
@@ -25395,7 +25482,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
             <tr><td> <b>both</b>       </td><td>zeigt den Header, die Verbraucherlegende, Energiefluß- und Vorhersagegrafik an (default)   </td></tr>
             <tr><td> <b>flow</b>       </td><td>zeigt den Header, die Verbraucherlegende und Energieflußgrafik an                          </td></tr>
             <tr><td> <b>forecast</b>   </td><td>zeigt den Header, die Verbraucherlegende und die Vorhersagegrafik an                       </td></tr>
@@ -25415,10 +25502,19 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicShowNight"></a>
        <li><b>graphicShowNight </b><br>
-         Anzeigen/Verbergen der Nachtstunden ohne Werte in der Balkengrafik. <br>
-         Sofern die ausgewählten Balkeninhalte in den Nachtstunden einen Wert enthalten, werden diese Balken
-         auch im Fall graphicShowNight=0 dargestellt. <br>
-         (default: 0 (verbergen))
+         Anzeigen oder Verbergen der Nachtstunden in der Balkengrafik.
+         <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="5%"> <col width="95%"> </colgroup>
+            <tr><td> <b>0</b>   </td><td>keine Anzeige der Nachtstunden sofern kein Wert anzuzeigen ist (default)                           </td></tr>
+            <tr><td>            </td><td>Sofern die ausgewählten Inhalte einen Wert enthalten, werden diese Balken dennoch dargestellt.     </td></tr>
+            <tr><td> <b>01</b>  </td><td>Wie '0', es findet jedoch eine Zeitsynchronisation zwischen den Balken                             </td></tr>
+            <tr><td>            </td><td>der Ebene 1 und der nachfolgenden Balkengrafikebene statt.                                         </td></tr>
+            <tr><td> <b>1</b>   </td><td>Nachtstunden werden immer angezeigt                                                                </td></tr>
+         </table>
+         </ul>
        </li>
        <br>
 
