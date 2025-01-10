@@ -157,7 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.43.0" => "09.01.2025   ",
+  "1.43.0" => "09.01.2025  graphicShowNight: add possible Time Sync of chart bar level 1 and the other ".
+                           "_addDynAttr: minor fix for graphicBeamXContent, new attr ctrlNextHoursSoCForecastReadings ",
   "1.42.0" => "07.01.2025  change socslidereg to batsocslidereg, _batChargeRecmd: add value to nexthours ".
                            "entryGraphic: enrich hfcg hash, __normDecPlaces: use it from/to battery, ".
                            "setupBatteryDevXX : new icon & show key, colour of icon can be changed separately, maxbatteries set to 3 ".
@@ -528,7 +529,7 @@ my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    consumerLegend consumerAdviceIcon consumerLink
                    ctrlAIdataStorageDuration ctrlBackupFilesKeep
                    ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
-                   ctrlLanguage ctrlNextDayForecastReadings ctrlShowLink ctrlSolCastAPImaxReq
+                   ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings ctrlShowLink ctrlSolCastAPImaxReq
                    ctrlSolCastAPIoptimizeReq ctrlSpecialReadings ctrlUserExitFn
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    disable
@@ -1336,6 +1337,7 @@ sub Initialize {
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
                                 "ctrlNextDayForecastReadings:multiple-strict,$hod ".
+                                "ctrlNextHoursSoCForecastReadings ".
                                 "ctrlShowLink:1,0 ".
                                 "ctrlSolCastAPImaxReq:selectnumbers,5,5,60,0,lin ".
                                 "ctrlSolCastAPIoptimizeReq:1,0 ".
@@ -1346,10 +1348,10 @@ sub Initialize {
                                 "graphicBeamHeightLevel1 ".
                                 "graphicBeamHeightLevel2 ".
                                 "graphicBeamWidth:slider,20,5,100 ".
-                                "graphicBeam1Content: ".
-                                "graphicBeam2Content: ".
-                                "graphicBeam3Content: ".
-                                "graphicBeam4Content: ".
+                                "graphicBeam1Content ".
+                                "graphicBeam2Content ".
+                                "graphicBeam3Content ".
+                                "graphicBeam4Content ".
                                 "graphicBeam1Color:colorpicker,RGB ".
                                 "graphicBeam2Color:colorpicker,RGB ".
                                 "graphicBeam3Color:colorpicker,RGB ".
@@ -5423,6 +5425,10 @@ sub Attr {
   if ($aName eq 'ctrlNextDayForecastReadings') {
       deleteReadingspec ($hash, "Tomorrow_Hour.*");
   }
+  
+  if ($aName eq 'ctrlNextHoursSoCForecastReadings') {
+      deleteReadingspec ($hash, "Battery_NextHour.._SoCforecast_..");       
+  }
 
   if ($aName =~ /ctrlBatSocManagement/xs && $init_done) {
       my $bn = (split 'ctrlBatSocManagement', $aName)[1];
@@ -6147,6 +6153,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       readingsDelete    ($hash, 'Battery_ChargeRecommended_'.$bn);
       readingsDelete    ($hash, 'Battery_ChargeRequest_'.$bn);
       readingsDelete    ($hash, 'Battery_OptimumTargetSoC_'.$bn);
+      deleteReadingspec ($hash, "NextHour.._Bat_${bn}_SoCforecast");
       
       undef @{$data{$name}{current}{batsocslidereg}};
       
@@ -7294,7 +7301,7 @@ sub _addDynAttr {
   ## Attributhüllen entfernen
   #############################
   my @deva = split " ", $modules{$type}{AttrList};
-  my $atd  = 'setupWeatherDev|setupRadiationAPI|graphicBeam*Content';
+  my $atd  = 'setupWeatherDev|setupRadiationAPI|graphicBeam*Content|ctrlNextHoursSoCForecastReadings';
   @deva    = grep {!/$atd/} @deva;
   
   ## Attr setupWeatherDevX / setupRadiationAPI zur Laufzeit hinzufügen
@@ -7311,23 +7318,26 @@ sub _addDynAttr {
 
   push @deva, "setupRadiationAPI:$rdd ";
   
-  ## Attr graphicBeamXContent zur Laufzeit hinzufügen
-  #####################################################
-  my $gbc = '';
+  ## Attr graphicBeamXContent, ctrlNextDayForecastReadings zur Laufzeit hinzufügen
+  ##################################################################################
+  my $gbc;
+  
   if (isBatteryUsed ($name)) {
       for my $bn (1..$maxbatteries) {                                          
           $bn   = sprintf "%02d", $bn;
           $gbc .= 'batsocforecast_'.$bn.',';
       }
+      
+      my $hod = join ",", (map { sprintf "%02d", $_} (0..23));
+      push @deva, "ctrlNextHoursSoCForecastReadings:multiple-strict,$hod";
   }
-  $gbc .= ',' if(!$gbc);
+
   $gbc .= 'consumption,consumptionForecast,energycosts,feedincome,gridconsumption,gridfeedin,pvForecast,pvReal';
-  
+   
   push @deva, "graphicBeam1Content:$gbc"; 
   push @deva, "graphicBeam2Content:$gbc";  
   push @deva, "graphicBeam3Content:$gbc"; 
   push @deva, "graphicBeam4Content:$gbc";
-  
   
   $hash->{".AttrList"} = join " ", @deva;
 
@@ -9912,7 +9922,14 @@ sub _batChargeRecmd {
           my $progsoc = sprintf "%.0f", (100 / $batinstcap * ($batinstcap - $whneed));           # Prognose SoC
           $progsoc    = $progsoc < $batoptsoc ? $batoptsoc :
                         $progsoc < $lowSoc    ? $lowSoc    :
-                        $progsoc;       
+                        $progsoc;  
+
+          __calcReadingsNextHoursSoCFc ( {name    => $name, 
+                                          nhr     => $nhr, 
+                                          bn      => $bn, 
+                                          progsoc => $progsoc
+                                         } 
+                                       );                                                        # Readings NextHourXX_Bat_XX_ChargeForecast erstellen  
           
           if ( $whneed + $sfmargin >= $spday  )      {$rcmd = 1}                                 # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
           if ( !$num && $pvCu - $curcon >= $inplim ) {$rcmd = 1}                                 # Ladeempfehlung wenn akt. PV Leistung >= WR-Leistungsbegrenzung
@@ -9951,6 +9968,28 @@ sub _batChargeRecmd {
       }
   }
   
+return;
+}
+
+################################################################
+#      zusätzliche Readings NextHourXX_Bat_XX_ChargeForecast
+#      erstellen
+################################################################
+sub __calcReadingsNextHoursSoCFc {                                            
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $nhr     = $paref->{nhr};                # nächste Stunde
+  my $bn      = $paref->{bn};                 # Batterienummer
+  my $progsoc = $paref->{progsoc};            # prognostizierter SoC
+
+  my $hods = AttrVal ($name, 'ctrlNextHoursSoCForecastReadings', '');
+
+  return if(!$hods);
+ 
+  if (grep { /$nhr/x } split ',', $hods) {
+      storeReading ('Battery_NextHour'.$nhr.'_SoCforecast_'.$bn, $progsoc.' %');
+  }
+
 return;
 }
 
@@ -12001,16 +12040,15 @@ return;
 
 ################################################################
 #      zusätzliche Readings Tomorrow_HourXX_PVforecast
-#      berechnen
+#      erstellen
 ################################################################
 sub _calcReadingsTomorrowPVFc {
   my $paref  = shift;
   my $name   = $paref->{name};
-  my $type   = $paref->{type};
 
   my $hash = $defs{$name};
   my $h    = $data{$name}{nexthours};
-  my $hods = AttrVal($name, 'ctrlNextDayForecastReadings', '');
+  my $hods = AttrVal ($name, 'ctrlNextDayForecastReadings', '');
 
   return if(!keys %{$h} || !$hods);
 
@@ -14558,19 +14596,7 @@ sub _beamGraphic {
       my $ii = 0;
 
       for my $i (0..($maxhours * 2) - 1) {                                                                      # gleiche Bedingung wie oben          
-          next if(__doSkipNightSync ($name, $paref, $i));
-          
-          #if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {
-          #    next;
-          #}
-      
-          #if (!$paref->{show_night} && $paref->{hfcg}{$i}{weather} > 99  && !$paref->{hfcg}{$i}{beam1} && 
-          #    !$paref->{hfcg}{beam2} && !$paref->{noSkip}{$i}) {
-          #    $paref->{skip}{$i} = 1;
-          #    next;
-          #}
-          
-          #$paref->{noSkip}{$i} = 1;
+          next if(__dontNightshowSkipSync ($name, $paref, $i));
           
           $ii++;                                                                                                # wieviele Stunden haben wir bisher angezeigt ?
           last if($ii > $maxhours || $ii > $barcount);                                                          # vorzeitiger Abbruch
@@ -14578,9 +14604,9 @@ sub _beamGraphic {
           $val = normBeamWidth ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
 
           if ($val ne '&nbsp;') {                                                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
-          $val = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
-                 $val > 0              ? '+'  .$val        :
-                 $val;                                                                                          # negative Zahlen in Fettschrift, 0 aber ohne +
+              $val = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
+                     $val > 0              ? '+'  .$val        :
+                     $val;                                                                                      # negative Zahlen in Fettschrift, 0 aber ohne +
           }
 
           $ret .= "<td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td>";
@@ -14594,18 +14620,7 @@ sub _beamGraphic {
   my $ii = 0;
 
   for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben    
-      next if(__doSkipNightSync ($name, $paref, $i));
-      #if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {
-      #    next;
-      #}
-      
-      #if (!$paref->{show_night} && $paref->{hfcg}{$i}{weather} > 99  && !$paref->{hfcg}{$i}{beam1} && 
-      #    !$paref->{hfcg}{$i}{beam2} && !$paref->{noSkip}{$i}) {
-      #    $paref->{skip}{$i} = 1;
-      #    next;
-      #}
-      
-      #$paref->{noSkip}{$i} = 1;
+      next if(__dontNightshowSkipSync ($name, $paref, $i));
       
       $ii++;
       last if($ii > $maxhours || $ii > $barcount);
@@ -14877,7 +14892,7 @@ return $ret;
 #  paref->noSkip = 1 - Synchronisation Anzeige des Balkens in nächsten Ebenen erzwingen
 #
 ############################################################################################
-sub __doSkipNightSync {                       
+sub __dontNightshowSkipSync {                       
   my $name  = shift;
   my $paref = shift;
   my $i     = shift;
@@ -14930,24 +14945,12 @@ sub __weatherOnBeam {
 
       debugLog ($paref, 'graphic', "weather id beam number >$i< (start hour $hfcg->{$i}{time_str}): wid $hfcg->{$i}{weather} / wcc $wcc") if($ii < $maxhours);
 
-      my $skip = __doSkipNightSync ($name, $paref, $i);
+      my $skip = __dontNightshowSkipSync ($name, $paref, $i);
       
       if ($skip) {
           debugLog ($paref, 'graphic', "Weather position >$i< is skipped due to don't show night condition") if($ii < $maxhours);
           next;          
       }
-      
-      #if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {
-      #    next;
-      #}
-          
-      #if (!$paref->{show_night} && $paref->{hfcg}{$i}{weather} > 99  && !$paref->{hfcg}{$i}{beam1} && 
-      #    !$paref->{hfcg}{$i}{beam2} && !$paref->{noSkip}{$i}) {                                                      
-      #    debugLog ($paref, 'graphic', "Weather position >$i< is skipped (condition ‘no night display’)") if($ii < $maxhours);
-      #    next;
-      #};
-      
-      #$paref->{noSkip}{$i} = 1;
                                                                                                              
       $ii++;                                                                                                 # wieviele Stunden Icons haben sind beechnet?
       last if($ii > $maxhours || $ii > $barcount);
@@ -15051,24 +15054,12 @@ sub __batRcmdOnBeam {
       my $ii       = 0;
             
       for my $i (0..($maxhours * 2) - 1) {
-          my $skip = __doSkipNightSync ($name, $paref, $i);
+          my $skip = __dontNightshowSkipSync ($name, $paref, $i);
           
           if ($skip) {
               debugLog ($paref, 'graphic', "Battery $bn recommandation pos >$i< skipped due to don't show night condition") if($ii < $maxhours);
               next;          
           }
-          
-          #if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {
-          #    next;
-          #}
-      
-          #if (!$paref->{show_night} && $paref->{hfcg}{$i}{weather} > 99  && !$paref->{hfcg}{$i}{beam1} && 
-          #    !$paref->{hfcg}{$i}{beam2} && !$paref->{noSkip}{$i}) {
-          #    debugLog ($paref, 'graphic', "Battery $bn recommandation pos >$i< skipped due to don't show night condition") if($ii < $maxhours);
-          #    next;
-          #};
-          
-          #$paref->{noSkip}{$i} = 1;
           
           $ii++;                                                                                      # wieviele Stunden Icons sind bisher beechnet?
           last if($ii > $maxhours || $ii > $barcount);
@@ -19403,7 +19394,7 @@ return ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0);
 sub isBatteryUsed {
   my $name = shift;
   
-  my $valid;
+  my $valid = 0;
 
   for my $bn (1..$maxbatteries) {
       $bn = sprintf "%02d", $bn;
@@ -22529,6 +22520,23 @@ to ensure that the system configuration is correct.
 
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-ctrlNextHoursSoCForecastReadings"></a>
+       <li><b>ctrlNextHoursSoCForecastReadings &lt;00,02,..,23&gt; </b><br>
+         If set, readings of the form Battery_NextHourXX_SoCforecast_BN are created if a battery is registered 
+         in the SolarForecast device (see <a href="#SolarForecast-attr-setupBatteryDev">attr &lt;name&gt; setupBatteryDevXX </a>). <br>
+         These readings contain the predicted SoC values (%) for the selected hours. <br>
+         Where 'XX' is the hour in the future starting from the current hour (00) and 'BN' is the number of the registered battery. 
+         <br><br>
+
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; ctrlNextHoursSoCForecastReadings 00,03,12,18 <br>
+         # creates readings for the current hour (00) and the following hours +03, +12 and +18.
+       </ul>
+
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-ctrlShowLink"></a>
        <li><b>ctrlShowLink </b><br>
@@ -23026,11 +23034,11 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="5%"> <col width="95%"> </colgroup>
-            <tr><td> <b>0</b>   </td><td>No display of night hours if no value is to be displayed (default)            </td></tr>
+            <tr><td> <b>0</b>   </td><td>no display of night hours if no value is to be displayed (default)            </td></tr>
             <tr><td>            </td><td>If the selected content contains a value, these bars are still displayed.     </td></tr>
-            <tr><td> <b>01</b>  </td><td>Like ‘0’, but time synchronisation takes place between the bars               </td></tr>
-            <tr><td>            </td><td>of level 1 and the subsequent bar chart level.                                </td></tr>
-            <tr><td> <b>1</b>   </td><td>The night hours are always displayed                                          </td></tr>
+            <tr><td> <b>01</b>  </td><td>Like ‘0’, but time synchronisation takes place between the level 1            </td></tr>
+            <tr><td>            </td><td>and the subsequent bar chart level.                                           </td></tr>
+            <tr><td> <b>1</b>   </td><td>the night hours are always displayed                                          </td></tr>
          </table>
          </ul>
        </li>
@@ -25013,6 +25021,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-ctrlNextHoursSoCForecastReadings"></a>
+       <li><b>ctrlNextHoursSoCForecastReadings &lt;00,02,..,23&gt; </b><br>
+         Wenn gesetzt, werden Readings der Form Battery_NextHourXX_SoCforecast_BN erstellt sofern eine Batterie im 
+         SolarForecast-Device registriert ist (siehe <a href="#SolarForecast-attr-setupBatteryDev">attr &lt;name&gt; setupBatteryDevXX </a>). <br>
+         Diese Readings enthalten die prognostizierten SoC-Werte (%) der ausgewählten Stunden. <br>
+         Dabei ist 'XX' die Stunde in der Zukunft ausgehend von der aktuellen Stunde (00) und 'BN' die Nummer der registrierten Batterie. 
+         <br><br>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; ctrlNextHoursSoCForecastReadings 00,03,12,18 <br>
+         # erstellt Readings für die aktuelle Stunde (00) sowie die nachfolgenden Stunden +03, +12 und +18.
+       </ul>
+
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-ctrlShowLink"></a>
        <li><b>ctrlShowLink </b><br>
@@ -25510,8 +25535,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="5%"> <col width="95%"> </colgroup>
             <tr><td> <b>0</b>   </td><td>keine Anzeige der Nachtstunden sofern kein Wert anzuzeigen ist (default)                           </td></tr>
             <tr><td>            </td><td>Sofern die ausgewählten Inhalte einen Wert enthalten, werden diese Balken dennoch dargestellt.     </td></tr>
-            <tr><td> <b>01</b>  </td><td>Wie '0', es findet jedoch eine Zeitsynchronisation zwischen den Balken                             </td></tr>
-            <tr><td>            </td><td>der Ebene 1 und der nachfolgenden Balkengrafikebene statt.                                         </td></tr>
+            <tr><td> <b>01</b>  </td><td>Wie '0', es findet jedoch eine Zeitsynchronisation zwischen der Ebene 1                            </td></tr>
+            <tr><td>            </td><td>und der nachfolgenden Balkengrafikebene statt.                                                     </td></tr>
             <tr><td> <b>1</b>   </td><td>Nachtstunden werden immer angezeigt                                                                </td></tr>
          </table>
          </ul>
