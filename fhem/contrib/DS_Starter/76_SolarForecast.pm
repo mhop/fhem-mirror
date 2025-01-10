@@ -9872,7 +9872,7 @@ sub _batChargeRecmd {
       next if($err);
   
       my $batinstcap = BatteryVal  ($hash, $bn, 'binstcap', 0);                                  # installierte Batteriekapazität Wh
-      my $soc        = BatteryVal  ($hash, $bn, 'bcharge',  0);                                  # aktuelle Ladung in %
+      my $csoc       = BatteryVal  ($hash, $bn, 'bcharge',  0);                                  # aktuelle Ladung in %
       my $batoptsoc  = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                  # aktueller optimierter SoC
                   
       if (!$inplim || !$batinstcap) {
@@ -9889,8 +9889,7 @@ sub _batChargeRecmd {
       
       debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - Installed Battery capacity: $batinstcap Wh");
                                                                
-      my $whneed   = sprintf "%.0f", ($batinstcap - ($batinstcap * $soc / 100));                 # benötigte Energie bis 100% Batteriekapazität Wh
-      my $sfmargin = $whneed * 0.25;                                                             # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
+      my $whneed = sprintf "%.0f", ($batinstcap - ($batinstcap * $csoc / 100));                  # benötigte Energie bis 100% Batteriekapazität Wh
       
       ## Auswertung für jede kommende Stunde
       ########################################
@@ -9919,8 +9918,9 @@ sub _batChargeRecmd {
           
           ## SOC-Prognose und Ladeempfehlung
           ####################################
-          my $progsoc = sprintf "%.0f", (100 / $batinstcap * ($batinstcap - $whneed));           # Prognose SoC
-          $progsoc    = $progsoc < $batoptsoc ? $batoptsoc :
+          my $progsoc = sprintf "%.0f", (100 / $batinstcap * ($batinstcap - $whneed));           # Prognose SoC   
+          $progsoc    = !$num                 ? $csoc      :                                     # Stunde 00 (aktuelle) -> $progsoc = $csoc
+                        $progsoc < $batoptsoc ? $batoptsoc :
                         $progsoc < $lowSoc    ? $lowSoc    :
                         $progsoc;  
 
@@ -9930,6 +9930,8 @@ sub _batChargeRecmd {
                                           progsoc => $progsoc
                                          } 
                                        );                                                        # Readings NextHourXX_Bat_XX_ChargeForecast erstellen  
+          
+          my $sfmargin = $whneed * 0.25;                                                         # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
           
           if ( $whneed + $sfmargin >= $spday  )      {$rcmd = 1}                                 # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
           if ( !$num && $pvCu - $curcon >= $inplim ) {$rcmd = 1}                                 # Ladeempfehlung wenn akt. PV Leistung >= WR-Leistungsbegrenzung
