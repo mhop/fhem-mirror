@@ -22517,7 +22517,7 @@ to ensure that the system configuration is correct.
        <li><b>ctrlNextHoursSoCForecastReadings &lt;00,02,..,23&gt; </b><br>
          If set, readings of the form Battery_NextHourXX_SoCforecast_BN are created if a battery is registered 
          in the SolarForecast device (see <a href="#SolarForecast-attr-setupBatteryDev">attr &lt;name&gt; setupBatteryDevXX </a>). <br>
-         These readings contain the predicted SoC values (%) for the selected hours. <br>
+         These readings contain the predicted SoC value (%) at the end of the selected hour. <br>
          Where 'XX' is the hour in the future starting from the current hour (00) and 'BN' is the number of the registered battery. 
          <br><br>
 
@@ -25018,7 +25018,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>ctrlNextHoursSoCForecastReadings &lt;00,02,..,23&gt; </b><br>
          Wenn gesetzt, werden Readings der Form Battery_NextHourXX_SoCforecast_BN erstellt sofern eine Batterie im 
          SolarForecast-Device registriert ist (siehe <a href="#SolarForecast-attr-setupBatteryDev">attr &lt;name&gt; setupBatteryDevXX </a>). <br>
-         Diese Readings enthalten die prognostizierten SoC-Werte (%) der ausgewählten Stunden. <br>
+         Diese Readings enthalten den prognostizierten SoC-Wert (%) zum Ende der ausgewählten Stunde. <br>
          Dabei ist 'XX' die Stunde in der Zukunft ausgehend von der aktuellen Stunde (00) und 'BN' die Nummer der registrierten Batterie. 
          <br><br>
 
