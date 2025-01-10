@@ -157,7 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.43.0" => "09.01.2025  graphicShowNight: add possible Time Sync of chart bar level 1 and the other ".
+  "1.43.0" => "10.01.2025  graphicShowNight: add possible Time Sync of chart bar level 1 and the other ".
                            "_addDynAttr: minor fix for graphicBeamXContent, new attr ctrlNextHoursSoCForecastReadings ",
   "1.42.0" => "07.01.2025  change socslidereg to batsocslidereg, _batChargeRecmd: add value to nexthours ".
                            "entryGraphic: enrich hfcg hash, __normDecPlaces: use it from/to battery, ".
@@ -9889,7 +9889,7 @@ sub _batChargeRecmd {
       
       debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - Installed Battery capacity: $batinstcap Wh");
                                                                
-      my $whneed = sprintf "%.0f", ($batinstcap - ($batinstcap * $csoc / 100));                  # benötigte Energie bis 100% Batteriekapazität Wh
+      my $socwh = sprintf "%.0f", ($batinstcap * $csoc / 100);                  # aktueller SoC in Wh
       
       ## Auswertung für jede kommende Stunde
       ########################################
@@ -9916,11 +9916,24 @@ sub _batChargeRecmd {
           
           $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
           
-          ## SOC-Prognose und Ladeempfehlung
-          ####################################
-          my $progsoc = sprintf "%.0f", (100 / $batinstcap * ($batinstcap - $whneed));           # Prognose SoC   
-          $progsoc    = !$num                 ? $csoc      :                                     # Stunde 00 (aktuelle) -> $progsoc = $csoc
-                        $progsoc < $batoptsoc ? $batoptsoc :
+          ## Ladeempfehlung
+          ###################
+          my $whneed   = $batinstcap - $socwh;
+          my $sfmargin = $whneed * 0.25;                                                         # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
+          
+          if ( $whneed + $sfmargin >= $spday  )      {$rcmd = 1}                                 # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+          if ( !$num && $pvCu - $curcon >= $inplim ) {$rcmd = 1}                                 # Ladeempfehlung wenn akt. PV Leistung >= WR-Leistungsbegrenzung
+          
+          ## SOC-Prognose
+          #################                                                                         
+          $socwh += $rcmd ? $pvfc - $confc : -$confc;                                            # PV Prognose nur einbeziehen wenn Ladeempfehlung                                            
+          $socwh  = sprintf "%.0f", $socwh;                      
+          $socwh  = $socwh < 0           ? 0           : 
+                    $socwh > $batinstcap ? $batinstcap :
+                    $socwh;          
+
+          my $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                            # Prognose SoC   
+          $progsoc    = $progsoc < $batoptsoc ? $batoptsoc :
                         $progsoc < $lowSoc    ? $lowSoc    :
                         $progsoc;  
 
@@ -9931,15 +9944,10 @@ sub _batChargeRecmd {
                                          } 
                                        );                                                        # Readings NextHourXX_Bat_XX_ChargeForecast erstellen  
           
-          my $sfmargin = $whneed * 0.25;                                                         # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
-          
-          if ( $whneed + $sfmargin >= $spday  )      {$rcmd = 1}                                 # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-          if ( !$num && $pvCu - $curcon >= $inplim ) {$rcmd = 1}                                 # Ladeempfehlung wenn akt. PV Leistung >= WR-Leistungsbegrenzung
-
-          my $msg = "(SoC forecast: $progsoc, need: $whneed Wh -> Surplus Day: $spday Wh, Curr PV: $pvCu W, Curr Consumption: $curcon W, Limit: $inplim W)";
+          my $msg = "(currsoc: $csoc %, SoCfc: $progsoc %, soc: $socwh Wh, pvfc: $pvfc, confc: $confc, Surp Day: $spday Wh, Curr PV: $pvCu W, Curr Consumption: $curcon W, Limit: $inplim W)";
           
           if ($num) {
-              $msg = "(SoC forecast: $progsoc, need: $whneed Wh -> Surplus Day: $spday Wh)";
+              $msg = "(SoCfc: $progsoc %, soc: $socwh Wh, pvfc: $pvfc, confc: $confc, Surp Day: $spday Wh)";
           }
           else {
               storeReading ('Battery_ChargeRecommended_'.$bn, $rcmd);                            # Reading nur für aktuelle Stunde
@@ -9948,25 +9956,7 @@ sub _batChargeRecmd {
           $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $rcmd;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
           
-          debugLog ($paref, 'batteryManagement', "Bat $bn Charge activation $stt -> $rcmd $msg");
-          
-          ## Fortschreibung der Prognose als Grundlage für die kommende Stunde
-          ######################################################################
-          if ($pvfc) {
-              if ($today) {                                                                      # (Rest) heutiger Tag
-                  $confcss  -= $confc;
-                  $confcss   = 0 if($confcss < 0);
-                  $rodpvfc  -= $pvfc;
-              }
-              else {                                                                             # nächster Tag
-                  $tomconfc -= $confc;
-                  $tomconfc  = 0 if($tomconfc < 0);
-                  $tompvfc  -= $pvfc;          
-              }
-          }
-          
-          $whneed -= sprintf "%.0f", ($rcmd ? $pvfc - $confc : 0);                               # PV Prognose nur einbeziehen wenn Ladeempfehlung                               
-          $whneed  = $whneed < 0 ? 0 : $whneed; 
+          debugLog ($paref, 'batteryManagement', "Bat $bn doCharge $stt -> $rcmd $msg");
       }
   }
   
