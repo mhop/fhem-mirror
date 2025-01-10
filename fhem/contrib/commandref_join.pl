@@ -15,7 +15,7 @@ use warnings;
 my $noWarnings = grep $_ eq '-noWarnings', @ARGV;
 my ($verify) = grep $_ =~ /\.pm$/ , @ARGV;
 
-use constant TAGS => qw{ul li code b i u table tr td div h4 h3};
+use constant TAGS => qw{b code div h3 h4 i li p table td tr u ul };
 
 sub generateModuleCommandref($$;$$);
 
