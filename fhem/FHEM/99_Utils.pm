@@ -317,67 +317,71 @@ WriteFile($$)
 <a name="Utils"></a>
 <h3>Utils</h3>
 <ul>
-  This is a collection of functions that can be used module-independant
-  in all your own development<br/>
-  </br>
-  <b>Defined functions</b><br/><br/>
+  This is a collection of functions that can be used module-independent
+  in all your own development<br>
+  <br>
+  <b>Defined functions</b><br><br>
   <ul>
     <li><b>abstime2rel("HH:MM:SS")</b><br>tells you the difference as HH:MM:SS
-      between now and the argument</li><br/>
+      between now and the argument</li><br>
+
+    <li><b>IsInt("string")</b><br>returns 1 if the argument is an integer,
+      otherwise an empty string (which evaluates to false).
+      </li><br>
 
     <li><b>ltrim("string")</b><br>returns string without leading
-      spaces</li><br/>
+      spaces</li><br>
 
     <li><b>max(str1, str2, ...)</b><br>returns the highest value from a given
-      list (sorted alphanumeric)</li><br/>
+      list (sorted alphanumeric)</li><br>
 
     <li><b>maxNum(num1, num2, ...)</b><br>returns the highest value from a
-      given list (sorted numeric)</li><br/>
+      given list (sorted numeric)</li><br>
 
     <li><b>min(str1, str2, ...)</b><br>returns the lowest value from a given
-      list (sorted alphanumeric)</li><br/>
+      list (sorted alphanumeric)</li><br>
 
     <li><b>minNum(num1, num2, ...)</b><br>returns the lowest value from a given
-      list (sorted numeric)</li><br/>
+      list (sorted numeric)</li><br>
 
     <li><b>rtrim("string")</b><br>returns string without trailing
-      spaces</li><br/>
+      spaces</li><br>
 
     <li><b>time_str2num("YYYY-MM-DD HH:MM:SS")</b><br>convert a time string to
-      number of seconds since 1970</li><br/>
+      number of seconds since 1970</li><br>
 
     <li><b>trim("string")</b><br>returns string without leading and without
-      trailing spaces</li><br/>
+      trailing spaces</li><br>
 
     <li><b>UntoggleDirect("deviceName")</b><br>For devices paired directly,
-       converts state 'toggle' into 'on' or 'off'</li><br/>
+       converts state 'toggle' into 'on' or 'off'</li><br>
 
     <li><b>UntoggleIndirect()</b><br>For devices paired indirectly, switches
       the target device 'on' or 'off', also when a 'toggle' was sent from the
-      source device</li><br/>
+      source device</li><br>
 
     <li><b>defInfo("devspec", "internal")</b><br>return an array with the
       internal values of all devices found with devspec, e.g.
-      defInfo("TYPE=SVG", "GPLOTFILE").</li><br/>
+      defInfo("TYPE=SVG", "GPLOTFILE").</li><br>
 
     <li><b>SVG_time_to_sec("YYYY-MM-DD_HH:MM:SS")</b><br>converts the argument
       to the number of seconds since 1970. Optimized for repeated use of similar
-      timestamps.</li></br>
+      timestamps.</li><br>
 
     <li><b>fhemNc("host:port", "textToSend", waitForReturn)</b><br>
       sends textToSend to host:port, and if waitForReturn is set, then read
       the answer (wait up to 5 seconds) and return it. Intended as small
       nc replacement.
-      </li></br>
+      </li><br>
 
     <li><b>round(value, digits)</b><br>
       round &lt;value&gt; to given digits behind comma
-      </li></br>
+      </li><br>
 
     <li><b>getUniqueId()</b><br>
       return the FHEM uniqueID used by the fheminfo command. Uses the
       getKeyValue / setKeyValue functions.
-      </li></br>
+      </li><br>
 
     <li><b>setKeyValue(keyName, value)</b><br>
       store the value in the file $modpath/FHEM/FhemUtils/uniqueID (the name is
@@ -386,18 +390,18 @@ WriteFile($$)
       The file/database entry will be written immediately, no explicit save is
       required.  If the value is undef, the entry will be deleted.
       Returns an error-string or undef.
-      </li></br>
+      </li><br>
 
     <li><b>getKeyValue(keyName)</b><br>
       return ($error, $value), stored previously by setKeyValue.
       $error is set if there was an error.  Both are undef, if there is no
       value yet for this key.
-      </li></br>
+      </li><br>
 
     <li><b>sortTopicNum("asc"|"desc",&lt;list of numbers&gt;)</b><br>
       sort an array of numbers like x.x.x<br>
       (Forum #98578)
-      </li></br>
+      </li><br>
 
     <li><b>Svn_GetFile(from, to, [finishFn])</b><br>
       Retrieve a file diretly from the fhem.de SVN server.<br>
@@ -408,7 +412,7 @@ WriteFile($$)
         <code>{ Svn_GetFile("contrib/86_FS10.pm", "FHEM/86_FS10.pm") }</code>
         <code>{ Svn_GetFile("contrib/86_FS10.pm", "FHEM/86_FS10.pm", sub(){CommandReload(undef, "86_FS10")}) }</code>
       </ul>
-      </li></br>
+      </li><br>
 
     <li><b>WriteFile(file, content)</b><br>
       Write a file in/below the curent directory.
@@ -418,7 +422,7 @@ WriteFile($$)
         attr m2d devStateIcon { '&lt;img src="fhem/images/map.png" style="max-width:256;;max-height:256;;"&gt;' }
 
       </ul>
-      </li></br>
+      </li><br>
 
   </ul>
 </ul>
