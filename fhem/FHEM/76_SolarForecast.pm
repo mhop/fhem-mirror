@@ -12969,6 +12969,11 @@ sub entryGraphic {
       $paref->{minDif} = $back->{minDif};                                                                  # für Typ diff
       
       $ret .= _beamGraphic ($paref);
+      
+      delete $paref->{maxVal};                                                                             # bereinigen vor nächster Ebene 
+      delete $paref->{maxCon};
+      delete $paref->{maxDif};
+      delete $paref->{minDif};
 
       ## Balkengrafik Ebene 2
       #########################
@@ -13001,6 +13006,11 @@ sub entryGraphic {
           # Balkengrafik Ausgabe
           ########################
           $ret .= _beamGraphic ($paref);
+          
+          delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene 
+          delete $paref->{maxCon};
+          delete $paref->{maxDif};
+          delete $paref->{minDif};
       }
 
       $paref->{modulo}++;
@@ -14440,7 +14450,7 @@ sub _beamGraphicRemainingHours {
   my $beam2cont = $paref->{beam2cont};
   my $maxVal    = $paref->{maxVal};                                                                     # dyn. Anpassung der Balkenhöhe oder statisch ?
 
-  $maxVal //= $hfcg->{0}{beam1};                                                                        # Startwert wenn kein Wert bereits via attr vorgegeben ist
+  $maxVal = $maxVal ? $maxVal : $hfcg->{0}{beam1};                                                      # Startwert wenn kein Wert bereits via attr vorgegeben ist
 
   my ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8);
   my $hbsocs;
