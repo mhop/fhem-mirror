@@ -158,7 +158,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.43.1" => "11.01.2025  _batChargeRecmd: bugfix PV daily surplus update, _collectAllRegConsumers: fix interruptable hysteresis ".
-                           "__batRcmdOnBeam: show soc forecast for hour 00 and fix english translation ",
+                           "__batRcmdOnBeam: show soc forecast for hour 00 and fix english translation ".
+                           "_batChargeRecmd: consider battery capacity as part of total capacity ",
   "1.43.0" => "10.01.2025  graphicShowNight: add possible Time Sync of chart bar level 1 and the other ".
                            "_addDynAttr: minor fix for graphicBeamXContent, new attr ctrlNextHoursSoCForecastReadings ",
   "1.42.0" => "07.01.2025  change socslidereg to batsocslidereg, _batChargeRecmd: add value to nexthours ".
@@ -9884,23 +9885,25 @@ sub _batChargeRecmd {
       next if($err);
   
       my $batinstcap = BatteryVal  ($hash, $bn, 'binstcap', 0);                                  # installierte Batteriekapazität Wh
-      my $csoc       = BatteryVal  ($hash, $bn, 'bcharge',  0);                                  # aktuelle Ladung in %
-      my $batoptsoc  = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                  # aktueller optimierter SoC
-                  
+                 
       if (!$inplim || !$batinstcap) {
           debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation are not met. Exit.");
           return;
       }
       
-      my $cgbt   = AttrVal ($name, 'ctrlBatSocManagement'.$bn, undef);
-      my $lowSoc = 0;
+      my $csoc       = BatteryVal  ($hash, $bn, 'bcharge',  0);                                  # aktuelle Ladung in %
+      my $batoptsoc  = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                  # aktueller optimierter SoC
+      my $cgbt       = AttrVal     ($name, 'ctrlBatSocManagement'.$bn, undef);
+      my $sf         = __batCapShareFactor ($hash, $bn);                                         # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
+      my $lowSoc     = 0;
       
       if ($cgbt) {
           ($lowSoc) = __parseAttrBatSoc ($name, $cgbt);
       }
       
-      debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - Installed Battery capacity: $batinstcap Wh");
-                                                               
+      debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
+      debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - The PV generation, consumption and surplus listed below are based on the battery's share of the total capacity!");
+      
       my $socwh = sprintf "%.0f", ($batinstcap * $csoc / 100);                                   # aktueller SoC in Wh
       
       ## Auswertung für jede kommende Stunde
@@ -9918,6 +9921,15 @@ sub _batChargeRecmd {
                 
           my $rcmd  = 0;                                                                         # Ladeempfehlung 0 per Default
           my $spday = 0;
+          
+          ## Aufteilung Energie auf Batterie XX im Verhältnis aller Bat   
+          ###############################################################
+          $pvfc     = sprintf "%.0f", $sf * $pvfc;
+          $confcss  = sprintf "%.0f", $sf * $confcss;
+          $confc    = sprintf "%.0f", $sf * $confc;
+          $rodpvfc  = sprintf "%.0f", $sf * $rodpvfc;
+          $tomconfc = sprintf "%.0f", $sf * $tomconfc;
+          $tompvfc  = sprintf "%.0f", $sf * $tompvfc;
           
           ## (Rest) PV-Überschuß für den Tag 
           ####################################
