@@ -157,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.43.1" => "11.01.2025  _batChargeRecmd: bugfix PV daily surplus update, _collectAllRegConsumers: fix interruptable hysteresis ".
+                           "__batRcmdOnBeam: show soc forecast for hour 00 and fix english translation ",
   "1.43.0" => "10.01.2025  graphicShowNight: add possible Time Sync of chart bar level 1 and the other ".
                            "_addDynAttr: minor fix for graphicBeamXContent, new attr ctrlNextHoursSoCForecastReadings ",
   "1.42.0" => "07.01.2025  change socslidereg to batsocslidereg, _batChargeRecmd: add value to nexthours ".
@@ -910,7 +912,11 @@ my %htitles = (                                                                 
   onlybatw => { EN => qq{Battery},
                 DE => qq{Batterie}                                                                                 },
   socofbat => { EN => qq{State of Charge battery},
-                DE => qq{Ladung Batterie}                                                                          },                
+                DE => qq{Ladung Batterie}                                                                          },
+  socbacur => { EN => qq{SoC current},
+                DE => qq{SoC aktuell}                                                                              }, 
+  socbatfc => { EN => qq{SoC forecast},
+                DE => qq{SoC Prognose}                                                                             },                
   bcharrcd => { EN => qq{Charging recommendation (activate release for charging the battery if necessary)},
                 DE => qq{Ladeempfehlung (evtl. Freigabe zum Laden der Batterie aktivieren)}                        }, 
   bncharcd => { EN => qq{No charging recommendation (possibly deactivate release for charging the battery)},
@@ -5604,10 +5610,10 @@ sub _attrconsumer {                      ## no critic "not used"
           my (undef,undef,$regex,$hyst) = split ":", $h->{interruptable};
 
           $err = checkRegex ($regex);
-          return $err if($err);
+          return "interruptable: $err" if($err);
 
           if ($hyst && !isNumeric ($hyst)) {
-              return qq{The hysteresis of key "interruptable" must be a numeric value like "0.5" or "2"};
+              return qq{The hysteresis of key "interruptable" must be a numeric value};
           }
       }
 
@@ -5615,24 +5621,24 @@ sub _attrconsumer {                      ## no critic "not used"
           my (undef,undef,$regex) = split ":", $h->{swoncond};
 
           $err = checkRegex ($regex);
-          return $err if($err);
+          return "swoncond: $err" if($err);
       }
 
       if (exists $h->{swoffcond}) {                                                                # Check Regex
           my (undef,undef,$regex) = split ":", $h->{swoffcond};
 
           $err = checkRegex ($regex);
-          return $err if($err);
+          return "swoffcond: $err" if($err);
       }
 
       if (exists $h->{swstate}) {                                                                  # Check Regex
           my (undef,$onregex,$offregex) = split ":", $h->{swstate};
 
           $err = checkRegex ($onregex);
-          return $err if($err);
+          return "swstate on-Regex: $err" if($err);
 
           $err = checkRegex ($offregex);
-          return $err if($err);
+          return "swstate off-Regex: $err" if($err);
       }
 
       if (exists $h->{mintime}) {                                                                  # Check Regex
@@ -7814,9 +7820,15 @@ sub _collectAllRegConsumers {
       my $interruptable = 0;
       my $hyst;
       if (exists $hc->{interruptable} && $hc->{interruptable} ne '0') {
-          $interruptable         = $hc->{interruptable};
-          ($interruptable,$hyst) = $interruptable =~ /(.*):(.*)$/xs if($interruptable ne '1');
+          $interruptable = $hc->{interruptable};
+          
+          if ($interruptable ne '1') {
+              (my $dv, my $rd, my $reg, $hyst) = split ':', $interruptable;
+              $interruptable                   = "$dv:$rd:$reg";
+          }
       }
+      
+      $hyst = $defhyst if(!$hyst);
 
       my ($riseshift, $setshift);
 
@@ -7879,7 +7891,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{rigncond}          = $rigncond           // q{};               # Reading liefert Ignore Bedingung
       $data{$name}{consumers}{$c}{spignorecondregex} = $spignorecondregex  // q{};               # Regex der Ignore Bedingung
       $data{$name}{consumers}{$c}{interruptable}     = $interruptable;                           # Ein-Zustand des Verbrauchers ist unterbrechbar
-      $data{$name}{consumers}{$c}{hysteresis}        = $hyst               // $defhyst;          # Hysterese
+      $data{$name}{consumers}{$c}{hysteresis}        = $hyst;                                    # Hysterese
       $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift     if(defined $riseshift);    # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
       $data{$name}{consumers}{$c}{sunsetshift}       = $setshift      if(defined $setshift);     # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
       $data{$name}{consumers}{$c}{icon}              = $hc->{icon}    if(defined $hc->{icon});   # Icon für den Verbraucher
@@ -9889,7 +9901,7 @@ sub _batChargeRecmd {
       
       debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - Installed Battery capacity: $batinstcap Wh");
                                                                
-      my $socwh = sprintf "%.0f", ($batinstcap * $csoc / 100);                  # aktueller SoC in Wh
+      my $socwh = sprintf "%.0f", ($batinstcap * $csoc / 100);                                   # aktueller SoC in Wh
       
       ## Auswertung für jede kommende Stunde
       ########################################
@@ -9902,16 +9914,26 @@ sub _batChargeRecmd {
           my $confc = NexthoursVal ($hash, 'NextHour'.$nhr, 'confc',      0);
           my $pvfc  = NexthoursVal ($hash, 'NextHour'.$nhr, 'pvfc',       0);
           my $stt   = NexthoursVal ($hash, 'NextHour'.$nhr, 'starttime', '');
-          $stt      = (split '-', $stt)[2] if($stt);
+          $stt      = (split /[-:]/, $stt)[2] if($stt);
                 
           my $rcmd  = 0;                                                                         # Ladeempfehlung 0 per Default
           my $spday = 0;
           
-          if ($today) {                                                                          
-              $spday = $rodpvfc - $confcss;                                                      # PV-Überschußprognose (Rest) heutiger Tag
-          }
-          else {                                                                                 # PV-Überschußprognose nächster Tag
-              $spday = $tompvfc - $tomconfc;
+          ## (Rest) PV-Überschuß für den Tag 
+          ####################################
+          if ($pvfc) {
+              if ($today) {                                                                      # heutiger Tag
+                  $confcss  -= $confc;                                                           # Verbrauch bis Sonnenuntergang - Verbrauch Fc aktuelle Stunde
+                  $confcss   = 0 if($confcss < 0);
+                  $rodpvfc  -= $pvfc;
+                  $spday     = $rodpvfc - $confcss;                                              # PV-Überschußprognose (Rest) heutiger Tag
+              }
+              else {                                                                             # nächster Tag
+                  $tomconfc -= $confc;
+                  $tomconfc  = 0 if($tomconfc < 0);
+                  $tompvfc  -= $pvfc;  
+                  $spday     = $tompvfc - $tomconfc;                  
+              }
           }
           
           $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
@@ -9956,7 +9978,7 @@ sub _batChargeRecmd {
           $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $rcmd;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
           
-          debugLog ($paref, 'batteryManagement', "Bat $bn doCharge $stt -> $rcmd $msg");
+          debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $rcmd $msg");
       }
   }
   
@@ -15065,14 +15087,14 @@ sub __batRcmdOnBeam {
           my $time_str  = $hfcg->{$i}{time_str};
           my $soc       = $hfcg->{$i}{'soc'.$bn};
           
-          my ($bpower);
+          my ($bpower, $currsoc);
           
           if ($day_str eq $day && $time_str eq $chour) {                                              # akt. Leistung nur für aktuelle Stunde
-              $bpower = $bpowerin  ? $bpowerin      :
-                        $bpowerout ? 0 - $bpowerout :                                                 # __substituteIcon: bpowerout als NEGATIVEN Wert übergeben!
-                        0;
+              $bpower  = $bpowerin  ? $bpowerin      :
+                         $bpowerout ? 0 - $bpowerout :                                                # __substituteIcon: bpowerout als NEGATIVEN Wert übergeben!
+                         0;
                         
-              $soc    = BatteryVal ($name, $bn, 'bcharge', 0);
+              $currsoc = BatteryVal ($name, $bn, 'bcharge', 0);
           }
           
           my ($bicon, $title) = __substituteIcon ( { name  => $name,                                  # Icon / Status des Batterie Devices
@@ -15085,6 +15107,8 @@ sub __batRcmdOnBeam {
                                                       lang  => $lang
                                                     }
                                                   ); 
+                                                  
+          $title .= defined $currsoc ? "\n".$htitles{socbacur}{$lang}.": ".$currsoc." %" : '';
                                                  
           debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): ".(defined $bpower ? $bpower : 'undef').
                                        " W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : 'undef').
@@ -15844,8 +15868,7 @@ sub __substituteIcon {
       my $socicon;
       
       if (defined $soc) {
-          $soctxt  = defined $pcurr ? "\nSoC: ".$soc." %" : 
-                     "\nSoC Prognose: ".$soc." %";                                       # defined pcurr? -> aktuelle Stunde
+          $soctxt  = "\n".$htitles{socbatfc}{$lang}.": ".$soc." %";                      # Text 'SoC Prognose'                                
           
           $socicon = $soc >= 80 ? 'measure_battery_100' :
                      $soc >= 60 ? 'measure_battery_75'  :
@@ -19891,7 +19914,9 @@ return $ps;
 #  Prüfung eines übergebenen Regex
 ################################################################
 sub checkRegex {
-  my $regexp = shift // return;
+  my $regexp = shift;
+  
+  return 'no Regex is provided' if(!$regexp);
 
   eval { "Hallo" =~ m/^$regexp$/;
          1;
@@ -22517,7 +22542,7 @@ to ensure that the system configuration is correct.
        <li><b>ctrlNextHoursSoCForecastReadings &lt;00,02,..,23&gt; </b><br>
          If set, readings of the form Battery_NextHourXX_SoCforecast_BN are created if a battery is registered 
          in the SolarForecast device (see <a href="#SolarForecast-attr-setupBatteryDev">attr &lt;name&gt; setupBatteryDevXX </a>). <br>
-         These readings contain the predicted SoC values (%) for the selected hours. <br>
+         These readings contain the predicted SoC value (%) at the end of the selected hour. <br>
          Where 'XX' is the hour in the future starting from the current hour (00) and 'BN' is the number of the registered battery. 
          <br><br>
 
@@ -25018,7 +25043,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>ctrlNextHoursSoCForecastReadings &lt;00,02,..,23&gt; </b><br>
          Wenn gesetzt, werden Readings der Form Battery_NextHourXX_SoCforecast_BN erstellt sofern eine Batterie im 
          SolarForecast-Device registriert ist (siehe <a href="#SolarForecast-attr-setupBatteryDev">attr &lt;name&gt; setupBatteryDevXX </a>). <br>
-         Diese Readings enthalten die prognostizierten SoC-Werte (%) der ausgewählten Stunden. <br>
+         Diese Readings enthalten den prognostizierten SoC-Wert (%) zum Ende der ausgewählten Stunde. <br>
          Dabei ist 'XX' die Stunde in der Zukunft ausgehend von der aktuellen Stunde (00) und 'BN' die Nummer der registrierten Batterie. 
          <br><br>
 
