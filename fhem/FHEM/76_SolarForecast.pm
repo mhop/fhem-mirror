@@ -15459,7 +15459,7 @@ END0
                                             
           $cc_dummy       -= $currentPower;
           $cicon           = FW_makeImage    ($cicon, '');
-          ($scale, $cicon) = __normIconScale ($cicon, $name);
+          ($scale, $cicon) = __normIconScale ($name, $cicon);
           
           $ret .= qq{<g id="consumer_${c}_$stna" transform="translate($cons_left,$y_pos),scale($scale)">};
           $ret .= "<title>$calias</title>".$cicon;
@@ -15488,7 +15488,7 @@ END1
   ## Home Icon
   ##############
   my $hicon        = FW_makeImage    ($homeicondef, '');
-  ($scale, $hicon) = __normIconScale ($hicon, $name);
+  ($scale, $hicon) = __normIconScale ($name, $hicon);
   
   $ret .= qq{<g id="home_$stna" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret .= "<title>Home</title>".$hicon;
@@ -15500,7 +15500,7 @@ END1
       my $dumtxt       = $htitles{dumtxt}{$lang};  
       my $dumcol       = $cc_dummy <= 0 ? '@grey' : q{};                                          # Einfärbung Consumer Dummy
       my $dicon        = FW_makeImage    ($cicondef.$dumcol, '');
-      ($scale, $dicon) = __normIconScale ($dicon, $name);
+      ($scale, $dicon) = __normIconScale ($name, $dicon);
       
       $ret .= qq{<g id="dummy_$stna" transform="translate(660,360),scale($scale)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
@@ -15810,7 +15810,7 @@ sub __addProducerIcon {
                                                 );
 
           $picon           = FW_makeImage    ($picon, '');
-          ($scale, $picon) = __normIconScale ($picon, $name);
+          ($scale, $picon) = __normIconScale ($name, $picon);
           
           $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($left,$y_coord),scale($scale)">};
           $ret .= "<title>$ptxt</title>".$picon;
@@ -15847,7 +15847,7 @@ sub __addNodeIcon {
                                          );
   
   $nicon           = FW_makeImage    ($nicon, '');
-  ($scale, $nicon) = __normIconScale ($nicon, $name);
+  ($scale, $nicon) = __normIconScale ($name, $nicon);
   
   my $ret = qq{<g id="node_$stna" transform="translate($x_coord,$y_coord),scale($scale)">};     # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
   $ret   .= "<title>$ntxt</title>".$nicon;
@@ -16034,8 +16034,9 @@ return $p;
 #    scale:   0.10   Normativ $fgscaledef
 ################################################################
 sub __normIconScale {
-  my $icon = shift;
   my $name = shift;
+  my $icon = shift;
+  my $dim  = shift // 470;                                                     # Dimension
   
   my $hscale           = $fgscaledef;                                          # Scale Normativ
   my $wscale           = $fgscaledef;
@@ -16044,27 +16045,27 @@ sub __normIconScale {
   
   return ($hscale, $icon) if(!$width || !$height);
   
-  $wscale = $hunit eq 'pt' ? 470 * $wscale / $width             :
-            $hunit eq 'px' ? 470 * $wscale / $width * 0.96      :
-            $hunit eq 'in' ? 470 * $wscale / $width * 0.0138889 :
-            $hunit eq 'mm' ? 470 * $wscale / $width * 0.352778  :
-            $hunit eq 'cm' ? 470 * $wscale / $width * 0.0352778 :
-            $hunit eq 'pc' ? 470 * $wscale / $width * 0.0833333 :
+  $wscale = $hunit eq 'pt' ? $dim * $wscale / $width             :
+            $hunit eq 'px' ? $dim * $wscale / $width * 0.96      :
+            $hunit eq 'in' ? $dim * $wscale / $width * 0.0138889 :
+            $hunit eq 'mm' ? $dim * $wscale / $width * 0.352778  :
+            $hunit eq 'cm' ? $dim * $wscale / $width * 0.0352778 :
+            $hunit eq 'pc' ? $dim * $wscale / $width * 0.0833333 :
             $wscale;
             
-  $hscale = $hunit eq 'pt' ? 470 * $hscale / $height             :
-            $hunit eq 'px' ? 470 * $hscale / $height * 0.96      :
-            $hunit eq 'in' ? 470 * $hscale / $height * 0.0138889 :
-            $hunit eq 'mm' ? 470 * $hscale / $height * 0.352778  :
-            $hunit eq 'cm' ? 470 * $hscale / $height * 0.0352778 :
-            $hunit eq 'pc' ? 470 * $hscale / $height * 0.0833333 :
+  $hscale = $hunit eq 'pt' ? $dim * $hscale / $height             :
+            $hunit eq 'px' ? $dim * $hscale / $height * 0.96      :
+            $hunit eq 'in' ? $dim * $hscale / $height * 0.0138889 :
+            $hunit eq 'mm' ? $dim * $hscale / $height * 0.352778  :
+            $hunit eq 'cm' ? $dim * $hscale / $height * 0.0352778 :
+            $hunit eq 'pc' ? $dim * $hscale / $height * 0.0833333 :
             $hscale;
            
   $wscale = sprintf "%.2f", $wscale;
   $hscale = sprintf "%.2f", $hscale;
   
-  my $widthnormpt  = (sprintf "%.0f", (470 * (1 + $wscale))).'pt';          # Breite auf Normativ in pt skaliert          
-  my $heightnormpt = (sprintf "%.0f", (470 * (1 + $hscale))).'pt';          # Höhe auf Normativ in pt skaliert
+  my $widthnormpt  = (sprintf "%.0f", ($dim * (1 + $wscale))).'pt';          # Breite auf Normativ in pt skaliert          
+  my $heightnormpt = (sprintf "%.0f", ($dim * (1 + $hscale))).'pt';          # Höhe auf Normativ in pt skaliert
   
   $icon =~ s/width="(.*?)"/width="$widthnormpt"/;
   $icon =~ s/height="(.*?)"/height="$heightnormpt"/;
