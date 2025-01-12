@@ -200,6 +200,7 @@ sub PID20_Define($$$)
     return "wrong syntax: define &lt;name&gt; PID20 " 
     . "&lt;sensor&gt;:reading:[regexp] &lt;actor&gt;[:cmd] ";
   }
+  setNotifyDev($hash,'global');
   return if !$init_done;
   return PID20_Check($hash, $a[2], $a[3]);
 }
@@ -223,6 +224,8 @@ sub PID20_Check($$$)
     PID20_Log $hash, 1, $msg;
     #return $msg;
     $err = 1;
+  } else {
+    setNotifyDev($hash,"global,$sensor");
   }
 
   # if reading of sender is unknown
