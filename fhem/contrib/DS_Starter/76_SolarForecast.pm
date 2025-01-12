@@ -157,6 +157,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.43.2" => "12.01.2025  _batChargeRecmd: bugfix calc socwh, Attr graphicBeam1MaxVal, (experimental) ctrlAreaFactorUsage are obsolete ".
+                           "trackFlex now default in DWD Model, replace title Charging recommendation by Charging release ".
+                           "_saveEnergyConsumption: add dowrite flag, edit comref ",
   "1.43.1" => "11.01.2025  _batChargeRecmd: bugfix PV daily surplus update, _collectAllRegConsumers: fix interruptable hysteresis ".
                            "__batRcmdOnBeam: show soc forecast for hour 00 and fix english translation ".
                            "_batChargeRecmd: consider battery capacity as part of total capacity ",
@@ -466,8 +469,8 @@ my $prodicondef    = 'sani_garden_pump';                                        
 my $cicondef       = 'light_light_dim_100';                                         # default Consumer-Icon
 my $ciconcoldef    = 'darkorange';                                                  # default Consumer-Icon Färbung
 my $bicondef       = 'measure_battery_75';                                          # default Batterie-Icon
-my $biccolrcddef   = 'grey';                                                        # default Batterie-Icon Färbung bei Ladeempfehlung und Inaktivität
-my $biccolnrcddef  = '#cccccc';                                                     # default Batterie-Icon Färbung bei fehlender Ladeempfehlung
+my $biccolrcddef   = 'grey';                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
+my $biccolnrcddef  = '#cccccc';                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
 my $bchgiconcoldef = 'darkorange';                                                  # default 'Aufladen' Batterie-Icon Färbung
 my $bdchiconcoldef = '#b32400';                                                     # default 'Entladen' Batterie-Icon Färbung
 my $homeicondef    = 'control_building_control@grey';                               # default Home-Icon
@@ -532,7 +535,8 @@ my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    consumerLegend consumerAdviceIcon consumerLink
                    ctrlAIdataStorageDuration ctrlBackupFilesKeep
                    ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
-                   ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings ctrlShowLink ctrlSolCastAPImaxReq
+                   ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings 
+                   ctrlShowLink ctrlSolCastAPImaxReq
                    ctrlSolCastAPIoptimizeReq ctrlSpecialReadings ctrlUserExitFn
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    disable
@@ -541,7 +545,7 @@ my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content
                    graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color
                    graphicBeam1FontColor graphicBeam2FontColor graphicBeam3FontColor graphicBeam4FontColor
-                   graphicBeam1MaxVal graphicEnergyUnit graphicHeaderOwnspec graphicHeaderOwnspecValForm
+                   graphicEnergyUnit graphicHeaderOwnspec graphicHeaderOwnspecValForm
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicWeatherColor graphicWeatherColorNight
@@ -918,10 +922,10 @@ my %htitles = (                                                                 
                 DE => qq{SoC aktuell}                                                                              }, 
   socbatfc => { EN => qq{SoC forecast},
                 DE => qq{SoC Prognose}                                                                             },                
-  bcharrcd => { EN => qq{Charging recommendation (activate release for charging the battery if necessary)},
-                DE => qq{Ladeempfehlung (evtl. Freigabe zum Laden der Batterie aktivieren)}                        }, 
-  bncharcd => { EN => qq{No charging recommendation (possibly deactivate release for charging the battery)},
-                DE => qq{keine Ladeempfehlung (evtl. Freigabe zum Laden der Batterie deaktivieren)}                },
+  bcharrel => { EN => qq{Charging release (activate release for charging the battery if necessary)},
+                DE => qq{Ladefreigabe (evtl. Freigabe zum Laden der Batterie aktivieren)}                          }, 
+  bncharel => { EN => qq{no Charging release (possibly deactivate release for charging the battery)},
+                DE => qq{keine Ladefreigabe (evtl. Freigabe zum Laden der Batterie deaktivieren)}                  },
   conrec   => { EN => qq{Current time is within the consumption planning},
                 DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}                                      },
   conrecba => { EN => qq{Current time is within the consumption planning, Priority charging Battery is active},
@@ -1339,7 +1343,7 @@ sub Initialize {
                                 "ctrlBackupFilesKeep ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#10 ".
-                                "ctrlAreaFactorUsage:fix,trackFull,trackShared,trackFlex ".
+                                "ctrlAreaFactorUsage ".
                                 "ctrlGenPVdeviation:daily,continuously ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
@@ -1367,7 +1371,6 @@ sub Initialize {
                                 "graphicBeam2FontColor:colorpicker,RGB ".
                                 "graphicBeam3FontColor:colorpicker,RGB ".
                                 "graphicBeam4FontColor:colorpicker,RGB ".
-                                "graphicBeam1MaxVal ".
                                 "graphicEnergyUnit:Wh,kWh ".
                                 "graphicHeaderOwnspec:textField-long ".
                                 "graphicHeaderOwnspecValForm:textField-long ".
@@ -1404,8 +1407,8 @@ sub Initialize {
                     
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################                    
-  # my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";
-  # $hash->{AttrList} .= " affect70percentRule:$av1 ctrlAutoRefresh:$av1 ctrlAutoRefreshFW:$av1 ";
+  my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";             # 12.01.25
+  $hash->{AttrList} .= " graphicBeam1MaxVal:$av1 ctrlAreaFactorUsage:$av1 ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -3394,7 +3397,6 @@ sub __getDWDSolarData {
   return if(!$raname || !$defs{$raname});
 
   my $fcdays  = AttrVal ($raname, 'forecastDays', 1);                                          # Anzahl Forecast Days in DWD Device
-  my $cafd    = AttrVal ($name, 'ctrlAreaFactorUsage', 'fix');                                 # Art der Flächenfaktor Berechnung
   my $stime   = $date.' 00:00:00';                                                             # Startzeit Soll Übernahmedaten
   my $sts     = timestringToTimestamp ($stime);
   my @strings = sort keys %{$data{$name}{strings}};
@@ -3433,15 +3435,16 @@ sub __getDWDSolarData {
 
       $data{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = sprintf "%.0f", $rad;
 
+      my $cafd            = 'trackFlex';                                                       # Art der Flächenfaktor Berechnung ('fix' wäre alternativ möglich = alte Methode)
       my ($ddate, $dtime) = split ' ', $dateTime;                                              # abzurufendes Datum + Zeit
       my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                      # abzurufende Zeit
       my $dday            = (split '-', $ddate)[2];                                            # abzurufender Tag: 01, 02 ... 31
 
       for my $string (@strings) {                                                              # für jeden String der Config ..
-          my $peak = $data{$name}{strings}{$string}{peak};                                  # String Peak (kWp)
+          my $peak = $data{$name}{strings}{$string}{peak};                                     # String Peak (kWp)
           $peak   *= 1000;                                                                     # kWp in Wp umrechnen
-          my $ti   = $data{$name}{strings}{$string}{tilt};                                  # Neigungswinkel Solarmodule
-          my $az   = $data{$name}{strings}{$string}{azimut};                                # Ausrichtung der Solarmodule
+          my $ti   = $data{$name}{strings}{$string}{tilt};                                     # Neigungswinkel Solarmodule
+          my $az   = $data{$name}{strings}{$string}{azimut};                                   # Ausrichtung der Solarmodule
           $az     += 180;                                                                      # Umsetzung -180 - 180 in 0 - 360
 
           my ($af, $pv, $sdr, $wcc);
@@ -3466,7 +3469,7 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
 
-              if ($cafd eq 'trackShared'|| ($cafd eq 'trackFlex' && $wcc >= 80)) {                  # Direktstrahlung + Diffusstrahlung
+              if ($cafd eq 'trackFlex' && $wcc >= 80) {                                             # Direktstrahlung + Diffusstrahlung
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
@@ -5408,16 +5411,16 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  #if ($cmd eq 'set' && $aName =~ /^graphicStartHtml|affect70percentRule|graphicEndHtml|ctrlAutoRefresh|ctrlAutoRefreshFW$/) {
-  #    if (!$init_done) {
-  #        my $msg = "The attribute $aName has been removed and is no longer valid.";
-  #        Log3 ($name, 1, "$name - $msg");
-  #        return qq{Device "$name" -> $msg};
-  #    }
-  #    else {
-  #        return qq{The attribute '$aName' is obsolete.};
-  #    }     
-  #}
+  if ($cmd eq 'set' && $aName =~ /^graphicBeam1MaxVal|ctrlAreaFactorUsage$/) {           # 12.01.25
+      my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg");
+          return qq{Device "$name" -> $msg};
+      }
+      else {
+          return $msg;
+      }     
+  }
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -7550,7 +7553,7 @@ sub centralTask {
   _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
   _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
-  _batChargeRecmd             ($centpars);                                            # Batterie Ladeempfehlung berechnen und erstellen
+  _batChargeRecmd             ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
   _estConsumptionForecast     ($centpars);                                            # Verbrauchsprognose erstellen
   _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
@@ -9838,7 +9841,7 @@ return $sf;
 }
 
 ################################################################
-#             Erstellung Batterie Ladeempfehlung 
+#             Erstellung Batterie Ladefreigabe 
 ################################################################
 sub _batChargeRecmd {
   my $paref = shift;
@@ -9901,6 +9904,9 @@ sub _batChargeRecmd {
           ($lowSoc) = __parseAttrBatSoc ($name, $cgbt);
       }
       
+      my $batoptsocwh = $batinstcap * $batoptsoc / 100;                                          # optimaler SoC in Wh
+      my $lowSocwh    = $batinstcap * $lowSoc    / 100;                                          # lowSoC in Wh
+      
       debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
       debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - The PV generation, consumption and surplus listed below are based on the battery's share of the total capacity!");
       
@@ -9919,7 +9925,7 @@ sub _batChargeRecmd {
           my $stt   = NexthoursVal ($hash, 'NextHour'.$nhr, 'starttime', '');
           $stt      = (split /[-:]/, $stt)[2] if($stt);
                 
-          my $rcmd  = 0;                                                                         # Ladeempfehlung 0 per Default
+          my $crel  = 0;                                                                         # Ladefreigabe 0 per Default
           my $spday = 0;
           
           ## Aufteilung Energie auf Batterie XX im Verhältnis aller Bat   
@@ -9950,28 +9956,31 @@ sub _batChargeRecmd {
           
           $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
           
-          ## Ladeempfehlung
-          ###################
+          ## Ladefreigabe
+          #################
           my $whneed   = $batinstcap - $socwh;
           my $sfmargin = $whneed * 0.25;                                                         # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
           
-          if ( $whneed + $sfmargin >= $spday  )      {$rcmd = 1}                                 # Ladeempfehlung wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-          if ( !$num && $pvCu - $curcon >= $inplim ) {$rcmd = 1}                                 # Ladeempfehlung wenn akt. PV Leistung >= WR-Leistungsbegrenzung
+          if ( $whneed + $sfmargin >= $spday  )      {$crel = 1}                                 # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+          if ( !$num && $pvCu - $curcon >= $inplim ) {$crel = 1}                                 # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
           
           ## SOC-Prognose
           #################                                                                         
-          $socwh += $rcmd ? $pvfc - $confc : -$confc;                                            # PV Prognose nur einbeziehen wenn Ladeempfehlung                                            
-          $socwh  = sprintf "%.0f", $socwh;                      
-          $socwh  = $socwh < 0           ? 0           : 
-                    $socwh > $batinstcap ? $batinstcap :
-                    $socwh;          
+          $socwh += $crel ? $pvfc - $confc : -$confc;                                            # PV Prognose nur einbeziehen wenn Ladefreigabe                                                                
+          
+          $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
+                    $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
+                    $socwh > $batinstcap  ? $batinstcap  :
+                    $socwh; 
 
-          my $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                            # Prognose SoC   
-          $progsoc    = $progsoc < $batoptsoc ? $batoptsoc :
-                        $progsoc < $lowSoc    ? $lowSoc    :
-                        $progsoc;  
+          $socwh      = sprintf "%.0f", $socwh;                     
+          my $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                            # Prognose SoC in %  
+          
+          #$progsoc    = $progsoc < $batoptsoc ? $batoptsoc :
+          #              $progsoc < $lowSoc    ? $lowSoc    :
+          #              $progsoc;  
 
-          __calcReadingsNextHoursSoCFc ( {name    => $name, 
+          __createNextHoursSFCReadings ( {name    => $name, 
                                           nhr     => $nhr, 
                                           bn      => $bn, 
                                           progsoc => $progsoc
@@ -9984,13 +9993,13 @@ sub _batChargeRecmd {
               $msg = "(SoCfc: $progsoc %, soc: $socwh Wh, pvfc: $pvfc, confc: $confc, Surp Day: $spday Wh)";
           }
           else {
-              storeReading ('Battery_ChargeRecommended_'.$bn, $rcmd);                            # Reading nur für aktuelle Stunde
+              storeReading ('Battery_ChargeRecommended_'.$bn, $crel);                            # Reading nur für aktuelle Stunde
           }
           
-          $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $rcmd;
+          $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
           
-          debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $rcmd $msg");
+          debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $crel $msg");
       }
   }
   
@@ -10001,7 +10010,7 @@ return;
 #      zusätzliche Readings NextHourXX_Bat_XX_ChargeForecast
 #      erstellen
 ################################################################
-sub __calcReadingsNextHoursSoCFc {                                            
+sub __createNextHoursSFCReadings {                                            
   my $paref   = shift;
   my $name    = $paref->{name};
   my $nhr     = $paref->{nhr};                # nächste Stunde
@@ -12512,18 +12521,20 @@ sub _saveEnergyConsumption {
       $ppreal += ReadingsNum ($name, 'Today_Hour'.$shr.'_PPreal_'.$prn, 0);
   }
   
-  my $con = $pvrl + $ppreal - $gfeedin + $gcon - $batin + $batout;
+  my $con     = $pvrl + $ppreal - $gfeedin + $gcon - $batin + $batout;
+  my $dowrite = 1;
 
   if (int $paref->{minute} > 30 && $con < 0) {                                  # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
-      my $vl  = 3;
-      my $pre = '- WARNING -';
+      $dowrite = 0;
+      my $vl   = 3;
+      my $pre  = '- WARNING -';
 
       if ($debug =~ /consumption/xs) {
           $vl  = 1;
           $pre = 'DEBUG> - WARNING -';
       }
 
-      Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error. Check Readings _PVreal, _GridFeedIn, _GridConsumption, _BatIn_XX, _BatOut_XX of hour >$shr<");
+      Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error and is not saved. Check Readings _PVreal, _GridFeedIn, _GridConsumption, _BatIn_XX, _BatOut_XX of hour >$shr<");
   }
   
   if ($debug =~ /collectData/xs) {
@@ -12531,7 +12542,7 @@ sub _saveEnergyConsumption {
       Log3 ($name, 1, "$name DEBUG> EnergyConsumption result -> $con Wh");
   }
   
-  writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $shr } );
+  writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $shr } ) if($dowrite);
 
 return;
 }
@@ -12864,7 +12875,6 @@ sub entryGraphic {
       height         => AttrNum    ($name, 'graphicBeamHeightLevel1',          200),
       width          => $width,
       fsize          => AttrNum    ($name, 'graphicSpaceSize',                  24),
-      maxVal         => AttrNum    ($name, 'graphicBeam1MaxVal',                 0),                # dyn. Anpassung der Balkenhöhe oder statisch ?
       layersync      => $layersync,                                                                 # Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen                                                             
       show_night     => $show_night,                                                                # alle Balken (Spalten) anzeigen ?
       show_diff      => AttrVal    ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
@@ -14448,14 +14458,12 @@ sub _beamGraphicRemainingHours {
   my $hourstyle = $paref->{hourstyle};
   my $beam1cont = $paref->{beam1cont};
   my $beam2cont = $paref->{beam2cont};
-  my $maxVal    = $paref->{maxVal};                                                                     # dyn. Anpassung der Balkenhöhe oder statisch ?
-
-  $maxVal = $maxVal ? $maxVal : $hfcg->{0}{beam1};                                                      # Startwert wenn kein Wert bereits via attr vorgegeben ist
 
   my ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8);
   my $hbsocs;
 
   my $hash   = $defs{$name};
+  my $maxVal = $hfcg->{0}{beam1};                                                                       # Startwert
   my $maxCon = $hfcg->{0}{beam1};
   my $maxDif = $hfcg->{0}{diff};                                                                        # für Typ diff
   my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
@@ -14713,7 +14721,7 @@ sub _beamGraphic {
           # z4 - Zahl negativer Wert + fsize
 
           my ($px_pos,$px_neg);
-          my $maxValBeam = 0;                                                                                   # ToDo:  maxValBeam noch aus Attribut graphicBeam1MaxVal ableiten
+          my $maxValBeam = 0;                                                                                   # ToDo:  maxValBeam noch aus maxVal ableiten
 
           if ($maxValBeam) {                                                                                    # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
               $px_pos = int($height/2);
@@ -15070,7 +15078,7 @@ sub __batRcmdOnBeam {
           $hfcg->{$kdx}{'soc'.$bn}          = $hh->{$ds}{$ts}{'soc'.$bn}          if(defined $hh->{$ds}{$ts}{'soc'.$bn});
       }
   }
-    #$hfcg->{9}{'rcdchargebat01'} = 0;
+
   ## Werte in Anzeigehash einfügen
   ##################################
   my $m     = $paref->{modulo} % 2;
@@ -15905,23 +15913,23 @@ sub __substituteIcon {
       $idischrg = $idischrg ? $idischrg : '';      
       
       if (defined $flag) {                                                               # Empfehlungszeitraum                                                             
-          if ($flag) {                                                                   # Ladeempfehlung
+          if ($flag) {                                                                   # Ladefreigabe
               ($icon, $color) = split '@', $ircmd;
               $icon           = $icon    ? $icon    : 
                                 $socicon ? $socicon :
                                 $bicondef;                                               # nur Farbe angegeben  
                                 
               $color  //= $biccolrcddef;
-              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bcharrcd}{$lang};
+              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bcharrel}{$lang};
           }
-          else {                                                                         # keine Ladeempfehlung
+          else {                                                                         # keine Ladefreigabe
               ($icon, $color) = split '@', $inorcmd;
               $icon           = $icon    ? $icon    : 
                                 $socicon ? $socicon :
                                 $bicondef;                                               # nur Farbe angegeben  
                                 
               $color  //= $biccolnrcddef;
-              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bncharcd}{$lang};
+              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bncharel}{$lang};
           }
       }
       
@@ -17142,7 +17150,7 @@ sub listDataPool {
               $hexp->{$day}{$key}{confc}              = $confc;
               $hexp->{$day}{$key}{GridFeedIn}         = $gfeedin;
               $hexp->{$day}{$key}{WeatherId}          = $wid;
-              $hexp->{$day}{$key}{CoudCover}          = $wcc;
+              $hexp->{$day}{$key}{CloudCover}         = $wcc;
               $hexp->{$day}{$key}{TotalPrecipitation} = $rr1c;
               $hexp->{$day}{$key}{Temperature}        = $temp    // '';
               $hexp->{$day}{$key}{PVCorrectionFactor} = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
@@ -22124,9 +22132,9 @@ to ensure that the system configuration is correct.
        <li><b>affectConsForecastLastDays </b><br>
          The specified past days (1..31) are included in the calculation of the consumption forecast. <br>
          For example, with the attribute value “1” only the previous day is taken into account, with the value “14” the previous 14 days. <br>
-         Any additional attribute
-		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
-		 is also taken into account. <br>
+         If an additional attribute 
+         <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a> 
+         is set, the specified number of past weekdays of the same type (Mon .. Sun) is taken into account. <br>
          (default: all days available in pvHistory)
        </li>
        <br>
@@ -22382,28 +22390,6 @@ to ensure that the system configuration is correct.
          Training begins approx. 15 minutes after the hour specified in the attribute. <br>
          For example, with a set value of '3', training would start at around 03:15. <br>
          (default: 2)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAreaFactorUsage"></a>
-       <li><b>ctrlAreaFactorUsage</b>   <br>
-	   (DWD model only, experimental)   <br><br>
-
-       When using the DWD model, an area factor of the solar modules is taken into account to calculate the
-       expected generation. This experimental attribute determines the method for determining the area factor.
-       <br><br>
-
-       <ul>
-        <table>
-        <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-           <tr><td> <b>fix</b>         </td><td>a uniquely determined area factor is used (default)                                                                        </td></tr>
-           <tr><td> <b>trackFull</b>   </td><td>the area factor is calculated continuously depending on the position of the sun and applied to the total global radiation  </td></tr>
-           <tr><td> <b>trackShared</b> </td><td>the area factor is calculated continuously depending on the position of the sun and applied to an approximated             </td></tr>
-		   <tr><td>                    </td><td>proportion of the direct radiation in the global radiation                                                                 </td></tr>
-           <tr><td> <b>trackFlex</b>   </td><td>combines the 'trackFull' and 'trackShared' methods. The system switches from 'trackFull' to 'trackShared'                  </td></tr>
-           <tr><td>                    </td><td>at a cloud cover of &gt;=80%.                                                                                              </td></tr>
-         </table>
-       </ul>
        </li>
        <br>
 
@@ -22752,16 +22738,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeam1MaxVal"></a>
-       <li><b>graphicBeam1MaxVal &lt;0...val&gt; </b><br>
-         Definition of the maximum amount of the primary beam of the first level for calculating the maximum beam height.
-         height.
-         This results in an adjustment of the permissible total height of the graphic. <br>
-         The value “0” is used for dynamic adjustment. <br>
-         (default: 0)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-graphicBeam2Color"></a>
        <li><b>graphicBeam2Color </b><br>
          Color selection of the secondary bars of the first level. <br>
@@ -23058,8 +23034,8 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-graphicShowDiff"></a>
-       <li><b>graphicShowDiff &lt;no | top | bottom&gt; </b><br>
-         Additional display of the difference “primary bar content - secondary bar content” in the header or
+       <li><b>graphicShowDiff [no | top | bottom] </b><br>
+         Additional display of the difference “&lt;primary bar content&gt; - &lt;secondary bar content&gt;” in the header or
          footer of the bar chart. <br>
          (default: no)
        </li>
@@ -24624,9 +24600,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>affectConsForecastLastDays </b><br>
          Es werden die angegebenen vergangenen Tage (1..31) bei der Berechnung der Verbrauchsprognose einbezogen. <br>
          So wird z.B. mit dem Attributwert "1" nur der vorangegangene Tag berücksichtigt, mit dem Wert "14" die vergangenen 14 Tage. <br>
-         Ein eventuell zusätzlich gesetztes Attribut 
+         Bei einem zusätzlich gesetzten Attribut 
 		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
-		 wird gleichfalls berücksichtigt. <br>
+		 wird die angegebene Anzahl vergangener gleicher Wochentage (Mo .. So) berücksichtigt. <br>
          (default: alle in pvHistory vorhandenen Tage)
        </li>
        <br>
@@ -24881,29 +24857,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Der Start des Trainings erfolgt ca. 15 Minuten nach der im Attribut festgelegten vollen Stunde. <br>
          Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten. <br>
          (default: 2)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAreaFactorUsage"></a>
-       <li><b>ctrlAreaFactorUsage</b>   <br>
-	   (nur Model DWD, experimentell)   <br><br>
-
-       Bei Verwendung des Model DWD wird zur Berechnung der voraussichtlichen Erzeugung ein Flächenfaktor der
-	   Solarmodule berücksichtigt. Dieses experimentelle Attribut bestimmt das Verfahren zur Ermittlung des
-       Flächenfaktors.
-       <br><br>
-
-       <ul>
-        <table>
-        <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-           <tr><td> <b>fix</b>         </td><td>es wird ein einmalig ermittelter Flächenfaktor verwendet (default)                                                          </td></tr>
-           <tr><td> <b>trackFull</b>   </td><td>der Flächenfaktor wird kontinuierlich abhängig vom Sonnenstand berechnet und auf die gesamte Globalstrahlung angewendet     </td></tr>
-           <tr><td> <b>trackShared</b> </td><td>der Flächenfaktor wird kontinuierlich abhängig vom Sonnenstand berechnet und auf einen approximierten Anteil der            </td></tr>
-		   <tr><td>                    </td><td>Direktstrahlung an der Globalstrahlung angewendet                                                                           </td></tr>
-           <tr><td> <b>trackFlex</b>   </td><td>kombiniert die Verfahren 'trackFull' und 'trackShared'. Es erfolgt eine Umschaltung von 'trackFull' auf 'trackShared'       </td></tr>
-           <tr><td>                    </td><td>bei einer Bewölkung von &gt;=80%.                                                                                           </td></tr>
-         </table>
-       </ul>
        </li>
        <br>
 
@@ -25241,25 +25194,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicBeam1Color"></a>
        <li><b>graphicBeam1Color </b><br>
-         Farbauswahl des primären Balken der ersten Ebene. <br>
+         Farbauswahl des primären Balkens der ersten Ebene. <br>
          (default: FFAC63)
        </li>
        <br>
 
        <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
        <li><b>graphicBeam1FontColor </b><br>
-         Auswahl der Schriftfarbe des primären Balken der ersten Ebene. <br>
+         Auswahl der Schriftfarbe des primären Balkens der ersten Ebene. <br>
          (default: 0D0D0D)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam1MaxVal"></a>
-       <li><b>graphicBeam1MaxVal &lt;0...val&gt; </b><br>
-         Festlegung des maximalen Betrags des primären Balkens der ersten Ebene zur Berechnung der maximalen
-         Balkenhöhe.
-         Dadurch erfolgt eine Anpassung der zulässigen Gesamthöhe der Grafik. <br>
-         Mit dem Wert "0" erfolgt eine dynamische Anpassung. <br>
-         (default: 0)
        </li>
        <br>
 
@@ -25557,8 +25500,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-graphicShowDiff"></a>
-       <li><b>graphicShowDiff &lt;no | top | bottom&gt; </b><br>
-         Zusätzliche Anzeige der Differenz "primärer Balkeninhalt - sekundärer Balkeninhalt" im Kopf- oder
+       <li><b>graphicShowDiff [no | top | bottom] </b><br>
+         Zusätzliche Anzeige der Differenz "&lt;primärer Balkeninhalt&gt; - &lt;sekundärer Balkeninhalt&gt;" im Kopf- oder
          Fußbereich der Balkengrafik. <br>
          (default: no)
        </li>
