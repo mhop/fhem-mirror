@@ -95,6 +95,8 @@
 #
 # 2024-12-20    1.0.0.11 - add some patches for better startup (thx to Beta-User)
 #
+# 2025-01-12    1.0.0.12 - add NOTIFYDEV
+#
 ####################################################################################################
 =cut
 
@@ -107,7 +109,7 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%modules);
 
-my $PID20_Version = "1.0.0.11";
+my $PID20_Version = "1.0.0.12";
 sub PID20_Calc($);
 ########################################
 sub PID20_Log($$$)
