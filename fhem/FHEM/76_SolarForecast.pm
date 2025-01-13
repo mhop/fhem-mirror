@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.43.3" => "13.01.2025  add Wiki icon in graphic header, _calcConsumptionForecast: switch calc from average to median, edit comref ",
   "1.43.2" => "12.01.2025  _batChargeRecmd: bugfix calc socwh, Attr graphicBeam1MaxVal, (experimental) ctrlAreaFactorUsage are obsolete ".
                            "trackFlex now default in DWD Model, replace title Charging recommendation by Charging release ".
                            "_saveEnergyConsumption: add dowrite flag, edit comref ",
@@ -254,7 +255,7 @@ my %vNotesIntern = (
   "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorFix function ",
   "1.32.0" => "02.09.2024  new attr setupOtherProducerXX, report calculation and storage of negative consumption values ".
                            "Forum: https://forum.fhem.de/index.php?msg=1319083 ".
-                           "bugfix in _estConsumptionForecast, new ctrlDebug consumption_long ",
+                           "bugfix in _calcConsumptionForecast, new ctrlDebug consumption_long ",
   "1.31.0" => "20.08.2024  rename attributes ctrlWeatherDevX to setupWeatherDevX ",
   "1.30.0" => "18.08.2024  new attribute flowGraphicShift, Forum:https://forum.fhem.de/index.php?msg=1318597 ",
   "1.29.4" => "03.08.2024  delete writeCacheToFile from _getRoofTopData, _specialActivities: avoid loop caused by \@widgetreadings ",
@@ -487,15 +488,15 @@ my $cfile = 'controls_solarforecast.txt';                                       
 
 
 # initiale Hashes für Stunden Consumption Forecast inkl. und exkl. Verbraucher
-my $conhfc = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
-               "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
-               "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
-             };
+#my $conhfc = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
+#               "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
+#               "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
+#             };
 
-my $conhfcex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
-                 "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
-                 "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
-               };
+#my $conhfcex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
+#                 "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
+#                 "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
+#               };
                                                                                   # mögliche Debug-Module
 my @dd = qw( aiProcess
              aiData
@@ -942,6 +943,8 @@ my %htitles = (                                                                 
                 DE => qq{Konfigurationspr&#252;fung der Anlage}                                                    },
   jtsfft   => { EN => qq{Open the SolarForecast Forum},
                 DE => qq{&#214;ffne das SolarForecast Forum}                                                       },
+  opwiki   => { EN => qq{Open the Wiki (German language)},
+                DE => qq{&#214;ffne das Wiki}                                                                      },
   scaresps => { EN => qq{API request successful},
                 DE => qq{API Abfrage erfolgreich}                                                                  },
   dwfcrsu  => { EN => qq{Weather data are up to date according to used DWD model},
@@ -7555,7 +7558,7 @@ sub centralTask {
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
   _batChargeRecmd             ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
-  _estConsumptionForecast     ($centpars);                                            # Verbrauchsprognose erstellen
+  _calcConsumptionForecast    ($centpars);                                            # Verbrauchsprognose erstellen
   _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
   _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
   _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
@@ -11812,7 +11815,7 @@ return ($simpCstat, $starttime, $stoptime, $supplmnt);
 ################################################################
 #     Energieverbrauch Vorhersage kalkulieren
 ################################################################
-sub _estConsumptionForecast {
+sub _calcConsumptionForecast {
   my $paref   = shift;
   my $name    = $paref->{name};
   my $type    = $paref->{type};
@@ -11840,10 +11843,7 @@ sub _estConsumptionForecast {
   ## Verbrauchsvorhersage für den kommenden Tag
   ##############################################
   my $tomorrow = strftime "%a", localtime($t+86400);                                                    # Wochentagsname kommender Tag
-  my $totcon   = 0;
-  my $dnum     = 0;
-  
-  my ($exconfc, $csme);
+  my (@cona, $exconfc, $csme);
 
   debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day ###################");
   debugLog ($paref, 'consumption|consumption_long', "Date(s) to take note: ".join ',', @dtn) if(@dtn);
@@ -11882,15 +11882,16 @@ sub _estConsumptionForecast {
 
       debugLog ($paref, 'consumption|consumption_long', "History Consumption day >$n< considering possible exclusions: $dcon");
 
-      $totcon += $dcon;
-      $dnum++;
+      push @cona, $dcon;
   }
 
+  my $dnum = scalar @cona;
+  
   if ($dnum) {
-       my $tomavg                                        = int ($totcon / $dnum);
-       $data{$name}{current}{tomorrowconsumption} = $tomavg;                                      # prognostizierter Durchschnittsverbrauch aller (gleicher) Wochentage
+       my $tomcon                                 = sprintf "%.0f", medianArray (\@cona);
+       $data{$name}{current}{tomorrowconsumption} = $tomcon;                                           # prognostizierter Verbrauch (Median) aller (gleicher) Wochentage
 
-       debugLog ($paref, 'consumption|consumption_long', "estimated Consumption for tomorrow: $tomavg, days for avg: $dnum");
+       debugLog ($paref, 'consumption|consumption_long', "estimated Consumption for tomorrow: $tomcon, days for avg: $dnum");
   }
   else {
       my $lang = $paref->{lang};
@@ -11906,22 +11907,14 @@ sub _estConsumptionForecast {
       my $nhtime = NexthoursVal ($hash, $k, "starttime", undef);                                    # Startzeit
       next if(!$nhtime);
 
-      $conhfc = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
-                  "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
-                  "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
-                };
-
-      $conhfcex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
-                    "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
-                    "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
-                  };
-
       $dnum          = 0;
       my $consumerco = 0;
       my $utime      = timestringToTimestamp ($nhtime);
       my $nhday      = strftime "%a", localtime($utime);                                            # Wochentagsname des NextHours Key
       my $nhhr       = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);               # Stunde des Tages vom NextHours Key  (01,02,...24)
 
+      my ($conhfc, $conhfcex);
+      
       for my $m (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
           next if($m eq $day);                                                                      # next wenn gleicher Tag (Datum) wie heute
 
@@ -11966,18 +11959,19 @@ sub _estConsumptionForecast {
               }
           }
 
-          $conhfcex->{$nhhr} += ($hcon - $consumerco) if($hcon >= $consumerco);                     # prognostizierter Verbrauch Ex registrierter Verbraucher
-          $conhfc->{$nhhr}   += $hcon;
+          push @{$conhfcex->{"$nhhr"}}, ($hcon - $consumerco) if($hcon >= $consumerco);                                 # prognostizierter Verbrauch (Median) Ex registrierter Verbraucher
+          push @{$conhfc->{"$nhhr"}}, $hcon;
+          
           $dnum++;
       }
 
       if ($dnum) {
-           my $conavgex                            = int ($conhfcex->{$nhhr} / $dnum);
+           my $conavgex                         = sprintf "%.0f", medianArray (\@{$conhfcex->{$nhhr}}) if(scalar @{$conhfcex->{$nhhr}});
            $data{$name}{nexthours}{$k}{confcEx} = $conavgex;
-           my $conavg                              = int ($conhfc->{$nhhr}   / $dnum);
-           $data{$name}{nexthours}{$k}{confc}   = $conavg;                                       # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
+           my $conavg                           = sprintf "%.0f", medianArray (\@{$conhfc->{$nhhr}}) if(scalar @{$conhfc->{$nhhr}});
+           $data{$name}{nexthours}{$k}{confc}   = $conavg;                                                              # prognostizierter Verbrauch (Median) auf Grundlage aller gleicher Wochentage pro Stunde
 
-           if (NexthoursVal ($hash, $k, 'today', 0)) {                                              # nur Werte des aktuellen Tag speichern
+           if (NexthoursVal ($hash, $k, 'today', 0)) {                                                                  # nur Werte des aktuellen Tag speichern
                $data{$name}{circular}{sprintf("%02d",$nhhr)}{confc} = $conavg;
                writeToHistory ( { paref => $paref, key => 'confc', val => $conavg, hour => $nhhr } );
            }
@@ -13283,6 +13277,12 @@ sub _graphicHeader {
       $img         = FW_makeImage('time_note@grey');
       my $fthicon  = "<a href='https://forum.fhem.de/index.php?topic=137058.0' target='_blank'>$img</a>";
       my $fthtitle = $htitles{jtsfft}{$lang};
+      
+      ## Wiki-Icon
+      ##############
+      $img         = FW_makeImage ('edit_copy@grey');
+      my $wikicon  = "<a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung' target='_blank'>$img</a>";
+      my $wiktitle = $htitles{opwiki}{$lang};                    
 
       ## Update-Icon
       ################
@@ -13494,13 +13494,14 @@ sub _graphicHeader {
       #######################
       my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
       my $dlink = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
-
+      my $space = '&nbsp;&nbsp;&nbsp;';
+      my $disti = qq{<span title="$chktitle"> $chkicon </span> $space <span title="$fthtitle"> $fthicon </span> $space <span title="$wiktitle"> $wikicon </span>};
+      
       $header  .= qq{<tr>};
-      $header  .= qq{<td colspan="1" align="left"                    $dstyle> <b>$dlink</b>              </td>};
-      $header  .= qq{<td colspan="1" align="right" title="$chktitle" $dstyle> $chkicon                   </td>};
-      $header  .= qq{<td colspan="1" align="left"  title="$fthtitle" $dstyle> $fthicon                   </td>};
-      $header  .= qq{<td colspan="3" align="left"                    $dstyle> $lupt $lup &nbsp; $upicon  </td>};
-      $header  .= qq{<td colspan="3" align="right"                   $dstyle> $api                       </td>};
+      $header  .= qq{<td colspan="1" align="left"   $dstyle> <b>$dlink</b>              </td>};
+      $header  .= qq{<td colspan="2" align="center" $dstyle> $disti                     </td>};
+      $header  .= qq{<td colspan="3" align="left"   $dstyle> $lupt $lup &nbsp; $upicon  </td>};
+      $header  .= qq{<td colspan="3" align="right"  $dstyle> $api                       </td>};
       $header  .= qq{</tr>};
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $sriseimg &nbsp; $srisetxt &nbsp;&nbsp;&nbsp; $ssetimg &nbsp; $ssettxt &nbsp;&nbsp;&nbsp; $waicon </td>};
@@ -22418,14 +22419,15 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>lowSoc</b>    </td><td>lower minimum SoC, the battery is not discharged lower than this value (> 0)                </td></tr>
-            <tr><td> <b>upSoC</b>     </td><td>upper minimum SoC, the usual value of the optimum SoC is between 'lowSoC'                   </td></tr>
-            <tr><td>                  </td><td>and this value.                                                                             </td></tr>
-            <tr><td> <b>maxSoC</b>    </td><td>Maximum minimum SoC, SoC value that must be reached at least every 'careCycle' days         </td></tr>
-            <tr><td>                  </td><td>in order to balance the charge in the storage network.                                      </td></tr>
-            <tr><td>                  </td><td>The specification is optional (&lt;= 100, default: 95)                                      </td></tr>
-            <tr><td> <b>careCycle</b> </td><td>Maximum interval in days that may occur between two states of charge                        </td></tr>
-            <tr><td>                  </td><td>of at least 'maxSoC'. The specification is optional (default: 20)                           </td></tr>
+            <tr><td> <b>lowSoc</b>    </td><td>lower minimum SoC - The battery is not discharged lower than this value (> 0)                </td></tr>
+            <tr><td> <b>upSoC</b>     </td><td>upper minimum SoC - The usual value of the optimum SoC tends to be                           </td></tr>
+            <tr><td>                  </td><td>between 'lowSoC' and 'upSoC' in periods with a high PV surplus                               </td></tr>
+            <tr><td>                  </td><td>and between 'upSoC' and 'maxSoC' in periods with a low PV surplus                            </td></tr>
+            <tr><td> <b>maxSoC</b>    </td><td>Maximum minimum SoC - SoC value that must be reached at least every 'careCycle' days         </td></tr>
+            <tr><td>                  </td><td>in order to balance the charge in the storage network.                                       </td></tr>
+            <tr><td>                  </td><td>The specification is optional (&lt;= 100, default: 95)                                       </td></tr>
+            <tr><td> <b>careCycle</b> </td><td>Maximum interval in days that may occur between two states of charge                         </td></tr>
+            <tr><td>                  </td><td>of at least 'maxSoC'. The specification is optional (default: 20)                            </td></tr>
          </table>
          </ul>
          <br>
@@ -24886,14 +24888,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>lowSoc</b>    </td><td>unterer Mindest-SoC, die Batterie wird nicht tiefer als dieser Wert entladen (> 0)        </td></tr>
-            <tr><td> <b>upSoC</b>     </td><td>oberer Mindest-SoC, der übliche Wert des optimalen SoC bewegt sich zwischen 'lowSoC'      </td></tr>
-            <tr><td>                  </td><td>und diesem Wert.                                                                          </td></tr>
-            <tr><td> <b>maxSoC</b>    </td><td>maximaler Mindest-SoC, SoC Wert der mindestens im Abstand von 'careCycle' Tagen erreicht  </td></tr>
-            <tr><td>                  </td><td>werden muß um den Ladungsausgleich im Speicherverbund auszuführen.                        </td></tr>
-            <tr><td>                  </td><td>Die Angabe ist optional (&lt;= 100, default: 95)                                      </td></tr>
-            <tr><td> <b>careCycle</b> </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'    </td></tr>
-            <tr><td>                  </td><td>auftreten darf. Die Angabe ist optional (default: 20)                                     </td></tr>
+            <tr><td> <b>lowSoc</b>    </td><td>unterer Mindest-SoC - Die Batterie wird nicht tiefer als dieser Wert entladen (> 0)             </td></tr>
+            <tr><td> <b>upSoC</b>     </td><td>oberer Mindest-SoC - Der übliche Wert des optimalen SoC bewegt sich in Perioden mit hohen       </td></tr>
+            <tr><td>                  </td><td>PV-Überschuß tendenziell zwischen 'lowSoC' und 'upSoC', in Perioden mit geringem PV-Überschuß   </td></tr>
+            <tr><td>                  </td><td>tendenziell zwischen 'upSoC' und 'maxSoC'                                                       </td></tr>
+            <tr><td> <b>maxSoC</b>    </td><td>maximaler Mindest-SoC - SoC Wert der mindestens im Abstand von 'careCycle' Tagen erreicht       </td></tr>
+            <tr><td>                  </td><td>werden muß um den Ladungsausgleich im Speicherverbund auszuführen.                              </td></tr>
+            <tr><td>                  </td><td>Die Angabe ist optional (&lt;= 100, default: 95)                                                </td></tr>
+            <tr><td> <b>careCycle</b> </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'          </td></tr>
+            <tr><td>                  </td><td>auftreten darf. Die Angabe ist optional (default: 20)                                           </td></tr>
          </table>
          </ul>
          <br>
