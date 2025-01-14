@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.43.4" => "14.01.2025  batsocslidereg: calculate the SoC as summary over all capacities in Wh, bugfix https://forum.fhem.de/index.php?msg=1330559 ",
   "1.43.3" => "13.01.2025  add Wiki icon in graphic header, _calcConsumptionForecast: switch calc from average to median, edit comref ",
   "1.43.2" => "12.01.2025  _batChargeRecmd: bugfix calc socwh, Attr graphicBeam1MaxVal, (experimental) ctrlAreaFactorUsage are obsolete ".
                            "trackFlex now default in DWD Model, replace title Charging recommendation by Charging release ".
@@ -487,17 +488,7 @@ my $pPath = '?format=txt';                                                      
 my $cfile = 'controls_solarforecast.txt';                                           # Name des Controlfiles
 
 
-# initiale Hashes für Stunden Consumption Forecast inkl. und exkl. Verbraucher
-#my $conhfc = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
-#               "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
-#               "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
-#             };
-
-#my $conhfcex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0, "05" => 0, "06" => 0, "07" => 0, "08" => 0,
-#                 "09" => 0, "10" => 0, "11" => 0, "12" => 0, "13" => 0, "14" => 0, "15" => 0, "16" => 0,
-#                 "17" => 0, "18" => 0, "19" => 0, "20" => 0, "21" => 0, "22" => 0, "23" => 0, "24" => 0,
-#               };
-                                                                                  # mögliche Debug-Module
+                                                                                    # mögliche Debug-Module
 my @dd = qw( aiProcess
              aiData
              apiCall
@@ -9433,6 +9424,7 @@ sub _transferBatteryValues {
   my $pbosum  = 0;
   my $bcapsum = 0;
   my $socsum;
+  my $socwhsum;
   
   delete $data{$name}{current}{batpowerinsum};       
   delete $data{$name}{current}{batpoweroutsum}; 
@@ -9443,8 +9435,6 @@ sub _transferBatteryValues {
   
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
-
-      $num++;
 
       my ($pin,$piunit)    = split ":", $h->{pin};                                                # Readingname/Unit für aktuelle Batterieladung
       my ($pou,$pounit)    = split ":", $h->{pout};                                               # Readingname/Unit für aktuelle Batterieentladung
@@ -9592,13 +9582,17 @@ sub _transferBatteryValues {
       
       writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, hour => $nhour } );  
       
-      $socsum += $soc;
+      $num++;
+      $socsum   += $soc;
+      $socwhsum += BatteryVal ($name, $bn, 'binstcap', 0) * $soc / 100;                    # Batterie SoC in Wh
+      
       $pbisum += $pbi;
       $pbosum += $pbo;
   }
     
   if ($num) {
-      push @{$data{$name}{current}{batsocslidereg}}, $socsum / $num;                       # Schieberegister average SOC aller Batterien
+      my $soctotal = sprintf "%.0f", ($socwhsum / $bcapsum * 100) if($bcapsum);           # resultierender SoC (%) aller Batterien als "eine" 
+      push @{$data{$name}{current}{batsocslidereg}}, $soctotal;                            # Schieberegister average SOC aller Batterien
       limitArray ($data{$name}{current}{batsocslidereg}, $slidenummax);
   
       $data{$name}{current}{batpowerinsum}  = $pbisum;                                     # summarische laufende Batterieladung
@@ -11913,7 +11907,7 @@ sub _calcConsumptionForecast {
       my $nhday      = strftime "%a", localtime($utime);                                            # Wochentagsname des NextHours Key
       my $nhhr       = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);               # Stunde des Tages vom NextHours Key  (01,02,...24)
 
-      my ($conhfc, $conhfcex);
+      my (@conhfc, @conhfcex);
       
       for my $m (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
           next if($m eq $day);                                                                      # next wenn gleicher Tag (Datum) wie heute
@@ -11959,16 +11953,16 @@ sub _calcConsumptionForecast {
               }
           }
 
-          push @{$conhfcex->{"$nhhr"}}, ($hcon - $consumerco) if($hcon >= $consumerco);                                 # prognostizierter Verbrauch (Median) Ex registrierter Verbraucher
-          push @{$conhfc->{"$nhhr"}}, $hcon;
+          push @conhfcex, ($hcon - $consumerco) if($hcon >= $consumerco);                                               # prognostizierter Verbrauch (Median) Ex registrierter Verbraucher
+          push @conhfc,   $hcon;
           
           $dnum++;
       }
 
       if ($dnum) {
-           my $conavgex                         = sprintf "%.0f", medianArray (\@{$conhfcex->{$nhhr}}) if(scalar @{$conhfcex->{$nhhr}});
+           my $conavgex                         = sprintf "%.0f", medianArray (\@conhfcex) if(scalar @conhfcex);
            $data{$name}{nexthours}{$k}{confcEx} = $conavgex;
-           my $conavg                           = sprintf "%.0f", medianArray (\@{$conhfc->{$nhhr}}) if(scalar @{$conhfc->{$nhhr}});
+           my $conavg                           = sprintf "%.0f", medianArray (\@conhfc)   if(scalar @conhfc);
            $data{$name}{nexthours}{$k}{confc}   = $conavg;                                                              # prognostizierter Verbrauch (Median) auf Grundlage aller gleicher Wochentage pro Stunde
 
            if (NexthoursVal ($hash, $k, 'today', 0)) {                                                                  # nur Werte des aktuellen Tag speichern
@@ -21231,7 +21225,8 @@ to ensure that the system configuration is correct.
       <li><b>batteryTrigger &lt;1on&gt;=&lt;Value&gt; &lt;1off&gt;=&lt;Value&gt; [&lt;2on&gt;=&lt;Value&gt; &lt;2off&gt;=&lt;Value&gt; ...] </b> <br><br>
 
       Generates triggers when the battery charge exceeds or falls below certain values (SoC in %). <br>
-      The SoC used is formed as an average of the SoC of all defined battery devices. <br>
+      The SoC used is formed as the resulting SoC (sum of the current charge of all battery devices in relation to the total installed 
+      total capacity), i.e. all batteries are considered as one cluster. <br>
       If the last three SoC measurements exceed a defined <b>Xon-Bedingung</b>, the reading <b>batteryTrigger_X = on</b>
       is created/set. <br>
       If the last three SoC measurements fall below a defined <b>Xoff-Bedingung</b>, the reading
@@ -23692,7 +23687,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>batteryTrigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br><br>
 
       Generiert Trigger bei Über- bzw. Unterschreitung bestimmter Batterieladungswerte (SoC in %). <br>
-      Der verwendete SoC wird als Durchschnitt des SoC aller definierten Batterie Geräte gebildet. <br>
+      Der verwendete SoC wird als resultierender SoC (Summe aktuelle Ladung aller Batterie Geräte zur im Verhältnis zur installierten 
+      Gesamtkapazität) gebildet, d.h. alle Batterien werden als ein Cluster betrachtet. <br>
       Überschreiten die letzten drei SoC-Messungen eine definierte <b>Xon-Bedingung</b>, wird das Reading
       <b>batteryTrigger_X = on</b> erstellt/gesetzt. <br>
       Unterschreiten die letzten drei SoC-Messungen eine definierte <b>Xoff-Bedingung</b>, wird das Reading
