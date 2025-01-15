@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  76_SolarForecast: FlowGraphic: SoC as a Cluster value of all Batts
  - bugfix:  76_SolarForecast: bugfix of version 1.43.3
  - change:  76_SolarForecast: consumption fc calc switch from average to median
  - change:  76_SolarForecast: Attr graphicBeam1MaxVal, ctrlAreaFactorUsage are 

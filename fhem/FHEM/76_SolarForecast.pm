@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.43.5" => "15.01.2025  _flowGraphic: calculate the resulting SoC as a cluster of batteries ",
   "1.43.4" => "14.01.2025  batsocslidereg: calculate the SoC as summary over all capacities in Wh, bugfix https://forum.fhem.de/index.php?msg=1330559 ",
   "1.43.3" => "13.01.2025  add Wiki icon in graphic header, _calcConsumptionForecast: switch calc from average to median, edit comref ",
   "1.43.2" => "12.01.2025  _batChargeRecmd: bugfix calc socwh, Attr graphicBeam1MaxVal, (experimental) ctrlAreaFactorUsage are obsolete ".
@@ -9571,14 +9572,15 @@ sub _transferBatteryValues {
       storeReading ('Current_PowerBatOut_'.$bn, $pbo.' W');
       storeReading ('Current_BatCharge_'.  $bn, $soc.' %');
       
-      $data{$name}{batteries}{$bn}{bname}        = $badev;                                  # Batterie Devicename            
-      $data{$name}{batteries}{$bn}{balias}       = AttrVal ($badev, 'alias', $badev);       # Alias Batterie Device
-      $data{$name}{batteries}{$bn}{bpowerin}     = $pbi;                                    # momentane Batterieladung
-      $data{$name}{batteries}{$bn}{bpowerout}    = $pbo;                                    # momentane Batterieentladung
-      $data{$name}{batteries}{$bn}{bcharge}      = $soc;                                    # aktuelle Batterieladung
-      $data{$name}{batteries}{$bn}{basynchron}   = $h->{asynchron} // 0;                    # asynchroner Modus = X
-      $data{$name}{batteries}{$bn}{bicon}        = $h->{icon} if($h->{icon});               # Batterie Icon
-      $data{$name}{batteries}{$bn}{bshowingraph} = $h->{show} // 0;                         # Batterie in Balkengrafik anzeigen 
+      $data{$name}{batteries}{$bn}{bname}        = $badev;                                               # Batterie Devicename            
+      $data{$name}{batteries}{$bn}{balias}       = AttrVal ($badev, 'alias', $badev);                    # Alias Batterie Device
+      $data{$name}{batteries}{$bn}{bpowerin}     = $pbi;                                                 # momentane Batterieladung
+      $data{$name}{batteries}{$bn}{bpowerout}    = $pbo;                                                 # momentane Batterieentladung
+      $data{$name}{batteries}{$bn}{bcharge}      = $soc;                                                 # Batterie SoC (%)
+      $data{$name}{batteries}{$bn}{basynchron}   = $h->{asynchron} // 0;                                 # asynchroner Modus = X
+      $data{$name}{batteries}{$bn}{bicon}        = $h->{icon} if($h->{icon});                            # Batterie Icon
+      $data{$name}{batteries}{$bn}{bshowingraph} = $h->{show} // 0;                                      # Batterie in Balkengrafik anzeigen
+      $data{$name}{batteries}{$bn}{bchargewh}    = BatteryVal ($name, $bn, 'binstcap', 0) * $soc / 100;  # Batterie SoC (Wh)     
       
       writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, hour => $nhour } );  
       
@@ -9591,7 +9593,7 @@ sub _transferBatteryValues {
   }
     
   if ($num) {
-      my $soctotal = sprintf "%.0f", ($socwhsum / $bcapsum * 100) if($bcapsum);           # resultierender SoC (%) aller Batterien als "eine" 
+      my $soctotal = sprintf "%.0f", ($socwhsum / $bcapsum * 100) if($bcapsum);            # resultierender SoC (%) aller Batterien als "eine" 
       push @{$data{$name}{current}{batsocslidereg}}, $soctotal;                            # Schieberegister average SOC aller Batterien
       limitArray ($data{$name}{current}{batsocslidereg}, $slidenummax);
   
@@ -15195,9 +15197,12 @@ sub _flowGraphic {
   
   ## definierte Batterien ermitteln und zusammenfassen
   ######################################################
-  my ($batin, $bat2home, $soc, @batsoc);
-  for my $bn (1..$maxbatteries) {                                              # für jede definierte Batterie
-      $bn = sprintf "%02d", $bn;
+  my ($batin, $bat2home);
+  my $socwhsum = 0;
+  my $soc      = 0;
+  
+  for my $bn (1..$maxbatteries) {                                                   # für jede definierte Batterie
+      $bn                   = sprintf "%02d", $bn;
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
       
@@ -15206,10 +15211,11 @@ sub _flowGraphic {
       $batin         += $batinpow    if(defined $batinpow); 
       $bat2home      += $bat2homepow if(defined $bat2homepow);
       
-      push @batsoc, ReadingsNum ($name, 'Current_BatCharge_'.$bn, 0);
+      $socwhsum      += BatteryVal ($name, $bn, 'bchargewh', 0);                    # Batterie SoC in Wh
   } 
   
-  $soc = avgArray (\@batsoc, scalar @batsoc) if(@batsoc); 
+  my $batcapsum = CurrentVal ($hash, 'batcapsum', 0);                               # Summe installierte Batterie Kapazität
+  $soc          = sprintf "%.0f", ($socwhsum / $batcapsum * 100) if($batcapsum);    # resultierender SoC (%) aller Batterien als Cluster
   
   if (!defined $batin && !defined $bat2home) {
       $hasbat   = 0;
@@ -21972,13 +21978,14 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>bname </b>          </td><td>Name of the device                                                           </td></tr>
-            <tr><td> <b>balias </b>         </td><td>Alias of the device                                                          </td></tr>
-            <tr><td> <b>basynchron </b>     </td><td>Mode of processing received battery events                                   </td></tr>
-            <tr><td> <b>bcharge </b>        </td><td>SOC (State of Charge) of the battery (%)                                     </td></tr>
-            <tr><td> <b>binstcap </b>       </td><td>installed battery capacity (Wh)                                              </td></tr>
-            <tr><td> <b>bpowerin </b>       </td><td>current charging power (W)                                                   </td></tr>
-            <tr><td> <b>bpowerout </b>      </td><td>current discharge power (W)                                                  </td></tr>
+            <tr><td> <b>bname </b>          </td><td>Name of the device                                     </td></tr>
+            <tr><td> <b>balias </b>         </td><td>Alias of the device                                    </td></tr>
+            <tr><td> <b>basynchron </b>     </td><td>Mode of processing received battery events             </td></tr>
+            <tr><td> <b>bcharge </b>        </td><td>current SoC (State of Charge) of the battery (%)       </td></tr>
+            <tr><td> <b>bchargewh </b>      </td><td>current SoC (State of Charge) of the battery (Wh)      </td></tr>
+            <tr><td> <b>binstcap </b>       </td><td>installed battery capacity (Wh)                        </td></tr>
+            <tr><td> <b>bpowerin </b>       </td><td>current charging power (W)                             </td></tr>
+            <tr><td> <b>bpowerout </b>      </td><td>current discharge power (W)                            </td></tr>
 		 </table>
       </ul>
 
@@ -24444,13 +24451,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>bname </b>          </td><td>Name des Gerätes                                                            </td></tr>
-            <tr><td> <b>balias </b>         </td><td>Alias des Gerätes                                                           </td></tr>
-            <tr><td> <b>basynchron </b>     </td><td>Modus der Verarbeitung empfangener Batterie-Events                          </td></tr>
-            <tr><td> <b>bcharge </b>        </td><td>SOC (State of Charge) der Batterie (%)                                      </td></tr>
-            <tr><td> <b>binstcap </b>       </td><td>installierte Batteriekapazität (Wh)                                         </td></tr>
-            <tr><td> <b>bpowerin </b>       </td><td>momentane Ladeleistung (W)                                                  </td></tr>
-            <tr><td> <b>bpowerout </b>      </td><td>momentane Entladeleistung (W)                                               </td></tr>
+            <tr><td> <b>bname </b>          </td><td>Name des Gerätes                                       </td></tr>
+            <tr><td> <b>balias </b>         </td><td>Alias des Gerätes                                      </td></tr>
+            <tr><td> <b>basynchron </b>     </td><td>Modus der Verarbeitung empfangener Batterie-Events     </td></tr>
+            <tr><td> <b>bcharge </b>        </td><td>aktueller SoC (State of Charge) der Batterie (%)       </td></tr>
+            <tr><td> <b>bchargewh </b>      </td><td>aktueller SoC (State of Charge) der Batterie (Wh)      </td></tr>
+            <tr><td> <b>binstcap </b>       </td><td>installierte Batteriekapazität (Wh)                    </td></tr>
+            <tr><td> <b>bpowerin </b>       </td><td>momentane Ladeleistung (W)                             </td></tr>
+            <tr><td> <b>bpowerout </b>      </td><td>momentane Entladeleistung (W)                          </td></tr>
 		 </table>
       </ul>
 
