@@ -321,7 +321,7 @@ MQTT2_getCmdHash($$)
     $k =~ s/:.*//; # potential arguments
     $h{$k} = $v;
   }
-  grep /./,
+  grep /[^ ]+/,
   split("\n", $list);
   return (\%h, join(" ",@cmd));
 }
