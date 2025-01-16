@@ -2,6 +2,10 @@
 #
 ##############################################
 #
+# 2025.01.16 - DS_Starter / fichtennadel v0.3
+# - CHANGE: 
+#          - check for init_done in fronius_StartUp loop instead of define (https://forum.fhem.de/index.php?topic=139206.msg1330774#msg1330774)
+#
 # 2024.05.27 - fichtennadel v0.2
 # - CHANGE: 
 #          - set GetActiveDeviceInfo
@@ -116,7 +120,7 @@ use Date::Parse;
 use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 
-my $ModulVersion        = "0.2";
+my $ModulVersion        = "0.3";
 
 ##############################################################################
 sub fronius_Initialize($) {
@@ -173,9 +177,7 @@ sub fronius_Define($$$) {
   # for WR in StandBy
   $hash->{helper}{VARS}{ReInitGetAPIVersionInfo} = 0;
   
-  if ($init_done) {
-    fronius_StartUp($hash);
-  } 
+  fronius_StartUp($hash);
   
   return undef;
 }
@@ -195,6 +197,14 @@ sub fronius_Undefine($$) {
 sub fronius_StartUp($) {
   my ($hash)       = @_;
   my $name = $hash->{NAME};
+  
+  RemoveInternalTimer ($hash, 'fronius_StartUp');
+
+  if (!$init_done) {
+      InternalTimer (gettimeofday() + 2, 'fronius_StartUp', $hash, 0);
+      return;
+  }
+  
   my $interval     = List::Util::max(AttrVal( $name, "IntervalArchiveData", AttrVal( $name, "IntervalRealtimeData", 300 ) ), 300);
 
   Log3 $name, 4, "[$name] [fronius_StartUp]";
