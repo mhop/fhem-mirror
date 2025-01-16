@@ -861,7 +861,7 @@ FileLog_Get($@)
             my $linf_to = ResolveDateWildcards($hash->{logfile},
                             localtime(time_str2num("$to_ymd $to_hms")));
             if($linf ne $linf_to){  # append each file into a temporary one
-              $tempfileName = $linf.".transit.temp.log";
+              $tempfileName = $linf.".transit.temp.log.$$";
               unlink($tempfileName);
               my $lf = $linf;
 
