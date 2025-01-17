@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2024 by Heiko Maaz
+#       (c) 2015-2025 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.6" => "17.01.2025  __stopLiveview: fix Warning, set verifiedversion to 9.2.2 ",
   "9.12.5" => "30.12.2024  remove delHashRefDeep ",
   "9.12.4" => "15.12.2024  fix Attr pollcaminfoall ",
   "9.12.3" => "08.12.2024  rollout delHashRefDeep, edit comref, internal code changed, replace some special data by local owndata ",
@@ -720,10 +721,11 @@ my $defSlim           = 3;                                 # default Anzahl der 
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
 my $sgnum             = '1,2,3,4,5,6,7,8,9,10';            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $sgbdef            = 0;                                 # default value Attr snapGalleryBoost
-my $compstat          = '9.2.1';                           # getestete SVS-Version
+my $verifiedversion   = '9.2.2';                           # getestete SVS-Version
 my $valZoom           = '.++,+,stop,-,--.';                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
 my $todef             = 20;                                # httptimeout default Wert
+my $rc                = 21600;                             # Wiederholungsintervall versionCheck
 
                                                            # mögliche Customizin Versionen
  my @simus  = qw (7.1                                      
@@ -980,7 +982,7 @@ sub Define {
   $hash->{CAMNAME}                = $camname;
   $hash->{MODEL}                  = ($camname =~ m/^SVS$/xi) ? "SVS" : "CAM";    # initial, CAM wird später ersetzt durch CamModel
   $hash->{PROTOCOL}               = $proto;
-  $hash->{COMPATIBILITY}          = $compstat;                                   # getestete SVS-version Kompatibilität
+  $hash->{COMPATIBILITY}          = $verifiedversion;                            # getestete SVS-version Kompatibilität
   $hash->{HELPER}{MODMETAABSENT}  = 1 if($modMetaAbsent);                        # Modul Meta.pm nicht vorhanden
 
   # Startwerte setzen
@@ -3930,13 +3932,13 @@ sub __stopLiveview {
     my $hash = shift;
     my $name = $hash->{NAME};
 
-    my $caller  = (caller(0))[3];
+    my $caller = (caller(0))[3];
 
-    RemoveInternalTimer($hash, $caller);
+    RemoveInternalTimer ($hash, $caller);
     return if(IsDisabled($name));
 
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{OPMODE}               = "stopliveview";
+        $hash->{OPMODE}               = 'stopliveview';
         $hash->{HELPER}{LOGINRETRIES} = 0;
 
         if (!$hash->{HELPER}{API}{PARSET}) {
@@ -3944,17 +3946,17 @@ sub __stopLiveview {
             return;
         }
 
-        setActiveToken($hash);
+        setActiveToken ($hash);
 
-        delete $hash->{HELPER}{LINK};                       # Link aus Helper-hash löschen
+        delete $hash->{HELPER}{LINK};                                                              # Link aus Helper-hash löschen
         delete $hash->{HELPER}{AUDIOLINK};
-        delete $hash->{HELPER}{ACTSTRM};                    # sprechender Name des laufenden Streamtyps für SSCamSTRM
+        delete $hash->{HELPER}{ACTSTRM};                                                           # sprechender Name des laufenden Streamtyps für SSCamSTRM
 
-        delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});  # Reading LiveStreamUrl löschen
+        delete $hash->{READINGS}{LiveStreamUrl} if ($hash->{READINGS}{LiveStreamUrl});             # Reading LiveStreamUrl löschen
 
-        readingsSingleUpdate($hash,"state","stopview",1);
+        readingsSingleUpdate ($hash, 'state', 'stopview', 1);
 
-        if($hash->{HELPER}{WLTYPE} eq "hls") {              # HLS Stream war aktiv, Streaming beenden
+        if (defined $hash->{HELPER}{WLTYPE} && $hash->{HELPER}{WLTYPE} eq "hls") {                 # HLS Stream war aktiv, Streaming beenden
             $hash->{OPMODE} = "stopliveview_hls";
 
             $hash->{HELPER}{CALL}{VKEY}   = "VIDEOSTMS";
@@ -3963,9 +3965,9 @@ sub __stopLiveview {
             return if(startOrShut($name));
             checkSid ($name);
         }
-        else {                                              # kein HLS Stream
-            roomRefresh   ($hash,0,1,1);                    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-            delActiveToken($hash);
+        else {                                                                                     # kein HLS Stream
+            roomRefresh    ($hash, 0, 1, 1);                                                       # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
+            delActiveToken ($hash);
         }
     }
     else {
@@ -4328,7 +4330,7 @@ sub _getapiInfo {                        ## no critic "not used"
 
   my $hash  = $defs{$name};
 
-  getClHash    ($hash,1);
+  getClHash    ($hash, 1);
   __getApiInfo ($hash);
 
 return;
@@ -4681,7 +4683,7 @@ sub __getApiInfo {
 
     my $caller = (caller(0))[3];
 
-    RemoveInternalTimer($hash, $caller);
+    RemoveInternalTimer ($hash, $caller);
     return if(IsDisabled($name));
 
     if ($hash->{HELPER}{ACTIVE} eq "off") {
@@ -6615,7 +6617,7 @@ sub _parsegetsvsinfo {                                  ## no critic "not used"
   }
 
   my $avsc      = $major.$minor.$small;                                 # Kompatibilitätscheck
-  my $avcomp    = $compstat;
+  my $avcomp    = $verifiedversion;
   $avcomp       =~ s/\.//gx;
   my $compstate = ($avsc <= $avcomp) ? 'true' : 'false';
 
@@ -12186,19 +12188,19 @@ return;
 sub versionCheck {
   my $hash = shift;
   my $name = $hash->{NAME};
-  my $rc   = 21600;
 
-  RemoveInternalTimer($hash, "FHEM::SSCam::versionCheck");
+  RemoveInternalTimer ($hash, "FHEM::SSCam::versionCheck");
   return if(IsDisabled($name));
 
-  my $cs = ReadingsVal($name, "compstate", "true");
-  if($cs eq "false") {
+  my $cs = ReadingsVal ($name, "compstate", "true");
+  
+  if ($cs eq "false") {
       Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".ReadingsVal($name, "SVSversion", "").
        " may be incompatible with SSCam version $hash->{HELPER}{VERSION}. ".
        "For further information execute \"get $name versionNotes 4\".");
   }
 
-InternalTimer(gettimeofday()+$rc, "FHEM::SSCam::versionCheck", $hash, 0);
+  InternalTimer (gettimeofday() + $rc, "FHEM::SSCam::versionCheck", $hash, 0);
 
 return;
 }
