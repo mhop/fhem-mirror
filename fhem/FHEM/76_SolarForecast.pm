@@ -157,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.43.6" => "17.01.2025  _calcCaQcomplex: additional write pvrl, pvfc to separate circular hash Array elements, listDataPool: show these Arrays ",
   "1.43.5" => "15.01.2025  _flowGraphic: calculate the resulting SoC as a cluster of batteries ",
   "1.43.4" => "14.01.2025  batsocslidereg: calculate the SoC as summary over all capacities in Wh, bugfix https://forum.fhem.de/index.php?msg=1330559 ",
   "1.43.3" => "13.01.2025  add Wiki icon in graphic header, _calcConsumptionForecast: switch calc from average to median, edit comref ",
@@ -7093,9 +7094,8 @@ sub writeCacheToFile {
       return ('', $nr, $na);
   }
   
-  my @arr;
   return if(!keys %{$data{$name}{$cachename}});
-  push @arr, encode_json ($data{$name}{$cachename});
+  push my @arr, encode_json ($data{$name}{$cachename});
 
   $error = FileWrite ($file, @arr);
 
@@ -8747,7 +8747,7 @@ sub _transferAPIRadiationValues {
       my $est            = __calcPVestimates ($paref);
       my ($msg, $pvaifc) = aiGetResult ($paref);                                              # KI Entscheidungen abfragen
 
-      $data{$name}{nexthours}{$nhtstr}{pvapifc} = $est;                                    # durch API gelieferte PV Forecast
+      $data{$name}{nexthours}{$nhtstr}{pvapifc} = $est;                                       # durch API gelieferte PV Forecast
 
       delete $paref->{fd};
       delete $paref->{fh1};
@@ -12225,20 +12225,28 @@ sub _calcCaQcomplex {
       debugLog     ($paref, 'pvCorrectionWrite', "Autolearning is switched off for hour: $h -> skip the recalculation of the complex correction factor");
       return;
   }
-
-  my $pvrl  = CircularVal ($hash, sprintf("%02d",$h), 'pvrl',    0);
-  my $pvfc  = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
+  
+  my $hh    = sprintf "%02d", $h;
+  my $pvrl  = CircularVal ($hash, $hh, 'pvrl',    0);                                  # real erzeugte PV Energie am Ende der vorherigen Stunde
+  my $pvfc  = CircularVal ($hash, $hh, 'pvapifc', 0);                                  # vorhergesagte PV Energie am Ende der vorherigen Stunde
 
   if (!$pvrl || !$pvfc) {
-      storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
+      storeReading ('.pvCorrectionFactor_'.$hh.'_cloudcover', 'done');
       return;
   }
 
-  my $chwcc  = HistoryVal ($hash, $day, sprintf("%02d",$h), 'wcc',    0);                            # Wolkenbedeckung Heute & abgefragte Stunde
-  my $sunalt = HistoryVal ($hash, $day, sprintf("%02d",$h), 'sunalt', 0);                            # Sonne Altitude
+  my $chwcc  = HistoryVal ($hash, $day, $hh, 'wcc',    0);                            # Wolkenbedeckung heute & abgefragte Stunde
+  my $sunalt = HistoryVal ($hash, $day, $hh, 'sunalt', 0);                            # Sonne Altitude
   my $crang  = cloud2bin  ($chwcc);
   my $sabin  = sunalt2bin ($sunalt);
+  
+  ## Speicherarrays schreiben
+  #############################
+  push @{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}}, $pvrl;
+  push @{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}}, $pvfc;
 
+  ## neuen Korrekturfaktor berechnen
+  ####################################
   $paref->{pvrl}   = $pvrl;
   $paref->{pvfc}   = $pvfc;
   $paref->{crang}  = $crang;
@@ -12253,16 +12261,16 @@ sub _calcCaQcomplex {
   delete $paref->{sabin};
   delete $paref->{calc};
 
-  storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
+  storeReading ('.pvCorrectionFactor_'.$hh.'_cloudcover', 'done');
 
   $aihit = $aihit ? ' AI result used,' : '';
 
   if ($acu =~ /on_complex/xs) {
       if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
-          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac,$aihit Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
+          storeReading ('pvCorrectionFactor_'.$hh, $factor." (automatic - old factor: $oldfac,$aihit Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
       }
       else {
-          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin,$aihit Cloud range: $crang, Days in range: $dnum");
+          storeReading ('pvCorrectionFactor_'.$hh, $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin,$aihit Cloud range: $crang, Days in range: $dnum");
       }
   }
 
@@ -12284,28 +12292,29 @@ sub _calcCaQsimple {
   my $aihit = $paref->{aihit};
 
   my $hash = $defs{$name};
-  my $sr   = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', '');
+  my $hh   = sprintf "%02d", $h;
+  my $sr   = ReadingsVal ($name, '.pvCorrectionFactor_'.$hh.'_apipercentil', '');
 
   if($sr eq "done") {
-      # debugLog ($paref, 'pvCorrectionWrite', "Simple Corrf factor Hour: ".sprintf("%02d",$h)." already calculated");
+      # debugLog ($paref, 'pvCorrectionWrite', "Simple Corrf factor Hour: ".$hh." already calculated");
       return;
   }
 
   if (!$aln) {
-      storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
+      storeReading ('.pvCorrectionFactor_'.$hh.'_apipercentil', 'done');
       debugLog     ($paref, 'pvCorrectionWrite', "Autolearning is switched off for hour: $h -> skip the recalculation of the simple correction factor");
       return;
   }
 
-  my $pvrl = CircularVal ($hash, sprintf("%02d",$h), 'pvrl',    0);
-  my $pvfc = CircularVal ($hash, sprintf("%02d",$h), 'pvapifc', 0);
+  my $pvrl = CircularVal ($hash, $hh, 'pvrl',    0);
+  my $pvfc = CircularVal ($hash, $hh, 'pvapifc', 0);
 
   if (!$pvrl || !$pvfc) {
-      storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
+      storeReading ('.pvCorrectionFactor_'.$hh.'_apipercentil', 'done');
       return;
   }
 
-  my $sunalt = HistoryVal ($hash, $day, sprintf("%02d",$h), 'sunalt', 0);                            # Sonne Altitude
+  my $sunalt = HistoryVal ($hash, $day, $hh, 'sunalt', 0);                            # Sonne Altitude
   my $sabin  = sunalt2bin ($sunalt);
 
   $paref->{pvrl}  = $pvrl;
@@ -12322,16 +12331,16 @@ sub _calcCaQsimple {
   delete $paref->{crang};
   delete $paref->{calc};
 
-  storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_apipercentil', 'done');
+  storeReading ('.pvCorrectionFactor_'.$hh.'_apipercentil', 'done');
 
   $aihit = $aihit ? ' AI result used,' : '';
 
   if ($acu =~ /on_simple/xs) {
       if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
-          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $factor." (automatic - old factor: $oldfac,$aihit Days in range: $dnum)");
+          storeReading ('pvCorrectionFactor_'.$hh, $factor." (automatic - old factor: $oldfac,$aihit Days in range: $dnum)");
       }
       else {
-          storeReading ('pvCorrectionFactor_'.sprintf("%02d",$h), $paref->{cpcf}." / flexmatic result $factor,$aihit Days in range: $dnum");
+          storeReading ('pvCorrectionFactor_'.$hh, $paref->{cpcf}." / flexmatic result $factor,$aihit Days in range: $dnum");
       }
   }
 
@@ -12359,8 +12368,9 @@ sub __calcNewFactor {
 
   debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> Start calculation correction factor for hour: $h");
 
-  my ($oldfac, $oldq)        = CircularSunCloudkorrVal ($hash, sprintf("%02d",$h), $sabin, $crang, 0);  # bisher definierter Korrekturfaktor / Qualität
-  my ($pvhis, $fchis, $dnum) = CircularSumVal          ($hash, sprintf("%02d",$h), $sabin, $crang, 0);
+  my $hh                     = sprintf "%02d", $h;
+  my ($oldfac, $oldq)        = CircularSunCloudkorrVal ($hash, $hh, $sabin, $crang, 0);  # bisher definierter Korrekturfaktor / Qualität
+  my ($pvhis, $fchis, $dnum) = CircularSumVal          ($hash, $hh, $sabin, $crang, 0);
   $oldfac                    = 1 if(1 * $oldfac == 0);                                            
   
   debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read historical values: pv real sum: $pvhis, pv forecast sum: $fchis, days sum: $dnum");
@@ -12403,23 +12413,44 @@ sub __calcNewFactor {
 
   if ($crang ne 'simple') {
       my $idx = $sabin.'.'.$crang;                                                                    # value für pvcorrf Sonne Altitude
-      $data{$name}{circular}{sprintf("%02d",$h)}{pvrlsum}{$idx} = $pvrlsum;                        # PV Erzeugung Summe speichern
-      $data{$name}{circular}{sprintf("%02d",$h)}{pvfcsum}{$idx} = $pvfcsum;                        # PV Prognose Summe speichern
-      $data{$name}{circular}{sprintf("%02d",$h)}{dnumsum}{$idx} = $dnum;                           # Anzahl aller historischen Tade dieser Range
-      $data{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$idx} = $factor;
-      $data{$name}{circular}{sprintf("%02d",$h)}{quality}{$idx} = $qual;
+      $data{$name}{circular}{$hh}{pvrlsum}{$idx} = $pvrlsum;                        # PV Erzeugung Summe speichern
+      $data{$name}{circular}{$hh}{pvfcsum}{$idx} = $pvfcsum;                        # PV Prognose Summe speichern
+      $data{$name}{circular}{$hh}{dnumsum}{$idx} = $dnum;                           # Anzahl aller historischen Tade dieser Range
+      $data{$name}{circular}{$hh}{pvcorrf}{$idx} = $factor;
+      $data{$name}{circular}{$hh}{quality}{$idx} = $qual;
   }
   else {
-      $data{$name}{circular}{sprintf("%02d",$h)}{pvrlsum}{$crang} = $pvrlsum;
-      $data{$name}{circular}{sprintf("%02d",$h)}{pvfcsum}{$crang} = $pvfcsum;
-      $data{$name}{circular}{sprintf("%02d",$h)}{dnumsum}{$crang} = $dnum;
-      $data{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$crang} = $factor;
-      $data{$name}{circular}{sprintf("%02d",$h)}{quality}{$crang} = $qual;
+      $data{$name}{circular}{$hh}{pvrlsum}{$crang} = $pvrlsum;
+      $data{$name}{circular}{$hh}{pvfcsum}{$crang} = $pvfcsum;
+      $data{$name}{circular}{$hh}{dnumsum}{$crang} = $dnum;
+      $data{$name}{circular}{$hh}{pvcorrf}{$crang} = $factor;
+      $data{$name}{circular}{$hh}{quality}{$crang} = $qual;
   }
   
   $oldfac = sprintf "%.2f", $oldfac;
   
 return ($oldfac, $factor, $dnum);
+}
+
+################################################################
+#            Qualität der Vorhersage berechnen
+################################################################
+sub __calcFcQuality {
+  my $pvfc = shift;                                                        # PV Vorhersagewert
+  my $pvrl = shift;                                                        # PV reale Erzeugung
+
+  return if(!$pvfc || !$pvrl);
+
+  $pvrl = sprintf "%.0f", $pvrl;
+  $pvfc = sprintf "%.0f", $pvfc;
+
+  my $diff = $pvfc - $pvrl;
+  my $hdv  = 1 - abs ($diff / $pvrl);                                      # Abweichung der Stunde, 1 = bestmöglicher Wert
+
+  $hdv = $hdv < 0 ? 0 : $hdv;
+  $hdv = sprintf "%.2f", $hdv;
+
+return $hdv;
 }
 
 ################################################################
@@ -16252,27 +16283,6 @@ sub _addHourAiRawdata {
 return;
 }
 
-################################################################
-#            Qualität der Vorhersage berechnen
-################################################################
-sub __calcFcQuality {
-  my $pvfc = shift;                                                        # PV Vorhersagewert
-  my $pvrl = shift;                                                        # PV reale Erzeugung
-
-  return if(!$pvfc || !$pvrl);
-
-  $pvrl = sprintf "%.0f", $pvrl;
-  $pvfc = sprintf "%.0f", $pvfc;
-
-  my $diff = $pvfc - $pvrl;
-  my $hdv  = 1 - abs ($diff / $pvrl);                                      # Abweichung der Stunde, 1 = bestmöglicher Wert
-
-  $hdv = $hdv < 0 ? 0 : $hdv;
-  $hdv = sprintf "%.2f", $hdv;
-
-return $hdv;
-}
-
 ###############################################################
 #    Eintritt in den KI Train Prozess normal/Blocking
 ###############################################################
@@ -17112,14 +17122,6 @@ sub listDataPool {
 
   my $sub = sub {
       my $day = shift;
-
-      #for my $dh (keys %{$h->{$day}}) {
-      #    if (!isNumeric ($dh)) {
-      #        delete $data{$name}{pvhist}{$day}{$dh};
-      #        Log3 ($name, 2, qq{$name - INFO - invalid key "$day -> $dh" was deleted from pvHistory storage});
-      #    }
-      #}
-
       my $ret;
 
       for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
@@ -17404,7 +17406,7 @@ sub listDataPool {
           
           for my $ckey (sort keys %{$h->{$idx}}) {
               if (ref $h->{$idx}{$ckey} eq 'ARRAY') {
-                 my $aser = join " ",@{$h->{$idx}{$ckey}};
+                 my $aser = join " ", @{$h->{$idx}{$ckey}};
                  $cret .= ($s1 ? $sp1 : "").$ckey." => ".$aser."\n";
               }
               
@@ -17431,6 +17433,35 @@ sub listDataPool {
       if (!keys %{$h}) {
           return qq{Circular cache is empty.};
       }
+ 
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ##########################################################################################################################
+    delete $data{$name}{circular}{'01'}{pvrl_5};
+    delete $data{$name}{circular}{'01'}{pvrl_10};
+    delete $data{$name}{circular}{'01'}{pvrl_25};
+    delete $data{$name}{circular}{'01'}{pvrl_60};
+    delete $data{$name}{circular}{'01'}{pvrl_65};
+    delete $data{$name}{circular}{'01'}{pvrl_90};
+
+    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4561;
+    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4562;
+    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4563;
+    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4564;
+    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4565;
+    #
+    #push @{$data{$name}{circular}{'01'}{pvrl_65}{60}}, 3561;
+    #push @{$data{$name}{circular}{'01'}{pvrl_65}{60}}, 3562;
+    #
+    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4561;
+    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4562;
+    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4563;
+    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4564;
+    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4565;
+
+    #push @{$data{$name}{circular}{'01'}{pvrl_90}{60}}, 3561;
+    #push @{$data{$name}{circular}{'01'}{pvrl_90}{60}}, 3562;
+
+############################################################################################################
 
       for my $idx (sort keys %{$h}) {
           my $pvrl     = CircularVal ($hash, $idx, 'pvrl',                '-');
@@ -17490,17 +17521,41 @@ sub listDataPool {
                   $bout     .= "batout${bn}: $batout";
               }
               
-              $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl\n";
-              $sq .= "      $bin\n";
-              $sq .= "      $bout\n";
-              $sq .= "      confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c\n";
-              $sq .= "      temp: $temp, wid: $wid, wtxt: $wtxt\n";
-              $sq .= "      $prdl\n";
-              $sq .= "      pvcorrf: $pvcf\n";
-              $sq .= "      quality: $cfq\n";
-              $sq .= "      pvrlsum: $pvrs\n";
-              $sq .= "      pvfcsum: $pvfs\n";
-              $sq .= "      dnumsum: $dnus";
+                my ($pvrlnew, $pvfcnew);
+                my @pvrlkeys = map { $_ =~ /^pvrl_/xs ? $_ : '' } sort keys %{$h->{$idx}}; 
+                my @pvfckeys = map { $_ =~ /^pvfc_/xs ? $_ : '' } sort keys %{$h->{$idx}};                  
+
+                for my $prl (@pvrlkeys) {
+                    next if(!$prl);
+                    my $lref = CircularVal ($hash, $idx, $prl, ''); 
+                    next if(!$lref);                  
+                    
+                    $pvrlnew .= "\n      " if($pvrlnew);
+                    $pvrlnew .= _ldchash2val ( { pool => $h, idx => $idx, key => $prl, cval => $lref } );
+                }
+                
+                for my $pfc (@pvfckeys) {
+                    next if(!$pfc);
+                    my $cref = CircularVal ($hash, $idx, $pfc, ''); 
+                    next if(!$cref);                  
+                    
+                    $pvfcnew .= "\n      " if($pvfcnew);
+                    $pvfcnew .= _ldchash2val ( { pool => $h, idx => $idx, key => $pfc, cval => $cref } );
+                }
+              
+              $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl";
+              $sq .= "\n      $bin";
+              $sq .= "\n      $bout";
+              $sq .= "\n      confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c";
+              $sq .= "\n      temp: $temp, wid: $wid, wtxt: $wtxt";
+              $sq .= "\n      $prdl";
+              $sq .= "\n      pvcorrf: $pvcf";
+              $sq .= "\n      quality: $cfq";
+              $sq .= "\n      pvrlsum: $pvrs";
+              $sq .= "\n      pvfcsum: $pvfs";
+              $sq .= "\n      dnumsum: $dnus";
+              $sq .= "\n      $pvrlnew" if($pvrlnew);
+              $sq .= "\n      $pvfcnew" if($pvfcnew);
           }
           else {
               my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7);
@@ -17772,7 +17827,24 @@ sub _ldchash2val {
 
       for my $f (sort {$a<=>$b} keys %{$pool->{$idx}{$key}}) {
           next if($f eq 'simple');
-          if ($f !~ /\./xs) {
+          
+          if (ref $pool->{$idx}{$key}{$f} eq 'ARRAY') {
+              my @sub_arrays = arraySplitBy (20, @{$pool->{$idx}{$key}{$f}});              # Array in Teil-Arrays zu je 20 Elemente aufteilen
+              
+              for my $suaref (@sub_arrays) {                                               # für jedes Teil-Array Join ausführen
+                  my $suajoined = join ' ', @{$suaref};
+                  
+                  if (!$ret) {
+                      $ret .= $key.' => ';
+                      $ret .= $f.' @ '.$suajoined;   
+                  }
+                  else {
+                      $ret .= "\n                 ";
+                      $ret .= $f.' @ '.$suajoined;
+                  }
+              }
+          }
+          elsif ($f !~ /\./xs) {
               $ret .= " " if($ret);
               $ret .= "$f=".$pool->{$idx}{$key}{$f};
               my $ct = ($ret =~ tr/=// // 0) / 10;
@@ -20217,6 +20289,48 @@ sub sunalt2bin {
             0;
 
 return $bin;
+}
+
+###############################################################################
+#   Teilt das Original-Array in Unter-Arrays auf, die den Inhalt des 
+#   Originals enthalten. Die Größe jedes Unterarrays ist gleich oder kleiner als 
+#   $split_size, wobei das letzte Array in der Regel kleiner ist, wenn nicht 
+#   genügend Elemente in @original vorhanden sind.
+#   (aus https://metacpan.org/dist/Array-Split/source/lib/Array/Split.pm)
+#
+#   arraySplitBy ($split_size, @original)
+###############################################################################
+sub arraySplitBy {
+  my $split_size = shift;
+    
+  $split_size = max ($split_size, 1);
+  my @sub_arrays;
+    
+  while (@_) {
+      push @sub_arrays, [splice @_, 0, $split_size];
+  }
+    
+return @sub_arrays;
+}
+  
+###############################################################################
+#   Teilt das angegebene Array in die Anzahl $count Unterarrays auf. 
+#   Es wird versucht, so viele Unter-Arrays zu erstellen, wie $count angibt, 
+#   aber es werden weniger zurückgegeben, wenn nicht genügend Elemente in 
+#   @original vorhanden sind.
+#
+#   Gibt eine Liste von Array-Referenzen zurück.
+#   (aus https://metacpan.org/dist/Array-Split/source/lib/Array/Split.pm)
+#
+#   arraySplitInto ($count, @original)
+###############################################################################
+sub arraySplitInto {                     
+  my ($count, @original) = @_;
+    
+  $count   = max( $count, 1 );
+  my $size = ceil @original / $count;
+    
+return arraySplitBy ($size, @original);
 }
 
 ###############################################################################
