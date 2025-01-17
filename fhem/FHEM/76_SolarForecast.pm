@@ -2152,6 +2152,10 @@ sub _setreset {                          ## no critic "not used"
               delete $data{$name}{circular}{$circh}{pvrlsum};
               delete $data{$name}{circular}{$circh}{pvfcsum};
               delete $data{$name}{circular}{$circh}{dnumsum};
+              
+              for my $k (keys %{$data{$name}{circular}{$circh}}) {
+                  delete $data{$name}{circular}{$circh}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
+              }
 
               for my $hid (keys %{$data{$name}{pvhist}}) {
                   delete $data{$name}{pvhist}{$hid}{$circh}{pvcorrf};
@@ -2167,6 +2171,10 @@ sub _setreset {                          ## no critic "not used"
               delete $data{$name}{circular}{$hod}{pvrlsum};
               delete $data{$name}{circular}{$hod}{pvfcsum};
               delete $data{$name}{circular}{$hod}{dnumsum};
+              
+              for my $k (keys %{$data{$name}{circular}{$hod}}) {
+                  delete $data{$name}{circular}{$hod}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
+              }
           }
 
           for my $hid (keys %{$data{$name}{pvhist}}) {
