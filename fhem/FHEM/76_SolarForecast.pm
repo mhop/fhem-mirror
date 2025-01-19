@@ -580,7 +580,7 @@ my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select
 my %msgs    = ();                                                             # Initialisierung Mitteilungssystem
 my %svicons = (                                                               # Schweregrad Icons Mitteilungssystem                                                            
   '0' => 'message_mail@grey',                                                 # Standard Mitteilungs-Icon 0 - keine Mitteilung
-  '1' => 'message_postbox_mail@darkorange',                                   # Standard Mitteilungs-Icon 1 - Mitteilung
+  '1' => 'message_mail_open@darkorange',                                      # Standard Mitteilungs-Icon 1 - Mitteilung
   '2' => 'message_attention@darkorange',                                      # Standard Mitteilungs-Icon 2 - Warnung
   '3' => 'message_attention@red',                                             # Standard Mitteilungs-Icon 3 - Fehler / Problem
 );
@@ -961,8 +961,8 @@ my %htitles = (                                                                 
                 DE => qq{&#214;ffne das Wiki}                                                                      },
   outpmsg  => { EN => qq{Messages are available - press the button to open them},
                 DE => qq{Mitteilungen sind vorhanden - dr&#252;cke die Taste um sie zu &#246;ffnen}                },
-  nomsgfo  => { EN => qq{there is no message available},
-                DE => qq{es ist keine Mitteilung vorhanden}                                                        },
+  nomsgfo  => { EN => qq{there are no new messages},
+                DE => qq{es sind keine neuen Mitteilungen vorhanden}                                               },
   scaresps => { EN => qq{API request successful},
                 DE => qq{API Abfrage erfolgreich}                                                                  },
   dwfcrsu  => { EN => qq{Weather data are up to date according to used DWD model},
@@ -1302,6 +1302,7 @@ my %hfspvh = (
 # $data{$name}{dwdcatalog}                                                    # temporärer Speicher DWD Stationskatalog
 # $data{$name}{strings}                                                       # temporärer Speicher Stringkonfiguration
 # $data{$name}{aidectree}{object}                                             # AI Decision Tree Object
+# $data{$name}{messages}                                                      # Speicher Mitteilungssystem
 
 ################################################################
 #               Init Fn
@@ -13783,16 +13784,16 @@ sub __fillupMessages {
   
   if (!ReadingsVal ($name, '.migrated', 0)) {
       $midx++;
-      $msgs{$midx}{SV}  = 1;
-      $msgs{$midx}{DE}  = 'Die gespeicherten PV Daten können mit "get ... x_migrate" in ein neues Format umgesetzt werden welches den Median Ansatz bei der PV Prognose aktiviert und nutzt.';
-      $msgs{$midx}{DE} .= '<br>Mit einem späteren Update des Moduls erfolgt diese Umstellung automatisch.';
-      $msgs{$midx}{EN}  = 'The stored PV data can be converted with “get ... x_migrate” into a new format which activates and uses the median approach in the PV forecast.';
-      $msgs{$midx}{EN} .= '<br>With a later update of the module, this changeover will take place automatically.';
+      $data{$name}{messages}{$midx}{SV}  = 1;
+      $data{$name}{messages}{$midx}{DE}  = 'Die gespeicherten PV Daten können mit "get ... x_migrate" in ein neues Format umgesetzt werden welches den Median Ansatz bei der PV Prognose aktiviert und nutzt.';
+      $data{$name}{messages}{$midx}{DE} .= '<br>Mit einem späteren Update des Moduls erfolgt diese Umstellung automatisch.';
+      $data{$name}{messages}{$midx}{EN}  = 'The stored PV data can be converted with “get ... x_migrate” into a new format which activates and uses the median approach in the PV forecast.';
+      $data{$name}{messages}{$midx}{EN} .= '<br>With a later update of the module, this changeover will take place automatically.';
   }
  
   if ($midx) {
       my @aidx   = map { $_ } (1..$midx);                                 # größte vorhandene Severity finden
-      my @values = map { $msgs{$_}{SV} } @aidx; 
+      my @values = map { $data{$name}{messages}{$_}{SV} } @aidx; 
       $max_sv    = max(@values);     
   }
   
@@ -18209,16 +18210,16 @@ sub outputMessages {
                                                                             
   my $hc = 0;
 
-  for my $key (sort keys %msgs) {
+  for my $key (sort keys %{$data{$name}{messages}}) {
       $hc++;
-      my $enmsg = encode ("utf8", $msgs{$key}{$lang});
+      my $enmsg = encode ("utf8", $data{$name}{messages}{$key}{$lang});
 
       $out .= qq{<tr>};
-      $out .= qq{<td style="padding: 5px; text-align: center">     $key                      </td>};
-      $out .= qq{<td style="padding: 5px;">                                                  </td>};
-      $out .= qq{<td style="padding: 5px; text-align: center">     $msgs{$key}{SV}           </td>};
-      $out .= qq{<td style="padding: 5px;">                                                  </td>};
-      $out .= qq{<td style="padding-right: 5px; text-align: left"> $enmsg                    </td>};
+      $out .= qq{<td style="padding: 5px; text-align: center">     $key                                       </td>};
+      $out .= qq{<td style="padding: 5px;">                                                                   </td>};
+      $out .= qq{<td style="padding: 5px; text-align: center">     $data{$name}{messages}{$key}{SV}           </td>};
+      $out .= qq{<td style="padding: 5px;">                                                                   </td>};
+      $out .= qq{<td style="padding-right: 5px; text-align: left"> $enmsg                                     </td>};
       $out .= qq{</tr>};
 
       if ($hc < $midx) {                                                                           # Zwischenzeile
