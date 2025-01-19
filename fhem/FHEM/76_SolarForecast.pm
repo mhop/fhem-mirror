@@ -960,7 +960,7 @@ my %htitles = (                                                                 
   opwiki   => { EN => qq{Open the Wiki (German language)},
                 DE => qq{&#214;ffne das Wiki}                                                                      },
   outpmsg  => { EN => qq{Messages are available - press the button to open them},
-                DE => qq{Mitteilungen sind vorhanden - dr&#252;cke die Taste um sie zu &#214;ffnen}                },
+                DE => qq{Mitteilungen sind vorhanden - dr&#252;cke die Taste um sie zu &#246;ffnen}                },
   nomsgfo  => { EN => qq{there is no message available},
                 DE => qq{es ist keine Mitteilung vorhanden}                                                        },
   scaresps => { EN => qq{API request successful},
@@ -22294,9 +22294,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvapifc</b>             </td><td>expected PV generation (Wh) of the API used                                                                           </td></tr>
             <tr><td> <b>pvaifc</b>              </td><td>PV forecast (Wh) of the AI for the next 24h from the current hour of the day                                          </td></tr>
             <tr><td> <b>pvfc</b>                </td><td>PV forecast used for the next 24h from the current hour of the day                                                    </td></tr>
+            <tr><td> <b>pvfc_XX</b>             </td><td>Array of predicted PV generation values depending on a certain degree of cloud cover (XX = altitude of the sun)       </td></tr>
             <tr><td> <b>pvcorrf</b>             </td><td>Autocorrection factors for the hour of the day, where 'simple' is the simple correction factor.                       </td></tr>
             <tr><td> <b>pvfcsum</b>             </td><td>summary PV forecast per cloud area over the entire term                                                               </td></tr>
             <tr><td> <b>pvrl</b>                </td><td>real PV generation of the last 24h (Attention: pvforecast and pvreal do not refer to the same period!)                </td></tr>
+            <tr><td> <b>pvrl_XX</b>             </td><td>Array of real PV generation values generated at a certain degree of cloudiness (XX = altitude of the sun)             </td></tr>
             <tr><td> <b>pvrlsum</b>             </td><td>summary real PV generation per cloud area over the entire term                                                        </td></tr>
             <tr><td> <b>pprlXX</b>              </td><td>Energy generation of producer XX (see attribute setupOtherProducerXX) in the last 24 hours (Wh)                       </td></tr>
             <tr><td> <b>quality</b>             </td><td>Quality of the autocorrection factors (0..1), where 'simple' is the quality of the simple correction factor.          </td></tr>
@@ -24779,9 +24781,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvapifc</b>             </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                                                           </td></tr>
             <tr><td> <b>pvaifc</b>              </td><td>PV Vorhersage (Wh) der KI für die nächsten 24h ab aktueller Stunde des Tages                                              </td></tr>
             <tr><td> <b>pvfc</b>                </td><td>verwendete PV Prognose für die nächsten 24h ab aktueller Stunde des Tages                                                 </td></tr>
+            <tr><td> <b>pvfc_XX</b>             </td><td>Array der prognostizierten PV Erzeugungswerte abhängig von einem bestimmten Bewölkungsgrad (XX = Altitude der Sonne)      </td></tr>
             <tr><td> <b>pvcorrf</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei 'simple' der einfach berechnete Korrekturfaktor ist.                </td></tr>
             <tr><td> <b>pvfcsum</b>             </td><td>Summe PV Prognose pro Bewölkungsbereich über die gesamte Laufzeit                                                         </td></tr>
             <tr><td> <b>pvrl</b>                </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>
+            <tr><td> <b>pvrl_XX</b>             </td><td>Array realer PV Erzeugungswerte erzeugt bei einem bestimmten Bewölkungsgrad (XX = Altitude der Sonne)                     </td></tr>
             <tr><td> <b>pvrlsum</b>             </td><td>Summe reale PV Erzeugung pro Bewölkungsbereich über die gesamte Laufzeit                                                  </td></tr>
             <tr><td> <b>pprlXX</b>              </td><td>Energieerzeugung des Produzenten XX (siehe Attribut setupOtherProducerXX) der letzten 24 Stunden (Wh)                     </td></tr>
             <tr><td> <b>quality</b>             </td><td>Qualität der Autokorrekturfaktoren (0..1), wobei 'simple' die Qualität des einfach berechneten Korrekturfaktors ist.      </td></tr>
