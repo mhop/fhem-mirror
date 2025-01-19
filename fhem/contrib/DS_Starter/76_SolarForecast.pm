@@ -577,7 +577,6 @@ my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select
 ## Steuerhashes
 #########################
 
-my %msgs    = ();                                                             # Initialisierung Mitteilungssystem
 my %svicons = (                                                               # Schweregrad Icons Mitteilungssystem                                                            
   '0' => 'message_mail@grey',                                                 # Standard Mitteilungs-Icon 0 - keine Mitteilung
   '1' => 'message_mail_open@darkorange',                                      # Standard Mitteilungs-Icon 1 - Mitteilung
@@ -4661,6 +4660,8 @@ sub _getoutputMessages {             ## no critic "not used"
 
   my $out = outputMessages ($paref);
   $out    = qq{<html>$out</html>};
+  
+  $data{$name}{messages}{9999}{RD} = 1;                   # Lesekennzeichen setzen
 
   ## asynchrone Ausgabe
   #######################
@@ -13778,7 +13779,11 @@ sub __fillupMessages {
   my $name  = $paref->{name};
   my $lang  = $paref->{lang};
 
-  undef %msgs;
+  for my $idx (keys %{$data{$name}{messages}}) {
+      next if($idx == 9999);
+      delete $data{$name}{messages}{$idx};
+  }
+  
   my $midx   = 0; 
   my $max_sv = 0;
   
@@ -13791,7 +13796,7 @@ sub __fillupMessages {
       $data{$name}{messages}{$midx}{EN} .= '<br>With a later update of the module, this changeover will take place automatically.';
   }
  
-  if ($midx) {
+  if ($midx && !defined $data{$name}{messages}{9999}{RD}) {               # RD = Read-Bit
       my @aidx   = map { $_ } (1..$midx);                                 # größte vorhandene Severity finden
       my @values = map { $data{$name}{messages}{$_}{SV} } @aidx; 
       $max_sv    = max(@values);     
@@ -18196,7 +18201,8 @@ sub outputMessages {
   ## Ausgabe
   ############
   my $out  = qq{<html>};
-  $out    .= qq{<b>}.$hqtxt{msgsys}{$lang}.qq{</b> <br><br>};
+  $out    .= qq{<b>}.$hqtxt{msgsys}{$lang}.qq{</b> <br>};
+  $out    .= qq{<b>Hinweis:</b> Gelesene Mitteilungen werden bis zu einem FHEM Neustart nicht wieder signalisiert, bleiben jedoch bei Relevanz erhalten. <br><br>};
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
   $out    .= qq{<tr style="font-weight:bold;">};
@@ -18211,6 +18217,8 @@ sub outputMessages {
   my $hc = 0;
 
   for my $key (sort keys %{$data{$name}{messages}}) {
+      next if($key == 9999);
+      
       $hc++;
       my $enmsg = encode ("utf8", $data{$name}{messages}{$key}{$lang});
 
