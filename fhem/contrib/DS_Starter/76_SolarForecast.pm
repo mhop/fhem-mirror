@@ -157,6 +157,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.43.7" => "19.01.2025  _listDataPoolCircular: may select a dedicated hour, add temporary Migrate funktion ".
+                           "fix interruptable key check in consumer attr Forum:https://forum.fhem.de/index.php?msg=1331073 ",
   "1.43.6" => "17.01.2025  _calcCaQcomplex: additional write pvrl, pvfc to separate circular hash Array elements, listDataPool: show these Arrays ",
   "1.43.5" => "15.01.2025  _flowGraphic: calculate the resulting SoC as a cluster of batteries ",
   "1.43.4" => "14.01.2025  batsocslidereg: calculate the SoC as summary over all capacities in Wh, bugfix https://forum.fhem.de/index.php?msg=1330559 ",
@@ -632,6 +634,7 @@ my %hget = (                                                                # Ha
   valDecTree         => { fn => \&_getaiDecTree,                needcred => 0 },
   ftuiFramefiles     => { fn => \&_ftuiFramefiles,              needcred => 0 },
   dwdCatalog         => { fn => \&_getdwdCatalog,               needcred => 0 },
+  '.migrate'         => { fn => \&_getmigrate,                  needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -2152,6 +2155,10 @@ sub _setreset {                          ## no critic "not used"
               delete $data{$name}{circular}{$circh}{pvrlsum};
               delete $data{$name}{circular}{$circh}{pvfcsum};
               delete $data{$name}{circular}{$circh}{dnumsum};
+              
+              for my $k (keys %{$data{$name}{circular}{$circh}}) {
+                  delete $data{$name}{circular}{$circh}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
+              }
 
               for my $hid (keys %{$data{$name}{pvhist}}) {
                   delete $data{$name}{pvhist}{$hid}{$circh}{pvcorrf};
@@ -2167,6 +2174,10 @@ sub _setreset {                          ## no critic "not used"
               delete $data{$name}{circular}{$hod}{pvrlsum};
               delete $data{$name}{circular}{$hod}{pvfcsum};
               delete $data{$name}{circular}{$hod}{dnumsum};
+              
+              for my $k (keys %{$data{$name}{circular}{$hod}}) {
+                  delete $data{$name}{circular}{$hod}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
+              }
           }
 
           for my $hid (keys %{$data{$name}{pvhist}}) {
@@ -2432,6 +2443,7 @@ sub Get {
                 );
 
   my @pha  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{pvhist}};
+  my @cla  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{circular}};
   my @vcm  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{consumers}};
   my @vba  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{batteries}};
   my @vin  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{inverters}};
@@ -2440,6 +2452,7 @@ sub Get {
 
   my $hol  = join ",", @ho;
   my $pvl  = join ",", @pha;
+  my $cll  = join ",", @cla;
   my $cml  = join ",", @vcm;
   my $bal  = join ",", @vba;
   my $inl  = join ",", @vin;
@@ -2458,12 +2471,13 @@ sub Get {
                 "ftuiFramefiles:noArg ".
                 "html:$hol ".
                 "nextHours:noArg ".
-                "pvCircular:noArg ".
+                "pvCircular:#,$cll ".
                 "pvHistory:#,exportToCsv,$pvl ".
                 "rooftopData:noArg ".
                 "radiationApiData:noArg ".
                 "statusApiData:noArg ".
                 "valCurrent:noArg ".
+                #".migrate:noArg ".
                 "weatherApiData:noArg "
                 ;
 
@@ -2504,6 +2518,59 @@ sub Get {
   }
 
 return $getlist;
+}
+
+################################################################
+#                      Getter .migrate
+################################################################
+sub _getmigrate {                   ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
+  
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ##########################################################################################################################    
+  my $n = 0;
+  
+  if (!exists $hash->{HELPER}{MIGDONE}) {
+      for my $hh (1..24) {                                            # 18.01.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_* 
+          $hh = sprintf "%02d", $hh;
+          
+          for my $cul (sort keys %{$data{$name}{circular}{$hh}}) {
+              next if($cul ne 'dnumsum');
+              
+              for my $dns (sort keys %{$data{$name}{circular}{$hh}{$cul}}) {
+                  next if($dns eq 'simple');
+                  
+                  my ($sabin, $crang) = split /\./, $dns;
+                  my ($pvsum, $fcsum, $dnum) = CircularSumVal ($hash, $hh, $sabin, $crang, undef);
+                  
+                  delete $data{$name}{circular}{$hh}{pvrlsum}{$dns};
+                  delete $data{$name}{circular}{$hh}{pvfcsum}{$dns};
+                  delete $data{$name}{circular}{$hh}{dnumsum}{$dns};
+                  
+                  next if(!defined $pvsum || !defined $fcsum || !$dnum);
+                  
+                  my $pvavg = sprintf "%.0f", ($pvsum / $dnum);
+                  my $fcavg = sprintf "%.0f", ($fcsum / $dnum);
+                  
+                  push @{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}}, $pvavg;
+                  push @{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}}, $fcavg;
+                  
+                  $n++;
+              }
+          }
+      }
+      
+      if ($n) {
+          Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
+      }
+  
+  }
+  
+  #$hash->{HELPER}{MIGDONE} = 1;
+  
+return "Circular Store was migrated, $n datasets were processed and deleted";
 }
 
 ################################################################
@@ -4582,9 +4649,10 @@ return $ret;
 sub _getlistPVCircular {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $arg   = $paref->{arg};
   my $hash  = $defs{$name};
 
-  my $ret = listDataPool   ($hash, 'circular');
+  my $ret = listDataPool   ($hash, 'circular', $arg);
   $ret   .= lineFromSpaces ($ret, 20);
 
 return $ret;
@@ -5607,13 +5675,19 @@ sub _attrconsumer {                      ## no critic "not used"
       }
 
       if (exists $h->{interruptable}) {                                                            # Check Regex/Hysterese
-          my (undef,undef,$regex,$hyst) = split ":", $h->{interruptable};
+          if ($h->{interruptable} !~ /^[01]$/xs) {
+              my ($dev,$rd,$regex,$hyst) = split ":", $h->{interruptable};
+              
+              if (!$dev || !$rd || !defined $regex) {
+                  return qq{A Device, Reading and Regex must be specified for the 'interruptable' key!};
+              }
 
-          $err = checkRegex ($regex);
-          return "interruptable: $err" if($err);
+              $err = checkRegex ($regex);
+              return "interruptable: $err" if($err);
 
-          if ($hyst && !isNumeric ($hyst)) {
-              return qq{The hysteresis of key "interruptable" must be a numeric value};
+              if ($hyst && !isNumeric ($hyst)) {
+                  return qq{The hysteresis of key "interruptable" must be a numeric value};
+              }
           }
       }
 
@@ -7428,52 +7502,6 @@ sub centralTask {
           $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc});
           $data{$name}{pvhist}{$dy}{$hr}{batsetsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batsetsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batsetsoc});
       }
-  }
-  
-  if (exists $data{$name}{solcastapi}{'?IdPair'}) {                             # 29.11.2024
-      for my $pk (keys %{$data{$name}{solcastapi}{'?IdPair'}}) {                
-          my $apikey = RadiationAPIVal ($hash, '?IdPair', $pk, 'apikey', '');
-          my $rtid   = RadiationAPIVal ($hash, '?IdPair', $pk, 'rtid', '');
-          
-          if ($apikey && $rtid) {
-              $data{$name}{statusapi}{'?IdPair'}{$pk}{rtid}   = $rtid;
-              $data{$name}{statusapi}{'?IdPair'}{$pk}{apikey} = $apikey;
-              
-              delete $data{$name}{solcastapi}{'?IdPair'}{$pk};
-          }
-      }
-      delete $data{$name}{solcastapi}{'?IdPair'};
-  }
-  
-  if (exists $data{$name}{solcastapi}{'?All'}{'?All'}) {                         # 29.11.2024                    
-      my ($rapi, $wapi) = getStatusApiName ($hash); 
-      
-      for my $key (keys %{$data{$name}{solcastapi}{'?All'}{'?All'}}) {         
-          my $val = RadiationAPIVal ($hash, '?All', '?All', $key, '');
-          
-          if ($rapi && $val) {
-              $data{$name}{statusapi}{$rapi}{'?All'}{$key} = $val;
-              delete $data{$name}{solcastapi}{'?All'}{'?All'}{$key};
-          }
-      }
-      
-      delete $data{$name}{solcastapi}{'?All'}{'?All'};
-  }
-  
-  if (keys %{$data{$name}{solcastapi}{'?All'}}) {                               # 29.11.2024
-      for my $idx (keys %{$data{$name}{solcastapi}{'?All'}}) {                   
-          delete $data{$name}{solcastapi}{'?All'}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);
-          delete $data{$name}{solcastapi}{'?All'}{$idx} if($idx eq 'sunrise');
-          delete $data{$name}{solcastapi}{'?All'}{$idx} if($idx eq 'sunset');
-      }
-  }
- 
-  delete $data{$name}{solcastapi}{'?All'} if(!keys %{$data{$name}{solcastapi}{'?All'}});
-  
-  my $vrmcr = RadiationAPIVal ($hash, '?VRM', '?API', 'credentials', '');               # 29.11.2024
-  if ($vrmcr) {
-      $data{$name}{statusapi}{'?VRM'}{'?API'}{credentials} = $vrmcr;
-      delete $data{$name}{solcastapi}{'?VRM'};
   }
   
   ##########################################################################################################################
@@ -11624,11 +11652,6 @@ sub __getCyclesAndRuntime {
 
   my $hash  = $defs{$name};
 
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################
-
-  ##########################################################################################################################
-
   my ($starthour, $startday);
 
   if (isConsumerLogOn ($hash, $c, $pcurr)) {                                                                                             # Verbraucher ist logisch "an"
@@ -12254,6 +12277,7 @@ sub _calcCaQcomplex {
   $paref->{calc}   = 'Complex';
 
   my ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
+  #my ($oldfac, $factor, $dnum) = __calcNewFactor_new ($paref);
 
   delete $paref->{pvrl};
   delete $paref->{pvfc};
@@ -12324,6 +12348,7 @@ sub _calcCaQsimple {
   $paref->{calc}  = 'Simple';
 
   my ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
+  #my ($oldfac, $factor, $dnum) = __calcNewFactor_new ($paref);
 
   delete $paref->{pvrl};
   delete $paref->{pvfc};
@@ -12369,7 +12394,7 @@ sub __calcNewFactor {
   debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> Start calculation correction factor for hour: $h");
 
   my $hh                     = sprintf "%02d", $h;
-  my ($oldfac, $oldq)        = CircularSunCloudkorrVal ($hash, $hh, $sabin, $crang, 0);  # bisher definierter Korrekturfaktor / Qualität
+  my ($oldfac, $oldq)        = CircularSunCloudkorrVal ($hash, $hh, $sabin, $crang, 0);                # bisher definierter Korrekturfaktor / Qualität
   my ($pvhis, $fchis, $dnum) = CircularSumVal          ($hash, $hh, $sabin, $crang, 0);
   $oldfac                    = 1 if(1 * $oldfac == 0);                                            
   
@@ -12403,9 +12428,8 @@ sub __calcNewFactor {
       Log3 ($name, 3, "$name - new $calc correction factor for hour $h calculated: $factor (old: $oldfac)");
   }
 
-  $pvrl = sprintf "%.0f", $pvrl;
-  $pvfc = sprintf "%.0f", $pvfc;
-
+  $pvrl    = sprintf "%.0f", $pvrl;
+  $pvfc    = sprintf "%.0f", $pvfc;
   my $qual = __calcFcQuality ($pvfc, $pvrl);                                                          # Qualität der Vorhersage für die vergangene Stunde
 
   debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
@@ -12413,9 +12437,9 @@ sub __calcNewFactor {
 
   if ($crang ne 'simple') {
       my $idx = $sabin.'.'.$crang;                                                                    # value für pvcorrf Sonne Altitude
-      $data{$name}{circular}{$hh}{pvrlsum}{$idx} = $pvrlsum;                        # PV Erzeugung Summe speichern
-      $data{$name}{circular}{$hh}{pvfcsum}{$idx} = $pvfcsum;                        # PV Prognose Summe speichern
-      $data{$name}{circular}{$hh}{dnumsum}{$idx} = $dnum;                           # Anzahl aller historischen Tade dieser Range
+      $data{$name}{circular}{$hh}{pvrlsum}{$idx} = $pvrlsum;                                          # PV Erzeugung Summe speichern
+      $data{$name}{circular}{$hh}{pvfcsum}{$idx} = $pvfcsum;                                          # PV Prognose Summe speichern
+      $data{$name}{circular}{$hh}{dnumsum}{$idx} = $dnum;                                             # Anzahl aller historischen Tade dieser Range
       $data{$name}{circular}{$hh}{pvcorrf}{$idx} = $factor;
       $data{$name}{circular}{$hh}{quality}{$idx} = $qual;
   }
@@ -12428,6 +12452,101 @@ sub __calcNewFactor {
   }
   
   $oldfac = sprintf "%.2f", $oldfac;
+  
+return ($oldfac, $factor, $dnum);
+}
+
+################################################################
+#    den neuen Korrekturfaktur berechnen (neue Funktion)
+################################################################
+sub __calcNewFactor_new {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $pvrl  = $paref->{pvrl};
+  my $pvfc  = $paref->{pvfc};
+  my $crang = $paref->{crang};
+  my $sabin = $paref->{sabin};
+  my $h     = $paref->{h};
+  my $calc  = $paref->{calc};
+
+  my $hash = $defs{$name};
+  my ($factor, $pvcirc, $fccirc, $pvrlsum, $pvfcsum, $dnum);
+
+  my $hh                = sprintf "%02d", $h;
+  my ($oldfac, $oldqal) = CircularSunCloudkorrVal ($hash, $hh, $sabin, $crang, 0);                        # bisher definierter Korrekturfaktor / Qualität
+  $oldfac               = 1 if(1 * $oldfac == 0);  
+  
+  debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> Start calculation correction factor for hour: $hh");
+  
+  if ($calc eq 'Simple') {
+      ($pvcirc, $fccirc, $dnum) = CircularSumVal ($hash, $hh, $sabin, 'simple', 0);       
+
+      debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read stored values: PVreal sum: $pvcirc, PVforecast sum: $fccirc, days: $dnum");      
+  
+      if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !
+          $dnum++;
+          $pvrlsum = $pvrl + $pvcirc;
+          $pvfcsum = $pvfc + $fccirc;
+          $pvrl    = $pvrlsum / $dnum;
+          $pvfc    = $pvfcsum / $dnum;
+          $factor  = sprintf "%.2f", ($pvrl / $pvfc);                                                     # Faktorberechnung: reale PV / Prognose
+      }
+      elsif ($oldfac && (!$pvcirc || !$fccirc)) {                                                         # Circular Hash liefert einen vorhandenen Korrekturfaktor aber keine gespeicherten PV-Werte
+          $dnum   = 1;
+          $factor = sprintf "%.2f", ($pvrl / $pvfc);
+          $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
+      }
+      else {                                                                                              # ganz neuer Wert
+          $dnum   = 1;
+          $factor = sprintf "%.2f", ($pvrl / $pvfc);
+      }
+  }
+  else {
+     $pvrl = sprintf "%.0f", medianArray (\@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});     # neuen Median berechnen
+     $pvfc = sprintf "%.0f", medianArray (\@{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}});     # neuen Median berechnen
+     
+     $dnum   = scalar (@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});
+     $factor = sprintf "%.2f", ($pvrl / $pvfc);  
+
+     debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read stored values: PVreal median: $pvrl, PVforecast median: $pvfc, days: $dnum");     
+  }
+
+  $factor = 1.00 if(1 * $factor == 0);                                                                    # 0.00-Werte ignorieren (Schleifengefahr)
+
+  ## max. Faktorsteigerung berücksichtigen
+  ##########################################
+  if (abs($factor - $oldfac) > $defmaxvar) {
+      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $defmaxvar : $oldfac - $defmaxvar);
+      Log3 ($name, 3, "$name - new $calc correction factor calculated (limited by maximum Day Variance): $factor (old: $oldfac) for hour: $hh");
+  }
+  else {
+      Log3 ($name, 3, "$name - new $calc correction factor for hour $hh calculated: $factor (old: $oldfac)");
+  }
+
+  ## Qualität berechnen
+  #######################
+  $oldfac  = sprintf "%.2f", $oldfac;
+  $pvrl    = sprintf "%.0f", $pvrl;
+  $pvfc    = sprintf "%.0f", $pvfc;
+  my $qual = __calcFcQuality ($pvfc, $pvrl);                                                             # Qualität der Vorhersage für die vergangene Stunde
+
+  debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
+  debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual, days: $dnum");
+
+  ## neue Werte speichern
+  #########################
+  if ($calc eq 'Simple') {
+      $data{$name}{circular}{$hh}{pvrlsum}{'simple'} = $pvrlsum;
+      $data{$name}{circular}{$hh}{pvfcsum}{'simple'} = $pvfcsum;
+      $data{$name}{circular}{$hh}{dnumsum}{'simple'} = $dnum;
+      $data{$name}{circular}{$hh}{pvcorrf}{'simple'} = $factor;
+      $data{$name}{circular}{$hh}{quality}{'simple'} = $qual;
+  }
+  else {                                                                                                
+      my $idx                                    = $sabin.'.'.$crang;
+      $data{$name}{circular}{$hh}{pvcorrf}{$idx} = $factor;
+      $data{$name}{circular}{$hh}{quality}{$idx} = $qual;
+  }
   
 return ($oldfac, $factor, $dnum);
 }
@@ -13090,11 +13209,6 @@ sub _checkSetupNotComplete {
 
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
-
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################
-
-  ##########################################################################################
 
   my $strings = AttrVal     ($name, 'setupInverterStrings',   undef);                       # String Konfig
   my $wedev   = AttrVal     ($name, 'setupWeatherDev1',       undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
@@ -17429,175 +17543,7 @@ sub listDataPool {
   }
 
   if ($htol eq "circular") {
-      $h = $data{$name}{circular};
-      if (!keys %{$h}) {
-          return qq{Circular cache is empty.};
-      }
- 
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################
-    delete $data{$name}{circular}{'01'}{pvrl_5};
-    delete $data{$name}{circular}{'01'}{pvrl_10};
-    delete $data{$name}{circular}{'01'}{pvrl_25};
-    delete $data{$name}{circular}{'01'}{pvrl_60};
-    delete $data{$name}{circular}{'01'}{pvrl_65};
-    delete $data{$name}{circular}{'01'}{pvrl_90};
-
-    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4561;
-    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4562;
-    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4563;
-    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4564;
-    #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4565;
-    #
-    #push @{$data{$name}{circular}{'01'}{pvrl_65}{60}}, 3561;
-    #push @{$data{$name}{circular}{'01'}{pvrl_65}{60}}, 3562;
-    #
-    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4561;
-    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4562;
-    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4563;
-    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4564;
-    #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4565;
-
-    #push @{$data{$name}{circular}{'01'}{pvrl_90}{60}}, 3561;
-    #push @{$data{$name}{circular}{'01'}{pvrl_90}{60}}, 3562;
-
-############################################################################################################
-
-      for my $idx (sort keys %{$h}) {
-          my $pvrl     = CircularVal ($hash, $idx, 'pvrl',                '-');
-          my $pvfc     = CircularVal ($hash, $idx, 'pvfc',                '-');
-          my $pvrlsum  = CircularVal ($hash, $idx, 'pvrlsum',             '-');
-          my $pvfcsum  = CircularVal ($hash, $idx, 'pvfcsum',             '-');
-          my $dnumsum  = CircularVal ($hash, $idx, 'dnumsum',             '-');
-          my $pvaifc   = CircularVal ($hash, $idx, 'pvaifc',              '-');
-          my $pvapifc  = CircularVal ($hash, $idx, 'pvapifc',             '-');
-          my $aihit    = CircularVal ($hash, $idx, 'aihit',               '-');
-          my $confc    = CircularVal ($hash, $idx, 'confc',               '-');
-          my $gcons    = CircularVal ($hash, $idx, 'gcons',               '-');
-          my $gfeedin  = CircularVal ($hash, $idx, 'gfeedin',             '-');
-          my $wid      = CircularVal ($hash, $idx, 'weatherid',           '-');
-          my $wtxt     = CircularVal ($hash, $idx, 'weathertxt',          '-');
-          my $wccv     = CircularVal ($hash, $idx, 'wcc',                 '-');
-          my $rr1c     = CircularVal ($hash, $idx, 'rr1c',                '-');
-          my $temp     = CircularVal ($hash, $idx, 'temp',                '-');
-          my $pvcorrf  = CircularVal ($hash, $idx, 'pvcorrf',             '-');
-          my $quality  = CircularVal ($hash, $idx, 'quality',             '-');
-          my $tdayDvtn = CircularVal ($hash, $idx, 'tdayDvtn',            '-');
-          my $ydayDvtn = CircularVal ($hash, $idx, 'ydayDvtn',            '-');
-          my $fitot    = CircularVal ($hash, $idx, 'feedintotal',         '-');
-          my $idfi     = CircularVal ($hash, $idx, 'initdayfeedin',       '-');
-          my $gcontot  = CircularVal ($hash, $idx, 'gridcontotal',        '-');
-          my $idgcon   = CircularVal ($hash, $idx, 'initdaygcon',         '-');
-          my $rtaitr   = CircularVal ($hash, $idx, 'runTimeTrainAI',      '-');
-          my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
-          my $airn     = CircularVal ($hash, $idx, 'aiRulesNumber',       '-');
-          my $aicts    = CircularVal ($hash, $idx, 'attrInvChangedTs',    '-');
-
-          my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
-          my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
-          my $pvrs = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvrlsum', cval => $pvrlsum} );
-          my $pvfs = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvfcsum', cval => $pvfcsum} );
-          my $dnus = _ldchash2val ( {pool => $h, idx => $idx, key => 'dnumsum', cval => $dnumsum} );
-
-          $sq .= "\n" if($sq);
-
-          if ($idx != 99) {
-              my $prdl;
-              for my $pn (1..$maxproducer) {                                              # alle Producer
-                  $pn       = sprintf "%02d", $pn;
-                  my $pprl  = CircularVal ($hash, $idx, 'pprl'.$pn, '-'); 
-                  $prdl    .= ', ' if($prdl);
-                  $prdl    .= "pprl${pn}: $pprl";
-              }
-              
-              my ($bin, $bout);
-              for my $bn (1..$maxbatteries) {                                            # alle Batterien
-                  $bn = sprintf "%02d", $bn;
-                  my $batin  = CircularVal ($hash, $idx, 'batin'. $bn, '-');
-                  my $batout = CircularVal ($hash, $idx, 'batout'.$bn, '-');
-                  $bin      .= ', ' if($bin);
-                  $bin      .= "batin${bn}: $batin";
-                  $bout     .= ', ' if($bout);
-                  $bout     .= "batout${bn}: $batout";
-              }
-              
-                my ($pvrlnew, $pvfcnew);
-                my @pvrlkeys = map { $_ =~ /^pvrl_/xs ? $_ : '' } sort keys %{$h->{$idx}}; 
-                my @pvfckeys = map { $_ =~ /^pvfc_/xs ? $_ : '' } sort keys %{$h->{$idx}};                  
-
-                for my $prl (@pvrlkeys) {
-                    next if(!$prl);
-                    my $lref = CircularVal ($hash, $idx, $prl, ''); 
-                    next if(!$lref);                  
-                    
-                    $pvrlnew .= "\n      " if($pvrlnew);
-                    $pvrlnew .= _ldchash2val ( { pool => $h, idx => $idx, key => $prl, cval => $lref } );
-                }
-                
-                for my $pfc (@pvfckeys) {
-                    next if(!$pfc);
-                    my $cref = CircularVal ($hash, $idx, $pfc, ''); 
-                    next if(!$cref);                  
-                    
-                    $pvfcnew .= "\n      " if($pvfcnew);
-                    $pvfcnew .= _ldchash2val ( { pool => $h, idx => $idx, key => $pfc, cval => $cref } );
-                }
-              
-              $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl";
-              $sq .= "\n      $bin";
-              $sq .= "\n      $bout";
-              $sq .= "\n      confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c";
-              $sq .= "\n      temp: $temp, wid: $wid, wtxt: $wtxt";
-              $sq .= "\n      $prdl";
-              $sq .= "\n      pvcorrf: $pvcf";
-              $sq .= "\n      quality: $cfq";
-              $sq .= "\n      pvrlsum: $pvrs";
-              $sq .= "\n      pvfcsum: $pvfs";
-              $sq .= "\n      dnumsum: $dnus";
-              $sq .= "\n      $pvrlnew" if($pvrlnew);
-              $sq .= "\n      $pvfcnew" if($pvfcnew);
-          }
-          else {
-              my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7);
-              for my $bn (1..$maxbatteries) {                                            # + alle Batterien
-                  $bn = sprintf "%02d", $bn;
-                  my $idbintot = CircularVal ($hash, $idx, 'initdaybatintot'. $bn, '-');
-                  my $idboutot = CircularVal ($hash, $idx, 'initdaybatouttot'.$bn, '-');
-                  my $bintot   = CircularVal ($hash, $idx, 'batintot'.        $bn, '-');
-                  my $boutot   = CircularVal ($hash, $idx, 'batouttot'.       $bn, '-');
-                  my $lstmsr   = CircularVal ($hash, $idx, 'lastTsMaxSocRchd'.$bn, '-');
-                  my $ntsmsc   = CircularVal ($hash, $idx, 'nextTsMaxSocChge'.$bn, '-');
-                  my $dtocare  = CircularVal ($hash, $idx, 'days2care'.       $bn, '-');
-                  $batvl1     .= ', ' if($batvl1);
-                  $batvl1     .= "initdaybatintot${bn}: $idbintot";
-                  $batvl2     .= ', ' if($batvl2);
-                  $batvl2     .= "initdaybatouttot${bn}: $idboutot";
-                  $batvl3     .= ', ' if($batvl3);
-                  $batvl3     .= "batintot${bn}: $bintot";
-                  $batvl4     .= ', ' if($batvl4);
-                  $batvl4     .= "batouttot${bn}: $boutot";
-                  $batvl5     .= ', ' if($batvl5);
-                  $batvl5     .= "lastTsMaxSocRchd${bn}: $lstmsr";
-                  $batvl6     .= ', ' if($batvl6);
-                  $batvl6     .= "nextTsMaxSocChge${bn}: $ntsmsc";
-                  $batvl7     .= ', ' if($batvl7);
-                  $batvl7     .= "days2care${bn}: $dtocare";
-              }
-              
-              $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn \n";
-              $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi \n";
-              $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon \n";
-              $sq .= "      $batvl1\n";
-              $sq .= "      $batvl2\n";
-              $sq .= "      $batvl3\n";
-              $sq .= "      $batvl4\n";
-              $sq .= "      $batvl5\n";
-              $sq .= "      $batvl6\n";
-              $sq .= "      $batvl7\n";
-              $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, aiRulesNumber: $airn \n";
-              $sq .= "      attrInvChangedTs: $aicts \n";
-          }
-      }
+      $sq = _listDataPoolCircular ($hash, $par);
   }
 
   if ($htol eq "nexthours") {
@@ -17810,6 +17756,192 @@ return $sq;
 }
 
 ################################################################
+#            Listing des Circular Speichers
+################################################################
+sub _listDataPoolCircular {
+  my $hash = shift;
+  my $par  = shift // q{};
+
+  my $name = $hash->{NAME};
+  my $h    = $data{$name}{circular};
+  
+  if (!keys %{$h}) {
+      return qq{Circular cache is empty.};
+  }
+  
+  my $sq;
+
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ##########################################################################################################################
+  delete $data{$name}{circular}{'01'}{pvrl_5};
+  delete $data{$name}{circular}{'01'}{pvrl_10};
+  delete $data{$name}{circular}{'01'}{pvrl_25};
+  delete $data{$name}{circular}{'01'}{pvrl_60};
+  delete $data{$name}{circular}{'01'}{pvrl_65};
+  delete $data{$name}{circular}{'01'}{pvrl_90};
+
+  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4561;
+  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4562;
+  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4563;
+  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4564;
+  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4565;
+  #
+  #push @{$data{$name}{circular}{'01'}{pvrl_65}{60}}, 3561;
+  #push @{$data{$name}{circular}{'01'}{pvrl_65}{60}}, 3562;
+  #
+  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4561;
+  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4562;
+  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4563;
+  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4564;
+  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4565;
+
+  #push @{$data{$name}{circular}{'01'}{pvrl_90}{60}}, 3561;
+  #push @{$data{$name}{circular}{'01'}{pvrl_90}{60}}, 3562;
+
+  ############################################################################################################
+
+  for my $idx (sort keys %{$h}) {
+      next if($par && $idx ne $par);
+      
+      my $pvrl     = CircularVal ($hash, $idx, 'pvrl',                '-');
+      my $pvfc     = CircularVal ($hash, $idx, 'pvfc',                '-');
+      my $pvrlsum  = CircularVal ($hash, $idx, 'pvrlsum',             '-');
+      my $pvfcsum  = CircularVal ($hash, $idx, 'pvfcsum',             '-');
+      my $dnumsum  = CircularVal ($hash, $idx, 'dnumsum',             '-');
+      my $pvaifc   = CircularVal ($hash, $idx, 'pvaifc',              '-');
+      my $pvapifc  = CircularVal ($hash, $idx, 'pvapifc',             '-');
+      my $aihit    = CircularVal ($hash, $idx, 'aihit',               '-');
+      my $confc    = CircularVal ($hash, $idx, 'confc',               '-');
+      my $gcons    = CircularVal ($hash, $idx, 'gcons',               '-');
+      my $gfeedin  = CircularVal ($hash, $idx, 'gfeedin',             '-');
+      my $wid      = CircularVal ($hash, $idx, 'weatherid',           '-');
+      my $wtxt     = CircularVal ($hash, $idx, 'weathertxt',          '-');
+      my $wccv     = CircularVal ($hash, $idx, 'wcc',                 '-');
+      my $rr1c     = CircularVal ($hash, $idx, 'rr1c',                '-');
+      my $temp     = CircularVal ($hash, $idx, 'temp',                '-');
+      my $pvcorrf  = CircularVal ($hash, $idx, 'pvcorrf',             '-');
+      my $quality  = CircularVal ($hash, $idx, 'quality',             '-');
+      my $tdayDvtn = CircularVal ($hash, $idx, 'tdayDvtn',            '-');
+      my $ydayDvtn = CircularVal ($hash, $idx, 'ydayDvtn',            '-');
+      my $fitot    = CircularVal ($hash, $idx, 'feedintotal',         '-');
+      my $idfi     = CircularVal ($hash, $idx, 'initdayfeedin',       '-');
+      my $gcontot  = CircularVal ($hash, $idx, 'gridcontotal',        '-');
+      my $idgcon   = CircularVal ($hash, $idx, 'initdaygcon',         '-');
+      my $rtaitr   = CircularVal ($hash, $idx, 'runTimeTrainAI',      '-');
+      my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
+      my $airn     = CircularVal ($hash, $idx, 'aiRulesNumber',       '-');
+      my $aicts    = CircularVal ($hash, $idx, 'attrInvChangedTs',    '-');
+
+      my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
+      my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
+      my $pvrs = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvrlsum', cval => $pvrlsum} );
+      my $pvfs = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvfcsum', cval => $pvfcsum} );
+      my $dnus = _ldchash2val ( {pool => $h, idx => $idx, key => 'dnumsum', cval => $dnumsum} );
+
+      $sq .= "\n" if($sq);
+
+      if ($idx != 99) {
+          my $prdl;
+          for my $pn (1..$maxproducer) {                                              # alle Producer
+              $pn       = sprintf "%02d", $pn;
+              my $pprl  = CircularVal ($hash, $idx, 'pprl'.$pn, '-'); 
+              $prdl    .= ', ' if($prdl);
+              $prdl    .= "pprl${pn}: $pprl";
+          }
+          
+          my ($bin, $bout);
+          for my $bn (1..$maxbatteries) {                                            # alle Batterien
+              $bn = sprintf "%02d", $bn;
+              my $batin  = CircularVal ($hash, $idx, 'batin'. $bn, '-');
+              my $batout = CircularVal ($hash, $idx, 'batout'.$bn, '-');
+              $bin      .= ', ' if($bin);
+              $bin      .= "batin${bn}: $batin";
+              $bout     .= ', ' if($bout);
+              $bout     .= "batout${bn}: $batout";
+          }
+          
+            my ($pvrlnew, $pvfcnew);
+            my @pvrlkeys = map { $_ =~ /^pvrl_/xs ? $_ : '' } sort keys %{$h->{$idx}}; 
+            my @pvfckeys = map { $_ =~ /^pvfc_/xs ? $_ : '' } sort keys %{$h->{$idx}};                  
+
+            for my $prl (@pvrlkeys) {
+                next if(!$prl);
+                my $lref = CircularVal ($hash, $idx, $prl, ''); 
+                next if(!$lref);                  
+                
+                $pvrlnew .= "\n      " if($pvrlnew);
+                $pvrlnew .= _ldchash2val ( { pool => $h, idx => $idx, key => $prl, cval => $lref } );
+            }
+            
+            for my $pfc (@pvfckeys) {
+                next if(!$pfc);
+                my $cref = CircularVal ($hash, $idx, $pfc, ''); 
+                next if(!$cref);                  
+                
+                $pvfcnew .= "\n      " if($pvfcnew);
+                $pvfcnew .= _ldchash2val ( { pool => $h, idx => $idx, key => $pfc, cval => $cref } );
+            }
+          
+          $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl";
+          $sq .= "\n      $bin";
+          $sq .= "\n      $bout";
+          $sq .= "\n      confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c";
+          $sq .= "\n      temp: $temp, wid: $wid, wtxt: $wtxt";
+          $sq .= "\n      $prdl";
+          $sq .= "\n      pvcorrf: $pvcf";
+          $sq .= "\n      quality: $cfq";
+          $sq .= "\n      pvrlsum: $pvrs";
+          $sq .= "\n      pvfcsum: $pvfs";
+          $sq .= "\n      dnumsum: $dnus";
+          $sq .= "\n      $pvrlnew" if($pvrlnew);
+          $sq .= "\n      $pvfcnew" if($pvfcnew);
+      }
+      else {
+          my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7);
+          for my $bn (1..$maxbatteries) {                                            # + alle Batterien
+              $bn = sprintf "%02d", $bn;
+              my $idbintot = CircularVal ($hash, $idx, 'initdaybatintot'. $bn, '-');
+              my $idboutot = CircularVal ($hash, $idx, 'initdaybatouttot'.$bn, '-');
+              my $bintot   = CircularVal ($hash, $idx, 'batintot'.        $bn, '-');
+              my $boutot   = CircularVal ($hash, $idx, 'batouttot'.       $bn, '-');
+              my $lstmsr   = CircularVal ($hash, $idx, 'lastTsMaxSocRchd'.$bn, '-');
+              my $ntsmsc   = CircularVal ($hash, $idx, 'nextTsMaxSocChge'.$bn, '-');
+              my $dtocare  = CircularVal ($hash, $idx, 'days2care'.       $bn, '-');
+              $batvl1     .= ', ' if($batvl1);
+              $batvl1     .= "initdaybatintot${bn}: $idbintot";
+              $batvl2     .= ', ' if($batvl2);
+              $batvl2     .= "initdaybatouttot${bn}: $idboutot";
+              $batvl3     .= ', ' if($batvl3);
+              $batvl3     .= "batintot${bn}: $bintot";
+              $batvl4     .= ', ' if($batvl4);
+              $batvl4     .= "batouttot${bn}: $boutot";
+              $batvl5     .= ', ' if($batvl5);
+              $batvl5     .= "lastTsMaxSocRchd${bn}: $lstmsr";
+              $batvl6     .= ', ' if($batvl6);
+              $batvl6     .= "nextTsMaxSocChge${bn}: $ntsmsc";
+              $batvl7     .= ', ' if($batvl7);
+              $batvl7     .= "days2care${bn}: $dtocare";
+          }
+          
+          $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn \n";
+          $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi \n";
+          $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon \n";
+          $sq .= "      $batvl1\n";
+          $sq .= "      $batvl2\n";
+          $sq .= "      $batvl3\n";
+          $sq .= "      $batvl4\n";
+          $sq .= "      $batvl5\n";
+          $sq .= "      $batvl6\n";
+          $sq .= "      $batvl7\n";
+          $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, aiRulesNumber: $airn \n";
+          $sq .= "      attrInvChangedTs: $aicts \n";
+      }
+  }
+
+return $sq;
+}
+
+################################################################
 #  Hashwert aus CircularVal in formatierten String umwandeln
 ################################################################
 sub _ldchash2val {
@@ -17830,17 +17962,23 @@ sub _ldchash2val {
           
           if (ref $pool->{$idx}{$key}{$f} eq 'ARRAY') {
               my @sub_arrays = arraySplitBy (20, @{$pool->{$idx}{$key}{$f}});              # Array in Teil-Arrays zu je 20 Elemente aufteilen
+              my $ln0        = length $key;
+              my $blk0       = '&nbsp;' x 17;
+              my $blkadd0    = '&nbsp;' x (7 - ($ln0 > 7 ? 0 : $ln0));
+              
+              my $ln1        = length $f;
+              my $blkadd1    = '&nbsp;' x (3 - ($ln1 > 3 ? 0 : $ln1));
               
               for my $suaref (@sub_arrays) {                                               # für jedes Teil-Array Join ausführen
                   my $suajoined = join ' ', @{$suaref};
                   
                   if (!$ret) {
-                      $ret .= $key.' => ';
-                      $ret .= $f.' @ '.$suajoined;   
+                      $ret .= $key.$blkadd0.' => ';
+                      $ret .= $f.$blkadd1.' @ '.$suajoined;   
                   }
                   else {
-                      $ret .= "\n                 ";
-                      $ret .= $f.' @ '.$suajoined;
+                      $ret .= "\n".$blk0;
+                      $ret .= $f.$blkadd1.' @ '.$suajoined;
                   }
               }
           }
@@ -20020,7 +20158,7 @@ return $ps;
 sub checkRegex {
   my $regexp = shift;
   
-  return 'no Regex is provided' if(!$regexp);
+  return 'no Regex is provided' if(!defined $regexp);
 
   eval { "Hallo" =~ m/^$regexp$/;
          1;
@@ -21971,13 +22109,13 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-get-pvCircular"></a>
       <li><b>pvCircular </b> <br><br>
-      Lists the existing values in the ring buffer.
+      Lists the stored data for the selected hour or all existing values in the ring buffer. <br>
       The hours 01 - 24 refer to the hour of the day, e.g. the hour 09 refers to the time from
       08 - 09 o'clock. <br>
       Hour 99 has a special function. <br>
       The values of the keys pvcorrf, quality, pvrlsum, pvfcsum and dnumsum are coded in the form
-      &lt;range sun elevation&gt;.&lt;cloud cover range&gt;. <br>
-      Explanation of the values: <br><br>
+      &lt;range sun elevation&gt;.&lt;cloud cover range&gt;. 
+      <br><br>
 
       <ul>
          <table>
@@ -24444,13 +24582,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-pvCircular"></a>
       <li><b>pvCircular </b> <br><br>
-      Listet die vorhandenen Werte im Ringspeicher auf.
+      Listet die gespeicherten Daten der ausgewählten Stunde oder alle vorhandenen Werte im Ringspeicher auf. <br>
       Die Stundenangaben 01 - 24 beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von
       08 - 09 Uhr. <br>
       Die Stunde 99 hat eine Sonderfunktion. <br>
       Die Werte der Schlüssel pvcorrf, quality, pvrlsum, pvfcsum und dnumsum sind in der Form
-      &lt;Bereich Sonnenstand Höhe&gt;.&lt;Bewölkungsbereich&gt; kodiert. <br>
-      Erläuterung der Werte: <br><br>
+      &lt;Bereich Sonnenstand Höhe&gt;.&lt;Bewölkungsbereich&gt; kodiert. 
+      <br><br>
 
       <ul>
          <table>
