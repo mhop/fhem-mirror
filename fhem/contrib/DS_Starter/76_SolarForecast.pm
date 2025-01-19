@@ -157,8 +157,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.43.7" => "19.01.2025  _listDataPoolCircular: may select a dedicated hour, add temporary Migrate funktion ".
-                           "fix interruptable key check in consumer attr Forum:https://forum.fhem.de/index.php?msg=1331073 ",
+  "1.44.0" => "19.01.2025  _listDataPoolCircular: may select a dedicated hour, add temporary Migrate funktion x_migrate ".
+                           "fix interruptable key check in consumer attr Forum:https://forum.fhem.de/index.php?msg=1331073 ".
+                           "set prdef to 1.0, Implementation of a Messaging System ", 
   "1.43.6" => "17.01.2025  _calcCaQcomplex: additional write pvrl, pvfc to separate circular hash Array elements, listDataPool: show these Arrays ",
   "1.43.5" => "15.01.2025  _flowGraphic: calculate the resulting SoC as a cluster of batteries ",
   "1.43.4" => "14.01.2025  batsocslidereg: calculate the SoC as summary over all capacities in Wh, bugfix https://forum.fhem.de/index.php?msg=1330559 ",
@@ -432,7 +433,7 @@ my $ometmaxreq     = 9700;                                                      
 my $leadtime       = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
 my $lagtime        = 1800;                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
 
-my $prdef          = 0.85;                                                          # default Performance Ratio (PR)
+my $prdef          = 1.0;                                                           # default Performance Ratio (PR)
 my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
 my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
 my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
@@ -573,8 +574,16 @@ for my $pn (1..$maxproducer) {
 
 my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
 
-# Steuerhashes
-################
+## Steuerhashes
+#########################
+
+my %msgs    = ();                                                             # Initialisierung Mitteilungssystem
+my %svicons = (                                                               # Schweregrad Icons Mitteilungssystem                                                            
+  '0' => 'message_mail@grey',                                                 # Standard Mitteilungs-Icon 0 - keine Mitteilung
+  '1' => 'message_postbox_mail@darkorange',                                   # Standard Mitteilungs-Icon 1 - Mitteilung
+  '2' => 'message_attention@darkorange',                                      # Standard Mitteilungs-Icon 2 - Warnung
+  '3' => 'message_attention@red',                                             # Standard Mitteilungs-Icon 3 - Fehler / Problem
+);
 
 my %hset = (                                                                # Hash der Set-Funktion
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
@@ -634,7 +643,8 @@ my %hget = (                                                                # Ha
   valDecTree         => { fn => \&_getaiDecTree,                needcred => 0 },
   ftuiFramefiles     => { fn => \&_ftuiFramefiles,              needcred => 0 },
   dwdCatalog         => { fn => \&_getdwdCatalog,               needcred => 0 },
-  '.migrate'         => { fn => \&_getmigrate,                  needcred => 0 },
+  outputMessages     => { fn => \&_getoutputMessages,           needcred => 0 },
+  x_migrate          => { fn => \&_getmigrate,                  needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -792,6 +802,14 @@ my %hqtxt = (                                                                # H
               DE => qq{Verbrauch}                                                                                           },
   tday   => { EN => qq{today},
               DE => qq{heute}                                                                                               },
+  simsg  => { EN => qq{Message},
+              DE => qq{Mitteilung}                                                                                          },
+  msgsys => { EN => qq{Messaging system},
+              DE => qq{Mitteilungssystem}                                                                                   },
+  msgimp => { EN => qq{Importance},
+              DE => qq{Wichtigkeit}                                                                                         },
+  number => { EN => qq{Number},
+              DE => qq{Nummer}                                                                                              },
   ctnsly => { EN => qq{continuously},
               DE => qq{fortlaufend}                                                                                         },
   yday   => { EN => qq{yesterday},
@@ -941,6 +959,10 @@ my %htitles = (                                                                 
                 DE => qq{&#214;ffne das SolarForecast Forum}                                                       },
   opwiki   => { EN => qq{Open the Wiki (German language)},
                 DE => qq{&#214;ffne das Wiki}                                                                      },
+  outpmsg  => { EN => qq{Messages are available - press the button to open them},
+                DE => qq{Mitteilungen sind vorhanden - dr&#252;cke die Taste um sie zu &#214;ffnen}                },
+  nomsgfo  => { EN => qq{there is no message available},
+                DE => qq{es ist keine Mitteilung vorhanden}                                                        },
   scaresps => { EN => qq{API request successful},
                 DE => qq{API Abfrage erfolgreich}                                                                  },
   dwfcrsu  => { EN => qq{Weather data are up to date according to used DWD model},
@@ -1169,8 +1191,8 @@ my %hcsr = (                                                                    
 
 # Funktiontemplate zur Speicherung von Werten in pvHistory
 # storname = Name des Elements in der pvHistory
-# nhour = evtl. abweichend von $nhour
-# fpar = Parameter zur spezifischen Verwendung
+# nhour    = evtl. abweichend von $nhour
+# fpar     = Parameter zur spezifischen Verwendung
 my %hfspvh = (
   radiation         => { fn => \&_storeVal, storname => 'rad1h',        validkey => undef,    fpar => undef    },    # irradiation
   DoN               => { fn => \&_storeVal, storname => 'DoN',          validkey => undef,    fpar => undef    },    # Tag 1 oder Nacht 0
@@ -1902,7 +1924,7 @@ return;
 }
 
 ################################################################
-#                      Setter plantConfiguration
+#      Setter / (verborgener) Getter plantConfiguration
 ################################################################
 sub _setplantConfiguration {             ## no critic "not used"
   my $paref = shift;
@@ -2477,9 +2499,12 @@ sub Get {
                 "radiationApiData:noArg ".
                 "statusApiData:noArg ".
                 "valCurrent:noArg ".
-                #".migrate:noArg ".
                 "weatherApiData:noArg "
                 ;
+                
+  if (!ReadingsVal ($name, '.migrated', 0)) {
+      $getlist .= "x_migrate:noArg ";
+  }
 
   ## KI spezifische Getter
   ##########################
@@ -2521,7 +2546,7 @@ return $getlist;
 }
 
 ################################################################
-#                      Getter .migrate
+#                      Getter x_migrate
 ################################################################
 sub _getmigrate {                   ## no critic "not used"
   my $paref = shift;
@@ -2532,8 +2557,8 @@ sub _getmigrate {                   ## no critic "not used"
   ##########################################################################################################################    
   my $n = 0;
   
-  if (!exists $hash->{HELPER}{MIGDONE}) {
-      for my $hh (1..24) {                                            # 18.01.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_* 
+  if (!ReadingsVal ($name, '.migrated', 0)) {
+      for my $hh (1..24) {                                            # 19.01.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_* 
           $hh = sprintf "%02d", $hh;
           
           for my $cul (sort keys %{$data{$name}{circular}{$hh}}) {
@@ -2568,9 +2593,9 @@ sub _getmigrate {                   ## no critic "not used"
   
   }
   
-  #$hash->{HELPER}{MIGDONE} = 1;
+  readingsSingleUpdate ($hash, '.migrated', 1, 0);
   
-return "Circular Store was migrated, $n datasets were processed and deleted";
+return "Circular Store was migrated, $n datasets were migrated";
 }
 
 ################################################################
@@ -4420,15 +4445,15 @@ sub __openMeteoDWD_ApiResponse {
               next;                                                                             # Daten älter als akt. Tag 00:00:00 verwerfen
           }
 
-          my $rad1wh  = $jdata->{hourly}{global_tilted_irradiance}[$k];                         # Wh/m2
-          my $rad     = 10 * (sprintf "%.0f", ($rad1wh * $WhtokJ) / 10);                        # Umrechnung Wh/m2 in kJ/m2 ->
-          my $pv      = sprintf "%.2f", int ($rad1wh / 1000 * $peak * $prdef);                  # Rad wird in kWh/m2 erwartet
+          my $rad1wh = $jdata->{hourly}{global_tilted_irradiance}[$k];                          # Wh/m2
+          my $rad    = 10 * (sprintf "%.0f", ($rad1wh * $WhtokJ) / 10);                         # Umrechnung Wh/m2 in kJ/m2 ->
+          my $pv     = sprintf "%.2f", int ($rad1wh / 1000 * $peak * $prdef);                   # Rad wird in kWh/m2 erwartet
           
-          my $don     = $jdata->{hourly}{is_day}[$k];
-          my $temp    = $jdata->{hourly}{temperature_2m}[$k];
-          my $rain    = $jdata->{hourly}{rain}[$k];                                             # Regen in Millimeter = kg/m2
-          my $wid     = ($don ? 0 : 100) + $jdata->{hourly}{weather_code}[$k];
-          my $wcc     = $jdata->{hourly}{cloud_cover}[$k];
+          my $don    = $jdata->{hourly}{is_day}[$k];
+          my $temp   = $jdata->{hourly}{temperature_2m}[$k];
+          my $rain   = $jdata->{hourly}{rain}[$k];                                              # Regen in Millimeter = kg/m2
+          my $wid    = ($don ? 0 : 100) + $jdata->{hourly}{weather_code}[$k];
+          my $wcc    = $jdata->{hourly}{cloud_cover}[$k];
 
           if ($k == 0 && $curwid) { $curwid = ($don ? 0 : 100) +  $curwid }
 
@@ -4625,6 +4650,44 @@ sub _getftui {
 return pageAsHtml ($name, 'ftui', $arg);
 }
 
+################################################################
+#          verborgener Getter outputMessages
+################################################################
+sub _getoutputMessages {             ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
+
+  my $out = outputMessages ($paref);
+  $out    = qq{<html>$out</html>};
+
+  ## asynchrone Ausgabe
+  #######################
+  #$err          = getClHash($hash);
+  #$paref->{out} = $out;
+  #InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::__plantCfgAsynchOut", $paref, 0);
+
+return $out;
+}
+
+###############################################################
+#                       Getter pvQualities
+###############################################################
+sub _getForecastQualities {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $arg   = $paref->{arg} // q{};
+  my $hash  = $defs{$name};
+
+  my $ret   = listDataPool ($hash, 'qualities');
+
+  if ($arg eq 'imgget') {                                # Ausgabe aus dem Grafikheader Qualitätsicon
+      $ret =~ s/\n/<br>/g;
+  }
+
+return $ret;
+}
+
 ###############################################################
 #                       Getter pvHistory
 ###############################################################
@@ -4668,24 +4731,6 @@ sub _getlistNextHours {
 
   my $ret = listDataPool   ($hash, 'nexthours');
   $ret   .= lineFromSpaces ($ret, 20);
-
-return $ret;
-}
-
-###############################################################
-#                       Getter pvQualities
-###############################################################
-sub _getForecastQualities {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $arg   = $paref->{arg} // q{};
-  my $hash  = $defs{$name};
-
-  my $ret   = listDataPool ($hash, 'qualities');
-
-  if ($arg eq 'imgget') {                                # Ausgabe aus dem Grafikheader Qualitätsicon
-      $ret =~ s/\n/<br>/g;
-  }
 
 return $ret;
 }
@@ -7525,7 +7570,7 @@ sub centralTask {
   }
   
   $data{$name}{current}{ctrunning} = 1;                                                        # Central Task running Statusbit
-  InternalTimer (gettimeofday() + 1.2, "FHEM::SolarForecast::releaseCentralTask", $hash, 0);   # Freigabe centralTask
+  InternalTimer (gettimeofday() + 2.0, "FHEM::SolarForecast::releaseCentralTask", $hash, 0);   # Freigabe centralTask
 
   my $t       = time;                                                                          # aktuelle Unix-Zeit
   my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
@@ -7743,7 +7788,6 @@ return $az;
 sub _getMoonPhase {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $t     = $paref->{t};                                          # Epoche Zeit
 
   my $moonphasei;
@@ -7768,8 +7812,6 @@ return;
 sub _collectAllRegConsumers {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
-
   my $hash  = $defs{$name};
 
   return if(CurrentVal ($hash, 'consumerCollected', 0));                                          # Abbruch wenn Consumer bereits gesammelt
@@ -12276,8 +12318,13 @@ sub _calcCaQcomplex {
   $paref->{sabin}  = $sabin;
   $paref->{calc}   = 'Complex';
 
-  my ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
-  #my ($oldfac, $factor, $dnum) = __calcNewFactor_new ($paref);
+  my ($oldfac, $factor, $dnum);
+  if (!ReadingsVal ($name, '.migrated', 0)) {                                         # Daten wurden noch nicht migriert
+      ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
+  }
+  else {
+      ($oldfac, $factor, $dnum) = __calcNewFactor_migrated ($paref);
+  }
 
   delete $paref->{pvrl};
   delete $paref->{pvfc};
@@ -12347,8 +12394,13 @@ sub _calcCaQsimple {
   $paref->{crang} = 'simple';
   $paref->{calc}  = 'Simple';
 
-  my ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
-  #my ($oldfac, $factor, $dnum) = __calcNewFactor_new ($paref);
+  my ($oldfac, $factor, $dnum);
+  if (!ReadingsVal ($name, '.migrated', 0)) {                                         # Daten wurden noch nicht migriert
+      ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
+  }
+  else {
+      ($oldfac, $factor, $dnum) = __calcNewFactor_migrated ($paref);
+  }
 
   delete $paref->{pvrl};
   delete $paref->{pvfc};
@@ -12459,7 +12511,7 @@ return ($oldfac, $factor, $dnum);
 ################################################################
 #    den neuen Korrekturfaktur berechnen (neue Funktion)
 ################################################################
-sub __calcNewFactor_new {
+sub __calcNewFactor_migrated {
   my $paref = shift;
   my $name  = $paref->{name};
   my $pvrl  = $paref->{pvrl};
@@ -12476,7 +12528,7 @@ sub __calcNewFactor_new {
   my ($oldfac, $oldqal) = CircularSunCloudkorrVal ($hash, $hh, $sabin, $crang, 0);                        # bisher definierter Korrekturfaktor / Qualität
   $oldfac               = 1 if(1 * $oldfac == 0);  
   
-  debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> Start calculation correction factor for hour: $hh");
+  debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> Start calculation correction factor for hour: $hh (migrated data structure)");
   
   if ($calc eq 'Simple') {
       ($pvcirc, $fccirc, $dnum) = CircularSumVal ($hash, $hh, $sabin, 'simple', 0);       
@@ -13401,10 +13453,12 @@ sub _graphicHeader {
          $lup = "$day.$month.$year&nbsp;$time";
       }
 
-      my $cmdplchk = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name plantConfigCheck', function(data){FW_okDialog(data)})"};          # Plant Check Button generieren
-
+      my $cmdplchk  = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name plantConfigCheck', function(data){FW_okDialog(data)})"};          # Plant Check Kommando generieren
+      my $cmdoutmsg = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name outputMessages', function(data){FW_okDialog(data)})"};            # Message Ausgabe Kommando generieren
+      
       if ($ftui eq 'ftui') {
-          $cmdplchk = qq{"ftui.setFhemStatus('get $name plantConfigCheck')"};
+          $cmdplchk  = qq{"ftui.setFhemStatus('get $name plantConfigCheck')"};
+          $cmdoutmsg = qq{"ftui.setFhemStatus('get $name outputMessages')"};
       }
 
       ## Anlagen Check-Icon
@@ -13423,8 +13477,15 @@ sub _graphicHeader {
       ##############
       $img         = FW_makeImage ('edit_copy@grey');
       my $wikicon  = "<a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung' target='_blank'>$img</a>";
-      my $wiktitle = $htitles{opwiki}{$lang};                    
+      my $wiktitle = $htitles{opwiki}{$lang};
 
+      ## Message-Icon
+      #################
+      my ($micon, $midx) = __fillupMessages ($paref);
+      $img               = FW_makeImage ($micon);
+      my $msgicon        = $midx ? "<a onClick=$cmdoutmsg>$img</a>" : $img;
+      my $msgtitle       = $midx ? $htitles{outpmsg}{$lang} : $htitles{nomsgfo}{$lang};
+      
       ## Update-Icon
       ################
       my $upicon =  __createUpdateIcon ($paref);
@@ -13636,7 +13697,7 @@ sub _graphicHeader {
       my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
       my $dlink = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
       my $space = '&nbsp;&nbsp;&nbsp;';
-      my $disti = qq{<span title="$chktitle"> $chkicon </span> $space <span title="$fthtitle"> $fthicon </span> $space <span title="$wiktitle"> $wikicon </span>};
+      my $disti = qq{<span title="$chktitle"> $chkicon </span> $space <span title="$fthtitle"> $fthicon </span> $space <span title="$wiktitle"> $wikicon </span> $space <span title="$msgtitle"> $msgicon </span>};
       
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="1" align="left"   $dstyle> <b>$dlink</b>              </td>};
@@ -13701,6 +13762,43 @@ sub _graphicHeader {
   $header .= qq{</table>};
 
 return $header;
+}
+
+################################################################
+#             Mitteilungssystem füllen
+#  Schweregrad SV:
+#  0 - keine Mitteilung
+#  1 - Mitteilung
+#  2 - Warnung
+#  3 - Fehler / Problem
+################################################################
+sub __fillupMessages {           
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+
+  undef %msgs;
+  my $midx   = 0; 
+  my $max_sv = 0;
+  
+  if (!ReadingsVal ($name, '.migrated', 0)) {
+      $midx++;
+      $msgs{$midx}{SV}  = 1;
+      $msgs{$midx}{DE}  = 'Die gespeicherten PV Daten können mit "get ... x_migrate" in ein neues Format umgesetzt werden welches den Median Ansatz bei der PV Prognose aktiviert und nutzt.';
+      $msgs{$midx}{DE} .= '<br>Mit einem späteren Update des Moduls erfolgt diese Umstellung automatisch.';
+      $msgs{$midx}{EN}  = 'The stored PV data can be converted with “get ... x_migrate” into a new format which activates and uses the median approach in the PV forecast.';
+      $msgs{$midx}{EN} .= '<br>With a later update of the module, this changeover will take place automatically.';
+  }
+ 
+  if ($midx) {
+      my @aidx   = map { $_ } (1..$midx);                                 # größte vorhandene Severity finden
+      my @values = map { $msgs{$_}{SV} } @aidx; 
+      $max_sv    = max(@values);     
+  }
+  
+  my $max_icon = $svicons{$max_sv};                                      # ... und das dazugehörige Icon
+
+return ($max_icon, $midx);
 }
 
 ################################################################
@@ -18085,6 +18183,60 @@ return "The memory structure was written to the file $outfile";
 }
 
 ################################################################
+#                Ausgabe des Mitteilungsystems
+################################################################
+sub outputMessages {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+  
+  my ($micon, $midx) = __fillupMessages ($paref);                                                 # Ergebnisse füllen (sind leer wenn Browser nicht refreshed)
+
+  ## Ausgabe
+  ############
+  my $out  = qq{<html>};
+  $out    .= qq{<b>}.$hqtxt{msgsys}{$lang}.qq{</b> <br><br>};
+
+  $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
+  $out    .= qq{<tr style="font-weight:bold;">};
+  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{number}{$lang} </td>};
+  $out    .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>};
+  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{msgimp}{$lang} </td>};
+  $out    .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>};
+  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{simsg}{$lang} </td>};
+  $out    .= qq{</tr>};
+  $out    .= qq{<tr></tr>};
+                                                                            
+  my $hc = 0;
+
+  for my $key (sort keys %msgs) {
+      $hc++;
+      my $enmsg = encode ("utf8", $msgs{$key}{$lang});
+
+      $out .= qq{<tr>};
+      $out .= qq{<td style="padding: 5px; text-align: center">     $key                      </td>};
+      $out .= qq{<td style="padding: 5px;">                                                  </td>};
+      $out .= qq{<td style="padding: 5px; text-align: center">     $msgs{$key}{SV}           </td>};
+      $out .= qq{<td style="padding: 5px;">                                                  </td>};
+      $out .= qq{<td style="padding-right: 5px; text-align: left"> $enmsg                    </td>};
+      $out .= qq{</tr>};
+
+      if ($hc < $midx) {                                                                           # Zwischenzeile
+          $out .= qq{<tr>};
+          $out .= qq{<td> &nbsp; </td>};
+          $out .= qq{</tr>};
+      }
+  }
+
+  $out .= qq{</table>};
+  $out .= qq{</html>};
+
+  $out .= "<br>";
+
+return $out;
+}
+
+################################################################
 #        validiert die aktuelle Anlagenkonfiguration
 ################################################################
 sub checkPlantConfig {
@@ -18670,7 +18822,7 @@ sub checkPlantConfig {
 
   $out .= "<br>";
 
-  if($cf) {
+  if ($cf) {
       $out .= encode ("utf8", $hqtxt{strnok}{$lang});
   }
   elsif ($wn) {
@@ -22346,6 +22498,18 @@ to ensure that the system configuration is correct.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-get-x_migrate"></a>
+      <li><b>x_migrate </b> <br><br>
+      Migrates the existing PV Real and PV Forecast values in the ring buffer a new data structure. <br>
+      From the time of the changeover, the correction factors for the PV forecast will be determined using a median calculation
+      instead of the previous average calculation. <br><br>
+      
+      <b>x_migrate is a special function. Please clarify any ambiguities in the SolarForecast forum before execution! </b>
+      </li>
+    </ul>
+    <br>
 
   </ul>
   <br>
@@ -22623,10 +22787,10 @@ to ensure that the system configuration is correct.
          <b>attr &lt;name&gt; consumer01</b> wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
          <b>attr &lt;name&gt; consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
          <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:100 <br>
-         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@ed type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
+         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@ed type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2          <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                       <br>
-         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:05 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                              <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=noShow                                                                                   <br>
+         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:05 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                 <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                        <br>
        </ul>
        </li>
        <br>
@@ -24817,6 +24981,18 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-get-x_migrate"></a>
+      <li><b>x_migrate </b> <br><br>
+      Migriert die vorhandenen PV Real und PV Forecast Werte im Ringspeicher in eine neue Datenstruktur. <br>
+      Ab dem Zeitpunkt der Umstellung werden die Korrekturfaktoren für die PV Vorhersage über eine Median Berechnung
+      statt der bisherigen Durchschnittberechnung ermittelt. <br><br>
+      
+      <b>x_migrate ist eine spezielle Funktion. Unklarheiten bitte vor Ausführung im SolarForecast Forum klären! </b>
+      </li>
+    </ul>
+    <br>
 
   </ul>
   <br>
@@ -25096,7 +25272,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@red type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                       <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                              <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=noShow                                                                                   <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                   <br>
        </ul>
        </li>
        <br>
