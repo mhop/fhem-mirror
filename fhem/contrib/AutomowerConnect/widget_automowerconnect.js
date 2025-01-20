@@ -16,7 +16,9 @@ var Modul_automowerconnect = function () {
       
       ftui.sendFhemCommand(cmd)
           .done(function (data, dev) {
-            elem.html(data);
+            var mapurl = elem.data('jsonurl').replace("json", "map");
+            var datanew = data.replace( "background-image: url('/fhem/AutomowerConnect/"+elem.data('device')+"/map", "background-image: url('"+mapurl );
+            elem.html(datanew);
       });
 
     });
