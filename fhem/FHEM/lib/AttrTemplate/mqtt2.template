@@ -4782,7 +4782,7 @@ attr DEVICE setList\
   BT_blacklist:textField $\DEVICETOPIC/commands/MQTTtoBT/config {"black-list":[$EVTPART1]}\
   BT_whitelist:textField $\DEVICETOPIC/commands/MQTTtoBT/config {"white-list":[$EVTPART1]}\
   BT_minrssi:slider,-110,1,0 $\DEVICETOPIC/commands/MQTTtoBT/config {"minrssi":$EVTPART1}\
-  BT_hasspresence:true,false $\DEVICETOPIC/commands/MQTTtoBT/config {"hasspresence":$EVTPART1}
+  BT_hasspresence:true,false $\DEVICETOPIC/commands/MQTTtoBT/config {"hasspresence":$EVTPART1}\
   deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith|attrTemplateVersion|last|LWT|version|Sys_).* 86400"}
 attr DEVICE periodicCmd deleteReadings:1440
 attr DEVICE comment For syntax wrt. update and BT commands see https://github.com/1technophile/OpenMQTTGateway/releases/tag/v0.9.7
@@ -4810,7 +4810,7 @@ attr DEVICE icon ICON
 attr DEVICE comment For syntax wrt. update and BT commands see https://github.com/1technophile/OpenMQTTGateway/releases/tag/v0.9.7
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
-setreading DEVICE attrTemplateVersion 20240409
+setreading DEVICE attrTemplateVersion 20250120
 { AttrTemplate_Initialize() }
 
 name:OpenMQTTGateway_BT_scanner
