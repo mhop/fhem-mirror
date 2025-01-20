@@ -1492,18 +1492,18 @@ __END__
     The following parameter are defined:
     <ul><b>device</b><br>
       The device to switch at the given time.
-    </ul>
+    </ul></p>
     <p>
     <ul><b>language</b><br>
       Specifies the language used for definition and profiles.
       de,en,fr,nl are possible. The parameter is optional.
-    </ul>
+    </ul></p>
     <p>
     <ul><b>weekdays</b><br>
       Specifies the days for all timer in the <b>WeekdayTimer</b>.
       The parameter is optional. For details see the weekdays part in profile.
-    </ul>
-    <p>
+    </ul></p>
+    <p></p>
     <ul><b>profile</b><br>
       Define the weekly profile. All timings are separated by space. A switchingtime can be defined
       in two ways: the classic definition or via the use of a <b><a href="#weekprofile">weekprofile</a></b> (see below, only temperature profiles can be set). Example for a classic definition: <br><br>
@@ -1555,19 +1555,19 @@ __END__
       The return value must be boolean.<br>
       The parameters $NAME and $EVENT will also be interpreted.
       If condition is provided and evaluation (at switchingtime) returns "0", the parameter will not be set, next check will be done as soon as next switchingtime is reached.
-    </ul>
-    <p>
+    </ul></p>
+    <p></p>
     <b>Examples:</b>
     <ul>
         <code>define shutter WeekdayTimer bath 12345|05:20|up  12345|20:30|down</code><br>
-        Mo-Fr are setting the shutter at 05:20 to <b>up</b>, and at 20:30 <b>down</b>.<p>
+        Mo-Fr are setting the shutter at 05:20 to <b>up</b>, and at 20:30 <b>down</b>.<p></p>
 
         <code>define heatingBath WeekdayTimer bath 07:00|16 Mo,Tu,Th-Fr|16:00|18.5 20:00|eco
           {fhem("set dummy on"); fhem("set $NAME desired-temp $EVENT");}</code><br>
-        At the given times and weekdays only(!) the command will be executed.<p>
+        At the given times and weekdays only(!) the command will be executed.<p></p>
 
         <code>define dimmer WeekdayTimer livingRoom Sa-Su,We|07:00|dim30% Sa-Su,We|21:00|dim90% (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
-        The dimmer is only set to dimXX% if the dummy variable WeAreThere is "yes"(not a real live example).<p>
+        The dimmer is only set to dimXX% if the dummy variable WeAreThere is "yes"(not a real live example).<p></p>
 
         If you want to have set all WeekdayTimer their current value (e.g. after a temperature lowering phase holidays)
         you can call the function <b>WeekdayTimer_SetParm("WD-device")</b> or <b>WeekdayTimer_SetAllParms()</b>.<br>
@@ -1587,7 +1587,7 @@ __END__
 
         define wd    Weekdaytimer  device de         {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21
         define wd    Weekdaytimer  device de         22:35|25  23:00|16
-        </code></pre>
+        </code></pre></p>
         The daylist can be given globaly for the whole Weekdaytimer:<p>
         <code><pre>
         define wd    Weekdaytimer device de  !$we     09:00|19  (function("Ein"))
@@ -1595,7 +1595,7 @@ __END__
         define wd    Weekdaytimer device de           09:00|19  (function("exit"))
         define wd    Weekdaytimer device de   57      09:00|19  (function("exit"))
         define wd    Weekdaytimer device de  fr,$we   09:00|19  (function("exit"))
-        </code></pre>
+        </code></pre></p>
     </ul>
   </ul>
 

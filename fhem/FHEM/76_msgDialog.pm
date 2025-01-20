@@ -760,7 +760,7 @@ __END__
     <li>
       <a id="msgDialog-attr-configFile"></a><b>configFile</b><br>
       <p>Path to a configuration file for the dialogue. This is an alternative way to using DEF.<br>
-      The file itself must contain a JSON-encoded dialogue structure - just as described in define.
+      The file itself must contain a JSON-encoded dialogue structure - just as described in define.</p>
       <p>Example (placed in the same dir fhem.pl is located):</p>
       <p><code>attr &lt;msgDialogDevice&gt; configFile ./metaDialogue.cfg</code></p>
     </li>
@@ -1215,7 +1215,7 @@ plot=Waschkeller_washer_SVG
     <li>
       <a id="msgDialog-attr-configFile"></a><b>configFile</b><br>
       <p>Alternativ zur Eingabe des Dialogs in der DEF kann eine Datei eingelesen werden, die die Konfigurationsinformationen zum Dialog enthält. Anzugeben ist der Pfad zu dieser Datei.<br>
-      Die Datei selbst muss den Dialog in einer JSON-Structur beinhalten (Kommentar-Zeilen beginnend mit # sind erlaubt) - ansonsten gilt dasselbe wie in define beschrieben.
+      Die Datei selbst muss den Dialog in einer JSON-Structur beinhalten (Kommentar-Zeilen beginnend mit # sind erlaubt) - ansonsten gilt dasselbe wie in define beschrieben.</p>
       <p>Beispiel (die Datei liegt im Modul-Verzeichnis):</p>
       <p><code>attr &lt;msgDialogDevice&gt; configFile ./FHEM/metaDialogue.cfg</code></p>
     </li>
