@@ -1,0 +1,13 @@
+#  Filestruktur für Mitteilungen:
+#  ==============================
+#  0|SV|1                   (= Severity 0 - 3)
+#  0|DE|Mitteilung 1....
+#  0|EN|Message 1 ...
+#
+#  1|SV|2
+#  1|DE|Mitteilung 2....
+#  1|EN|Message 2 ...
+#
+#  (Index kann bis max. 99999 laufen)
+#
+####################################################
