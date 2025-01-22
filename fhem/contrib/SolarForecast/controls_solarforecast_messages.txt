@@ -1,0 +1,3 @@
+# Das Fileformat muß so aussehen:
+#
+#
