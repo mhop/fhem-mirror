@@ -11,3 +11,7 @@
 #  (Index kann bis max. 99999 laufen)
 #
 ####################################################
+
+1|SV|1
+1|DE|Willkommen beim neuen Mitteilungssystem. Hier findest du Mitteilungen vom System oder Hinweise vom Modulautor. <br>Die Funktionen des Systems werden laufend erweitert.
+1|EN|Welcome to the new messaging system. Here you will find messages from the system or notes from the module author. <br>The functions of the system are constantly being expanded.
