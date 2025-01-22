@@ -12,3 +12,7 @@
 0|SV|1
 0|DE|neue Mitteilung 1 ....
 0|EN|new Message 1 ...
+
+1|SV|2
+1|DE|Ab Relesease 1.44.3 werden die Attribute x, Y, Z entfernt
+1|EN|From Relesease 1.44.3 the attributes x, Y, Z are removed
