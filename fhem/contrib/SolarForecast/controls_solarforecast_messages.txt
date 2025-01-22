@@ -1,3 +1,6 @@
 # Das Fileformat muß so aussehen:
 #
 #
+0|SV|1
+0|DE|neue Mitteilung 1 ....
+0|EN|new Message 1 ...
