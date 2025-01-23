@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
- - feature: 76_SolarForecast: consumer device may have specified an own alias
+ - feature: 76_SolarForecast: show historical battery SoC when displaying the 
+                              battery in the bar graph
  - feature:  73_AutoShuttersControl: 
                                 https://forum.fhem.de/index.php?topic=136510.0
  - feature: 76_SolarForecast: add temporary Migrate Getter x_migrate,

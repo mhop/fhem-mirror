@@ -159,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.44.2" => "23.01.2025  _batChargeRecmd: user storeffdef, show historical battery SoC when displaying the battery in the bar graph ",
   "1.44.1" => "20.01.2025  Notification system: minor fixes, integration of controls_solarforecast_messages_test/prod ".
                            "Define: random start of Timer subs, consumerXX: consumer device may have specified an own alias ",
   "1.44.0" => "19.01.2025  _listDataPoolCircular: may select a dedicated hour, add temporary Migrate funktion x_migrate ".
@@ -439,6 +440,7 @@ my $leadtime       = 3600;                                                      
 my $lagtime        = 1800;                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
 
 my $prdef          = 1.0;                                                           # default Performance Ratio (PR)
+my $storeffdef     = 0.9;                                                           # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
 my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
 my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
 my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
@@ -498,7 +500,7 @@ my $cfile        = 'controls_solarforecast.txt';                                
 my $msgfiletest  = 'controls_solarforecast_messages_test.txt';                      # TEST Input-File Notification System
 my $msgfileprod  = 'controls_solarforecast_messages_prod.txt';                      # PRODUKTIVES Input-File Notification System
 my $pPath        = '?format=txt';                                                   # Download Format
-my $gmfilerepeat = 3000;                                                            # Wiederholungsuntervall Aholen Message File aus contrib
+my $gmfilerepeat = 4600;                                                            # Wiederholungsuntervall Aholen Message File aus contrib
 my $idxlimit     = 900000;                                                          # Notification System: Indexe > $idxlimit sind reserviert für Steuerungsaufgaben
 
 my $messagefile = $msgfileprod;
@@ -948,7 +950,9 @@ my %htitles = (                                                                 
   socbacur => { EN => qq{SoC current},
                 DE => qq{SoC aktuell}                                                                              }, 
   socbatfc => { EN => qq{SoC forecast},
-                DE => qq{SoC Prognose}                                                                             },                
+                DE => qq{SoC Prognose}                                                                             },
+  socbaths => { EN => qq{SoC at the end of the hour},
+                DE => qq{SoC am Ende der Stunde}                                                                   },                
   bcharrel => { EN => qq{Charging release (activate release for charging the battery if necessary)},
                 DE => qq{Ladefreigabe (evtl. Freigabe zum Laden der Batterie aktivieren)}                          }, 
   bncharel => { EN => qq{no Charging release (possibly deactivate release for charging the battery)},
@@ -10043,7 +10047,7 @@ sub _batChargeRecmd {
           
           ## SOC-Prognose
           #################                                                                         
-          $socwh += $crel ? $pvfc - $confc : -$confc;                                            # PV Prognose nur einbeziehen wenn Ladefreigabe                                                                
+          $socwh += $crel ? ($pvfc - $confc) * $storeffdef : -$confc / $storeffdef;              # PV Prognose nur einbeziehen wenn Ladefreigabe                                                                
           
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -15224,6 +15228,7 @@ sub __batRcmdOnBeam {
   my $t          = $paref->{t};
   my $barcount   = $paref->{barcount} // 9999;                                   # Sync Anzahl Balken dieser Ebene mit voriger Ebene
   
+  my $hash = $defs{$name};
   my $hh;
 
   for my $idx (sort keys %{$data{$name}{nexthours}}) {
@@ -15252,8 +15257,21 @@ sub __batRcmdOnBeam {
           $bn = sprintf "%02d", $bn;
           $ds = sprintf "%02d", $ds;
           
+          ## Einfügen prepared NextHour Werte
+          #####################################
           $hfcg->{$kdx}{'rcdchargebat'.$bn} = $hh->{$ds}{$ts}{'rcdchargebat'.$bn} if(defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn});
           $hfcg->{$kdx}{'soc'.$bn}          = $hh->{$ds}{$ts}{'soc'.$bn}          if(defined $hh->{$ds}{$ts}{'soc'.$bn});
+          
+          ## Auffüllen mit History Werten (Achtung: Stundenverschieber relativ zu Nexthours)
+          ####################################################################################
+          if (!defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn}) {
+              my $histsoc = HistoryVal ($hash, $ds, (sprintf "%02d", $ts+1), 'batsoc'.$bn, undef);
+              
+              if (defined $histsoc) {
+                  $hfcg->{$kdx}{'soc'.$bn}          = $histsoc;
+                  $hfcg->{$kdx}{'rcdchargebat'.$bn} = 'hist';
+              }
+          }
       }
   }
 
@@ -16102,7 +16120,13 @@ sub __substituteIcon {
                                 $bicondef;                                               # nur Farbe angegeben  
                                 
               $color  //= $biccolrcddef;
-              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bcharrel}{$lang};
+              
+              if ($flag eq 'hist') {                                                     # erreichter SoC vergangener Stunden
+                  $pretxt = $htitles{onlybatw}{$lang}." $pn: $msg1";
+              }
+              else {                                                                     # prognostizierte Ladefreigabe 
+                  $pretxt = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bcharrel}{$lang};
+              }
           }
           else {                                                                         # keine Ladefreigabe
               ($icon, $color) = split '@', $inorcmd;
@@ -16144,8 +16168,12 @@ sub __substituteIcon {
                $txt     = "$pretxt\nStatus: Standby".$soctxt;
            }
       }
-      else {                                                                             # zukünftiger Zeitraum (Prognose)
-          $txt = $pretxt.$soctxt;
+      else {                                                                             
+          if (defined $flag && $flag eq 'hist') {                                        # Text 'SoC am Ende der Stunde' 
+              $soctxt = "\n".$htitles{socbaths}{$lang}.": ".$soc." %";     
+          }                                                                              
+          
+          $txt = $pretxt.$soctxt;                                                        # resultierender Text
       }
   }
   elsif ($ptyp eq 'producer') {                                                          # Icon Producer
