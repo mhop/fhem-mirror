@@ -9,9 +9,10 @@
 #  1|EN|Message 2 ...
 #
 #  (Index kann bis max. 99999 laufen)
+#  Zeilenumbruch mit <br>
 #
 ####################################################
 
 1|SV|1
-1|DE|Willkommen beim neuen Mitteilungssystem. Hier findest du Mitteilungen vom System oder Hinweise vom Modulautor. <br>Die Funktionen des Systems werden laufend erweitert.
-1|EN|Welcome to the new messaging system. Here you will find messages from the system or notes from the module author. <br>The functions of the system are constantly being expanded.
+1|DE|In dem kommenden Release 1.44.3 sind die Spezial-Readings todayBatInSum und todayBatOutSum mit dem Attribut ctrlSpecialReadings erstellbar. <br>Voraussichtliche Auslieferung ist mit dem Update vom 26.01.2025.   
+1|EN|In the upcoming release 1.44.3, the special readings todayBatInSum and todayBatOutSum can be created with the ctrlSpecialReadings attribute. <br>Expected delivery is with the update from 26.01.2025.   
