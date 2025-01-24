@@ -9,9 +9,10 @@
 #  1|EN|Message 2 ...
 #
 #  (Index kann bis max. 99999 laufen)
+#  Zeilenumbruch mit <br>
 #
 ####################################################
 
-1|SV|2
-1|DE|Ab Relesease 1.44.3 werden die Attribute x, Y, Z entfernt
-1|EN|From Relesease 1.44.3 the attributes x, Y, Z are removed
+1|SV|1
+1|DE|In dem kommenden Release 1.44.3 sind die Spezial-Readings todayBatIn_Sum und todayBatOut_Sum mit dem Attribut ctrlSpecialReadings auswählbar. <br>Voraussichtliche Auslieferung ist mit dem Update vom 26.01.2025.   
+1|EN|
