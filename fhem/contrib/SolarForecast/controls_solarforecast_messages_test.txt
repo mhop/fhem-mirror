@@ -14,5 +14,5 @@
 ####################################################
 
 1|SV|1
-1|DE|In dem kommenden Release 1.44.3 sind die Spezial-Readings todayBatIn_Sum und todayBatOut_Sum mit dem Attribut ctrlSpecialReadings erstellbar. <br>Voraussichtliche Auslieferung ist mit dem Update vom 26.01.2025.   
+1|DE|In dem kommenden Release 1.44.3 sind die Spezial-Readings todayBatInSum und todayBatOutSum mit dem Attribut ctrlSpecialReadings erstellbar. <br>Voraussichtliche Auslieferung ist mit dem Update vom 26.01.2025.   
 1|EN|
