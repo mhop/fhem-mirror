@@ -199,6 +199,7 @@ sub getClHash {
           $hash->{HELPER}{CL}{$i}->{NR}    = $defs{$outdev}{NR};
           $hash->{HELPER}{CL}{$i}->{PEER}  = $defs{$outdev}{PEER};                   # IP-Adresse des FHEMWEB Servers
           $hash->{HELPER}{CL}{$i}->{SNAME} = $defs{$outdev}{SNAME};                  # Name des aufrufenden FHEMWEB Devices
+          $hash->{HELPER}{CL}{$i}->{SSL}   = $defs{$outdev}{SSL} ? 1 : 0;            # SSL-Verbindung?
           $hash->{HELPER}{CL}{$i}->{SPORT} = $defs{$defs{$outdev}{SNAME}}{PORT};     # Port des FHEMWEB SNAME! Devices
           $hash->{HELPER}{CL}{$i}->{COMP}  = 1;
           $i++;               
