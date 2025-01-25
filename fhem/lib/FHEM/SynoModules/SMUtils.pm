@@ -198,9 +198,9 @@ sub getClHash {
           $hash->{HELPER}{CL}{$i}->{NAME}  = $defs{$outdev}{NAME};
           $hash->{HELPER}{CL}{$i}->{NR}    = $defs{$outdev}{NR};
           $hash->{HELPER}{CL}{$i}->{PEER}  = $defs{$outdev}{PEER};                   # IP-Adresse des FHEMWEB Servers
-          $hash->{HELPER}{CL}{$i}->{SNAME} = $defs{$outdev}{SNAME};                  # Name des aufrufenden FHEMWEB Devices
           $hash->{HELPER}{CL}{$i}->{SSL}   = $defs{$outdev}{SSL} ? 1 : 0;            # SSL-Verbindung?
-          $hash->{HELPER}{CL}{$i}->{SPORT} = $defs{$defs{$outdev}{SNAME}}{PORT};     # Port des FHEMWEB SNAME! Devices
+          $hash->{HELPER}{CL}{$i}->{SNAME} = $defs{$outdev}{SNAME};                  # Name des FHEMWEB Eltern-Devices
+          $hash->{HELPER}{CL}{$i}->{SPORT} = $defs{$defs{$outdev}{SNAME}}{PORT};     # Port des FHEMWEB Eltern-Devices
           $hash->{HELPER}{CL}{$i}->{COMP}  = 1;
           $i++;               
       }   
@@ -208,10 +208,11 @@ sub getClHash {
       
   if (defined($hash->{HELPER}{CL}{1})) {                                             # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz)
       for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-          Log3 ($name, 4, "$name - Clienthash number: $k");
+          Log3 ($name, 5, "$name - Clienthash number: $k");
+          
           while (my ($key,$val) = each(%{$hash->{HELPER}{CL}{$k}})) {
               $val = $val // q{};
-              Log3 ($name, 4, "$name - Clienthash: $key -> $val");
+              Log3 ($name, 5, "$name - Clienthash: $key -> $val");
           }
       }
   } 
