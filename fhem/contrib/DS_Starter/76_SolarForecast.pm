@@ -15377,7 +15377,7 @@ sub __batRcmdOnBeam {
           
           my $image = FW_makeImage ($bicon);
           
-          $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
+          $ret .= "<td class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;' title='$title'>$image</td>";
       }
       
       $ret .= "<td class='solarfc'></td></tr>" if($ret);                                                  # freier Platz am Ende der Icon Zeile
