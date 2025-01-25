@@ -15375,9 +15375,11 @@ sub __batRcmdOnBeam {
                                        " W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : 'undef').
                                        ", SoC: ".(defined $hfcg->{$i}{'soc'.$bn} ? $hfcg->{$i}{'soc'.$bn} : 'undef')." %");
           
-          my $image = FW_makeImage ($bicon);
+          my $image = defined $hfcg->{$i}{'rcdchargebat'.$bn} ? FW_makeImage ($bicon) : '';
           
-          $ret .= "<td class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;' title='$title'>$image</td>";
+          Log3 ($name, 1, "$name - Test orig title: $title");
+          
+          $ret .= "<td title='Ersatztitle' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
       }
       
       $ret .= "<td class='solarfc'></td></tr>" if($ret);                                                  # freier Platz am Ende der Icon Zeile
