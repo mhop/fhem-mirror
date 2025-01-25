@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       SMUtils.pm
 #
-#       (c) 2020-2024 by Heiko Maaz
+#       (c) 2020-2025 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module provides routines for FHEM modules developed for Synology use cases.
@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.28.3  25.01.2025  getClHash: get more parameter 
 # 1.28.2  15.12.2024  change delHashRefDeep
 # 1.28.1  08.12.2024  fix delHashRefDeep
 # 1.28.0  07.12.2024  add function delHashRefDeep
@@ -64,7 +65,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.28.2');
+use version 0.77; our $VERSION = version->declare('1.28.3');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -174,33 +175,37 @@ my %hasqhandler = (                                                         # Ha
 ###############################################################################
 sub getClHash {      
   my $hash  = shift // carp $carpnohash && return;
-  my $nobgd = shift;
+  my $nobgd = shift // 0;
+  my $fwdev = shift // '';                                                           # CL-Hash eines bestimmten FW-Devices übernehmen
+  
   my $name  = $hash->{NAME};
   my $ret;
   
-  if ($nobgd) {                                                      # nur übergebenen CL-Hash speichern, keine Hintergrundverarbeitung bzw. synthetische Erstellung CL-Hash
+  delClHash ($name);                                                                 # vorhandenen CL-Hash löschen                                            
+  
+  if ($nobgd) {                                                                      # übergebenen CL-Hash in Helper eintragen
       $hash->{HELPER}{CL}{1} = $hash->{CL};
       return;
   }
-
-  if (!defined($hash->{CL})) {                                      # Clienthash wurde nicht übergeben und wird erstellt (FHEMWEB Instanzen mit canAsyncOutput=1 analysiert)
-      my $outdev;
+  else {                                                                             # Clienthash wurde nicht übergeben und wird erstellt (FHEMWEB Instanzen mit canAsyncOutput=1 analysiert)
       my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=canAsyncOutput=1:FILTER=STATE=Connected");
       my $i = 1;
       
       for my $outdev (@webdvs) {
           next if(!$defs{$outdev});
-          $hash->{HELPER}{CL}{$i}->{NAME} = $defs{$outdev}{NAME};
-          $hash->{HELPER}{CL}{$i}->{NR}   = $defs{$outdev}{NR};
-          $hash->{HELPER}{CL}{$i}->{COMP} = 1;
+          next if($fwdev && $fwdev ne $defs{$outdev}{SNAME});
+          
+          $hash->{HELPER}{CL}{$i}->{NAME}  = $defs{$outdev}{NAME};
+          $hash->{HELPER}{CL}{$i}->{NR}    = $defs{$outdev}{NR};
+          $hash->{HELPER}{CL}{$i}->{PEER}  = $defs{$outdev}{PEER};                   # IP-Adresse des FHEMWEB Servers
+          $hash->{HELPER}{CL}{$i}->{SNAME} = $defs{$outdev}{SNAME};                  # Name des aufrufenden FHEMWEB Devices
+          $hash->{HELPER}{CL}{$i}->{SPORT} = $defs{$defs{$outdev}{SNAME}}{PORT};     # Port des FHEMWEB SNAME! Devices
+          $hash->{HELPER}{CL}{$i}->{COMP}  = 1;
           $i++;               
       }   
-  } 
-  else {                                                            # übergebenen CL-Hash in Helper eintragen
-      $hash->{HELPER}{CL}{1} = $hash->{CL};
   }
       
-  if (defined($hash->{HELPER}{CL}{1})) {                            # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz)
+  if (defined($hash->{HELPER}{CL}{1})) {                                             # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz)
       for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
           Log3 ($name, 4, "$name - Clienthash number: $k");
           while (my ($key,$val) = each(%{$hash->{HELPER}{CL}{$k}})) {
@@ -224,7 +229,7 @@ sub delClHash {
   my $name = shift;
   my $hash = $defs{$name};
   
-  delete($hash->{HELPER}{CL});
+  delete $hash->{HELPER}{CL};
   
 return;
 }
