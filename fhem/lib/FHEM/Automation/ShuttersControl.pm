@@ -1769,7 +1769,11 @@ sub SetCmdFn {
         || $FHEM::Automation::ShuttersControl::shutters
         ->getWindProtectionStatus eq 'protected'
         || $FHEM::Automation::ShuttersControl::shutters
-        ->getRainProtectionStatus eq 'protected' );
+        ->getRainProtectionStatus eq 'protected'
+        || (   CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+            && $shutters->getStatus == $shutters->getOpenPos
+            && $shutters->getShuttersPlace eq 'terrace'
+            && $shutters->getSelfDefenseMode eq 'off') );
 
     if ( $shutters->getStatus != $posValue ) {
         $shutters->setLastPos( $shutters->getStatus );
