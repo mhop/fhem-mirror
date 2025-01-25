@@ -159,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.44.3" => "25.01.2025  Notification System: minor changes, special Readings todayBatInSum todayBatOutSum ",
   "1.44.2" => "23.01.2025  _batChargeRecmd: user storeffdef, show historical battery SoC when displaying the battery in the bar graph ",
   "1.44.1" => "20.01.2025  Notification system: minor fixes, integration of controls_solarforecast_messages_test/prod ".
                            "Define: random start of Timer subs, consumerXX: consumer device may have specified an own alias ",
@@ -500,7 +501,7 @@ my $cfile        = 'controls_solarforecast.txt';                                
 my $msgfiletest  = 'controls_solarforecast_messages_test.txt';                      # TEST Input-File Notification System
 my $msgfileprod  = 'controls_solarforecast_messages_prod.txt';                      # PRODUKTIVES Input-File Notification System
 my $pPath        = '?format=txt';                                                   # Download Format
-my $gmfilerepeat = 4600;                                                            # Wiederholungsuntervall Aholen Message File aus contrib
+my $gmfilerepeat = 4600;                                                            # Wiederholungsuntervall Abholen Message File aus contrib
 my $idxlimit     = 900000;                                                          # Notification System: Indexe > $idxlimit sind reserviert für Steuerungsaufgaben
 
 my $messagefile = $msgfileprod;
@@ -876,6 +877,8 @@ my %hqtxt = (                                                                # H
               DE => qq{LINK wartet auf Solarvorhersagedaten ... <br>}                                                       },
   wexso  => { EN => qq{switched externally},
               DE => qq{von extern umgeschaltet}                                                                             },
+  legimp => { EN => qq{Legend Importance: 1 - general Message, 2 - important Message, 3 - Error or Problem},
+              DE => qq{Legende Wichtigkeit: 1 - allgemeine Mitteilung, 2 - wichtige Mitteilung, 3 - Fehler oder Problem}    },
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
               DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                                                 },
   strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please note the warnings (<W>).},
@@ -1140,7 +1143,7 @@ my %hef = (                                                                     
   "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },
 );
 
-my %hcsr = (                                                                                                                               # Funktiontemplate zur Erstellung optionaler Statistikreadings
+my %hcsr = (                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
   currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
   lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
   lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
@@ -1165,6 +1168,8 @@ my %hcsr = (                                                                    
   todayGridConsumption        => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
   todayConsumptionForecast    => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => '-'         },
   conForecastTillNextSunrise  => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => 0           },
+  todayBatInSum               => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => ' Wh',  def => 0           },
+  todayBatOutSum              => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => ' Wh',  def => 0           },
 );
 
   for my $csr (1..$maxconsumer) {
@@ -1195,13 +1200,13 @@ my %hcsr = (                                                                    
       $hcsr{'todayBatIn_'.$bn}{fnr}  = 4;
       $hcsr{'todayBatIn_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'todayBatIn_'.$bn}{par}  = 99;
-      $hcsr{'todayBatIn_'.$bn}{unit} = '';
+      $hcsr{'todayBatIn_'.$bn}{unit} = ' Wh';
       $hcsr{'todayBatIn_'.$bn}{def}  = 0; 
 
       $hcsr{'todayBatOut_'.$bn}{fnr}  = 4;
       $hcsr{'todayBatOut_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'todayBatOut_'.$bn}{par}  = 99;
-      $hcsr{'todayBatOut_'.$bn}{unit} = '';
+      $hcsr{'todayBatOut_'.$bn}{unit} = ' Wh';
       $hcsr{'todayBatOut_'.$bn}{def}  = 0;       
   }
 
@@ -12794,25 +12799,55 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dgcon).' Wh');
           }
+          
+          if ($kpi eq 'todayBatInSum') {                                                                       # Summe tägl. Ladeenergie (alle Batterien) 
+              my $tdbisum = 0;
+              
+              for my $bn (1..$maxbatteries) {
+                  $bn = sprintf "%02d", $bn;              
+              
+                  my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot'.$bn, $def);     # initialer Tagesstartwert Batterie In total
+                  my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot'.$bn,        $def);     # aktuell total Batterieladung (Wh)
+
+                  $tdbisum += ($cbitot - $idbitot);
+              }
+
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbisum).' '.$hcsr{$kpi}{unit});    
+          }
+          
+          if ($kpi eq 'todayBatOutSum') {                                                                      # Summe tägl. Entadeenergie (alle Batterien) 
+              my $tdbosum = 0;
+              
+              for my $bn (1..$maxbatteries) {
+                  $bn = sprintf "%02d", $bn;              
+              
+                  my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot'.$bn, $def);    # initialer Tagesstartwert Batterie Out total
+                  my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot'.$bn,        $def);    # aktuelles total Batterie Out
+
+                  $tdbosum += ($cbotot - $idbotot);
+              }
+              
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbosum).' '.$hcsr{$kpi}{unit});
+          }
 
           if ($kpi =~ /todayBatIn_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
               my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot'.$bn, $def);     # initialer Tagesstartwert Batterie In total
-              my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot'.$bn,   $def);          # aktuell total Batterieladung (Wh)
+              my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot'.$bn,        $def);     # aktuell total Batterieladung (Wh)
 
               my $dbi = $cbitot - $idbitot;
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbi).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbi).' '.$hcsr{$kpi}{unit});
           }
 
           if ($kpi =~ /todayBatOut_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
               my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot'.$bn, $def);    # initialer Tagesstartwert Batterie Out total
-              my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot'.$bn,   $def);         # aktuelles total Batterie Out
+              my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot'.$bn,        $def);    # aktuelles total Batterie Out
 
               my $dbo = $cbotot - $idbotot;
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbo).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbo).' '.$hcsr{$kpi}{unit});
           }
 
           if ($kpi eq 'dayAfterTomorrowPVforecast') {                                                      # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
@@ -16669,8 +16704,8 @@ sub fillupMessageSystem {
       next if($smi >= $idxlimit);
       $midx++;
       $data{$name}{messages}{$midx}{SV} = $data{$name}{preparedmessages}{$smi}{SV};
-      $data{$name}{messages}{$midx}{DE} = $data{$name}{preparedmessages}{$smi}{DE};
-      $data{$name}{messages}{$midx}{EN} = $data{$name}{preparedmessages}{$smi}{EN};   
+      $data{$name}{messages}{$midx}{DE} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{DE});
+      $data{$name}{messages}{$midx}{EN} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{EN});  
   }
   
   $data{$name}{messages}{999000}{TS} = $data{$name}{filemessages}{999000}{TS}     // 0;
@@ -16743,7 +16778,8 @@ sub outputMessages {
       next if($key >= $idxlimit);
       
       $hc++;
-      my $enmsg = encode ("utf8", $data{$name}{messages}{$key}{$lang});
+      #my $enmsg = encode ("utf8", $data{$name}{messages}{$key}{$lang});
+      my $enmsg = $data{$name}{messages}{$key}{$lang};
 
       $out .= qq{<tr>};
       $out .= qq{<td style="padding: 5px; text-align: center">     $key                                       </td>};
@@ -16760,10 +16796,11 @@ sub outputMessages {
       }
   }
 
-  $out .= qq{</table>};
+  $out .= qq{</table>};                        
   $out .= qq{</html>};
 
   $out .= "<br>";
+  $out .= $hqtxt{legimp}{$lang};
 
 return $out;
 }
@@ -23336,8 +23373,10 @@ to ensure that the system configuration is correct.
             <tr><td>                                   </td><td>A call can contain multiple API requests.                                                                            </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>the number of radiation data API calls still possible on the current day                                             </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>the number of radiation data API requests still possible on the current day                                          </td></tr>
-            <tr><td> <b>todayBatInXX</b>               </td><td>the energy charged into the battery XX on the current day                                                            </td></tr>
-            <tr><td> <b>todayBatOutXX</b>              </td><td>the energy taken from the battery XX on the current day                                                              </td></tr>
+            <tr><td> <b>todayBatIn_XX</b>              </td><td>the energy charged into the battery XX on the current day                                                            </td></tr>
+            <tr><td> <b>todayBatInSum</b>              </td><td>Total energy charged in all batteries on the current day                                                             </td></tr>
+            <tr><td> <b>todayBatOut_XX</b>             </td><td>the energy taken from the battery XX on the current day                                                              </td></tr>
+            <tr><td> <b>todayBatOutSum</b>             </td><td>Total energy drawn from all batteries on the current day                                                             </td></tr>
          </table>
          </ul>
        <br>
@@ -25826,8 +25865,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                   </td><td>Ein Call kann mehrere API Requests enthalten.                                                                   </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Calls                                        </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Requests                                     </td></tr>
-            <tr><td> <b>todayBatInXX</b>               </td><td>die am aktuellen Tag in die Batterie XX geladene Energie                                                        </td></tr>
-            <tr><td> <b>todayBatOutXX</b>              </td><td>die am aktuellen Tag aus der Batterie XX entnommene Energie                                                     </td></tr>
+            <tr><td> <b>todayBatIn_XX</b>              </td><td>die am aktuellen Tag in die Batterie XX geladene Energie                                                        </td></tr>
+            <tr><td> <b>todayBatInSum</b>              </td><td>Summe der am aktuellen Tag in alle Batterien geladene Energie                                                   </td></tr>           
+            <tr><td> <b>todayBatOut_XX</b>             </td><td>die am aktuellen Tag aus der Batterie XX entnommene Energie                                                     </td></tr>
+            <tr><td> <b>todayBatOutSum</b>             </td><td>Summe der am aktuellen Tag aus allen Batterien entnommene Energie                                               </td></tr>
          </table>
          </ul>
        <br>
