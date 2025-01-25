@@ -104,6 +104,8 @@ BEGIN {
           getAllSets
           HttpUtils_NonblockingGet
           HttpUtils_BlockingGet
+          GetFileFromURL
+          GetHttpFile
           init_done
           InternalTimer
           InternalVal
@@ -157,6 +159,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.44.3" => "25.01.2025  Notification System: minor changes, special Readings todayBatInSum todayBatOutSum ",
+  "1.44.2" => "23.01.2025  _batChargeRecmd: user storeffdef, show historical battery SoC when displaying the battery in the bar graph ",
+  "1.44.1" => "20.01.2025  Notification system: minor fixes, integration of controls_solarforecast_messages_test/prod ".
+                           "Define: random start of Timer subs, consumerXX: consumer device may have specified an own alias ",
   "1.44.0" => "19.01.2025  _listDataPoolCircular: may select a dedicated hour, add temporary Migrate funktion x_migrate ".
                            "fix interruptable key check in consumer attr Forum:https://forum.fhem.de/index.php?msg=1331073 ".
                            "set prdef to 1.0, Implementation of a Messaging System ", 
@@ -423,6 +429,7 @@ my $calcmaxd       = 30;                                                        
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat    = 851;                                                           # Wiederholungsintervall Cache File Daten schreiben
+my $gmfblto        = 30;                                                            # Timeout Aholen Message File aus contrib
 
 my $solapirepdef   = 3600;                                                          # default Abrufintervall SolCast API (s)
 my $forapirepdef   = 900;                                                           # default Abrufintervall ForecastSolar API (s)
@@ -434,6 +441,7 @@ my $leadtime       = 3600;                                                      
 my $lagtime        = 1800;                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
 
 my $prdef          = 1.0;                                                           # default Performance Ratio (PR)
+my $storeffdef     = 0.9;                                                           # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
 my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
 my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
 my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
@@ -489,10 +497,14 @@ my $actcoldef      = 'orange';                                                  
 my $inactcoldef    = 'grey';                                                        # default Färbung Icon wenn inaktiv
 
 my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
-my $pPath = '?format=txt';                                                          # Download Format
-my $cfile = 'controls_solarforecast.txt';                                           # Name des Controlfiles
+my $cfile        = 'controls_solarforecast.txt';                                    # Controlfile Update FTUI-Files
+my $msgfiletest  = 'controls_solarforecast_messages_test.txt';                      # TEST Input-File Notification System
+my $msgfileprod  = 'controls_solarforecast_messages_prod.txt';                      # PRODUKTIVES Input-File Notification System
+my $pPath        = '?format=txt';                                                   # Download Format
+my $gmfilerepeat = 4600;                                                            # Wiederholungsuntervall Abholen Message File aus contrib
+my $idxlimit     = 900000;                                                          # Notification System: Indexe > $idxlimit sind reserviert für Steuerungsaufgaben
 
-
+my $messagefile = $msgfileprod;
                                                                                     # mögliche Debug-Module
 my @dd = qw( aiProcess
              aiData
@@ -803,12 +815,14 @@ my %hqtxt = (                                                                # H
               DE => qq{heute}                                                                                               },
   simsg  => { EN => qq{Message},
               DE => qq{Mitteilung}                                                                                          },
-  msgsys => { EN => qq{Messaging system},
+  msgsys => { EN => qq{Notification system},
               DE => qq{Mitteilungssystem}                                                                                   },
   msgimp => { EN => qq{Importance},
               DE => qq{Wichtigkeit}                                                                                         },
   number => { EN => qq{Number},
               DE => qq{Nummer}                                                                                              },
+  ludich => { EN => qq{last update Input channels},
+              DE => qq{letzte Aktualisierung Eingangskan&auml;le}                                                           },  
   ctnsly => { EN => qq{continuously},
               DE => qq{fortlaufend}                                                                                         },
   yday   => { EN => qq{yesterday},
@@ -863,6 +877,8 @@ my %hqtxt = (                                                                # H
               DE => qq{LINK wartet auf Solarvorhersagedaten ... <br>}                                                       },
   wexso  => { EN => qq{switched externally},
               DE => qq{von extern umgeschaltet}                                                                             },
+  legimp => { EN => qq{Legend Importance: 1 - general Message, 2 - important Message, 3 - Error or Problem},
+              DE => qq{Legende Wichtigkeit: 1 - allgemeine Mitteilung, 2 - wichtige Mitteilung, 3 - Fehler oder Problem}    },
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
               DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                                                 },
   strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please note the warnings (<W>).},
@@ -871,6 +887,8 @@ my %hqtxt = (                                                                # H
               DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                                                     },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Mode:&nbsp;<mode><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Modus:&nbsp;<mode><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden} },
+  dmgsig => { EN => qq{Read messages are not signaled again until a FHEM restart, but are retained if they are relevant.},
+              DE => qq{Gelesene Mitteilungen werden bis zu einem FHEM Neustart nicht wieder signalisiert, bleiben bei Relevanz jedoch erhalten.}                                             },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -935,7 +953,9 @@ my %htitles = (                                                                 
   socbacur => { EN => qq{SoC current},
                 DE => qq{SoC aktuell}                                                                              }, 
   socbatfc => { EN => qq{SoC forecast},
-                DE => qq{SoC Prognose}                                                                             },                
+                DE => qq{SoC Prognose}                                                                             },
+  socbaths => { EN => qq{SoC at the end of the hour},
+                DE => qq{SoC am Ende der Stunde}                                                                   },                
   bcharrel => { EN => qq{Charging release (activate release for charging the battery if necessary)},
                 DE => qq{Ladefreigabe (evtl. Freigabe zum Laden der Batterie aktivieren)}                          }, 
   bncharel => { EN => qq{no Charging release (possibly deactivate release for charging the battery)},
@@ -1123,7 +1143,7 @@ my %hef = (                                                                     
   "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },
 );
 
-my %hcsr = (                                                                                                                               # Funktiontemplate zur Erstellung optionaler Statistikreadings
+my %hcsr = (                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
   currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
   lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
   lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => '-'         },
@@ -1148,6 +1168,8 @@ my %hcsr = (                                                                    
   todayGridConsumption        => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => '',     def => 0           },
   todayConsumptionForecast    => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => '-'         },
   conForecastTillNextSunrise  => { fnr => 4, fn => \&NexthoursVal,    par => 'confc',             unit => ' Wh',  def => 0           },
+  todayBatInSum               => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => ' Wh',  def => 0           },
+  todayBatOutSum              => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => ' Wh',  def => 0           },
 );
 
   for my $csr (1..$maxconsumer) {
@@ -1178,13 +1200,13 @@ my %hcsr = (                                                                    
       $hcsr{'todayBatIn_'.$bn}{fnr}  = 4;
       $hcsr{'todayBatIn_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'todayBatIn_'.$bn}{par}  = 99;
-      $hcsr{'todayBatIn_'.$bn}{unit} = '';
+      $hcsr{'todayBatIn_'.$bn}{unit} = ' Wh';
       $hcsr{'todayBatIn_'.$bn}{def}  = 0; 
 
       $hcsr{'todayBatOut_'.$bn}{fnr}  = 4;
       $hcsr{'todayBatOut_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'todayBatOut_'.$bn}{par}  = 99;
-      $hcsr{'todayBatOut_'.$bn}{unit} = '';
+      $hcsr{'todayBatOut_'.$bn}{unit} = ' Wh';
       $hcsr{'todayBatOut_'.$bn}{def}  = 0;       
   }
 
@@ -1301,7 +1323,9 @@ my %hfspvh = (
 # $data{$name}{dwdcatalog}                                                    # temporärer Speicher DWD Stationskatalog
 # $data{$name}{strings}                                                       # temporärer Speicher Stringkonfiguration
 # $data{$name}{aidectree}{object}                                             # AI Decision Tree Object
-# $data{$name}{messages}                                                      # Speicher Mitteilungssystem
+# $data{$name}{messages}                                                      # Mitteilungssystem - permanent erneuerter Speicher
+# $data{$name}{filemessages}                                                  # Mitteilungssystem - Input vom Message File
+# $data{$name}{preparedmessages}                                              # Mitteilungssystem - vorbereitete Messages innerhalb des Code
 
 ################################################################
 #               Init Fn
@@ -1479,9 +1503,10 @@ sub Define {
   reloadCacheFiles     ($params);
   singleUpdateState    ( {hash => $hash, state => 'initialized', evt => 1} );
 
-  $readyfnlist{$name} = $hash;                                                                           # Registrierung in Ready-Schleife
-  InternalTimer (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteMemcache", $hash, 0);   # Einstieg periodisches Schreiben historische Daten
-
+  $readyfnlist{$name} = $hash;                                                                                                   # Registrierung in Ready-Schleife
+  InternalTimer (gettimeofday() + $whistrepeat  + int(rand(300)), "FHEM::SolarForecast::periodicWriteMemcache",     $hash, 0);   # Einstieg periodisches Schreiben historische Daten
+  InternalTimer (gettimeofday() + 120           + int(rand(300)), "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
+  
 return;
 }
 
@@ -4661,7 +4686,7 @@ sub _getoutputMessages {             ## no critic "not used"
   my $out = outputMessages ($paref);
   $out    = qq{<html>$out</html>};
   
-  $data{$name}{messages}{9999}{RD} = 1;                   # Lesekennzeichen setzen
+  $data{$name}{messages}{999999}{RD} = 1;                   # Lesekennzeichen setzen
 
   ## asynchrone Ausgabe
   #######################
@@ -5400,21 +5425,10 @@ sub __updPreFile {
           $err .= "Please check whether the path $path is present and accessible.<br>";
           $err .= "After installing FTUI, come back and execute the get command again.";
           return $err;
-
-          #my $ok = mkdir $path;
-
-          #if (!$ok) {
-          #    $err = "MKDIR ERROR: $!";
-          #    Log3 ($name, 1, "$name - $err");
-          #    return $err;
-          #}
-          #else {
-          #    Log3 ($name, 3, "$name - MKDIR $path");
-          #}
       }
   }
 
-  ($err, my $remFile) = __updGetUrl ($name, $bPath.$file.$pPath);
+  ($err, my $remFile) = __httpBlockingGet ($name, $bPath.$file.$pPath);
 
   if ($err) {
       Log3 ($name, 1, "$name - $err");
@@ -5446,27 +5460,27 @@ return;
 ###############################################################
 #                     File von url holen
 ###############################################################
-sub __updGetUrl {
+sub __httpBlockingGet {
   my $name = shift;
   my $url  = shift;
 
   $url =~ s/%/%25/g;
-  my %upd_connecthash;
+  my %connecthash;
   my $unicodeEncoding = 1;
 
-  $upd_connecthash{url}           = $url;
-  $upd_connecthash{keepalive}     = ($url =~ m/localUpdate/ ? 0 : 1);                        # Forum #49798
-  $upd_connecthash{forceEncoding} = '' if($unicodeEncoding);
+  $connecthash{url}           = $url;
+  $connecthash{keepalive}     = ($url =~ m/localUpdate/ ? 0 : 1);                        # Forum #49798
+  $connecthash{forceEncoding} = '' if($unicodeEncoding);
 
-  my ($err, $dat) = HttpUtils_BlockingGet (\%upd_connecthash);
+  my ($err, $dat) = HttpUtils_BlockingGet (\%connecthash);
 
   if ($err) {
-      $err = "update ERROR: $err";
+      $err = "GetUrl ERROR: $err";
       return ($err, '');
   }
 
   if (!$dat) {
-      $err = 'update ERROR: empty file received';
+      $err = 'WARNING - empty file received';
       return ($err, '');
   }
 
@@ -7347,7 +7361,7 @@ sub runTask {
           }
 
           releaseCentralTask ($hash);
-          centralTask ($hash, 1);
+          centralTask        ($hash, 1);
       }
   }
   else {
@@ -7363,13 +7377,13 @@ sub runTask {
           }
           
           releaseCentralTask ($hash);
-          centralTask ($hash, 1);
+          centralTask        ($hash, 1);
       }
   }
   else {
       delete $hash->{HELPER}{S03DONE};
   }
-
+  
 return;
 }
 
@@ -7638,6 +7652,7 @@ sub centralTask {
   setTimeTracking             ($hash, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
 
   createReadingsFromArray     ($hash, $evt);                                          # Readings erzeugen
+  _readSystemMessages         ($centpars);                                            # Notification System - System Messages zusammenstellen
 
   if ($evt) {
       $centpars->{evt} = $evt;
@@ -7822,10 +7837,10 @@ sub _collectAllRegConsumers {
 
   for my $c (1..$maxconsumer) {
       $c = sprintf "%02d", $c;
-      my ($err, $consumer, $hc) = isDeviceValid ( { name => $name, obj => "consumer${c}", method => 'attr' } );
+      my ($err, $consumer, $hc, $alias) = isDeviceValid ( { name => $name, obj => "consumer${c}", method => 'attr' } );
       next if($err);
 
-      push @{$data{$name}{current}{consumerdevs}}, $consumer;                                  # alle Consumerdevices in CurrentHash eintragen
+      push @{$data{$name}{current}{consumerdevs}}, $consumer;                                     # alle Consumerdevices in CurrentHash eintragen
 
       my $dswitch = $hc->{switchdev};                                                             # alternatives Schaltdevice
 
@@ -7833,13 +7848,13 @@ sub _collectAllRegConsumers {
           my ($err) = isDeviceValid ( { name => $name, obj => $dswitch, method => 'string' } );
           next if($err);
 
-          push @{$data{$name}{current}{consumerdevs}}, $dswitch if($dswitch ne $consumer);     # Switchdevice zusätzlich in CurrentHash eintragen
+          push @{$data{$name}{current}{consumerdevs}}, $dswitch if($dswitch ne $consumer);        # Switchdevice zusätzlich in CurrentHash eintragen
       }
       else {
           $dswitch = $consumer;
       }
 
-      my $alias = AttrVal ($consumer, 'alias', $consumer);
+      $alias = AttrVal ($consumer, 'alias', $consumer) if(!$alias);
 
       my ($rtot,$utot,$ethreshold);
       if (exists $hc->{etotal}) {
@@ -9912,7 +9927,7 @@ return $sf;
 }
 
 ################################################################
-#             Erstellung Batterie Ladefreigabe 
+#       Erstellung Batterie Ladefreigabe + SoC Prognose
 ################################################################
 sub _batChargeRecmd {
   my $paref = shift;
@@ -10037,7 +10052,7 @@ sub _batChargeRecmd {
           
           ## SOC-Prognose
           #################                                                                         
-          $socwh += $crel ? $pvfc - $confc : -$confc;                                            # PV Prognose nur einbeziehen wenn Ladefreigabe                                                                
+          $socwh += $crel ? ($pvfc - $confc) * $storeffdef : -$confc / $storeffdef;              # PV Prognose nur einbeziehen wenn Ladefreigabe                                                                
           
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -10046,11 +10061,7 @@ sub _batChargeRecmd {
 
           $socwh      = sprintf "%.0f", $socwh;                     
           my $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                            # Prognose SoC in %  
-          
-          #$progsoc    = $progsoc < $batoptsoc ? $batoptsoc :
-          #              $progsoc < $lowSoc    ? $lowSoc    :
-          #              $progsoc;  
-
+                        
           __createNextHoursSFCReadings ( {name    => $name, 
                                           nhr     => $nhr, 
                                           bn      => $bn, 
@@ -12627,65 +12638,6 @@ return $hdv;
 }
 
 ################################################################
-#     Berechnen Tag / Stunden Verschieber
-#     aus aktueller Stunde + lfd. Nummer
-################################################################
-sub calcDayHourMove {
-  my $chour = shift;
-  my $num   = shift;
-
-  my $fh = $chour + $num;
-  my $fd = int ($fh / 24) ;
-  $fh    = $fh - ($fd * 24);
-
-return ($fd, $fh);
-}
-
-################################################################
-#  Zeit gemäß DWD_OpenData-Format
-#  Berechnen Tag / Stunden Verschieber ab aktuellen Tag
-#  Input:   YYYY-MM-DD HH:MM:SS
-#  Output:  $fd - 0 (Heute), 1 (Morgen), 2 (Übermorgen), ....
-#           $fh - Stunde von $fd ohne führende Null
-#  Return:  fc${fd}_${fh}
-################################################################
-sub formatWeatherTimestrg {
-  my $date = shift // return;
-
-  my $cdate = strftime "%Y-%m-%d", localtime(time);
-  my $refts = timestringToTimestamp ($cdate.' 00:00:00');                                      # Referenztimestring
-  my $datts = timestringToTimestamp ($date);
-  my $fd    = int (($datts - $refts) / 86400);
-  my $fh    = int ((split /[ :]/, $date)[1]);
-
-return "fc${fd}_${fh}";
-}
-
-################################################################
-#    Spezialfall auflösen wenn Wert von $val2 dem
-#    Redingwert von $val1 entspricht sofern $val1 negativ ist
-################################################################
-sub substSpecialCases {
-  my $paref = shift;
-  my $dev   = $paref->{dev};
-  my $rdg   = $paref->{rdg};
-  my $rdgf  = $paref->{rdgf};
-
-  my $val1  = ReadingsNum ($dev, $rdg, 0) * $rdgf;
-  my $val2;
-
-  if($val1 <= 0) {
-      $val2 = abs($val1);
-      $val1 = 0;
-  }
-  else {
-      $val2 = 0;
-  }
-
-return ($val1,$val2);
-}
-
-################################################################
 #     Energieverbrauch des Hauses in History speichern
 ################################################################
 sub _saveEnergyConsumption {
@@ -12847,25 +12799,55 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dgcon).' Wh');
           }
+          
+          if ($kpi eq 'todayBatInSum') {                                                                       # Summe tägl. Ladeenergie (alle Batterien) 
+              my $tdbisum = 0;
+              
+              for my $bn (1..$maxbatteries) {
+                  $bn = sprintf "%02d", $bn;              
+              
+                  my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot'.$bn, $def);     # initialer Tagesstartwert Batterie In total
+                  my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot'.$bn,        $def);     # aktuell total Batterieladung (Wh)
+
+                  $tdbisum += ($cbitot - $idbitot);
+              }
+
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbisum).' '.$hcsr{$kpi}{unit});    
+          }
+          
+          if ($kpi eq 'todayBatOutSum') {                                                                      # Summe tägl. Entadeenergie (alle Batterien) 
+              my $tdbosum = 0;
+              
+              for my $bn (1..$maxbatteries) {
+                  $bn = sprintf "%02d", $bn;              
+              
+                  my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot'.$bn, $def);    # initialer Tagesstartwert Batterie Out total
+                  my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot'.$bn,        $def);    # aktuelles total Batterie Out
+
+                  $tdbosum += ($cbotot - $idbotot);
+              }
+              
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbosum).' '.$hcsr{$kpi}{unit});
+          }
 
           if ($kpi =~ /todayBatIn_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
               my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot'.$bn, $def);     # initialer Tagesstartwert Batterie In total
-              my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot'.$bn,   $def);          # aktuell total Batterieladung (Wh)
+              my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot'.$bn,        $def);     # aktuell total Batterieladung (Wh)
 
               my $dbi = $cbitot - $idbitot;
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbi).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbi).' '.$hcsr{$kpi}{unit});
           }
 
           if ($kpi =~ /todayBatOut_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
               my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot'.$bn, $def);    # initialer Tagesstartwert Batterie Out total
-              my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot'.$bn,   $def);         # aktuelles total Batterie Out
+              my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot'.$bn,        $def);    # aktuelles total Batterie Out
 
               my $dbo = $cbotot - $idbotot;
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbo).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbo).' '.$hcsr{$kpi}{unit});
           }
 
           if ($kpi eq 'dayAfterTomorrowPVforecast') {                                                      # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
@@ -12966,6 +12948,36 @@ sub _genSpecialReadings {
           }
       }
   }
+
+return;
+}
+
+###################################################################################
+#      Messagefile für Notification System lesen
+#  Filestruktur:
+#  0|SV|1
+#  0|DE|Mitteilung ....
+#  0|EN|Message...
+#  $data{$name}{preparedmessages}{999500}{TS}: Timestamp Stand prepared Messages
+###################################################################################
+sub _readSystemMessages {                  
+  my $paref = shift;
+  my $name  = $paref->{name};
+  
+  delete $data{$name}{preparedmessages};
+  
+  my $midx = 0; 
+
+  if (!ReadingsVal ($name, '.migrated', 0)) {
+      $midx++;
+      $data{$name}{preparedmessages}{$midx}{SV}  = 1;
+      $data{$name}{preparedmessages}{$midx}{DE}  = 'Die gespeicherten PV Daten können mit "get ... x_migrate" in ein neues Format umgesetzt werden welches den Median Ansatz bei der PV Prognose aktiviert und nutzt.';
+      $data{$name}{preparedmessages}{$midx}{DE} .= '<br>Mit einem späteren Update des Moduls erfolgt diese Umstellung automatisch.';
+      $data{$name}{preparedmessages}{$midx}{EN}  = 'The stored PV data can be converted with “get ... x_migrate” into a new format which activates and uses the median approach in the PV forecast.';
+      $data{$name}{preparedmessages}{$midx}{EN} .= '<br>With a later update of the module, this changeover will take place automatically.';
+  }
+  
+  $data{$name}{preparedmessages}{999500}{TS} = time;
 
 return;
 }
@@ -13483,7 +13495,7 @@ sub _graphicHeader {
 
       ## Message-Icon
       #################
-      my ($micon, $midx) = __fillupMessages ($paref);
+      my ($micon, $midx) = fillupMessageSystem ($paref);
       $img               = FW_makeImage ($micon);
       my $msgicon        = $midx ? "<a onClick=$cmdoutmsg>$img</a>" : $img;
       my $msgtitle       = $midx ? $htitles{outpmsg}{$lang} : $htitles{nomsgfo}{$lang};
@@ -13764,47 +13776,6 @@ sub _graphicHeader {
   $header .= qq{</table>};
 
 return $header;
-}
-
-################################################################
-#             Mitteilungssystem füllen
-#  Schweregrad SV:
-#  0 - keine Mitteilung
-#  1 - Mitteilung
-#  2 - Warnung
-#  3 - Fehler / Problem
-################################################################
-sub __fillupMessages {           
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $lang  = $paref->{lang};
-
-  for my $idx (keys %{$data{$name}{messages}}) {
-      next if($idx == 9999);
-      delete $data{$name}{messages}{$idx};
-  }
-  
-  my $midx   = 0; 
-  my $max_sv = 0;
-  
-  if (!ReadingsVal ($name, '.migrated', 0)) {
-      $midx++;
-      $data{$name}{messages}{$midx}{SV}  = 1;
-      $data{$name}{messages}{$midx}{DE}  = 'Die gespeicherten PV Daten können mit "get ... x_migrate" in ein neues Format umgesetzt werden welches den Median Ansatz bei der PV Prognose aktiviert und nutzt.';
-      $data{$name}{messages}{$midx}{DE} .= '<br>Mit einem späteren Update des Moduls erfolgt diese Umstellung automatisch.';
-      $data{$name}{messages}{$midx}{EN}  = 'The stored PV data can be converted with “get ... x_migrate” into a new format which activates and uses the median approach in the PV forecast.';
-      $data{$name}{messages}{$midx}{EN} .= '<br>With a later update of the module, this changeover will take place automatically.';
-  }
- 
-  if ($midx && !defined $data{$name}{messages}{9999}{RD}) {               # RD = Read-Bit
-      my @aidx   = map { $_ } (1..$midx);                                 # größte vorhandene Severity finden
-      my @values = map { $data{$name}{messages}{$_}{SV} } @aidx; 
-      $max_sv    = max(@values);     
-  }
-  
-  my $max_icon = $svicons{$max_sv};                                      # ... und das dazugehörige Icon
-
-return ($max_icon, $midx);
 }
 
 ################################################################
@@ -15292,6 +15263,7 @@ sub __batRcmdOnBeam {
   my $t          = $paref->{t};
   my $barcount   = $paref->{barcount} // 9999;                                   # Sync Anzahl Balken dieser Ebene mit voriger Ebene
   
+  my $hash = $defs{$name};
   my $hh;
 
   for my $idx (sort keys %{$data{$name}{nexthours}}) {
@@ -15320,8 +15292,21 @@ sub __batRcmdOnBeam {
           $bn = sprintf "%02d", $bn;
           $ds = sprintf "%02d", $ds;
           
+          ## Einfügen prepared NextHour Werte
+          #####################################
           $hfcg->{$kdx}{'rcdchargebat'.$bn} = $hh->{$ds}{$ts}{'rcdchargebat'.$bn} if(defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn});
           $hfcg->{$kdx}{'soc'.$bn}          = $hh->{$ds}{$ts}{'soc'.$bn}          if(defined $hh->{$ds}{$ts}{'soc'.$bn});
+          
+          ## Auffüllen mit History Werten (Achtung: Stundenverschieber relativ zu Nexthours)
+          ####################################################################################
+          if (!defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn}) {
+              my $histsoc = HistoryVal ($hash, $ds, (sprintf "%02d", $ts+1), 'batsoc'.$bn, undef);
+              
+              if (defined $histsoc) {
+                  $hfcg->{$kdx}{'soc'.$bn}          = $histsoc;
+                  $hfcg->{$kdx}{'rcdchargebat'.$bn} = 'hist';
+              }
+          }
       }
   }
 
@@ -15390,7 +15375,7 @@ sub __batRcmdOnBeam {
                                        " W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : 'undef').
                                        ", SoC: ".(defined $hfcg->{$i}{'soc'.$bn} ? $hfcg->{$i}{'soc'.$bn} : 'undef')." %");
           
-          my $image = defined $hfcg->{$i}{'rcdchargebat'.$bn} ? FW_makeImage ($bicon) : '';
+          my $image = FW_makeImage ($bicon);
           
           $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
       }
@@ -16170,7 +16155,13 @@ sub __substituteIcon {
                                 $bicondef;                                               # nur Farbe angegeben  
                                 
               $color  //= $biccolrcddef;
-              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bcharrel}{$lang};
+              
+              if ($flag eq 'hist') {                                                     # erreichter SoC vergangener Stunden
+                  $pretxt = $htitles{onlybatw}{$lang}." $pn: $msg1";
+              }
+              else {                                                                     # prognostizierte Ladefreigabe 
+                  $pretxt = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bcharrel}{$lang};
+              }
           }
           else {                                                                         # keine Ladefreigabe
               ($icon, $color) = split '@', $inorcmd;
@@ -16212,8 +16203,12 @@ sub __substituteIcon {
                $txt     = "$pretxt\nStatus: Standby".$soctxt;
            }
       }
-      else {                                                                             # zukünftiger Zeitraum (Prognose)
-          $txt = $pretxt.$soctxt;
+      else {                                                                             
+          if (defined $flag && $flag eq 'hist') {                                        # Text 'SoC am Ende der Stunde' 
+              $soctxt = "\n".$htitles{socbaths}{$lang}.": ".$soc." %";     
+          }                                                                              
+          
+          $txt = $pretxt.$soctxt;                                                        # resultierender Text
       }
   }
   elsif ($ptyp eq 'producer') {                                                          # Icon Producer
@@ -16502,6 +16497,315 @@ return;
 }
 
 ###############################################################
+#     Abruf und Einlesen Messagefile nonBlocking
+###############################################################
+sub getMessageFileNonBlocking {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+      
+  RemoveInternalTimer ($hash, "FHEM::SolarForecast::getMessageFileNonBlocking");
+  InternalTimer       (gettimeofday() + $gmfilerepeat, "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
+  
+  my (undef, $disabled, $inactive) = controller ($name);
+  return if($disabled || $inactive);
+
+  delete $hash->{HELPER}{GMFRUNNING} if(defined $hash->{HELPER}{GMFRUNNING}{pid} && $hash->{HELPER}{GMFRUNNING}{pid} =~ /DEAD/xs);
+
+  if (defined $hash->{HELPER}{GMFRUNNING}{pid}) {
+      Log3 ($name, 3, qq{$name - another Message File Process with PID "$hash->{HELPER}{GMFRUNNING}{pid}" is already running ... get Message File is aborted});
+      return;
+  }
+  
+  Log3 ($name, 4, "$name - Notification System - Message file >$messagefile< is retrieved non blocking");
+
+  my $paref = { name  => $name,
+                hash  => $hash,
+                block => 1
+              };
+
+  $hash->{HELPER}{GMFRUNNING} = BlockingCall ( "FHEM::SolarForecast::_retrieveMessageFile",
+                                               $paref,
+                                               "FHEM::SolarForecast::_processMessageFile",
+                                               $gmfblto,
+                                               "FHEM::SolarForecast::_abortGetMessageFile",
+                                               $hash
+                                             );
+
+
+  if (defined $hash->{HELPER}{GMFRUNNING}) {
+      $hash->{HELPER}{GMFRUNNING}{loglevel} = 3;
+  }
+
+return;
+}
+
+###############################################################
+#         Message File aus contrib abholen
+###############################################################
+sub _retrieveMessageFile {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $block = $paref->{block} // 0;
+  
+  my $valid           = 1;
+  my ($err, $remfile) = __httpBlockingGet ($name, $bPath.$messagefile.$pPath);
+  
+  $remfile = q{} if($remfile =~ /No\snode\strunk\/fhem\/contrib\/SolarForecast\//xs);
+  
+  if ($err) {
+      $valid = 0;
+      Log3 ($name, 4, "$name - Notification System - retrieve of remote Message File faulty: $err");
+  }
+
+  if (!$remfile) {
+      $valid = 0;
+      Log3 ($name, 4, "$name - Notification System - no remote Message File >$messagefile< found");
+  }
+  
+  if ($valid) {
+      $err = __updWriteFile ("$root/FHEM/", $messagefile, $remfile);
+
+      if ($err) {
+          $valid = 0;
+          Log3 ($name, 1, "$name - $err");
+      }
+      else {
+          Log3 ($name, 4, "$name - Notification System - new Message File updated to $root/FHEM/$messagefile");
+      }
+  }
+  
+  $paref->{valid} = $valid;
+  my $serial      = encode_base64 (Serialize ( $paref ), "");                           # Serialisierung
+
+  $block ? return ($serial) : return \&_processMessageFile ($serial);
+
+return;
+}
+
+###############################################################
+#     Folgeroutine nach Message File aus contrib abholen
+###############################################################
+sub _processMessageFile {
+  my $serial = decode_base64 (shift);
+
+  my $paref = eval { thaw ($serial) };                                             # Deserialisierung
+  my $name  = $paref->{name};
+  my $valid = $paref->{valid};
+  my $hash  = $defs{$name};
+  
+  if ($valid) {
+      __readFileMessages ($paref);
+  }
+
+return;
+}
+
+######################################################################
+#      Messagefile für Notification System lesen
+#  Filestruktur:
+#  0|SV|1
+#  0|DE|Mitteilung ....
+#  0|EN|Message...
+#  $data{$name}{messages}{999000}{TS}: Timestamp Stand Message File
+######################################################################
+sub __readFileMessages {                  
+  my $paref = shift;
+  my $name  = $paref->{name};
+  
+  my $hash  = $defs{$name};
+
+  open (FD, "$root/FHEM/$messagefile") or do { return $! };
+  
+  delete $data{$name}{filemessages};
+
+  my @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
+  close (FD);
+
+  Log3 ($name, 4, "$name - Notification System - read local Message File >$messagefile< with ".scalar @locList." entries.");
+
+  for my $l (@locList) {
+      next if ($l =~ /^\#/xs);
+      my @l = split /\|/, $l, 3;
+      next if(!isNumeric ($l[0]));
+      next if($l[1] !~ /^(DE|EN|SV)$/xs);
+      
+      $data{$name}{filemessages}{$l[0]}{$l[1]} = $l[2];
+  }
+  
+  $data{$name}{filemessages}{999000}{TS} = time;
+
+return;
+}
+
+####################################################################################################
+#                    Abbruchroutine BlockingCall Timeout
+####################################################################################################
+sub _abortGetMessageFile {
+  my $hash   = shift;
+  my $cause  = shift // "Timeout: process terminated";
+  my $name   = $hash->{NAME};
+  my $type   = $hash->{TYPE};
+
+  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{GMFRUNNING}{fn} pid:$hash->{HELPER}{AIBLOCKRUNNING}{pid} aborted: $cause");
+
+  delete $hash->{HELPER}{GMFRUNNING};
+
+return;
+}
+
+##########################################################################
+#             Mitteilungssystem füllen
+#  Schweregrad SV:
+#  0 - keine Mitteilung
+#  1 - Mitteilung
+#  2 - Warnung
+#  3 - Fehler / Problem
+#
+#  Statusspeicher:
+#  $data{$name}{messages}{999999}{RD}: 1 - gelesen, 0 - ungelesen
+#  $data{$name}{messages}{999000}{TS}: Timestamp Stand Message File
+#  $data{$name}{messages}{999500}{TS}: Timestamp Stand prepared Messages
+##########################################################################
+sub fillupMessageSystem {           
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+
+  my $otxt   = q{};
+  my $ntxt   = q{};
+  my $midx   = 0; 
+  my $max_sv = 0;
+  
+  ## Aufnahme Stand für alt/neu Vergleich + Clear Messages
+  ##########################################################
+  for my $idx (sort keys %{$data{$name}{messages}}) {    
+      next if($idx >= $idxlimit);
+      $otxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
+      $otxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
+      $otxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
+      
+      delete $data{$name}{messages}{$idx};
+  }
+  
+  ## Messages füllen
+  ######################################################################## 
+  # Integration File Messages
+  for my $mfi (sort keys %{$data{$name}{filemessages}}) {
+      next if($mfi >= $idxlimit);
+      $midx++;
+      $data{$name}{messages}{$midx}{SV} = $data{$name}{filemessages}{$mfi}{SV};
+      $data{$name}{messages}{$midx}{DE} = $data{$name}{filemessages}{$mfi}{DE};
+      $data{$name}{messages}{$midx}{EN} = $data{$name}{filemessages}{$mfi}{EN};
+  }
+  
+  # Integration prepared Messages
+  for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
+      next if($smi >= $idxlimit);
+      $midx++;
+      $data{$name}{messages}{$midx}{SV} = $data{$name}{preparedmessages}{$smi}{SV};
+      $data{$name}{messages}{$midx}{DE} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{DE});
+      $data{$name}{messages}{$midx}{EN} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{EN});  
+  }
+  
+  $data{$name}{messages}{999000}{TS} = $data{$name}{filemessages}{999000}{TS}     // 0;
+  $data{$name}{messages}{999500}{TS} = $data{$name}{preparedmessages}{999500}{TS} // 0;
+  
+  ########################################################################
+  ## Ende Messages auffüllen
+  
+  
+  ## Vergleich auf geänderte Messages
+  #####################################
+  for my $idx (sort keys %{$data{$name}{messages}}) {                                     
+      next if($idx >= $idxlimit);
+      $ntxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
+      $ntxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
+      $ntxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
+  }
+  
+  if ($ntxt ne $otxt) {                                                                   # es gibt neue Post! bzw. Änderungen -> Read-Bit läschen
+      delete $data{$name}{messages}{999999}{RD};
+  }
+  
+ 
+  if ($midx && !defined $data{$name}{messages}{999999}{RD}) {                             # RD = Read-Bit (undef -> Messages nicht gelesen)
+      my @aidx   = map { $_ } (1..$midx);                                                 # größte vorhandene Severity finden ...
+      my @values = map { $data{$name}{messages}{$_}{SV} } @aidx; 
+      $max_sv    = max(@values);     
+  }
+  
+  my $max_icon = $svicons{$max_sv};                                                       # ... und das dazugehörige Icon
+
+return ($max_icon, $midx);
+}
+
+################################################################
+#                Ausgabe des Mitteilungsystems
+################################################################
+sub outputMessages {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+  
+  my ($micon, $midx) = fillupMessageSystem ($paref);                                                 # Ergebnisse füllen (sind leer wenn Browser nicht refreshed)
+  my $tnf            = $data{$name}{messages}{999000}{TS}                                     ? 
+                       (timestampToTimestring ($data{$name}{messages}{999000}{TS}, $lang))[0] :
+                       'n.a.';
+  my $tpm            = $data{$name}{messages}{999500}{TS}  ?
+                       (timestampToTimestring ($data{$name}{messages}{999500}{TS}, $lang))[0] :
+                       'n.a.';
+  ## Ausgabe
+  ############
+  my $out  = qq{<html>};
+  $out    .= qq{<b>$hqtxt{msgsys}{$lang}</b> <br><br>};  
+  $out    .= qq{$hqtxt{ludich}{$lang} - <b>File:</b> $tnf, <b>System:</b> $tpm  <br>};       
+  $out    .= qq{($hqtxt{dmgsig}{$lang})  <br><br>};
+
+  $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
+  $out    .= qq{<tr style="font-weight:bold;">};
+  $out    .= qq{<td style="text-decoration:underline;"> Pos.                  </td>};
+  $out    .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>};
+  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{msgimp}{$lang} </td>};
+  $out    .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>};
+  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{simsg}{$lang}  </td>};
+  $out    .= qq{</tr>};
+  $out    .= qq{<tr></tr>};
+                                                                            
+  my $hc = 0;
+
+  for my $key (sort keys %{$data{$name}{messages}}) {
+      next if($key >= $idxlimit);
+      
+      $hc++;
+      #my $enmsg = encode ("utf8", $data{$name}{messages}{$key}{$lang});
+      my $enmsg = $data{$name}{messages}{$key}{$lang};
+
+      $out .= qq{<tr>};
+      $out .= qq{<td style="padding: 5px; text-align: center">     $key                                       </td>};
+      $out .= qq{<td style="padding: 5px;">                                                                   </td>};
+      $out .= qq{<td style="padding: 5px; text-align: center">     $data{$name}{messages}{$key}{SV}           </td>};
+      $out .= qq{<td style="padding: 5px;">                                                                   </td>};
+      $out .= qq{<td style="padding-right: 5px; text-align: left"> $enmsg                                     </td>};
+      $out .= qq{</tr>};
+
+      if ($hc < $midx) {                                                                           # Zwischenzeile
+          $out .= qq{<tr>};
+          $out .= qq{<td> &nbsp; </td>};
+          $out .= qq{</tr>};
+      }
+  }
+
+  $out .= qq{</table>};                        
+  $out .= qq{</html>};
+
+  $out .= "<br>";
+  $out .= $hqtxt{legimp}{$lang};
+
+return $out;
+}
+
+###############################################################
 #    Eintritt in den KI Train Prozess normal/Blocking
 ###############################################################
 sub manageTrain {
@@ -16688,7 +16992,6 @@ return;
 sub aiTrain {                            ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $block = $paref->{block} // 0;
 
   my $hash = $defs{$name};
@@ -18189,63 +18492,6 @@ return "The memory structure was written to the file $outfile";
 }
 
 ################################################################
-#                Ausgabe des Mitteilungsystems
-################################################################
-sub outputMessages {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $lang  = $paref->{lang};
-  
-  my ($micon, $midx) = __fillupMessages ($paref);                                                 # Ergebnisse füllen (sind leer wenn Browser nicht refreshed)
-
-  ## Ausgabe
-  ############
-  my $out  = qq{<html>};
-  $out    .= qq{<b>}.$hqtxt{msgsys}{$lang}.qq{</b> <br>};
-  $out    .= qq{<b>Hinweis:</b> Gelesene Mitteilungen werden bis zu einem FHEM Neustart nicht wieder signalisiert, bleiben jedoch bei Relevanz erhalten. <br><br>};
-
-  $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
-  $out    .= qq{<tr style="font-weight:bold;">};
-  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{number}{$lang} </td>};
-  $out    .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>};
-  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{msgimp}{$lang} </td>};
-  $out    .= qq{<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>};
-  $out    .= qq{<td style="text-decoration:underline;"> $hqtxt{simsg}{$lang} </td>};
-  $out    .= qq{</tr>};
-  $out    .= qq{<tr></tr>};
-                                                                            
-  my $hc = 0;
-
-  for my $key (sort keys %{$data{$name}{messages}}) {
-      next if($key == 9999);
-      
-      $hc++;
-      my $enmsg = encode ("utf8", $data{$name}{messages}{$key}{$lang});
-
-      $out .= qq{<tr>};
-      $out .= qq{<td style="padding: 5px; text-align: center">     $key                                       </td>};
-      $out .= qq{<td style="padding: 5px;">                                                                   </td>};
-      $out .= qq{<td style="padding: 5px; text-align: center">     $data{$name}{messages}{$key}{SV}           </td>};
-      $out .= qq{<td style="padding: 5px;">                                                                   </td>};
-      $out .= qq{<td style="padding-right: 5px; text-align: left"> $enmsg                                     </td>};
-      $out .= qq{</tr>};
-
-      if ($hc < $midx) {                                                                           # Zwischenzeile
-          $out .= qq{<tr>};
-          $out .= qq{<td> &nbsp; </td>};
-          $out .= qq{</tr>};
-      }
-  }
-
-  $out .= qq{</table>};
-  $out .= qq{</html>};
-
-  $out .= "<br>";
-
-return $out;
-}
-
-################################################################
 #        validiert die aktuelle Anlagenkonfiguration
 ################################################################
 sub checkPlantConfig {
@@ -18987,10 +19233,69 @@ return;
 }
 
 ################################################################
+#     Berechnen Tag / Stunden Verschieber
+#     aus aktueller Stunde + lfd. Nummer
+################################################################
+sub calcDayHourMove {
+  my $chour = shift;
+  my $num   = shift;
+
+  my $fh = $chour + $num;
+  my $fd = int ($fh / 24) ;
+  $fh    = $fh - ($fd * 24);
+
+return ($fd, $fh);
+}
+
+################################################################
+#  Zeit gemäß DWD_OpenData-Format
+#  Berechnen Tag / Stunden Verschieber ab aktuellen Tag
+#  Input:   YYYY-MM-DD HH:MM:SS
+#  Output:  $fd - 0 (Heute), 1 (Morgen), 2 (Übermorgen), ....
+#           $fh - Stunde von $fd ohne führende Null
+#  Return:  fc${fd}_${fh}
+################################################################
+sub formatWeatherTimestrg {
+  my $date = shift // return;
+
+  my $cdate = strftime "%Y-%m-%d", localtime(time);
+  my $refts = timestringToTimestamp ($cdate.' 00:00:00');                                      # Referenztimestring
+  my $datts = timestringToTimestamp ($date);
+  my $fd    = int (($datts - $refts) / 86400);
+  my $fh    = int ((split /[ :]/, $date)[1]);
+
+return "fc${fd}_${fh}";
+}
+
+################################################################
+#    Spezialfall auflösen wenn Wert von $val2 dem
+#    Redingwert von $val1 entspricht sofern $val1 negativ ist
+################################################################
+sub substSpecialCases {
+  my $paref = shift;
+  my $dev   = $paref->{dev};
+  my $rdg   = $paref->{rdg};
+  my $rdgf  = $paref->{rdgf};
+
+  my $val1  = ReadingsNum ($dev, $rdg, 0) * $rdgf;
+  my $val2;
+
+  if($val1 <= 0) {
+      $val2 = abs($val1);
+      $val1 = 0;
+  }
+  else {
+      $val2 = 0;
+  }
+
+return ($val1,$val2);
+}
+
+################################################################
 #              Timestrings berechnen
 #  gibt Zeitstring in lokaler Zeit zurück
 ################################################################
-sub timestampToTimestring {
+sub timestampToTimestring {         
   my $epoch = shift;
   my $lang  = shift // '';
 
@@ -20027,7 +20332,7 @@ return $is;
 #                      reading: Device ist im Reading Value enthalten
 #                      attr:    Device ist im Attr Value enthalten
 #                      string:  Device ist im Objekt-Inhalt enthalten
-#    return: $valid  - ist die Angabe valide (1)
+#    return: $err    - evtl. Fehler
 #            $a->[0] - das extrahierte Device
 #            $h      - Hash der geparsten Entität
 #####################################################################
@@ -20054,24 +20359,27 @@ sub isDeviceValid {
   }
 
   my ($a, $h) = parseParams ($dev);
+  
+  my ($dv, $al) = !$a->[0]         ? ('', '')             :
+                  $a->[0] =~ /:/xs ? (split ':', $a->[0]) : 
+                  ($a->[0], '');                                               # (optionalen) SF-spezifischen Alias abtrennen
 
-  if ($a->[0] && $a->[0] =~ /\@/xs ) {                                                # Remote Device
-       $a->[0] = (split '@', $a->[0])[0];
-       return ($err, $a->[0], $h);                                                    # ToDo: $h aus remote Werten anreichern
-  }
-
-  if (!$a->[0] || !$defs{$a->[0]}) {
-      $a->[0] //= '';
-      $err      = qq{The device '$a->[0]' doesn't exist or is not a valid device.};
-      $err      = qq{There is no device set. Check the syntax with the command reference.}               if(!$a->[0]);
-      $err      = qq{The device '$a->[0]' doesn't exist anymore! Delete or change the attribute '$obj'.} if(!$defs{$a->[0]} && $method eq 'attr' && $obj =~ /consumer/);
+  if (!$dv || !$defs{$dv}) {
+      $dv //= '';
+      $err  = qq{The device '$dv' doesn't exist or is not a valid device.};
+      $err  = qq{There is no device set. Check the syntax with the command reference.}            if(!$dv);
+      $err  = qq{The device '$dv' doesn't exist anymore! Delete or change the attribute '$obj'.}  if(!$defs{$dv} && $method eq 'attr' && $obj =~ /consumer/);
   }
 
   if ($err) {
       Log3 ($name, 1, "$name - ERROR - $err");
   }
+  
+  if ($al) {                                                                   # Leerzeichen im SF-Alias generieren
+      $al =~ s/\+/ /g;
+  }
 
-return ($err, $a->[0], $h);
+return ($err, $dv, $h, $al);
 }
 
 #####################################################################
@@ -22619,7 +22927,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
+       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
                          [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                                <br>
                          [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]                                      <br>
                          [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                      <br>
@@ -22628,8 +22936,8 @@ to ensure that the system configuration is correct.
                          [surpmeth=&lt;Option&gt] [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] [exconfc=&lt;Option&gt] </b><br>
                          <br>
 
-        Registers a consumer &lt;Device Name&gt; with the SolarForecast Device. In this case, &lt;Device Name&gt;
-        is a consumer device already created in FHEM, e.g. a switchable socket.
+        Registers a consumer &lt;Device&gt; with the SolarForecast Device. An optional alias can be specified. <br>
+        In this case, &lt;Device&gt; is a consumer device already created in FHEM, e.g. a switchable socket.
         Most of the keys are optional, but are a prerequisite for certain functionalities and are filled with
         default values. <br>
         If the dish is defined "auto", the automatic mode in the integrated consumer graphic can be switched with the
@@ -22664,6 +22972,11 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+            <tr><td> <b>Device</b>         </td><td>Consumer device. In the simple case, the device works both as an energy meter and as a switch.                                                    </td></tr>
+            <tr><td>                       </td><td>In the optional alias, spaces must be replaced by '+' (e.g. 'Ein+toller+Alias').                                                                  </td></tr>
+            <tr><td>                       </td><td>If the consumer consists of different devices/channels (e.g. Homematic), the energy meter is defined as a &lt;Device&gt;.                         </td></tr>
+            <tr><td>                       </td><td>The associated switching device is specified with the key 'switchdev'.                                                                            </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>type</b>           </td><td>Type of consumer. The following types are allowed:                                                                                                </td></tr>
             <tr><td>                       </td><td><b>dishwasher</b>     - Consumer is a dishwasher                                                                                                  </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Consumer is a tumble dryer                                                                                                </td></tr>
@@ -23060,8 +23373,10 @@ to ensure that the system configuration is correct.
             <tr><td>                                   </td><td>A call can contain multiple API requests.                                                                            </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>the number of radiation data API calls still possible on the current day                                             </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>the number of radiation data API requests still possible on the current day                                          </td></tr>
-            <tr><td> <b>todayBatInXX</b>               </td><td>the energy charged into the battery XX on the current day                                                            </td></tr>
-            <tr><td> <b>todayBatOutXX</b>              </td><td>the energy taken from the battery XX on the current day                                                              </td></tr>
+            <tr><td> <b>todayBatIn_XX</b>              </td><td>the energy charged into the battery XX on the current day                                                            </td></tr>
+            <tr><td> <b>todayBatInSum</b>              </td><td>Total energy charged in all batteries on the current day                                                             </td></tr>
+            <tr><td> <b>todayBatOut_XX</b>             </td><td>the energy taken from the battery XX on the current day                                                              </td></tr>
+            <tr><td> <b>todayBatOutSum</b>             </td><td>Total energy drawn from all batteries on the current day                                                             </td></tr>
          </table>
          </ul>
        <br>
@@ -25104,7 +25419,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
+       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]<br>
                          [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;minutes&gt; | SunPath[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;]]                                <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [asynchron=&lt;Option&gt]                                    <br>
                          [notbefore=&lt;Ausdruck&gt;] [notafter=&lt;Ausdruck&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                          <br>
@@ -25113,8 +25428,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
                          [surpmeth=&lt;Option&gt] [interruptable=&lt;Option&gt] [noshow=&lt;Option&gt] [exconfc=&lt;Option&gt]  </b><br>
                          <br>
 
-        Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
-        ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose.
+        Registriert einen Verbraucher &lt;Device&gt; beim SolarForecast Device. Ein optionaler Alias kann angegeben werden. <br>
+        Dabei ist &lt;Device&gt; ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose.
         Die meisten Schlüssel sind optional, sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit
         default-Werten besetzt. <br>
         Ist der Schüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den
@@ -25148,6 +25463,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+            <tr><td> <b>Device</b>         </td><td>Verbraucher-Gerät. Im einfachen Fall arbeitet das Gerät sowohl als Energiemesser als auch als Schalter.                                            </td></tr>
+            <tr><td>                       </td><td>Im optionalen Alias sind Leerzeichen durch '+' zu ersetzen (z.B. 'Ein+toller+Alias').                                                              </td></tr>
+            <tr><td>                       </td><td>Besteht der Verbraucher aus verschiedenen Geräten/Kanäalen (z.B. Homematic), wird der Energiemesser als  &lt;Device&gt; definiert.                 </td></tr>
+            <tr><td>                       </td><td>Das dazugehörige Schalt-Gerät wird mit dem Schlüssel 'switchdev' spezifiziert.                                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                                 </td></tr>
             <tr><td>                       </td><td><b>dishwasher</b>     - Verbraucher ist eine Spülmaschine                                                                                          </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Verbraucher ist ein Wäschetrockner                                                                                         </td></tr>
@@ -25545,8 +25865,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                   </td><td>Ein Call kann mehrere API Requests enthalten.                                                                   </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Calls                                        </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Requests                                     </td></tr>
-            <tr><td> <b>todayBatInXX</b>               </td><td>die am aktuellen Tag in die Batterie XX geladene Energie                                                        </td></tr>
-            <tr><td> <b>todayBatOutXX</b>              </td><td>die am aktuellen Tag aus der Batterie XX entnommene Energie                                                     </td></tr>
+            <tr><td> <b>todayBatIn_XX</b>              </td><td>die am aktuellen Tag in die Batterie XX geladene Energie                                                        </td></tr>
+            <tr><td> <b>todayBatInSum</b>              </td><td>Summe der am aktuellen Tag in alle Batterien geladene Energie                                                   </td></tr>           
+            <tr><td> <b>todayBatOut_XX</b>             </td><td>die am aktuellen Tag aus der Batterie XX entnommene Energie                                                     </td></tr>
+            <tr><td> <b>todayBatOutSum</b>             </td><td>Summe der am aktuellen Tag aus allen Batterien entnommene Energie                                               </td></tr>
          </table>
          </ul>
        <br>
