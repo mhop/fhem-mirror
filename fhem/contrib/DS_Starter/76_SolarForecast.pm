@@ -709,17 +709,17 @@ my %hmoon = (
 );
 
 my %hrepl = (                                                                # Zeichenersetzungen
-  '0' => 'a',
-  '1' => 'b',
-  '2' => 'c',
-  '3' => 'd',
-  '4' => 'e',
-  '5' => 'f',
-  '6' => 'g',
-  '7' => 'h',
-  '8' => 'i',
-  '9' => 'j',
-  '.' => 'k',
+  '0'  => 'a',
+  '1'  => 'b',
+  '2'  => 'c',
+  '3'  => 'd',
+  '4'  => 'e',
+  '5'  => 'f',
+  '6'  => 'g',
+  '7'  => 'h',
+  '8'  => 'i',
+  '9'  => 'j',
+  '\.' => 'k',
 );
 
 my %hqtxt = (                                                                # Hash (Setup) Texte
@@ -4745,7 +4745,7 @@ sub _getlistPVCircular {
   my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'circular', $arg);
-  $ret   .= lineFromSpaces ($ret, -20);
+  $ret   .= lineFromSpaces ($ret, 5);
 
 return $ret;
 }
@@ -13193,6 +13193,8 @@ sub entryGraphic {
       delete $paref->{maxDif};
       delete $paref->{minDif};
 
+      Log3 ($name, 4, "$name - RET nach Ebene 1:\n".$ret);
+        
       ## Balkengrafik Ebene 2
       #########################
       if ($paref->{beam3cont} || $paref->{beam4cont}) {                                                    # Balkengrafik Ebene 2
@@ -13230,6 +13232,8 @@ sub entryGraphic {
           delete $paref->{maxDif};
           delete $paref->{minDif};
       }
+      
+      Log3 ($name, 4, "$name - RET nach Ebene 2:\n".$ret);
 
       $paref->{modulo}++;
   }
@@ -13264,6 +13268,8 @@ sub entryGraphic {
 
   $ret .= "</td></tr>";
   $ret .= "</table>";
+  
+  Log3 ($name, 4, "$name - RET nach Ebene Flowgrafik:\n".$ret);
 
 return $ret;
 }
@@ -14851,6 +14857,7 @@ sub _beamGraphic {
   my $ret      = q{};
   $ret        .= __weatherOnBeam ($paref) if($weather);
   $ret        .= __batteryOnBeam ($paref);
+  
   my $m        = $paref->{modulo} % 2;
 
   if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
@@ -15329,7 +15336,6 @@ sub __batteryOnBeam {
       
       $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                            # freier Platz am Anfang     
       my $ii       = 0;
-      my $m =0;
             
       for my $i (0..($maxhours * 2) - 1) {
           my $skip = __dontNightshowSkipSync ($name, $paref, $i);
@@ -15372,27 +15378,14 @@ sub __batteryOnBeam {
                                                     }
                                                   ); 
                                                   
-          Log3 ($name, 4, "$name - Test title nach Subst $i: $title") if($m==0 || $m==1 || $m==2); 
-                                                  
-          my $titleadd   = defined $currsoc ? "\n".$htitles{socbacur}{$lang}.": ".$currsoc." %" : '';
-          
-          Log3 ($name, 4, "$name - Test title Addon $i: $titleadd") if($m==0 || $m==1 || $m==2);   
-
-          $title      .= $titleadd;
-          
-          Log3 ($name, 4, "$name - Test title Zusammengesetzt $i: $title") if($m==0 || $m==1 || $m==2);  
-          
+          $title   .= defined $currsoc ? "\n".$htitles{socbacur}{$lang}.": ".$currsoc." %" : '';
           my $image = defined $hfcg->{$i}{'rcdchargebat'.$bn} ? FW_makeImage ($bicon) : '';
           
           $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
-      
-          Log3 ($name, 4, "$name - Test Return komplett $i: $ret\n") if($m==0 || $m==1 || $m==2); 
-          
+                                         
           debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): ".(defined $bpower ? $bpower : 'undef').
                                        " W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : 'undef').
                                        ", SoC: ".(defined $hfcg->{$i}{'soc'.$bn} ? $hfcg->{$i}{'soc'.$bn} : 'undef')." %");
-
-          $m++;
       }
       
       $ret .= "<td class='solarfc'></td></tr>" if($ret);                                                  # freier Platz am Ende der Icon Zeile
