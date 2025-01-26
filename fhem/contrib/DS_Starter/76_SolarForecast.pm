@@ -34,6 +34,7 @@ package FHEM::SolarForecast;                                                    
 
 use strict;
 use warnings;
+#use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                                           # für Syntaxcheck mit: perl -c /opt/fhem/FHEM/76_SolarForecast.pm
 use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
@@ -159,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.44.4" => "26.01.2025  _getlistPVCircular: change width of output, new sub _listDataPoolPvHist ",
   "1.44.3" => "25.01.2025  Notification System: minor changes, special Readings todayBatInSum todayBatOutSum ",
   "1.44.2" => "23.01.2025  _batChargeRecmd: user storeffdef, show historical battery SoC when displaying the battery in the bar graph ",
   "1.44.1" => "20.01.2025  Notification system: minor fixes, integration of controls_solarforecast_messages_test/prod ".
@@ -174,7 +176,7 @@ my %vNotesIntern = (
                            "trackFlex now default in DWD Model, replace title Charging recommendation by Charging release ".
                            "_saveEnergyConsumption: add dowrite flag, edit comref ",
   "1.43.1" => "11.01.2025  _batChargeRecmd: bugfix PV daily surplus update, _collectAllRegConsumers: fix interruptable hysteresis ".
-                           "__batRcmdOnBeam: show soc forecast for hour 00 and fix english translation ".
+                           "__batteryOnBeam: show soc forecast for hour 00 and fix english translation ".
                            "_batChargeRecmd: consider battery capacity as part of total capacity ",
   "1.43.0" => "10.01.2025  graphicShowNight: add possible Time Sync of chart bar level 1 and the other ".
                            "_addDynAttr: minor fix for graphicBeamXContent, new attr ctrlNextHoursSoCForecastReadings ",
@@ -4743,7 +4745,7 @@ sub _getlistPVCircular {
   my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'circular', $arg);
-  $ret   .= lineFromSpaces ($ret, 20);
+  $ret   .= lineFromSpaces ($ret, -20);
 
 return $ret;
 }
@@ -14848,7 +14850,7 @@ sub _beamGraphic {
 
   my $ret      = q{};
   $ret        .= __weatherOnBeam ($paref) if($weather);
-  $ret        .= __batRcmdOnBeam ($paref);
+  $ret        .= __batteryOnBeam ($paref);
   my $m        = $paref->{modulo} % 2;
 
   if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
@@ -15252,7 +15254,7 @@ return $ret;
 ################################################################
 #         Batterieladeempfehlung in Balkengrafik
 ################################################################
-sub __batRcmdOnBeam {
+sub __batteryOnBeam {
   my $paref      = shift;
   my $name       = $paref->{name};
   my $maxhours   = $paref->{maxhours};
@@ -15327,6 +15329,7 @@ sub __batRcmdOnBeam {
       
       $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                            # freier Platz am Anfang     
       my $ii       = 0;
+      my $m =0;
             
       for my $i (0..($maxhours * 2) - 1) {
           my $skip = __dontNightshowSkipSync ($name, $paref, $i);
@@ -15369,17 +15372,27 @@ sub __batRcmdOnBeam {
                                                     }
                                                   ); 
                                                   
-          $title .= defined $currsoc ? "\n".$htitles{socbacur}{$lang}.": ".$currsoc." %" : '';
-                                                 
-          debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): ".(defined $bpower ? $bpower : 'undef').
-                                       " W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : 'undef').
-                                       ", SoC: ".(defined $hfcg->{$i}{'soc'.$bn} ? $hfcg->{$i}{'soc'.$bn} : 'undef')." %");
+          Log3 ($name, 4, "$name - Test title nach Subst $i: $title") if($m==0 || $m==1 || $m==2); 
+                                                  
+          my $titleadd   = defined $currsoc ? "\n".$htitles{socbacur}{$lang}.": ".$currsoc." %" : '';
+          
+          Log3 ($name, 4, "$name - Test title Addon $i: $titleadd") if($m==0 || $m==1 || $m==2);   
+
+          $title      .= $titleadd;
+          
+          Log3 ($name, 4, "$name - Test title Zusammengesetzt $i: $title") if($m==0 || $m==1 || $m==2);  
           
           my $image = defined $hfcg->{$i}{'rcdchargebat'.$bn} ? FW_makeImage ($bicon) : '';
           
-          Log3 ($name, 1, "$name - Test orig title: $title");
+          $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
+      
+          Log3 ($name, 4, "$name - Test Return komplett $i: $ret\n") if($m==0 || $m==1 || $m==2); 
           
-          $ret .= "<td title='Ersatztitle' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$image</td>";
+          debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): ".(defined $bpower ? $bpower : 'undef').
+                                       " W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : 'undef').
+                                       ", SoC: ".(defined $hfcg->{$i}{'soc'.$bn} ? $hfcg->{$i}{'soc'.$bn} : 'undef')." %");
+
+          $m++;
       }
       
       $ret .= "<td class='solarfc'></td></tr>" if($ret);                                                  # freier Platz am Ende der Icon Zeile
@@ -17633,272 +17646,10 @@ sub listDataPool {
   my $par  = shift // q{};
 
   my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-
-  my ($sq, $h, $hexp);
-  my $export = q{};
-
-  if ($par eq 'exportToCsv') {
-      $export = 'csv';
-      $par    = q{};
-  }
-
-  my $sub = sub {
-      my $day = shift;
-      my $ret;
-
-      for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl    = HistoryVal ($name, $day, $key, 'pvrl',        '-');
-          my $pvrlvd  = HistoryVal ($name, $day, $key, 'pvrlvd',      '-');
-          my $pvfc    = HistoryVal ($name, $day, $key, 'pvfc',        '-');
-          my $gcons   = HistoryVal ($name, $day, $key, 'gcons',       '-');
-          my $con     = HistoryVal ($name, $day, $key, 'con',         '-');
-          my $confc   = HistoryVal ($name, $day, $key, 'confc',       '-');
-          my $gfeedin = HistoryVal ($name, $day, $key, 'gfeedin',     '-');
-          my $wid     = HistoryVal ($name, $day, $key, 'weatherid',   '-');
-          my $wcc     = HistoryVal ($name, $day, $key, 'wcc',         '-');
-          my $rr1c    = HistoryVal ($name, $day, $key, 'rr1c',        '-');
-          my $temp    = HistoryVal ($name, $day, $key, 'temp',      undef);
-          my $pvcorrf = HistoryVal ($name, $day, $key, 'pvcorrf',     '-');
-          my $dayname = HistoryVal ($name, $day, $key, 'dayname',   undef);
-          my $rad1h   = HistoryVal ($name, $day, $key, 'rad1h',       '-');
-          my $sunaz   = HistoryVal ($name, $day, $key, 'sunaz',       '-');
-          my $sunalt  = HistoryVal ($name, $day, $key, 'sunalt',      '-');
-          my $don     = HistoryVal ($name, $day, $key, 'DoN',         '-');
-          my $conprc  = HistoryVal ($name, $day, $key, 'conprice',    '-');
-          my $feedprc = HistoryVal ($name, $day, $key, 'feedprice',   '-');
-
-          if ($export eq 'csv') {
-              $hexp->{$day}{$key}{PVreal}             = $pvrl;
-              $hexp->{$day}{$key}{PVrealValid}        = $pvrlvd;
-              $hexp->{$day}{$key}{PVforecast}         = $pvfc;
-              $hexp->{$day}{$key}{GridConsumption}    = $gcons;
-              $hexp->{$day}{$key}{Consumption}        = $con;
-              $hexp->{$day}{$key}{confc}              = $confc;
-              $hexp->{$day}{$key}{GridFeedIn}         = $gfeedin;
-              $hexp->{$day}{$key}{WeatherId}          = $wid;
-              $hexp->{$day}{$key}{CloudCover}         = $wcc;
-              $hexp->{$day}{$key}{TotalPrecipitation} = $rr1c;
-              $hexp->{$day}{$key}{Temperature}        = $temp    // '';
-              $hexp->{$day}{$key}{PVCorrectionFactor} = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
-              $hexp->{$day}{$key}{Quality}            = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
-              $hexp->{$day}{$key}{DayName}            = $dayname // '';
-              $hexp->{$day}{$key}{GlobalRadiation }   = $rad1h;
-              $hexp->{$day}{$key}{SunAzimuth}         = $sunaz;
-              $hexp->{$day}{$key}{SunAltitude}        = $sunalt;
-              $hexp->{$day}{$key}{DayOrNight}         = $don;
-              $hexp->{$day}{$key}{PurchasePrice}      = $conprc;
-              $hexp->{$day}{$key}{FeedInPrice}        = $feedprc;
-          }
-
-          my ($inve, $invl);
-          for my $in (1..$maxinverter) {                                              # + alle Inverter
-              $in       = sprintf "%02d", $in;
-              my $etoti = HistoryVal ($name, $day, $key, 'etotali'.$in, '-');
-              my $pvrli = HistoryVal ($name, $day, $key, 'pvrl'.$in,    '-');
-              
-              if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"Etotal${in}"} = $etoti;
-                  $hexp->{$day}{$key}{"PVreal${in}"} = $pvrli;
-              }
-              
-              $inve .= ', ' if($inve);
-              $inve .= "etotali${in}: $etoti";
-              $invl .= ', ' if($invl);
-              $invl .= "pvrl${in}: $pvrli";
-          }
-          
-          my ($prde, $prdl);
-          for my $pn (1..$maxproducer) {                                              # + alle Producer
-              $pn       = sprintf "%02d", $pn;
-              my $etotp = HistoryVal ($name, $day, $key, 'etotalp'.$pn, '-');
-              my $pprl  = HistoryVal ($name, $day, $key, 'pprl'.$pn,    '-');
-              
-              if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"Etotal${pn}"} = $etotp;
-                  $hexp->{$day}{$key}{"PPreal${pn}"} = $pprl;
-              }
-              
-              $prde .= ', ' if($prde);
-              $prde .= "etotalp${pn}: $etotp";
-              $prdl .= ', ' if($prdl);
-              $prdl .= "pprl${pn}: $pprl";
-          }
-          
-          my ($btotin, $batin, $btotout, $batout, $batmsoc, $batssoc, $batsoc);
-          for my $bn (1..$maxbatteries) {                                            # + alle Batterien
-              $bn          = sprintf "%02d", $bn;
-              my $hbtotin  = HistoryVal ($name, $day, $key, 'batintotal'.$bn,  '-');
-              my $hbtotout = HistoryVal ($name, $day, $key, 'batouttotal'.$bn, '-');
-              my $hbatin   = HistoryVal ($name, $day, $key, 'batin'.$bn,       '-');
-              my $hbatout  = HistoryVal ($name, $day, $key, 'batout'.$bn,      '-');
-              my $hbatmsoc = HistoryVal ($name, $day, $key, 'batmaxsoc'.$bn,   '-');
-              my $hbatssoc = HistoryVal ($name, $day, $key, 'batsetsoc'.$bn,   '-');
-              my $hbatsoc  = HistoryVal ($name, $day, $key, 'batsoc'.$bn,      '-');
-              
-              if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"BatteryInTotal${bn}"}  = $hbtotin;
-                  $hexp->{$day}{$key}{"BatteryOutTotal${bn}"} = $hbtotout;
-                  $hexp->{$day}{$key}{"BatteryIn${bn}"}       = $hbatin;
-                  $hexp->{$day}{$key}{"BatteryOut${bn}"}      = $hbatout;
-                  $hexp->{$day}{$key}{"BatteryMaxSoc${bn}"}   = $hbatmsoc;
-                  $hexp->{$day}{$key}{"BatterySetSoc${bn}"}   = $hbatssoc;
-                  $hexp->{$day}{$key}{"BatterySoc${bn}"}      = $hbatsoc;
-              }
-              
-              $btotin  .= ', ' if($btotin);
-              $btotin  .= "batintotal${bn}: $hbtotin";
-              $btotout .= ', ' if($btotout);
-              $btotout .= "batouttotal${bn}: $hbtotout";
-              $batin   .= ', ' if($batin);
-              $batin   .= "batin${bn}: $hbatin";
-              $batout  .= ', ' if($batout);
-              $batout  .= "batout${bn}: $hbatout";
-              $batmsoc .= ', ' if($batmsoc);
-              $batmsoc .= "batmaxsoc${bn}: $hbatmsoc";
-              $batssoc .= ', ' if($batssoc);
-              $batssoc .= "batsetsoc${bn}: $hbatssoc";
-              $batsoc .= ', ' if($batsoc);
-              $batsoc .= "batsoc${bn}: $hbatsoc";
-          }
-          
-          $ret .= "\n      " if($ret);
-          $ret .= $key." => ";
-          $ret .= "pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
-          $ret .= "\n            ";          
-          $ret .= $inve            if($inve && $key ne '99');
-          $ret .= "\n            " if($inve && $key ne '99');
-          $ret .= $invl            if($invl);
-          $ret .= "\n            " if($invl);           
-          $ret .= $prde            if($prde && $key ne '99');
-          $ret .= "\n            " if($prde && $key ne '99');
-          $ret .= $prdl            if($prdl);
-          $ret .= "\n            " if($prdl);
-          $ret .= "confc: $confc, con: $con, gcons: $gcons, conprice: $conprc";
-          $ret .= "\n            ";
-          $ret .= "gfeedin: $gfeedin, feedprice: $feedprc";
-          $ret .= "\n            ";
-          $ret .= "DoN: $don, sunaz: $sunaz, sunalt: $sunalt";
-          $ret .= "\n            ";
-          
-          $ret .= $btotin                                        if($key ne '99');
-          $ret .= "\n            "                               if($key ne '99');
-          $ret .= $btotout                                       if($key ne '99');
-          $ret .= "\n            "                               if($key ne '99');
-          $ret .= $batsoc                                        if($key ne '99');
-          $ret .= "\n            "                               if($key ne '99');
-    
-          $ret .= $batin;
-          $ret .= "\n            ";
-          $ret .= $batout;
-          $ret .= "\n            ";
-          
-          $ret .= $batmsoc                                         if($key eq '99');
-          $ret .= "\n            "                                 if($key eq '99');
-          $ret .= $batssoc                                         if($key eq '99');
-          $ret .= "\n            "                                 if($key eq '99');
-
-          if ($key ne '99') {
-              $ret .= "wid: $wid, ";
-              $ret .= "wcc: $wcc, ";
-              $ret .= "rr1c: $rr1c, ";
-              $ret .= "pvcorrf: $pvcorrf ";
-          }
-
-          $ret .= "temp: $temp, "       if($temp);
-          $ret .= "dayname: $dayname, " if($dayname);
-
-          my $csm;
-          for my $c (1..$maxconsumer) {                                                      # + alle Consumer
-              $c       = sprintf "%02d", $c;
-              my $nl   = 0;
-              my $csmc = HistoryVal ($name, $day, $key, "cyclescsm${c}",      undef);
-              my $csmt = HistoryVal ($name, $day, $key, "csmt${c}",           undef);
-              my $csme = HistoryVal ($name, $day, $key, "csme${c}",           undef);
-              my $csmm = HistoryVal ($name, $day, $key, "minutescsm${c}",     undef);
-              my $csmh = HistoryVal ($name, $day, $key, "hourscsme${c}",      undef);
-              my $csma = HistoryVal ($name, $day, $key, "avgcycmntscsm${c}",  undef);
-
-              if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc if(defined $csmc);
-                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt if(defined $csmt);
-                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme if(defined $csme);
-                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm if(defined $csmm);
-                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh if(defined $csmh);
-                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma if(defined $csma);
-              }
-
-              if (defined $csmc) {
-                  $csm .= "cyclescsm${c}: $csmc";
-                  $nl   = 1;
-              }
-
-              if (defined $csmt) {
-                  $csm .= ", " if($nl);
-                  $csm .= "csmt${c}: $csmt";
-                  $nl   = 1;
-              }
-
-              if (defined $csme) {
-                  $csm .= ", " if($nl);
-                  $csm .= "csme${c}: $csme";
-                  $nl   = 1;
-              }
-
-              if (defined $csmm) {
-                  $csm .= ", " if($nl);
-                  $csm .= "minutescsm${c}: $csmm";
-                  $nl   = 1;
-              }
-
-              if (defined $csmh) {
-                  $csm .= ", " if($nl);
-                  $csm .= "hourscsme${c}: $csmh";
-                  $nl   = 1;
-              }
-
-              if (defined $csma) {
-                  $csm .= ", " if($nl);
-                  $csm .= "avgcycmntscsm${c}: $csma";
-                  $nl   = 1;
-              }
-
-              $csm .= "\n            " if($nl);
-          }
-
-          if ($csm) {
-              $ret .= "\n            ";
-              $ret .= $csm;
-          }
-          else {
-              $ret .= "\n            ";
-          }
-      }
-      return $ret;
-  };
+  my ($sq, $h);
 
   if ($htol eq "pvhist") {
-      $h = $data{$name}{pvhist};
-
-      if (!keys %{$h}) {
-          return qq{PV cache is empty.};
-      }
-
-      for my $i (keys %{$h}) {
-          if (!isNumeric ($i)) {
-              delete $data{$name}{pvhist}{$i};
-              Log3 ($name, 2, qq{$name - INFO - invalid key "$i" was deleted from pvHistory storage});
-          }
-      }
-
-      for my $idx (sort keys %{$h}) {
-          next if($par && $idx ne $par);
-          $sq .= $idx." => ".$sub->($idx)."\n";
-      }
-
-      if ($export eq 'csv') {
-          return _writeAsCsv ($hash, $hexp, $pvhexprtcsv.$name.'.csv');
-      }
+      $sq = _listDataPoolPvHist ($hash, $par);
   }
 
   if ($htol =~ /consumers|inverters|producers|strings|batteries/xs) {
@@ -18165,6 +17916,282 @@ return $sq;
 }
 
 ################################################################
+#            Listing des pvHistory Speichers           
+################################################################
+sub _listDataPoolPvHist {
+  my $hash = shift;
+  my $par  = shift // q{};
+
+  my $name = $hash->{NAME};
+
+  my ($sq, $h, $hexp);
+  my $export = q{};
+
+  if ($par eq 'exportToCsv') {
+      $export = 'csv';
+      $par    = q{};
+  }
+
+  my $sub = sub {
+      my $day = shift;
+      my $ret;
+
+      for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
+          my $pvrl    = HistoryVal ($name, $day, $key, 'pvrl',        '-');
+          my $pvrlvd  = HistoryVal ($name, $day, $key, 'pvrlvd',      '-');
+          my $pvfc    = HistoryVal ($name, $day, $key, 'pvfc',        '-');
+          my $gcons   = HistoryVal ($name, $day, $key, 'gcons',       '-');
+          my $con     = HistoryVal ($name, $day, $key, 'con',         '-');
+          my $confc   = HistoryVal ($name, $day, $key, 'confc',       '-');
+          my $gfeedin = HistoryVal ($name, $day, $key, 'gfeedin',     '-');
+          my $wid     = HistoryVal ($name, $day, $key, 'weatherid',   '-');
+          my $wcc     = HistoryVal ($name, $day, $key, 'wcc',         '-');
+          my $rr1c    = HistoryVal ($name, $day, $key, 'rr1c',        '-');
+          my $temp    = HistoryVal ($name, $day, $key, 'temp',      undef);
+          my $pvcorrf = HistoryVal ($name, $day, $key, 'pvcorrf',     '-');
+          my $dayname = HistoryVal ($name, $day, $key, 'dayname',   undef);
+          my $rad1h   = HistoryVal ($name, $day, $key, 'rad1h',       '-');
+          my $sunaz   = HistoryVal ($name, $day, $key, 'sunaz',       '-');
+          my $sunalt  = HistoryVal ($name, $day, $key, 'sunalt',      '-');
+          my $don     = HistoryVal ($name, $day, $key, 'DoN',         '-');
+          my $conprc  = HistoryVal ($name, $day, $key, 'conprice',    '-');
+          my $feedprc = HistoryVal ($name, $day, $key, 'feedprice',   '-');
+
+          if ($export eq 'csv') {
+              $hexp->{$day}{$key}{PVreal}             = $pvrl;
+              $hexp->{$day}{$key}{PVrealValid}        = $pvrlvd;
+              $hexp->{$day}{$key}{PVforecast}         = $pvfc;
+              $hexp->{$day}{$key}{GridConsumption}    = $gcons;
+              $hexp->{$day}{$key}{Consumption}        = $con;
+              $hexp->{$day}{$key}{confc}              = $confc;
+              $hexp->{$day}{$key}{GridFeedIn}         = $gfeedin;
+              $hexp->{$day}{$key}{WeatherId}          = $wid;
+              $hexp->{$day}{$key}{CloudCover}         = $wcc;
+              $hexp->{$day}{$key}{TotalPrecipitation} = $rr1c;
+              $hexp->{$day}{$key}{Temperature}        = $temp    // '';
+              $hexp->{$day}{$key}{PVCorrectionFactor} = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
+              $hexp->{$day}{$key}{Quality}            = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
+              $hexp->{$day}{$key}{DayName}            = $dayname // '';
+              $hexp->{$day}{$key}{GlobalRadiation }   = $rad1h;
+              $hexp->{$day}{$key}{SunAzimuth}         = $sunaz;
+              $hexp->{$day}{$key}{SunAltitude}        = $sunalt;
+              $hexp->{$day}{$key}{DayOrNight}         = $don;
+              $hexp->{$day}{$key}{PurchasePrice}      = $conprc;
+              $hexp->{$day}{$key}{FeedInPrice}        = $feedprc;
+          }
+
+          my ($inve, $invl);
+          for my $in (1..$maxinverter) {                                              # + alle Inverter
+              $in       = sprintf "%02d", $in;
+              my $etoti = HistoryVal ($name, $day, $key, 'etotali'.$in, '-');
+              my $pvrli = HistoryVal ($name, $day, $key, 'pvrl'.$in,    '-');
+              
+              if ($export eq 'csv') {
+                  $hexp->{$day}{$key}{"Etotal${in}"} = $etoti;
+                  $hexp->{$day}{$key}{"PVreal${in}"} = $pvrli;
+              }
+              
+              $inve .= ', ' if($inve);
+              $inve .= "etotali${in}: $etoti";
+              $invl .= ', ' if($invl);
+              $invl .= "pvrl${in}: $pvrli";
+          }
+          
+          my ($prde, $prdl);
+          for my $pn (1..$maxproducer) {                                              # + alle Producer
+              $pn       = sprintf "%02d", $pn;
+              my $etotp = HistoryVal ($name, $day, $key, 'etotalp'.$pn, '-');
+              my $pprl  = HistoryVal ($name, $day, $key, 'pprl'.$pn,    '-');
+              
+              if ($export eq 'csv') {
+                  $hexp->{$day}{$key}{"Etotal${pn}"} = $etotp;
+                  $hexp->{$day}{$key}{"PPreal${pn}"} = $pprl;
+              }
+              
+              $prde .= ', ' if($prde);
+              $prde .= "etotalp${pn}: $etotp";
+              $prdl .= ', ' if($prdl);
+              $prdl .= "pprl${pn}: $pprl";
+          }
+          
+          my ($btotin, $batin, $btotout, $batout, $batmsoc, $batssoc, $batsoc);
+          for my $bn (1..$maxbatteries) {                                            # + alle Batterien
+              $bn          = sprintf "%02d", $bn;
+              my $hbtotin  = HistoryVal ($name, $day, $key, 'batintotal'.$bn,  '-');
+              my $hbtotout = HistoryVal ($name, $day, $key, 'batouttotal'.$bn, '-');
+              my $hbatin   = HistoryVal ($name, $day, $key, 'batin'.$bn,       '-');
+              my $hbatout  = HistoryVal ($name, $day, $key, 'batout'.$bn,      '-');
+              my $hbatmsoc = HistoryVal ($name, $day, $key, 'batmaxsoc'.$bn,   '-');
+              my $hbatssoc = HistoryVal ($name, $day, $key, 'batsetsoc'.$bn,   '-');
+              my $hbatsoc  = HistoryVal ($name, $day, $key, 'batsoc'.$bn,      '-');
+              
+              if ($export eq 'csv') {
+                  $hexp->{$day}{$key}{"BatteryInTotal${bn}"}  = $hbtotin;
+                  $hexp->{$day}{$key}{"BatteryOutTotal${bn}"} = $hbtotout;
+                  $hexp->{$day}{$key}{"BatteryIn${bn}"}       = $hbatin;
+                  $hexp->{$day}{$key}{"BatteryOut${bn}"}      = $hbatout;
+                  $hexp->{$day}{$key}{"BatteryMaxSoc${bn}"}   = $hbatmsoc;
+                  $hexp->{$day}{$key}{"BatterySetSoc${bn}"}   = $hbatssoc;
+                  $hexp->{$day}{$key}{"BatterySoc${bn}"}      = $hbatsoc;
+              }
+              
+              $btotin  .= ', ' if($btotin);
+              $btotin  .= "batintotal${bn}: $hbtotin";
+              $btotout .= ', ' if($btotout);
+              $btotout .= "batouttotal${bn}: $hbtotout";
+              $batin   .= ', ' if($batin);
+              $batin   .= "batin${bn}: $hbatin";
+              $batout  .= ', ' if($batout);
+              $batout  .= "batout${bn}: $hbatout";
+              $batmsoc .= ', ' if($batmsoc);
+              $batmsoc .= "batmaxsoc${bn}: $hbatmsoc";
+              $batssoc .= ', ' if($batssoc);
+              $batssoc .= "batsetsoc${bn}: $hbatssoc";
+              $batsoc .= ', ' if($batsoc);
+              $batsoc .= "batsoc${bn}: $hbatsoc";
+          }
+          
+          $ret .= "\n      " if($ret);
+          $ret .= $key." => ";
+          $ret .= "pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, rad1h: $rad1h";
+          $ret .= "\n            ";          
+          $ret .= $inve            if($inve && $key ne '99');
+          $ret .= "\n            " if($inve && $key ne '99');
+          $ret .= $invl            if($invl);
+          $ret .= "\n            " if($invl);           
+          $ret .= $prde            if($prde && $key ne '99');
+          $ret .= "\n            " if($prde && $key ne '99');
+          $ret .= $prdl            if($prdl);
+          $ret .= "\n            " if($prdl);
+          $ret .= "confc: $confc, con: $con, gcons: $gcons, conprice: $conprc";
+          $ret .= "\n            ";
+          $ret .= "gfeedin: $gfeedin, feedprice: $feedprc";
+          $ret .= "\n            ";
+          $ret .= "DoN: $don, sunaz: $sunaz, sunalt: $sunalt";
+          $ret .= "\n            ";
+          
+          $ret .= $btotin                                        if($key ne '99');
+          $ret .= "\n            "                               if($key ne '99');
+          $ret .= $btotout                                       if($key ne '99');
+          $ret .= "\n            "                               if($key ne '99');
+          $ret .= $batsoc                                        if($key ne '99');
+          $ret .= "\n            "                               if($key ne '99');
+    
+          $ret .= $batin;
+          $ret .= "\n            ";
+          $ret .= $batout;
+          $ret .= "\n            ";
+          
+          $ret .= $batmsoc                                         if($key eq '99');
+          $ret .= "\n            "                                 if($key eq '99');
+          $ret .= $batssoc                                         if($key eq '99');
+          $ret .= "\n            "                                 if($key eq '99');
+
+          if ($key ne '99') {
+              $ret .= "wid: $wid, ";
+              $ret .= "wcc: $wcc, ";
+              $ret .= "rr1c: $rr1c, ";
+              $ret .= "pvcorrf: $pvcorrf ";
+          }
+
+          $ret .= "temp: $temp, "       if($temp);
+          $ret .= "dayname: $dayname, " if($dayname);
+
+          my $csm;
+          for my $c (1..$maxconsumer) {                                                      # + alle Consumer
+              $c       = sprintf "%02d", $c;
+              my $nl   = 0;
+              my $csmc = HistoryVal ($name, $day, $key, "cyclescsm${c}",      undef);
+              my $csmt = HistoryVal ($name, $day, $key, "csmt${c}",           undef);
+              my $csme = HistoryVal ($name, $day, $key, "csme${c}",           undef);
+              my $csmm = HistoryVal ($name, $day, $key, "minutescsm${c}",     undef);
+              my $csmh = HistoryVal ($name, $day, $key, "hourscsme${c}",      undef);
+              my $csma = HistoryVal ($name, $day, $key, "avgcycmntscsm${c}",  undef);
+
+              if ($export eq 'csv') {
+                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc if(defined $csmc);
+                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt if(defined $csmt);
+                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme if(defined $csme);
+                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm if(defined $csmm);
+                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh if(defined $csmh);
+                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma if(defined $csma);
+              }
+
+              if (defined $csmc) {
+                  $csm .= "cyclescsm${c}: $csmc";
+                  $nl   = 1;
+              }
+
+              if (defined $csmt) {
+                  $csm .= ", " if($nl);
+                  $csm .= "csmt${c}: $csmt";
+                  $nl   = 1;
+              }
+
+              if (defined $csme) {
+                  $csm .= ", " if($nl);
+                  $csm .= "csme${c}: $csme";
+                  $nl   = 1;
+              }
+
+              if (defined $csmm) {
+                  $csm .= ", " if($nl);
+                  $csm .= "minutescsm${c}: $csmm";
+                  $nl   = 1;
+              }
+
+              if (defined $csmh) {
+                  $csm .= ", " if($nl);
+                  $csm .= "hourscsme${c}: $csmh";
+                  $nl   = 1;
+              }
+
+              if (defined $csma) {
+                  $csm .= ", " if($nl);
+                  $csm .= "avgcycmntscsm${c}: $csma";
+                  $nl   = 1;
+              }
+
+              $csm .= "\n            " if($nl);
+          }
+
+          if ($csm) {
+              $ret .= "\n            ";
+              $ret .= $csm;
+          }
+          else {
+              $ret .= "\n            ";
+          }
+      }
+      return $ret;
+  };
+
+  $h = $data{$name}{pvhist};
+
+  if (!keys %{$h}) {
+      return qq{PV cache is empty.};
+  }
+
+  for my $i (keys %{$h}) {
+      if (!isNumeric ($i)) {
+          delete $data{$name}{pvhist}{$i};
+          Log3 ($name, 2, qq{$name - INFO - invalid key "$i" was deleted from pvHistory storage});
+      }
+  }
+
+  for my $idx (sort keys %{$h}) {
+      next if($par && $idx ne $par);
+      $sq .= $idx." => ".$sub->($idx)."\n";
+  }
+
+  if ($export eq 'csv') {
+      return _writeAsCsv ($hash, $hexp, $pvhexprtcsv.$name.'.csv');
+  }
+
+return $sq;
+}
+
+################################################################
 #            Listing des Circular Speichers
 ################################################################
 sub _listDataPoolCircular {
@@ -18179,35 +18206,6 @@ sub _listDataPoolCircular {
   }
   
   my $sq;
-
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################
-  delete $data{$name}{circular}{'01'}{pvrl_5};
-  delete $data{$name}{circular}{'01'}{pvrl_10};
-  delete $data{$name}{circular}{'01'}{pvrl_25};
-  delete $data{$name}{circular}{'01'}{pvrl_60};
-  delete $data{$name}{circular}{'01'}{pvrl_65};
-  delete $data{$name}{circular}{'01'}{pvrl_90};
-
-  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4561;
-  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4562;
-  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4563;
-  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4564;
-  #push @{$data{$name}{circular}{'01'}{pvrl_65}{100}}, 4565;
-  #
-  #push @{$data{$name}{circular}{'01'}{pvrl_65}{60}}, 3561;
-  #push @{$data{$name}{circular}{'01'}{pvrl_65}{60}}, 3562;
-  #
-  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4561;
-  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4562;
-  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4563;
-  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4564;
-  #push @{$data{$name}{circular}{'01'}{pvrl_90}{100}}, 4565;
-
-  #push @{$data{$name}{circular}{'01'}{pvrl_90}{60}}, 3561;
-  #push @{$data{$name}{circular}{'01'}{pvrl_90}{60}}, 3562;
-
-  ############################################################################################################
 
   for my $idx (sort keys %{$h}) {
       next if($par && $idx ne $par);
