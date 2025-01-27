@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  76_SolarForecast: remove graphicBeam1MaxVal,ctrlAreaFactorUsage
  - feature: 76_SolarForecast: new special readings todayBatInSum,todayBatOutSum 
  - change:  73_AutoShuttersControl: Change version 
  - feature: 76_SolarForecast: show historical battery SoC when displaying the 
