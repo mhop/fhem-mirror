@@ -14,5 +14,9 @@
 ####################################################
 
 1|SV|1
-1|DE|In dem kommenden Release 1.44.3 sind die Spezial-Readings todayBatInSum und todayBatOutSum mit dem Attribut ctrlSpecialReadings erstellbar. <br>Das Feature wird mit dem Update am 26.01.2025 ausgeliefert.   
-1|EN|In the upcoming release 1.44.3, the special readings todayBatInSum and todayBatOutSum can be created with the ctrlSpecialReadings attribute. <br>The feature will be delivered with the update on 26.01.2025.   
+1|DE|In dem Release 1.44.3 sind die Spezial-Readings todayBatInSum und todayBatOutSum mit dem Attribut ctrlSpecialReadings erstellbar. <br>Das Feature wird mit dem Update am 26.01.2025 ausgeliefert.   
+1|EN|In the release 1.44.3, the special readings todayBatInSum and todayBatOutSum can be created with the ctrlSpecialReadings attribute. <br>The feature will be delivered with the update on 26.01.2025. 
+
+2|SV|1
+2|DE|Mit dem Release 1.44.4 werden die Attribute graphicBeam1MaxVal und ctrlAreaFactorUsage entfernt. <br>Das Release wird mit dem Update am 28.01.2025 ausgeliefert. 
+2|EN|Release 1.44.4 removes the graphicBeam1MaxVal and ctrlAreaFactorUsage attributes. <br>The release will be delivered with the update on 28.01.2025. 
