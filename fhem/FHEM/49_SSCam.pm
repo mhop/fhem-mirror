@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.7" => "27.01.2025  _setsnapGallery: limit getClHash to the calling FHEMWEB Device ",
   "9.12.6" => "17.01.2025  __stopLiveview: fix Warning, set verifiedversion to 9.2.2 ",
   "9.12.5" => "30.12.2024  remove delHashRefDeep ",
   "9.12.4" => "15.12.2024  fix Attr pollcaminfoall ",
@@ -2085,7 +2086,7 @@ sub _setsnapGallery {                    ## no critic "not used"
 
   return if(!IsModelCam($hash));
 
-  my $ret = getClHash ($hash);
+  my $ret = getClHash ($hash, 1);
   return $ret if($ret);
 
   if (!AttrVal($name, 'snapGalleryBoost', $sgbdef)) {                             # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
@@ -4394,7 +4395,7 @@ sub _getlistLog {                        ## no critic "not used"
 
   return if(IsModelCam($hash));
 
-  getClHash ($hash,1);                                     # übergebenen CL-Hash (FHEMWEB) in Helper eintragen
+  getClHash ($hash, 1);                                     # übergebenen CL-Hash (FHEMWEB) in Helper eintragen
 
   extlogargs ($hash, $arg)  if($arg);
   extlogargs ($hash, $arg1) if($arg1);
@@ -4416,7 +4417,7 @@ sub _getlistPresets {                    ## no critic "not used"
 
   return if(!IsModelCam($hash));
 
-  getClHash    ($hash,1);                                 # übergebenen CL-Hash (FHEMWEB) in Helper eintragen
+  getClHash    ($hash, 1);                                 # übergebenen CL-Hash (FHEMWEB) in Helper eintragen
   __getPresets ($hash);
 
 return;
@@ -4529,7 +4530,8 @@ sub _getsnapGallery {                    ## no critic "not used"
 
   return if(!IsModelCam($hash));
 
-  my $ret = getClHash($hash);
+  my $fwdev = $hash->{CL}{SNAME};
+  my $ret   = getClHash ($hash, 0, $fwdev);
   return $ret if($ret);
 
   if (!AttrVal($name, 'snapGalleryBoost', $sgbdef)) {                                          # Snaphash ist nicht vorhanden und wird abgerufen
