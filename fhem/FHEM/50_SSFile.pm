@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       50_SSFile.pm
 #
-#       (c) 2020-2024 by Heiko Maaz
+#       (c) 2020-2025 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module integrate the Synology File Station into FHEM
@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.3"  => "27.01.2024  _getapiInfo: use new getClHash ",
   "1.0.2"  => "25.05.2024  replace Smartmatch Forum:#137776 ",
   "1.0.1"  => "18.07.2021  compatibility to DSM7 ",
   "1.0.0"  => "25.05.2021  ready for check in ",
@@ -1062,8 +1063,7 @@ sub _getapiInfo {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   
-  delClHash ($name);
-  getClHash ($hash,1);                                                # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
+  getClHash ($hash, 1);                                                # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
 
   # Schema:  name   => Name, 
   #          opmode => operation mode, 
