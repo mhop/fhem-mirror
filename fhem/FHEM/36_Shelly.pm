@@ -127,6 +127,26 @@
 #           add: reading 'firmware_ID' (Gen2)
 # 6.01.4    fix: use of defined-or operator
 # 6.01.5    add: reading 'temperature' for ShellyPlusUni 
+# 6.02 Beta1 add: reading 'model_function' for Gen1-devices
+#           add: auto-run 'getModel' if some readings are not present
+#           add: ShellyEM Energy Meter reading ct_type
+#           add: ShellyEM50
+#           improved: validity check in definition
+#           add: reading 'network_DNS' to represent the DNS-name of the device
+#           improved readings 'temperature' for ShellyPlusUni
+#           improved readings for input/counter for ShellyPlusUni
+# 6.02 Beta2 fix: do not reset timer after *-for-timer 
+#           fix: handling of old timer on retriggering
+#           add: add check for (new) beta for gen2 with fw=beta
+#           internal change: moved energy-format to updater sub
+# 6.02 Beta3 new: attribute host_ip to be used instead of "hostname --all-ip-addresses" [hugomckinley]
+#           fix: no energy readings available on ShellyPlusRGBWpm if NoLoad on channel  [GerhardJ]
+#           fix: cannot clear energy on ShellyPMMini devices [edition]
+#           new: set commands for multichannel roller device [bmwfan]
+#           new: set commands for wall display thermostat (experimental)
+#           removed:  command get ... shelly_status (deprecated since 6/24)
+# 6.02 Beta4 fix: reading state of ShellyEM50
+# 6.02      fix: command "set <name> button_on" w/o channel
 
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
@@ -136,20 +156,21 @@ package main;
 
 use strict;
 use warnings;
+use 5.10.0;     # defined-or
 
 use JSON;
 use HttpUtils;
 use SetExtensions;
+use Socket;     # gethostbyname() gethostbyaddr() ...
 
 use vars qw{%attr %defs};
-
 
 sub Log($$);
 sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.01.5 06.11.2024";
+my $version = "6.02 27.01.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -161,7 +182,6 @@ my %shelly_firmware = (  # latest known versions  # as of 29.08.2024
     "gen2"        => "1.3.3",   # some:  1.4.4
     "walldisplay" => "2.2.1"
     );
-
 
 #-- Time slices in seconds for time zone Germany CET/CEST
 #              [offset dst==0, offset dst==1, periode length]
@@ -183,7 +203,7 @@ my %attributes = (
   "dimmer"        => " dimstep",
   "input"         => " showinputs:show,hide",
   "emeter"        => " Energymeter_F Energymeter_P Energymeter_R EMchannels:ABC_,L123_,_ABC,_L123".
-                     " Periods:multiple-strict,Week,day,dayT,dayQ,hour,hourQ,hourT,min".                 # @keys = keys %periods   descending order is used by Shelly_procEMData()
+                     " Periods:multiple-strict,Week,day,dayT,dayQ,hour,hourQ,hourT,min".                 # @keys = keys %periods   descending order is used by Shelly_procEnergyData()
                      " PeriodsCorr-F Balancing:0,1 interval_power",
   "metering"      => " maxpower",
   "showunits"     => " showunits:none,original,normal,normal2,ISO"
@@ -193,7 +213,7 @@ my %shelly_dropdowns = (
 #-- these we may get on request
     "Gets"  => "status:noArg settings:noArg registers:noArg config version:noArg model:noArg actions:noArg readingsGroup:Device,Firmware,Network,Status",
 #-- these we may set
-    "Shelly"=> "config interval password reboot:noArg update:noArg name reset:noArg clear:disconnects,error,energy,responsetimes",   ##reset is deprecated ; CLR
+    "Shelly"=> "config interval password reboot:noArg update:noArg name clear:disconnects,error,energy,responsetimes",
     "Actions"=>" actions",  # create,delete,disable,enable,update
     "Onoff" => " on off toggle on-for-timer off-for-timer",## on-till off-till on-till-overnight off-till-overnight blink intervals",
     "Multi" => " ON:noArg OFF:noArg xtrachannels:noArg",
@@ -203,7 +223,8 @@ my %shelly_dropdowns = (
     "RgbwC" => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100 effect:select,Off,1,2,3",
     "Input" => " input:momentary,toggle,edge,detached,activation", 
     "Input1"=> ",momentary_on_release",  # only Shelly1
-    "Input2"=> ",cycle"                  # only ShellyPlus2
+    "Input2"=> ",cycle",                  # only ShellyPlus2
+    "Therm" => " target, thermostat_type:heating,cooling thermostat_output:straight,invert"    # Wall display thermostat target temperature °C
 );
 ## may be used for RgbwC:
 ##  "hsv:colorpicker,HSV"
@@ -213,6 +234,10 @@ my %shelly_dropdowns = (
 # Device model by https://kb.shelly.cloud/knowledge-base/
 # Device name as given by KB listed as comment
 my %shelly_vendor_ids = (
+    # keys: 'Device model' as in KB Device identification
+    # value 0:  the 'model' attribute used by the Fhem
+    # value 1:  the 'Device name' as in KB 
+    # value 2:  the 'Device Bluetooth ID', Gen3 only
     # Gen1 devices
     "SHSW-1"     => ["shelly1",        "Shelly 1"],   ## no power metering
     "SHSW-PM"    => ["shelly1pm",      "Shelly 1PM"],
@@ -237,7 +262,7 @@ my %shelly_vendor_ids = (
     "SHBDUO-1"   => ["shellybulb",     "Shelly Duo/Duo GU10"],  ## dimmable white (WW/CW) light with submodels: E27 or GU10 fitting
     "SHVIN-1"    => ["shellybulb",     "Shelly Vintage"],       ## dimmable white light with different fittings
     "SHBLB-1"    => ["shellybulb",     "Shelly Bulb"],          #
-    "SHCB-1"     => ["shellybulb",     "Shelly duo color G10"], # = shelly color bulb
+    "SHCB-1"     => ["shellybulb",     "Shelly Duo RGBW G10"],  # = shelly color bulb   submodels: E27, GU10
 
     "SHHT-1"     => ["generic",        "Shelly H&T"],           ## humidity and temperature sensor
     "SHWT-1"     => ["generic",        "Shelly Flood"],         ## flood sensor
@@ -273,16 +298,22 @@ my %shelly_vendor_ids = (
     "SNSW-001P8EU"    => ["shellyplus1pm",  "Shelly Plus 1PM Mini"],
     "SNPM-001PCEU16"  => ["shellypmmini",   "Shelly Plus PM Mini"],
     # Gen3 Devices
-    "S3SW-001X16EU"   => ["shellyplus1",    "Shelly 1 Gen3"],     ##new
-    "S3SW-001P16EU"   => ["shellyplus1pm",  "Shelly 1PM Gen3"],   ##new
-    "S3SN-0024X"      => ["shellyi4gen3",   "Shelly i4 Gen3"],    ## (AC), new
-    "S3SN-0U12A"      => ["generic",        "Shelly H&T Gen3"],   ## new, not yet implemented
-    "S3DM-0010WW"     => ["shellyplus010v", "Shelly Dimmer 0/1-10V PM Gen3"], ## new
-    "S3PL-00112EU"    => ["shellyplusplug", "Shelly Plug S MTR Gen3"],
+    "S3SW-001X16EU"   => ["shellyplus1",    "Shelly 1 Gen3",           0x1018],   ##new
+    "S3SW-001P16EU"   => ["shellyplus1pm",  "Shelly 1PM Gen3",         0x1019],   ##new
+    "S3SW-002P16EU"   => ["shellyplus2pm",  "Shelly 2PM Gen3",         0x1005],   # added 10/2024
+    "S3SN-0024X"      => ["shellyi4gen3",   "Shelly i4 Gen3",          0x1812],   ## (AC), new
+    "S3SN-0U12A"      => ["generic",        "Shelly H&T Gen3",         0x1809],   ## new, not yet implemented
+    "S3DM-0010WW"     => ["shellyplus010v", "Shelly Dimmer 0/1-10V PM Gen3",0x1072], ## new
+    "S3PL-00112EU"    => ["shellyplusplug", "Shelly Plug S MTR Gen3",  0x1805],   # added 10/2024
+    "S3DM-0A101WWL"   => ["shellyprodm1pm", "Shelly Dimmer Gen3",      0x1073],   # added 01/2025
+    "S3DM-0A1WW"      => ["generic",        "Shelly DALI Dimmer Gen3", 0x1071],   # added 10/2024
+    "S3EM-002CXEU"    => ["generic",        "Shelly EM Gen3",          0x1027],   # added 10/2024
+    "S3EM-003CXCEU63" => ["generic",        "Shelly 3EM 63 Gen3",      0x1026],   # added 01/2025    
+    "S3PL-10112EU"    => ["shellyplusplug", "Shelly AZ Plug",          0x1850],   # added 01/2025  amazon compatible
     ## Mini Gen3 Devices
-    "S3SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen3"],
-    "S3SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1 PM Mini Gen3"],
-    "S3PM-001PCEU16"  => ["shellypmmini",   "Shelly PM Mini Gen3"],
+    "S3SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen3",      0x1015],
+    "S3SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1 PM Mini Gen3",   0x1016],
+    "S3PM-001PCEU16"  => ["shellypmmini",   "Shelly PM Mini Gen3",     0x1023],
     # 2nd Gen PRO devices
     "SPSW-001XE16EU"  => ["shellypro1",     "Shelly Pro 1"],      ## not listed by KB
     "SPSW-201XE16EU"  => ["shellypro1",     "Shelly Pro 1 v.1"],
@@ -298,10 +329,11 @@ my %shelly_vendor_ids = (
     "SPSW-003XE16EU"  => ["shellypro3",     "Shelly Pro 3"],
     "SPEM-003CEBEU"   => ["shellypro3em",   "Shelly Pro 3EM"],
     "SPEM-003CEBEU400"=> ["shellypro3em",   "Shelly Pro 3EM-400"],
+    "SPEM-003CEBEU63" => ["shellypro3em",   "Shelly Pro 3EM-3CT63"],
     "SPEM-002CEBEU50" => ["shellyproem50",  "Shelly Pro EM-50"],
     "SPSW-004PE16EU"  => ["shellypro4pm",   "Shelly Pro 4PM V1"],
     "SPSW-104PE16EU"  => ["shellypro4pm",   "Shelly Pro 4PM V2"],
-    # Control Panels
+    # Android Devices / Control Panels
     "SAWD-0A1XX10EU1" => ["walldisplay1",   "Shelly Wall Display"], ## prelim version ?  ## not listed by KB
     "SAWD1"           => ["walldisplay1",   "Shelly Wall Display"]
     );
@@ -312,25 +344,33 @@ my %shelly_family = (
      "SN" => "Plus/Gen2",
      "DC" => "LED driverGen3",
      "SP" => "Pro/Gen2",
-     "SA" => "Control Panel"
+     "SA" => "Control Panel",
+     "S3" => "Gen3"
      );
 
 my %shelly_category = (
-    # code as given in characters 3 & 4 of family-id (not for Gen1-devices)
+    # code as given in characters 3 & 4 of family-id 
+    # Gen1 - devices 
+     "BD" => "bulb",             # BDUO
+     "CB" => "bulb",             # CB - color bulb
+     "IX" => "sensor",           # IX3
+     "RG" => "LED controller",   # RGBW2
+    # Gen1 & Gen2+ - devices
+     "SW" => "switch",
+    # Gen2+ - devices)
      "DC" => "LED driver",
      "DM" => "dimmer",
      "EM" => "energy meter",
      "PL" => "plug",
      "PM" => "power meter",
      "SN" => "sensor",
-     "SW" => "switch",
      "WD" => "wall display"
     );
 
 
 my %shelly_models = (
     #(   0      1       2         3    4    5       6    7     8)
-    #(relays,rollers,dimmers,  meters, NG,inputs,  res.,color,modes)
+    #(relays,rollers,dimmers,  meters, NG,inputs,  EM,color,modes)
     "generic"       => [0,0,0, 0,0,0,  0,0,0],
     "shellyi3"      => [0,0,0, 0,0,3,  0,0,0],    # 3 inputs
     "shelly1"       => [1,0,0, 0,0,1,  0,0,0],    # not metering, only a power constant in older fw
@@ -364,8 +404,8 @@ my %shelly_models = (
     "shellypro4pm"  => [4,0,0, 4,1,4,  0,0,0],
     "shellyprodm1pm"=> [0,0,1, 1,2,2,  0,0,0],    # 1 dimmer with 2 inputs
     "shellyprodm2pm"=> [0,0,2, 2,2,4,  0,0,0],    # 2 dimmer with each 2 inputs
-    "shellyproem50" => [1,0,0, 1,1,0,  0,0,0],    # has two single-phase meter and one relay
-    "shellypro3em"  => [0,0,0, 1,1,0,  0,0,0],    # has one (1) three-phase meter
+    "shellyproem50" => [1,0,0, 0,1,0,  1,0,0],    # has two single-phase meter and one relay
+    "shellypro3em"  => [0,0,0, 0,1,0,  3,0,0],    # has one (1) three-phase meter in triphase profile
     "shellyprodual" => [0,2,0, 4,1,4,  0,0,0],
     "shellypmmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to ShellyPlusPM
     "walldisplay1"  => [1,0,0, 0,2,1,  0,0,0]     # similar to ShellyPlus1PM
@@ -617,10 +657,15 @@ my %si_units = (
      "voltage"       => [""," V"],
      "voltmeter"     => [""," V"],     # same as voltage, used by Shelly Sensor Addon
      "power"         => [""," W"],     # Wirkleistung
+     "act_power"     => [""," W"],     # double
      "reactivepower" => [""," var"],   # Blindleistung
-     "apparentpower" => [""," VA"],    # Scheinleistung				
+     "react_power"   => [""," var"],   # double
+     "apparentpower" => [""," VA"],    # Scheinleistung	
+     "aprt_power"    => [""," VA"],    # double			
      "energy"        => [""," Wh"],    # Arbeit;
      "frequency"     => [""," Hz"],
+     "tempAbs"       => [""," K"],     # Kelvin 
+     "tempF"         => [""," °F"],    # Fahrenheit 
      "tempC"         => [""," °C"],    # Celsius
      "temperature"   => [""," °C"],    # Celsius
      "humidity"      => [""," %"],
@@ -636,6 +681,7 @@ my %si_units = (
 
  my %energy_units  = ( #si, faktor, decimals
      "none"       => [ "Wh", 1,     0 ],
+     "original"   => [ "-", 1,     0 ],
      "normal"     => [ "Wh", 1,     1 ],
      "normal2"    => [ "kWh",0.001, 4 ],
      "ISO"        => [ "kJ", 3.6,   0 ]
@@ -648,9 +694,9 @@ my %peripherals = (
   "dht22"       => "humidity",
   "ds18b20"     => "temperature",
   "voltmeter"   => "voltmeter"
-);
+); 
 
-
+my @id2ch = ( "a_", "b_", "c_" );  # map id's of monophase device to channels
 #-- support differtent readings-names for energy & power metering
 my %mapping = (
         sf => {
@@ -812,6 +858,7 @@ sub Shelly_Initialize ($) {
                      " webhook:".join(",",devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1')).   ## none,
                      $attributes{'emeter'}.
                      " verbose:0,1,2,3,4,5".
+                     " host_dns host_ip".
                      " ".$readingFnAttributes;
        
   }
@@ -825,50 +872,133 @@ sub Shelly_Initialize ($) {
 #
 ########################################################################################
 
-sub Shelly_Define($$) {
+sub Shelly_Define($$) {   # use Socket;
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name=$hash->{NAME};
+  
+  if(@a < 3){
+      return "[Shelly_Define] $name: Define the address of the Shelly device as a parameter";
+  }elsif(@a > 4){
+     return "error in definiton / illegal number of arguments";
+  }
+
+  my $definit=$a[2];
+  my ($portnumber,$hostname);
+  #-- checking ipv4-address [:portnumber]
+#  if( $a[2] =~ m|\d\d?\d?\.\d\d?\d?\.\d\d?\d?\.\d\d?\d?(\:\d+)?| ){ 
+#  if( $a[2] =~ m|^((\d{1,3}\.?\b){4})(\:\d+)?$| ){
+  if( $a[2] =~ m|^((\d{1,3}\.?\b){4})| ){
+    $definit=$1; #ipaddr
+    if( $a[2] =~ m/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}(\:\d+)?$/ ){
+      # we have a valid ip-address
+      Log 4,"[Shelly_define] IPv4-Addr \'$definit\' is valid"; 
+      $hostname = gethostbyaddr( inet_aton($definit),AF_INET);
+      if( defined($hostname) && $a[2] !~ /\:/ ){
+          Log 4,"[Shelly_define] Hostname of $definit is $hostname";
+          $hostname =~ s/\.fritz\.box//;
+          readingsSingleUpdate($hash,"network_DNS",$hostname,1);
+      }else{
+          readingsSingleUpdate($hash,"network_DNS","-",1);
+      }
+    }else{
+      Log 1,"[Shelly_define] looks like an ip4-address, but is not valid";
+      return "looks like an ip4-address, but is not valid";
+    }
+
+  #-- check DNS-name [:portnumber]
+  }elsif( $a[2] =~ m|^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{3,63}(?<!-)(\:\d+)?$| ){
+      # we have a valid DNS name
+      Log3 $name,3,"[Shelly_define] alphanumerical DNS name \'$definit\' is treated as valid";
+      my $dnsname=$definit;
+      if( $a[2] =~ m|(.*)\:(\d*)$| ){
+          # we have a valid dns-name and portnumber
+          $dnsname=$1 // $definit;
+          my $portnum=$2 // "";
+          Log3 $name,3,"[Shelly_define] DNS-name is $dnsname and port=$portnum"; 
+      }      
+      my $packed_ip=gethostbyname($dnsname);
+      if( defined($packed_ip) ){
+          my $ip_addr=Socket::inet_ntoa($packed_ip); # use
+          Log 3,"[Shelly_define] $name: found ip-address=$ip_addr for host=\'$dnsname\'";
+          if( $a[2] !~ /\:/ ){
+              readingsSingleUpdate($hash,"network_DNS",$dnsname,1);
+          }else{
+              readingsSingleUpdate($hash,"network_DNS","-",1);
+          }
+      }else{
+          Log 1,"[Shelly_define] $name: cannot find \'$dnsname\'";
+          return "cannot find $dnsname";
+      }
+   #-- check MAC-address 
+  }elsif( $a[2] =~ m/^(([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})/ ){
+      # we have a valid MAC-address
+      Log 4,"[Shelly_define] $name: hexadecimal MAC-Addr \'$definit\' is treated as valid";
+      $hash->{SUBTYPE} = "bluetooth";
+      readingsSingleUpdate($hash,"mac",uc($a[2]),1 );
+      return undef;
+  }else{
+      Log 1,"[Shelly_define] invalid definition (IP address / DNS name / MAC address) ".$a[2];
+      return "[Shelly_Define] $name: invalid definition ".$a[2];
+  }
+  
+  #-- checking port number
+    if( $a[2] =~ m/\:(\d+)$/ ){
+      # we have a port number
+      $portnumber=$1;
+      if( $portnumber <= 65535 ){
+          Log 4,"[Shelly_define] Portno \'$portnumber' is valid"; 
+      }else{
+          Log 1,"[Shelly_define] \'$portnumber' is not a valid port number";
+          return "port number \'$portnumber' is not valid";
+      }
+      #******
+if(0){
+      use IO::Socket::INET;
+      # Connect to TCP socket
+  my $socket = new IO::Socket::INET(
+    PeerHost => $definit,
+    PeerPort => $portnumber,
+    Proto => 'tcp',
+    Timeout => 3);
+  if ($socket){
+    # We are connected...
+    my $buffer = "";
+    my $length = 1024;
+    $socket->recv($buffer, $length);    
+    $socket->close();
+    Log 0,"OK - got message '$buffer'";
+  }else{
+    # Connection failed
+    Log 0,"Connection to $definit\:$portnumber failed";
+  }
+}
+      #******
+    }else{
+      Log 4,"[Shelly_define] no port number given";
+    }
+  #-- authentication -----------------
   my $user="admin";
   my $pwd="";
-
-  if( @a == 4 ){ # user:password
-      if( $a[3] =~ /\:/ ){
+  if( @a == 4 ){ # 
+      if( $a[3] =~ /\:/ ){  # user:password
           $a[3] =~ m/(\S*):(\S*)/;
           $user=$1;
           $pwd =$2;
-      }else{
+      }else{    # password
           $pwd =$a[3];
-      }
-      Log3 $name,6,"[Shelly_define] got user=$user and password=$pwd";
+      } 
+      Log 2,"[Shelly_define] got user=$user and password=$pwd"; #6
       $attr{$name}{shellyuser}=$user;
       Shelly_Set($hash,$name,"password",$pwd);
       # strip off user and password from DEF:
       $hash->{DEF}=$a[2];
   }
 
-  return "[Shelly_Define] $name: Define the IP address of the Shelly device as a parameter"
-    if(@a < 3);
-
-  if( $a[2] =~ m|\d\d?\d?\.\d\d?\d?\.\d\d?\d?\.\d\d?\d?(\:\d+)?| ){
-      # we have a valid ip-address
-  }elsif( $a[2] =~ m|^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{3,63}(?<!-)(\:\d+)?$| ){
-      # we have a valid DNS name
-  }elsif( $a[2] =~ m/^(([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})/ ){
-      # we have a valid MAC-address
-      $hash->{SUBTYPE} = "bluetooth";return undef;
-  }else{
-      return "[Shelly_Define] $name: invalid IP address / DNS name / MAC address".$a[2]." of Shelly";
-  }
-
-  my $dev = $a[2];
- # $hash->{TCPIP} = $dev;
-  $hash->{helper}{settings_time} = 0; #
-  $hash->{units}=0 if( !defined($hash->{units}) );
-
-  # use hidden AttrList to make attributes changeable by Shelly_Attr()
+  #-- use hidden AttrList to make attributes changeable by Shelly_Attr()
   $hash->{'.AttrList'} = $modules{Shelly}{'AttrList'};
-#-- name of the ap
+  
+  #-- name of the access point ap
   if( $hash->{DEF} =~ /:/ ){
       $hash->{DEF} =~ /(.*):/;
       my $ap = (defInfo("DEF=$1",'NAME'))[0];   # the device name of the ap
@@ -880,20 +1010,38 @@ sub Shelly_Define($$) {
   }else{
       fhem("deletereading $name network_host",1);
   }
-#--
+  #--
   $modules{Shelly}{defptr}{$a[0]} = $hash;
-  delete $hash->{SHELLY}; 
-  if( $init_done  ){
+  if( $init_done ){
       $hash->{INTERVAL} = AttrVal($hash->{NAME},"interval",$defaultINTERVAL); # Updates each minute, if not set as attribute
       Log3 $name,4,"[Shelly_define] Define is calling get modell for device $name, init=$init_done";  #  && $hash->{INTERVAL}>0
       Shelly_HttpRequest($hash,"/shelly","","Shelly_getModel" );
       InternalTimer(time()+0.6, "Refresh", $hash);   # perform a browser refresh
   }
   
-  #initialize helper values
+  #-- initialize helper values
   $hash->{helper}{timer}=0;
   $hash->{helper}{StatusCall}=0;
+  $hash->{helper}{settings_time} = 0;
+  #-- initialize INTERNALS
+  $hash->{units}=0 if( !defined($hash->{units}) );
+  #-- remove 
+  delete $hash->{SHELLY}; 
   
+  #-- get host dns-name and ip-address 
+  if(0 && $init_done && !AttrVal($name,"host_dns",undef) ){
+      my $host=qx(hostname);
+      $host =~ s/\n//;  # remove NewLine
+      fhem("attr -silent $name host_dns $host");
+  }   
+  if($init_done && !AttrVal($name,"host_ip",undef) ){
+      my $host_ip = qx(hostname --all-ip-addresses); # only on linux, otherwise we get something else
+      $host_ip =~ s/ .*\n$//;
+      if( $host_ip !~ m/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/ ){ # ip4
+          fhem("attr -silent $name host_ip xxx.xxx.xxx.xxx");
+          Log3 $name,1,"[Shelly_define] Please set attribute \'host_ip\' first";
+      }
+  }
   return undef;
 } #end Shelly_Define()
 
@@ -916,7 +1064,7 @@ sub Shelly_getModel {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $call = $param->{cmd};
-  my ($model_id,$model,$mode,$auth,$mac);
+  my ($model_id,$model,$mode,$auth,$mac,$profile);
 
   if( $call eq "/shelly" ){  # the /shelly call is not blocked by authentication!
       if( defined($jhash->{type}) ){ #1G
@@ -944,11 +1092,18 @@ sub Shelly_getModel {
       if( defined($jhash->{"relay_in_thermostat"}) ){
           # set the attr mode to thermostat          Shelly_Attr
           $attr{$hash->{NAME}}{mode} = "thermostat";
-          $hash->{helper}{Sets} =~ s/on off toggle on-for-timer off-for-timer/target/;
+         # $hash->{helper}{Sets} =~ s/on off toggle on-for-timer off-for-timer/target/;
+          $hash->{helper}{Sets} = "target";
           Log3 $name,1,"[Shelly_getModel] device $name is set to mode >thermostat<";
       }elsif(0&& $model =~ /walldisplay/ ){
           $attr{$hash->{NAME}}{mode} = "switch";
           Log3 $name,1,"[Shelly_getModel] device $name is of model >walldisplay< and set to mode >switch<";
+      }
+      ### Gen2 energy meter are working in 'monophase' profile and (if applicant) in 'triphase' profile
+      ### ShellyPlus2PM may work in profiles 'switch' or 'cover'
+      if( defined($jhash->{profile}) ){
+          $profile = $jhash->{profile};
+          Log3 $name,1,"[Shelly_getModel] device $name is working in profile <$profile>";
       }
       
   }elsif( $call eq "/settings" ){
@@ -970,20 +1125,21 @@ sub Shelly_getModel {
           Log3 $name,2,"[Shelly_getModel] type not found, proposed model of device $name is \'generic\'";
           $model_id = "unknown";
           $model = "generic";
+      }      
+      if( defined($jhash->{profile}) ){   # see above "/shelly"
+          $profile = $jhash->{profile};
+          Log3 $name,1,"[Shelly_getModel] device $name is working in profile <$profile>";
       }
   }
   if( defined($model_id) ){
-        Log3 $name,4,"[Shelly_getModel] device $name is of model_id $model_id";
+        Log3 $name,4,"[Shelly_getModel] device $name is of model_ID $model_id";
         $model = $shelly_vendor_ids{$model_id}[0];
         my $device_name = $shelly_vendor_ids{$model_id}[1];
         my $device_family = $shelly_family{substr($model_id,0,2)};
         readingsSingleUpdate($hash,"model_ID",$model_id,1);
         readingsSingleUpdate($hash,"model_family",$device_family,1);
         readingsSingleUpdate($hash,"model_name",$device_name,1);
-        if( $device_family ne "Gen1" ){
-            my $device_function = $shelly_category{substr($model_id,2,2)};
-            readingsSingleUpdate($hash,"model_function",$device_function,1);
-        }
+        readingsSingleUpdate($hash,"model_function",$shelly_category{substr($model_id,2,2)}//"unknown",1);
         if ( $model ){
             Log3 $name,4,"[Shelly_getModel] $call: discovered model=$model for device $name";
         }else{
@@ -1022,6 +1178,9 @@ sub Shelly_getModel {
     }else{
         delete($attr{$hash->{NAME}}{mode});
     }
+  }  
+  if( defined($profile) && substr($model_id,2,2) eq "EM" ){
+     readingsSingleUpdate($hash,"model_profile",$profile,1);
   }
   if( defined($auth) && $auth==1 && !defined(AttrVal($name,"shellyuser",undef)) && $shelly_models{$model}[4]==0 ){
      Shelly_error_handling($hash,"Shelly_getModel","Authentication required",1);
@@ -1173,7 +1332,7 @@ sub Shelly_Attr(@) {
           $hash->{'.AttrList'} =~ s/ dimstep//;
     }
 
-    if( $attrVal eq "shellypro3em" ){
+    if( $attrVal =~ /pro3em|proem50/ ){  # "shellyproem50"  "shellypro3em"
           $hash->{'.AttrList'} =~ s/\smaxpower//;
     ##    $hash->{'.AttrList'} =~ s/ webhook:(\S+?)\s//;  # Shelly actions do not work properly (fw v0.14.1)
     ##      $hash->{'.AttrList'} .= " Energymeter_F Energymeter_P Energymeter_R EMchannels:ABC_,L123_,_ABC,_L123";
@@ -1572,8 +1731,9 @@ sub Shelly_Attr(@) {
 
   #---------------------------------------
   }elsif( $attrName eq "Balancing" ){
-    if( $model ne "shellypro3em" && $init_done){
-      $error="Setting of the attribute \"$attrName\" only works for ShellyPro3EM";
+  #  if( $model ne "shellypro3em" && $init_done){
+    if( ReadingsVal($name,"model_profile","monophase") ne "triphase" && $init_done){
+      $error="Setting of the attribute \"$attrName\" only works for ShellyPro3EM in triphase profile";
       Log3 $name,1,"[Shelly_Attr] $name\: $error ";
       return $error;
     }
@@ -1595,8 +1755,8 @@ sub Shelly_Attr(@) {
     }
   #---------------------------------------
   }elsif( $attrName eq "Periods" ){
-    if( $model ne "shellypro3em" && $model ne "shellypmmini" && $init_done ){
-      $error="Setting of the attribute \"$attrName\" only works for ShellyPro3EM / ShellyPMmini";
+    if( $model ne "shellypro3em" && $model ne "shellyproem50" && $model ne "shellypmmini" && $init_done ){
+      $error="Setting of the attribute \"$attrName\" only works for ShellyPro3EM / ShellyPro50EM / ShellyPMmini";
       Log3 $name,1,"[Shelly_Attr] $name\: $error ";
       return $error;
     }
@@ -1623,9 +1783,9 @@ sub Shelly_Attr(@) {
               my $energy;
               my $factor=$energy_units{AttrVal($name,"showunits","none")}[1];  # normalize readings values to "Wh"
               my @readings = ("energy");
-              if( $model eq "shellypro3em" ){
+              if( $model =~ /shellypro3em|shellyproem50/ ){
                   @readings = ("Purchased_Energy_S","Returned_Energy_S","Total_Energy_S");
-                  push( @readings,"Purchased_Energy_T","Returned_Energy_T","Total_Energy_T" ) if(AttrVal($name,"Balancing",1) == 1);
+                  push( @readings,"Purchased_Energy_T","Returned_Energy_T","Total_Energy_T" ) if(AttrVal($name,"Balancing",0) == 1);
               }
               foreach my $reading ( @readings ){
                 if( ReadingsVal($name,"$reading\_$RP",undef) ){
@@ -1665,8 +1825,8 @@ sub Shelly_Attr(@) {
           return $error;
       }elsif( $attrVal == 0 ){
           readingsSingleUpdate( $hash,"state","disabled",1 );
-  readingsSingleUpdate($hash,"/_nextUpdateTimer","disabled",1)
-                                        if(0&& AttrVal($name,'timeout',undef) );
+          readingsSingleUpdate($hash,"/_nextUpdateTimer","disabled",1)
+                                        if( AttrVal($name,'timeout',undef) );
       }
       #-- update timer
       if(0&& $model eq "shellypro3em" && $attrVal > 0 ){
@@ -1689,9 +1849,9 @@ sub Shelly_Attr(@) {
       Shelly_Set($hash,$name,"startTimer");
     }
   #---------------------------------------
-  }elsif( $attrName eq "interval_power" ){
+  }elsif( $attrName eq "interval_power" && $cmd eq "set" ){
     #-- update timer for power-readings of ShellyPro3EM
-    if( $model ne "shellypro3em" ){
+    if( $model ne "shellypro3em" && $model ne "shellyproem50" ){
          return "wrong model";
     }
     if( $attrVal =~ /\D/ || $attrVal == 0 ){
@@ -1756,8 +1916,16 @@ sub Shelly_Notify($$) {
 	my $name = $hash->{NAME};
 	Log3 $name,6,"[Shelly_Notify] $name: processing Notify dN=".$dev->{NAME}; #5
 	return if($dev->{NAME} ne "global");
-	return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));	        
-
+	return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));	
+	return if( defined($hash->{SUBTYPE}) );
+	
+        # complete readings
+        # only Shelly-BLU devices have internal SUBTYPE
+        if( !defined($hash->{SUBTYPE})  &&  ReadingsVal($name,"model_function","unknown") eq "unknown" ){
+           # Shelly_getModel($hash);
+            Shelly_HttpRequest($hash,"/shelly","","Shelly_getModel" );
+        }
+        
 	my $interval = AttrVal($name,"interval",$defaultINTERVAL);
 	if( $interval == 0 ){
             # device is disabled (AttrVal get real value, as we are initilized!)
@@ -1816,13 +1984,12 @@ sub Shelly_Get ($@) {
     $v = Shelly_status($hash,"Shelly_Get");
 
   #-- current settings of shelly
-  }elsif($a[1] eq "settings" || $a[1] eq "shelly_status") {
+  }elsif($a[1] eq "settings" ) {
     if( $shelly_models{$model}[4]==0 ){
          Shelly_HttpRequest($hash,"/settings",undef,"Shelly_settings1G" );
     }else{
          Shelly_HttpRequest($hash,"/rpc/Shelly.GetConfig",undef,"Shelly_settings2G","config" );
     }
-    Log3  $name,1,"[Shelly_Get] Command \'get $name shelly_status\' is deprecated, use \'get $name settings\' instead! "  if( $a[1] eq "shelly_status");
     $v = "Done.";
 
   #-- GET some help on registers
@@ -1899,15 +2066,15 @@ sub Shelly_Get ($@) {
       my $msg; 
       #~~~~ ***Device***
       if( $rgName eq "rgShellyDevice" ){
-          fhem("defmod $rgName readingsGroup <Name>,<Definition>,<MAC>,<Shelly-ID>,<Model-Name>,<?ModelAttr>,<Family>,<UptimeHrs>,<Units>,<Verbose>,<ShellyName>
-                            .*:FILTER=TYPE=Shelly:+DEF,mac,+SHELLYID,model_name,?model,model_family,uptime,+units,?verbose,name");  
+          fhem("defmod $rgName readingsGroup <Name>,<Definition>,<MAC>,<Model-ID>,<Shelly-ID>,<Model-Name>,<Function>,<Family>,<ShellyName>,<?ModelAttr>,<UptimeHrs>,<Units>,<Verbose>,<Subtype>
+                            .*:FILTER=TYPE=Shelly:+DEF,mac,model_ID,+SHELLYID,model_name,model_function,model_family,name,?model,uptime,+units,?verbose,+SUBTYPE");  
           fhem("attr $rgName sortColumn 0"); 
-          fhem("attr $rgName valueColumn { DEF=>1, model_name=>4, model=>5, model_family=>6, uptime=>7, name=>10 }");
+          fhem("attr $rgName valueColumn { DEF=>1, model_name=>5, model_function=>6, model_family=>7, name=>8, model=>9, uptime=>10, SUBTYPE=>13 }");
           fhem("attr $rgName valueFormat { \$READING eq 'uptime'?int(ReadingsNum(\$DEVICE,\$READING,0)/3600):\$VALUE }");
       #~~~~ ***Firmware***
       }elsif( $rgName eq "rgShellyFirmware" ){
-          fhem("defmod $rgName readingsGroup <Name>,<Definition>,<Family>,<Firmware>,<Text>,<> 
-                            .*:FILTER=TYPE=Shelly:+DEF,model_family,firmware_current,firmware_updText,firmware_updIcon");
+          fhem("defmod $rgName readingsGroup <Name>,<Definition>,<Family>,<Firmware>,<Text>,<>,<ID>  
+                            .*:FILTER=TYPE=Shelly:+DEF,model_family,firmware_current,firmware_updText,firmware_updIcon,firmware_ID");
           fhem("attr $rgName valueColumn { DEF=>1, firmware_current=>3}");
           fhem("attr $rgName valueFormat { DEF=>\'<a href=\"http://\$VALUE\">\$VALUE</a>\' }");
           fhem("attr $rgName valueIcon { 
@@ -1927,9 +2094,9 @@ sub Shelly_Get ($@) {
              }");
       #~~~~ ***Network***
       }elsif( $rgName eq "rgShellyNetwork" ){
-          fhem("defmod $rgName readingsGroup <Name>,<Definition>,<MAC>,<Connection>,<Host>,<SSID>,<RSSI>,<Roaming>,<COIOT>,<BT>,<Cloud>,<AP>,<Clients>,<Disconn> 
-                            .*:FILTER=TYPE=Shelly:+DEF,mac,network_connection,network_host,network_ssid,network_rssi,network_wifi_roaming,coiot,ble,cloud,ap,ap_clients,network_disconnects");
-          fhem("attr $rgName valueColumn { DEF=>1, network_connection=>3,network_host=>4,network_ssid=>5,network_rssi=>6,network_wifi_roaming=>7, coiot=>8,ble=>9,cloud=>10,ap=>11,ap_clients=>12,network_disconnects=>13 }");
+          fhem("defmod $rgName readingsGroup <Name>,<Definition>,<MAC>,<Connection>,<Host>,<SSID>,<RSSI>,<Roaming>,<COIOT>,<BT>,<Cloud>,<AP>,<Clients>,<Disconn>,<DNS_name>,<Webhook> 
+                            .*:FILTER=TYPE=Shelly:+DEF,mac,network_connection,network_host,network_ssid,network_rssi,network_wifi_roaming,coiot,ble,cloud,ap,ap_clients,network_disconnects,network_DNS,?webhook");
+          fhem("attr $rgName valueColumn { DEF=>1, network_connection=>3,network_host=>4,network_ssid=>5,network_rssi=>6,network_wifi_roaming=>7, coiot=>8,ble=>9,cloud=>10,ap=>11,ap_clients=>12,network_disconnects=>13,network_DNS=>14 }");
           fhem("attr $rgName valueFormat { DEF=>\'<a href=\"http://\$VALUE\">\$VALUE</a>\' }");
           fhem("attr $rgName valueIcon { \"network_connection.offline\" => \"15px-red\",
              \"network_connection.online\"  => \"it_wifi\\\@green\",
@@ -1998,7 +2165,7 @@ sub Shelly_Set ($@) {
       }else{
           $parameters=", no parameters" ;
       }
-      readingsSingleUpdate($hash,"/_set.command",join(" ",$cmd,@a),1) if( AttrVal($name,"timeout",undef) );
+      readingsSingleUpdate($hash,"/_set.command",join(" ",$cmd,@a),1)  if( AttrVal($name,"timeout",undef) );
       Log3 $name,4,"[Shelly_Set] calling for device $name with command \'$cmd\'$parameters";  #4
   }elsif( !defined($name) ){
       $name = $hash->{NAME};
@@ -2037,6 +2204,8 @@ sub Shelly_Set ($@) {
       # most of devices, except roller, metering
       $newkeys .= $shelly_dropdowns{Onoff}
                                     if( ($mode ne "thermostat" && $mode ne "roller" && $shelly_models{$model}[0]>0) ||  $shelly_models{$model}[2]>0 || $shelly_models{$model}[7]>0 );
+      $newkeys .= $shelly_dropdowns{Therm}
+                                    if( $model =~ /walldisplay/ );
       # multichannel devices
       $newkeys .= $shelly_dropdowns{Multi} if( ($mode ne "roller" && $shelly_models{$model}[0]>1) || ($shelly_models{$model}[2]>1 && $mode eq "white") );
       if( $mode eq "roller" || ($shelly_models{$model}[0]==0 && $shelly_models{$model}[1]>0)){
@@ -2092,7 +2261,7 @@ sub Shelly_Set ($@) {
                                                                             (defined($isWhat)?", iswhat=$isWhat":", isWhat not defined"); #6
     readingsBeginUpdate($hash);
     
-    readingsBulkUpdateMonitored($hash,"/_set.command","$cmd $parameters") if(1&& AttrVal($name,"timeout",undef) );
+    readingsBulkUpdateMonitored($hash,"/_set.command","$cmd $parameters") if( AttrVal($name,"timeout",undef) );
     if( $cmd =~ /^(out)/ ){
        my $channels = maxNum($shelly_models{$model}[0],$shelly_models{$model}[2]); # device has one or more relay or dimmer - channels
        $channels = 1  if( !$value );  #no channel given - change of single channel device output
@@ -2111,8 +2280,11 @@ sub Shelly_Set ($@) {
        }else{
           Shelly_error_handling($hash,"Shelly_Set:out","no handler for command <$cmd>",1);
        }
-    }elsif( $signal eq "button" ){   # ShellyPlug(S)
-          $subs = ($shelly_models{$model}[5] == -1) ? "" : "_".$value;
+    }elsif( $signal eq "button" ){   # ShellyPlug(S)   # button_on
+          if( $shelly_models{$model}[5]==0 ){
+              Log3 $name,6,"[Shelly_Set] WARNING: command button_on|button_off not allowed for device $name";
+          }
+          $subs = ( abs($shelly_models{$model}[5])==1 || !defined($value) ) ? "" : "_".$value;
           readingsBulkUpdateMonitored($hash, "button$subs", $isWhat, 1 );
     }elsif( $signal eq "input" ){    # devices with an input-terminal
           $subs = ($shelly_models{$model}[5] == 1) ? "" : "_".$value;
@@ -2133,14 +2305,14 @@ sub Shelly_Set ($@) {
           readingsBulkUpdateMonitored($hash,$signal.$subs."_range", $isWhat );
     }elsif( $signal =~ /^(tempC)/ ){
           $subs = defined($a[0])?"_".$a[0]:"" ;
-          readingsBulkUpdateMonitored($hash,"temperature".$subs, $value.$si_units{tempC}[$hash->{units}] );
+          Shelly_readingsBulkUpdate($hash,"temperature".$subs, $value,"tempC");
     }elsif( $signal =~ /^(Xtemperature|Xhumidity|illuminance|illumination)/ ){
           $subs = defined($a[0])?"_".$a[0]:"" ;
           if( $signal eq "illumination" && ReadingsAge($name,"illuminance".$subs,0) > 2.5 ){ # to cover a bug in Shellies fw (no $ev.illuminance known)
               # readingsBulkUpdateMonitored($hash,"illuminance".$subs, "-" );
               Shelly_status($hash,"Shelly_Set sens");
           }else{
-              readingsBulkUpdateMonitored($hash,$signal.$subs, $value.$si_units{$signal}[$hash->{units}] );
+              Shelly_readingsBulkUpdate($hash,$signal.$subs,$value,$signal );
           }
     }elsif( $cmd =~ /^(power|voltage|current|temperature|humidity)/ ){  #as by ShellyPMmini, ShellyUni, ...
 
@@ -2174,8 +2346,8 @@ sub Shelly_Set ($@) {
                  Shelly_error_handling($hash,"Shelly_Set","Wrong value <$value> for command <$cmd>",1);
              }else{
                  $subs = $channels>1?"_".$channel:"" ;
-                 $value = sprintf( "%5.2f%s", $value, $si_units{$signal}[$hash->{units}] ); ## %5.1f
-                 readingsBulkUpdateMonitored($hash,$signal.$subs,$value );
+                 $value = sprintf( "%5.2f", $value ); ## %5.1f
+                 Shelly_readingsBulkUpdate($hash,$signal.$subs,$value,$signal);
              }
           }
     }elsif( $signal =~ /^(Active_Power|Voltage|Current)/ ){
@@ -2213,7 +2385,7 @@ sub Shelly_Set ($@) {
     }elsif( $signal =~ /voltmeter/ ){    
           my $channel = shift @a;  # 1st parameter
           #action example:  ...?cmd=set+<name>+voltmeter+$voltage+0
-          readingsBulkUpdateMonitored($hash,"voltmeter_$channel",$value.$si_units{voltage}[$hash->{units}] );
+          Shelly_readingsBulkUpdate($hash,"voltmeter_$channel",$value,"voltage");
           
     }else{
           Log3 $name,1,"[Shelly_Set] $name: Wrong detail on action command $cmd $value". (defined($mode)?", mode is $mode":", no mode given");
@@ -2222,12 +2394,10 @@ sub Shelly_Set ($@) {
 #    readingsBulkUpdateMonitored($hash,"state",$hash->{MOVING}) if( defined($hash->{MOVING}) );
     readingsEndUpdate($hash,1);
     #-- Call status after switch.n
-if(1){
     if( $signal !~ /^(Active_Power|Voltage|Current|apower|voltage|current)/ ){
         #-- scheduling next status update
         Shelly_status($hash,"Shelly_Set",0.75);
     }
-}
     return undef;
   #---------------------------
   #-- commands from shelly roller actions: opening, closing, stopped, is_closed, is_open
@@ -2491,23 +2661,17 @@ if(1){
      }elsif( $shelly_models{$model}[$ff] > 1 ){
               $subs = "_$channel";
      }
-     Log3 $name,4,"[Shelly_Set] $name channel is $channel and subs =$subs<";
+     Log3 $name,4,"[Shelly_Set] $name channel is $channel and subs =\'$subs\'";
   }
 
   #-- do not loose existing 'on' timer on retrigger
-  my $oldtimer;
-  my $tmr = "timer$subs";  #  defined($channel) ? "timer_$channel" : "timer";
-  $msg = "[Shelly_Set] $name \'$tmr\': ";
-  $oldtimer = ReadingsNum( $name, $tmr, 0 );  #ReadingsNum( $name, "timer", 0 ) );
-  if( $oldtimer > 0 && $cmd !~ /off/ ){
-         $oldtimer -= ReadingsAge( $name, $tmr, 0 );   #ReadingsAge( $name, "timer", 0 ) );
-         $oldtimer = "&timer=$oldtimer";
-         $msg .= "adding remaining timer \'$oldtimer\' to command $cmd";
-  }else{
-         $msg .= "no timer to add to $cmd";
-         $oldtimer = "";
+  my $tmr = "timer$subs";
+  my $remainingTmr = ReadingsNum( $name, $tmr, 0 ) - ReadingsAge( $name, $tmr, 0 );  # may be negative
+  my $tmrcmd = "";  # string to add to the query-url
+  if( $remainingTmr > 0 && $cmd !~ /^(on|off.*)$/ ){
+         $tmrcmd = "&timer=$remainingTmr";
+         Log3 $name,4,"[Shelly_Set] $name \'$tmr\': adding remaining timer \'$tmrcmd\' to command $cmd";
   }
-  Log3 $name,4,$msg;
 
   #-- transfer toggle command to an on-off-command
   if( $cmd eq "toggle" ){ #  && $shelly_models{$model}[0]<2 && $shelly_models{$model}[2]<2 ){ #select devices with less than 2 channels
@@ -2529,13 +2693,12 @@ if(1){
     if( $cmd eq "dim" ){
            #
            if( $brightness == 0 ){
-               $cmd = "?turn=off$oldtimer";
+               $cmd = "?turn=off$tmrcmd";
            }else{
-               $cmd = "?brightness=$brightness&turn=on$oldtimer";
+               $cmd = "?brightness=$brightness&turn=on$tmrcmd";
            }
-    }
     #-- check timer command: on-for-timer off-for-timer dim-for-timer
-    elsif( $cmd =~ /for-timer/ ){
+    }elsif( $cmd =~ /for-timer/ ){
         #
         if( $time =~ /\D+/ ){ #anything else than digits
           $msg = "Error: wrong time spec \'$time\' for device $name, must be <integer>";
@@ -2559,7 +2722,7 @@ if(1){
         }
         $hash->{helper}{timer} = $time; # cannot read out timer in latest fw eg walldisplay
     }elsif( $cmd =~ /(on)|(off)/ ){
-        $cmd = "?turn=$cmd$oldtimer";
+        $cmd = "?turn=$cmd$tmrcmd";
     }
     # $cmd = is 'on' or 'off'  or  'on&timer=...' or 'off&timer=....' or 'dim&timer=....'
     
@@ -2664,15 +2827,33 @@ if(1){
             }else{
                   $cmd="?brightness=$value\&turn=on";
             }
-            Shelly_HttpRequest($hash,"/$comp","/$channel$cmd$oldtimer","Shelly_response","dim");
+            Shelly_HttpRequest($hash,"/$comp","/$channel$cmd$tmrcmd","Shelly_response","dim");
      }
      return;
 
   ################################################################################################################
   #-- we have a roller type device / roller mode
   }elsif( $ff==1 && $cmd =~ /^(stop|closed|open|pct|pos|delta|zero)/ ){
-    Log3 $name,5,"[Shelly_Set:Roller] $name: we have a $model ($mode mode) and command is $cmd";
-
+    Log3 $name,4,"[Shelly_Set:Roller] $name: we have a $model ($mode mode) and command is $cmd";
+    Log3 $name,7,"[Shelly_Set:Roller] $name: 1st parameter=$value " if( defined($value) );
+    $channel = 0;   # default, and used for devices with one roller only
+    if( $shelly_models{$model}[1]>1 ){   # >1
+        if( scalar(@a) == 1 ){  # one more parameter
+            $channel = shift @a;
+            return "channel not given as parameter" if( !defined($channel) );
+        }elsif( $cmd =~ /pct|pos|delta/ ){
+            return "not enough parameter";
+        }else{
+            $channel = $value;
+            $value = undef;
+        }
+        return "channel not numerical"  if( $channel =~ /\D/ );
+        return "wrong channel number"   if( $channel >= $shelly_models{$model}[1] ); # >=
+        $subs = "_$channel"; 
+        Log3 $name,4,"[Shelly_Set] $name: channel is selected: $channel";
+    }
+    Log3 $name,4,"[Shelly_Set:Roller] $name: value parameter=$value " if( defined($value) );
+    
     my $max=AttrVal($name,"maxtime",30);
     my $maxopen =AttrVal($name,"maxtime_open",30);
     my $maxclose=AttrVal($name,"maxtime_close",30);
@@ -2793,8 +2974,8 @@ if(1){
         $hash->{helper}{timer} = $hash->{DURATION};
         $cmd = "?go=to_pos&roller_pos=" . ($pctnormal ? $targetpct : 100 - $targetpct);
     }
-    $cmd = "/roller/0".$cmd;
-    Log3 $name,4,"[Shelly_Set] $name: requesting up/down with comand $cmd, duration=".$hash->{DURATION};
+    $cmd = "/roller/$channel".$cmd;  
+    Log3 $name,4,"[Shelly_Set] $name: requesting up/down with comand $cmd, duration=".$hash->{DURATION};  #4
 
     my $CMD2;
     my $gen;
@@ -2823,6 +3004,7 @@ if(1){
                 $CMD2 .= "&duration=".$hash->{helper}{UserDuration}    if( $hash->{helper}{UserDuration} );  # Gen2 only
                 delete $hash->{helper}{UserDuration};
             }
+            Log3 $name,4,"[Shelly_Set] $name Gen2 command is=$cmd$CMD2"; 
             $gen=2;
     }else{
             # Gen1;  channel is set to 0 - we don't have Gen1 multichannel roller devices
@@ -2839,7 +3021,7 @@ if(1){
   #-- we have a ShellyBulbDuo (it's a bulb in white mode) $ff=2
   }elsif( $cmd eq "ct" ){
     $channel = shift @a;
-    Shelly_HttpRequest($hash,"/light","/0?temp=$value$oldtimer","Shelly_response","dim");
+    Shelly_HttpRequest($hash,"/light","/0?temp=$value$tmrcmd","Shelly_response","dim");
     return;
 
   ################################################################################################################
@@ -2885,15 +3067,22 @@ if(1){
               Shelly_error_handling($hash,"Shelly_Set:rgbw",$err,1);
               return $err;
     }
-    Shelly_HttpRequest($hash,"/color","/0?$cmd$oldtimer","Shelly_response","dim");
+    Shelly_HttpRequest($hash,"/color","/0?$cmd$tmrcmd","Shelly_response","dim");
     return;  
     
   ################################################################################################################
-  #-- we have a Walldisplay with thermostat
+  #-- we have a Walldisplay with thermostat  
   }elsif( $cmd eq "target" ){  # desired temperature, in °C
-#    $channel = shift @a;
-#    Shelly_HttpRequest($hash,"/rpc/Thermostat.SetConfig","/0?temp=$value","Shelly_response","target");
-    return "not available";
+     $channel = shift @a;
+     Shelly_HttpRequest($hash,"/rpc/Thermostat.SetConfig","?config={\"id\":0,\"target_C\":$value}","Shelly_response","target");
+     return;
+  }elsif( $cmd eq "thermostat_type" ){  # thermostat_type: heating, cooling
+     Shelly_HttpRequest($hash,"/rpc/Thermostat.SetConfig","?config={\"id\":0,\"type\":$value}","Shelly_response","target");
+     return;
+  }elsif( $cmd eq "thermostat_output" ){  # thermostat_relay_mode: straight, invert
+     $value = $value eq "invert" ? 1:0;# : false;
+     Shelly_HttpRequest($hash,"/rpc/Thermostat.SetConfig","?config={\"id\":0,\"invert_output\":$value}","Shelly_response","target");
+     return;
   }
 
   ###########################################################################
@@ -2901,7 +3090,7 @@ if(1){
   if( $cmd eq "password" ){
     my $user = AttrVal($name,"shellyuser",undef);
     if(!$user && $shelly_models{$model}[4]==0 ){
-      my $msg = "Error: password can be set only if attribute \'shellyuser\' is set";
+      my $msg = "Error: password can be set only if attribute \'shellyuser\' is set";   # Gen1
       Log3 $name,1,"[Shelly_Set] ".$msg;
       return $msg;
     }
@@ -2918,7 +3107,7 @@ if(1){
       }elsif( $value == 0 ){
           $hash->{INTERVAL} = 0;
           readingsSingleUpdate( $hash,"state","disabled",1 );
-          Log3 $name,2,"[Shelly_Set:interval] No timer started for $name, device is disabled";
+          Log3 $name,2,"[Shelly_Set:interval] No timer started for $name, polling of device is disabled";
       }elsif( $value == -1 ){
           $value =AttrVal($name,"interval",$defaultINTERVAL);
           $hash->{INTERVAL} = $value;
@@ -2935,23 +3124,23 @@ if(1){
       my $timer=$hash->{INTERVAL};
       my $msg;
           RemoveInternalTimer($hash,"Shelly_getEMvalues");
-          RemoveInternalTimer($hash,"Shelly_getEMData");
+          RemoveInternalTimer($hash,"Shelly_getEnergyData");
       if( $timer ){
           $msg = "(Re-)Starting cyclic timers: ";
           #---------------------------
           #-- scheduling next status update
           Shelly_status($hash,"Shelly_Set",$timer);
           $msg .= "status-timer=$timer";
-          if( $model eq "shellypro3em" ){
+          if( $model =~ /shellypro3em|shellyproem50/ ){
               #
               RemoveInternalTimer($hash,"Shelly_getEMvalues");
               $timer=1; #$hash->{INTERVAL}/4;
               InternalTimer(time()+$hash->{INTERVAL}/4, "Shelly_getEMvalues", $hash);
               $msg .= ", EM power-values-timer=$timer";
               #
-              RemoveInternalTimer($hash,"Shelly_getEMData");
+              RemoveInternalTimer($hash,"Shelly_getEnergyData");
               $timer=int((time()+60)/60)*60+1 - time();  #  +60
-              InternalTimer(int((time()+60)/60)*60+1, "Shelly_getEMData", $hash);
+              InternalTimer(int((time()+60)/60)*60+1, "Shelly_getEnergyData", $hash);
               $msg .= ", EM energy-data-timer=$timer";
           }
       }else{
@@ -2991,9 +3180,6 @@ if(1){
       readingsSingleUpdate($hash,"firmware_updIcon","U",1);  # set as clickable icon in readingsGroup
       return undef;
 
-  }elsif( $cmd eq "reset" ){
-  ## CLR
-      return "deprecated, use \'clear\' instead";
   }elsif( $cmd eq "clear" ){
       my $doreset = $value;
       my $comp;
@@ -3011,7 +3197,7 @@ if(1){
              }
          }
          Log3 $name,2,"[Shelly_Set:Clear] Clearing $ptrclrcnt process time readings at device $name";
-      }elsif( $doreset eq "energy" ){
+      }elsif( $doreset eq "energy" ){    # command:  set <name> clear energy
          if( ReadingsVal($name,"firmware_current","") =~ /(v0|v1.0)/ ){
               my $err = "firmware must be at least v1.1.0";
               Shelly_error_handling($hash,"Shelly_Set:clear",$err,1);
@@ -3031,13 +3217,14 @@ if(1){
             $comp = "lights";
            # $numC = $shelly_models{$model}[7];
          }elsif( $shelly_models{$model}[3]>0 && !$mode ){
-            return if( ReadingsVal($name,'model_id','') !~ /^S.PM/ );
+            return if( ReadingsVal($name,'model_ID','') !~ /^S.PM/ );  # eg S3PM.... or SNPM.... of model "shellypmmini"
             $comp = "PM1";
             $numC = $shelly_models{$model}[3];
          }else{
             Log3 $name,1,"[Shelly_Set] Wrong component $comp";
             return;
          }
+         Log3 $name,1,"[Shelly_Set] Clear energy for $numC channels on comp=$comp / $mode id=".ReadingsVal($name,'model_ID','');
          for( my $id=0; $id<$numC; $id++ ){
             Shelly_HttpRequest($hash,"/rpc/$comp\.ResetCounters","?id=$id&type=[\"aenergy\"]","Shelly_response","config_$id");
          }
@@ -3250,7 +3437,7 @@ sub Shelly_pwd($){
 #
 # Shelly_status        - Endpoint for Internal Timers
 # Shelly_getEMvalues   - Endpoint for Internal Timers (ShellyPro3EM only)
-# Shelly_getEMData     - Endpoint for Internal Timers (ShellyPro3EM only)
+# Shelly_getEnergyData     - Endpoint for Internal Timers (ShellyPro3EM only)
 #
 ########################################################################################
 
@@ -3262,26 +3449,22 @@ sub Shelly_status(@){
   my $name = $hash->{NAME};
   ##$hash->{callFn}=$callFn;  # to be used by Shelly_status2G
   
-  if( defined($scheduled) ){
-
-      Log3 $name,4,"[Shelly_status] $name: scheduled next status update in $scheduled seconds by $callFn"
-      .", helper=".$hash->{helper}{timer}; #4
- 
-      readingsSingleUpdate($hash,"/_nextUpdateTimer",$scheduled.$si_units{time}[$hash->{units}]." ".$callFn,1)
+  Log3 $name,5,"[Shelly_status:1] $name: callFn=".($callFn//"undefiniert")." sched=".($scheduled//"no").", helper=".$hash->{helper}{timer}; #4
+  if( $scheduled//0 ){  
+      Log3 $name,6,"[Shelly_status:1a] $name: set internal Timer  ---and------BYE------";
+      readingsSingleUpdate($hash,"/_nextUpdateTimer","$scheduled Sec $callFn",1)
                                                if( AttrVal($name,'timeout',undef) );
-                                               
       RemoveInternalTimer($hash,"Shelly_status");
       InternalTimer(time()+$scheduled, "Shelly_status", $hash);
-      #   $hash->{helper}{StatusCall}=1;
-       #  Log3 $name,3,"[Shelly_status:scheduler] set STATUS_CALL \'pending\' for $name";
       return;
   }elsif( defined($callFn) && AttrVal($name,'timeout',undef) ){
-      readingsSingleUpdate($hash,"/_StatusCaller",$callFn,1);
+      Log3 $name,6,"[Shelly_status:1b] $name";
   }elsif( !defined($callFn) ){
-      $callFn = "Shelly_Status_";
+      $callFn = "Shelly_Status"; 
+      Log3 $name,6,"[Shelly_status:1c] $name";
   } 
  
-  Log3 $name,4,"[Shelly_status] $name: processing Http-Request forced by $callFn, helper=".$hash->{helper}{timer};
+  Log3 $name,4,"[Shelly_status:2] $name: processing Http-Request forced by $callFn, helper=".$hash->{helper}{timer};
   
   my $timer = $hash->{INTERVAL};
 
@@ -3289,43 +3472,43 @@ sub Shelly_status(@){
   
   ### use a flag to avoid subsequent status calls ###
   if( $hash->{helper}{StatusCall} > 0 ){
-         Log3 $name,4,"[Shelly_status] SKIPPED STATUS_CALL for $name";
+         Log3 $name,4,"[Shelly_status:3a SKIPPED STATUS_CALL for $name";
          return;
   }else{
-         $hash->{helper}{StatusCall}=1;
-         Log3 $name,4,"[Shelly_status] set STATUS_CALL \'pending\' for $name";
-  }
-  ### the flag will be resetted by Shelly_HttpResponse()
+         Log3 $name,4,"[Shelly_status:3b] set STATUS_CALL \'pending\' for $name";
+         $hash->{helper}{StatusCall}=1;  # will be resetted to 0 by Shelly_HttpResponse()
+  
+
   ### ------------------------------------------------
   if($shelly_models{$model}[4]==0 ){
          Shelly_HttpRequest($hash,"/status",undef,"Shelly_status1G" );
   }elsif( $shelly_models{$model}[4]>=1 ){
          Shelly_HttpRequest($hash,"/rpc/Shelly.GetStatus",undef,"Shelly_status2G" );
   }
-  #-- force short-hand OR cyclic update    
-  $timer = $hash->{helper}{timer};
-  if( $timer <= 0 ){
-      $hash->{helper}{timer} = 0;
+  }
+  #-- force short-hand OR cyclic update
+  my $msg="[Shelly_status] $name ";
+  if( $hash->{helper}{timer}==0 && $hash->{INTERVAL}>0 ){
       $timer = $hash->{INTERVAL};
-      Log3 $name,4,"[Shelly_status:A] $name: next status call scheduled at INTERVAL in $timer seconds";
-  }elsif( $timer > $hash->{INTERVAL} && $hash->{INTERVAL} > 0 ){  # call status at end of drive-time
+      $msg .= "A  next status call scheduled at INTERVAL in $timer seconds";
+  }elsif( $hash->{helper}{timer} > $hash->{INTERVAL} && $hash->{INTERVAL} > 0 ){  # call status at end of operation-time
       $timer = $hash->{INTERVAL};
       $hash->{helper}{timer} = $hash->{helper}{timer} - $hash->{INTERVAL};
-      Log3 $name,4,"[Shelly_status:B] $name: next intermediate status call scheduled at INTERVAL in $timer seconds";
-  }elsif( $timer <= $hash->{INTERVAL} && $hash->{INTERVAL} > 0){       
-      $hash->{helper}{timer} = -1;
-      Log3 $name,4,"[Shelly_status:C] $name: next status call scheduled at end of operation in $timer seconds";
+      $msg .= "B  next intermediate status call scheduled in $timer seconds";
+  }elsif(0&& $hash->{helper}{timer} > 0 && $hash->{INTERVAL} == 0 ){  # call status at end of timer
+      $timer = $hash->{helper}{timer};
+      $hash->{helper}{timer} = 0;
+      $msg .= "C  status call scheduled in $timer seconds";
+  }elsif(0&& $hash->{helper}{timer} == 0 ){  # no call status 
+      $hash->{helper}{StatusCall} = 0;
+      $msg .= "X  SKIPP status call ";
   }else{
-      Log3 $name,4,"[Shelly_status:D] $name: next status call scheduled in $timer seconds";
+      $timer = $hash->{helper}{timer};
+      $hash->{helper}{timer} = 0;
+      $msg .= "D  next status call scheduled in $timer seconds";
   }
-  
-  if( $timer > 0 ){
-      #-- scheduling next status update
-      Shelly_status($hash,"Shelly_status",$timer);  # recursive call -> forward declaration necessary
-  }elsif( AttrVal($name,'timeout',undef) ){
-      # do not update when disabled
-      readingsSingleUpdate($hash,"/_nextUpdateTimer","- ".$callFn,1);
-  }
+  Log3 $name,4,$msg;
+  readingsSingleUpdate($hash,"/_nextUpdateTimer",($timer>0?$timer:"-")." ".$callFn,1)  if( AttrVal($name,'timeout',undef) );
 } #end Shelly_status()
 
 ##########################
@@ -3334,23 +3517,22 @@ sub Shelly_getEMvalues($){
   my $name = $hash->{NAME};
   return if( $hash->{INTERVAL} == 0 );
   my $model = AttrVal($name,"model","generic");
-
-  if( $model eq "shellypro3em"){
-         Shelly_HttpRequest($hash,"/rpc/EM.GetStatus","?id=0","Shelly_procEMvalues" );
-  }
-}
+ 
+  my $EMcall="EM1.GetStatus";
+  $EMcall="EM.GetStatus"  if( ReadingsVal($name,"model_profile","nn") eq "triphase");
+  Shelly_HttpRequest($hash,"/rpc/$EMcall","?id=0","Shelly_procEMvalues" );
+} #end Shelly_getEMvalues()
 
 ##########################
-sub Shelly_getEMData($){
+sub Shelly_getEnergyData($){
   my ($hash) = @_;
   my $name = $hash->{NAME};
   return if( $hash->{INTERVAL} == 0 );
-  my $model = AttrVal($name,"model","generic");
-
-  if( $model eq "shellypro3em"){
-         Shelly_HttpRequest($hash,"/rpc/EMData.GetStatus","?id=0","Shelly_procEMData" );
-  }
-} #end Shelly_getEMData()
+  
+  my $EMcall="EM1Data.GetStatus";
+  $EMcall="EMData.GetStatus"  if( ReadingsVal($name,"model_profile","nn") eq "triphase");
+  Shelly_HttpRequest($hash,"/rpc/$EMcall","?id=0","Shelly_procEnergyData" );
+} #end Shelly_getEnergyData()
 
 
 ########################################################################################
@@ -3365,7 +3547,8 @@ sub Shelly_status1G {
   my $hash = $param->{hash};
   my $name  = $hash->{NAME};
   my $state = $hash->{READINGS}{state}{VAL};
-  my $intervalN = $hash->{INTERVAL};   # next update interval
+  my $statusTmr1G=$hash->{INTERVAL};   # timer for next status update 
+  my $remaining=-1;   # read remaining timer from Shelly
 
   my $model = AttrVal($name,"model","generic");
   my $mode  = AttrVal($name,"mode","");
@@ -3376,9 +3559,9 @@ sub Shelly_status1G {
   my ($overpower,$power,$energy);
 
   readingsBeginUpdate($hash);
-  Shelly_readingsBulkUpdate($hash,"network","<html>connected to <a href=\"http://".$hash->{DEF}."\">".$hash->{DEF}."</a></html>",1); # formerly $hash->{TCPIP}
+  Shelly_readingsBulkUpdate($hash,"network","<html>connected to <a href=\"http://".$hash->{DEF}."\">".$hash->{DEF}."</a></html>",undef,1); # formerly $hash->{TCPIP}
   readingsBulkUpdateIfChanged($hash,"network_connection","online");
-  readingsBulkUpdateMonitored($hash,"network_rssi",Shelly_rssi($hash,$jhash->{'wifi_sta'}{'rssi'}) );
+  Shelly_readingsBulkUpdate($hash,"network_rssi",$jhash->{wifi_sta}{rssi},"rssi=2" );
   readingsBulkUpdateMonitored($hash,"network_ip-address",$jhash->{wifi_sta}{ip} );
   readingsBulkUpdateMonitored($hash,"network_ssid",$jhash->{'wifi_sta'}{'ssid'} )
                                                                       if( $jhash->{'wifi_sta'}{'ssid'} );
@@ -3403,31 +3586,27 @@ sub Shelly_status1G {
 
       # timer
       if( $model ne "shelly4" ){  # readings not supported by Shelly4 v1.5.7
-         #-- source
-         $source = $jhash->{relays}[$i]{source};
-         readingsBulkUpdateMonitored($hash,"source".$subs,$source);
-         #-- timer
-         my $remaining  = $jhash->{relays}[$i]{timer_remaining};
-         readingsBulkUpdateMonitored($hash,"timer".$subs,$remaining.$si_units{time}[$hash->{units}]);
-         #-- next update timer
-         if( $remaining>0 && AttrVal($name,'verbose',1) > 5 ){
-             $intervalN  = minNum($intervalN,$remaining+0.95);
-      #       readingsBulkUpdateMonitored($hash,"/_nextUpdateTimer",$intervalN.$si_units{time}[$hash->{units}]);
-         }
+          #-- source
+          $source = $jhash->{relays}[$i]{source};
+          readingsBulkUpdateMonitored($hash,"source".$subs,$source);
+          #-- timer
+          $remaining  = $jhash->{relays}[$i]{timer_remaining};         
       }else{  # Shelly4pro
-         my $onofftmr = 0;
-         if( $jhash->{relays}[$i]{has_timer} =~ /1|(true)/ ){
-             $onofftmr = ReadingsNum($name,"auto_off".$subs,0) if( ReadingsNum($name,"timer".$subs,0)==0 );
-             $onofftmr += ReadingsNum($name,"timer".$subs,0)-ReadingsAge($name,"timer".$subs,0);   # interpolate remaining time
-         }
-         readingsBulkUpdateMonitored($hash,"timer".$subs,$onofftmr.$si_units{time}[$hash->{units}]);        
+          $remaining = 0;
+          if( $jhash->{relays}[$i]{has_timer} =~ /1|(true)/ ){
+               $remaining = ReadingsNum($name,"auto_off".$subs,0) if( ReadingsNum($name,"timer".$subs,0)==0 );
+               $remaining += ReadingsNum($name,"timer".$subs,0)-ReadingsAge($name,"timer".$subs,0);   # interpolate remaining time
+          }      
       }
+      Shelly_readingsBulkUpdate($hash,"timer".$subs,$remaining,"time");
+  ##    #-- next update timer
+  ##    $statusTmr1G  = minNum($hash->{INTERVAL},$remaining+0.95)   if( $remaining>0 );
+  ##    Shelly_readingsBulkUpdate($hash,"/_nextUpdateTimer",$statusTmr1G,"time")  if( AttrVal($name,'timeout',undef) );
     }
 
     #-- we have a shellyuni device
     if($model eq "shellyuni") {
-      my  $voltage = $jhash->{adcs}[0]{voltage}.$si_units{voltage}[$hash->{units}];
-      readingsBulkUpdateMonitored($hash,"voltage",$voltage);
+      Shelly_readingsBulkUpdate($hash,"voltage",$jhash->{adcs}[0]{voltage},"voltage");
     }
   #-----------------------------------------------------------------------------------------
   #-- we have a shelly2 or shelly2.5 roller type device
@@ -3513,28 +3692,27 @@ sub Shelly_status1G {
           my $blue  = $jhash->{'lights'}[0]{'blue'};
           my $white = $jhash->{'lights'}[0]{'white'};
           my $gain  = $jhash->{'lights'}[0]{'gain'};  # 0 .... 100
-          Shelly_readingsBulkUpdate($hash,"gain",$gain.$si_units{pct}[$hash->{units}]);
+          Shelly_readingsBulkUpdate($hash,"gain",$gain,"pct");   ##si
 
           if( defined $gain && $gain <= 100 ) { # !=
              $red   = round($red*$gain/100.0  ,0);
              $blue  = round($blue*$gain/100.0 ,0);
              $green = round($green*$gain/100.0,0);
           }
-          Shelly_readingsBulkUpdate($hash,"L-red",$red);
-          Shelly_readingsBulkUpdate($hash,"L-green",$green);
-          Shelly_readingsBulkUpdate($hash,"L-blue",$blue);
-          Shelly_readingsBulkUpdate($hash,"L-white",$white);
-          Shelly_readingsBulkUpdate($hash,"rgb",sprintf("%02X%02X%02X", $red,$green,$blue));
-          Shelly_readingsBulkUpdate($hash,"rgbw",sprintf("%02X%02X%02X%02X", $red,$green,$blue,$white));
-          Shelly_readingsBulkUpdate($hash,"white",round($white/2.55,1).$si_units{pct}[$hash->{units}]);    #percentual value
+          readingsBulkUpdate($hash,"L-red",$red);
+          readingsBulkUpdate($hash,"L-green",$green);
+          readingsBulkUpdate($hash,"L-blue",$blue);
+          readingsBulkUpdate($hash,"L-white",$white);
+          readingsBulkUpdate($hash,"rgb",sprintf("%02X%02X%02X", $red,$green,$blue));
+          readingsBulkUpdate($hash,"rgbw",sprintf("%02X%02X%02X%02X", $red,$green,$blue,$white));
+          Shelly_readingsBulkUpdate($hash,"white",round($white/2.55,1),"pct");    #percentual value  ##si
           if(0){
              my ($hue,$sat,$bri)  = Color::rgb2hsv($red/255,$green/255,$blue/255);
-             Shelly_readingsBulkUpdate($hash,"HSV",sprintf("%d,%4.1f,%4.1f",$hue*360,100*$sat,100*$bri)); # 'hsv' will have interference with widgets for white
+             readingsBulkUpdate($hash,"HSV",sprintf("%d,%4.1f,%4.1f",$hue*360,100*$sat,100*$bri)); # 'hsv' will have interference with widgets for white
           }
       # brightness (white-devices only)
       }else{
-        my $bri    = $jhash->{'lights'}[$i]{'brightness'};
-        readingsBulkUpdateMonitored($hash,"pct".$subs,$bri.$si_units{pct}[$hash->{units}]);
+        Shelly_readingsBulkUpdate($hash,"pct".$subs,$jhash->{'lights'}[$i]{'brightness'},"pct");
       }
 
       # effect
@@ -3545,16 +3723,12 @@ sub Shelly_status1G {
 
       # color-temperature ct
       if( defined($jhash->{'lights'}[$i]{'temp'}) ){  # eg shellybulb in white-mode
-        my $ct     = $jhash->{'lights'}[$i]{'temp'};
-        readingsBulkUpdateMonitored($hash,"ct".$subs, $ct.$si_units{ct}[$hash->{units}]);
+        Shelly_readingsBulkUpdate($hash,"ct".$subs,$jhash->{'lights'}[$i]{'temp'},"ct");
       }
 
       # timer
-      my $remaining  = $jhash->{'lights'}[$i]{'timer_remaining'};
-      readingsBulkUpdateMonitored($hash,"timer".$subs,$remaining.$si_units{time}[$hash->{units}]);
-      $intervalN  = minNum($intervalN,$remaining+0.95)   if( $remaining>0 );
-      readingsBulkUpdateMonitored($hash,"/_nextUpdateTimer",$intervalN.$si_units{time}[$hash->{units}])
-                                               if(0&& AttrVal($name,'timeout',undef) );
+      $remaining  = $jhash->{'lights'}[$i]{'timer_remaining'};
+      Shelly_readingsBulkUpdate($hash,"timer".$subs,$remaining,"time");
 
       # source
       $source = $jhash->{'lights'}[$i]{'source'};  # 'timer' will occur as 'http'
@@ -3566,18 +3740,16 @@ sub Shelly_status1G {
       }
     }
     readingsBulkUpdateMonitored($hash,"state", ($dimmers > 1)?"OK":$ison);
-    Log3 $name,$VERB,"[Shelly_status1G] finished processing lights-device $name is $model and mode is $mode. Next update in $intervalN seconds. ";
+    Log3 $name,$VERB,"[Shelly_status1G] finished processing lights-device $name is $model and mode is $mode.";
   #-----------------------------------------------------------------------------------------
   }else{
-      Log3 $name,$VERB,"[Shelly_status1G] Model of device $name is $model and mode is $mode. Status updates every ".$hash->{INTERVAL}." seconds. ";
-      readingsBulkUpdateMonitored($hash,"state","OK");
+    Log3 $name,$VERB,"[Shelly_status1G] Model of device $name is $model and mode is $mode. Status updates every ".$hash->{INTERVAL}." seconds. ";
+    readingsBulkUpdateMonitored($hash,"state","OK");
   }
   #-----------------------------------------------------------------------------------------
   #-- common to all models
   #- uptime
-  my $uptime = $jhash->{uptime};
-  $uptime .= " sec, last reboot at ".FmtDateTime(time()-$uptime)    if( [$hash->{units}] );
-  readingsBulkUpdateIfChanged($hash,"uptime",$uptime);
+  Shelly_readingsBulkUpdate($hash,"uptime",$jhash->{uptime},"time=5");
 
   #- checking firmware and if updates are available
   my $hasupdate = $jhash->{update}{has_update};
@@ -3588,6 +3760,7 @@ sub Shelly_status1G {
   ##$firmware_     = $1 if( length($1)>5 ); # very old versions don't start with v...
 
   my $firmware = $jhash->{update}{old_version};
+  readingsBulkUpdateIfChanged($hash,"firmware_ID",$firmware);   # long version   find same in /settings call as {fw} 
   
   my $update = $jhash->{update}{new_version};
   $update = "none" if( $update eq $firmware );
@@ -3663,14 +3836,14 @@ sub Shelly_status1G {
              "power_last".$subs,                              # name of reading
              $powerR.$si_units{power}[$hash->{units}]." ".
              ReadingsVal($name,"last_dir".$subs,""),          # value
-             undef,
+             undef,undef,
              ReadingsTimestamp($name,"power".$subs,"") )      # timestamp
                                              if( $powerR > 0 );
       }
 
       #-- Power is provided by all metering devices, except Shelly1 (which has a power-constant in older fw)
       $power = $jhash->{$metern}[$i]{power};
-      readingsBulkUpdateMonitored($hash,"power".$subs,$power.$si_units{power}[$hash->{units}]);
+      Shelly_readingsBulkUpdate($hash,"power".$subs,$jhash->{$metern}[$i]{power},"power");
       $powerTTL += $power;
   Log3 $name,7,"[Shelly_status1G] $name metering sbs=$subs meters=$meters mName=$metern pwr=$powerR/$power dir=".ReadingsVal($name,"last_dir".$subs,"x");
 
@@ -3678,15 +3851,13 @@ sub Shelly_status1G {
       if( defined($jhash->{$metern}[$i]{'total'}) ) {
           $energy = $jhash->{$metern}[$i]{'total'};
           $energyTTL += $energy;
-          $energy = shelly_energy_fmt($hash,$energy,$model =~ /shelly.?em/ ? "Wh" : "Wm" );
-          readingsBulkUpdateMonitored($hash,"energy".$subs,$energy);
-          Log3 $name,$VERB,"[Shelly_status1G] $name $subs: power=$power TTL=$powerTTL, energy=$energy TTL=$energyTTL";
+          Shelly_readingsBulkUpdate($hash,"energy".$subs,$energy,$model =~ /shelly.?em/ ? "energy/Wh" : "energy/Wm");
       }
 
       #-- Overpower: power value messured from device as overpowered, otherwise 0 (zero); not provided by all devices
       if( defined($jhash->{$metern}[$i]{'overpower'}) && $model !~ /rgbw/ ){  # 'defined' seems not working properly
           $overpower = $jhash->{$metern}[$i]{'overpower'};
-          readingsBulkUpdateMonitored($hash,"overpower".$subs,$overpower.$si_units{power}[$hash->{units}]);
+          Shelly_readingsBulkUpdate($hash,"overpower".$subs,$overpower,"power");
       #-- for Shelly.EM  or  ShellyRGBW  use boolean state of relay instead
       }elsif( $i>=0 && $model !~ /bulb/ && $model ne "shelly1" ){
         if( defined($jhash->{'relays'}[$i]{'overpower'}) ){
@@ -3705,11 +3876,10 @@ sub Shelly_status1G {
       if( $model =~ /shelly.?em/ ) {
           my $energy_returned  = $jhash->{$metern}[$i]{'total_returned'};
           $returnedTTL += $energy_returned;
-          #readingsBulkUpdateMonitored($hash,"energy_returned".$subs,shelly_energy_fmt($hash,$energy_returned,"Wh"));
-          readingsBulkUpdateMonitored($hash,"energyReturned".$subs,shelly_energy_fmt($hash,$energy_returned,"Wh"));
+          Shelly_readingsBulkUpdate($hash,"energy_returned".$subs,$energy_returned,"energy/Wh");
 
           my $voltage = $jhash->{$metern}[$i]{'voltage'};
-          readingsBulkUpdateMonitored($hash,'voltage'.$subs,$voltage.$si_units{voltage}[$hash->{units}]);
+          Shelly_readingsBulkUpdate($hash,'voltage'.$subs,$voltage,"voltage");
 
           my ($pfactor,$freq,$current);
           my $apparentPower=0;
@@ -3729,32 +3899,30 @@ sub Shelly_status1G {
               my $v=($apparentPower * $apparentPower) - ($power * $power);
               $reactivePower = sprintf("%4.1f",($v<=>0)*sqrt( abs($v) ));#    if($apparentPower>$power);
               $current      = $jhash->{$metern}[$i]{'current'};
-              readingsBulkUpdateMonitored($hash,'current'.$subs,$current.$si_units{current}[$hash->{units}]);
+              Shelly_readingsBulkUpdate($hash,'current'.$subs,$current,"current");
           }
           $freq = $jhash->{$metern}[$i]{'freq'};
-          readingsBulkUpdateMonitored($hash,'powerFactor'.$subs,$pfactor);
-          readingsBulkUpdateMonitored($hash,'frequency'.$subs,$freq)  if( defined($freq) );   # supported from fw 1.0.0
-          readingsBulkUpdateMonitored($hash,'apparentpower'.$subs,$apparentPower.$si_units{apparentpower}[$hash->{units}]);
-          readingsBulkUpdateMonitored($hash,'reactivepower'.$subs,$reactivePower.$si_units{reactivepower}[$hash->{units}]);
+          Shelly_readingsBulkUpdate($hash,'powerFactor'.$subs,$pfactor);
+          Shelly_readingsBulkUpdate($hash,'frequency'.$subs,$freq,"frequency");
+          Shelly_readingsBulkUpdate($hash,'apparentpower'.$subs,$apparentPower,"apparentpower");
+          Shelly_readingsBulkUpdate($hash,'reactivepower'.$subs,$reactivePower,"reactivepower");
       }
     }   #-- end looping all meters
     if( $meters>1 ){  #write out values for devices with more than one meter
-        if( defined($jhash->{'total_power'}) ){ #not provided by Shelly4
-            readingsBulkUpdateMonitored($hash,"power_TTL",$jhash->{'total_power'}.$si_units{power}[$hash->{units}]);
-        }
-        readingsBulkUpdateMonitored($hash,"energy_TTL",shelly_energy_fmt($hash,$energyTTL,$model =~ /shelly.?em/ ? "Wh" : "Wm"));
+        Shelly_readingsBulkUpdate($hash,"power_TTL",$jhash->{'total_power'},"power");  #not provided by Shelly4
+        
+        Shelly_readingsBulkUpdate($hash,"energy_TTL",$energyTTL,$model =~ /shelly.?em/ ? "energy/Wh" : "energy/Wm");
         if( $model =~ /shelly.?em/ ){
-          # readingsBulkUpdateMonitored($hash,"energy_returned_TTL",shelly_energy_fmt($hash,$returnedTTL,"Wh"));
-            readingsBulkUpdateMonitored($hash,"energyReturned_TTL",shelly_energy_fmt($hash,$returnedTTL,"Wh"));
+            Shelly_readingsBulkUpdate($hash,"energy_returned_TTL",$returnedTTL,"energy/Wh");
             #---try to calculate an energy balance
-            readingsBulkUpdateMonitored($hash,"Total_Energy",shelly_energy_fmt($hash,$energyTTL-$returnedTTL,"Wh"));
+            Shelly_readingsBulkUpdate($hash,"Total_Energy",$energyTTL-$returnedTTL,"energy/Wh");
             #---
             #-- the calculated total power value may be obsolete, if always equal to the read total_power (see above)
-            readingsBulkUpdateMonitored($hash,"power_TTLc",$powerTTL.$si_units{power}[$hash->{units}]);
+            Shelly_readingsBulkUpdate($hash,"power_TTLc",$powerTTL,"power");
      #   }elsif( $model eq "shellyrgbw" && $mode eq "white" ){  #Shellyrgbw is remaining total power value if state=off and pct>0 & timer>0
           #  readingsBulkUpdateMonitored($hash,"power_TTLc",$powerTTL.$si_units{power}[$hash->{units}]);
         }elsif( $model eq "shelly4" ){  #Shelly4 does not calculate total power value
-            readingsBulkUpdateMonitored($hash,"power_TTL",$powerTTL.$si_units{power}[$hash->{units}]);
+            Shelly_readingsBulkUpdate($hash,"power_TTL",$powerTTL,"power");
         }
     }
   }
@@ -3789,47 +3957,61 @@ sub Shelly_status1G {
       }
   }
   #-----------------------------------------------------------------------------------------
-  #-- for all models set internal temperature reading and status
-  if( $jhash->{'temperature'} ){
-      readingsBulkUpdateMonitored($hash,"inttemp",$jhash->{'temperature'}.$si_units{tempC}[$hash->{units}]);
-  }elsif( $jhash->{'tmp'}{'tC'} ){
-      readingsBulkUpdateMonitored($hash,"inttemp",$jhash->{'tmp'}{'tC'}.$si_units{tempC}[$hash->{units}]);
-  }
-  readingsBulkUpdateMonitored($hash,"inttempStatus",$jhash->{'temperature_status'})
-                                                                      if($jhash->{'temperature_status'}) ;
-  readingsBulkUpdateMonitored($hash,"overtemperature",$jhash->{'overtemperature'})
-                                                                       if($jhash->{'overtemperature'});
+  #-- for most of the models set internal temperature reading and status
+  Shelly_readingsBulkUpdate($hash,"inttemp",$jhash->{temperature}//$jhash->{tmp}{tC},"tempC");
+  Shelly_readingsBulkUpdate($hash,"inttempStatus",$jhash->{'temperature_status'});
+  Shelly_readingsBulkUpdate($hash,"overtemperature",$jhash->{'overtemperature'});
+  
   #-- look for external sensors
   if( $jhash->{'ext_temperature'} ){
     my %sensors = %{$jhash->{'ext_temperature'}};
     foreach my $temp (keys %sensors){
-      readingsBulkUpdateMonitored($hash,"temperature_".$temp,$sensors{$temp}->{'tC'}.$si_units{tempC}[$hash->{units}]);
+      Shelly_readingsBulkUpdate($hash,"temperature_".$temp,$sensors{$temp}->{'tC'},"tempC");
     }
   }
   if( $jhash->{'ext_humidity'} ){
     my %sensors = %{$jhash->{'ext_humidity'}};
     foreach my $hum (keys %sensors){
-      readingsBulkUpdateMonitored($hash,"humidity_".$hum,$sensors{$hum}->{'hum'}.$si_units{humidity}[$hash->{units}]);
+      Shelly_readingsBulkUpdate($hash,"humidity_".$hum,$sensors{$hum}->{'hum'},"humidity");
     }
   }
-
-        # calibration status
-        my $calib = $jhash->{calibrated};
-        if( defined($calib) ){
+  # calibration status
+  my $calib = $jhash->{calibrated};
+  if( defined($calib) ){
             $calib =~ s/0|(false)/no/;
             $calib =~ s/1|(true)/yes/;
             readingsBulkUpdateMonitored($hash,"calibrated",$calib);
-        }
+  }
   #-----------------------------------------------------------------------------------------
+  #-- scheduling next status update
+  if( $remaining>0 ){
+            if( $hash->{INTERVAL}==0 ){
+                $statusTmr1G  = $remaining+0.95;
+            }else{
+                $statusTmr1G  = minNum($hash->{INTERVAL},$remaining+0.95);
+            }
+  }
+  
+  if( $statusTmr1G==0 && $hash->{INTERVAL}==0 ){
+      Log3 $name,4,"[Shelly_status1G:iv0] $name status update is finished, no retrigger";
+      $statusTmr1G = -1;    #-- to skip here
+  }elsif( $statusTmr1G > $hash->{INTERVAL} + 3 && $hash->{INTERVAL} > 0 ){
+      #-- override scheduling next status update: perform multiple updates
+      $statusTmr1G = $statusTmr1G / ceil($statusTmr1G/$hash->{INTERVAL});   # use POSIX required
+  }
+  Shelly_readingsBulkUpdate($hash,"/_nextUpdateTimer",$statusTmr1G,"time")   if( AttrVal($name,'timeout',undef) );
+  Log3 $name,6,"[Shelly_status1G:ti] $name timer=$statusTmr1G INTERVAL=".$hash->{INTERVAL}." helper=".$hash->{helper}{timer};
+  
   readingsEndUpdate($hash,1);
-  # nextUpdate
-  if( $hash->{helper}{timer} == 0  &&  $hash->{INTERVAL}>0 ){
+  
+  if( $statusTmr1G > 0 ){
       #-- scheduling next status update
-      Shelly_status($hash,"Shelly_status1G",$intervalN);
-      #-- call settings
-      if( time()-$hash->{helper}{settings_time} > 36.00 ){        
+      Shelly_status($hash,"Shelly_status1G",$statusTmr1G);
+  }
+  
+  #-- call settings
+  if( time()-$hash->{helper}{settings_time} > 36.00 ){        
          Shelly_HttpRequest($hash,"/settings",undef,"Shelly_settings1G" );
-      }
   }
 } #end Shelly_status1G
 
@@ -3907,12 +4089,10 @@ sub Shelly_settings1G {
               # when an on/off value is given, then the on/off function is enabled, otherwise disabled
               # when enabled, the default value is 30 sec
               foreach $onoff ("on","off"){
-                  $val=$jhash->{relays}[$i]{"auto_$onoff"};
-                  $val=$val?$val.$si_units{time}[$hash->{units}]:"0 - disabled";
-                  Shelly_readingsBulkUpdate($hash,"auto_$onoff$subs",$val);
+                  Shelly_readingsBulkUpdate($hash,"auto_$onoff$subs",$jhash->{relays}[$i]{"auto_$onoff"},"time=0");
               }
-              $val = $jhash->{relays}[$i]{name}; # relay name; don't use Umlaute
-              Shelly_readingsBulkUpdate($hash,"relay$subs\_name",$val) if( defined($val) );
+              # relay name; don't use Umlaute
+              Shelly_readingsBulkUpdate($hash,"relay$subs\_name",$jhash->{relays}[$i]{name} );# if( defined($val) );
           }
 
           #-- we have a shellyuni device
@@ -3940,28 +4120,19 @@ sub Shelly_settings1G {
           $chn = 1 if( AttrVal($name,"mode", "color") eq "color" );
           for( $i=0;$i<$chn;$i++ ){
               $subs = ($chn>1 ? "_$i" : "" );
-              # transition -- transition time (in milli-seconds)
-              $val  = $jhash->{lights}[$i]{transition};  # 0 .... 5000
-              if( defined($val) ){
-                  Shelly_readingsBulkUpdate($hash,"transition$subs",$val.$si_units{time_ms}[$hash->{units}]);
-              }
+              # transition -- transition time (in milli-seconds) 0 .... 5000
+              Shelly_readingsBulkUpdate($hash,"transition$subs",$jhash->{lights}[$i]{transition},"time_ms");
+              
               # auto_on, auto_off -- default timer in seconds
               foreach $onoff ("on","off"){
-                  $val=$jhash->{lights}[$i]{"auto_$onoff"};
-                  $val=$val?$val.$si_units{time}[$hash->{units}]:"0 - disabled";
-                  Shelly_readingsBulkUpdate($hash,"auto_$onoff$subs",$val);
+                  Shelly_readingsBulkUpdate($hash,"auto_$onoff$subs",$jhash->{lights}[$i]{"auto_$onoff"},"time=0");
               }
           }
        # effect: ShellyRGBW2 in color mode
-       $val = $jhash->{lights}[0]{effect};
-       if( defined($val) ){
-              Shelly_readingsBulkUpdate($hash,"effect",$val); # no subs
-       }
+       Shelly_readingsBulkUpdate($hash,"effect",$jhash->{lights}[0]{effect}); # no subs
+  
        #-- Shellydimmer
-       $val = $jhash->{transition};
-       if( defined($val) ){
-          readingsBulkUpdateMonitored($hash,"transition", $val.$si_units{time_ms}[$hash->{units}]);
-       }
+       Shelly_readingsBulkUpdate($hash,"transition",$jhash->{transition},"time_ms");
     }
     #-----------------------------------------------------------------------------------------
     # common to all 1G-devices
@@ -3969,22 +4140,15 @@ sub Shelly_settings1G {
     my $coiot = $jhash->{coiot}{enabled};
     $coiot = $jhash->{coiot_execute_enable} if( !defined($coiot) ); # old fw of shelly4
     readingsBulkUpdateIfChanged($hash,"coiot",$coiot==1?"enabled":"disabled");
-    readingsBulkUpdateIfChanged($hash,"coiot_period",
-                       defined($jhash->{coiot}{update_period})?$jhash->{coiot}{update_period}.$si_units{time}[$hash->{units}]:"disabled");
+    Shelly_readingsBulkUpdate($hash,"coiot_period",$jhash->{coiot}{update_period}//-1,"time=4");
+                    #   defined($jhash->{coiot}{update_period})?$jhash->{coiot}{update_period}.$si_units{time}[$hash->{units}]:"disabled");
     # ap-roaming
-    my $ap_roaming = $jhash->{ap_roaming}{enabled};
-    if( defined($ap_roaming) ){
-        if( $ap_roaming == 1 ){
-            $ap_roaming = $jhash->{ap_roaming}{threshold}.$si_units{rssi}[$hash->{units}];
-        }else{
-            $ap_roaming = "disabled";
-        }
-        readingsBulkUpdateIfChanged($hash,"network_wifi_roaming",$ap_roaming);
-    }
+    my $ap_roaming = $jhash->{ap_roaming}{enabled} // 2 ;
+    $ap_roaming = $jhash->{ap_roaming}{threshold}  if( $ap_roaming == 1 );
+    Shelly_readingsBulkUpdate($hash,"network_wifi_roaming",$ap_roaming,"rssi=3");
+    
     # name
-    readingsBulkUpdateIfChanged($hash,"name",$jhash->{name} )
-                                               if( defined($jhash->{name}) );
-    # MAC - will be captured by 'get model'
+    Shelly_readingsBulkUpdate($hash,"name",$jhash->{name} ); 
 
     my %comp = (  # name of the reading where to find input's settings
         # profile   # component
@@ -4075,7 +4239,7 @@ sub Shelly_settings1G {
         $msg.="<th>Index&nbsp;</th><th>URL</th><th>EN/DIS</th>"   unless( $info );
         $msg.="</tr></thead><tbody>";
         my $url;
-        my $host_ip =  qx("\"hostname --all-ip-addresses\"");   # local   same as option -I
+        my $host_ip = AttrVal($name,"host_ip",undef)//qx("\"hostname --all-ip-addresses\"");   # local   same as option -I
         foreach my $m ($model,"addon1"){
           # parsing %shelly_events
           for( $e=0; $event = $shelly_events{$m}[$e] ; $e++ ){
@@ -4144,31 +4308,46 @@ sub Shelly_status2G {
   my ($param,$jhash) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
-  my $comp = $param->{comp};
+  #  my $comp = $param->{comp};
 
   my $state = $hash->{READINGS}{state}{VAL};
   my $model = AttrVal($name,"model","generic");
   my $mode  = AttrVal($name,"mode","");
 
-  my ($channels,$channel,$id);
-
-    # $channel  = $jhash->{'id'}  if( $comp eq "relay" || $comp eq "roller" || $comp eq "input" );
-  ##my $dimmers  = $shelly_models{$model}[2];
-
-  my ($subs,$ison,$overpower,$voltage,$current,$power,$energy,$ret_energy,$pfactor,$freq,$minutes,$errors);  ##R  minutes errors
-  my $timer = $hash->{INTERVAL};  # timer in seconds for next update of status via Shelly_status()
-if( $hash->{helper}{timer}>0 ){
-        $timer=$hash->{helper}{timer}  ;
-        }
-  # check we have a second gen device
-  if( $shelly_models{$model}[4]==0 ){
-        Log3 $name,2,"[Shelly_status2G] ERROR: calling status2G for a not 2ndGen Device";
+  my ($comp,$channels,$channel,$id);
+    #(   0      1       2         3    4    5       6    7     8)
+    #(relays,rollers,dimmers,  meters, NG,inputs,  res.,color,modes)
+  my @chnls=@{$shelly_models{$model}};   # extract the array of 'model' out of the hash 
+  
+  # check we don't have a first gen device
+  if( $chnls[4]==0 ){
+        Log3 $name,2,"[Shelly_status2G] ERROR: calling status2G for a 1stdGen Device";
         return undef;
+  } 
+  # mofify number of channels for multi-mode devices
+  if( $chnls[8] > 0 ){
+     if( $mode eq "relay" ){
+         $chnls[1]=0;
+     }elsif( $mode eq "roller" ){
+         $chnls[0]=0; # no relay channel
+         $chnls[3]=$chnls[1]; # no of energy metering channels is number of rollers 
+     }elsif( $mode eq "white" ){
+         $chnls[7]=0; # no color channel
+     }elsif( $mode eq "color" ){
+         $chnls[2]=0; # no dimmer/white channel
+         $chnls[3]=$chnls[7]; # no of energy metering channels is number of color channels         
+     }
+  } 
+  Log3 $name,4,"[Shelly_status2G] device $name of model $model ($mode) processing one-in-all status call: @chnls";  #4
+
+  my $timer = $hash->{INTERVAL};  # timer in seconds for next update of status via Shelly_status()
+  if( $hash->{helper}{timer}>0 ){
+     $timer=$hash->{helper}{timer}; 
+     Log3 $name,2,"$name have set timer to helper";
   }
 
-  Log3 $name,4,"[Shelly_status2G] device $name of model $model processing one-in-all status call ";
-
   readingsBeginUpdate($hash);
+  my ($subs,$ison,$overpower,$voltage,$current,$power,$energy,$ret_energy,$pfactor,$freq,$minutes,$errors);  ##R  minutes errors
 
   ############ Processing system values. ##############################
   ############ Available for all Gen2 devices (exceptions are marked *)
@@ -4226,7 +4405,7 @@ if( $hash->{helper}{timer}>0 ){
   if( $wifi_status eq "got ip" ){
       $wifi_ip   = $jhash->{wifi}{sta_ip};
       $wifi_ssid = $jhash->{wifi}{ssid};
-      $wifi_rssi = Shelly_rssi($hash,$jhash->{wifi}{rssi});
+      $wifi_rssi = $jhash->{wifi}{rssi};
   }else{
       $wifi_ip   = "-";
       $wifi_ssid = "-";
@@ -4234,7 +4413,7 @@ if( $hash->{helper}{timer}>0 ){
   }
   readingsBulkUpdateIfChanged($hash,"network_ip-address".$netw_subs,$wifi_ip );
   readingsBulkUpdateIfChanged($hash,"network_ssid",$wifi_ssid);
-  readingsBulkUpdateIfChanged($hash,"network_rssi",$wifi_rssi);
+  Shelly_readingsBulkUpdate($hash,"network_rssi",$wifi_rssi,"rssi=2");
 
   if( $eth_ip eq "-" && $wifi_ssid eq "-" ){   # disconnected
       Shelly_error_handling($hash,"Shelly_status2G:status","not connected",2);
@@ -4259,18 +4438,16 @@ if( $hash->{helper}{timer}>0 ){
   Log3 $name,6,"[Shelly_status2G:network] $name ethernet=$eth_ip,wifi=$wifi_ssid @ $wifi_rssi";
 
   ############ checking uptime
-  my $uptime = $jhash->{sys}{uptime};
-  $uptime .= " sec, last reboot at ".FmtDateTime(time()-$uptime) if( $hash->{units} );
-  readingsBulkUpdateIfChanged($hash,"uptime",$uptime);
+  Shelly_readingsBulkUpdate($hash,"uptime",$jhash->{sys}{uptime},"time=5");
 
   ############ checking webhook version
   my $webhook_rev = $jhash->{sys}{webhook_rev};
   readingsBulkUpdateIfChanged($hash,"webhook_ver",$webhook_rev);
 
-  ############ Processing input states ###############################
+  ############ processing input states ###############################
   #Inputs in button-mode (Taster) CANNOT be read out!
   #Inputs of cover devices are strongly attached to the device.
-  $channels = $shelly_models{$model}[5]; # number of inputs
+  $channels = $chnls[5]; # number of inputs
   if( $channels>0 ){
     Log3 $name,5,"[Shelly_status2G:input] Processing $channels input states for device $name ($model)";
 
@@ -4296,68 +4473,38 @@ if( $hash->{helper}{timer}>0 ){
         my $minute_ts = $jhash->{"input:$channel"}{counts}{minute_ts};
         my $freq = $jhash->{"input:$channel"}{freq};
         #-- set readings
-        readingsBulkUpdateMonitored($hash,"input".$subs,$cnts_ttl);
-        readingsBulkUpdateMonitored($hash,"input".$subs,$cnts_xttl);
-        readingsBulkUpdateMonitored($hash,"input".$subs,$cnts_byminute);
-        readingsBulkUpdateMonitored($hash,"input".$subs,$cnts_xbyminute);
-        readingsBulkUpdateMonitored($hash,"input".$subs,$minute_ts); #timestamp
-        readingsBulkUpdateMonitored($hash,"input".$subs,$freq.$si_units{frequency}[$hash->{units}]);
+        Shelly_readingsBulkUpdate($hash,"input$subs\_cnts_ttl",$cnts_ttl);
+        Shelly_readingsBulkUpdate($hash,"input$subs\_cnts_xttl",$cnts_xttl);
+        Shelly_readingsBulkUpdate($hash,"input$subs\_cnts_byminute",$cnts_byminute);
+        Shelly_readingsBulkUpdate($hash,"input$subs\_cnts_xbyminute",$cnts_xbyminute);
+        Shelly_readingsBulkUpdate($hash,"input$subs\_timestamp",$minute_ts);   #timestamp
+        Shelly_readingsBulkUpdate($hash,"input$subs\_freq",$freq,"frequency" );
         #####
         # may have input:100 as analog input
         $channel=100;
         $id = $jhash->{"input:$channel"}{id};
         $subs = "_".$channel;
         #-- get values
-        my $percent  = $jhash->{"input:$channel"}{percent};
-        if( defined $percent ){
-            readingsBulkUpdateMonitored($hash,"input$subs",$percent.$si_units{pct}[$hash->{units}]);
+       # my $percent  = $jhash->{"input:$channel"}{percent};
+        #if( defined($percent) ){
+            Shelly_readingsBulkUpdate($hash,"input$subs",$jhash->{"input:$channel"}{percent},"pct" );
+       # }
+        my ($id,$temperature);        
+        for( my $ti=100;$ti<=105;$ti++){
+            $id = $jhash->{"temperature:$ti"}{id};
+            $temperature = $jhash->{"temperature:$ti"}{tC};
+            next  if( !defined($id) );
+            next  if( !defined($temperature) );
+            $id -=100;
+            Shelly_readingsBulkUpdate($hash,"temperature\_$id",$temperature,"tempC" );
         }
-        my $temperature = $jhash->{'temperature:100'}{tC};
-        readingsBulkUpdateMonitored($hash,"temperature",$temperature.$si_units{tempC}[$hash->{units}] ) if( defined($temperature) );
     }
     # set state of 'input-only' devices to OK  (may have state 'error')
     readingsBulkUpdateMonitored($hash,"state","OK") if( $model eq "shellyplusi4" );
   }
-  ############ processing light device ###############################
-  $channels = $shelly_models{$model}[2]; # number of dimmers
-  if( $channels>0 ){
-    $comp="light";
-    Log3 $name,5,"[Shelly_status2G:light] Processing $channels light states for device $name ($model)";
-
-    for($channel=0; $channel<$channels; $channel++){
-        Log3 $name,5,"[Shelly_status2G:light] Processing state of dimmer $channel for device $name ";#5
-        $id = $jhash->{"light:$channel"}{id};
-        $subs = ($channels == 1) ? "" : "_".$channel;
-        $ison = $jhash->{"light:$channel"}{output};
-        $ison =~ s/0|(false)/off/;
-        $ison =~ s/1|(true)/on/;
-        readingsBulkUpdateMonitored($hash,"light".$subs,$ison);
-
-        # brightness (white-devices only)
-        my $bri    = $jhash->{"light:$channel"}{brightness};
-        readingsBulkUpdateMonitored($hash,"pct".$subs,$bri.$si_units{pct}[$hash->{units}]);
-
-        # processing timers --> see 'emeters' below $timer
-
-        # processing transition time
-        if( $jhash->{"light:$channel"}{transition}{started_at} ){
-           my $tran_start    = $jhash->{"light:$channel"}{transition}{started_at};
-           my $tran_duration = $jhash->{"light:$channel"}{transition}{duration};
-           my $tran_remaining= round($tran_start + $tran_duration - time() , 3);
-           readingsBulkUpdateMonitored($hash,"transition_timer".$subs,$tran_remaining.$si_units{time}[$hash->{units}]);
-           readingsBulkUpdateMonitored($hash,"transition_target".$subs,$jhash->{"light:$channel"}{transition}{target}{brightness}.$si_units{pct}[$hash->{units}]);
-        }
-
-        # Switch Reason: Trigger for switching
-        # --> init, http <-fhemWEB, WS_in, timer, loopback (=schedule?), HTTP <-Shelly-App
-        readingsBulkUpdateMonitored($hash,"source".$subs,$jhash->{"light:$channel"}{source});
-    }
-    #set state for multichannel light-devices to "OK"
-    readingsBulkUpdateMonitored($hash,"state",($channels == 1)?$ison:"OK");
-  }
   ############ processing relay states ###############################
-  $channels = $shelly_models{$model}[0]; # number of relays
-  if( $channels>0 && $mode ne "roller" ){
+  $channels = $chnls[0]; # number of relays
+  if( $channels>0 ){
     $comp="switch";
     Log3 $name,5,"[Shelly_status2G:switch] Processing $channels relay states for device $name ($model as $mode)";
 
@@ -4378,15 +4525,15 @@ if( $hash->{helper}{timer}>0 ){
     readingsBulkUpdateMonitored($hash,"state",($channels == 1)?$ison:"OK");
   }
   ############ processing roller states and position ###############################
-  $channels = $shelly_models{$model}[1]; # number of rollers
-  if( $channels>0 && $mode ne "relay"){
+  $channels = $chnls[1]; # number of rollers
+  if( $channels>0 ){
     $comp="cover";
     for($channel=0; $channel<$channels; $channel++){
       Log3 $name,5,"[Shelly_status2G:cover] Processing roller state for device $name channel $channel (we have $channels rollers)";
       $id = $jhash->{"cover:$channel"}{id};
+      $subs = ($channels == 1) ? "" : "_".$channel;
       my ($rsource,$rstate,$raction,$rcurrpos,$rtargetpos,$position,$pct,$pctnormal);
       my $rlastdir = "unknown";
-      $subs = ($channels == 1) ? "" : "_".$channel;
 
       #roller: check reason for moving or stopping: http, timeout *), WS_in, limit-switch,obstruction,overpower,overvoltage ...
       #  and safety_switch  (if Safety switch is enabled in Shelly -> see Cover.GetConfig)
@@ -4417,22 +4564,17 @@ if( $hash->{helper}{timer}>0 ){
           Shelly_readingsBulkUpdate($hash,"power_last".$subs,
              $power.$si_units{power}[$hash->{units}]." ".
              ReadingsVal($name,"last_dir".$subs,""),
-             undef,
+             undef,undef,
              ReadingsTimestamp($name,"power".$subs,"") )
                                              if( $power > 0 );
           $current = ReadingsNum($name,"current".$subs,0);
           Shelly_readingsBulkUpdate($hash,"current_last".$subs,
              $current.$si_units{current}[$hash->{units}]." ".
              ReadingsVal($name,"last_dir".$subs,""),
-             undef,
+             undef,undef,
              ReadingsTimestamp($name,"current".$subs,"") )
                                              if( $current > 0 );
       }
-
-      # Power in Watts
-      $power = $jhash->{"cover:$channel"}{apower}.$si_units{power}[$hash->{units}];
-      readingsBulkUpdateMonitored($hash,"power".$subs,$power);
-      Log3 $name,6,"[Shelly_status2G:cover] Roller reading power$subs=$power";
 
       #-- open 100% or 0% ?
       $pctnormal = (AttrVal($name,"pct100","open") eq "open");
@@ -4455,20 +4597,178 @@ if( $hash->{helper}{timer}>0 ){
       readingsBulkUpdateMonitored($hash,"state".$subs,$rstate);
     }
   }
+  ############ processing dimmer or white device ###############################
+  $channels = $chnls[2]; # number of dimmers
+  if( $channels>0 ){
+    $comp="light";
+    Log3 $name,5,"[Shelly_status2G:light] Processing $channels light states for device $name ($model)";
 
+    for($channel=0; $channel<$channels; $channel++){
+        Log3 $name,5,"[Shelly_status2G:light] Processing state of dimmer $channel for device $name ";#5
+        $id = $jhash->{"light:$channel"}{id};
+        $subs = ($channels == 1) ? "" : "_".$channel;
+        $ison = $jhash->{"light:$channel"}{output};
+        $ison =~ s/0|(false)/off/;
+        $ison =~ s/1|(true)/on/;
+        readingsBulkUpdateMonitored($hash,"light".$subs,$ison);
+
+        # brightness (white-devices only)
+        my $bri    = $jhash->{"light:$channel"}{brightness};
+        Shelly_readingsBulkUpdate($hash,"pct".$subs,$bri,"pct" );
+
+        # processing timers --> see 'emeters' below $timer
+
+        # processing transition time
+        if( $jhash->{"light:$channel"}{transition}{started_at} ){
+           my $tran_start    = $jhash->{"light:$channel"}{transition}{started_at};
+           my $tran_duration = $jhash->{"light:$channel"}{transition}{duration};
+           my $tran_remaining= round($tran_start + $tran_duration - time() , 3);
+           Shelly_readingsBulkUpdate($hash,"transition_timer" .$subs,$tran_remaining,"time" );
+           Shelly_readingsBulkUpdate($hash,"transition_target".$subs,$jhash->{"light:$channel"}{transition}{target}{brightness},"pct" );
+        }
+
+        # Switch Reason: Trigger for switching
+        # --> init, http <-fhemWEB, WS_in, timer, loopback (=schedule?), HTTP <-Shelly-App
+        readingsBulkUpdateMonitored($hash,"source".$subs,$jhash->{"light:$channel"}{source});
+    }
+    #set state for multichannel light-devices to "OK"
+    readingsBulkUpdateMonitored($hash,"state",($channels == 1)?$ison:"OK");
+  }
+  ##**##
   ############ processing internal temperature ###############################
-  if( defined($jhash->{"$comp:0"}{temperature}{tC}) ){
-         # most Gen2 devices have internal temperature on each channel, eg. {light:1}{temperature}{tC}
-         # we use only channel :0
-         readingsBulkUpdateMonitored($hash,"inttemp",$jhash->{"$comp:0"}{temperature}{tC}.$si_units{tempC}[$hash->{units}]);
-         Log3 $name,5,"[Shelly_status2G:inttemp] $name processed internal temperature";
-  }elsif( $model eq "shellypro3em" ){
-        my $value = $jhash->{'temperature:0'}{tC};
-        readingsBulkUpdateMonitored($hash,"inttemp",$value.$si_units{tempC}[$hash->{units}]);
-        Log3 $name,5,"[Shelly_status2G:inttemp] $name processed internal temperature";
+  ### only for comp: switch,cover,light,rgb,rgbw
+  if( defined($comp) ){
+      # most Gen2 devices have internal temperature on each channel, eg. {light:1}{temperature}{tC}   we use only channel :0
+      Shelly_readingsBulkUpdate($hash,"inttemp",$jhash->{"$comp:0"}{temperature}{tC}//$jhash->{'temperature:0'}{tC},"tempC");
+      Log3 $name,5,"[Shelly_status2G:inttemp] $name processed internal temperature of comp $comp"; #5
   }else{
-        # internal temperature not provided by all devices
-        Log3 $name,5,"[Shelly_status2G:inttemp] $name no internal temperature for $model ($comp) found";
+      Log3 $name,5,"[Shelly_status2G:inttemp] $name NO internal temperature"; #5
+  }
+  
+  
+  ############ processing energy meter readings ###############################
+  # common to roller and relay, also ShellyPMmini energymeter, but not: Walldisplay
+  # get number of metering channels
+
+  ############ processing power measureing (PM) device ###############################
+  if( $chnls[3]>0 ){  # number of pm1 channels
+    $channels = $chnls[3]; 
+    $comp="pm1" if( !defined($comp) );
+    Log3 $name,5,"[Shelly_status2G:pm] Processing $channels PM channels of device $name ($model) as comp $comp";
+
+    for( $channel=0; $channel<$channels; $channel++){
+      my $CC = "$comp:$channel";
+      my $id = $jhash->{$CC}{id};
+      #$subs = ( $mode eq "roller" ? $shelly_models{$model}[1] : $shelly_models{$model}[3])==1?"":"_$id";
+      $subs = $channels==1 ? "" : "_$id";
+      Log3 $name,5,"[Shelly_status2G:emeter] $name: Processing metering channel$subs";
+
+      $energy = $jhash->{$CC}{aenergy}{total};
+      if( defined($energy) ){   # not available on RGBWW-channels with NoLoad
+          Shelly_readingsBulkUpdate($hash,"current".$subs,$jhash->{$CC}{current},"current");
+          Shelly_readingsBulkUpdate($hash,"power"  .$subs,$jhash->{$CC}{apower},"power");       # active power, in Watts
+          Shelly_readingsBulkUpdate($hash,"state",$jhash->{$CC}{apower},"power") if($model eq "shellypmmini");
+          Shelly_readingsBulkUpdate($hash,"energy".$subs,$energy,"energy/Wh");
+          # Energy consumption by minute (in Milliwatt-hours) for the last minute, is cumulated while minute restarts
+         ## $minutes = shelly_energy_fmt($hash,$jhash->{$CC}{aenergy}{by_minute}[0],"mWh"); # 
+          Shelly_readingsBulkUpdate($hash,"energy_lastMinute".$subs,$jhash->{$CC}{aenergy}{by_minute}[0],"energy/mWh") if(1); 
+          # Returned Energy available with suitable devices/mode only, eg. ShellyPro1PM
+          $ret_energy= $jhash->{$CC}{ret_aenergy}{total};
+          if( defined($ret_energy) ){
+              Shelly_readingsBulkUpdate($hash,"energy_returned" .$subs,$ret_energy,"energy/Wh");
+              Shelly_readingsBulkUpdate($hash,"energy_purchased".$subs,$energy-$ret_energy,"energy/Wh");
+          }
+      }
+      
+      # Voltage is always available
+      Shelly_readingsBulkUpdate($hash,"voltage".$subs,$jhash->{$CC}{voltage},"voltage");
+          
+      # PowerFactor not supported by ShellyPlusPlugS, ShellyPMmini and others
+      Shelly_readingsBulkUpdate($hash,"pfactor".$subs,$jhash->{$CC}{pf} ) if( defined($jhash->{$CC}{pf}) );
+
+      # frequency supported from fw 1.0.0, AC operated devices only
+      Shelly_readingsBulkUpdate($hash,"frequency".$subs,$jhash->{$CC}{freq},"frequency") if( defined($jhash->{$CC}{freq}) );
+
+      # on ShellyPlusRGBWpm we have:  $jhash->{$CC}{X}  with X is source,output,brightness,{temperature}{tc}
+
+      # protection: checking for overload errors
+      $errors  = $jhash->{$CC}{errors}[0];
+      $errors = "none"   if(!$errors);
+       #readingsBulkUpdateMonitored($hash,"errors".$subs,$errors);
+      readingsBulkUpdateMonitored($hash,"protection".$subs,$errors);
+
+      # processing timers, if present (not provided by Walldisplay)
+      if( $jhash->{$CC}{timer_started_at} ){
+         my ($tmrDur,$tmrEnd);
+         Log3 $name,5,"[Shelly_status2G:timer] $name processing timer";
+         if( $jhash->{$CC}{timer_remaining} ){
+            $tmrDur = $jhash->{$CC}{timer_remaining};
+            Log3 $name,4,"[Shelly_status2G:timer] $name remaining timer$subs is $tmrDur"; #5
+            $tmrEnd = $tmrDur + time();
+         }else{
+            $tmrEnd = $jhash->{$CC}{timer_started_at} + $jhash->{$CC}{timer_duration};
+            $tmrDur =  $tmrEnd - time();
+            $tmrDur =  round($tmrDur,1);
+            Log3 $name,4,"[Shelly_status2G:tmr] $name calculated timer$subs from start and duration is $tmrDur"; #5
+         }
+         $timer = minNum( $timer, $tmrDur );
+         Log3 $name,4,"[Shelly_status2G:timer] $name calculated update timer is $timer"; #5
+         $tmrDur .= " sec = ".FmtDateTime($tmrEnd)  if( $hash->{units} );
+         readingsBulkUpdateMonitored($hash,"timer".$subs,$tmrDur);
+      }elsif( $jhash->{$CC}{move_started_at} ){  # cover, if moving
+         Log3 $name,6,"[Shelly_status2G:move] $name processing movement-stated at=".$jhash->{$CC}{move_started_at};
+         $timer = $jhash->{$CC}{move_started_at}+$jhash->{$CC}{move_timeout}-time();
+         $timer +=0.25;  # extra time to avoid delays in positioning
+         Log3 $name,6,"[Shelly_status2G:move] $name calculated remaining time=$timer";
+         
+      }elsif(ReadingsVal($name,"timer$subs",undef) ){
+         readingsBulkUpdateMonitored($hash,"timer".$subs,'-');
+         $hash->{helper}{timer}=0;    #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      }
+
+      # calculate all periods, when given by attribute
+      my @TPs=split(/,/x, AttrVal($name,"Periods", "") );
+      #$unixtime = $unixtime-$unixtime%60;  # adjust to lass full minute
+      my $unixtime = time();
+      #$TimeStamp = FmtDateTime($unixtime-$unixtime%60); # adjust to lass full minute
+      my $TimeStamp = FmtDateTime( time() );
+      foreach my $TP (@TPs){
+           Log3 $name,5,"[Shelly_status2G:periods] $name: calling Shelly_delta_energy for period \'$TP\' ";
+           Shelly_delta_energy($hash,"energy_",$TP,$unixtime,$energy,$TimeStamp,fhem('{$isdst}',1));
+      }
+      #---
+    } #end of metering channels loop    
+  }
+  ############ processing energy measureing (EM) device ###############################
+  if( $chnls[6]>0 ){  # number of em/em1 channels
+    $channels = $chnls[6]; 
+   # $comp="em" if( !defined($comp) );
+    if( $model eq "shellypro3em" ){
+      $comp = "em";
+    }elsif( $model eq "shellyproem50" ){
+      $comp = "em1";
+    }
+    Log3 $name,5,"[Shelly_status2G:em] Processing $channels EM channels of device $name ($model) as comp $comp tbd";
+    if( $comp eq "em" ){
+        Log3 $name,5,"[Shelly_status2G:emeter] $name is of model $model and component $comp: processing errors (if any)";#5
+        my $errors = undef;
+        my $suffix = AttrVal($name,"EMchannels","_ABC");
+        foreach my $emch ( "a_","b_","c_","total_" ){
+           # checking for em-channel errors
+           # may contain:  power_meter_failure, no_load
+           if( defined($jhash->{'em:0'}{$emch.'errors'}[0]) ){
+              $errors .= $mapping{sf}{$suffix}{$emch}.$jhash->{'em:0'}{$emch.'errors'}[0];
+           }
+        }
+        # checking for EM-system errors
+        # may contain:  power_meter_failure, phase_sequence (eg if a phase is switched off), no_load
+        if( $jhash->{'em:0'}{errors}[0] ){
+              $errors .= "System: ".$jhash->{'em:0'}{errors}[0];
+        }
+        readingsBulkUpdateMonitored($hash,"error_EM",defined($errors)?$errors:"ok");
+    }elsif( $comp eq "em1" ){
+                           # .... tbd
+    }
   }
 
   ############ processing Walldisplay ambient readings ###############################
@@ -4476,10 +4776,10 @@ if( $hash->{helper}{timer}>0 ){
         $comp = "walldisplay";
             $subs ="";
             # readings supported by the /Shelly.GetStatus call or by individual calls eg /Temperature.GetStatus
-            readingsBulkUpdateMonitored($hash,"temperature" .$subs,$jhash->{'temperature:0'}{'tC'}.$si_units{tempC}[$hash->{units}] );
-            readingsBulkUpdateMonitored($hash,"humidity"    .$subs,$jhash->{'humidity:0'}{'rh'}.$si_units{humidity}[$hash->{units}] );
-            readingsBulkUpdateMonitored($hash,"illuminance" .$subs,$jhash->{'illuminance:0'}{'lux'}.$si_units{illuminance}[$hash->{units}] );
-            readingsBulkUpdateMonitored($hash,"illumination".$subs,$jhash->{'illuminance:0'}{'illumination'} );
+            Shelly_readingsBulkUpdate($hash,"temperature" .$subs,$jhash->{'temperature:0'}{'tC'},"tempC");
+            Shelly_readingsBulkUpdate($hash,"humidity"    .$subs,$jhash->{'humidity:0'}{'rh'},"humidity");
+            Shelly_readingsBulkUpdate($hash,"illuminance" .$subs,$jhash->{'illuminance:0'}{'lux'},"illuminance");
+            Shelly_readingsBulkUpdate($hash,"illumination".$subs,$jhash->{'illuminance:0'}{'illumination'} );
   }
 
   ############ processing Shelly Plus Sensor Addon ############################### Y174Addon
@@ -4511,8 +4811,8 @@ if( $hash->{helper}{timer}>0 ){
                    $value =~ s/0|(false)/off/;
                    $value =~ s/1|(true)/on/;
                }              
-               readingsBulkUpdateMonitored($hash,$comp.$subs,      $value.$si_units{$sensor}[$hash->{units}] );
-               readingsBulkUpdateMonitored($hash,$comp.$subs."_id",$id)   if( $comp eq "input" );
+               Shelly_readingsBulkUpdate($hash,$comp.$subs,$value,$sensor );
+               Shelly_readingsBulkUpdate($hash,$comp.$subs."_id",$id)   if( $comp eq "input" );
            #  digital input is buggy:  state will appear even if the addon is not connected to the Shelly
            }elsif( defined($jhash->{"$comp:$id"}{errors}[0]) ){
                my $errmsg = "[Shelly_status2G:addon] $name: AddOn/$sensor: no value found for $comp$subs: id=$id";
@@ -4524,130 +4824,16 @@ if( $hash->{helper}{timer}>0 ){
      }
   }
 
-  ############ processing energy meter readings ###############################
-  # common to roller and relay, also ShellyPMmini energymeter, but not: Walldisplay
-  # get number of metering channels
-  $channels = $shelly_models{$model}[3];  # number of metering channels
-  $channels = $shelly_models{$model}[1] if( $mode eq "roller" );
-
-  $comp = "pm1" if( $model eq "shellypmmini" );
-  $comp = "em"  if( $model eq "shellypro3em" );
-
-  if( $comp eq "light" || $comp eq "cover" || $comp eq "switch" || $comp eq "pm1" ){
-
-    for( $channel=0; $channel<$channels; $channel++){
-      my $CC = "$comp:$channel";
-      my $id = $jhash->{$CC}{id};
-      $subs = ( $mode eq "roller" ? $shelly_models{$model}[1] : $shelly_models{$model}[3])==1?"":"_$id";
-      Log3 $name,5,"[Shelly_status2G:emeter] $name: Processing metering channel$subs";
-
-      $voltage = $jhash->{$CC}{voltage}.$si_units{voltage}[$hash->{units}];
-      $current = $jhash->{$CC}{current}.$si_units{current}[$hash->{units}];
-      $power   = $jhash->{$CC}{apower} .$si_units{power}[$hash->{units}];   # active power
-
-      $energy    = $jhash->{$CC}{aenergy}{total};
-      $ret_energy= $jhash->{$CC}{ret_aenergy}{total};
-      # Energy consumption by minute (in Milliwatt-hours) for the last minute
-      $minutes = shelly_energy_fmt($hash,$jhash->{$CC}{aenergy}{by_minute}[0],"mWh"); # is cumulated while minute restarts
-
-      Log3 $name,5,"[Shelly_status2G:emeter] $name $comp voltage$subs=$voltage, current$subs=$current, power$subs=$power";  #4
-
-      readingsBulkUpdateMonitored($hash,"voltage".$subs,$voltage);
-      readingsBulkUpdateMonitored($hash,"current".$subs,$current);
-      readingsBulkUpdateMonitored($hash,"power"  .$subs,$power);
-      # PowerFactor not supported by ShellyPlusPlugS, ShellyPMmini and others
-      readingsBulkUpdateMonitored($hash,"pfactor".$subs,$jhash->{$CC}{pf}) if( defined($jhash->{$CC}{pf}) );
-
-      # frequency supported from fw 1.0.0
-      readingsBulkUpdateMonitored($hash,"frequency".$subs,$jhash->{$CC}{freq}.$si_units{frequency}[$hash->{units}])
-                                                                          if( defined($jhash->{$CC}{freq}) );
-
-      readingsBulkUpdateMonitored($hash,"energy" .$subs,shelly_energy_fmt($hash,$energy,"Wh"));
-      if( defined($ret_energy) ){   # available with suitable devices/mode only, eg. ShellyPro1PM
-          readingsBulkUpdateMonitored($hash,"energy_returned" .$subs,shelly_energy_fmt($hash,$ret_energy,"Wh"));
-          readingsBulkUpdateMonitored($hash,"energy_purchased".$subs,shelly_energy_fmt($hash,$energy-$ret_energy,"Wh"));
-      }
-
-      #readingsBulkUpdateMonitored($hash,"energy_lastMinute".$subs,$minutes);
-      readingsBulkUpdateMonitored($hash,"state",$power) if($model eq "shellypmmini");
-
-      # protection: checking for overload errors
-      $errors  = $jhash->{$CC}{errors}[0];
-      $errors = "none"   if(!$errors);
-       #readingsBulkUpdateMonitored($hash,"errors".$subs,$errors);
-      readingsBulkUpdateMonitored($hash,"protection".$subs,$errors);
-
-      # processing timers, if present (not provided by Walldisplay)
-      if( $jhash->{$CC}{timer_started_at} ){
-         my ($tmrDur,$tmrEnd);
-         Log3 $name,5,"[Shelly_status2G:timer] $name processing timer";
-         if( $jhash->{$CC}{timer_remaining} ){
-            $tmrDur = $jhash->{$CC}{timer_remaining};
-            Log3 $name,5,"[Shelly_status2G:timer] $name remaining timer$subs is $tmrDur"; #5
-            $tmrEnd = $tmrDur + time();
-         }else{
-            $tmrEnd = $jhash->{$CC}{timer_started_at} + $jhash->{$CC}{timer_duration};
-            $tmrDur =  $tmrEnd - time();
-            $tmrDur =  round($tmrDur,1);
-            Log3 $name,5,"[Shelly_status2G:tmr] $name calculated timer$subs from start and duration is $tmrDur"; #5
-         }
-         $timer = minNum( $timer, $tmrDur );
-         Log3 $name,5,"[Shelly_status2G:timer] $name calculated update timer is $timer"; #5
-         $tmrDur .= $si_units{time}[$hash->{units}] ." = ".FmtDateTime($tmrEnd)  if( $hash->{units} );
-         readingsBulkUpdateMonitored($hash,"timer".$subs,$tmrDur);
-      }elsif( $jhash->{$CC}{move_started_at} ){  # cover, if moving
-         Log3 $name,6,"[Shelly_status2G:move] $name processing movement-stated at=".$jhash->{$CC}{move_started_at};
-         $timer = $jhash->{$CC}{move_started_at}+$jhash->{$CC}{move_timeout}-time();
-         $timer +=0.25;  # extra time to avoid delays in positioning
-         Log3 $name,6,"[Shelly_status2G:move] $name calculated remaining time=$timer";
-         
-      }elsif(ReadingsVal($name,"timer$subs",undef) ){
-         readingsBulkUpdateMonitored($hash,"timer".$subs,'-');
-      }
-
-      # calculate all periods, when given by attribute
-      my @TPs=split(/,/x, AttrVal($name,"Periods", "") );
-      #$unixtime = $unixtime-$unixtime%60;  # adjust to lass full minute
-      my $unixtime = time();
-      #$TimeStamp = FmtDateTime($unixtime-$unixtime%60); # adjust to lass full minute
-      my $TimeStamp = FmtDateTime( time() );
-      foreach my $TP (@TPs){
-           Log3 $name,5,"[Shelly_status2G:periods] $name: calling shelly_delta_energy for period \'$TP\' ";
-           shelly_delta_energy($hash,"energy_",$TP,$unixtime,$energy,$TimeStamp,fhem('{$isdst}',1));
-      }
-      #---
-    } #end of metering channels loop
-  }elsif( $comp eq "em" ){
-        Log3 $name,5,"[Shelly_status2G:emeter] $name is of model $model and component $comp: processing errors (if any)";#5
-        my $errors = undef;
-        my $suffix = AttrVal($name,"EMchannels","_ABC");
-        foreach my $emch ( "a_","b_","c_","total_" ){
-           # checking for em-channel errors
-           # may contain:  power_meter_failure, no_load
-           if( defined($jhash->{'em:0'}{$emch.'errors'}[0]) ){
-              $errors .= $mapping{sf}{$suffix}{$emch}.$jhash->{'em:0'}{$emch.'errors'}[0];
-           }
-        }
-        # checking for EM-system errors
-        # may contain:  power_meter_failure, phase_sequence (eg if a phase is switched off), no_load
-        if( $jhash->{'em:0'}{errors}[0] ){
-              $errors .= "System: ".$jhash->{'em:0'}{errors}[0];
-        }
-        readingsBulkUpdateMonitored($hash,"error_EM",defined($errors)?$errors:"ok");
-  }else{
-        Log3 $name,5,"[Shelly_status2G:emeter] $name is of model $model and component $comp: skipped metering";#5
-  }
-  
   
   ############ processing H&T readings ###############################
   if( ReadingsVal($name,"model_ID","") eq "S3SN-0U12A" ){
             # readings supported by the /Shelly.GetStatus call 
-            readingsBulkUpdateMonitored($hash,"temperature",$jhash->{'temperature:0'}{'tC'}.$si_units{tempC}[$hash->{units}] );
-            readingsBulkUpdateMonitored($hash,"humidity"   ,$jhash->{'humidity:0'}{'rh'}.$si_units{humidity}[$hash->{units}] );
-            readingsBulkUpdateMonitored($hash,"power_battery"    ,$jhash->{'devicepower:0'}{'battery'}{V}.$si_units{voltage}[$hash->{units}] );
-            readingsBulkUpdateMonitored($hash,"power_battery"    ,$jhash->{'devicepower:0'}{'battery'}{percent}.$si_units{pct}[$hash->{units}] );
-            readingsBulkUpdateMonitored($hash,"power_wakeup",$jhash->{sys}{wakeup_period}.$si_units{time}[$hash->{units}] );
-            readingsBulkUpdateMonitored($hash,"power_external",$jhash->{'devicepower:0'}{'external'}{present}?1:0 );
+            Shelly_readingsBulkUpdate($hash,"temperature"  ,$jhash->{'temperature:0'}{'tC'},"tempC");
+            Shelly_readingsBulkUpdate($hash,"humidity"     ,$jhash->{'humidity:0'}{'rh'},"humidity");
+            Shelly_readingsBulkUpdate($hash,"power_battery",$jhash->{'devicepower:0'}{'battery'}{V},"voltage");
+            Shelly_readingsBulkUpdate($hash,"power_battery",$jhash->{'devicepower:0'}{'battery'}{percent},"pct");
+            Shelly_readingsBulkUpdate($hash,"power_wakeup" ,$jhash->{sys}{wakeup_period},"time");
+            Shelly_readingsBulkUpdate($hash,"power_external",$jhash->{'devicepower:0'}{'external'}{present}?1:0 );
   }
 
   #--------------------------------------------------------------------------------
@@ -4659,8 +4845,9 @@ if( $hash->{helper}{timer}>0 ){
   ##my $callFn=$hash->{callFn};
   ##$callFn = "ov" if( !defined($callFn) );
   ##delete $hash->{callFn};
+  Log3 $name,7,"[Shelly_status2G:ti] $name timer=$timer INTERVAL=".$hash->{INTERVAL}." helper=".$hash->{helper}{timer};
   if( $timer == $hash->{INTERVAL} ){
-      #-- skip here
+      Shelly_status($hash,"Shelly_status2G iv0",$timer);
   }elsif( $timer < $hash->{INTERVAL} || $hash->{INTERVAL} == 0 ){
       #-- override scheduling next status update
       Shelly_status($hash,"Shelly_status2G ov",$timer);
@@ -4689,8 +4876,8 @@ if( $hash->{helper}{timer}>0 ){
 sub Shelly_settings2G {
   my ($param,$jhash) = @_;
   my $hash = $param->{hash};
-  my $comp = $param->{comp};
   my $name = $hash->{NAME};
+  my $comp = $param->{comp};
   my $model= AttrVal($name,"model","generic");
   my $subs;
   my $range_extender_enable;
@@ -4718,14 +4905,18 @@ sub Shelly_settings2G {
         ### checking bluetooth ble
         my $ble  = $jhash->{ble}{enable};
         $ble = defined($ble) ? ($ble == 1 ? "enabled" : "disabled"):"error";
-        if( $ble eq "enabled" ){
-            readingsBulkUpdateIfChanged($hash,"ble_rpc",($jhash->{ble}{rpc}{enable}==1 ? "enabled" : "disabled"));
-            readingsBulkUpdateIfChanged($hash,"ble_obs",($jhash->{ble}{observer}{enable}==1 ? "enabled" : "disabled"));
+        if( $ble eq "enabled" ){ 
+            readingsBulkUpdateIfChanged($hash,"ble_rpc",($jhash->{ble}{rpc}{enable}==1 ? "enabled" : "disabled")); 
         }else{
             readingsBulkUpdateIfChanged($hash,"ble_rpc","-");
-            readingsBulkUpdateIfChanged($hash,"ble_obs","-");
+         #   readingsBulkUpdateIfChanged($hash,"ble_obs","-");
         }
-        readingsBulkUpdateIfChanged($hash,"ble",$ble);         
+        readingsBulkUpdateIfChanged($hash,"ble",$ble);
+        if( defined($jhash->{ble}{observer}{enable}) ){
+            readingsBulkUpdateIfChanged($hash,"ble_obs",($jhash->{ble}{observer}{enable}==1 ? "enabled" : "disabled"));
+        }else{
+            fhem("deletereading $name ble_obs");   # 'bluetooth gateway' not supported by fw 1.5.0+
+        }
 
         ### Cloud
         my $hascloud = $jhash->{cloud}{enable};
@@ -4741,15 +4932,9 @@ sub Shelly_settings2G {
         }
         #**********
         # ap-roaming
-        my $ap_roaming = $jhash->{wifi}{roam}{interval};
-        if( defined($ap_roaming) ){
-          if( $ap_roaming > 0 ){
-            $ap_roaming = $jhash->{wifi}{roam}{rssi_thr}.$si_units{rssi}[$hash->{units}];
-          }else{
-            $ap_roaming = "disabled";
-          }
-        readingsBulkUpdateIfChanged($hash,"network_wifi_roaming",$ap_roaming);
-        }
+        my $ap_roaming = $jhash->{wifi}{roam}{interval} // 2;
+        $ap_roaming = $jhash->{wifi}{roam}{rssi_thr} if( $ap_roaming > 0 ); 
+        Shelly_readingsBulkUpdate($hash,"network_wifi_roaming",$ap_roaming,"rssi=3");
         #**********
 
         ### Access Point network, range extender
@@ -4796,30 +4981,30 @@ sub Shelly_settings2G {
               $i=2*$c;  # two inputs each light-channel
               # inputs mode: dimup-down with input_0 or dual dim
               if( $in_mode eq "dual_dim" ){
-                 Shelly_readingsBulkUpdate($hash,"input_$i\_function","dimdown");
+                 readingsBulkUpdate($hash,"input_$i\_function","dimdown");
                  $i++;
-                 Shelly_readingsBulkUpdate($hash,"input_$i\_function","dimup");
+                 readingsBulkUpdate($hash,"input_$i\_function","dimup");
               }elsif( $in_mode eq "dual" ){
                  # inputs swapped (cover only, in dual mode) ?
                  my $in_swap = $jhash->{"cover:$c"}{swap_inputs};
                  my $dir = ($in_swap==1?"down":"up")."wards";
-                 Shelly_readingsBulkUpdate($hash,"input_$i\_function",$dir);
+                 readingsBulkUpdate($hash,"input_$i\_function",$dir);
                  $i++;
                  $dir = ($in_swap == 1?"up":"down")."wards";
-                 Shelly_readingsBulkUpdate($hash,"input_$i\_function",$dir);
+                 readingsBulkUpdate($hash,"input_$i\_function",$dir);
                  $in_swap =~ s/0/normal/;    # 0=(false)  = not swapped
                  $in_swap =~ s/1/swapped/;   # 1=(true)
               }else{
-                 Shelly_readingsBulkUpdate($hash,"input_$i\_function",$in_mode);  # Button set to "dim", "activate" or "detached"
+                 readingsBulkUpdate($hash,"input_$i\_function",$in_mode);  # Button set to "dim", "activate" or "detached"
                                                                               # Switch as Toggle: 'follow' or Switch as Edge: 'flip'
                  $i++;
-                 Shelly_readingsBulkUpdate($hash,"input_$i\_function","detached");
+                 readingsBulkUpdate($hash,"input_$i\_function","detached");
               }
             }elsif( $model ne "shellyi4" ){  # switch: follow, detached
                  if( $shelly_models{$model}[5] < 2 ){ 
-                     Shelly_readingsBulkUpdate($hash,"input\_function",$in_mode);
+                     readingsBulkUpdate($hash,"input\_function",$in_mode);
                  }else{            
-                     Shelly_readingsBulkUpdate($hash,"input_$i\_function",$in_mode);
+                     readingsBulkUpdate($hash,"input_$i\_function",$in_mode);
                  }
             }
             # outputs swapped / reverse directions (cover only) ?
@@ -4827,15 +5012,15 @@ sub Shelly_settings2G {
                 my $output_swapped = $jhash->{"$profile:$c"}{invert_directions};
                 $subs = $shelly_models{$model}[1]==1?"":"_$i";
                 if( $output_swapped == 1 ){
-                    Shelly_readingsBulkUpdate($hash,"output$subs\_mode","O1=down, O2=up (swapped)");
+                    readingsBulkUpdate($hash,"output$subs\_mode","O1=down, O2=up (swapped)");
                 }else{
-                    Shelly_readingsBulkUpdate($hash,"output$subs\_mode","O1=up, O2=down");
+                    readingsBulkUpdate($hash,"output$subs\_mode","O1=up, O2=down");
                 }
             }
             $c++;            
             Log3 $name,6,"[Shelly_settings2G:config:inputs] $name is of profile=$profile and input-mode=$in_mode";
           }
-   # Y175
+   
           my ($i_start,$input,$enable,$invert);
           foreach $i_start (0, 100 ){ # eg ShellyPlusUni has input:100 as analog input
             $i=$i_start;
@@ -4894,21 +5079,13 @@ sub Shelly_settings2G {
                for( $c=0;$c<$chn;$c++ ){
                   $subs = ($chn>1 ? "_$c" : "" );
                   $comp = $comps[$m].":".$c;
-                  # transition -- transition time (in seconds)
-                  $val  = $jhash->{$comp}{transition_duration};  # 0 .... 5 sec, steps of 0.1 sec
-                  if( defined($val) ){
-                      Shelly_readingsBulkUpdate($hash,"transition$subs",$val.$si_units{time}[$hash->{units}]);
-                  }
+                  # transition -- transition time (in seconds) 0 .... 5 sec, steps of 0.1 sec
+                  Shelly_readingsBulkUpdate($hash,"transition$subs",$jhash->{$comp}{transition_duration},"time");
+             
                   # auto_on, auto_off -- default timer in seconds
                   foreach $onoff ("on","off"){
-                      $val=$jhash->{$comp}{"auto_$onoff"};
-                      if( $val ){
-                         $val=$jhash->{$comp}{"auto_$onoff\_delay"};
-                         $val.=$si_units{time}[$hash->{units}];
-                      }else{
-                         $val = "disabled";
-                      }
-                      Shelly_readingsBulkUpdate($hash,"auto_$onoff$subs",$val);
+                     $val=$jhash->{$comp}{"auto_$onoff"} ? $jhash->{$comp}{"auto_$onoff\_delay"} : 0;
+                     Shelly_readingsBulkUpdate($hash,"auto_$onoff$subs",$val,"time=1");
                   }
                }
             }
@@ -4924,12 +5101,12 @@ sub Shelly_settings2G {
         ### temperature sensors   # 2G:addon
         if( $jhash->{sys}{device}{addon_type} ){
         Log3 $name,5,"[Shelly_settings2G:config] $name: processing add-on sensors";  #5
-        for( my $sid=100; $sid<=105; $sid++ ){
+          for( my $sid=100; $sid<=105; $sid++ ){
             next if( !defined($jhash->{"temperature:$sid"}{name} ));
             my $jvalue= $jhash->{"temperature:$sid"}{name};
             my $fid=$sid-100;
             readingsBulkUpdateMonitored($hash,"temperature_$fid\_name",$jvalue);
-        }
+          }
         }
 
         ### look if device is walldisplay with thermostat
@@ -4941,15 +5118,19 @@ sub Shelly_settings2G {
             readingsBulkUpdateMonitored($hash,"thermostat_sensor",$jhash->{'thermostat:0'}{sensor} );
             readingsBulkUpdateMonitored($hash,"thermostat_relay" ,$jhash->{'thermostat:0'}{actuator} );
             readingsBulkUpdateMonitored($hash,"thermostat_type",  $jhash->{'thermostat:0'}{type} );
-            readingsBulkUpdateMonitored($hash,"thermostat_hysteresis",$jhash->{'thermostat:0'}{hysteresis} );
-            readingsBulkUpdateMonitored($hash,"thermostat_target",$jhash->{'thermostat:0'}{target_C}. " °C" );
+            Shelly_readingsBulkUpdate($hash,"thermostat_hysteresis",$jhash->{'thermostat:0'}{hysteresis},"tempAbs" );
+            Shelly_readingsBulkUpdate($hash,"thermostat_target",$jhash->{'thermostat:0'}{target_C},"temperature" );
             my $output = $jhash->{'thermostat:0'}{invert_output};
             $output  =~ s/0|(false)/straight/;  # 0=(false)
             $output  =~ s/1|(true)/inverted/;   # 1=(true)
             #$output = $output eq (false) ? 'straight' : 'inverted';
             readingsBulkUpdateMonitored($hash,"thermostat_relay_mode",  $output );
         }
-        
+        # EnergyMeter: CT Types
+        if( $shelly_models{$model}[3]>0 && ReadingsVal($name,"model_function","unknown") eq "energy meter" ){
+            readingsBulkUpdateMonitored($hash,"ct_type",  ($jhash->{'em:0'}{ct_type} // ($jhash->{'em1:0'}{ct_type} // "unknown")) );
+        }
+            
         Shelly_HttpRequest($hash,"/rpc/Shelly.GetDeviceInfo",undef,"Shelly_settings2G","info" );
 
   ################ Shelly.GetDeviceInfo
@@ -4967,8 +5148,8 @@ sub Shelly_settings2G {
 
        my $fw_fhem = ReadingsVal($name,"firmware_current","none"); # the firmware information that fhem knows
 
-       $fw_fhem  =~ /v([^\(]*)\K(.*)/;
-       $fw_fhem  = $1;
+       $fw_fhem  =~ /v([^\(]*)\K(.*)/; 
+       $fw_fhem  = $1;   # everything between 'v' and opening bracket '('  ;  removing  '(update needed....'
        if( $fw_fhem eq $fw_shelly ){
           Log3 $name,4,"[Shelly_settings2G:info] $name: info about current firmware Shelly and Fhem are matching: $fw_shelly";
        }else{
@@ -5015,16 +5196,16 @@ sub Shelly_settings2G {
 
            # MAC
            $mac = uc($jhash->{ap_clients}[$xi]{mac});    # uppercase of clients MAC
-           Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_mac",$mac,undef,$timestamp );
+           Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_mac",$mac,undef,undef,$timestamp );
 
            # the ip at the extended network
            $ip_ext = $jhash->{ap_clients}[$xi]{ip};
-           Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_extlink",$ip_ext,undef,$timestamp );
+           Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_extlink",$ip_ext,undef,undef,$timestamp );
 
            # intlink
            $ip_int = InternalVal($name,"DEF","ip");
            $ip_int.= ":".$jhash->{ap_clients}[$xi]{mport};
-           Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_intlink",$ip_int,undef,$timestamp );
+           Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_intlink",$ip_int,undef,undef,$timestamp );
 
            # scanning all fhem-devices for the 'MAC'           
            foreach my $d ( keys %defs ){
@@ -5044,7 +5225,7 @@ sub Shelly_settings2G {
            
            if( $client_name ){
                Log3 $name,3,"[Shelly_settings2G:APclients] $name: found client \'$client_name\' with MAC=$mac";
-               Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_model",ReadingsVal($client_name,"model_name","unknown"),undef,$timestamp );
+               Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_model",ReadingsVal($client_name,"model_name","unknown"),undef,undef,$timestamp );
                $client = InternalVal($client_name,"DEF",undef);
                if( $client ne $ip_int ) {
                    Log3 $name,1,"[Shelly_settings2G:APclients] $client_name: wrong definition \'$client\', use <DNS-name>:<port>";
@@ -5058,10 +5239,10 @@ sub Shelly_settings2G {
                $client = "no definition";  # may be a smartphone as client - this is no error
                Log3 $name,3,"[Shelly_settings2G:APclients] $name: no fhem device found with MAC=$mac ";
            }
-           Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_name",$client,undef,$timestamp );
+           Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_name",$client,undef,undef,$timestamp );
            $xi++;
       }
-      Shelly_readingsBulkUpdate($hash,"ap_clients",$xi,undef,FmtDateTime($jhash->{ts}) );   # Total number of clients
+      Shelly_readingsBulkUpdate($hash,"ap_clients",$xi,undef,undef,FmtDateTime($jhash->{ts}) );   # Total number of clients
       ###--- start next request
       if( $model !~ /display/ ){
           Shelly_HttpRequest($hash,"/rpc/BLE.CloudRelay.List",undef,"Shelly_settings2G","BLEclients" );
@@ -5081,8 +5262,36 @@ sub Shelly_settings2G {
           fhem("deletereading $name ble_client_$ai"); # not silent: -> logging at level 3
           $ai++;
       }
-      Shelly_HttpRequest($hash,"/rpc/Webhook.List",undef,"Shelly_settings2G","actions",1 ); #call silent
+      Shelly_HttpRequest($hash,"/rpc/Script.List",undef,"Shelly_settings2G","scripts",1 ); #call silent
 
+
+  ################ Script.List
+  }elsif($comp eq "scripts"){
+      Log3 $name,4,"[Shelly_settings2G:scripts] $name: processing the answer /rpc/Script.List"; #4
+      my $i=0; #index
+      my ($scriptname,$scriptid,$enable,$running);
+      # /rpc/Script.List
+      while( defined($jhash->{scripts}[$i]{id}) ){
+          $scriptid=$jhash->{scripts}[$i]{id};
+          $scriptname=$jhash->{scripts}[$i]{name};
+          $enable=$jhash->{scripts}[$i]{enable};
+          $enable =~ s/0/disabled/;
+          $enable =~ s/1/enabled/;
+          $running=$jhash->{scripts}[$i]{running};
+          $running =~ s/0/stopped/;
+          $running =~ s/1/running/;
+          
+          readingsBulkUpdateIfChanged($hash,"script_$i","$scriptid: $scriptname $enable $running" );
+          $i++;
+      }
+      # number of scripts, write out only when scripts have been at least once 
+      readingsBulkUpdateIfChanged($hash,"scripts",$i ) if( $i || $hash->{READINGS}{scripts}{VAL} );
+      # delete reading of non existing scripts
+      while( defined(ReadingsVal($name,"script_$i",undef)) ){   # start with the last value of $i
+          fhem("deletereading $name script_$i"); # not silent: -> logging at level 3
+          $i++;
+      }
+      Shelly_HttpRequest($hash,"/rpc/Webhook.List",undef,"Shelly_settings2G","actions",1 ); #call silent
 
   ################ Webhook.List
   }elsif($comp eq "actions"){
@@ -5093,7 +5302,7 @@ sub Shelly_settings2G {
       my $enabled=0;  # counts the number of urls of actions that are enabled
       my $unused=0;
       my $controlled=0;  # counts the number of urls controled by this fhem-instance
-      my $host_ip =  qx("\"hostname --all-ip-addresses\"");   # local   same as option -I
+      my $host_ip = AttrVal($name,"host_ip",undef)//qx("\"hostname --all-ip-addresses\"");   # local   same as option -I
       my $msg="<thead><tr><th>Id</th><th>Name</th><th>Action</th><th>URL</th><th>EN/DIS</th></tr></thead><tbody>";
       my $url;
       $rev = $jhash->{rev};
@@ -5114,10 +5323,10 @@ sub Shelly_settings2G {
                 $msg .= $isenabled;
                 $enabled++ if( $isenabled eq "EN" );
                 my $ipaddr=""; 
-                if( $url =~ m/\/\/(.*):/ ){
+                if( $url =~ m/\/\/(.*)(:\d*)?\// ){
                     $ipaddr=$1;
                 }else{
-                    Log3 $name,4,"[Shelly_settings2G:actions] $name: no ip-address detected in url $url";
+                    Log3 $name,4,"[Shelly_settings2G:actions] $name: no ip-address detected in url $url"; #4
                 }
                 if( $action =~ /^_.*_$/ &&  $host_ip =~ /$ipaddr/ ){
                     $controlled++;  
@@ -5278,121 +5487,172 @@ sub Shelly_procEMvalues {
   my ($param,$jhash) = @_;
   my $hash=$param->{hash};
   my $name=$hash->{NAME};
+  my $id=$jhash->{id};
+  my $model = AttrVal($name,"model","generic");
+  my @chnls=@{$shelly_models{$model}}; 
 
-  Log3 $name,5,"[Shelly_procEMvalues] processing Shelly_procEMvalues() for device $name channel/id=".$jhash->{id}; #4
-
-  return  if( AttrVal($name,"model","none") ne "shellypro3em" );
+  Log3 $name,4,"[Shelly_procEMvalues] processing Shelly_procEMvalues() for device $name channel/id=$id"; #4
+  return  if( $chnls[6]==0 );  # check number of EM-channels
+  return  if( $model ne "shellypro3em" && $model ne "shellyproem50" );  # 
 
   readingsBeginUpdate($hash);
 
   my $suffix = AttrVal($name,"EMchannels","_ABC");
   my ($pr,$ps,$reading,$value);
-  my ($act_power,$aprt_power);
-  my $reactivePower=0;  # calculated reactive power
+  my ($act_power,$aprt_power,$current,$reactive_power); 
   my $power=0;  # cumulated active power
 
-  foreach my $emch ( "a_","b_","c_","total_" ){
-        if( $suffix eq "ABC_" || $suffix eq "L123_" ){
-          $pr=$mapping{sf}{$suffix}{$emch};
+  my (@emchannels,$mpsub,$mpch);  
+  if( ReadingsVal($name,"model_profile","nn") eq "triphase" ){
+    # triphase
+    @emchannels = ("a_","b_","c_","total_");
+    $mpsub="";
+  }else{   
+    # monophase
+    @emchannels = ("");
+    $mpsub = "_energy";
+    $mpch=$id2ch[$id];
+  }
+  
+  foreach my $emch ( @emchannels ){
+      if( $suffix =~ /_$/ ){  # ABC_  L123_
+          $pr=$mapping{sf}{$suffix}{$mpch//$emch};  # take $emch if $mpch is undefined
           $ps="";
-        }else{
+      }else{          # _ABC  _L123
           $pr="";
-          $ps=$mapping{sf}{$suffix}{$emch};
-        }
-          $reading=$pr.$mapping{E1}{current}.$ps;
-          $value  =sprintf("%5.3f%s",$jhash->{$emch.'current'},$si_units{current}[$hash->{units}]);
+          $ps=$mapping{sf}{$suffix}{$mpch//$emch};
+      }
+      # current
+      $reading=$pr.$mapping{E1}{current}.$ps;
+      $current=$jhash->{$emch.'current'};
+      $value  =sprintf("%5.3f",$current);
+      Shelly_readingsBulkUpdate($hash,$reading,$value,"current");
 
+      # aparent power
+      $reading=$pr.$mapping{E1}{aprt_power}.$ps;
+      $aprt_power=$jhash->{$emch.'aprt_power'}; 
+      $value  =sprintf("%4.1f",$aprt_power);
+      Shelly_readingsBulkUpdate($hash,$reading,$value,"apparentpower");
+      
+      # active power
+      $reading=$pr.$mapping{E1}{act_power}.$ps;
+      $act_power=$jhash->{$emch.'act_power'};
+      $value  =sprintf("%5.1f",$act_power);
+      Shelly_readingsBulkUpdate($hash,$reading,$value,"power"); # store this also as helper
+
+      if($emch ne "total_"){
+          # to get latest values when calculating total pushed value
+          $hash->{helper}{$emch.'Active_Power'} = $act_power;
+
+          # voltage
+          $reading=$pr.$mapping{E1}{voltage}.$ps;
+          $value  =sprintf("%4.1f",$jhash->{$emch.'voltage'});
+          Shelly_readingsBulkUpdate($hash,$reading,$value,"voltage");
+
+          # power factor
+          $reading=$pr.$mapping{E1}{pf}.$ps;
+          $value = $jhash->{$emch.'pf'};
+          $value = sprintf("%4.2f%s",abs($value),( abs($value)==1?"":" (".( $value<0 ? $mapping{E1}{cap}:$mapping{E1}{ind}).")"));
           readingsBulkUpdateMonitored($hash,$reading,$value);
 
-          $reading=$pr.$mapping{E1}{aprt_power}.$ps;
-          $aprt_power=$jhash->{$emch.'aprt_power'};
- 
-          $value  =sprintf("%4.1f%s",$aprt_power, $si_units{apparentpower}[$hash->{units}] );
-          readingsBulkUpdateMonitored($hash,$reading,$value);
-          $reading=$pr.$mapping{E1}{act_power}.$ps;
-          $act_power=$jhash->{$emch.'act_power'};
-          $value  =sprintf("%5.1f%s",$act_power, $si_units{power}[$hash->{units}] );
-          readingsBulkUpdateMonitored($hash,$reading,$value); # store this also as helper
+          # frequency
+          $reading=$pr.$mapping{E1}{frequency}.$ps;
+          Shelly_readingsBulkUpdate($hash,$reading,$jhash->{$emch.'freq'},"frequency"); # supported from fw1.0.0
 
-          if($emch ne "total_"){
-            # to get latest values when calculating total pushed value
-            $hash->{helper}{$emch.'Active_Power'}=$act_power;
-
-            $reading=$pr.$mapping{E1}{voltage}.$ps;
-            $value  =sprintf("%4.1f%s",$jhash->{$emch.'voltage'},$si_units{voltage}[$hash->{units}]);
-            readingsBulkUpdateMonitored($hash,$reading,$value);
-
-            $reading=$pr.$mapping{E1}{pf}.$ps;
-            $value = $jhash->{$emch.'pf'};
-            $value = sprintf("%4.2f%s",abs($value),( abs($value)==1?"":" (".( $value<0 ? $mapping{E1}{cap}:$mapping{E1}{ind}).")"));
-            readingsBulkUpdateMonitored($hash,$reading,$value);
-
-            $reading=$pr.$mapping{E1}{frequency}.$ps;
-            $value = $jhash->{$emch.'freq'};
-            readingsBulkUpdateMonitored($hash,$reading,$value.$si_units{frequency}[$hash->{units}]) if( defined($value) );  # supported from fw 1.0.0
-
-            $power += $act_power;
-            # reactive power: not provided by Shelly
-            if(1){    # calculation of reactive power!
-                $reading=$pr.$mapping{E1}{react_power}.$ps;
-                $value = ($aprt_power * $aprt_power) - ($act_power * $act_power);
-                $value = ($value<=>0)*sqrt( abs($value) );
-                $reactivePower += $value;
-                $value = sprintf("%4.1f%s",$value, $si_units{reactivepower}[$hash->{units}] );
-                readingsBulkUpdateMonitored($hash,$reading,$value);
-            }
-          }else{
-                $reading=$pr.$mapping{E1}{react_power}.$ps;
-                $value = sprintf("%4.1f%s",$reactivePower, $si_units{reactivepower}[$hash->{units}] );
-                readingsBulkUpdateMonitored($hash,$reading,$value);
-          }
+          $power += $act_power;
+          
+          # reactive power: not provided by Shelly
+          # calculation of reactive power!
+          $reading=$pr.$mapping{E1}{react_power}.$ps;
+          $value = ($aprt_power * $aprt_power) - ($act_power * $act_power);
+          $reactive_power = round( ($value<=>0)*sqrt( abs($value) ),1);
+          $value = sprintf("%4.1f",$reactive_power);
+          Shelly_readingsBulkUpdate($hash,$reading,$value,"reactivepower");
+      }
   }
   $value = $jhash->{'n_current'};
   if( defined($value) ){
           $reading='Current_N';  ## $pr.$mapping{E1}{current}.$ps;
-          $value  =sprintf("%5.3f%s",$value,$si_units{current}[$hash->{units}]);
-          readingsBulkUpdateMonitored($hash,$reading,$value);
+          $value  =sprintf("%5.3f",$value);
+          Shelly_readingsBulkUpdate($hash,$reading,$value,"current");
   }
-
-  ### Balancing: cumulate power values and save them in helper, will be used by Shelly_procEMData()
+  
+  ### Balancing: cumulate power values and save them in helper, will be used by Shelly_procEnergyData()
   $hash->{helper}{powerCnt}++;
   $hash->{helper}{power} += $power;
   $hash->{helper}{powerPos} += $power if($power>0);
   $hash->{helper}{powerNeg} -= $power if($power<0);  # the cumulated value is positive!
 
-  readingsBulkUpdateMonitored($hash,"state","OK");
+  ### ----------------------------------------
+  ### get cumulated values in monophase profile
+  if( ReadingsVal($name,"model_profile","nn") ne "triphase" ){
+          if( $id==0 ){   # initialize helper values
+              $hash->{helper}{'act_power'}  = 0;
+              $hash->{helper}{'aprt_power'}  = 0;
+              $hash->{helper}{'react_power'}  = 0;
+              $hash->{helper}{'current'}  = 0;
+          }
+          $hash->{helper}{'act_power'} += $act_power;
+          $hash->{helper}{'aprt_power'} += $aprt_power;
+          $hash->{helper}{'react_power'} += $reactive_power;
+          $hash->{helper}{'current'} += $current;
+          
+          if( $id == $shelly_models{$model}[3]-1 ){ 
+            # write out cumulated values when passed last channel 
+            foreach my $helper( 'act_power','aprt_power','react_power','current' ){
+               if( $suffix =~ /^_/ ){ # _ABC  _L123
+                   $ps = '_S';
+               }else{     # ABC_  L123_
+                   $pr = 'S_';
+               }
+               $reading = $pr.$mapping{E1}{$helper}.$ps;
+               Shelly_readingsBulkUpdate($hash,$reading,$hash->{helper}{$helper},$helper);
+            }
+          }
+  }
+
+  readingsBulkUpdateMonitored($hash,"state","OK")  if( $chnls[0]==0 );
 
   readingsEndUpdate($hash,1);
   #~~~~~~~~~~~~~~~~~~~~~
+  
+  if( ReadingsVal($name,"model_profile","nn") ne "triphase"    &&    ++$id < $shelly_models{$model}[3] ){
+         Shelly_HttpRequest($hash,"/rpc/EM1.GetStatus","?id=$id","Shelly_procEMvalues" );
+         return;
+  }
+
   if( $hash->{INTERVAL}>0 ){
       #-- initiate next run
       my $timer=AttrVal($name,"interval_power",$hash->{INTERVAL});
       RemoveInternalTimer($hash,"Shelly_getEMvalues");
       InternalTimer(time()+$timer, "Shelly_getEMvalues", $hash);
-      Log3 $name,5,"[Shelly_procEMvalues] $name: next \'Get EM values\' update in $timer seconds"; #4
+      Log3 $name,4,"[Shelly_procEMvalues] $name: next \'Get EM values\' update in $timer seconds"; #4
   }
 } #end Shelly_procEMvalues()
 
 
 ########################################################################################
 #
-# Shelly_procEMData - processing ShellyPro3EM (channel=0) Energy Data
-#                 data requested by /rpc/EMData.GetStatus?id=0
+# Shelly_procEnergyData - processing ShellyPro energy meter Energy Data
+#                 data requested by /rpc/EMData.GetStatus?id=0     ShellyPro3EM in triphase profile (channel=0)
+#                 data requested by /rpc/EM1Data.GetStatus?id=$id  in monophase profile
 #
 # Parameter param, jhash
 #
 ########################################################################################
 
-sub Shelly_procEMData {
+sub Shelly_procEnergyData {
   my ($param,$jhash) = @_;
   my $hash=$param->{hash};
   my $name=$hash->{NAME};
+  my $id=$jhash->{id};  
+  my $model = AttrVal($name,"model","generic");
 
   my $unixtime = time();####$jhash->{sys}{unixtime};
   my $TimeStamp = strftime("%Y-%m-%d %H:%M:%S",localtime($unixtime) );
   readingsBeginUpdate($hash);
   #readingsBulkUpdateMonitored($hash,"timestamp", $TimeStamp);
-  Log3 $name,5,"[Shelly_procEMData] processing Shelly_procEMData() for device $name";   #5
+  Log3 $name,5,"[Shelly_procEnergyData] processing Shelly_procEnergyData() for device $name, channel=$id";   #5
 
   # Energy Readings are calculated by the Shelly every minute, matching "zero"-seconds
   # with some processing time the result will appear in fhem some seconds later
@@ -5403,33 +5663,49 @@ sub Shelly_procEMData {
   my $suffix =  AttrVal($name,"EMchannels","_ABC");
   my ($pr,$ps,$reading,$value);
   my ($active_energy,$return_energy,$deltaEnergy,$deltaAge);
-
+  
+  my (@emchannels,$mpsub,$mpch);  
+  if( ReadingsVal($name,"model_profile","nn") eq "triphase" ){
+    # triphase: we have for the channel 0:
+    # a_total_act_energy
+    # a_total_act_ret_energy
+    # b_...
+    # c_...
+    # total_act
+    # total_act_ret
+    @emchannels = ("a_","b_","c_","total_");
+    $mpsub="";
+  }else{   
+    # monophase: we have for each channel 0,1,2:
+    # total_act_energy
+    # total_act_ret_energy
+    @emchannels = ("total_");
+    $mpsub = "_energy";
+    $mpch=$id2ch[$id];
+  }
   #--- looping all phases
-  foreach my $emch ( "a_","b_","c_","total_" ){
-        if( $suffix eq "ABC_" ||  $suffix eq "L123_" ){
-            $pr=$mapping{sf}{$suffix}{$emch};
+  foreach my $emch ( @emchannels ){                  # "a_","b_","c_","total_"
+        if( $suffix =~ /_$/ ){  # ABC_  L123_
+            $pr=$mapping{sf}{$suffix}{$mpch//$emch};  # take $emch if $mpch is undefined
             $ps="";
-        }else{
+        }else{         # _ABC  _L123
             $pr="";
-            $ps=$mapping{sf}{$suffix}{$emch};
+            $ps=$mapping{sf}{$suffix}{$mpch//$emch};
         }
         foreach my $flow ("act","act_ret"){
             if( $emch ne "total_" ){
               $reading = $pr.$mapping{E1}{'total_'.$flow.'_energy'}.$ps;
-              #$value = $jhash->{'emdata:0'}{$emch.'total_'.$flow.'_energy'};
               $value = $jhash->{$emch.'total_'.$flow.'_energy'};
             }else{          # processing total_ values
               $reading = $pr.$mapping{E1}{$flow}.$ps;
-              #$value = $jhash->{'emdata:0'}{'total_'.$flow};
-              $value = $jhash->{'total_'.$flow};
+              $value = $jhash->{'total_'.$flow.$mpsub};
               if( $flow eq "act" ){
                   $active_energy = $value;
               }else{
                   $return_energy = $value;
               }
             }
-            $value = shelly_energy_fmt($hash,$value,"Wh");
-            Shelly_readingsBulkUpdate($hash,$reading,$value,undef,$TimeStamp);
+            Shelly_readingsBulkUpdate($hash,$reading,$value,"energy/Wh",undef,$TimeStamp);
         }
   }
 
@@ -5443,10 +5719,26 @@ sub Shelly_procEMData {
 
   ### processing calculated values ###
   ### 1. calculate Total Energy
-        $value = shelly_energy_fmt($hash,$active_energy - $return_energy,"Wh");
-        Shelly_readingsBulkUpdate($hash,"Total_Energy_S",$value,undef,$TimeStamp);
+        Shelly_readingsBulkUpdate($hash,$pr."Total_Energy".$ps,$active_energy - $return_energy,"energy/Wh",undef,$TimeStamp);
 
-  ### 2. calculate a power value from the difference of Energy measures
+  ### 2. calculate Energy-differences for a set of different periods   //  all meters
+        #prepare the list of periods
+        my @TPs=split(/,/x, AttrVal($name,"Periods", "") );
+
+        #calculate all periods
+        my $dst = fhem('{$isdst}',1); # is daylight saving time (Sommerzeit) ?   silent/no log entry {$isdst} at level 3
+        $unixtime = $unixtime-$unixtime%60;  # adjust to lass full minute
+        foreach my $TP (@TPs){
+           Log3 $name,5,"[Shelly_procEnergyData] calling Shelly_delta_energy for period \'$TP\' ";
+           # Shellie'S Energy value 'S'
+           Shelly_delta_energy($hash,$pr."Total_Energy".    $ps."_",$TP,$unixtime,$active_energy-$return_energy,$TimeStamp,$dst);
+           Shelly_delta_energy($hash,$pr."Purchased_Energy".$ps."_",$TP,$unixtime,$active_energy,$TimeStamp,$dst);
+           Shelly_delta_energy($hash,$pr."Returned_Energy". $ps."_",$TP,$unixtime,$return_energy,$TimeStamp,$dst);
+        } 
+        
+  ### ~~~~~~~~~~Triphase~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      
+  if( ReadingsVal($name,"model_profile","nn") eq "triphase" ){
+  ### 3. calculate a power value from the difference of Energy measures
         $deltaAge = $unixtime - $hash->{helper}{timestamp_last};
         $hash->{helper}{timestamp_last} = $unixtime;
 
@@ -5457,26 +5749,14 @@ sub Shelly_procEMData {
         $value  = sprintf("%4.1f",3600*$deltaEnergy/$deltaAge) if( $deltaAge>0 );  # this is a Power value in Watts.
         $value .= $si_units{power}[$hash->{units}];
         $value .= sprintf(" \( %d Ws = %5.2f Wh in %d s \)",3600*$deltaEnergy,$deltaEnergy,$deltaAge);
-        Shelly_readingsBulkUpdate($hash,$reading,$value,undef,$TimeStamp);
-
-  ### 3. calculate Energy-differences for a set of different periods
-        #prepare the list of periods
-        my @TPs=split(/,/x, AttrVal($name,"Periods", "") );
-
-        #calculate all periods
-        my $dst = fhem('{$isdst}',1); # is daylight saving time (Sommerzeit) ?   silent/no log entry {$isdst} at level 3
-        $unixtime = $unixtime-$unixtime%60;  # adjust to lass full minute
-        foreach my $TP (@TPs){
-           Log3 $name,5,"[Shelly_procEMData] calling shelly_delta_energy for period \'$TP\' ";
-           # Shellie'S Energy value 'S'
-           shelly_delta_energy($hash,"Total_Energy_S_",    $TP,$unixtime,$active_energy-$return_energy,$TimeStamp,$dst);
-           shelly_delta_energy($hash,"Purchased_Energy_S_",$TP,$unixtime,$active_energy,$TimeStamp,$dst);
-           shelly_delta_energy($hash,"Returned_Energy_S_", $TP,$unixtime,$return_energy,$TimeStamp,$dst);
-        }
+        Shelly_readingsBulkUpdate($hash,$reading,$value,undef,undef,$TimeStamp);
+  }  # Triphase/
 
   ############ Balancing ######################
-  if( AttrVal($name,"Balancing",1) == 1 && $hash->{helper}{powerCnt} ){   # don't divide by zero
-      Log3 $name,5,"[Shelly_procEMData] processing Balancing";
+  if( ReadingsVal($name,"model_profile","nn") eq "triphase"  
+    &&  AttrVal($name,"Balancing",1) == 1 
+    &&  $hash->{helper}{powerCnt} ){   # don't divide by zero
+      Log3 $name,5,"[Shelly_procEnergyData] processing Balancing";
       ### 4. calculate a power value by integration of single power values
       ### calculate purchased and returned Energy out of integration of positive and negative power values
           my ($mypower,$mypowerPos,$mypowerNeg)=(0,0,0);
@@ -5493,7 +5773,7 @@ sub Shelly_procEMData {
 
           $active_energy_i = $mypowerPos/60 + $hash->{helper}{Energymeter_P};    # Energy in Watthours
           $return_energy_i = $mypowerNeg/60 + $hash->{helper}{Energymeter_R};
-          Log3 $name,5,"[Shelly_procEMData] integrated Energy= $active_energy_i   $return_energy_i   in Watthours";
+          Log3 $name,5,"[Shelly_procEnergyData] integrated Energy= $active_energy_i   $return_energy_i   in Watthours";
           $mypowerPos = sprintf("%4.1f %s (%d Ws = %5.2f Wh)", $mypowerPos,$si_units{power}[$hash->{units}],$mypowerPos*60,$mypowerPos/60 );
           $mypowerNeg = sprintf("%4.1f %s (%d Ws = %5.2f Wh)", $mypowerNeg,$si_units{power}[$hash->{units}],$mypowerNeg*60,$mypowerNeg/60);
           # don't write out when not calculated
@@ -5525,43 +5805,74 @@ sub Shelly_procEMData {
                }
                # next line we need because additon works not properly!!!
                $value = sprintf("%7.4f",$value+AttrVal($name,"Energymeter_$EM",50000));
-               $value = shelly_energy_fmt($hash, $value,"Wh");
-               Shelly_readingsBulkUpdate($hash,"Total_Energymeter_$EM", $value, undef, $TimeStamp);
+               Shelly_readingsBulkUpdate($hash,"Total_Energymeter_$EM",$value,"energy/Wh",undef,$TimeStamp);
             }
           }
 
      ### 8. write out actual balanced meter values
-          readingsBulkUpdateMonitored($hash,"Purchased_Energy_T",shelly_energy_fmt($hash,$active_energy_i,"Wh"), undef, $TimeStamp);
-          readingsBulkUpdateMonitored($hash,"Returned_Energy_T", shelly_energy_fmt($hash,$return_energy_i,"Wh"), undef, $TimeStamp);
-          readingsBulkUpdateMonitored($hash,"Total_Energy_T",    shelly_energy_fmt($hash,$active_energy_i-$return_energy_i,"Wh"), undef, $TimeStamp);
+          Shelly_readingsBulkUpdate($hash,"Purchased_Energy_T",$active_energy_i,"energy/Wh", undef, $TimeStamp);
+          Shelly_readingsBulkUpdate($hash,"Returned_Energy_T",$return_energy_i,"energy/Wh", undef, $TimeStamp);
+          Shelly_readingsBulkUpdate($hash,"Total_Energy_T",$active_energy_i-$return_energy_i,"energy/Wh", undef, $TimeStamp);
 
      ### 9. calculate Energy-differences for a set of different periods
           foreach my $TP (@TPs){
               # integrated (balanced) energy values 'T'
-              shelly_delta_energy($hash,"Total_Energy_T_",    $TP,$unixtime,$active_energy_i-$return_energy_i,$TimeStamp,$dst); # $return_energy is positive
-              shelly_delta_energy($hash,"Purchased_Energy_T_",$TP,$unixtime,$active_energy_i,$TimeStamp,$dst);
-              shelly_delta_energy($hash,"Returned_Energy_T_", $TP,$unixtime,$return_energy_i,$TimeStamp,$dst);
+              Shelly_delta_energy($hash,"Total_Energy_T_",    $TP,$unixtime,$active_energy_i-$return_energy_i,$TimeStamp,$dst); # $return_energy is positive
+              Shelly_delta_energy($hash,"Purchased_Energy_T_",$TP,$unixtime,$active_energy_i,$TimeStamp,$dst);
+              Shelly_delta_energy($hash,"Returned_Energy_T_", $TP,$unixtime,$return_energy_i,$TimeStamp,$dst);
           }
-  }  # Balancing/
+  }  # Balancing/ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      
   readingsEndUpdate($hash,1);
+
+  if( ReadingsVal($name,"model_profile","nn") ne "triphase"    &&    ++$id < $shelly_models{$model}[3] ){
+         Shelly_HttpRequest($hash,"/rpc/EM1Data.GetStatus","?id=$id","Shelly_procEnergyData" );
+         return;
+  }
+  
+  # last run: get total values  for monophase profile
+  if( ReadingsVal($name,"model_profile","nn") ne "triphase"  ){
+      readingsBeginUpdate($hash);
+      my ($val,$unit);
+      #    $reading = $pr.$mapping{E1}{'total_'}.$ps;
+      foreach my $reading( "Purchased_Energy","Returned_Energy","Total_Energy" ){
+          $value=0;
+          #   for( my $i=0; $i<$shelly_models{$model}[3]; $i++){
+          foreach my $idx( "A","B","C" ){
+              last unless( ReadingsNum($name,"$reading\_$idx",undef) );
+              $val = ReadingsVal($name,"$reading\_$idx",0) =~ /(\d+.?\d+)\s(\S*)/;
+              $unit = $2;
+              $value += ReadingsNum($name,"$reading\_$idx",0);
+            #  $value += ($1//0);
+          }
+          # Shellie'S Energy value 'S'
+       #   my $unit=$si_units
+          $pr="";$ps="_S";
+          Shelly_readingsBulkUpdate($hash,$pr.$reading.$ps,$value,"energy/$unit"); # Purchased_Energy, ...
+          foreach my $TP (@TPs){
+              Log3 $name,5,"[Shelly_procEnergyData] calling Shelly_delta_energy for period \'$TP\' for Shelly in monophase-profile";
+              Shelly_delta_energy($hash,$pr.$reading.$ps."_",$TP,$unixtime,$value,$TimeStamp,$dst);
+          } 
+      }
+      readingsEndUpdate($hash,1);
+  }
 
   if( $hash->{INTERVAL}>0 ){
       #-- initiate next run, adjusted to full minute plus 1 sec
       my $perds = AttrVal($name,"Periods", "min");
-      $perds=~/(\w+)$/; # \w matches all word chars, looking for last key in descending order
-      my $timer=$periods{$1}[2]; $timer=60 if( !defined($timer) || $timer==0 );
+      $perds=~/(\w+)$/; # \w matches all word chars, looking for last key in descending order   
+      my $timer=($periods{$1}[2]  //   60); 
       my $Time=(int(time()/$timer)+1)*$timer+1; 
-      Log3 $name,4,"[Shelly_procEMData] $name: \'EM Data\' update interval is $timer sec, next update \@ ".strftime("%H:%M:%S",localtime($Time)); #4
-      RemoveInternalTimer($hash,"Shelly_getEMData");
-      InternalTimer( $Time, "Shelly_getEMData", $hash);
+      Log3 $name,4,"[Shelly_procEnergyData] $name: \'EM Data\' update interval is $timer sec, next update \@ ".strftime("%H:%M:%S",localtime($Time)); #4
+      RemoveInternalTimer($hash,"Shelly_getEnergyData");
+      InternalTimer( $Time, "Shelly_getEnergyData", $hash);
   }
   return undef;
-} #end Shelly_procEMData()
+} #end Shelly_procEnergyData()
 
 
 ########################################################################################
 #
-# shelly_delta_energy - calculate energy for a periode
+# Shelly_delta_energy - calculate energy for a periode
 #
 # Parameter hash,
 #           reading     name of the reading of the energy-counter
@@ -5573,7 +5884,7 @@ sub Shelly_procEMData {
 #
 ########################################################################################
 
-sub shelly_delta_energy {
+sub Shelly_delta_energy {
   my ($hash,$reading,$TP,$utime,$energy,$TimeStamp,$dst) = @_;
 
   my ($energyOld,$denergy,$timestampRef,$dtime);
@@ -5600,20 +5911,20 @@ sub shelly_delta_energy {
           }
 
           my $power = $dtime ? sprintf(" %4.1f %s",3600*$denergy/$dtime,$si_units{power}[$hash->{units}]) : "-";
-          readingsBulkUpdate($hash,$reading,
+          readingsBulkUpdateIfChanged($hash,$reading,
                   shelly_energy_fmt($hash,$denergy,"Wh").sprintf(" (%7.4f) ",$energy).$power,
                   undef, $TimeStamp);
           #--- corrected values ?
           my $corrFactor = AttrVal($hash->{NAME},"PeriodsCorr-F",undef);
           if( $corrFactor ){
                 $power = $dtime ? sprintf(" %4.1f %s",3600*$denergy*$corrFactor/$dtime,$si_units{power}[$hash->{units}]) : "-";
-                readingsBulkUpdate($hash,$reading."-c",
+                readingsBulkUpdateIfChanged($hash,$reading."-c",
                   shelly_energy_fmt($hash,$denergy*$corrFactor,"Wh").sprintf(" (%7.4f f=%4.3f) ",$energy,$corrFactor).$power,
                   undef, $TimeStamp);
           }
        }
        return undef;
-}
+} #end Shelly_delta_energy()
 
 
 ########################################################################################
@@ -5631,7 +5942,8 @@ sub shelly_energy_fmt {
   my $name = $hash->{NAME};
 
   if( $showunits eq "original" ){
-      return( "$energy $unit" );
+      return( sprintf("%4.2f %s",$energy, $unit ) );
+ #    return( "$energy $unit" );
   }
   if( $unit eq "Wm" ){  # Watt-Minutes, as in Shellies first gen, except Shelly-EM
       $energy = int($energy/6)/10;   # 60 minutes per hour
@@ -5639,28 +5951,33 @@ sub shelly_energy_fmt {
   }elsif( $unit eq "mWh" ){  # Milli-Watt-Hours, as in Shellies 2nd gen "last-minute"
       $energy /= 1000;   # 1000 mWh per Wh
       $decimals=3;
+  }elsif( $unit eq "kWh" ){  # Kilo-Watt-Hours, when reading Values with ReadingsVal()
+      $energy *= 1000;   # 1000 mWh per Wh
+      $decimals=6;
   }
-  $unit = "Wh";
+  my $unit2 = "Wh";
   if( $showunits eq "none" ){
-      $unit = "";  # in Wh
+      $unit2 = "";  # in Wh
       return $energy;
   }elsif( $showunits eq "normal" ){
       $decimals += 1;
       # nothing more to do here
   }elsif( $showunits eq "normal2" ){
       $energy /= 1000;   # 1000 Wh per kWh
-      $unit = "kWh";
+      $unit2 = "kWh";
       $decimals += 4;
+      $decimals = 5   if( $unit eq $unit2 );
   }elsif( $showunits eq "ISO" ){
       $energy *= 3.6;   # 3.6 kJ per Wh (Kilo-Joule)
-      $unit = "kJ";     # Kilo-Joule
+      $unit2 = "kJ";     # Kilo-Joule
   }else{
       return "Error: wrong unit";
   }
   $decimals = 1 if( $energy == 0 );
   $decimals = "%1.".$decimals."f";   # e.g. %1.4f
-  return( sprintf("$decimals %s",$energy, $unit ) );
+  return( sprintf("$decimals %s",$energy, $unit2 ) );
 } #end shelly_energy_fmt()
+
 
 ########################################################################################
 #
@@ -5680,7 +5997,7 @@ sub Shelly_response {
   my $model= AttrVal($name,"model","generic");
   my $timer;
   #processing incoming data
-  Log3 $name,4,"[Shelly_response] device $name has returned JSON for component $comp to set $cmd";
+  Log3 $name,4,"[Shelly_response] device $name has returned JSON for component \'$comp\' to set \'$cmd\'"; #4
 
   #---------------------------
   if( $comp eq "dim" ){
@@ -5729,7 +6046,7 @@ sub Shelly_response {
       }elsif( defined($jhash->{cover}) && $jhash->{cover} eq "successfull" ){
           if( $urlcmd =~ m/toggle_after=(\d+)/ ){
               $hash->{helper}{timer} = $1;
-              $hash->{helper}{timerCnt}=1; 
+              $hash->{helper}{timerCnt}=1;
           } 
         # Shellies type dimmer gen2 response of 'on-for-timer' etc. is 'null'
         Log3 $name,5,"[Shelly_response:onoff] received \'null\' --> skipping helper=$1=".$hash->{helper}{timer};
@@ -5751,23 +6068,21 @@ sub Shelly_response {
                 $onofftimer = "-";   # no remaining time given by old fw eg Shelly4pro
             }
         }
-        
-        
         if( defined($jhash->{timer_duration}) ){
                 $onofftimer  = $jhash->{timer_duration};
                 $hash->{helper}{timer} = $onofftimer;
         }
+        if( $urlcmd =~ /\&timer=(\d+)?/ ){
+            $onofftimer = $1; 
+        }
+        Log3 $name,1,"[Shelly_response:onoff] returns with problem for device $name, timer not set"   if( $onofftimer && !$hastimer );
 
         # check on successful execution
         $urlcmd =~ m/\/(\d)\?/;
         my $channel = $1;
-        $urlcmd =~ m/turn=(o.*)(\&timer=)?(\d+)?/;
-        my $turnstate=$1;
-        $onofftimer = $3  if( $model eq "shelly4" && $urlcmd=~/timer/ ); # get remaining time from command (is not supported by /status call)
-        Log3 $name,1,"[Shelly_response:onoff] returns with problem for device $name, timer not set"   if( $3 && !$hastimer );
         
         $urlcmd =~ m/turn=(on|off)/; 
-        Log3 $name,1,"[Shelly_response:onoff] returns without success for device $name, cmd=$urlcmd but ison=$ison vs $1" if( $ison ne $1 );
+        Log3 $name,1,"[Shelly_response:onoff] returns without success for device $name, cmd=$urlcmd but ison=$ison vs $1"  if( $ison ne $1 );
 
         if( defined($overpower) && $overpower eq "1") {
           Log3 $name,1,"[Shelly_response:onoff] device $name switched off automatically because of overpower signal";
@@ -5801,11 +6116,12 @@ if(0){
 }
         readingsEndUpdate($hash,1);
         }
-        $timer=0.40;
 
         # switching dimable devices on or off also have 'brightness' and 'transition'
         my $brightness = $jhash->{brightness};
         my $transition = $jhash->{transition};
+        
+        $timer=maxNum(1.40,ReadingsNum($name,"transition",0)/1000);
 
   #---------------------------
   }elsif( $comp =~ /updown(\d)/ ){   # updown1  updown2
@@ -5923,7 +6239,6 @@ if(0){
                 Log3 $name,4,"[Shelly_response:config] device $name has been processed";
         }
 
-
   # GET CONFIG
   #---------------------------
   }elsif( $comp eq "getconfig" ){
@@ -6016,6 +6331,8 @@ sub Shelly_webhook_create {
           # We don't care, because we can use actions on 'opening' and 'closing'
           $compCount   = abs($shelly_models{$model}[5]);  # number of inputs on ShellyPlug is -1, because it's a button, not an wired input
        }elsif( $component eq "emeter" && $model eq "shellypro3em" ){
+          $compCount   = 1;
+       }elsif( $component eq "emeter" && $model eq "shellyproem50" ){
           $compCount   = 1;
        }elsif( $component eq "pm1" && $model eq "shellypmmini" ){
           $compCount   = 1;
@@ -6236,7 +6553,7 @@ sub Shelly_webhook_update {
   # CSFR-Token
   my $curr_token = InternalVal($hookdevice,"CSRFTOKEN","");
   # ip
-  my $curr_host_ip = qx("\"hostname -I\"");   # local
+  my $curr_host_ip = AttrVal($name,"host_ip",undef)//qx("\"hostname --all-ip-addresses\"");   # local
   $curr_host_ip    =~ m/(\d\d?\d?\.\d\d?\d?\.\d\d?\d?\.\d\d?\d?).*/; #extract ipv4-address
   $curr_host_ip    = $1;
 
@@ -6245,7 +6562,6 @@ sub Shelly_webhook_update {
   # parsing all actions
   my ($i,$u); # loop counter
   my ($sh_hookid,$sh_hookname,$sh_url,$sh_ip,$sh_port,$sh_webname,$sh_token); # values read from Shelly
-
 
   my $updcmd = ($gen>0?"/rpc/Webhook.Update":"/settings/actions");
   my $ttlChanges=0; # counts total number of changed urls
@@ -6467,10 +6783,11 @@ sub Shelly_webhook_update {
   #  FW_directNotify("FILTER=$name","#FHEMWEB:$FW_wname","FW_okDialog( \"$msg\" )", "");   $msg
   if( $ttlChanges == 0 ){
         $msg = "no actions to update";
-  }elsif(1){
+  }else{
         $msg =  "start updating $ttlChanges actions with command $updcmd";
         #start update procedure with the last action
-        Shelly_HttpRequest($hash,$updcmd,$hash->{helper}{actionUpdate}[$ttlChanges-1],"Shelly_webhook_update","proc",$ttlChanges); # on success, we receive data
+        # on success, we receive data
+        Shelly_HttpRequest($hash,$updcmd,$hash->{helper}{actionUpdate}[$ttlChanges-1],"Shelly_webhook_update","proc",$ttlChanges); 
   }
   Log3 $name,3,"[Shelly_webhook_update] $name: $msg";
   return;
@@ -6513,7 +6830,7 @@ sub Shelly_actionWebhook ($@) {
   #my $webhook = ($gen>=1?"&urls=[%22":"&urls[]="); # Gen2 : Gen1
   my $webhook = ($gen>=1?"urls=[\"":"urls[]="); # Gen2 : Gen1
   							
-  my $host_ip =  qx("\"hostname -I\"");   # local
+  my $host_ip = AttrVal($name,"host_ip",undef)//qx("\"hostname --all-ip-addresses\"");   # local
   $host_ip =~ m/(\d\d?\d?\.\d\d?\d?\.\d\d?\d?\.\d\d?\d?).*/; #extract ipv4-address
   $host_ip = $1;
   Log3 $name,$V,"[Shelly_actionWebhook] the host-ip of $name is: $host_ip";
@@ -6575,24 +6892,6 @@ sub Shelly_actionWebhook ($@) {
 } #end Shelly_actionWebhook()
 
 
-
-sub Shelly_rssi {
-  my ($hash, $rssi) = @_;
-  return "-"  if( !defined($rssi) || $rssi eq "-" );
-  my $ret = $rssi;
-  if( $hash->{units} == 1){ $ret .= $si_units{rssi}[1];
-     if( $rssi < -76 )    { $ret .= " (bad)";}
-     elsif( $rssi < -55 ) { $ret .= " (fair)";}
-     elsif( $rssi < -35 ) { $ret .= " (good)";}
-     else                 { $ret .= " (excellent)";}
-  }
-  Log3 $hash->{NAME},5,"[Shelly_rssi] returns $ret to device ".$hash->{NAME};
-  return $ret;
-} #end Shelly_rssi
-
-
-
-
 sub Shelly_firmwarecheck {
   ############ checking if current firmware is up to date
   my ($hash,$firmware,$update,$beta) = @_;
@@ -6609,6 +6908,9 @@ sub Shelly_firmwarecheck {
       if( $icon eq "OK" ){  
           $txt = "downgrade possible to latest stable $update";
           $icon= "D";
+      }
+      if( defined($beta) && $beta ne "none" ){
+          $txt .= ", check for new beta-version "; 
       }
 
   #-- we don't have info about an update (really no update,  no internet)
@@ -6638,41 +6940,42 @@ sub Shelly_firmwarecheck {
   return ($firmware,$txt,$icon);
 } #end Shelly_firmwarecheck
 
+
 sub cmpVersions {
-    my $old=shift;
-    my $new=shift;
+    my ($firmware,$update)=@_;
     my (@oldN,@newN,$icon,$txt);
-    $old =~ /(\d+)\.(\d+)\.(\d+)(-((rc)|(beta))\d+)?/;
-    $oldN[2]=$1  // 0;
-    $oldN[1]=$2  // 0;
-    $oldN[0]=$3  // 0;
-    $oldN[3]=$4;
-    $old = "v$1.$2.$3";
-    $old .= $4  if( defined($4) );
-    $new =~ /(\d+)\.(\d+)\.(\d+)(-((rc)|(beta))\d+)?/;
-    $newN[2]=$1  // 0;
-    $newN[1]=$2  // 0;
-    $newN[0]=$3  // 0;
-    $newN[3]=$4;
-    $new = "v$1.$2.$3";
-    $new .= $4  if( defined($4) );
-    $txt = "update needed to $new";
-    if( $newN[2] > $oldN[2] ){   #major update available
+    $firmware =~ /v?(\d+)\.(\d+)\.?(\d+)?(-((rc)|(beta))\d+)?/;
+    $oldN[1]=($1 // 0);
+    $oldN[2]=($2 // 0);
+    $oldN[3]=($3 // 0);
+    $oldN[0] = "v$1.$2";
+    $oldN[0] .= ".$3"  if( defined($3) );
+    $oldN[0] .= $4  if( defined($4) );
+    $update =~ /(\d+)\.(\d+)\.?(\d+)?(-((rc)|(beta))\d+)?/;
+    $newN[1]=($1 // 0);
+    $newN[2]=($2 // 0);
+    $newN[3]=($3 // 0);
+    $newN[0] = "v$1.$2";
+    $newN[0] .= ".$3"  if( defined($3) );
+    $newN[0] .= $4  if( defined($4) );
+    $txt = "update needed to ".$newN[0];
+    if( $newN[1] > $oldN[1] ){   #major update available
        $icon = "M";
-    }elsif( $newN[2] < $oldN[2] ){       
-       $icon = "OK";
-    }elsif( $newN[1] > $oldN[1] ){   #minor update available
-       $icon = "m";
     }elsif( $newN[1] < $oldN[1] ){       
        $icon = "OK";
-    }elsif( $newN[0] > $oldN[0] ){   #patch update available
+    }elsif( $newN[2] > $oldN[2] ){   #minor update available
+       $icon = "m";
+    }elsif( $newN[2] < $oldN[2] ){       
+       $icon = "OK";
+    }elsif( $newN[3] > $oldN[3] ){   #patch update available
        $icon = "p";
     }else{
        $icon = "OK";
     }
-    $txt = "-/-" if( $icon eq "OK" );
-    return ( $old,$new,$txt,$icon );
-} #end cmpVersions
+    $txt = "-/-" if( $icon eq "OK" );#return $oldN[0]." == $icon >> $txt ".$newN[0];
+    return ( $oldN[0],$newN[0],$txt,$icon );
+} #end cmpVersions()
+
 
 ########################################################################################
 #
@@ -6771,19 +7074,6 @@ sub Shelly_error_handling {
 
 ########################################################################################
 
-# if unchanged, generates an event and hold the old timestamp
-sub readingsBulkUpdateHoldTimestamp($$$@)
-{
-  my ($hash,$reading,$value,$changed)= @_;
-  my $timestamp=ReadingsTimestamp($hash->{NAME},$reading,undef); # yyyy-MM-dd hh:mm:ss
-  if( $value eq ReadingsVal($hash->{NAME},$reading,"") ){
-       return readingsBulkUpdate($hash,$reading,$value,$changed,$timestamp);
-  }else{
-       return readingsBulkUpdate($hash,$reading,$value,$changed);
-  }
-} #end readingsBulkUpdateHoldTimestamp()
-
-
 # generate events at least at given readings age, even if the reading has not changed
 sub readingsBulkUpdateMonitored($$$@) # derived from fhem.pl readingsBulkUpdateIfChanged()
 {
@@ -6802,11 +7092,52 @@ sub readingsBulkUpdateMonitored($$$@) # derived from fhem.pl readingsBulkUpdateI
 } #end readingsBulkUpdateMonitored()
 
 
-sub Shelly_readingsBulkUpdate($$$@) # derived from fhem.pl readingsBulkUpdateIfChanged()
-{
-  my ($hash,$reading,$value,$changed,$timestamp)= @_;
+sub Shelly_readingsBulkUpdate($$$@){ # derived from fhem.pl readingsBulkUpdateIfChanged()
+  my ($hash,$reading,$value,$unit,$changed,$timestamp)= @_;
+  return if( !defined($value) );
+  my $name=$hash->{NAME};
   my $readingsProfile ="none";
-  if($value ne ReadingsVal($hash->{NAME},$reading,"")){
+     if( defined($unit) && $value =~ /^-?\d+(\.\d+)?$/ && $value ne "xx-" ){ ## value shall be a decimal 
+        my $flag=-1;        
+        
+        if( $unit =~ /(.*)=(\d)/ ){ # eg "time=0"
+            $unit = $1;
+            $flag=$2;
+        }elsif( $unit =~ /energy\/([km]?W[hm])/ ){   # mWh, Wh, kWh, Wm
+            $unit = $1;
+            $flag = 9;
+        } 
+        
+        if( $flag == 9 ){
+            $value = shelly_energy_fmt($hash,$value,$unit);
+            
+        }elsif( $value == 0 && $flag == 0 ){
+            $value = "0 - disabled";
+        }elsif( $value == 0 && $flag == 1 ){
+            $value = "disabled";
+        }elsif( $flag == 2 ){  #  rssi=2
+          if( $value ne "-" && AttrVal($name,"showunits","none") ne "none"){
+            my $rssi=$value;
+            $value .= $si_units{rssi}[1];
+            if( $rssi < -76 )    { $value .= " (bad)";}
+            elsif( $rssi < -55 ) { $value .= " (fair)";}
+            elsif( $rssi < -35 ) { $value .= " (good)";}
+            else                 { $value .= " (excellent)";}    
+          }
+        }elsif( $value == 0 && $flag == 3 ){  #  rssi=3     normal values are negative!
+             $value = "disabled"; 
+        }elsif( $value == 2 && $flag == 3 ){ 
+             return;
+        }elsif( $value == -1 && $flag == 4 ){   # time=4
+             return;
+        }elsif( $flag == 5 && $hash->{units} ){  #  time=5
+             $value .= " sec, last reboot at ".FmtDateTime(time()-$value);
+        }elsif( AttrVal($name,"showunits","none") ne "none" ){
+            $value .= $si_units{$unit}[1];  # add a si-units string to the reading
+        }
+     }
+  if($value ne ReadingsVal($name,$reading,"")){ 
+    Log3 $name,5,"[Shelly_readingsBulkUpdate] writing $name $reading $value ".($timestamp//"no timestamp ");
     if( !defined($timestamp) ){
       # Value of Reading changed: generate Event, timestamp is actual time
       readingsBulkUpdate($hash,$reading,$value,$changed);
@@ -6899,8 +7230,8 @@ sub Shelly_HttpResponse($){
     ### use a flag to avoid subsequent status calls ###
     ### the flag is set by Shelly_status()
     if( $param->{funcname} =~ /Shelly_status/ ){ # 1G  or  2G
+         Log3 $name,4,"[Shelly_HttpResponse] incoming STATUS_CALL answer for $name, resetting flag ".$hash->{helper}{StatusCall};
          $hash->{helper}{StatusCall}=0;
-         Log3 $name,5,"[Shelly_HttpResponse] incoming STATUS_CALL answer for $name, resetting flag";
     }
     ### -----------------------------------------------
 
@@ -6932,7 +7263,7 @@ sub Shelly_HttpResponse($){
         return;
     }elsif($data ne ""){
         my $call = $param->{url};
-        $msg = AttrVal($name,"verbose",5) == 5 ? $data : "....";   # make Logging more readable
+        $msg = AttrVal($name,"verbose",1) == 5 ? $data : (substr($data,0,16)."....");   # make Logging more readable
         Log3 $name,4,"[Shelly_HttpResponse] $name $call returned data: $msg";
 
         # Reset the increasing INTERVAL to default value (attr)
@@ -6986,7 +7317,6 @@ sub Shelly_HttpResponse($){
              Shelly_error_handling($hash,"Shelly_HttpResponse:code","$err: $msg",2);
              return;
         }
-    #    Log3 $name,4,"[Shelly_HttpResponse] $name: forwarding JSON-Hash to func: ".Sub::Util::subname($param->{function});
         Log3 $name,5,"[Shelly_HttpResponse] $name: forwarding JSON-Hash to func: ".$param->{funcname};
         # calling the sub() forwarded by $param
         $param->{function}->($param,$jhash);
@@ -7250,7 +7580,7 @@ sub Shelly_HttpResponse($){
                 <code>attr &lt;name&gt; interval &lt;interval&gt;</code>
                 <br />Update interval for reading in seconds. The default is 60 seconds, a value of 0 disables the automatic update.
                 <br />
-                <br />Note: The ShellyPro3EM energy meter is working with a set of two intervals:
+                <br />Note: The ShellyPro3EM / ShellyProEM50 energy meter is working with a set of two intervals:
                    The power values are read at the main interval (as set by the attribute value),
                    the energy values and calculated power values are read at a multiple of 60 seconds.
                    When setting the main interval, the value is adjusted to match an integer divider of 60.
@@ -7334,7 +7664,7 @@ sub Shelly_HttpResponse($){
                 <code>attr &lt;name&gt; pct100 open|closed (default:open) </code>
                 <br/>roller or blind devices only: is pct=100 open or closed ? </li>
         </ul>
-        <br/>For energy meter ShellyPro3EM
+        <br/>For energy meter ShellyPro3EM /ShellyProEM50 
         <ul>
             <li>
                 <a id="Shelly-attr-Energymeter_P"></a>
@@ -7480,7 +7810,7 @@ sub Shelly_HttpResponse($){
                   </ul>
 
 
-           <h5>ShellyPro3EM </h5>
+           <h5>ShellyPro3EM / ShellyProEM50 </h5>
 
            <h6>Power</h6>
 
@@ -7594,7 +7924,7 @@ sub Shelly_HttpResponse($){
            Das Device enthält dann keine Aktoren, es ist nur ein Platzhalter für die Bereitstellung von Readings</li>
 
         <li>Bei bestimmten Shelly Modellen können URLs (Webhooks) festgelegt werden, welche bei Eintreten bestimmter Ereignisse ausgelöst werden.
-           Beispielsweise lauten die Webhooks für die Information über die Betätigung lokaler Eingänge wie folgt:
+           Beispielsweise lauten die Webhooks für die Information über die Betätigung lokaler Taster wie folgt:
            <ul>
               <li> <i>Button switched ON url</i>:
                     http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?cmd=set%20&lt;Devicename&gt;%20<b>button_on</b>%20[&lt;channel&gt;]</li>
@@ -7736,8 +8066,8 @@ sub Shelly_HttpResponse($){
                 <a id="Shelly-set-pos"></a>
                 <code>set &lt;name&gt; pos &lt;integer percent value&gt; </code>
                 <br />Fährt den Rollladen zu einer Zwischenstellung (normalerweise gilt 100=offen, 0=geschlossen, siehe Attribut 'pct100').
-                <s>Wenn dem Wert für die Zwischenstellung ein Plus (+) oder Minus (-) - Zeichen vorangestellt wird,
-                wird der Wert auf den aktuellen Positionswert hinzugezählt.</s>
+          <!--      <s>Wenn dem Wert für die Zwischenstellung ein Plus (+) oder Minus (-) - Zeichen vorangestellt wird,
+                wird der Wert auf den aktuellen Positionswert hinzugezählt.</s>  //-->
                 <br />
 
                 äquivalent zu <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>
@@ -7777,7 +8107,9 @@ sub Shelly_HttpResponse($){
             <li>
                 <a id="Shelly-set-pct"></a>
                 <code>set &lt;name&gt; pct &lt;1...100&gt; [&lt;channel&gt;] </code>
-                <br />Prozentualer Wert für die Helligkeit (brightness). Es wird nur der Helligkeitswert gesetzt ohne das Gerät ein oder aus zu schalten.
+                <br />Dimmer: Prozentualer Wert für die Helligkeit (brightness). 
+                      Es wird nur der Helligkeitswert gesetzt ohne das Gerät ein oder aus zu schalten.                      
+                <br />Rollo: Prozentualer Wert für die Position, siehe auch <code>set &lt;name&gt; pos &lt;integer percent value&gt; </code>. 
                       </li>
             <li>   <code>set &lt;name&gt; pct 0 [&lt;channel&gt;] </code>
                 <br />Das Gerät/Kanal wird ausgeschaltet, der vorhandene Helligkeitswert bleibt unverändert.
@@ -7932,7 +8264,7 @@ sub Shelly_HttpResponse($){
                 <br/>ändert den Modus des Einganges [channel] zu &lt;mode&gt;</li>
             </ul>
 
-            <br/>Für ShellyPro3EM (model=...)
+            <br/>Für ShellyPro3EM / ShellyProEM50 (model=...)
             <ul>
                <li>
                <code>set &lt;name&gt; interval_power &lt;integer&gt;</code>
@@ -7969,12 +8301,6 @@ sub Shelly_HttpResponse($){
                 <a id="Shelly-get-status"></a>
                 <code>get &lt;name&gt; status</code>
                 <br />Aktualisiert den Gerätestatus.</li>
-            <li>
-                <a id="Shelly-get-shelly_status"></a>
-                <code>get &lt;name&gt; shelly_status</code>
-                <br />Aktualisiert die Systemdaten des Shelly.
-                Veraltet/abgekündigt: stattdessen get ... settings
-                </li>
             <li>
                 <a id="Shelly-get-settings"></a>
                 <code>get &lt;name&gt; settings</code>
@@ -8025,6 +8351,22 @@ sub Shelly_HttpResponse($){
                 <code>attr &lt;name&gt; mode relay|roller</code> (nur bei model=shelly2/2.5/plus2/pro2)
                 <br />             <code>attr &lt;name&gt; mode white|color </code> (nur bei model=shellyrgbw)
                 <br />Betriebsart bei bestimmten Shelly Devices</li>
+                
+                
+            <li>
+                <a id="Shelly-attr-host_dns"></a>
+                <code>attr &lt;name&gt; host_dns &lt;dns-name&gt; </code> 
+                <br/>DNS-Name des FHEM-Hosts
+                <br/>Hinweis: wird bei Definition eines Devices vom System gesetzt
+                </li>         
+            <li>
+                <a id="Shelly-attr-host_ip"></a>
+                <code>attr &lt;name&gt; host_ip &lt;ip-address&gt; </code> 
+                <br/>IP-Adresse des FHEM-Hosts 
+                <br/>Beispiel: <code>attr meinShelly host_ip 192.168.178.200</code> 
+                <br/>Hinweis: wird bei Definition eines Devices vom System gesetzt, sofern unterstützt
+                </li>
+                
              <li>
                 <a id="Shelly-attr-interval"></a>
                 <code>attr &lt;name&gt; interval &lt;interval&gt;</code>
@@ -8034,13 +8376,13 @@ sub Shelly_HttpResponse($){
              <li>
                 <a id="Shelly-attr-interval_power"></a>
                 <code>attr &lt;name&gt; interval_power &lt;interval&gt;</code>
-                <br />Aktualisierungsinterval für das Polling der Leistungswerte von ShellyPro3EM Energiemessgeräten (i.W. Strom, Spannung, Leistung).
+                <br />Aktualisierungsinterval für das Polling der Leistungswerte von ShellyPro3EM / ShellyProEM50 Energiemessgeräten (i.W. Strom, Spannung, Leistung).
                 Der Default-Wert ist das mit dem Attribut <code>interval</code> festgelegte Intervall. Minimalwert ist 1 sec.
                 <br/>
                 </li>
                 <br/>Hinweise: 
                 <br/>Wenn <code>interval_power</code> gesetzt ist, kann <code>interval</code> auf einen größeren Wert (z.B. 300 sec) gesetzt werden.
-                <br/>Bei den ShellyPro3EM Energiemessgeräten werden die Energiewerte (und daraus rekursiv bestimmte Leistungswerte)
+                <br/>Bei den ShellyPro3EM / ShellyProEM50 Energiemessgeräten werden die Energiewerte (und daraus rekursiv bestimmte Leistungswerte)
                 alle 60 Sekunden oder einem Vielfachen davon gelesen.
 
              <li>
@@ -8135,7 +8477,7 @@ sub Shelly_HttpResponse($){
                 <code>attr &lt;name&gt; pct100 open|closed (default:open) </code>
                 <br/>Festlegen der 100%-Endlage für Rollladen offen (pct100=open) oder Rollladen geschlossen (pct100=closed)</li>
         </ul>
-        <br/>Für Energiemeter ShellyPro3EM
+        <br/>Für Energiemeter ShellyPro3EM / ShellyProEM50
         <ul>
             <li>
                 <a id="Shelly-attr-Energymeter_P"></a>
@@ -8289,7 +8631,7 @@ sub Shelly_HttpResponse($){
                   </ul>
 
 
-           <h5>ShellyPro3EM </h5>
+           <h5>ShellyPro3EM / ShellyProEM50 </h5>
 
            <h6>Power</h6>
 
