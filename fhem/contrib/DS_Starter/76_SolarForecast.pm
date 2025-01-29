@@ -160,7 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.44.4" => "26.01.2025  _getlistPVCircular: change width of output, new sub _listDataPoolPvHist ",
+  "1.44.5" => "29.01.2025  temp2bin: expand to more negative bins ",  
+  "1.44.4" => "26.01.2025  _getlistPVCircular: change width of output, new sub _listDataPoolPvHist, fix bug in hrepl Hash ".
+                           "remove Attr graphicBeam1MaxVal,ctrlAreaFactorUsage ",
   "1.44.3" => "25.01.2025  Notification System: minor changes, special Readings todayBatInSum todayBatOutSum ",
   "1.44.2" => "23.01.2025  _batChargeRecmd: user storeffdef, show historical battery SoC when displaying the battery in the bar graph ",
   "1.44.1" => "20.01.2025  Notification system: minor fixes, integration of controls_solarforecast_messages_test/prod ".
@@ -1390,7 +1392,6 @@ sub Initialize {
                                 "ctrlBackupFilesKeep ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#10 ".
-                                "ctrlAreaFactorUsage ".
                                 "ctrlGenPVdeviation:daily,continuously ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
@@ -1450,12 +1451,11 @@ sub Initialize {
                                 $readingFnAttributes;
                                 
   ## Hinweis:   graphicBeamXContent wird in _addDynAttr hinzugefügt 
-  
-                    
+    
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################                    
-  my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";             # 12.01.25
-  $hash->{AttrList} .= " graphicBeam1MaxVal:$av1 ctrlAreaFactorUsage:$av1 ";
+  # my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";    
+  # $hash->{AttrList} .= " graphicBeam1MaxVal:$av1 ctrlAreaFactorUsage:$av1 ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -4745,7 +4745,7 @@ sub _getlistPVCircular {
   my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'circular', $arg);
-  $ret   .= lineFromSpaces ($ret, 5);
+  $ret   .= lineFromSpaces ($ret, -20);
 
 return $ret;
 }
@@ -5538,16 +5538,16 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^graphicBeam1MaxVal|ctrlAreaFactorUsage$/) {           # 12.01.25
-      my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
-      if (!$init_done) {
-          Log3 ($name, 1, "$name - $msg");
-          return qq{Device "$name" -> $msg};
-      }
-      else {
-          return $msg;
-      }     
-  }
+  #if ($cmd eq 'set' && $aName =~ /^graphicBeam1MaxVal|ctrlAreaFactorUsage$/) { 
+  #    my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
+  #    if (!$init_done) {
+  #        Log3 ($name, 1, "$name - $msg");
+  #        return qq{Device "$name" -> $msg};
+  #    }
+  #    else {
+  #        return $msg;
+  #    }     
+  #}
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -8291,14 +8291,6 @@ sub __delObsoleteAPIData {
               delete $data{$name}{solcastapi}{$idx}{$scd} if($ds && $ds < $refts);
           }
       }
-
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################    
-      # 01.12.2024
-      for my $idx (keys %{$data{$name}{solcastapi}{'?All'}}) {                      # Wetterindexe löschen (kann später raus)
-          delete $data{$name}{solcastapi}{'?All'}{$idx} if($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs);
-      }
-  #####################################################################################################################
   }
 
   ## veraltete Strings aus Strings-Hash löschen
@@ -13193,8 +13185,6 @@ sub entryGraphic {
       delete $paref->{maxDif};
       delete $paref->{minDif};
 
-      Log3 ($name, 4, "$name - RET nach Ebene 1:\n".$ret);
-        
       ## Balkengrafik Ebene 2
       #########################
       if ($paref->{beam3cont} || $paref->{beam4cont}) {                                                    # Balkengrafik Ebene 2
@@ -13232,8 +13222,6 @@ sub entryGraphic {
           delete $paref->{maxDif};
           delete $paref->{minDif};
       }
-      
-      Log3 ($name, 4, "$name - RET nach Ebene 2:\n".$ret);
 
       $paref->{modulo}++;
   }
@@ -13268,8 +13256,6 @@ sub entryGraphic {
 
   $ret .= "</td></tr>";
   $ret .= "</table>";
-  
-  Log3 ($name, 4, "$name - RET nach Ebene Flowgrafik:\n".$ret);
 
 return $ret;
 }
@@ -14857,7 +14843,6 @@ sub _beamGraphic {
   my $ret      = q{};
   $ret        .= __weatherOnBeam ($paref) if($weather);
   $ret        .= __batteryOnBeam ($paref);
-  
   my $m        = $paref->{modulo} % 2;
 
   if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
@@ -16527,7 +16512,6 @@ sub getMessageFileNonBlocking {
   Log3 ($name, 4, "$name - Notification System - Message file >$messagefile< is retrieved non blocking");
 
   my $paref = { name  => $name,
-                hash  => $hash,
                 block => 1
               };
 
@@ -17646,53 +17630,7 @@ sub listDataPool {
   }
 
   if ($htol =~ /consumers|inverters|producers|strings|batteries/xs) {
-      my $sub = $htol eq 'consumers' ? \&ConsumerVal :
-                $htol eq 'inverters' ? \&InverterVal :
-                $htol eq 'producers' ? \&ProducerVal :
-                $htol eq 'strings'   ? \&StringVal   :
-                $htol eq 'batteries' ? \&BatteryVal  :
-                '';
-      
-      $h = $data{$name}{$htol};                
-      
-      if (!keys %{$h}) {
-          return ucfirst($htol).qq{ cache is empty.};
-      }
-
-      for my $i (keys %{$h}) {
-          if ($i !~ /^[0-9]{2}$/ix && $htol ne 'strings') {                       # bereinigen ungültige Position, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
-              delete $data{$name}{$htol}{$i};
-              Log3 ($name, 2, qq{$name - INFO - invalid key "$i" was deleted from }.ucfirst($htol).qq{ storage});
-          }
-      }
-
-      for my $idx (sort keys %{$h}) {
-          next if($par && $idx ne $par);
-          my ($cret, $s1);
-          my $sp1 = _ldpspaces ($idx, q{});
-          
-          for my $ckey (sort keys %{$h->{$idx}}) {
-              if (ref $h->{$idx}{$ckey} eq 'ARRAY') {
-                 my $aser = join " ", @{$h->{$idx}{$ckey}};
-                 $cret .= ($s1 ? $sp1 : "").$ckey." => ".$aser."\n";
-              }
-              
-              if (ref $h->{$idx}{$ckey} eq 'HASH') {
-                  my $hk = qq{};
-                  for my $f (sort {$a<=>$b} keys %{$h->{$idx}{$ckey}}) {
-                      $hk .= " " if($hk);
-                      $hk .= "$f=".$h->{$idx}{$ckey}{$f};
-                  }
-                  $cret .= ($s1 ? $sp1 : "").$ckey." => ".$hk."\n";
-              }
-              else {
-                  $cret .= ($s1 ? $sp1 : "").$ckey." => ". &{$sub} ($hash, $idx, $ckey, "")."\n";
-              }
-              
-              $s1 = 1;
-          }
-          $sq .= $idx." => ".$cret."\n";
-      }
+      $sq = _listDataPoolVarious ($hash, $htol, $par);
   }
 
   if ($htol eq "circular") {
@@ -17700,186 +17638,19 @@ sub listDataPool {
   }
 
   if ($htol eq "nexthours") {
-      $h = $data{$name}{nexthours};
-      
-      if (!keys %{$h}) {
-          return qq{NextHours cache is empty.};
-      }
-
-      for my $idx (sort keys %{$h}) {
-          my $nhts    = NexthoursVal ($name, $idx, 'starttime',        '-');
-          my $hod     = NexthoursVal ($name, $idx, 'hourofday',        '-');
-          my $today   = NexthoursVal ($name, $idx, 'today',            '-');
-          my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',             '-');
-          my $pvapifc = NexthoursVal ($name, $idx, 'pvapifc',          '-');       # PV Forecast der API
-          my $pvaifc  = NexthoursVal ($name, $idx, 'pvaifc',           '-');       # PV Forecast der KI
-          my $aihit   = NexthoursVal ($name, $idx, 'aihit',            '-');       # KI ForeCast Treffer Status
-          my $wid     = NexthoursVal ($name, $idx, 'weatherid',        '-');
-          my $wcc     = NexthoursVal ($name, $idx, 'wcc',              '-');
-          my $crang   = NexthoursVal ($name, $idx, 'cloudrange',       '-');
-          my $rr1c    = NexthoursVal ($name, $idx, 'rr1c',             '-');
-          my $rrange  = NexthoursVal ($name, $idx, 'rainrange',        '-');
-          my $rad1h   = NexthoursVal ($name, $idx, 'rad1h',            '-');
-          my $pvcorrf = NexthoursVal ($name, $idx, 'pvcorrf',          '-');
-          my $temp    = NexthoursVal ($name, $idx, 'temp',             '-');
-          my $confc   = NexthoursVal ($name, $idx, 'confc',            '-');
-          my $confcex = NexthoursVal ($name, $idx, 'confcEx',          '-');
-          my $don     = NexthoursVal ($name, $idx, 'DoN',              '-');
-          my $sunaz   = NexthoursVal ($name, $idx, 'sunaz',            '-');
-          my $sunalt  = NexthoursVal ($name, $idx, 'sunalt',           '-');
-          
-          my ($rcdbat, $socs);
-          for my $bn (1..$maxbatteries) {                                            # alle Batterien
-              $bn = sprintf "%02d", $bn;
-              my $rcdcharge = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, '-');
-              my $socxx     = NexthoursVal ($name, $idx, 'soc'.$bn, '-');
-              $rcdbat      .= ', ' if($rcdbat);
-              $rcdbat      .= "rcdchargebat${bn}: $rcdcharge";
-              $socs        .= ', ' if($socs);
-              $socs        .= "soc${bn}: $socxx";
-          }
-
-          $sq        .= "\n" if($sq);
-          $sq        .= $idx." => ";
-          $sq        .= "starttime: $nhts, hourofday: $hod, today: $today";
-          $sq        .= "\n              ";
-          $sq        .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc";
-          $sq        .= "\n              ";
-          $sq        .= "confcEx: $confcex, DoN: $don, weatherid: $wid, wcc: $wcc, rr1c: $rr1c, temp=$temp";
-          $sq        .= "\n              ";
-          $sq        .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt";
-          $sq        .= "\n              ";
-          $sq        .= "rrange: $rrange, crange: $crang, correff: $pvcorrf";
-          $sq        .= "\n              ";
-          $sq        .= $socs;
-          $sq        .= "\n              ";
-          $sq        .= $rcdbat;
-      }
+      $sq = _listDataPoolNextHours ($name, $par);
   }
 
   if ($htol eq "qualities") {
-      $h = $data{$name}{nexthours};
-      if (!keys %{$h}) {
-          return qq{NextHours cache is empty.};
-      }
-      for my $idx (sort keys %{$h}) {
-          my $nhfc    = NexthoursVal ($hash, $idx, 'pvfc', undef);
-          next if(!$nhfc);
-
-          my $nhts    = NexthoursVal ($hash, $idx, 'starttime',  '-');
-          my $pvcorrf = NexthoursVal ($hash, $idx, 'pvcorrf',  '-/-');
-          my $aihit   = NexthoursVal ($hash, $idx, 'aihit',      '-');
-          my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',       '-');
-          my $wcc     = NexthoursVal ($hash, $idx, 'wcc',        '-');
-          my $sunalt  = NexthoursVal ($hash, $idx, 'sunalt',     '-');
-
-          my ($f,$q)  = split "/", $pvcorrf;
-          $sq        .= "\n" if($sq);
-          $sq        .= "Start: $nhts, Quality: $q, Factor: $f, AI usage: $aihit, PV expect: $pvfc Wh, Sun Alt: $sunalt, Cloud: $wcc";
-      }
+      $sq = _listDataPoolQualities ($name, $par);
   }
 
   if ($htol eq "current") {
-      $h = $data{$name}{current};
-      
-      if (!keys %{$h}) {
-          return qq{Current values cache is empty.};
-      }
-
-      for my $idx (sort keys %{$h}) {
-          if (ref $h->{$idx} eq 'ARRAY') {
-             my $aser = join " ",@{$h->{$idx}};
-             $sq     .= $idx." => ".$aser."\n";
-          }
-          elsif (ref $h->{$idx} eq 'HASH') {
-              my $s1;
-              my $sp1 = _ldpspaces ($idx, q{});
-              $sq    .= $idx." => ";
-
-              for my $idx1 (sort keys %{$h->{$idx}}) {
-                  if (ref $h->{$idx}{$idx1} eq 'HASH') {
-                      my $s2;
-                      my $sp2 = _ldpspaces ($idx1, $sp1);
-                      $sq    .= ($s1 ? $sp1 : "").$idx1." => ";
-
-                      for my $idx2 (sort keys %{$h->{$idx}{$idx1}}) {
-                          my $s3;
-                          my $sp3 = _ldpspaces ($idx2, $sp2);
-                          $sq .= ($s2 ? $sp2 : "").$idx2." => ";
-
-                          if (ref $h->{$idx}{$idx1}{$idx2} eq 'HASH') {
-                              for my $idx3 (sort keys %{$h->{$idx}{$idx1}{$idx2}}) {
-                                  $sq .= ($s3 ? $sp3 : "").$idx3." => ".(defined $h->{$idx}{$idx1}{$idx2}{$idx3} ? $h->{$idx}{$idx1}{$idx2}{$idx3} : '')."\n";
-                                  $s3 = 1;
-                              }
-                          }
-                          else {
-                              $sq .= (defined $h->{$idx}{$idx1}{$idx2} ? $h->{$idx}{$idx1}{$idx2} : '')."\n";
-                          }
-
-                          $s1 = 1;
-                          $s2 = 1;
-                      }
-                  }
-                  else {
-                      $sq .= (defined $h->{$idx}{$idx1} ? $h->{$idx}{$idx1} : '')."\n";
-                  }
-              }
-          }
-          else {
-              $sq .= $idx." => ".(defined $h->{$idx} ? $h->{$idx} : '')."\n";
-          }
-      }
+      $sq = _listDataPoolCurrent ($name, $par); 
   }
 
-  my $git = sub {
-      my $it     = shift;
-      my @sorted = sort { $a cmp $b } keys %$it;
-      my $key    = shift @sorted;
-
-      my $ret = {};
-      $ret    = { $key => $it->{$key} } if($key);
-
-      return $ret;
-  };
-
   if ($htol =~ /radiationApiData|weatherApiData|statusApiData/xs) {                       
-      $h = $data{$name}{solcastapi};
-      $h = $data{$name}{weatherapi}  if($htol eq 'weatherApiData');
-      $h = $data{$name}{statusapi}   if($htol eq 'statusApiData');
-      
-      if (!keys %{$h}) {
-          return qq{The API values cache is empty.};
-      }
-
-      my $pve   = q{};
-      my $itref = dclone $h;                                                         # Deep Copy von $h
-
-      for my $idx (sort keys %{$itref}) {
-          my $s1;
-          my $sp1 = _ldpspaces ($idx, q{});
-          $sq    .= $idx." => ";
-
-          while (my ($tag, $item) = each %{$git->($itref->{$idx})}) {
-              $sq .= ($s1 ? $sp1 : "").$tag." => ";
-
-              if (ref $item eq 'HASH') {
-                  my $s2;
-                  my $sp2 = _ldpspaces ($tag, $sp1);
-
-                  while (my ($tag1, $item1) = each %{$git->($itref->{$idx}{$tag})}) {
-                      $sq .= ($s2 ? $sp2 : "")."$tag1: ".$item1."\n";
-                      $s2  = 1;
-                      delete $itref->{$idx}{$tag}{$tag1};
-                  }
-              }
-
-              $s1  = 1;
-              $sq .= "\n" if($sq !~ /\n$/xs);
-
-              delete $itref->{$idx}{$tag};
-          }
-      }
+      $sq = _listDataPoolApiData ($name, $htol, $par);  
   }
 
   if ($htol eq "aiRawData") {
@@ -17892,14 +17663,14 @@ sub listDataPool {
       $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
 
       for my $idx (sort keys %{$h}) {
-          my $hod    = AiRawdataVal ($hash, $idx, 'hod',    '-');
-          my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt', '-');
-          my $sunaz  = AiRawdataVal ($hash, $idx, 'sunaz',  '-');
-          my $rad1h  = AiRawdataVal ($hash, $idx, 'rad1h',  '-');
-          my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',    '-');
-          my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c',   '-');
-          my $pvrl   = AiRawdataVal ($hash, $idx, 'pvrl',   '-');
-          my $temp   = AiRawdataVal ($hash, $idx, 'temp',   '-');
+          my $hod    = AiRawdataVal ($name, $idx, 'hod',    '-');
+          my $sunalt = AiRawdataVal ($name, $idx, 'sunalt', '-');
+          my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',  '-');
+          my $rad1h  = AiRawdataVal ($name, $idx, 'rad1h',  '-');
+          my $wcc    = AiRawdataVal ($name, $idx, 'wcc',    '-');
+          my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',   '-');
+          my $pvrl   = AiRawdataVal ($name, $idx, 'pvrl',   '-');
+          my $temp   = AiRawdataVal ($name, $idx, 'temp',   '-');
           $sq       .= "\n";
           $sq       .= "$idx => hod: $hod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, pvrl: $pvrl, temp: $temp";
       }
@@ -18185,6 +17956,69 @@ return $sq;
 }
 
 ################################################################
+#       Listing des verschiedene Speicher
+################################################################
+sub _listDataPoolVarious {              
+  my $hash = shift;
+  my $htol = shift;
+  my $par  = shift // q{};
+
+  my $name = $hash->{NAME};
+
+  my $func = $htol eq 'consumers' ? \&ConsumerVal :
+             $htol eq 'inverters' ? \&InverterVal :
+             $htol eq 'producers' ? \&ProducerVal :
+             $htol eq 'strings'   ? \&StringVal   :
+             $htol eq 'batteries' ? \&BatteryVal  :
+             '';
+  
+  my $h = $data{$name}{$htol};                
+  
+  if (!keys %{$h}) {
+      return ucfirst($htol).qq{ cache is empty.};
+  }
+
+  for my $i (keys %{$h}) {
+      if ($i !~ /^[0-9]{2}$/ix && $htol ne 'strings') {                       # bereinigen ungültige Position, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
+          delete $data{$name}{$htol}{$i};
+          Log3 ($name, 2, qq{$name - INFO - invalid key "$i" was deleted from }.ucfirst($htol).qq{ storage});
+      }
+  }
+  
+  my $sq;
+
+  for my $idx (sort keys %{$h}) {
+      next if($par && $idx ne $par);
+      my ($cret, $s1);
+      my $sp1 = _ldpspaces ($idx, q{});
+      
+      for my $ckey (sort keys %{$h->{$idx}}) {
+          if (ref $h->{$idx}{$ckey} eq 'ARRAY') {
+             my $aser = join " ", @{$h->{$idx}{$ckey}};
+             $cret .= ($s1 ? $sp1 : "").$ckey." => ".$aser."\n";
+          }
+          
+          if (ref $h->{$idx}{$ckey} eq 'HASH') {
+              my $hk = qq{};
+              for my $f (sort {$a<=>$b} keys %{$h->{$idx}{$ckey}}) {
+                  $hk .= " " if($hk);
+                  $hk .= "$f=".$h->{$idx}{$ckey}{$f};
+              }
+              $cret .= ($s1 ? $sp1 : "").$ckey." => ".$hk."\n";
+          }
+          else {
+              $cret .= ($s1 ? $sp1 : "").$ckey." => ". &{$func} ($hash, $idx, $ckey, "")."\n";
+          }
+          
+          $s1 = 1;
+      }
+      $sq .= $idx." => ".$cret."\n";
+  }
+
+return $sq;
+}
+
+################################################################
 #            Listing des Circular Speichers
 ################################################################
 sub _listDataPoolCircular {
@@ -18335,6 +18169,228 @@ sub _listDataPoolCircular {
           $sq .= "      $batvl7\n";
           $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, aiRulesNumber: $airn \n";
           $sq .= "      attrInvChangedTs: $aicts \n";
+      }
+  }
+
+return $sq;
+}
+
+################################################################
+#       Listing des NextHours Speicher
+################################################################
+sub _listDataPoolNextHours {          
+  my $name = shift;
+  my $par  = shift // q{};
+
+  my $h = $data{$name}{nexthours};
+  my $sq;
+
+  if (!keys %{$h}) {
+      return qq{NextHours cache is empty.};
+  }
+
+  for my $idx (sort keys %{$h}) {
+      my $nhts    = NexthoursVal ($name, $idx, 'starttime',  '-');
+      my $hod     = NexthoursVal ($name, $idx, 'hourofday',  '-');
+      my $today   = NexthoursVal ($name, $idx, 'today',      '-');
+      my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',       '-');
+      my $pvapifc = NexthoursVal ($name, $idx, 'pvapifc',    '-');       # PV Forecast der API
+      my $pvaifc  = NexthoursVal ($name, $idx, 'pvaifc',     '-');       # PV Forecast der KI
+      my $aihit   = NexthoursVal ($name, $idx, 'aihit',      '-');       # KI ForeCast Treffer Status
+      my $wid     = NexthoursVal ($name, $idx, 'weatherid',  '-');
+      my $wcc     = NexthoursVal ($name, $idx, 'wcc',        '-');
+      my $crang   = NexthoursVal ($name, $idx, 'cloudrange', '-');
+      my $rr1c    = NexthoursVal ($name, $idx, 'rr1c',       '-');
+      my $rrange  = NexthoursVal ($name, $idx, 'rainrange',  '-');
+      my $rad1h   = NexthoursVal ($name, $idx, 'rad1h',      '-');
+      my $pvcorrf = NexthoursVal ($name, $idx, 'pvcorrf',    '-');
+      my $temp    = NexthoursVal ($name, $idx, 'temp',       '-');
+      my $confc   = NexthoursVal ($name, $idx, 'confc',      '-');
+      my $confcex = NexthoursVal ($name, $idx, 'confcEx',    '-');
+      my $don     = NexthoursVal ($name, $idx, 'DoN',        '-');
+      my $sunaz   = NexthoursVal ($name, $idx, 'sunaz',      '-');
+      my $sunalt  = NexthoursVal ($name, $idx, 'sunalt',     '-');
+      
+      my ($rcdbat, $socs);
+      for my $bn (1..$maxbatteries) {                                            # alle Batterien
+          $bn = sprintf "%02d", $bn;
+          my $rcdcharge = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, '-');
+          my $socxx     = NexthoursVal ($name, $idx, 'soc'.$bn, '-');
+          $rcdbat      .= ', ' if($rcdbat);
+          $rcdbat      .= "rcdchargebat${bn}: $rcdcharge";
+          $socs        .= ', ' if($socs);
+          $socs        .= "soc${bn}: $socxx";
+      }
+
+      $sq        .= "\n" if($sq);
+      $sq        .= $idx." => ";
+      $sq        .= "starttime: $nhts, hourofday: $hod, today: $today";
+      $sq        .= "\n              ";
+      $sq        .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc";
+      $sq        .= "\n              ";
+      $sq        .= "confcEx: $confcex, DoN: $don, weatherid: $wid, wcc: $wcc, rr1c: $rr1c, temp=$temp";
+      $sq        .= "\n              ";
+      $sq        .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt";
+      $sq        .= "\n              ";
+      $sq        .= "rrange: $rrange, crange: $crang, correff: $pvcorrf";
+      $sq        .= "\n              ";
+      $sq        .= $socs;
+      $sq        .= "\n              ";
+      $sq        .= $rcdbat;
+  }
+
+return $sq;
+}
+
+################################################################
+#       Listing des Qualities Speicher
+################################################################
+sub _listDataPoolQualities {           
+  my $name = shift;
+  my $par  = shift // q{};
+
+  my $h = $data{$name}{nexthours};
+  my $sq;
+
+  if (!keys %{$h}) {
+      return qq{NextHours cache is empty.};
+  }
+  
+  for my $idx (sort keys %{$h}) {
+      my $nhfc    = NexthoursVal ($name, $idx, 'pvfc', undef);
+      next if(!$nhfc);
+
+      my $nhts    = NexthoursVal ($name, $idx, 'starttime',  '-');
+      my $pvcorrf = NexthoursVal ($name, $idx, 'pvcorrf',  '-/-');
+      my $aihit   = NexthoursVal ($name, $idx, 'aihit',      '-');
+      my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',       '-');
+      my $wcc     = NexthoursVal ($name, $idx, 'wcc',        '-');
+      my $sunalt  = NexthoursVal ($name, $idx, 'sunalt',     '-');
+
+      my ($f,$q)  = split "/", $pvcorrf;
+      $sq        .= "\n" if($sq);
+      $sq        .= "Start: $nhts, Quality: $q, Factor: $f, AI usage: $aihit, PV expect: $pvfc Wh, Sun Alt: $sunalt, Cloud: $wcc";
+  }
+
+return $sq;
+}
+
+################################################################
+#       Listing des Current Speicher
+################################################################
+sub _listDataPoolCurrent {         
+  my $name = shift;
+  my $par  = shift // q{};
+
+  my $h = $data{$name}{current};
+  my $sq;
+
+  if (!keys %{$h}) {
+      return qq{Current values cache is empty.};
+  }
+
+  for my $idx (sort keys %{$h}) {
+      if (ref $h->{$idx} eq 'ARRAY') {
+         my $aser = join " ",@{$h->{$idx}};
+         $sq     .= $idx." => ".$aser."\n";
+      }
+      elsif (ref $h->{$idx} eq 'HASH') {
+          my $s1;
+          my $sp1 = _ldpspaces ($idx, q{});
+          $sq    .= $idx." => ";
+
+          for my $idx1 (sort keys %{$h->{$idx}}) {
+              if (ref $h->{$idx}{$idx1} eq 'HASH') {
+                  my $s2;
+                  my $sp2 = _ldpspaces ($idx1, $sp1);
+                  $sq    .= ($s1 ? $sp1 : "").$idx1." => ";
+
+                  for my $idx2 (sort keys %{$h->{$idx}{$idx1}}) {
+                      my $s3;
+                      my $sp3 = _ldpspaces ($idx2, $sp2);
+                      $sq .= ($s2 ? $sp2 : "").$idx2." => ";
+
+                      if (ref $h->{$idx}{$idx1}{$idx2} eq 'HASH') {
+                          for my $idx3 (sort keys %{$h->{$idx}{$idx1}{$idx2}}) {
+                              $sq .= ($s3 ? $sp3 : "").$idx3." => ".(defined $h->{$idx}{$idx1}{$idx2}{$idx3} ? $h->{$idx}{$idx1}{$idx2}{$idx3} : '')."\n";
+                              $s3 = 1;
+                          }
+                      }
+                      else {
+                          $sq .= (defined $h->{$idx}{$idx1}{$idx2} ? $h->{$idx}{$idx1}{$idx2} : '')."\n";
+                      }
+
+                      $s1 = 1;
+                      $s2 = 1;
+                  }
+              }
+              else {
+                  $sq .= (defined $h->{$idx}{$idx1} ? $h->{$idx}{$idx1} : '')."\n";
+              }
+          }
+      }
+      else {
+          $sq .= $idx." => ".(defined $h->{$idx} ? $h->{$idx} : '')."\n";
+      }
+  }
+
+return $sq;
+}
+
+################################################################
+#       Listing der APiData Speicher
+################################################################
+sub _listDataPoolApiData {         
+  my $name = shift;
+  my $htol = shift;
+  my $par  = shift // q{};
+
+  my $h = $data{$name}{solcastapi};
+  $h    = $data{$name}{weatherapi}  if($htol eq 'weatherApiData');
+  $h    = $data{$name}{statusapi}   if($htol eq 'statusApiData');
+  
+  if (!keys %{$h}) {
+      return qq{The API values cache is empty.};
+  }
+  
+  my $git = sub {
+      my $it     = shift;
+      my @sorted = sort { $a cmp $b } keys %$it;
+      my $key    = shift @sorted;
+
+      my $ret = {};
+      $ret    = { $key => $it->{$key} } if($key);
+
+      return $ret;
+  };
+  
+  my $sq;
+  my $pve   = q{};
+  my $itref = dclone $h;                                                         # Deep Copy von $h
+
+  for my $idx (sort keys %{$itref}) {
+      my $s1;
+      my $sp1 = _ldpspaces ($idx, q{});
+      $sq    .= $idx." => ";
+
+      while (my ($tag, $item) = each %{$git->($itref->{$idx})}) {
+          $sq .= ($s1 ? $sp1 : "").$tag." => ";
+
+          if (ref $item eq 'HASH') {
+              my $s2;
+              my $sp2 = _ldpspaces ($tag, $sp1);
+
+              while (my ($tag1, $item1) = each %{$git->($itref->{$idx}{$tag})}) {
+                  $sq .= ($s2 ? $sp2 : "")."$tag1: ".$item1."\n";
+                  $s2  = 1;
+                  delete $itref->{$idx}{$tag}{$tag1};
+              }
+          }
+
+          $s1  = 1;
+          $sq .= "\n" if($sq !~ /\n$/xs);
+
+          delete $itref->{$idx}{$tag};
       }
   }
 
@@ -20773,22 +20829,29 @@ return ($rapi, $wapi);
 sub temp2bin {
   my $val = shift;
 
-  my $bin = $val > 35 ? 35 :
-            $val > 32 ? 35 :
-            $val > 30 ? 30 :
-            $val > 27 ? 30 :
-            $val > 25 ? 25 :
-            $val > 22 ? 25 :
-            $val > 20 ? 20 :
-            $val > 17 ? 20 :
-            $val > 15 ? 15 :
-            $val > 12 ? 15 :
-            $val > 10 ? 10 :
-            $val > 7  ? 10 :
-            $val > 5  ? 5  :
-            $val > 2  ? 5  :
-            $val > 0  ? 0  :
-            -5;
+  my $bin = $val > 35  ? 35  :
+            $val > 32  ? 35  :
+            $val > 30  ? 30  :
+            $val > 27  ? 30  :
+            $val > 25  ? 25  :
+            $val > 22  ? 25  :
+            $val > 20  ? 20  :
+            $val > 17  ? 20  :
+            $val > 15  ? 15  :
+            $val > 12  ? 15  :
+            $val > 10  ? 10  :
+            $val > 7   ? 10  :
+            $val > 5   ? 5   :
+            $val > 2   ? 5   :
+            $val > 0   ? 0   :
+            $val > -2  ? 0   :
+            $val > -5  ? -5  :
+            $val > -7  ? -5  :
+            $val > -10 ? -10 :
+            $val > -12 ? -10 :
+            $val > -15 ? -15 :
+            $val > -17 ? -15 :
+            -20;
 
 return $bin;
 }
