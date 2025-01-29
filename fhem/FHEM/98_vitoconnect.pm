@@ -125,7 +125,7 @@ my %translations;       # Über das Attribut translations definierte Readings zu
 
 
 # Feste Readings, orignal Verhalten des Moduls, können über RequestListMapping oder translations überschrieben werden.
-# letzte SVN Version vor meinen Änderungen am 2024-11-16 oder letzte Version von Roger vom 8. November (https://forum.fhem.de/index.php?msg=1292441).
+# letzte SVN Version vor meinen Änderungen am 2024-11-16 oder letzte Version von Roger vom 8. November (https://forum.fhem.de/index.php?msg=1292441)
 my $RequestListSvn = {
     "heating.boiler.serial.value"      => "Kessel_Seriennummer",
     "heating.boiler.temperature.value" => "Kessel_Solltemperatur",
