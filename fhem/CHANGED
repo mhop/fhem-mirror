@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  98_vitoconnect.pm: improved version, support multiple locations,
+                               gateways and devices
  - change:  36_Shelly: multiple additions and fixings (published as beta)
  - change:  76_SolarForecast: remove graphicBeam1MaxVal,ctrlAreaFactorUsage
  - feature: 76_SolarForecast: new special readings todayBatInSum,todayBatOutSum 
@@ -29,6 +31,7 @@
  - change:  76_SolarForecast: rename of some readings, see Forum:
                               ?topic=137058.msg1329009#msg1329009
  - feature: WMBus.pm: support for smoke detector IE6500-OMS: #1326558
+>>>>>>> .r29593
  - change:  76_SolarForecast: more preparation for multi batteries
  - change:  70_PylonLowVoltage: internal code change (use random time delay)
  - feature: 76_SolarForecast: change Attr setupBatteryDev to setupBatteryDev01, 
