@@ -17305,10 +17305,13 @@ sub aiAddRawData {
           my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',  20);
           my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt', 0);
           my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',  0); 
-          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',    0);                              
+          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',    0);    
+          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',    0);
+          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',   0);          
           
           my $tbin   = temp2bin   ($temp);     
           my $sabin  = sunalt2bin ($sunalt);
+          my $cbin   = cloud2bin  ($wcc);
           
           $data{$name}{aidectree}{airaw}{$ridx}{sunalt}  = $sabin;
           $data{$name}{aidectree}{airaw}{$ridx}{sunaz}   = $sunaz;
@@ -17316,6 +17319,8 @@ sub aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
           $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $tbin;
           $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con;
+          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $cbin;
+          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c;
           
           $dosave++;
           
@@ -17325,14 +17330,7 @@ sub aiAddRawData {
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl || $pvrl <= 0);
           
-          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',    0);
-          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',   0);
-
-          my $cbin   = cloud2bin  ($wcc);
-          
           $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h;
-          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $cbin;
-          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c;
           $data{$name}{aidectree}{airaw}{$ridx}{pvrl}    = $pvrl;
 
           debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, rr1c: $rr1c, temp: $tbin", 4);
