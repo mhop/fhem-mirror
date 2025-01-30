@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.44.5" => "30.01.2025  temp2bin: expand to more negative bins, bugfix: https://forum.fhem.de/index.php?msg=1332421 ".
+                           "expand data collection dayname, con for AI support, Task 1: delete readings Error, Errorcode ",  
   "1.44.4" => "26.01.2025  _getlistPVCircular: change width of output, new sub _listDataPoolPvHist, fix bug in hrepl Hash ".
                            "remove Attr graphicBeam1MaxVal,ctrlAreaFactorUsage ",
   "1.44.3" => "25.01.2025  Notification System: minor changes, special Readings todayBatInSum todayBatOutSum ",
@@ -330,7 +332,7 @@ my %vNotesIntern = (
                            "integrate OpenMeteoWorld-API with the 'Best match' Weather model ",
   "1.17.1" => "27.03.2024  add AI to OpenMeteoDWD-API, changed AI train debuglog, new attr ctrlAIshiftTrainStart ".
                            "_specialActivities: split tasks to several time slots, bugfixes ".
-                           "AI: modify aiAddInstance, Customize pattern training data ".
+                           "AI: modify aiAddInstancePV, Customize pattern training data ".
                            "add batteryTrigger to save plantconfig, valDecTree: more infos in get aiRuleStrings ",
   "1.17.0" => "24.03.2024  new DWD ICON API, change defmaxvar from 0.5 to 0.8, attr ctrlWeatherDev1 can select OpenMeteoDWD-API ",
   "1.16.8" => "16.03.2024  plantConfigCheck: adjust pvCorrectionFactor_Auto check, settings of forecastRefresh ".
@@ -2449,7 +2451,7 @@ sub _setaiDecTree {                   ## no critic "not used"
   my $prop  = $paref->{prop} // return;
 
   if ($prop eq 'addInstances') {
-      aiAddInstance ($paref);
+      aiAddInstancePV ($paref);
   }
 
   if ($prop eq 'addRawData') {
@@ -2534,8 +2536,18 @@ sub Get {
 
   ## KI spezifische Getter
   ##########################
+  my $vdtopt = q{};
+  if (!$aidtabs) {                                                    # AI::DecisionTree ist installiert
+      $vdtopt = 'aiRawData';
+  }
+  
   if (isPrepared4AI ($hash)) {
-       $getlist .= "valDecTree:aiRawData,aiRuleStrings ";
+       $vdtopt .= ',' if($vdtopt);
+       $vdtopt .= 'aiRuleStrings';
+  }
+  
+  if ($vdtopt) {
+      $getlist .= "valDecTree:$vdtopt ";
   }
 
   my (undef, $disabled, $inactive) = controller ($name);
@@ -4744,7 +4756,7 @@ sub _getlistPVCircular {
   my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'circular', $arg);
-  $ret   .= lineFromSpaces ($ret, 5);
+  $ret   .= lineFromSpaces ($ret, 15);
 
 return $ret;
 }
@@ -8061,6 +8073,9 @@ sub _specialActivities {
           deleteReadingspec ($hash, '(Today_Hour(.*_Grid.*|.*_PV.*|.*_PPreal.*|.*_Bat.*)|powerTrigger_.*|Today_MaxPVforecast.*)');
           readingsDelete    ($hash, 'Today_PVdeviation');
           readingsDelete    ($hash, 'Today_PVreal');
+          
+          readingsDelete    ($hash, 'Error');
+          readingsDelete    ($hash, 'Errorcode');
 
           if (scalar(@widgetreadings)) {                                                          # vermeide Schleife falls FHEMWEB geöfffnet
               my @acopy       = @widgetreadings;
@@ -8175,7 +8190,7 @@ sub _specialActivities {
           aiDelRawData ($paref);                                                            # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
 
           $paref->{taa} = 1;
-          aiAddInstance ($paref);                                                           # AI füllen, trainieren und sichern
+          aiAddInstancePV ($paref);                                                         # AI PV-Forecast füllen, trainieren und sichern
           delete $paref->{taa};
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 5 finished");
@@ -16475,7 +16490,7 @@ sub _addHourAiRawdata {
 
   debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
 
-  $paref->{ood} = 1;                                              # Only One Day
+  $paref->{ood} = 1;                                              # only one Day
   $paref->{rho} = $rho;
 
   aiAddRawData ($paref);                                          # Raw Daten für AI hinzufügen und sichern
@@ -16511,7 +16526,6 @@ sub getMessageFileNonBlocking {
   Log3 ($name, 4, "$name - Notification System - Message file >$messagefile< is retrieved non blocking");
 
   my $paref = { name  => $name,
-                hash  => $hash,
                 block => 1
               };
 
@@ -16912,7 +16926,7 @@ return;
 ################################################################
 #     KI Instanz(en) aus Raw Daten Hash erzeugen
 ################################################################
-sub aiAddInstance {                   ## no critic "not used"
+sub aiAddInstancePV {                   ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $type  = $paref->{type};
@@ -16956,7 +16970,7 @@ sub aiAddInstance {                   ## no critic "not used"
                                   );
              1;
            }
-           or do { Log3 ($name, 1, "$name - aiAddInstance ERROR: $@");
+           or do { Log3 ($name, 1, "$name - aiAddInstancePV ERROR: $@");
                    $data{$name}{current}{aiaddistate} = $@;
                    return;
                  };
@@ -17253,13 +17267,14 @@ return;
 #    Daten der Raw Datensammlung hinzufügen
 ################################################################
 sub aiAddRawData {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $day   = $paref->{day} // strftime "%d",  localtime(time);           # aktueller Tag (range 01 to 31)
-  my $ood   = $paref->{ood} // 0;                                         # only one (current) day
-  my $rho   = $paref->{rho};                                              # only this hour of day
-
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $type    = $paref->{type};
+  my $day     = $paref->{day} // strftime "%d",  localtime(time);           # aktueller Tag (range 01 to 31)
+  my $ood     = $paref->{ood} // 0;                                         # only one (current) day
+  my $rho     = $paref->{rho};                                              # only this hour of day
+  my $dayname = $paref->{dayname}; 
+  
   my $hash  = $defs{$name};
 
   delete $data{$name}{current}{aitrawstate};
@@ -17286,34 +17301,39 @@ sub aiAddRawData {
               next;
           }
 
+          my $ridx   = _aiMakeIdxRaw ($pvd, $hod);
+          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',  20);
+          my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt', 0);
+          my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',  0); 
+          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',    0);                              
+          
+          my $tbin   = temp2bin   ($temp);     
+          my $sabin  = sunalt2bin ($sunalt);
+          
+          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}  = $sabin;
+          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}   = $sunaz;
+          $data{$name}{aidectree}{airaw}{$ridx}{dayname} = $dayname;
+          $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
+          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $tbin;
+          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con;
+          
+          $dosave++;
+          
           my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
           next if(!$rad1h || $rad1h <= 0);
 
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl || $pvrl <= 0);
-
-          my $ridx = _aiMakeIdxRaw ($pvd, $hod);
-
-          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',  20);
+          
           my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',    0);
           my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',   0);
-          my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt', 0);
-          my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',  0);
 
-          my $tbin  = temp2bin   ($temp);
-          my $cbin  = cloud2bin  ($wcc);
-          my $sabin = sunalt2bin ($sunalt);
-
-          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}  = $rad1h;
-          $data{$name}{aidectree}{airaw}{$ridx}{temp}   = $tbin;
-          $data{$name}{aidectree}{airaw}{$ridx}{wcc}    = $cbin;
-          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}   = $rr1c;
-          $data{$name}{aidectree}{airaw}{$ridx}{hod}    = $hod;
-          $data{$name}{aidectree}{airaw}{$ridx}{pvrl}   = $pvrl;
-          $data{$name}{aidectree}{airaw}{$ridx}{sunalt} = $sabin;
-          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}  = $sunaz;
-
-          $dosave++;
+          my $cbin   = cloud2bin  ($wcc);
+          
+          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h;
+          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $cbin;
+          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c;
+          $data{$name}{aidectree}{airaw}{$ridx}{pvrl}    = $pvrl;
 
           debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, rr1c: $rr1c, temp: $tbin", 4);
       }
@@ -17663,16 +17683,19 @@ sub listDataPool {
       $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
 
       for my $idx (sort keys %{$h}) {
-          my $hod    = AiRawdataVal ($name, $idx, 'hod',    '-');
-          my $sunalt = AiRawdataVal ($name, $idx, 'sunalt', '-');
-          my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',  '-');
-          my $rad1h  = AiRawdataVal ($name, $idx, 'rad1h',  '-');
-          my $wcc    = AiRawdataVal ($name, $idx, 'wcc',    '-');
-          my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',   '-');
-          my $pvrl   = AiRawdataVal ($name, $idx, 'pvrl',   '-');
-          my $temp   = AiRawdataVal ($name, $idx, 'temp',   '-');
+          my $hod    = AiRawdataVal ($name, $idx, 'hod',     '-');
+          my $sunalt = AiRawdataVal ($name, $idx, 'sunalt',  '-');
+          my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',   '-');
+          my $rad1h  = AiRawdataVal ($name, $idx, 'rad1h',   '-');
+          my $wcc    = AiRawdataVal ($name, $idx, 'wcc',     '-');
+          my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',    '-');
+          my $pvrl   = AiRawdataVal ($name, $idx, 'pvrl',    '-');
+          my $temp   = AiRawdataVal ($name, $idx, 'temp',    '-');
+          my $nod    = AiRawdataVal ($name, $idx, 'dayname', '-');
+          my $con    = AiRawdataVal ($name, $idx, 'con',     '-');    
+          
           $sq       .= "\n";
-          $sq       .= "$idx => hod: $hod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, pvrl: $pvrl, temp: $temp";
+          $sq       .= "$idx => hod: $hod, nod: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, pvrl: $pvrl, con: $con, temp: $temp";
       }
   }
 
@@ -20829,22 +20852,29 @@ return ($rapi, $wapi);
 sub temp2bin {
   my $val = shift;
 
-  my $bin = $val > 35 ? 35 :
-            $val > 32 ? 35 :
-            $val > 30 ? 30 :
-            $val > 27 ? 30 :
-            $val > 25 ? 25 :
-            $val > 22 ? 25 :
-            $val > 20 ? 20 :
-            $val > 17 ? 20 :
-            $val > 15 ? 15 :
-            $val > 12 ? 15 :
-            $val > 10 ? 10 :
-            $val > 7  ? 10 :
-            $val > 5  ? 5  :
-            $val > 2  ? 5  :
-            $val > 0  ? 0  :
-            -5;
+  my $bin = $val > 35  ? 35  :
+            $val > 32  ? 35  :
+            $val > 30  ? 30  :
+            $val > 27  ? 30  :
+            $val > 25  ? 25  :
+            $val > 22  ? 25  :
+            $val > 20  ? 20  :
+            $val > 17  ? 20  :
+            $val > 15  ? 15  :
+            $val > 12  ? 15  :
+            $val > 10  ? 10  :
+            $val > 7   ? 10  :
+            $val > 5   ? 5   :
+            $val > 2   ? 5   :
+            $val > 0   ? 0   :
+            $val > -2  ? 0   :
+            $val > -5  ? -5  :
+            $val > -7  ? -5  :
+            $val > -10 ? -10 :
+            $val > -12 ? -10 :
+            $val > -15 ? -15 :
+            $val > -17 ? -15 :
+            -20;
 
 return $bin;
 }
@@ -22788,17 +22818,21 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      If AI support is activated in the SolarForecast Device, various AI-relevant data can be displayed                      :
+      If AI support is activated in the SolarForecast device, various AI-relevant data can be displayed.
+      The available display options depend on the activated AI support level. 
       <br><br>
 
       <ul>
        <table>
        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-          <tr><td> <b>aiRawData</b>     </td><td>The PV, radiation and environmental data currently stored for the AI.           </td></tr>
-          <tr><td> <b>aiRuleStrings</b> </td><td>Returns a list that describes the AI's decision tree in the form of rules.      </td></tr>
-          <tr><td>                      </td><td><b>Note:</b> While the order of the rules is not predictable, the               </td></tr>
-          <tr><td>                      </td><td>order of criteria within each rule, however, reflects the order                 </td></tr>
-          <tr><td>                      </td><td>in which the criteria are considered in the decision-making process.            </td></tr>
+          <tr><td> <b>aiRawData</b>     </td><td>Display of the PV, radiation and environmental data currently stored for the AI.       </td></tr>
+          <tr><td>                      </td><td>(available if the Perl module AI::DecisionTree is installed)                           </td></tr>
+          <tr><td>                      </td><td>                                                                                       </td></tr>
+          <tr><td> <b>aiRuleStrings</b> </td><td>Returns a list that describes the AI's decision tree in the form of rules.             </td></tr>
+          <tr><td>                      </td><td><b>Note:</b> While the order of the rules is not predictable, the                      </td></tr>
+          <tr><td>                      </td><td>order of criteria within each rule, however, reflects the order                        </td></tr>
+          <tr><td>                      </td><td>in which the criteria are considered in the decision-making process.                   </td></tr>
+          <tr><td>                      </td><td>(available if an AI-compatible SolarForecast MODEL of the PV forecast is activated)    </td></tr>
         </table>
       </ul>
     </li>
@@ -25281,17 +25315,21 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      Ist der KI Support im SolarForecast Device aktiviert, können verschiedene KI relevante Daten angezeigt werden                  :
+      Ist der KI Support im SolarForecast Device aktiviert, können verschiedene KI relevante Daten angezeigt werden.
+      Die verfügbaren Anzeigeoptionen sind abhängig vom aktivierten KI Unterstützungslevel. 
       <br><br>
 
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>aiRawData</b>     </td><td>Die aktuell für die KI gespeicherten PV-, Strahlungs- und Umweltdaten.                     </td></tr>
+          <tr><td> <b>aiRawData</b>     </td><td>Anzeige der aktuell für die KI gespeicherten PV-, Strahlungs- und Umweltdaten.             </td></tr>
+          <tr><td>                      </td><td>(verfügbar wenn das Perl Modul AI::DecisionTree installiert ist)                           </td></tr>
+          <tr><td>                      </td><td>                                                                                           </td></tr>
           <tr><td> <b>aiRuleStrings</b> </td><td>Gibt eine Liste zurück, die den Entscheidungsbaum der KI in Form von Regeln beschreibt.    </td></tr>
           <tr><td>                      </td><td><b>Hinweis:</b> Die Reihenfolge der Regeln ist zwar nicht vorhersehbar, die                </td></tr>
           <tr><td>                      </td><td>Reihenfolge der Kriterien innerhalb jeder Regel spiegelt jedoch die Reihenfolge            </td></tr>
           <tr><td>                      </td><td>wider, in der die Kriterien bei der Entscheidungsfindung geprüft werden.                   </td></tr>
+          <tr><td>                      </td><td>(verfügbar wenn ein KI kompatibles SolarForecast MODEL der PV Vorhersage aktiviert ist)    </td></tr>
         </table>
       </ul>
     </li>
