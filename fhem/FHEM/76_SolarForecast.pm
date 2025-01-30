@@ -22818,8 +22818,8 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      If AI support is activated in the SolarForecast device, various AI-relevant data can be displayed.
-      The available display options depend on the activated AI support level. 
+      Display of AI-relevant data.
+      The available display options depend on the available and activated AI support level. 
       <br><br>
 
       <ul>
@@ -25315,8 +25315,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      Ist der KI Support im SolarForecast Device aktiviert, können verschiedene KI relevante Daten angezeigt werden.
-      Die verfügbaren Anzeigeoptionen sind abhängig vom aktivierten KI Unterstützungslevel. 
+      Anzeige von KI relevanten Daten.
+      Die verfügbaren Anzeigeoptionen sind abhängig vom verfügbaren und aktivierten KI Unterstützungslevel. 
       <br><br>
 
       <ul>
