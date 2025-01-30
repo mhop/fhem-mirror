@@ -454,7 +454,7 @@ sub PIFACE_Shutdown {
 <a id="PIFACE"></a>
 <h3>PIFACE</h3>
 <ul>
-  The PIFACE module managed the <a href=http://www.raspberrypi.org/>Raspberry Pi</a> extension board <a href=http://www.piface.org.uk/products/piface_digital/>PiFace Digital</a>.<br>
+  The PIFACE module managed the <a href=http://www.raspberrypi.org/>Raspberry Pi</a> extension board PiFace Digital.<br>
   PIFACE controls the input ports 0..7 and output ports 0..7.
   <ul>
   <li>The relays 0 and 1 have corresponding output port 0 and 1.</li>
@@ -463,8 +463,11 @@ sub PIFACE_Shutdown {
   The status of the ports can be displayed periodically. The update of the states via interrupt is not supported.<br>
   The module can be periodically monitored by a watchdog function.<br>
   The ports can be read and controlled individually by the function <a href="#readingsProxy">readingsProxy</a>.<br>
-  PIFACE is tested with the Raspbian OS, Debian version 11 (bullseye) 32 bit and wiringpi_3.2-bullseye_armhf.<br>
-  Raspberry 5 and Raspbian OS Bookworm may work but is not tested.
+  PIFACE is tested with
+  <ul>
+  <li>Raspbian OS, Debian version 11 (bullseye) 32 bit and wiringpi_3.2-bullseye_armhf</li>
+  <li>Raspbian OS, Debian version 12 (bookworm) 64 bit and wiringpi_3.12_arm64 (Raspberry Pi 5 B)</li>
+  </ul>
   <br><br>
   <b>Preparatory Work</b><br>
   The use of PIFACE module requires some preparatory work. The module needs the <a href=http://wiringpi.com>Wiring Pi</a> tool.
