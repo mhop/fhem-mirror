@@ -1,6 +1,6 @@
 #  Filestruktur für Mitteilungen:
 #  ==============================
-#  0|SV|1                   (= Severity 0 - 3)
+#  0|SV|1                   (= Severity 1 - 3: 1 - allgemeine Mitteilung, 2 - wichtige Mitteilung, 3 - Fehler oder Problem)
 #  0|DE|Mitteilung 1....
 #  0|EN|Message 1 ...
 #
@@ -11,4 +11,8 @@
 #  (Index kann bis max. 99999 laufen)
 #  Zeilenumbruch mit <br>
 #
-####################################################
+#################################################################################################################################
+
+1|SV|1
+1|DE|Voraussichtlich am 02.02.25 wird die Version 1.45.0 ausgeliefert. Die gespeicherten PV Daten werden in ein neues Format umgesetzt welches den Median Ansatz bei der PV Prognose aktiviert und nutzt. <br>Den Befehl "get ... x_migrate" wird es dann nicht mehr geben. Die Umstellung kann vorab damit vorgenommen werden.
+1|EN|Version 1.45.0 is expected to be delivered on 02.02.25. The stored PV data will be converted into a new format which activates and uses the median approach for PV forecasting. <br>The command “get ... x_migrate” command will no longer exist. The changeover can be carried out in advance.
