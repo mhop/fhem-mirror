@@ -14,5 +14,5 @@
 #################################################################################################################################
 
 1|SV|1
-1|DE|Voraussichtlich am 02.02.25 wird die Version 1.45.0 ausgeliefert. Die gespeicherten PV Daten werden in ein neues Format umgesetzt welches den Median Ansatz bei der PV Prognose aktiviert und nutzt. <br>Den Befehl "get ... x_migrate" wird es dann nicht mehr geben. Die Umstellung kann vorab damit vorgenommen werden.
+1|DE|Am 02.02.25 wird die Version 1.45.0 ausgeliefert. Die gespeicherten PV Daten werden in ein neues Format umgesetzt welches den Median Ansatz bei der PV Prognose aktiviert und nutzt. <br>Den Befehl "get ... x_migrate" wird es dann nicht mehr geben. Die Umstellung kann vorab damit vorgenommen werden.
 1|EN|Version 1.45.0 is expected to be delivered on 02.02.25. The stored PV data will be converted into a new format which activates and uses the median approach for PV forecasting. <br>The command “get ... x_migrate” command will no longer exist. The changeover can be carried out in advance.
