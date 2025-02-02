@@ -15283,7 +15283,8 @@ sub __batteryOnBeam {
           my $bpowerout = BatteryVal ($name, $bn, 'bpowerout',   0);
           
           my $day_str   = $hfcg->{$i}{day_str};
-          my $time_str  = $hfcg->{$i}{time_str};
+          my $time_str  = $hfcg->{$i}{time_str};             
+          $time_str     = (split ":", $time_str)[0];                                                 # Forum: https://forum.fhem.de/index.php?msg=1332721
           my $soc       = $hfcg->{$i}{'soc'.$bn};
           
           my ($bpower, $currsoc);
