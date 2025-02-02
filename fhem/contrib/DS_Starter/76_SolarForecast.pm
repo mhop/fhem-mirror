@@ -50,7 +50,7 @@ use Color;
 use utf8;
 use HttpUtils;
 eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # Debian: sudo apt-get install libjson-perl
-eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval'
+eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval' # Debian: sudo apt-get install libai-decisiontree-perl
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                            # Error Code Modul
 use FHEM::SynoModules::SMUtils qw (checkModVer
@@ -160,7 +160,13 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.44.5" => "29.01.2025  temp2bin: expand to more negative bins ",  
+  "1.45.1" => "02.02.2025  _specialActivities: Task 1 __deleteEveryHourControls changed, all Tasks adapted ".
+                           "_retrieveMessageFile: fix path in __updWriteFile ",
+  "1.45.0" => "01.02.2025  new function timestringsFromOffset, _batChargeRecmd: change condition for load release ".
+                           "_addHourAiRawdata: add hour 24 (of day before), remove x-migrate -> auto migrate pv data ".
+                           "Pool output width limited to 140 characters, checkPlantConfig: add installen Perl Modules check ",
+  "1.44.5" => "30.01.2025  temp2bin: expand to more negative bins, bugfix: https://forum.fhem.de/index.php?msg=1332421 ".
+                           "expand data collection dayname, con for AI support, Task 1: delete readings Error, Errorcode ",  
   "1.44.4" => "26.01.2025  _getlistPVCircular: change width of output, new sub _listDataPoolPvHist, fix bug in hrepl Hash ".
                            "remove Attr graphicBeam1MaxVal,ctrlAreaFactorUsage ",
   "1.44.3" => "25.01.2025  Notification System: minor changes, special Readings todayBatInSum todayBatOutSum ",
@@ -331,7 +337,7 @@ my %vNotesIntern = (
                            "integrate OpenMeteoWorld-API with the 'Best match' Weather model ",
   "1.17.1" => "27.03.2024  add AI to OpenMeteoDWD-API, changed AI train debuglog, new attr ctrlAIshiftTrainStart ".
                            "_specialActivities: split tasks to several time slots, bugfixes ".
-                           "AI: modify aiAddInstance, Customize pattern training data ".
+                           "AI: modify aiAddInstancePV, Customize pattern training data ".
                            "add batteryTrigger to save plantconfig, valDecTree: more infos in get aiRuleStrings ",
   "1.17.0" => "24.03.2024  new DWD ICON API, change defmaxvar from 0.5 to 0.8, attr ctrlWeatherDev1 can select OpenMeteoDWD-API ",
   "1.16.8" => "16.03.2024  plantConfigCheck: adjust pvCorrectionFactor_Auto check, settings of forecastRefresh ".
@@ -371,36 +377,35 @@ my %vNotesIntern = (
   "1.14.3" => "02.02.2024  _transferWeatherValues: first step of multi weather device merger ",
   "1.14.2" => "02.02.2024  fix warning, _transferAPIRadiationValues: Consider upper and lower deviation limit AI to API forecast ",
   "1.14.1" => "01.02.2024  language support for ___setConsumerPlanningState -> supplement, fix setting 'swoncond not met' ",
-  "1.14.0" => "31.01.2024  data maintenance, new func _addDynAttr for adding attributes at runtime ".
-                           "replace setter currentWeatherDev by attr ctrlWeatherDev1, new data with func CircularSumVal ".
-                           "rewrite correction factor calculation with _calcCaQcomplex, _calcCaQsimple, __calcNewFactor ",
-  "1.13.0" => "27.01.2024  minor change of deleteOldBckpFiles, Setter writeHistory replaced by operatingMemory ".
-                           "save, backup and recover in-memory operating data ",
-  "1.12.0" => "26.01.2024  create backup files and delete old generations of them ",
-  "1.11.1" => "26.01.2024  fix ___switchonTimelimits ",
-  "1.11.0" => "25.01.2024  consumerXX: notbefore, notafter format extended to possible perl code {...} ",
-  "1.10.0" => "24.01.2024  consumerXX: notbefore, notafter format extended to hh[:mm], new sub checkCode, checkhhmm ",
-  "1.9.0"  => "23.01.2024  modify disable, add operationMode: active/inactive ",
-  "1.8.0"  => "22.01.2024  add 'noLearning' Option to Setter pvCorrectionFactor_Auto ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
+
+## Konstanten
+######################
+use constant LPOOLLENLIM   => 140;                                                  # Breitenbegrenzung der Ausgabe von List Pooldaten
+use constant KJ2KWH        => 0.0002777777778;                                      # Umrechnungsfaktor kJ in kWh
+use constant KJ2WH         => 0.2777777778;                                         # Umrechnungsfaktor kJ in Wh
+use constant WH2KJ         => 3.6;                                                  # Umrechnungsfaktor Wh in kJ
+use constant DEFLANG       => 'EN';                                                 # default Sprache wenn nicht konfiguriert
+use constant DEFMAXVAR     => 10;                                                   # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
+use constant DEFINTERVAL   => 70;                                                   # Standard Abfrageintervall
+use constant SLIDENUMMAX   => 3;                                                    # max. Anzahl der Arrayelemente in Schieberegistern
+use constant SPLSLIDEMAX   => 20;                                                   # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
+
+use constant MAXWEATHERDEV => 3;                                                    # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
+use constant MAXBATTERIES  => 3;                                                    # maximale Anzahl der möglichen Batterien
+use constant MAXCONSUMER   => 16;                                                   # maximale Anzahl der möglichen Consumer (Attribut)
+use constant MAXPRODUCER   => 3;                                                    # maximale Anzahl der möglichen anderen Produzenten (Attribut)
+use constant MAXINVERTER   => 3;                                                    # maximale Anzahl der möglichen Inverter
+
+use constant MAXSOCDEF     => 95;                                                   # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
+use constant CARECYCLEDEF  => 20;                                                   # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
+use constant BATSOCCHGDAY  => 5;                                                    # Batterie: prozentuale SoC Anpassung pro Tag
 
 ## Standardvariablen
 ######################
 my @da;                                                                             # zentraler temporärer Readings-Store
-my $deflang        = 'EN';                                                          # default Sprache wenn nicht konfiguriert
 my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
-my $kJtokWh        = 0.0002777777778;                                               # Umrechnungsfaktor kJ in kWh
-my $kJtoWh         = 0.2777777778;                                                  # Umrechnungsfaktor kJ in Wh
-my $WhtokJ         = 3.6;                                                           # Umrechnungsfaktor Wh in kJ
-my $defmaxvar      = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
-my $definterval    = 70;                                                            # Standard Abfrageintervall
-my $slidenummax    = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
-my $splslidenummax = 20;                                                            # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
-my $weatherDevMax  = 3;                                                             # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
-my $maxSoCdef      = 95;                                                            # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
-my $carecycledef   = 20;                                                            # max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
-my $batSocChgDay   = 5;                                                             # prozentuale SoC Änderung pro Tag
 my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
 
 my $root           = $attr{global}{modpath};                                        # Pfad zu dem Verzeichnis der FHEM Module
@@ -449,12 +454,6 @@ my $storeffdef     = 0.9;                                                       
 my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
 my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
 my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
-
-my $maxbatteries   = 3;                                                             # maximale Anzahl der möglichen Batterien
-my $maxconsumer    = 16;                                                            # maximale Anzahl der möglichen Consumer (Attribut)
-my $maxproducer    = 3;                                                             # maximale Anzahl der möglichen anderen Produzenten (Attribut)
-my $maxinverter    = 3;                                                             # maximale Anzahl der möglichen Inverter
-
 my $epiecMaxCycles = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
@@ -566,24 +565,24 @@ my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    setupRoofTops
                  );
 
-for my $cn (1..$maxconsumer) {
+for my $cn (1..MAXCONSUMER) {
   $cn = sprintf "%02d", $cn;
   push @aconfigs, "consumer${cn}";                            # Anlagenkonfiguration: add Consumer Attribute
   push @dd,       "consumerSwitching${cn}";                   # ctrlDebug: add specific Consumer
 }
 
-for my $bn (1..$maxbatteries) {
+for my $bn (1..MAXBATTERIES) {
   $bn = sprintf "%02d", $bn;
   push @aconfigs, "setupBatteryDev${bn}";                     # Anlagenkonfiguration: add Battery Attribute
   push @aconfigs, "ctrlBatSocManagement${bn}";
 }
 
-for my $in (1..$maxinverter) {
+for my $in (1..MAXINVERTER) {
   $in = sprintf "%02d", $in;
   push @aconfigs, "setupInverterDev${in}";                    # Anlagenkonfiguration: add Inverter Attribute
 }
 
-for my $pn (1..$maxproducer) {
+for my $pn (1..MAXPRODUCER) {
   $pn = sprintf "%02d", $pn;
   push @aconfigs, "setupOtherProducer${pn}";                  # Anlagenkonfiguration: add Producer Attribute
 }
@@ -659,7 +658,6 @@ my %hget = (                                                                # Ha
   ftuiFramefiles     => { fn => \&_ftuiFramefiles,              needcred => 0 },
   dwdCatalog         => { fn => \&_getdwdCatalog,               needcred => 0 },
   outputMessages     => { fn => \&_getoutputMessages,           needcred => 0 },
-  x_migrate          => { fn => \&_getmigrate,                  needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -678,17 +676,17 @@ my %hattr = (                                                                # H
   flowGraphicControl        => { fn => \&_attrflowGraphicControl  },
 );
 
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
       $hattr{'setupBatteryDev'.$bn}{fn} = \&_attrBatteryDev;
   }
   
-  for my $in (1..$maxinverter) {
+  for my $in (1..MAXINVERTER) {
       $in = sprintf "%02d", $in;
       $hattr{'setupInverterDev'.$in}{fn} = \&_attrInverterDev;
   }
   
-  for my $prn (1..$maxproducer) {
+  for my $prn (1..MAXPRODUCER) {
       $prn = sprintf "%02d", $prn;
       $hattr{'setupOtherProducer'.$prn}{fn} = \&_attrProducerDev;
   }
@@ -1176,7 +1174,7 @@ my %hcsr = (                                                                    
   todayBatOutSum              => { fnr => 4, fn => \&CircularVal,     par => 99,                  unit => ' Wh',  def => 0           },
 );
 
-  for my $csr (1..$maxconsumer) {
+  for my $csr (1..MAXCONSUMER) {
       $csr                                       = sprintf "%02d", $csr;
 
       $hcsr{'currentRunMtsConsumer_'.$csr}{fnr}  = 4;
@@ -1192,7 +1190,7 @@ my %hcsr = (                                                                    
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{def}  = 0;
   }
   
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn                                      = sprintf "%02d", $bn;
       
       $hcsr{'daysUntilBatteryCare_'.$bn}{fnr}  = 4;
@@ -1239,7 +1237,7 @@ my %hfspvh = (
   pvrl              => { fn => \&_storeVal, storname => 'pvrl',         validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag PV
 );
 
-  for my $in (1..$maxinverter) {
+  for my $in (1..MAXINVERTER) {
       $in                              = sprintf "%02d", $in;
       $hfspvh{'pvrl'.$in}{fn}          = \&_storeVal;                         # realer Energieertrag Inverter
       $hfspvh{'pvrl'.$in}{storname}    = 'pvrl'.$in;
@@ -1252,7 +1250,7 @@ my %hfspvh = (
       $hfspvh{'etotali'.$in}{fpar}     = undef;
   }
   
-  for my $pn (1..$maxproducer) {
+  for my $pn (1..MAXPRODUCER) {
       $pn                              = sprintf "%02d", $pn;
       $hfspvh{'pprl'.$pn}{fn}          = \&_storeVal;                         # realer Energieertrag sonstiger Erzeuger
       $hfspvh{'pprl'.$pn}{storname}    = 'pprl'.$pn;
@@ -1265,7 +1263,7 @@ my %hfspvh = (
       $hfspvh{'etotalp'.$pn}{fpar}     = undef;
   }
   
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn                                     = sprintf "%02d", $bn;
       $hfspvh{'batintotal'.$bn}{fn}           = \&_storeVal;                  # totale Batterieladung
       $hfspvh{'batintotal'.$bn}{storname}     = 'batintotal'.$bn;
@@ -1341,24 +1339,24 @@ sub Initialize {
   my $srd = join ",", sort keys (%hcsr);
 
   my ($consumer, $setupbat, $ctrlbatsm, $setupprod, $setupinv, @allc);
-  for my $c (1..$maxconsumer) {
+  for my $c (1..MAXCONSUMER) {
       $c         = sprintf "%02d", $c;
       $consumer .= "consumer${c}:textField-long ";
       push @allc, $c;
   }
   
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn         = sprintf "%02d", $bn;
       $setupbat  .= "setupBatteryDev${bn}:textField-long ";
       $ctrlbatsm .= "ctrlBatSocManagement${bn}:textField-long ";
   }
 
-  for my $in (1..$maxinverter) {
+  for my $in (1..MAXINVERTER) {
       $in        = sprintf "%02d", $in;
       $setupinv .= "setupInverterDev${in}:textField-long ";
   }
   
-  for my $prn (1..$maxproducer) {
+  for my $prn (1..MAXPRODUCER) {
       $prn        = sprintf "%02d", $prn;
       $setupprod .= "setupOtherProducer${prn}:textField-long ";
   }
@@ -2450,7 +2448,7 @@ sub _setaiDecTree {                   ## no critic "not used"
   my $prop  = $paref->{prop} // return;
 
   if ($prop eq 'addInstances') {
-      aiAddInstance ($paref);
+      aiAddInstancePV ($paref);
   }
 
   if ($prop eq 'addRawData') {
@@ -2528,15 +2526,21 @@ sub Get {
                 "valCurrent:noArg ".
                 "weatherApiData:noArg "
                 ;
-                
-  if (!ReadingsVal ($name, '.migrated', 0)) {
-      $getlist .= "x_migrate:noArg ";
-  }
 
   ## KI spezifische Getter
   ##########################
+  my $vdtopt = q{};
+  if (!$aidtabs) {                                                    # AI::DecisionTree ist installiert
+      $vdtopt = 'aiRawData';
+  }
+  
   if (isPrepared4AI ($hash)) {
-       $getlist .= "valDecTree:aiRawData,aiRuleStrings ";
+       $vdtopt .= ',' if($vdtopt);
+       $vdtopt .= 'aiRuleStrings';
+  }
+  
+  if ($vdtopt) {
+      $getlist .= "valDecTree:$vdtopt ";
   }
 
   my (undef, $disabled, $inactive) = controller ($name);
@@ -2570,59 +2574,6 @@ sub Get {
   }
 
 return $getlist;
-}
-
-################################################################
-#                      Getter x_migrate
-################################################################
-sub _getmigrate {                   ## no critic "not used"
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $hash  = $defs{$name};
-  
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################    
-  my $n = 0;
-  
-  if (!ReadingsVal ($name, '.migrated', 0)) {
-      for my $hh (1..24) {                                            # 19.01.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_* 
-          $hh = sprintf "%02d", $hh;
-          
-          for my $cul (sort keys %{$data{$name}{circular}{$hh}}) {
-              next if($cul ne 'dnumsum');
-              
-              for my $dns (sort keys %{$data{$name}{circular}{$hh}{$cul}}) {
-                  next if($dns eq 'simple');
-                  
-                  my ($sabin, $crang) = split /\./, $dns;
-                  my ($pvsum, $fcsum, $dnum) = CircularSumVal ($hash, $hh, $sabin, $crang, undef);
-                  
-                  delete $data{$name}{circular}{$hh}{pvrlsum}{$dns};
-                  delete $data{$name}{circular}{$hh}{pvfcsum}{$dns};
-                  delete $data{$name}{circular}{$hh}{dnumsum}{$dns};
-                  
-                  next if(!defined $pvsum || !defined $fcsum || !$dnum);
-                  
-                  my $pvavg = sprintf "%.0f", ($pvsum / $dnum);
-                  my $fcavg = sprintf "%.0f", ($fcsum / $dnum);
-                  
-                  push @{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}}, $pvavg;
-                  push @{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}}, $fcavg;
-                  
-                  $n++;
-              }
-          }
-      }
-      
-      if ($n) {
-          Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
-      }
-  
-  }
-  
-  readingsSingleUpdate ($hash, '.migrated', 1, 0);
-  
-return "Circular Store was migrated, $n datasets were migrated";
 }
 
 ################################################################
@@ -3588,15 +3539,15 @@ sub __getDWDSolarData {
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
-                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * $kJtokWh * $peak * $prdef);  # Rad wird in kW/m2 erwartet
+                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * KJ2KWH * $peak * $prdef);    # Rad wird in kW/m2 erwartet
               }
               else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
-                  $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);
+                  $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * $prdef);
               }
           }
           else {                                                                                    # Flächenfaktor Fix
               $af = ___areaFactorFix ($ti, $az);                                                    # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
-              $pv = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef);                       # Rad wird in kW/m2 erwartet
+              $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * $prdef);                         # Rad wird in kW/m2 erwartet
           }
 
           $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                 # Startzeit wird verwendet, nicht laufende Stunde
@@ -4473,7 +4424,7 @@ sub __openMeteoDWD_ApiResponse {
           }
 
           my $rad1wh = $jdata->{hourly}{global_tilted_irradiance}[$k];                          # Wh/m2
-          my $rad    = 10 * (sprintf "%.0f", ($rad1wh * $WhtokJ) / 10);                         # Umrechnung Wh/m2 in kJ/m2 ->
+          my $rad    = 10 * (sprintf "%.0f", ($rad1wh * WH2KJ) / 10);                           # Umrechnung Wh/m2 in kJ/m2 ->
           my $pv     = sprintf "%.2f", int ($rad1wh / 1000 * $peak * $prdef);                   # Rad wird in kWh/m2 erwartet
           
           my $don    = $jdata->{hourly}{is_day}[$k];
@@ -4745,7 +4696,7 @@ sub _getlistPVCircular {
   my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'circular', $arg);
-  $ret   .= lineFromSpaces ($ret, -20);
+  $ret   .= lineFromSpaces ($ret, 0);
 
 return $ret;
 }
@@ -6521,7 +6472,7 @@ sub Notify {
   
   ## Battery Event?
   ###################
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn    = sprintf "%02d", $bn;
       $bname = BatteryVal ($myHash, $bn, 'bname', '');
   
@@ -6550,7 +6501,7 @@ sub Notify {
   
   ## Inverter Event?
   ####################  
-  for my $in (1..$maxinverter) {
+  for my $in (1..MAXINVERTER) {
       $in    = sprintf "%02d", $in;
       $iname = InverterVal ($myHash, $in, 'iname', '');
       
@@ -7448,7 +7399,7 @@ sub _addDynAttr {
   
   ## Attr setupWeatherDevX / setupRadiationAPI zur Laufzeit hinzufügen
   ######################################################################
-  for my $step (1..$weatherDevMax) {
+  for my $step (1..MAXWEATHERDEV) {
       if ($step == 1) {
           push @deva, ($adwds ? "setupWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" :
                        "setupWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
@@ -7465,7 +7416,7 @@ sub _addDynAttr {
   my $gbc;
   
   if (isBatteryUsed ($name)) {
-      for my $bn (1..$maxbatteries) {                                          
+      for my $bn (1..MAXBATTERIES) {                                          
           $bn   = sprintf "%02d", $bn;
           $gbc .= 'batsocforecast_'.$bn.',';
       }
@@ -7550,7 +7501,7 @@ sub centralTask {
       $data{$name}{circular}{$ck}{batout01} = delete $data{$name}{circular}{$ck}{batout} if(defined $data{$name}{circular}{$ck}{batout});
   }
   
-  for my $pn (1..$maxproducer) {                                                # 30.12.2024                                                                                                      
+  for my $pn (1..MAXPRODUCER) {                                                # 30.12.2024                                                                                                      
       $pn       = sprintf "%02d", $pn;
       readingsDelete ($hash, 'Current_PP'.$pn);      
       deleteReadingspec    ($hash, '.*PPreal'.$pn);
@@ -7566,6 +7517,42 @@ sub centralTask {
           $data{$name}{pvhist}{$dy}{$hr}{batsetsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batsetsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batsetsoc});
       }
   }
+  
+  my $n = 0;                                                       # 01.02.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_* 
+  for my $hh (1..24) {                                            
+      $hh = sprintf "%02d", $hh;
+      
+      for my $cul (sort keys %{$data{$name}{circular}{$hh}}) {
+          next if($cul ne 'dnumsum');
+          
+          for my $dns (sort keys %{$data{$name}{circular}{$hh}{$cul}}) {
+              next if($dns eq 'simple');
+              
+              my ($sabin, $crang) = split /\./, $dns;
+              my ($pvsum, $fcsum, $dnum) = CircularSumVal ($hash, $hh, $sabin, $crang, undef);
+              
+              delete $data{$name}{circular}{$hh}{pvrlsum}{$dns};
+              delete $data{$name}{circular}{$hh}{pvfcsum}{$dns};
+              delete $data{$name}{circular}{$hh}{dnumsum}{$dns};
+              
+              next if(!defined $pvsum || !defined $fcsum || !$dnum);
+              
+              my $pvavg = sprintf "%.0f", ($pvsum / $dnum);
+              my $fcavg = sprintf "%.0f", ($fcsum / $dnum);
+              
+              push @{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}}, $pvavg;
+              push @{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}}, $fcavg;
+              
+              $n++;
+          }
+      }
+  }
+  
+  if ($n) {
+      Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
+  }
+      
+  readingsDelete ($hash, '.migrated');
   
   ##########################################################################################################################
 
@@ -7590,23 +7577,21 @@ sub centralTask {
   $data{$name}{current}{ctrunning} = 1;                                                        # Central Task running Statusbit
   InternalTimer (gettimeofday() + 2.0, "FHEM::SolarForecast::releaseCentralTask", $hash, 0);   # Freigabe centralTask
 
-  my $t       = time;                                                                          # aktuelle Unix-Zeit
-  my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
-  my $chour   = strftime "%H",       localtime($t);                                            # aktuelle Stunde in 24h format (00-23)
-  my $minute  = strftime "%M",       localtime($t);                                            # aktuelle Minute (00-59)
-  my $day     = strftime "%d",       localtime($t);                                            # aktueller Tag (range 01 .. 31)
-  my $dayname = strftime "%a",       localtime($t);                                            # aktueller Wochentagsname
-  my $debug   = getDebug ($hash);                                                              # Debug Module 
+  my $t     = time;                                                                            # aktuelle Unix-Zeit
+  my $debug = getDebug ($hash);                                                                # Debug Module 
+  
+  my $dt    = timestringsFromOffset ($t, 0);
+  my $chour = $dt->{hour};  
 
   my $centpars = {
       name    => $name,
       type    => $type,
       t       => $t,
-      date    => $date,
-      minute  => $minute,
-      chour   => $chour,
-      day     => $day,
-      dayname => $dayname,
+      date    => $dt->{date},                                                                  # aktuelles Datum
+      minute  => $dt->{minute},                                                                # aktuelle Minute (00-59)
+      chour   => $dt->{hour},                                                                  # aktuelle Stunde in 24h format (00-23)
+      day     => $dt->{day},                                                                   # aktueller Tag (range 01 .. 31)
+      dayname => $dt->{dayname},                                                               # aktueller Wochentagsname (locale-dependent!!)
       debug   => $debug,
       lang    => getLang ($hash),
       state   => 'running',
@@ -7645,7 +7630,7 @@ sub centralTask {
   _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
   _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
   _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
-  _calcValueImproves          ($centpars);                                            # neue Korrekturfaktor/Qualität und berechnen und speichern, AI anreichern
+  _calcDataEveryFullHour      ($centpars);                                            # Daten berechnen/speichern die nur einmal nach jeder vollen Stunde ermittelt werden
   _saveEnergyConsumption      ($centpars);                                            # Energie Hausverbrauch speichern
   _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
   _genSpecialReadings         ($centpars);                                            # optionale Statistikreadings erstellen
@@ -7837,7 +7822,7 @@ sub _collectAllRegConsumers {
 
   delete $data{$name}{current}{consumerdevs};
 
-  for my $c (1..$maxconsumer) {
+  for my $c (1..MAXCONSUMER) {
       $c = sprintf "%02d", $c;
       my ($err, $consumer, $hc, $alias) = isDeviceValid ( { name => $name, obj => "consumer${c}", method => 'attr' } );
       next if($err);
@@ -8037,15 +8022,32 @@ sub _specialActivities {
   ##################################
   $chour    = int $chour;
   $minute   = int $minute;
-  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', $aitrstartdef);                        # Stunde f. Start AI-Training
+  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', $aitrstartdef);                             # Stunde f. Start AI-Training
 
   ## Task 1
   ###########
-  if ($chour == 0 && $minute >= 0) {
+  if ($chour == 0) {
       if (!defined $hash->{HELPER}{T1RUN}) {
           $hash->{HELPER}{T1RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 1 started");
+
+          __deleteEveryHourControls ($paref);                                                     # Sperrsignale der Stundenwerte-Steuerung löschen
+
+          Log3 ($name, 4, "$name - Daily special tasks - Task 1 finished");
+      }
+  }
+  else {
+      delete $hash->{HELPER}{T1RUN};
+  }
+  
+  ## Task 2
+  ###########
+  if ($chour == 0 && $minute >= 0) {
+      if (!defined $hash->{HELPER}{T2RUN}) {
+          $hash->{HELPER}{T2RUN} = 1;
+
+          Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
 
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                         # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
@@ -8062,6 +8064,9 @@ sub _specialActivities {
           deleteReadingspec ($hash, '(Today_Hour(.*_Grid.*|.*_PV.*|.*_PPreal.*|.*_Bat.*)|powerTrigger_.*|Today_MaxPVforecast.*)');
           readingsDelete    ($hash, 'Today_PVdeviation');
           readingsDelete    ($hash, 'Today_PVreal');
+          
+          readingsDelete    ($hash, 'Error');
+          readingsDelete    ($hash, 'Errorcode');
 
           if (scalar(@widgetreadings)) {                                                          # vermeide Schleife falls FHEMWEB geöfffnet
               my @acopy       = @widgetreadings;
@@ -8083,7 +8088,7 @@ sub _specialActivities {
           delete $data{$name}{current}{sunsetToday};
           delete $data{$name}{current}{sunsetTodayTs};
           
-          for my $bn (1..$maxbatteries) {
+          for my $bn (1..MAXBATTERIES) {
               $bn = sprintf "%02d", $bn;
               delete $data{$name}{circular}{99}{'initdaybatintot'.$bn};
               delete $data{$name}{circular}{99}{'initdaybatouttot'.$bn};
@@ -8097,28 +8102,6 @@ sub _specialActivities {
           writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration sichern
 
           Log3 ($name, 3, "$name - history day >$day< deleted");
-          Log3 ($name, 4, "$name - Daily special tasks - Task 1 finished");
-      }
-  }
-  else {
-      delete $hash->{HELPER}{T1RUN};
-  }
-
-  ## Task 2
-  ###########
-  if ($chour == 0 && $minute >= 2) {
-      if (!defined $hash->{HELPER}{T2RUN}) {
-          $hash->{HELPER}{T2RUN} = 1;
-
-          Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
-
-          for my $c (keys %{$data{$name}{consumers}}) {                                  # Planungsdaten regulär löschen
-              next if(ConsumerVal ($hash, $c, "plandelete", "regular") ne "regular");
-              deleteConsumerPlanning ($hash, $c);
-          }
-
-          writeCacheToFile ($hash, "consumers", $csmcache.$name);                           # Cache File Consumer schreiben
-
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 finished");
       }
   }
@@ -8128,14 +8111,18 @@ sub _specialActivities {
 
   ## Task 3
   ###########
-  if ($chour == 0 && $minute >= 5) {
+  if ($chour == 0 && $minute >= 2) {
       if (!defined $hash->{HELPER}{T3RUN}) {
           $hash->{HELPER}{T3RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 started");
 
-          __createAdditionalEvents ($paref);                                                # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
-          __delObsoleteAPIData     ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash
+          for my $c (keys %{$data{$name}{consumers}}) {                                         # Planungsdaten regulär löschen
+              next if(ConsumerVal ($hash, $c, "plandelete", "regular") ne "regular");
+              deleteConsumerPlanning ($hash, $c);
+          }
+
+          writeCacheToFile ($hash, "consumers", $csmcache.$name);                               # Cache File Consumer schreiben
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 finished");
       }
@@ -8146,17 +8133,14 @@ sub _specialActivities {
 
   ## Task 4
   ###########
-  if ($chour == 0 && $minute >= 9) {
+  if ($chour == 0 && $minute >= 5) {
       if (!defined $hash->{HELPER}{T4RUN}) {
           $hash->{HELPER}{T4RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
 
-          __deletePvCorffReadings ($paref);                                                 # Readings der pvCorrectionFactor-Steuerung löschen
-          
-          if (AttrVal ($name, 'ctrlBackupFilesKeep', 3)) {
-              periodicWriteMemcache ($hash, 'bckp');                                        # Backup Files erstellen und alte Versionen löschen (unterbleibt bei ctrlBackupFilesKeep == 0)
-          }
+          __createAdditionalEvents ($paref);                                                   # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
+          __delObsoleteAPIData     ($paref);                                                   # Bereinigung obsoleter Daten im solcastapi Hash
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
       }
@@ -8167,17 +8151,15 @@ sub _specialActivities {
 
   ## Task 5
   ###########
-  if ($chour == $aitrh && $minute >= 15) {
+  if ($chour == 0 && $minute >= 9) {
       if (!defined $hash->{HELPER}{T5RUN}) {
           $hash->{HELPER}{T5RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 5 started");
-
-          aiDelRawData ($paref);                                                            # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
-
-          $paref->{taa} = 1;
-          aiAddInstance ($paref);                                                           # AI füllen, trainieren und sichern
-          delete $paref->{taa};
+          
+          if (AttrVal ($name, 'ctrlBackupFilesKeep', 3)) {
+              periodicWriteMemcache ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen (unterbleibt bei ctrlBackupFilesKeep == 0)
+          }
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 5 finished");
       }
@@ -8186,22 +8168,47 @@ sub _specialActivities {
       delete $hash->{HELPER}{T5RUN};
   }
 
+  ## Task 6
+  ###########
+  if ($chour == $aitrh && $minute >= 15) {
+      if (!defined $hash->{HELPER}{T6RUN}) {
+          $hash->{HELPER}{T6RUN} = 1;
+
+          Log3 ($name, 4, "$name - Daily special tasks - Task 6 started");
+
+          aiDelRawData ($paref);                                                            # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
+
+          $paref->{taa} = 1;
+          aiAddInstancePV ($paref);                                                         # AI PV-Forecast füllen, trainieren und sichern
+          delete $paref->{taa};
+
+          Log3 ($name, 4, "$name - Daily special tasks - Task 6 finished");
+      }
+  }
+  else {
+      delete $hash->{HELPER}{T6RUN};
+  }
+
 return;
 }
 
 #############################################################################
 #         Readings der pvCorrectionFactor-Steuerung löschen
 #############################################################################
-sub __deletePvCorffReadings  {
+sub __deleteEveryHourControls  {
   my $paref = shift;
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
 
-  for my $n (1..24) {
+  for my $n (0..24) {
       $n = sprintf "%02d", $n;
 
-      readingsDelete ($hash, ".pvCorrectionFactor_${n}_cloudcover");
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ##########################################################################################################################
+      readingsDelete ($hash, ".pvCorrectionFactor_${n}_cloudcover");                 # 01.02.2025
       readingsDelete ($hash, ".pvCorrectionFactor_${n}_apipercentil");
+  ##########################################################################################################################
+      
       readingsDelete ($hash, ".signaldone_${n}");
 
       if (ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off') =~ /on/xs) {
@@ -8348,7 +8355,7 @@ sub _transferWeatherValues {
   $data{$name}{current}{dwdWfchAge}   = $fctime;
   $data{$name}{current}{dwdWfchAgeTS} = $fctimets;
 
-  for my $step (1..$weatherDevMax) {
+  for my $step (1..MAXWEATHERDEV) {
       $paref->{step} = $step;
       __readDataWeather ($paref);                                                              # Wetterdaten in einen Hash einlesen
        delete $paref->{step};
@@ -8522,7 +8529,7 @@ sub __mergeDataWeather {
 
   my $ds = 0;
 
-  for my $wd (1..$weatherDevMax) {
+  for my $wd (1..MAXWEATHERDEV) {
       my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$wd);              # Weather Forecast Device
       $ds++ if($valid);
   }
@@ -8658,7 +8665,7 @@ sub _transferInverterValues {
   my $pvsum        = 0;                                                 # Summe aktuelle PV aller Inverter
   my $ethishoursum = 0;                                                 # Summe Erzeugung akt. Stunde aller Inverter
   
-  for my $in (1..$maxinverter) {
+  for my $in (1..MAXINVERTER) {
       $in = sprintf "%02d", $in;
       
       my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
@@ -8741,7 +8748,7 @@ sub _transferInverterValues {
   $data{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishoursum;                                          # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
   
   push @{$data{$name}{current}{genslidereg}}, $pvsum;                                                            # Schieberegister PV Erzeugung
-  limitArray ($data{$name}{current}{genslidereg}, $slidenummax);
+  limitArray ($data{$name}{current}{genslidereg}, SLIDENUMMAX);
 
   writeToHistory ( { paref => $paref, key => 'pvrl', val => $ethishoursum, hour => $nhour, valid => $aln } );    # valid=1: beim Learning berücksichtigen, 0: nicht
 
@@ -9212,7 +9219,7 @@ sub _transferProducerValues {
 
   my $hash  = $defs{$name};
 
-  for my $pn (1..$maxproducer) {
+  for my $pn (1..MAXPRODUCER) {
       $pn = sprintf "%02d", $pn;
       my ($err, $prdev, $h) = isDeviceValid ( { name => $name, obj => 'setupOtherProducer'.$pn, method => 'attr' } );
       next if($err);
@@ -9512,7 +9519,7 @@ sub _transferBatteryValues {
   delete $data{$name}{current}{batpoweroutsum}; 
   delete $data{$name}{current}{batcapsum};  
   
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
   
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
@@ -9676,7 +9683,7 @@ sub _transferBatteryValues {
   if ($num) {
       my $soctotal = sprintf "%.0f", ($socwhsum / $bcapsum * 100) if($bcapsum);            # resultierender SoC (%) aller Batterien als "eine" 
       push @{$data{$name}{current}{batsocslidereg}}, $soctotal;                            # Schieberegister average SOC aller Batterien
-      limitArray ($data{$name}{current}{batsocslidereg}, $slidenummax);
+      limitArray ($data{$name}{current}{batsocslidereg}, SLIDENUMMAX);
   
       $data{$name}{current}{batpowerinsum}  = $pbisum;                                     # summarische laufende Batterieladung
       $data{$name}{current}{batpoweroutsum} = $pbosum;                                     # summarische laufende Batterieentladung
@@ -9699,7 +9706,7 @@ sub _batSocTarget {
   
   my $hash = $defs{$name};
   
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
   
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
@@ -9722,7 +9729,7 @@ sub _batSocTarget {
       $paref->{batnmb}    = $bn;
       $paref->{careCycle} = $careCycle;
       
-      __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $soc >= $maxsoc || $soc >= $maxSoCdef || $oldd2care < 0);
+      __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $soc >= $maxsoc || $soc >= MAXSOCDEF || $oldd2care < 0);
 
       my $nt         = '';
       my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
@@ -9732,8 +9739,8 @@ sub _batSocTarget {
       my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc'.$bn,       0);                 # gespeicherter max. SOC des Vortages
       my $batysetsoc = HistoryVal ($hash, $yday, 99, 'batsetsoc'.$bn, $lowSoc);                 # gespeicherter SOC Sollwert des Vortages
       
-      $target = $batymaxsoc <  $maxsoc ? $batysetsoc + $batSocChgDay :
-                $batymaxsoc >= $maxsoc ? $batysetsoc - $batSocChgDay :
+      $target = $batymaxsoc <  $maxsoc ? $batysetsoc + BATSOCCHGDAY :
+                $batymaxsoc >= $maxsoc ? $batysetsoc - BATSOCCHGDAY :
                 $batysetsoc;                                                                    # neuer Min SOC für den laufenden Tag
 
       ## erwartete PV ermitteln & Anteilsfaktor Bat an Gesamtbatteriekapazität anwenden
@@ -9753,7 +9760,7 @@ sub _batSocTarget {
           Log3 ($name, 1, "$name DEBUG> Bat $bn SoC Step1 - compare with SoC history -> preliminary new Target: $target %");
       }
       
-      ## Pflege-SoC (Soll SoC $maxSoCdef bei $batSocChgDay % Steigerung p. Tag)
+      ## Pflege-SoC (Soll SoC MAXSOCDEF bei BATSOCCHGDAY % Steigerung p. Tag)
       ###########################################################################
       my $sunset  = CurrentVal ($hash, 'sunsetTodayTs', $t);
       my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
@@ -9764,7 +9771,8 @@ sub _batSocTarget {
       my $days2care = floor       (($ntsmsc - $t) / 86400);                                    # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
       my $docare    = 0;                                                                       # keine Zwangsanwendung care SoC
       
-      my $whneed    = ($maxsoc / 100 * $batinstcap) - ($soc / 100 * $batinstcap);        # benötigte Ladeenergie in Wh bis $maxsoc
+      my $whneed    = ($maxsoc / 100 * $batinstcap) - ($soc / 100 * $batinstcap);              # benötigte Ladeenergie in Wh bis $maxsoc
+      $whneed       = $whneed < 0 ? 0 : $whneed;
       $whneed       = sprintf "%.0f", $whneed;
       
       if ($t > $delayts || $pvexpect < $whneed || !$days2care) {
@@ -9772,7 +9780,7 @@ sub _batSocTarget {
           __batSaveSocKeyFigures ($paref);
           delete $paref->{days2care};
 
-          $careSoc = $maxsoc - ($days2care * $batSocChgDay);                                   # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
+          $careSoc = $maxsoc - ($days2care * BATSOCCHGDAY);                                    # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
           $careSoc = $careSoc < $lowSoc ? $lowSoc : $careSoc;
           
           if ($careSoc >= $target) {
@@ -9878,8 +9886,8 @@ sub __parseAttrBatSoc {
   my ($pa,$ph)  = parseParams ($cgbt);
   my $lowSoc    = $ph->{lowSoc};
   my $upSoc     = $ph->{upSoC};
-  my $maxsoc    = $ph->{maxSoC}    // $maxSoCdef;                            # optional (default: $maxSoCdef)
-  my $careCycle = $ph->{careCycle} // $carecycledef;                         # Ladungszyklus (Maintenance) für maxSoC in Tagen
+  my $maxsoc    = $ph->{maxSoC}    // MAXSOCDEF;                                          # optional (default: MAXSOCDEF)
+  my $careCycle = $ph->{careCycle} // CARECYCLEDEF;                                       # Ladungszyklus (Maintenance) für maxSoC in Tagen
 
 return ($lowSoc, $upSoc, $maxsoc, $careCycle);
 }
@@ -9927,6 +9935,7 @@ sub _batChargeRecmd {
   my $paref = shift;
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
+  my $t     = $paref->{t};
   
   return if(!isBatteryUsed ($name));
   
@@ -9941,7 +9950,7 @@ sub _batChargeRecmd {
   
   ## Inverter Limits ermitteln
   ##############################
-  for my $in (1..$maxinverter) {                           
+  for my $in (1..MAXINVERTER) {                           
       $in       = sprintf "%02d", $in;
       my $iname = InverterVal ($hash, $in, 'iname', '');
       next if(!$iname); 
@@ -9961,7 +9970,7 @@ sub _batChargeRecmd {
   
   ## Schleife über alle Batterien
   #################################
-  for my $bn (1..$maxbatteries) {                                                                # für jede Batterie
+  for my $bn (1..MAXBATTERIES) {                                                                # für jede Batterie
       $bn = sprintf "%02d", $bn;
   
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
@@ -10039,10 +10048,12 @@ sub _batChargeRecmd {
           ## Ladefreigabe
           #################
           my $whneed   = $batinstcap - $socwh;
+          my $maxfctim = timestringToTimestamp (ReadingsVal ($name, 'Today_MaxPVforecastTime', '')) // $t;
+          
           my $sfmargin = $whneed * 0.25;                                                         # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
           
-          if ( $whneed + $sfmargin >= $spday  )      {$crel = 1}                                 # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-          if ( !$num && $pvCu - $curcon >= $inplim ) {$crel = 1}                                 # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
+          if ( $whneed + $sfmargin >= $spday || $t >  $maxfctim) {$crel = 1}                     # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+          if ( !$num && ($pvCu - $curcon) >= $inplim )           {$crel = 1}                     # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
           
           ## SOC-Prognose
           #################                                                                         
@@ -10199,7 +10210,7 @@ sub _createSummaries {
   my $pvre = int $todaySumRe->{PV};
 
   push @{$data{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                                # Schieberegister 4h Summe Forecast
-  limitArray ($data{$name}{current}{h4fcslidereg}, $slidenummax);
+  limitArray ($data{$name}{current}{h4fcslidereg}, SLIDENUMMAX);
 
   my $gcon    = CurrentVal ($hash, 'gridconsumption',         0);                                       # aktueller Netzbezug
   my $tconsum = CurrentVal ($hash, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
@@ -10208,7 +10219,7 @@ sub _createSummaries {
   my $batin  = 0;
   my $batout = 0;
   
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
       $batin  += BatteryVal ($hash, $bn, 'bpowerin',  0);                                               # Summe momentane Batterieladung
       $batout += BatteryVal ($hash, $bn, 'bpowerout', 0);                                               # Summe momentane Batterieentladung
@@ -10217,7 +10228,7 @@ sub _createSummaries {
   my $pvgen   = 0;
   my $pv2grid = 0;                                                                                      # PV-Erzeugung zu Grid-only
 
-  for my $in (1..$maxinverter) {                                                                        # Summe alle Inverter
+  for my $in (1..MAXINVERTER) {                                                                        # Summe alle Inverter
       $in      = sprintf "%02d", $in;
       my $pvi  = InverterVal ($hash, $in, 'igeneration', 0);
       my $feed = InverterVal ($hash, $in, 'ifeed',      '');
@@ -10227,7 +10238,7 @@ sub _createSummaries {
   
   my $othprod = 0;                                                                                      # Summe Otherproducer
 
-  for my $pn (1..$maxproducer) {                                                                        # Erzeugung sonstiger Producer hinzufügen
+  for my $pn (1..MAXPRODUCER) {                                                                        # Erzeugung sonstiger Producer hinzufügen
       $pn       = sprintf "%02d", $pn;
       $othprod += ProducerVal ($hash, $pn, 'pgeneration', 0);
   }
@@ -10253,7 +10264,7 @@ sub _createSummaries {
   $data{$name}{current}{surplus}             = $surplus;
   
   push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
-  limitArray ($data{$name}{current}{surplusslidereg}, $splslidenummax);
+  limitArray ($data{$name}{current}{surplusslidereg}, SPLSLIDEMAX);
 
   storeReading ('Current_GridFeedIn',           (int $gfeedin).       ' W');                            # V 1.37.0
   storeReading ('Current_GridConsumption',      (int $gcon).          ' W');                            # V 1.37.0
@@ -12108,7 +12119,7 @@ sub __evaluateArray {
   my @aa    = ();
   @aa       = @{$aaref} if (ref $aaref eq 'ARRAY');
 
-  return if(scalar @aa < $slidenummax);
+  return if(scalar @aa < SLIDENUMMAX);
 
   my $gen1   = $aa[0];
   my $gen2   = $aa[1];
@@ -12209,10 +12220,13 @@ return;
 }
 
 ################################################################
-#  Korrekturen und Qualität berechnen / speichern
-#  sowie AI Quellen Daten hinzufügen
+#  Werte berechnen und speichern die nach jeder vollen Stunde
+#  nur einmal ermittelt werden:
+#  - PV-Prognosekorrekturfaktoren und deren Qualität 
+#  - AI Quellendaten hinzufügen
+#  - Verbrauchswerte für Medianauswertung
 ################################################################
-sub _calcValueImproves {
+sub _calcDataEveryFullHour {
   my $paref = shift;
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
@@ -12248,20 +12262,37 @@ sub _calcValueImproves {
   $paref->{acu} = $acu;
   $paref->{aln} = $aln;
 
-  for my $h (1..23) {
-      next if(!$chour || $h > $chour);
-
-      $paref->{cpcf}  = ReadingsVal ($name, 'pvCorrectionFactor_'.sprintf("%02d",$h), '');        # aktuelles pvCorf-Reading
-      $paref->{aihit} = CircularVal ($hash, sprintf("%02d",$h), 'aihit',  0);                     # AI verwendet?
+  for my $h (0..23) {
+      next if($h > $chour);
+      
+      if (int $chour == 0) {                                                                      # 00:XX -> Stunde 24 des Vortages speichern
+          my $dt             = timestringsFromOffset ($t, 3600);
+          $paref->{yt}       = $t - 3600;                                                         # Timestamp Vortag
+          $paref->{yday}     = $dt->{day};                                                        # vorheriger Tag (range 01 .. 31)
+          $paref->{ydayname} = $dt->{dayname};
+          $h                 = 24;                                                                # Stunde 24 am Vortag!
+      }
+      
+      my $hh          = sprintf "%02d", $h;
+      $paref->{cpcf}  = ReadingsVal ($name, 'pvCorrectionFactor_'.$hh, '');                       # aktuelles pvCorf-Reading
+      $paref->{aihit} = CircularVal ($hash, $hh, 'aihit',  0);                                    # AI verwendet?
       $paref->{h}     = $h;
 
-      _calcCaQcomplex   ($paref);                                                                 # Korrekturberechnung mit Bewölkung duchführen/speichern
+      next if(ReadingsVal ($name, '.signaldone_'.$hh, '') eq "done");      
+      
       _calcCaQsimple    ($paref);                                                                 # einfache Korrekturberechnung duchführen/speichern
+      _calcCaQcomplex   ($paref);                                                                 # Korrekturberechnung mit Bewölkung duchführen/speichern
       _addHourAiRawdata ($paref);                                                                 # AI Raw Data hinzufügen
+      _addCon2CircArray ($paref);                                                                 # Hausverbrauch der vergangenen Stunde zum con-Array im Circular Speicher hinzufügen
+      
+      storeReading ('.signaldone_'.$hh, 'done');                                                  # Sperrsignal (erledigt) setzen
 
       delete $paref->{h};
       delete $paref->{cpcf};
       delete $paref->{aihit};
+      delete $paref->{yday};
+      delete $paref->{ydayname};
+      delete $paref->{yt};
   }
 
   delete $paref->{aln};
@@ -12285,16 +12316,9 @@ sub _calcCaQcomplex {
   my $aihit = $paref->{aihit};
 
   my $hash = $defs{$name};
-  my $sr   = ReadingsVal ($name, '.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', '');
-
-  if ($sr eq 'done') {
-      # Log3 ($name, 1, "$name DEBUG> Complex Corrf -> factor Hour: ".sprintf("%02d",$h)." already calculated");
-      return;
-  }
 
   if (!$aln) {
-      storeReading ('.pvCorrectionFactor_'.sprintf("%02d",$h).'_cloudcover', 'done');
-      debugLog     ($paref, 'pvCorrectionWrite', "Autolearning is switched off for hour: $h -> skip the recalculation of the complex correction factor");
+      debugLog ($paref, 'pvCorrectionWrite', "Autolearning is switched off for hour: $h -> skip the recalculation of the complex correction factor");
       return;
   }
   
@@ -12303,7 +12327,6 @@ sub _calcCaQcomplex {
   my $pvfc  = CircularVal ($hash, $hh, 'pvapifc', 0);                                  # vorhergesagte PV Energie am Ende der vorherigen Stunde
 
   if (!$pvrl || !$pvfc) {
-      storeReading ('.pvCorrectionFactor_'.$hh.'_cloudcover', 'done');
       return;
   }
 
@@ -12325,21 +12348,13 @@ sub _calcCaQcomplex {
   $paref->{sabin}  = $sabin;
   $paref->{calc}   = 'Complex';
 
-  my ($oldfac, $factor, $dnum);
-  if (!ReadingsVal ($name, '.migrated', 0)) {                                         # Daten wurden noch nicht migriert
-      ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
-  }
-  else {
-      ($oldfac, $factor, $dnum) = __calcNewFactor_migrated ($paref);
-  }
+  my ($oldfac, $factor, $dnum) = __calcNewFactor_migrated ($paref);                  # migrierte Daten verwenden
 
   delete $paref->{pvrl};
   delete $paref->{pvfc};
   delete $paref->{crang};
   delete $paref->{sabin};
   delete $paref->{calc};
-
-  storeReading ('.pvCorrectionFactor_'.$hh.'_cloudcover', 'done');
 
   $aihit = $aihit ? ' AI result used,' : '';
 
@@ -12371,16 +12386,9 @@ sub _calcCaQsimple {
 
   my $hash = $defs{$name};
   my $hh   = sprintf "%02d", $h;
-  my $sr   = ReadingsVal ($name, '.pvCorrectionFactor_'.$hh.'_apipercentil', '');
-
-  if($sr eq "done") {
-      # debugLog ($paref, 'pvCorrectionWrite', "Simple Corrf factor Hour: ".$hh." already calculated");
-      return;
-  }
 
   if (!$aln) {
-      storeReading ('.pvCorrectionFactor_'.$hh.'_apipercentil', 'done');
-      debugLog     ($paref, 'pvCorrectionWrite', "Autolearning is switched off for hour: $h -> skip the recalculation of the simple correction factor");
+      debugLog ($paref, 'pvCorrectionWrite', "Autolearning is switched off for hour: $h -> skip the recalculation of the simple correction factor");
       return;
   }
 
@@ -12388,7 +12396,6 @@ sub _calcCaQsimple {
   my $pvfc = CircularVal ($hash, $hh, 'pvapifc', 0);
 
   if (!$pvrl || !$pvfc) {
-      storeReading ('.pvCorrectionFactor_'.$hh.'_apipercentil', 'done');
       return;
   }
 
@@ -12401,21 +12408,13 @@ sub _calcCaQsimple {
   $paref->{crang} = 'simple';
   $paref->{calc}  = 'Simple';
 
-  my ($oldfac, $factor, $dnum);
-  if (!ReadingsVal ($name, '.migrated', 0)) {                                         # Daten wurden noch nicht migriert
-      ($oldfac, $factor, $dnum) = __calcNewFactor ($paref);
-  }
-  else {
-      ($oldfac, $factor, $dnum) = __calcNewFactor_migrated ($paref);
-  }
-
+  my ($oldfac, $factor, $dnum) = __calcNewFactor_migrated ($paref);                   # migrierte Daten verwenden
+      
   delete $paref->{pvrl};
   delete $paref->{pvfc};
   delete $paref->{sabin};
   delete $paref->{crang};
   delete $paref->{calc};
-
-  storeReading ('.pvCorrectionFactor_'.$hh.'_apipercentil', 'done');
 
   $aihit = $aihit ? ' AI result used,' : '';
 
@@ -12432,91 +12431,34 @@ return;
 }
 
 ################################################################
-#    den neuen Korrekturfaktur berechnen
+#  den Hausverbrauch der vergangenen Stunde zum con-Array
+#  im Circular Speicher hinzufügen
 ################################################################
-sub __calcNewFactor {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $pvrl  = $paref->{pvrl};
-  my $pvfc  = $paref->{pvfc};
-  my $crang = $paref->{crang};
-  my $sabin = $paref->{sabin};
-  my $h     = $paref->{h};
-  my $calc  = $paref->{calc};
+sub _addCon2CircArray {
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $h        = $paref->{h};
+  my $yday     = $paref->{yday};                                              # vorheriger Tag (falls gesetzt)
+  my $day      = $paref->{day};                                               # aktueller Tag (range 01 to 31)
+  my $dayname  = $paref->{dayname}; 
+  my $ydayname = $paref->{ydayname};
 
-  my $factor;
-  my $hash    = $defs{$name};
-  my $pvrlsum = $pvrl;
-  my $pvfcsum = $pvfc;
+  my $hash  = $defs{$name};
 
-  debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> Start calculation correction factor for hour: $h");
-
-  my $hh                     = sprintf "%02d", $h;
-  my ($oldfac, $oldq)        = CircularSunCloudkorrVal ($hash, $hh, $sabin, $crang, 0);                # bisher definierter Korrekturfaktor / Qualität
-  my ($pvhis, $fchis, $dnum) = CircularSumVal          ($hash, $hh, $sabin, $crang, 0);
-  $oldfac                    = 1 if(1 * $oldfac == 0);                                            
+  $day      = $yday     if(defined $yday);                                    # der vergangene Tag soll verarbeitet werden
+  $dayname  = $ydayname if(defined $ydayname);                                # Name des Vortages
+  my $hh    = sprintf "%02d", $h;
+  my $con   = HistoryVal ($hash, $day, $hh, 'con', 0);                        # Consumption der abgefragten Stunde
   
-  debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read historical values: pv real sum: $pvhis, pv forecast sum: $fchis, days sum: $dnum");
-
-  if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !
-      $dnum++;
-      $pvrlsum = $pvrl + $pvhis;
-      $pvfcsum = $pvfc + $fchis;
-      $pvrl    = $pvrlsum / $dnum;
-      $pvfc    = $pvfcsum / $dnum;
-      $factor  = sprintf "%.2f", ($pvrl / $pvfc);                                                     # Faktorberechnung: reale PV / Prognose
-  }
-  elsif ($oldfac && (!$pvhis || !$fchis)) {                                                           # Circular Hash liefert einen vorhandenen Korrekturfaktor aber keine gespeicherten PV-Werte
-      $dnum   = 1;
-      $factor = sprintf "%.2f", ($pvrl / $pvfc);
-      $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
-  }
-  else {                                                                                              # ganz neuer Wert
-      $dnum    = 1;
-      $factor  = sprintf "%.2f", ($pvrl / $pvfc);
-  }
-
-  $factor = 1.00 if(1 * $factor == 0);                                                                # 0.00-Werte ignorieren (Schleifengefahr)
-
-  if (abs($factor - $oldfac) > $defmaxvar) {
-      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $defmaxvar : $oldfac - $defmaxvar);
-      Log3 ($name, 3, "$name - new $calc correction factor calculated (limited by maximum Day Variance): $factor (old: $oldfac) for hour: $h");
-  }
-  else {
-      Log3 ($name, 3, "$name - new $calc correction factor for hour $h calculated: $factor (old: $oldfac)");
-  }
-
-  $pvrl    = sprintf "%.0f", $pvrl;
-  $pvfc    = sprintf "%.0f", $pvfc;
-  my $qual = __calcFcQuality ($pvfc, $pvrl);                                                          # Qualität der Vorhersage für die vergangene Stunde
-
-  debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
-  debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual, days: $dnum");
-
-  if ($crang ne 'simple') {
-      my $idx = $sabin.'.'.$crang;                                                                    # value für pvcorrf Sonne Altitude
-      $data{$name}{circular}{$hh}{pvrlsum}{$idx} = $pvrlsum;                                          # PV Erzeugung Summe speichern
-      $data{$name}{circular}{$hh}{pvfcsum}{$idx} = $pvfcsum;                                          # PV Prognose Summe speichern
-      $data{$name}{circular}{$hh}{dnumsum}{$idx} = $dnum;                                             # Anzahl aller historischen Tade dieser Range
-      $data{$name}{circular}{$hh}{pvcorrf}{$idx} = $factor;
-      $data{$name}{circular}{$hh}{quality}{$idx} = $qual;
-  }
-  else {
-      $data{$name}{circular}{$hh}{pvrlsum}{$crang} = $pvrlsum;
-      $data{$name}{circular}{$hh}{pvfcsum}{$crang} = $pvfcsum;
-      $data{$name}{circular}{$hh}{dnumsum}{$crang} = $dnum;
-      $data{$name}{circular}{$hh}{pvcorrf}{$crang} = $factor;
-      $data{$name}{circular}{$hh}{quality}{$crang} = $qual;
-  }
+  push @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}, $con;             # Wert zum Speicherarray hinzufügen
   
-  $oldfac = sprintf "%.2f", $oldfac;
-  
-return ($oldfac, $factor, $dnum);
+  debugLog ($paref, 'saveData2Cache', "add consumption into Array (con_all) in Circular - day: $day, hod: $hh, con: $con");
+
+return;
 }
 
 ################################################################
-#    den neuen Korrekturfaktur berechnen (neue Funktion)
+#   den neuen Korrekturfaktur berechnen (neue Median Funktion)
 ################################################################
 sub __calcNewFactor_migrated {
   my $paref = shift;
@@ -12574,8 +12516,8 @@ sub __calcNewFactor_migrated {
 
   ## max. Faktorsteigerung berücksichtigen
   ##########################################
-  if (abs($factor - $oldfac) > $defmaxvar) {
-      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $defmaxvar : $oldfac - $defmaxvar);
+  if (abs($factor - $oldfac) > DEFMAXVAR) {
+      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + DEFMAXVAR : $oldfac - DEFMAXVAR);
       Log3 ($name, 3, "$name - new $calc correction factor calculated (limited by maximum Day Variance): $factor (old: $oldfac) for hour: $hh");
   }
   else {
@@ -12589,8 +12531,8 @@ sub __calcNewFactor_migrated {
   $pvfc    = sprintf "%.0f", $pvfc;
   my $qual = __calcFcQuality ($pvfc, $pvrl);                                                             # Qualität der Vorhersage für die vergangene Stunde
 
-  debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
-  debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual, days: $dnum");
+  debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $hh, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
+  debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $hh, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual, days: $dnum");
 
   ## neue Werte speichern
   #########################
@@ -12648,7 +12590,7 @@ sub _saveEnergyConsumption {
   my $batin  = 0;
   my $batout = 0;
   
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
       $batin  += ReadingsNum ($name, 'Today_Hour'.$shr.'_BatIn_'.$bn,  0);
       $batout += ReadingsNum ($name, 'Today_Hour'.$shr.'_BatOut_'.$bn, 0);
@@ -12656,7 +12598,7 @@ sub _saveEnergyConsumption {
   
   my $ppreal  = 0;
 
-  for my $prn (1..$maxproducer) {                                               # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
+  for my $prn (1..MAXPRODUCER) {                                               # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
       $prn     = sprintf "%02d", $prn;
       $ppreal += ReadingsNum ($name, 'Today_Hour'.$shr.'_PPreal_'.$prn, 0);
   }
@@ -12797,7 +12739,7 @@ sub _genSpecialReadings {
           if ($kpi eq 'todayBatInSum') {                                                                       # Summe tägl. Ladeenergie (alle Batterien) 
               my $tdbisum = 0;
               
-              for my $bn (1..$maxbatteries) {
+              for my $bn (1..MAXBATTERIES) {
                   $bn = sprintf "%02d", $bn;              
               
                   my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot'.$bn, $def);     # initialer Tagesstartwert Batterie In total
@@ -12812,7 +12754,7 @@ sub _genSpecialReadings {
           if ($kpi eq 'todayBatOutSum') {                                                                      # Summe tägl. Entadeenergie (alle Batterien) 
               my $tdbosum = 0;
               
-              for my $bn (1..$maxbatteries) {
+              for my $bn (1..MAXBATTERIES) {
                   $bn = sprintf "%02d", $bn;              
               
                   my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot'.$bn, $def);    # initialer Tagesstartwert Batterie Out total
@@ -12947,8 +12889,8 @@ return;
 }
 
 ###################################################################################
-#      Messagefile für Notification System lesen
-#  Filestruktur:
+#      Erstellen System-Messages für Notification System
+#  Struktur:
 #  0|SV|1
 #  0|DE|Mitteilung ....
 #  0|EN|Message...
@@ -12962,14 +12904,14 @@ sub _readSystemMessages {
   
   my $midx = 0; 
 
-  if (!ReadingsVal ($name, '.migrated', 0)) {
-      $midx++;
-      $data{$name}{preparedmessages}{$midx}{SV}  = 1;
-      $data{$name}{preparedmessages}{$midx}{DE}  = 'Die gespeicherten PV Daten können mit "get ... x_migrate" in ein neues Format umgesetzt werden welches den Median Ansatz bei der PV Prognose aktiviert und nutzt.';
-      $data{$name}{preparedmessages}{$midx}{DE} .= '<br>Mit einem späteren Update des Moduls erfolgt diese Umstellung automatisch.';
-      $data{$name}{preparedmessages}{$midx}{EN}  = 'The stored PV data can be converted with “get ... x_migrate” into a new format which activates and uses the median approach in the PV forecast.';
-      $data{$name}{preparedmessages}{$midx}{EN} .= '<br>With a later update of the module, this changeover will take place automatically.';
-  }
+  #if (!ReadingsVal ($name, '.migrated', 0)) {
+  #    $midx++;
+  #    $data{$name}{preparedmessages}{$midx}{SV}  = 1;
+  #    $data{$name}{preparedmessages}{$midx}{DE}  = 'Die gespeicherten PV Daten können mit "get ... x_migrate" in ein neues Format umgesetzt werden welches den Median Ansatz bei der PV Prognose aktiviert und nutzt.';
+  #    $data{$name}{preparedmessages}{$midx}{DE} .= '<br>Mit einem späteren Update des Moduls erfolgt diese Umstellung automatisch.';
+  #    $data{$name}{preparedmessages}{$midx}{EN}  = 'The stored PV data can be converted with “get ... x_migrate” into a new format which activates and uses the median approach in the PV forecast.';
+  #    $data{$name}{preparedmessages}{$midx}{EN} .= '<br>With a later update of the module, this changeover will take place automatically.';
+  #}
   
   $data{$name}{preparedmessages}{999500}{TS} = time;
 
@@ -14595,7 +14537,7 @@ sub _beamGraphicFirstHour {
   
   ## Batterien Selektionshash erstellen
   #######################################
-  for my $bn (1..$maxbatteries) {                                                                                          
+  for my $bn (1..MAXBATTERIES) {                                                                                          
       $bn               = sprintf "%02d", $bn;
       $hbsocs->{0}{$bn} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0);
   }
@@ -14716,7 +14658,7 @@ sub _beamGraphicRemainingHours {
 
               ## Batterien Selektionshash erstellen
               #######################################  
-              for my $bn (1..$maxbatteries) {                                                                                     
+              for my $bn (1..MAXBATTERIES) {                                                                                     
                   $bn                = sprintf "%02d", $bn;
                   $hbsocs->{$i}{$bn} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0);
               }              
@@ -14744,7 +14686,7 @@ sub _beamGraphicRemainingHours {
           
           ## Batterien Selektionshash anreichern
           ########################################
-          for my $bn (1..$maxbatteries) {                                                                                     
+          for my $bn (1..MAXBATTERIES) {                                                                                     
               $bn                = sprintf "%02d", $bn;
               $hbsocs->{$i}{$bn} = NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0);
           }
@@ -15261,13 +15203,13 @@ sub __batteryOnBeam {
   my $hh;
 
   for my $idx (sort keys %{$data{$name}{nexthours}}) {
-      for my $bn (1..$maxbatteries) {                                            # alle Batterien
+      for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
           $bn      = sprintf "%02d", $bn;
           my $rcdc = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, undef);
           my $stt  = NexthoursVal ($name, $idx, 'starttime',        undef);
           next if(!defined $stt || !defined $rcdc);
           
-          my (undef,undef,$day_str,$time_str) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
+          my (undef,undef,$day_str,$time_str) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})/xs;
           
           $hh->{$day_str}{$time_str}{'rcdchargebat'.$bn} = $rcdc;
           $hh->{$day_str}{$time_str}{'soc'.$bn}          = NexthoursVal ($name, $idx, 'soc'.$bn, undef);
@@ -15282,7 +15224,7 @@ sub __batteryOnBeam {
       
       next if(!defined $ds || !defined $ts);
       
-      for my $bn (1..$maxbatteries) {
+      for my $bn (1..MAXBATTERIES) {
           $bn = sprintf "%02d", $bn;
           $ds = sprintf "%02d", $ds;
           
@@ -15311,7 +15253,7 @@ sub __batteryOnBeam {
   my $chour = strftime "%H", localtime($t);                                                           # aktuelle Stunde in 24h format (00-23) 
   my $ret   = q{};
   
-  for my $bn (1..$maxbatteries) {                                                                     # für jede definierte Batterie
+  for my $bn (1..MAXBATTERIES) {                                                                     # für jede definierte Batterie
       $bn = sprintf "%02d", $bn;
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
@@ -15428,7 +15370,7 @@ sub _flowGraphic {
   my $socwhsum = 0;
   my $soc      = 0;
   
-  for my $bn (1..$maxbatteries) {                                                   # für jede definierte Batterie
+  for my $bn (1..MAXBATTERIES) {                                                   # für jede definierte Batterie
       $bn                   = sprintf "%02d", $bn;
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
@@ -15472,7 +15414,7 @@ sub _flowGraphic {
   my $pv2bat  = 0;
   my $lfn     = 0;
 
-  for my $pn (1..$maxproducer) {
+  for my $pn (1..MAXPRODUCER) {
       $pn      = sprintf "%02d", $pn;
       my $p    = ProducerVal ($hash, $pn, 'pgeneration',    undef);
       my $feed = ProducerVal ($hash, $pn, 'pfeed',      'default');
@@ -15489,7 +15431,7 @@ sub _flowGraphic {
       }
   }
       
-  for my $in (1..$maxinverter) {
+  for my $in (1..MAXINVERTER) {
       $in      = sprintf "%02d", $in;
       my $p    = InverterVal ($hash, $in, 'igeneration',    undef);
       my $feed = InverterVal ($hash, $in, 'ifeed',      'default');
@@ -16464,27 +16406,21 @@ sub _addHourAiRawdata {
 
   my $hash = $defs{$name};
   my $rho  = sprintf "%02d", $h;
-  my $sr   = ReadingsVal ($name, ".signaldone_".$rho, "");
-
-  return if($sr eq "done");
 
   if (!$aln) {
-      storeReading ('.signaldone_'.sprintf("%02d",$h), 'done');
       debugLog     ($paref, 'pvCorrectionRead', "Autolearning is switched off for hour: $h -> skip add AI raw data");
       return;
   }
 
   debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
 
-  $paref->{ood} = 1;                                              # Only One Day
+  $paref->{ood} = 1;                                              # only one Day
   $paref->{rho} = $rho;
 
   aiAddRawData ($paref);                                          # Raw Daten für AI hinzufügen und sichern
 
   delete $paref->{ood};
   delete $paref->{rho};
-
-  storeReading ('.signaldone_'.sprintf("%02d",$h), 'done');
 
 return;
 }
@@ -16555,7 +16491,7 @@ sub _retrieveMessageFile {
   }
   
   if ($valid) {
-      $err = __updWriteFile ("$root/FHEM/", $messagefile, $remfile);
+      $err = __updWriteFile ("$root/FHEM", $messagefile, $remfile);
 
       if ($err) {
           $valid = 0;
@@ -16580,7 +16516,7 @@ return;
 sub _processMessageFile {
   my $serial = decode_base64 (shift);
 
-  my $paref = eval { thaw ($serial) };                                             # Deserialisierung
+  my $paref = eval { thaw ($serial) };                                                  # Deserialisierung
   my $name  = $paref->{name};
   my $valid = $paref->{valid};
   my $hash  = $defs{$name};
@@ -16912,7 +16848,7 @@ return;
 ################################################################
 #     KI Instanz(en) aus Raw Daten Hash erzeugen
 ################################################################
-sub aiAddInstance {                   ## no critic "not used"
+sub aiAddInstancePV {                   ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $type  = $paref->{type};
@@ -16956,7 +16892,7 @@ sub aiAddInstance {                   ## no critic "not used"
                                   );
              1;
            }
-           or do { Log3 ($name, 1, "$name - aiAddInstance ERROR: $@");
+           or do { Log3 ($name, 1, "$name - aiAddInstancePV ERROR: $@");
                    $data{$name}{current}{aiaddistate} = $@;
                    return;
                  };
@@ -17253,25 +17189,30 @@ return;
 #    Daten der Raw Datensammlung hinzufügen
 ################################################################
 sub aiAddRawData {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $day   = $paref->{day} // strftime "%d",  localtime(time);           # aktueller Tag (range 01 to 31)
-  my $ood   = $paref->{ood} // 0;                                         # only one (current) day
-  my $rho   = $paref->{rho};                                              # only this hour of day
-
-  my $hash  = $defs{$name};
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $yday     = $paref->{yday};                                             # vorheriger Tag (falls gesetzt)
+  my $day      = $paref->{day} // strftime "%d",  localtime(time);           # aktueller Tag (range 01 to 31)
+  my $ood      = $paref->{ood} // 0;                                         # only one (current) day
+  my $rho      = $paref->{rho};                                              # only this hour of day
+  my $dayname  = $paref->{dayname}; 
+  my $ydayname = $paref->{ydayname};
+  
+  my $hash = $defs{$name};
 
   delete $data{$name}{current}{aitrawstate};
 
   my $err;
   my $dosave = 0;
+  
+  $day     = $yday     if(defined $yday);                                    # der vergangene Tag soll verarbeitet werden
+  $dayname = $ydayname if(defined $ydayname);                                # Name des Vortages
 
   for my $pvd (sort keys %{$data{$name}{pvhist}}) {
       next if(!$pvd);
 
       if ($ood) {
-          next if($pvd ne $paref->{day});
+          next if($pvd ne $day);
       }
 
       last if(int $pvd > int $day);
@@ -17279,43 +17220,43 @@ sub aiAddRawData {
       for my $hod (sort keys %{$data{$name}{pvhist}{$pvd}}) {
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
 
+          my $ridx   = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
+          
+          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',     20);
+          my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt',    0);
+          my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',     0); 
+          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',       0);    
+          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',       0);
+          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',      0);  
+          my $rad1h  = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);          
+          
+          my $tbin   = temp2bin   ($temp);     
+          my $sabin  = sunalt2bin ($sunalt);
+          my $cbin   = cloud2bin  ($wcc);
+          
+          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}  = $sabin;
+          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}   = $sunaz;
+          $data{$name}{aidectree}{airaw}{$ridx}{dayname} = $dayname;
+          $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
+          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $tbin;
+          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con;
+          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $cbin;
+          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c;
+          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h if(defined $rad1h && $rad1h > 0);
+          
+          $dosave++;
+          
           my $pvrlvd = HistoryVal ($hash, $pvd, $hod, 'pvrlvd', 1);
 
           if (!$pvrlvd) {                                                        # Datensatz ignorieren wenn als invalid gekennzeichnet
               debugLog ($paref, 'aiProcess', qq{AI raw data is marked as invalid and is ignored - day: $pvd, hod: $hod});
               next;
-          }
-
-          my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
-          next if(!$rad1h || $rad1h <= 0);
-
-          my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
-          next if(!$pvrl || $pvrl <= 0);
-
-          my $ridx = _aiMakeIdxRaw ($pvd, $hod);
-
-          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',  20);
-          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',    0);
-          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',   0);
-          my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt', 0);
-          my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',  0);
-
-          my $tbin  = temp2bin   ($temp);
-          my $cbin  = cloud2bin  ($wcc);
-          my $sabin = sunalt2bin ($sunalt);
-
-          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}  = $rad1h;
-          $data{$name}{aidectree}{airaw}{$ridx}{temp}   = $tbin;
-          $data{$name}{aidectree}{airaw}{$ridx}{wcc}    = $cbin;
-          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}   = $rr1c;
-          $data{$name}{aidectree}{airaw}{$ridx}{hod}    = $hod;
-          $data{$name}{aidectree}{airaw}{$ridx}{pvrl}   = $pvrl;
-          $data{$name}{aidectree}{airaw}{$ridx}{sunalt} = $sabin;
-          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}  = $sunaz;
-
-          $dosave++;
-
-          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: $rad1h, pvrl: $pvrl, wcc: $cbin, rr1c: $rr1c, temp: $tbin", 4);
+          }         
+          
+          my $pvrl                                    = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
+          $data{$name}{aidectree}{airaw}{$ridx}{pvrl} = $pvrl if(defined $pvrl && $pvrl  > 0);
+          
+          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: ".($rad1h ? $rad1h : '-').", pvrl: ".($pvrl ? $pvrl : '-').", con: $con, wcc: $cbin, rr1c: $rr1c, temp: $tbin", 4);
       }
   }
 
@@ -17516,7 +17457,7 @@ sub setPVhistory {
           
           ## Reorg Inverter 
           ##################           
-          for my $in (1..$maxinverter) {
+          for my $in (1..MAXINVERTER) {
               $in   = sprintf "%02d", $in;
               my $e = HistoryVal ($hash, $reorgday, $k, 'pvrl'.$in, undef);
               $ien->{$in} += $e if(defined $e);
@@ -17524,7 +17465,7 @@ sub setPVhistory {
           
           ## Reorg Producer
           ##################           
-          for my $pn (1..$maxproducer) {
+          for my $pn (1..MAXPRODUCER) {
               $pn   = sprintf "%02d", $pn;
               my $e = HistoryVal ($hash, $reorgday, $k, 'pprl'.$pn, undef);
               $pen->{$pn} += $e if(defined $e);
@@ -17532,7 +17473,7 @@ sub setPVhistory {
           
           ## Reorg Battery
           ##################           
-          for my $bn (1..$maxbatteries) {
+          for my $bn (1..MAXBATTERIES) {
               $bn   = sprintf "%02d", $bn;
               my $bi = HistoryVal ($hash, $reorgday, $k, 'batin'.$bn,  undef);
               my $bo = HistoryVal ($hash, $reorgday, $k, 'batout'.$bn, undef);
@@ -17663,16 +17604,19 @@ sub listDataPool {
       $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
 
       for my $idx (sort keys %{$h}) {
-          my $hod    = AiRawdataVal ($name, $idx, 'hod',    '-');
-          my $sunalt = AiRawdataVal ($name, $idx, 'sunalt', '-');
-          my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',  '-');
-          my $rad1h  = AiRawdataVal ($name, $idx, 'rad1h',  '-');
-          my $wcc    = AiRawdataVal ($name, $idx, 'wcc',    '-');
-          my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',   '-');
-          my $pvrl   = AiRawdataVal ($name, $idx, 'pvrl',   '-');
-          my $temp   = AiRawdataVal ($name, $idx, 'temp',   '-');
+          my $hod    = AiRawdataVal ($name, $idx, 'hod',     '-');
+          my $sunalt = AiRawdataVal ($name, $idx, 'sunalt',  '-');
+          my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',   '-');
+          my $rad1h  = AiRawdataVal ($name, $idx, 'rad1h',   '-');
+          my $wcc    = AiRawdataVal ($name, $idx, 'wcc',     '-');
+          my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',    '-');
+          my $pvrl   = AiRawdataVal ($name, $idx, 'pvrl',    '-');
+          my $temp   = AiRawdataVal ($name, $idx, 'temp',    '-');
+          my $nod    = AiRawdataVal ($name, $idx, 'dayname', '-');
+          my $con    = AiRawdataVal ($name, $idx, 'con',     '-');    
+          
           $sq       .= "\n";
-          $sq       .= "$idx => hod: $hod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, pvrl: $pvrl, temp: $temp";
+          $sq       .= "$idx => hod: $hod, nod: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, pvrl: $pvrl, con: $con, temp: $temp";
       }
   }
 
@@ -17745,7 +17689,7 @@ sub _listDataPoolPvHist {
           }
 
           my ($inve, $invl);
-          for my $in (1..$maxinverter) {                                              # + alle Inverter
+          for my $in (1..MAXINVERTER) {                                              # + alle Inverter
               $in       = sprintf "%02d", $in;
               my $etoti = HistoryVal ($name, $day, $key, 'etotali'.$in, '-');
               my $pvrli = HistoryVal ($name, $day, $key, 'pvrl'.$in,    '-');
@@ -17762,7 +17706,7 @@ sub _listDataPoolPvHist {
           }
           
           my ($prde, $prdl);
-          for my $pn (1..$maxproducer) {                                              # + alle Producer
+          for my $pn (1..MAXPRODUCER) {                                              # + alle Producer
               $pn       = sprintf "%02d", $pn;
               my $etotp = HistoryVal ($name, $day, $key, 'etotalp'.$pn, '-');
               my $pprl  = HistoryVal ($name, $day, $key, 'pprl'.$pn,    '-');
@@ -17779,7 +17723,7 @@ sub _listDataPoolPvHist {
           }
           
           my ($btotin, $batin, $btotout, $batout, $batmsoc, $batssoc, $batsoc);
-          for my $bn (1..$maxbatteries) {                                            # + alle Batterien
+          for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
               $bn          = sprintf "%02d", $bn;
               my $hbtotin  = HistoryVal ($name, $day, $key, 'batintotal'.$bn,  '-');
               my $hbtotout = HistoryVal ($name, $day, $key, 'batouttotal'.$bn, '-');
@@ -17862,7 +17806,7 @@ sub _listDataPoolPvHist {
           $ret .= "dayname: $dayname, " if($dayname);
 
           my $csm;
-          for my $c (1..$maxconsumer) {                                                      # + alle Consumer
+          for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
               $c       = sprintf "%02d", $c;
               my $nl   = 0;
               my $csmc = HistoryVal ($name, $day, $key, "cyclescsm${c}",      undef);
@@ -18076,7 +18020,7 @@ sub _listDataPoolCircular {
 
       if ($idx != 99) {
           my $prdl;
-          for my $pn (1..$maxproducer) {                                              # alle Producer
+          for my $pn (1..MAXPRODUCER) {                                              # alle Producer
               $pn       = sprintf "%02d", $pn;
               my $pprl  = CircularVal ($hash, $idx, 'pprl'.$pn, '-'); 
               $prdl    .= ', ' if($prdl);
@@ -18084,7 +18028,7 @@ sub _listDataPoolCircular {
           }
           
           my ($bin, $bout);
-          for my $bn (1..$maxbatteries) {                                            # alle Batterien
+          for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
               $bn = sprintf "%02d", $bn;
               my $batin  = CircularVal ($hash, $idx, 'batin'. $bn, '-');
               my $batout = CircularVal ($hash, $idx, 'batout'.$bn, '-');
@@ -18094,9 +18038,10 @@ sub _listDataPoolCircular {
               $bout     .= "batout${bn}: $batout";
           }
           
-            my ($pvrlnew, $pvfcnew);
-            my @pvrlkeys = map { $_ =~ /^pvrl_/xs ? $_ : '' } sort keys %{$h->{$idx}}; 
-            my @pvfckeys = map { $_ =~ /^pvfc_/xs ? $_ : '' } sort keys %{$h->{$idx}};                  
+            my ($pvrlnew, $pvfcnew, $conall);
+            my @pvrlkeys = map { $_ =~ /^pvrl_/xs   ? $_ : '' } sort keys %{$h->{$idx}}; 
+            my @pvfckeys = map { $_ =~ /^pvfc_/xs   ? $_ : '' } sort keys %{$h->{$idx}};  
+            my @conakeys = map { $_ =~ /^con_all/xs ? $_ : '' } sort keys %{$h->{$idx}};            
 
             for my $prl (@pvrlkeys) {
                 next if(!$prl);
@@ -18115,6 +18060,15 @@ sub _listDataPoolCircular {
                 $pvfcnew .= "\n      " if($pvfcnew);
                 $pvfcnew .= _ldchash2val ( { pool => $h, idx => $idx, key => $pfc, cval => $cref } );
             }
+            
+            for my $coa (@conakeys) {
+                next if(!$coa);
+                my $caref = CircularVal ($hash, $idx, $coa, ''); 
+                next if(!$caref);                  
+                
+                $conall .= "\n      " if($conall);
+                $conall .= _ldchash2val ( { pool => $h, idx => $idx, key => $coa, cval => $caref } );
+            }
           
           $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl";
           $sq .= "\n      $bin";
@@ -18127,12 +18081,13 @@ sub _listDataPoolCircular {
           $sq .= "\n      pvrlsum: $pvrs";
           $sq .= "\n      pvfcsum: $pvfs";
           $sq .= "\n      dnumsum: $dnus";
+          $sq .= "\n      $conall"  if($conall);
           $sq .= "\n      $pvrlnew" if($pvrlnew);
           $sq .= "\n      $pvfcnew" if($pvfcnew);
       }
       else {
           my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7);
-          for my $bn (1..$maxbatteries) {                                            # + alle Batterien
+          for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
               $bn = sprintf "%02d", $bn;
               my $idbintot = CircularVal ($hash, $idx, 'initdaybatintot'. $bn, '-');
               my $idboutot = CircularVal ($hash, $idx, 'initdaybatouttot'.$bn, '-');
@@ -18212,7 +18167,7 @@ sub _listDataPoolNextHours {
       my $sunalt  = NexthoursVal ($name, $idx, 'sunalt',     '-');
       
       my ($rcdbat, $socs);
-      for my $bn (1..$maxbatteries) {                                            # alle Batterien
+      for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
           $bn = sprintf "%02d", $bn;
           my $rcdcharge = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, '-');
           my $socxx     = NexthoursVal ($name, $idx, 'soc'.$bn, '-');
@@ -18551,7 +18506,7 @@ sub checkPlantConfig {
 
   setModel ($hash);                                                                            # Model setzen
 
-  my $lang        = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
+  my $lang        = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', DEFLANG));
   my $pcf         = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', 'off');
   my $raname      = AttrVal        ($name, 'setupRadiationAPI',          '');
   my ($acu, $aln) = isAutoCorrUsed ($name);
@@ -18566,6 +18521,7 @@ sub checkPlantConfig {
       'Weather Properties'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Common Settings'      => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'FTUI Widget Files'    => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Perl Modules'         => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
 
   my $sub = sub {
@@ -18629,7 +18585,7 @@ sub checkPlantConfig {
   my $mosm = '';
   my $resh;
 
-  for my $step (1..$weatherDevMax) {
+  for my $step (1..MAXWEATHERDEV) {
       my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$step);
       next if(!$fcname && $step ne 1);
 
@@ -18851,7 +18807,7 @@ sub checkPlantConfig {
 
   if (!$aiprep) {
       $result->{'Common Settings'}{state}   = $info;
-      $result->{'Common Settings'}{result} .= qq{The AI support is not used. <br>};
+      $result->{'Common Settings'}{result} .= qq{AI support for the PV forecast is not used. <br>};
       $result->{'Common Settings'}{note}   .= qq{$aiusemsg.<br>};
       $result->{'Common Settings'}{info}    = 1;
   }
@@ -18897,6 +18853,13 @@ sub checkPlantConfig {
   }
 
   if (isOpenMeteoUsed ($hash)) {                                                             # allg. Settings bei Nutzung Open-Meteo API
+      if ($aidtabs) {
+          $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
+          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
+          $result->{'Common Settings'}{info}    = 1;
+      }
+      
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
@@ -19027,6 +18990,23 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{note}   .= qq{event-on-change-reading, ctrlLanguage <br>};
   }
 
+  ## installierte Perl Module
+  #############################
+  if ($aidtabs) {
+      $result->{'Perl Modules'}{state}   = $info;
+      $result->{'Perl Modules'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
+      $result->{'Perl Modules'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
+      $result->{'Perl Modules'}{info}    = 1;
+  }
+
+  if (!$result->{'Perl Modules'}{info} && !$result->{'Perl Modules'}{warn} && !$result->{'Perl Modules'}{fault}) {
+      $result->{'Perl Modules'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
+      $result->{'Perl Modules'}{note}   .= qq{<br>checked installed Perl Modules: <br>};
+      $result->{'Perl Modules'}{note}   .= qq{AI::DecisionTree <br>};
+  }
+  
+  
+  
   ## FTUI Widget Support
   ########################
   my $tpath = "$root/www/tablet/css";
@@ -19214,12 +19194,12 @@ return ($method, $surplus);
 #
 #  $aref  = Referenz zum Array
 #  $limit = die Anzahl Elemente auf die gekürzt werden soll
-#           (default $slidenummax)
+#           (default SLIDENUMMAX)
 #
 ################################################################
 sub limitArray {
   my $aref  = shift;
-  my $limit = shift // $slidenummax;
+  my $limit = shift // SLIDENUMMAX;
 
   return if(ref $aref ne 'ARRAY');
 
@@ -19241,7 +19221,7 @@ return;
 ################################################################
 sub avgArray {                  
   my $aref = shift;
-  my $num  = shift // $slidenummax;
+  my $num  = shift // SLIDENUMMAX;
   
   return undef if(ref $aref ne 'ARRAY' || scalar @{$aref} < $num);
   
@@ -19433,6 +19413,35 @@ return ($err, $ctime);
 }
 
 ################################################################
+#  Timestrings aus Startzeit Timestamp und gegebenen Offset (s)
+#  berechnen, Rückgabe als Hashreferenz
+################################################################
+sub timestringsFromOffset {                                           
+  my $epoch  = shift;
+  my $offset = shift // 0;
+  
+  return if($epoch !~ /[0-9]/xs);
+
+  if (length ($epoch) == 13) {                                                                  # Millisekunden
+      $epoch = $epoch / 1000;
+  }
+  
+  my @ts = localtime ($epoch - $offset);
+  
+  my $dt = {
+      year    => (strftime "%Y",       (@ts)),                                                  # Jahr
+      month   => (strftime "%m",       (@ts)),                                                  # Monat
+      day     => (strftime "%d",       (@ts)),                                                  # Tag (range 01 .. 31)
+      date    => (strftime "%Y-%m-%d", (@ts)),                                                  # Datum
+      hour    => (strftime "%H",       (@ts)),                                                  # Stunde in 24h format (00-23)
+      minute  => (strftime "%M",       (@ts)),                                                  # Minute (00-59)
+      dayname => (strftime "%a",       (@ts)),                                                  # Wochentagsname
+  };
+
+return $dt;
+}
+
+################################################################
 #  Zeitstring der Form 2023-05-27T14:24:30+02:00 formatieren
 #  in YYYY-MM-TT hh:mm:ss
 ################################################################
@@ -19600,14 +19609,14 @@ sub createAssociatedWith {
           push @cd, $dswitch if($dswitch);
       }
       
-      for my $bn (1..$maxbatteries) {                                        # Battery Devices
+      for my $bn (1..MAXBATTERIES) {                                         # Battery Devices
           $bn       = sprintf "%02d", $bn;
           my $badev = AttrVal ($name, "setupBatteryDev${bn}", '');
           my ($aba) = parseParams ($badev);
           push @cd, $aba->[0] if($aba->[0]);
       }
       
-      for my $in (1..$maxinverter) {                                         # Inverter Devices
+      for my $in (1..MAXINVERTER) {                                          # Inverter Devices
           $in       = sprintf "%02d", $in;
           my $inc   = AttrVal ($name, "setupInverterDev${in}", '');
           my ($ind) = parseParams ($inc);
@@ -19622,7 +19631,7 @@ sub createAssociatedWith {
       push @nd, $radev  if($radev  && $radev  !~ /-API/xs);
       push @nd, $medev;
 
-      for my $prn (1..$maxproducer) {                                       # Producer Devices
+      for my $prn (1..MAXPRODUCER) {                                         # Producer Devices
           $prn      = sprintf "%02d", $prn;
           my $pdc   = AttrVal ($name, "setupOtherProducer${prn}", "");
           my ($prd) = parseParams ($pdc);
@@ -19725,7 +19734,7 @@ return;
 sub controller {
   my $name = shift;
 
-  my $interval = AttrVal    ($name, 'ctrlInterval', $definterval);            # 0 wenn manuell gesteuert
+  my $interval = AttrVal    ($name, 'ctrlInterval', DEFINTERVAL);            # 0 wenn manuell gesteuert
   my $idval    = IsDisabled ($name);
   my $disabled = $idval == 1 ? 1 : 0;
   my $inactive = $idval == 3 ? 1 : 0;
@@ -20168,7 +20177,7 @@ sub isBatteryUsed {
   
   my $valid = 0;
 
-  for my $bn (1..$maxbatteries) {
+  for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
       my ($err) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
@@ -20494,7 +20503,7 @@ sub isWeatherAgeExceeded {
 
   my ($newts, $th);
 
-  for my $step (1..$weatherDevMax) {
+  for my $step (1..MAXWEATHERDEV) {
       my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$step);
       next if(!$fcname && $step ne 1);
 
@@ -20767,7 +20776,7 @@ sub getLang {
   my $hash = shift;
 
   my $name  = $hash->{NAME};
-  my $glang = AttrVal ('global', 'language', $deflang);
+  my $glang = AttrVal ('global', 'language', DEFLANG);
   my $lang  = AttrVal ($name, 'ctrlLanguage', $glang);
 
 return $lang;
@@ -21091,12 +21100,14 @@ sub lineFromSpaces {
 
   my @sps = split "\n", $str;
   my $mlen = 1;
-
+  
   for my $s (@sps) {
-      my $len = length (trim $s);
+      my $len = length ($s);
       $mlen   = $len if($len && $len > $mlen);
   }
-
+  
+  $mlen = $mlen > LPOOLLENLIM ? LPOOLLENLIM : $mlen;                            
+  
   my $ret = "\n";
   $ret   .= "&nbsp;" x ($mlen + $an);
 
@@ -21159,8 +21170,8 @@ return;
 #             rr1c           - Gesamtniederschlag (1-stündig) letzte 1 Stunde kg/m2
 #             pvcorrf        - PV Autokorrekturfaktor f. Stunde des Tages
 #             dayname        - Tagesname (Kürzel)
-#             csmt${c}       - Totalconsumption Consumer $c (1..$maxconsumer)
-#             csme${c}       - Consumption Consumer $c (1..$maxconsumer) in $hod
+#             csmt${c}       - Totalconsumption Consumer $c (1..MAXCONSUMER)
+#             csme${c}       - Consumption Consumer $c (1..MAXCONSUMER) in $hod
 #             sunaz          - Azimuth der Sonne (in Dezimalgrad)
 #             sunalt         - Höhe der Sonne (in Dezimalgrad)
 #    $def: Defaultwert
@@ -21214,7 +21225,7 @@ return $def;
 #             pvcorrf            - PV Autokorrekturfaktoren (<Sonne Altitude>.<Cloudcover> = Faktor)
 #             lastTsMaxSocRchdXX - Timestamp des letzten Erreichens von SoC >= maxSoC
 #             nextTsMaxSocChgeXX - Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
-#             days2careXX        - verbleibende Tage bis der Batterie XX Pflege-SoC (default $maxSoCdef) erreicht sein soll
+#             days2careXX        - verbleibende Tage bis der Batterie XX Pflege-SoC (default MAXSOCDEF) erreicht sein soll
 #             tdayDvtn           - heutige Abweichung PV Prognose/Erzeugung in %
 #             ydayDvtn           - gestrige Abweichung PV Prognose/Erzeugung in %
 #             initdayfeedin      - initialer Wert für "gridfeedin" zu Beginn des Tages (Wh)
@@ -22586,7 +22597,7 @@ to ensure that the system configuration is correct.
       The 'exportToCsv' specification exports the entire content of the pvHistory to a CSV file. <br>
 
       The hour specifications refer to the respective hour of the day, e.g. the hour 09 refers to the time from
-      08 o'clock to 09 o'clock.
+      08 o'clock to 09 o'clock. The hour '99' contains daily values.
       <br><br>
 
       <ul>
@@ -22605,6 +22616,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>csmtXX</b>         </td><td>total energy consumption of ConsumerXX                                                                                   </td></tr>
             <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)                             </td></tr>
             <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
+            <tr><td> <b>dayname</b>        </td><td>short name of the day (locale-dependent)                                                                                 </td></tr>
             <tr><td> <b>DoN</b>            </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                                           </td></tr>
             <tr><td> <b>etotaliXX</b>      </td><td>PV meter reading “Total energy yield” (Wh) of inverter XX at the beginning of the hour                                   </td></tr>
             <tr><td> <b>etotalpXX</b>      </td><td>Meter reading “Total energy yield” (Wh) of producer XX at the beginning of the hour                                      </td></tr>
@@ -22795,17 +22807,21 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      If AI support is activated in the SolarForecast Device, various AI-relevant data can be displayed                      :
+      Display of AI-relevant data.
+      The available display options depend on the available and activated AI support level. 
       <br><br>
 
       <ul>
        <table>
        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-          <tr><td> <b>aiRawData</b>     </td><td>The PV, radiation and environmental data currently stored for the AI.           </td></tr>
-          <tr><td> <b>aiRuleStrings</b> </td><td>Returns a list that describes the AI's decision tree in the form of rules.      </td></tr>
-          <tr><td>                      </td><td><b>Note:</b> While the order of the rules is not predictable, the               </td></tr>
-          <tr><td>                      </td><td>order of criteria within each rule, however, reflects the order                 </td></tr>
-          <tr><td>                      </td><td>in which the criteria are considered in the decision-making process.            </td></tr>
+          <tr><td> <b>aiRawData</b>     </td><td>Display of the PV, radiation and environmental data currently stored for the AI.       </td></tr>
+          <tr><td>                      </td><td>(available if the Perl module AI::DecisionTree is installed)                           </td></tr>
+          <tr><td>                      </td><td>                                                                                       </td></tr>
+          <tr><td> <b>aiRuleStrings</b> </td><td>Returns a list that describes the AI's decision tree in the form of rules.             </td></tr>
+          <tr><td>                      </td><td><b>Note:</b> While the order of the rules is not predictable, the                      </td></tr>
+          <tr><td>                      </td><td>order of criteria within each rule, however, reflects the order                        </td></tr>
+          <tr><td>                      </td><td>in which the criteria are considered in the decision-making process.                   </td></tr>
+          <tr><td>                      </td><td>(available if an AI-compatible SolarForecast MODEL of the PV forecast is activated)    </td></tr>
         </table>
       </ul>
     </li>
@@ -22870,18 +22886,6 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-get-weatherApiData"></a>
       <li><b>weatherApiData </b> <br><br>
       Shows the data supplied by the selected weather API.
-      </li>
-    </ul>
-    <br>
-    
-    <ul>
-      <a id="SolarForecast-get-x_migrate"></a>
-      <li><b>x_migrate </b> <br><br>
-      Migrates the existing PV Real and PV Forecast values in the ring buffer a new data structure. <br>
-      From the time of the changeover, the correction factors for the PV forecast will be determined using a median calculation
-      instead of the previous average calculation. <br><br>
-      
-      <b>x_migrate is a special function. Please clarify any ambiguities in the SolarForecast forum before execution! </b>
       </li>
     </ul>
     <br>
@@ -25079,7 +25083,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Die Angabe 'exportToCsv' exportiert den gesamten Inhalt der pvHistory in eine CSV-Datei. <br>
 
       Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit
-      von 08 Uhr bis 09 Uhr.
+      von 08 Uhr bis 09 Uhr. Die Stunde '99' enthält Tageswerte.
       <br><br>
 
       <ul>
@@ -25098,6 +25102,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>con</b>             </td><td>realer Energieverbrauch (Wh) des Hauses                                                            </td></tr>
             <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im setupMeterDev definiert.             </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                      </td></tr>
+            <tr><td> <b>dayname</b>         </td><td>Kurzname des Tages (locale-abhängig)                                                               </td></tr>
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                               </td></tr>
             <tr><td> <b>etotaliXX</b>       </td><td>PV Zählerstand "Energieertrag total" (Wh) von Inverter XX zu Beginn der Stunde                     </td></tr>
             <tr><td> <b>etotalpXX</b>       </td><td>Zählerstand "Energieertrag total" (Wh) des Produzenten XX zu Beginn der Stunde                     </td></tr>
@@ -25288,17 +25293,21 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      Ist der KI Support im SolarForecast Device aktiviert, können verschiedene KI relevante Daten angezeigt werden                  :
+      Anzeige von KI relevanten Daten.
+      Die verfügbaren Anzeigeoptionen sind abhängig vom verfügbaren und aktivierten KI Unterstützungslevel. 
       <br><br>
 
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>aiRawData</b>     </td><td>Die aktuell für die KI gespeicherten PV-, Strahlungs- und Umweltdaten.                     </td></tr>
+          <tr><td> <b>aiRawData</b>     </td><td>Anzeige der aktuell für die KI gespeicherten PV-, Strahlungs- und Umweltdaten.             </td></tr>
+          <tr><td>                      </td><td>(verfügbar wenn das Perl Modul AI::DecisionTree installiert ist)                           </td></tr>
+          <tr><td>                      </td><td>                                                                                           </td></tr>
           <tr><td> <b>aiRuleStrings</b> </td><td>Gibt eine Liste zurück, die den Entscheidungsbaum der KI in Form von Regeln beschreibt.    </td></tr>
           <tr><td>                      </td><td><b>Hinweis:</b> Die Reihenfolge der Regeln ist zwar nicht vorhersehbar, die                </td></tr>
           <tr><td>                      </td><td>Reihenfolge der Kriterien innerhalb jeder Regel spiegelt jedoch die Reihenfolge            </td></tr>
           <tr><td>                      </td><td>wider, in der die Kriterien bei der Entscheidungsfindung geprüft werden.                   </td></tr>
+          <tr><td>                      </td><td>(verfügbar wenn ein KI kompatibles SolarForecast MODEL der PV Vorhersage aktiviert ist)    </td></tr>
         </table>
       </ul>
     </li>
@@ -25362,18 +25371,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-get-weatherApiData"></a>
       <li><b>weatherApiData </b> <br><br>
       Zeigt die gelieferten Daten der gewählten Wetter-API.
-      </li>
-    </ul>
-    <br>
-    
-    <ul>
-      <a id="SolarForecast-get-x_migrate"></a>
-      <li><b>x_migrate </b> <br><br>
-      Migriert die vorhandenen PV Real und PV Forecast Werte im Ringspeicher in eine neue Datenstruktur. <br>
-      Ab dem Zeitpunkt der Umstellung werden die Korrekturfaktoren für die PV Vorhersage über eine Median Berechnung
-      statt der bisherigen Durchschnittberechnung ermittelt. <br><br>
-      
-      <b>x_migrate ist eine spezielle Funktion. Unklarheiten bitte vor Ausführung im SolarForecast Forum klären! </b>
       </li>
     </ul>
     <br>
