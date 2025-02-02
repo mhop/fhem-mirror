@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  76_SolarForecast: minor fixes of Version 1.45.0
  - feature: 76_SolarForecast: Version 1.45.0 rollout
  - bugfix:  76_SolarForecast: fix https://forum.fhem.de/index.php?msg=1332421
  - change:  98_vitoconnect.pm: improved version, support multiple locations,

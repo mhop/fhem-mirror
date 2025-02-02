@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.45.1" => "02.02.2025  _specialActivities: Task 1 __deleteEveryHourControls changed, all Tasks adapted ".
+                           "_retrieveMessageFile: fix path in __updWriteFile, fix https://forum.fhem.de/index.php?msg=1332721 ",
   "1.45.0" => "01.02.2025  new function timestringsFromOffset, _batChargeRecmd: change condition for load release ".
                            "_addHourAiRawdata: add hour 24 (of day before), remove x-migrate -> auto migrate pv data ".
                            "Pool output width limited to 140 characters, checkPlantConfig: add installen Perl Modules check ",
@@ -4694,7 +4696,7 @@ sub _getlistPVCircular {
   my $hash  = $defs{$name};
 
   my $ret = listDataPool   ($hash, 'circular', $arg);
-  $ret   .= lineFromSpaces ($ret, 0);
+  $ret   .= lineFromSpaces ($ret, 10);
 
 return $ret;
 }
@@ -7517,7 +7519,6 @@ sub centralTask {
   }
   
   my $n = 0;                                                       # 01.02.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_* 
-  
   for my $hh (1..24) {                                            
       $hh = sprintf "%02d", $hh;
       
@@ -8021,15 +8022,32 @@ sub _specialActivities {
   ##################################
   $chour    = int $chour;
   $minute   = int $minute;
-  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', $aitrstartdef);                        # Stunde f. Start AI-Training
+  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', $aitrstartdef);                             # Stunde f. Start AI-Training
 
   ## Task 1
   ###########
-  if ($chour == 0 && $minute >= 0) {
+  if ($chour == 0) {
       if (!defined $hash->{HELPER}{T1RUN}) {
           $hash->{HELPER}{T1RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 1 started");
+
+          __deleteEveryHourControls ($paref);                                                     # Sperrsignale der Stundenwerte-Steuerung löschen
+
+          Log3 ($name, 4, "$name - Daily special tasks - Task 1 finished");
+      }
+  }
+  else {
+      delete $hash->{HELPER}{T1RUN};
+  }
+  
+  ## Task 2
+  ###########
+  if ($chour == 0 && $minute >= 0) {
+      if (!defined $hash->{HELPER}{T2RUN}) {
+          $hash->{HELPER}{T2RUN} = 1;
+
+          Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
 
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                         # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
@@ -8084,28 +8102,6 @@ sub _specialActivities {
           writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration sichern
 
           Log3 ($name, 3, "$name - history day >$day< deleted");
-          Log3 ($name, 4, "$name - Daily special tasks - Task 1 finished");
-      }
-  }
-  else {
-      delete $hash->{HELPER}{T1RUN};
-  }
-
-  ## Task 2
-  ###########
-  if ($chour == 0 && $minute >= 2) {
-      if (!defined $hash->{HELPER}{T2RUN}) {
-          $hash->{HELPER}{T2RUN} = 1;
-
-          Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
-
-          for my $c (keys %{$data{$name}{consumers}}) {                                  # Planungsdaten regulär löschen
-              next if(ConsumerVal ($hash, $c, "plandelete", "regular") ne "regular");
-              deleteConsumerPlanning ($hash, $c);
-          }
-
-          writeCacheToFile ($hash, "consumers", $csmcache.$name);                           # Cache File Consumer schreiben
-
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 finished");
       }
   }
@@ -8115,14 +8111,18 @@ sub _specialActivities {
 
   ## Task 3
   ###########
-  if ($chour == 0 && $minute >= 5) {
+  if ($chour == 0 && $minute >= 2) {
       if (!defined $hash->{HELPER}{T3RUN}) {
           $hash->{HELPER}{T3RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 started");
 
-          __createAdditionalEvents ($paref);                                                # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
-          __delObsoleteAPIData     ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash
+          for my $c (keys %{$data{$name}{consumers}}) {                                         # Planungsdaten regulär löschen
+              next if(ConsumerVal ($hash, $c, "plandelete", "regular") ne "regular");
+              deleteConsumerPlanning ($hash, $c);
+          }
+
+          writeCacheToFile ($hash, "consumers", $csmcache.$name);                               # Cache File Consumer schreiben
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 finished");
       }
@@ -8133,17 +8133,14 @@ sub _specialActivities {
 
   ## Task 4
   ###########
-  if ($chour == 0 && $minute >= 9) {
+  if ($chour == 0 && $minute >= 5) {
       if (!defined $hash->{HELPER}{T4RUN}) {
           $hash->{HELPER}{T4RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
 
-          __deleteEveryHourControls ($paref);                                               # Readings der Stundenwerte-Steuerung löschen
-          
-          if (AttrVal ($name, 'ctrlBackupFilesKeep', 3)) {
-              periodicWriteMemcache ($hash, 'bckp');                                        # Backup Files erstellen und alte Versionen löschen (unterbleibt bei ctrlBackupFilesKeep == 0)
-          }
+          __createAdditionalEvents ($paref);                                                   # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
+          __delObsoleteAPIData     ($paref);                                                   # Bereinigung obsoleter Daten im solcastapi Hash
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
       }
@@ -8154,11 +8151,30 @@ sub _specialActivities {
 
   ## Task 5
   ###########
-  if ($chour == $aitrh && $minute >= 15) {
+  if ($chour == 0 && $minute >= 9) {
       if (!defined $hash->{HELPER}{T5RUN}) {
           $hash->{HELPER}{T5RUN} = 1;
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 5 started");
+          
+          if (AttrVal ($name, 'ctrlBackupFilesKeep', 3)) {
+              periodicWriteMemcache ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen (unterbleibt bei ctrlBackupFilesKeep == 0)
+          }
+
+          Log3 ($name, 4, "$name - Daily special tasks - Task 5 finished");
+      }
+  }
+  else {
+      delete $hash->{HELPER}{T5RUN};
+  }
+
+  ## Task 6
+  ###########
+  if ($chour == $aitrh && $minute >= 15) {
+      if (!defined $hash->{HELPER}{T6RUN}) {
+          $hash->{HELPER}{T6RUN} = 1;
+
+          Log3 ($name, 4, "$name - Daily special tasks - Task 6 started");
 
           aiDelRawData ($paref);                                                            # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
 
@@ -8166,11 +8182,11 @@ sub _specialActivities {
           aiAddInstancePV ($paref);                                                         # AI PV-Forecast füllen, trainieren und sichern
           delete $paref->{taa};
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 5 finished");
+          Log3 ($name, 4, "$name - Daily special tasks - Task 6 finished");
       }
   }
   else {
-      delete $hash->{HELPER}{T5RUN};
+      delete $hash->{HELPER}{T6RUN};
   }
 
 return;
@@ -8184,7 +8200,7 @@ sub __deleteEveryHourControls  {
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
 
-  for my $n (1..24) {
+  for my $n (0..24) {
       $n = sprintf "%02d", $n;
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
@@ -12267,6 +12283,7 @@ sub _calcDataEveryFullHour {
       _calcCaQsimple    ($paref);                                                                 # einfache Korrekturberechnung duchführen/speichern
       _calcCaQcomplex   ($paref);                                                                 # Korrekturberechnung mit Bewölkung duchführen/speichern
       _addHourAiRawdata ($paref);                                                                 # AI Raw Data hinzufügen
+      _addCon2CircArray ($paref);                                                                 # Hausverbrauch der vergangenen Stunde zum con-Array im Circular Speicher hinzufügen
       
       storeReading ('.signaldone_'.$hh, 'done');                                                  # Sperrsignal (erledigt) setzen
 
@@ -12414,6 +12431,33 @@ return;
 }
 
 ################################################################
+#  den Hausverbrauch der vergangenen Stunde zum con-Array
+#  im Circular Speicher hinzufügen
+################################################################
+sub _addCon2CircArray {
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $h        = $paref->{h};
+  my $yday     = $paref->{yday};                                              # vorheriger Tag (falls gesetzt)
+  my $day      = $paref->{day};                                               # aktueller Tag (range 01 to 31)
+  my $dayname  = $paref->{dayname}; 
+  my $ydayname = $paref->{ydayname};
+
+  my $hash  = $defs{$name};
+
+  $day      = $yday     if(defined $yday);                                    # der vergangene Tag soll verarbeitet werden
+  $dayname  = $ydayname if(defined $ydayname);                                # Name des Vortages
+  my $hh    = sprintf "%02d", $h;
+  my $con   = HistoryVal ($hash, $day, $hh, 'con', 0);                        # Consumption der abgefragten Stunde
+  
+  push @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}, $con;             # Wert zum Speicherarray hinzufügen
+  
+  debugLog ($paref, 'saveData2Cache', "add consumption into Array (con_all) in Circular - day: $day, hod: $hh, con: $con");
+
+return;
+}
+
+################################################################
 #   den neuen Korrekturfaktur berechnen (neue Median Funktion)
 ################################################################
 sub __calcNewFactor_migrated {
@@ -12487,8 +12531,8 @@ sub __calcNewFactor_migrated {
   $pvfc    = sprintf "%.0f", $pvfc;
   my $qual = __calcFcQuality ($pvfc, $pvrl);                                                             # Qualität der Vorhersage für die vergangene Stunde
 
-  debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
-  debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $h, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual, days: $dnum");
+  debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $hh, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
+  debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $hh, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual, days: $dnum");
 
   ## neue Werte speichern
   #########################
@@ -15176,9 +15220,11 @@ sub __batteryOnBeam {
       next if(!isNumeric ($kdx));
       
       my $ds = $hfcg->{$kdx}{day_str};
-      my $ts = $hfcg->{$kdx}{time_str};      
+      my $ts = $hfcg->{$kdx}{time_str};           
       
       next if(!defined $ds || !defined $ts);
+      
+      $ts = (split ":", $ts)[0];                                           # Forum: https://forum.fhem.de/index.php?msg=1332721
       
       for my $bn (1..MAXBATTERIES) {
           $bn = sprintf "%02d", $bn;
@@ -15237,7 +15283,8 @@ sub __batteryOnBeam {
           my $bpowerout = BatteryVal ($name, $bn, 'bpowerout',   0);
           
           my $day_str   = $hfcg->{$i}{day_str};
-          my $time_str  = $hfcg->{$i}{time_str};
+          my $time_str  = $hfcg->{$i}{time_str};             
+          $time_str     = (split ":", $time_str)[0];                                                 # Forum: https://forum.fhem.de/index.php?msg=1332721
           my $soc       = $hfcg->{$i}{'soc'.$bn};
           
           my ($bpower, $currsoc);
@@ -16447,7 +16494,7 @@ sub _retrieveMessageFile {
   }
   
   if ($valid) {
-      $err = __updWriteFile ("$root/FHEM/", $messagefile, $remfile);
+      $err = __updWriteFile ("$root/FHEM", $messagefile, $remfile);
 
       if ($err) {
           $valid = 0;
@@ -16472,7 +16519,7 @@ return;
 sub _processMessageFile {
   my $serial = decode_base64 (shift);
 
-  my $paref = eval { thaw ($serial) };                                             # Deserialisierung
+  my $paref = eval { thaw ($serial) };                                                  # Deserialisierung
   my $name  = $paref->{name};
   my $valid = $paref->{valid};
   my $hash  = $defs{$name};
@@ -17147,7 +17194,6 @@ return;
 sub aiAddRawData {
   my $paref    = shift;
   my $name     = $paref->{name};
-  my $type     = $paref->{type};
   my $yday     = $paref->{yday};                                             # vorheriger Tag (falls gesetzt)
   my $day      = $paref->{day} // strftime "%d",  localtime(time);           # aktueller Tag (range 01 to 31)
   my $ood      = $paref->{ood} // 0;                                         # only one (current) day
@@ -17210,10 +17256,10 @@ sub aiAddRawData {
               next;
           }         
           
-          my $pvrl = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
+          my $pvrl                                    = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           $data{$name}{aidectree}{airaw}{$ridx}{pvrl} = $pvrl if(defined $pvrl && $pvrl  > 0);
           
-          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: ".($rad1h ? $rad1h : '-').", pvrl: ".($pvrl ? $pvrl : '-').", wcc: $cbin, rr1c: $rr1c, temp: $tbin", 4);
+          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: ".($rad1h ? $rad1h : '-').", pvrl: ".($pvrl ? $pvrl : '-').", con: $con, wcc: $cbin, rr1c: $rr1c, temp: $tbin", 4);
       }
   }
 
@@ -17995,9 +18041,10 @@ sub _listDataPoolCircular {
               $bout     .= "batout${bn}: $batout";
           }
           
-            my ($pvrlnew, $pvfcnew);
-            my @pvrlkeys = map { $_ =~ /^pvrl_/xs ? $_ : '' } sort keys %{$h->{$idx}}; 
-            my @pvfckeys = map { $_ =~ /^pvfc_/xs ? $_ : '' } sort keys %{$h->{$idx}};                  
+            my ($pvrlnew, $pvfcnew, $conall);
+            my @pvrlkeys = map { $_ =~ /^pvrl_/xs   ? $_ : '' } sort keys %{$h->{$idx}}; 
+            my @pvfckeys = map { $_ =~ /^pvfc_/xs   ? $_ : '' } sort keys %{$h->{$idx}};  
+            my @conakeys = map { $_ =~ /^con_all/xs ? $_ : '' } sort keys %{$h->{$idx}};            
 
             for my $prl (@pvrlkeys) {
                 next if(!$prl);
@@ -18016,6 +18063,15 @@ sub _listDataPoolCircular {
                 $pvfcnew .= "\n      " if($pvfcnew);
                 $pvfcnew .= _ldchash2val ( { pool => $h, idx => $idx, key => $pfc, cval => $cref } );
             }
+            
+            for my $coa (@conakeys) {
+                next if(!$coa);
+                my $caref = CircularVal ($hash, $idx, $coa, ''); 
+                next if(!$caref);                  
+                
+                $conall .= "\n      " if($conall);
+                $conall .= _ldchash2val ( { pool => $h, idx => $idx, key => $coa, cval => $caref } );
+            }
           
           $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl";
           $sq .= "\n      $bin";
@@ -18028,6 +18084,7 @@ sub _listDataPoolCircular {
           $sq .= "\n      pvrlsum: $pvrs";
           $sq .= "\n      pvfcsum: $pvfs";
           $sq .= "\n      dnumsum: $dnus";
+          $sq .= "\n      $conall"  if($conall);
           $sq .= "\n      $pvrlnew" if($pvrlnew);
           $sq .= "\n      $pvfcnew" if($pvfcnew);
       }
