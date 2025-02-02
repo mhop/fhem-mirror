@@ -15209,7 +15209,7 @@ sub __batteryOnBeam {
           my $stt  = NexthoursVal ($name, $idx, 'starttime',        undef);
           next if(!defined $stt || !defined $rcdc);
           
-          my (undef,undef,$day_str,$time_str) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})/xs;
+          my (undef,undef,$day_str,$time_str) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
           
           $hh->{$day_str}{$time_str}{'rcdchargebat'.$bn} = $rcdc;
           $hh->{$day_str}{$time_str}{'soc'.$bn}          = NexthoursVal ($name, $idx, 'soc'.$bn, undef);
@@ -15220,9 +15220,11 @@ sub __batteryOnBeam {
       next if(!isNumeric ($kdx));
       
       my $ds = $hfcg->{$kdx}{day_str};
-      my $ts = $hfcg->{$kdx}{time_str};      
+      my $ts = $hfcg->{$kdx}{time_str};           
       
       next if(!defined $ds || !defined $ts);
+      
+      $ts = (split ":", $ts)[0];                                           # Forum: https://forum.fhem.de/index.php?msg=1332721
       
       for my $bn (1..MAXBATTERIES) {
           $bn = sprintf "%02d", $bn;
