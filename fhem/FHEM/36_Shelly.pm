@@ -147,6 +147,7 @@
 #           removed:  command get ... shelly_status (deprecated since 6/24)
 # 6.02 Beta4 fix: reading state of ShellyEM50
 # 6.02      fix: command "set <name> button_on" w/o channel
+# 6.02.1    fix: update of input/output readings
 
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
@@ -170,7 +171,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.02 27.01.2025";
+my $version = "6.02.1 03.02.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -380,7 +381,7 @@ my %shelly_models = (
     "shelly2.5"     => [2,1,0, 2,0,2,  0,0,2],    # relay mode, roller mode
     "shellyplug"    => [1,0,0, 1,0,-1, 0,0,0],    # shellyplug & shellyplugS;   no input, but a button which is only reachable via Action
     "shelly4"       => [4,0,0, 4,0,4,  0,0,0],    # shelly4pro;  inputs not provided by fw v1.6.6
-    "shellyrgbw"    => [0,0,4, 4,0,1,  0,1,2],    # shellyrgbw2:  color mode, white mode; metering col 1 channel, white 4 channels
+    "shellyrgbw"    => [0,0,4, 4,0,1,  0,1,2], #!!   # shellyrgbw2:  color mode, white mode; metering col 1 channel, white 4 channels
     "shellydimmer"  => [0,0,1, 1,0,2,  0,0,0],
     "shellyem"      => [1,0,0, 2,0,0,  0,0,0],    # with one control-relay, consumed energy in Wh
     "shelly3em"     => [1,0,0, 3,0,0,  0,0,0],    # with one control-relay, consumed energy in Wh
@@ -2377,14 +2378,17 @@ sub Shelly_Set ($@) {
           }
           readingsBulkUpdateMonitored($hash,$reading,$value );
 
-    }elsif( $signal =~ /analog_in/ ){    
-          my $channel = shift @a;  # 1st parameter
+    }elsif( $signal =~ /analog_in/ ){
           #action example:  ...?cmd=set+<name>+analog_in+$percent+<inputchannel>
-          readingsBulkUpdateMonitored($hash,"input_$channel",$value.$si_units{pct}[$hash->{units}] );
-
-    }elsif( $signal =~ /voltmeter/ ){    
           my $channel = shift @a;  # 1st parameter
+          return if( !defined($channel) );
+          #readingsBulkUpdateMonitored($hash,"input_$channel",$value.$si_units{pct}[$hash->{units}] );
+          Shelly_readingsBulkUpdate($hash,"input_$channel",$value,"pct" );
+
+    }elsif( $signal =~ /voltmeter/ ){
           #action example:  ...?cmd=set+<name>+voltmeter+$voltage+0
+          my $channel = shift @a;  # 1st parameter
+          return if( !defined($channel) );
           Shelly_readingsBulkUpdate($hash,"voltmeter_$channel",$value,"voltage");
           
     }else{
@@ -3030,6 +3034,8 @@ sub Shelly_Set ($@) {
   }elsif( $ff==7 && $cmd =~ /hsv|rgb|white|gain|effect/ ){
     #$ff = 7;
     #my $channel = $value;
+    my ($red,$green,$blue,$white);
+    my $cmd0;
     Log3 $name,5,"[Shelly_Set] processing command $cmd for $name";
     if( $cmd eq "hsv" ){
       my($hue,$saturation,$value)=split(',',$value);
@@ -3037,37 +3043,52 @@ sub Shelly_Set ($@) {
       if( $hue>1 ){
         $hue = $hue/360;
       }
-      my ($red,$green,$blue)=Color::hsv2rgb($hue,$saturation,$value);
-      $cmd=sprintf("red=%d&green=%d&blue=%d",int($red*255+0.5),int($green*255+0.5),int($blue*255+0.5));
+      ($red,$green,$blue)=Color::hsv2rgb($hue,$saturation,$value);
+      $red  =int($red*255+0.5);
+      $green=int($green*255+0.5);
+      $blue= int($blue*255+0.5);
+      $cmd0=sprintf("red=%d&green=%d&blue=%d",$red,$green,$blue);
       if($model eq "shellybulb"){
-          $cmd .= "&gain=100";
+          $cmd0 .= "&gain=100";
       }else{
-          $cmd .= sprintf("&gain=%d",$value*100);  #new
+          $cmd0 .= sprintf("&gain=%d",$value*100);  #new
       }
 
     }elsif( $cmd =~ /rgb/ ){
-      my $red  = hex(substr($value,0,2));  # convert hexadecimal number into decimal
-      my $green= hex(substr($value,2,2));
-      my $blue = hex(substr($value,4,2));
+      $red  = hex(substr($value,0,2));  # convert hexadecimal number into decimal
+      $green= hex(substr($value,2,2));
+      $blue = hex(substr($value,4,2));
       if( $cmd eq "rgbw" ){
-          my $white= hex(substr($value,6,2));
-          $cmd     = sprintf("white=%d",$white);
+          $white= hex(substr($value,6,2));
+          $cmd0    = sprintf("white=%d",$white);
       }
-      $cmd    .= sprintf("&red=%d&green=%d&blue=%d",$red,$green,$blue);
-      $cmd    .= "&gain=100";
+      $cmd0    .= sprintf("&red=%d&green=%d&blue=%d",$red,$green,$blue);
+      $cmd0    .= "&gain=100";
     }elsif( $cmd eq "white" ){  # value 0 ... 100
-      $cmd=sprintf("white=%d",$value*2.55);
+      $cmd0=sprintf("white=%d",$value*2.55);
     }elsif( $cmd eq "gain" ){  # value 0 ... 100
-      $cmd=sprintf("gain=%d",$value);
+      $cmd0=sprintf("gain=%d",$value);
     }elsif( $cmd eq "effect" ){  # value 0 ... 3
       $value = 0  if( $value eq 'Off' );
-      $cmd=sprintf("effect=%d",$value);
+      $cmd0=sprintf("effect=%d",$value);
     }else{
               my $err = "no handler for command \'$cmd\'";
               Shelly_error_handling($hash,"Shelly_Set:rgbw",$err,1);
               return $err;
     }
-    Shelly_HttpRequest($hash,"/color","/0?$cmd$tmrcmd","Shelly_response","dim");
+    my ($CMD1,$CMD2);
+    my $gen;
+    if( $shelly_models{$model}[4]==2 ){ # Gen2   RGBWgen2
+        if( $cmd =~ /hsv|rgb/ ){
+                $CMD1="/rpc/RGB.Set";
+                $CMD2="?id=0&on=true&rgb=[$red,$green,$blue]&brightness=100";
+                $CMD2.="&white=$white"   if( $cmd =~ "rgbw" );
+        }
+    }else{  # Gen1
+        $CMD1="/color";
+        $CMD2="/0?$cmd0$tmrcmd";
+    }
+    Shelly_HttpRequest($hash,$CMD1,$CMD2,"Shelly_response","dim");
     return;  
     
   ################################################################################################################
@@ -4951,7 +4972,6 @@ sub Shelly_settings2G {
              readingsBulkUpdateIfChanged($hash,"ap","$ap_enabled $ap_is_open");
              readingsBulkUpdateIfChanged($hash,"ap_name",$ap_ssid);
 
-
              my $extender = $jhash->{wifi}{ap}{range_extender}{enable};
              $extender =~ s/(true|1)/enabled/;
              $extender =~ s/(false|0)/disabled/;
@@ -4981,41 +5001,34 @@ sub Shelly_settings2G {
               $i=2*$c;  # two inputs each light-channel
               # inputs mode: dimup-down with input_0 or dual dim
               if( $in_mode eq "dual_dim" ){
-                 readingsBulkUpdate($hash,"input_$i\_function","dimdown");
+                 readingsBulkUpdateIfChanged($hash,"input_$i\_function","dimdown");
                  $i++;
-                 readingsBulkUpdate($hash,"input_$i\_function","dimup");
+                 readingsBulkUpdateIfChanged($hash,"input_$i\_function","dimup");
               }elsif( $in_mode eq "dual" ){
                  # inputs swapped (cover only, in dual mode) ?
                  my $in_swap = $jhash->{"cover:$c"}{swap_inputs};
-                 my $dir = ($in_swap==1?"down":"up")."wards";
-                 readingsBulkUpdate($hash,"input_$i\_function",$dir);
+                 my $dir = ($in_swap==1?"downwards":"upwards");
+                 readingsBulkUpdateIfChanged($hash,"input_$i\_function",$dir);
                  $i++;
-                 $dir = ($in_swap == 1?"up":"down")."wards";
-                 readingsBulkUpdate($hash,"input_$i\_function",$dir);
+                 $dir = ($in_swap==1?"upwards":"downwards");
+                 readingsBulkUpdateIfChanged($hash,"input_$i\_function",$dir);
                  $in_swap =~ s/0/normal/;    # 0=(false)  = not swapped
                  $in_swap =~ s/1/swapped/;   # 1=(true)
               }else{
-                 readingsBulkUpdate($hash,"input_$i\_function",$in_mode);  # Button set to "dim", "activate" or "detached"
+                 readingsBulkUpdateIfChanged($hash,"input_$i\_function",$in_mode);  # Button set to "dim", "activate" or "detached"
                                                                               # Switch as Toggle: 'follow' or Switch as Edge: 'flip'
                  $i++;
-                 readingsBulkUpdate($hash,"input_$i\_function","detached");
+                 readingsBulkUpdateIfChanged($hash,"input_$i\_function","detached");
               }
             }elsif( $model ne "shellyi4" ){  # switch: follow, detached
-                 if( $shelly_models{$model}[5] < 2 ){ 
-                     readingsBulkUpdate($hash,"input\_function",$in_mode);
-                 }else{            
-                     readingsBulkUpdate($hash,"input_$i\_function",$in_mode);
-                 }
+                $subs = $shelly_models{$model}[5]<2?"":"_$i";
+                readingsBulkUpdateIfChanged($hash,"input$subs\_function",$in_mode);
             }
             # outputs swapped / reverse directions (cover only) ?
             if( $profile eq "cover" ){
-                my $output_swapped = $jhash->{"$profile:$c"}{invert_directions};
+                my $output_mode = $jhash->{"$profile:$c"}{invert_directions}==1 ? "O1=down, O2=up (swapped)" : "O1=up, O2=down";
                 $subs = $shelly_models{$model}[1]==1?"":"_$i";
-                if( $output_swapped == 1 ){
-                    readingsBulkUpdate($hash,"output$subs\_mode","O1=down, O2=up (swapped)");
-                }else{
-                    readingsBulkUpdate($hash,"output$subs\_mode","O1=up, O2=down");
-                }
+                readingsBulkUpdateIfChanged($hash,"output$subs\_mode",$output_mode);
             }
             $c++;            
             Log3 $name,6,"[Shelly_settings2G:config:inputs] $name is of profile=$profile and input-mode=$in_mode";
@@ -5840,13 +5853,13 @@ sub Shelly_procEnergyData {
           foreach my $idx( "A","B","C" ){
               last unless( ReadingsNum($name,"$reading\_$idx",undef) );
               $val = ReadingsVal($name,"$reading\_$idx",0) =~ /(\d+.?\d+)\s(\S*)/;
-              $unit = $2;
+              $unit = $2//"";  # no units in reading if attr showunits is 'none'
               $value += ReadingsNum($name,"$reading\_$idx",0);
             #  $value += ($1//0);
           }
           # Shellie'S Energy value 'S'
-       #   my $unit=$si_units
           $pr="";$ps="_S";
+          ##    Log3 $name,0,"[Shelly_procEnergyData] $name: val=$value unit >$unit<"; 
           Shelly_readingsBulkUpdate($hash,$pr.$reading.$ps,$value,"energy/$unit"); # Purchased_Energy, ...
           foreach my $TP (@TPs){
               Log3 $name,5,"[Shelly_procEnergyData] calling Shelly_delta_energy for period \'$TP\' for Shelly in monophase-profile";
