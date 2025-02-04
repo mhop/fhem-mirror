@@ -91,6 +91,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.6.3"  => "04.02.2025  Small bug fixes, removed warnings",
   "0.6.2"  => "28.01.2025  Very small bugfixes ",
   "0.6.1"  => "28.01.2025  Rework of module documentation",
   "0.6.0"  => "23.01.2025  Total rebuild of initialization and gw handling. In case of more than one installation or gw you have to set it via".
@@ -1369,15 +1370,15 @@ sub vitoconnect_Set {
     # Setter für Device Werte rufen
     if  (AttrVal( $name, 'vitoconnect_raw_readings', 0 ) eq "1" ) {
         #use new dynamic parsing of JSON to get raw setters
-        $val .= vitoconnect_Set_New ($hash,$name,$opt,@args);
+        $val .= vitoconnect_Set_New ($hash,$name,$opt,@args) // '';
     } 
     elsif  (AttrVal( $name, 'vitoconnect_mapping_roger', 0 ) eq "1" ) {
         #use roger setters
-        $val .= vitoconnect_Set_Roger ($hash,$name,$opt,@args);
+        $val .= vitoconnect_Set_Roger ($hash,$name,$opt,@args) // '';
     } 
     else {
         #use svn setters
-    $val .= vitoconnect_Set_SVN ($hash,$name,$opt,@args);
+    $val .= vitoconnect_Set_SVN ($hash,$name,$opt,@args) // '';
     }
     
 
@@ -3655,7 +3656,7 @@ sub vitoconnect_action {
     }
     else                                                                {   # Befehl korrekt ausgeführt
         readingsSingleUpdate($hash,"Aktion_Status","OK: ".$opt." ".$Text,1);    # Reading 'Aktion_Status' setzen
-        #Log3($name,1,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt: ".$err." :: ".$msg); # TODO: Wieder weg machen $err
+        # Log3($name,1,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt: ".$err." :: ".$msg); # TODO: Wieder weg machen $err
         Log3($name,3,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt"); 
         
         # Spezial Readings update
@@ -3667,6 +3668,7 @@ sub vitoconnect_action {
             $Text = "1";
         }
         readingsSingleUpdate($hash,$opt,$Text,1);   # Reading updaten
+        # Log3($name,1,$name.",vitoconnect_action: reading upd1 hash:".$hash." opt:".$opt." text:".$Text); # TODO: Wieder weg machen $err
         
         # Spezial Readings update, activate mit temperatur siehe brenner Vitoladens300C
         if ($feature =~ /(.*)\.deactivate/) {
@@ -3676,6 +3678,7 @@ sub vitoconnect_action {
             $Text = "1";
         }
         readingsSingleUpdate($hash,$opt,$Text,1);   # Reading updaten
+        # Log3($name,1,$name.",vitoconnect_action: reading upd2 hash:".$hash." opt:".$opt." text:".$Text); # TODO: Wieder weg machen $err
         
         
         Log3($name,4,$name.",vitoconnect_action: set feature:".$feature." data:".$data.", korrekt ausgefuehrt"); #4
@@ -3693,20 +3696,20 @@ sub vitoconnect_errorHandling {
     
     #Log3 $name, 1, "$name - errorHandling StatusCode: $items->{statusCode} ";
     
-        if (!$items->{statusCode} eq "")    {
+        if (defined $items->{statusCode} && !$items->{statusCode} eq "")    {
             Log3 $name, 4,
-                "$name - statusCode: $items->{statusCode} "
-              . "errorType: $items->{errorType} "
-              . "message: $items->{message} "
-              . "error: $items->{error}";
+               "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
+             . "errorType: " . ($items->{errorType} // 'undef') . " "
+             . "message: " . ($items->{message} // 'undef') . " "
+             . "error: " . ($items->{error} // 'undef');
             readingsSingleUpdate(
-                $hash,
-                "state",
-                "statusCode: $items->{statusCode} "
-                  . "errorType: $items->{errorType} "
-                  . "message: $items->{message} "
-                  . "error: $items->{error}",
-                1
+               $hash,
+               "state",
+               "statusCode: " . ($items->{statusCode} // 'undef') . " "
+             . "errorType: " . ($items->{errorType} // 'undef') . " "
+             . "message: " . ($items->{message} // 'undef') . " "
+             . "error: " . ($items->{error} // 'undef'),
+               1
             );
             if ( $items->{statusCode} eq "401" ) {
                 #  EXPIRED TOKEN
