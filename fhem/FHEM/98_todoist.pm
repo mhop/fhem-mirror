@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.26";
+my $version = "1.3.28";
 my $apiUrl = "https://api.todoist.com/sync/v9/";
 
 my $srandUsed;
@@ -687,7 +687,7 @@ sub todoist_CreateTask($$) {
         
         # data array for API - we could transfer more data        
         %args = (
-          project_id           => int($hash->{PID}),
+          project_id           => $hash->{PID},
           content              => $titleS,
         );
         
