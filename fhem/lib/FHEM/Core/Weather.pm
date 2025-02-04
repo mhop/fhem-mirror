@@ -2,7 +2,7 @@
 ##############################################################################
 #
 #     59_Weather.pm
-#     (c) 2009-2024 Copyright by Dr. Boris Neubert
+#     (c) 2009-2025 Copyright by Dr. Boris Neubert
 #     e-mail: omega at online dot de
 #
 #       Contributors:
@@ -434,8 +434,13 @@ sub _Writereadings {
                 && ref( $dataRef->{$r} ) ne 'ARRAY' );
         }
 
-        ::readingsBulkUpdate( $hash, 'icon',
-            $iconlist[ $dataRef->{current}->{code} ] );
+        if ( defined( $dataRef->{current}->{code} )
+            && $dataRef->{current}->{code} )
+        {
+            ::readingsBulkUpdate( $hash, 'icon',
+                $iconlist[ $dataRef->{current}->{code} ] );
+        }
+
         if (   defined( $dataRef->{current}->{wind_direction} )
             && $dataRef->{current}->{wind_direction}
             && defined( $dataRef->{current}->{wind_speed} )

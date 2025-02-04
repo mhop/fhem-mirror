@@ -2,7 +2,7 @@
 ##############################################################################
 #
 #     59_Weather.pm
-#     (c) 2009-2024 Copyright by Dr. Boris Neubert
+#     (c) 2009-2025 Copyright by Dr. Boris Neubert
 #     e-mail: omega at online dot de
 #
 #       Contributors:
@@ -74,7 +74,7 @@ __END__
 <h3>Weather</h3>
 <ul>
   Note: you need the JSON perl module. Use <code>apt-get install
-  libjson-perl</code> on Debian and derivatives.<p><p>
+  libjson-perl</code> on Debian and derivatives.<p></p>
 
   The Weather module works with various weather APIs:
   <ul>
@@ -105,12 +105,12 @@ __END__
        <tr><td><code>lang</code></td><td>language of the forecast: <code>de</code>,
          <code>en</code>, <code>pl</code>, <code>fr</code>, <code>it</code> or <code>nl</code></td></tr>
        </table>
-       <p>
+       <p></p>
 
     A very simple definition is:<br><br>
     <code>define &lt;name&gt; Weather apikey=&lt;DarkSkyAPISecretKey&gt;</code><br><br>
     This uses the Dark Sky API with an individual key that you need to
-    retrieve from the Dark Sky web site.<p><p>
+    retrieve from the Dark Sky web site.<p></p>
 
     Examples:
     <pre>
@@ -120,9 +120,9 @@ __END__
     </pre>
 
 
-    API-specific documentation follows.<p>
+    API-specific documentation follows.<p></p>
 
-        <h4>Dark Sky</h4><p>
+        <h4>Dark Sky</h4><p></p>
 
         <table>
         <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
@@ -133,9 +133,9 @@ __END__
           weather is forecast; if missing, the values of the attributes
           of the <code>global</code> device are taken, if these exist.</td></tr>
         </table>
-        <p><p>
+        <p></p>
 
-        <h4>OpenWeatherMap</h4><p>
+        <h4>OpenWeatherMap</h4><p></p>
 
         <table>
         <tr><td>API</td><td><code>OpenWeatherMapAPI</code></td></tr>
@@ -151,9 +151,9 @@ __END__
           weather is forecast; if missing, the values of the attributes
           of the <code>global</code> device are taken, if these exist.</td></tr>
         </table>
-        <p><p>
+        <p></p>
         
-        <h4>Wunderground</h4><p>
+        <h4>Wunderground</h4><p></p>
 
         <table>
         <tr><td>API</td><td><code>wundergroundAPI</code></td></tr>
@@ -165,7 +165,7 @@ __END__
           weather is forecast; if missing, the values of the attributes
           of the <code>global</code> device are taken, if these exist.</td></tr>
         </table>
-        <p><p>
+        <p></p>
 
     The module provides four additional functions <code>WeatherAsHtml</code>,
     <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> and
@@ -303,7 +303,7 @@ __END__
 <ul>
     Hinweis: es wird das Perl-Modul JSON ben&ouml;tigt. Mit <code>apt-get install
     libjson-perl</code> kann es unter Debian und Derivaten installiert
-    werden.<p><p>
+    werden.<p></p>
 
     Das Weather-Modul arbeitet mit verschiedenen Wetter-APIs zusammen:
     <ul>
@@ -334,14 +334,15 @@ __END__
     <tr><td><code>lang</code></td><td>Sprache der Wettervorhersage: <code>de</code>,
       <code>en</code>, <code>pl</code>, <code>fr</code>, <code>it</code> oder <code>nl</code></td></tr>
     </table>
-    <p>
+    <p></p>
+
 
     Eine ganz einfache Definition ist:<br><br>
     <code>define &lt;name&gt; Weather apikey=&lt;DarkSkyAPISecretKey&gt;</code><br><br>
 
     Bei dieser Definition wird die API von Dark Sky verwendet mit einem
     individuellen Schl&uuml;ssel, den man sich auf der Webseite von Dark Sky
-     beschaffen muss.<p><p>
+     beschaffen muss.<p></p>
 
     Beispiele:
     <pre>
@@ -350,9 +351,9 @@ __END__
       define <name> Weather API=wundergroundAPI,stationId:IHAUIDELB111 apikey=ed64ccc80f004556a4e3456567800b6324a
     </pre>
 
-    Es folgt die API-spezifische Dokumentation.<p>
+    Es folgt die API-spezifische Dokumentation.<p></p>
 
-    <h4>Dark Sky</h4><p>
+    <h4>Dark Sky</h4><p></p>
 
     <table>
     <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
@@ -364,9 +365,9 @@ __END__
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
       des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
     </table>
-    <p><p>
+    <p></p>
 
-    <h4>OpenWeatherMap</h4><p>
+    <h4>OpenWeatherMap</h4><p></p>
 
     <table>
     <tr><td>API</td><td><code>OpenWeatherMapAPI</code></td></tr>
@@ -385,9 +386,9 @@ __END__
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
       des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
     </table>
-    <p><p>
+    <p></p>
     
-    <h4>Wunderground</h4><p>
+    <h4>Wunderground</h4><p></p>
 
     <table>
     <tr><td>API</td><td><code>wundergroundAPI</code></td></tr>
@@ -400,7 +401,7 @@ __END__
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
       des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
     </table>
-    <p><p>
+    <p></p>
 
     Das Modul unterst&uuml;tzt zus&auml;tzlich vier verschiedene Funktionen
     <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>,
@@ -544,7 +545,7 @@ __END__
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.2.30",
+  "version": "v2.2.35",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
@@ -573,3 +574,4 @@ __END__
 =end :application/json;q=META.json
 
 =cut
+

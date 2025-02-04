@@ -3,7 +3,7 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2019-2023 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2019-2025 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -423,7 +423,7 @@ sub _ProcessingRetrieveData {
                 _ErrorHandling( $self,
                     'OpenWeatherMap Weather decode JSON err ' . $@ );
             }
-            elsif (defined( $data->{cod} )
+            elsif ( defined( $data->{cod} )
                 && $data->{cod}
                 && $data->{cod} != 200
                 && defined( $data->{message} )
