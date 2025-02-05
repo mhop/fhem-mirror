@@ -160,6 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.45.2" => "05.02.2025  aiAddRawData: temp, con, wcc, rr1c, rad1h = undef if no value in pvhistory, fix isWeatherDevValid ".
+                           "__readDataWeather(API): fix no values of hour 01 (00:00+), weather_ids: more weather entries ".
+                           "change weather display management (don), some minor bugfixes ",
   "1.45.1" => "02.02.2025  _specialActivities: Task 1 __deleteEveryHourControls changed, all Tasks adapted ".
                            "_retrieveMessageFile: fix path in __updWriteFile, fix https://forum.fhem.de/index.php?msg=1332721 ",
   "1.45.0" => "01.02.2025  new function timestringsFromOffset, _batChargeRecmd: change condition for load release ".
@@ -365,42 +368,54 @@ my %vNotesIntern = (
   "1.15.5" => "11.02.2024  change forecastQualities output, new limits for 'accurate' and 'spreaded' results from AI ".
                            "checkPlantConfig: change common check info output ".
                            "fix load Astro ",
-  "1.15.4" => "10.02.2024  integrate sun position from Astro module, setPVhistory: change some writes ".
-                           "_transferAPIRadiationValues: consider 'accurate' or 'spreaded' result from AI".
-                           "___calcPeaklossByTemp: bugfix temp, rename moduleDirection to moduleAzimuth ".
-                           "rename moduleTiltAngle to moduleDeclination, checkPlantConfig: check global altitude attr ",
-  "1.15.3" => "06.02.2024  Header: add links to the API website dependend from the used API ",
-  "1.15.2" => "05.02.2024  __mergeDataWeather: fix merger failures, number of temperature decimal places ".
-                           "cicrular Hash: replace 'percentile' by 'simple' ",
-  "1.15.1" => "04.02.2024  checkPlantConfig: fix check attribute ctrlWeatherDevX ",
-  "1.15.0" => "03.02.2024  reduce cpu utilization, add attributes ctrlWeatherDev2, ctrlWeatherDev3 ",
-  "1.14.3" => "02.02.2024  _transferWeatherValues: first step of multi weather device merger ",
-  "1.14.2" => "02.02.2024  fix warning, _transferAPIRadiationValues: Consider upper and lower deviation limit AI to API forecast ",
-  "1.14.1" => "01.02.2024  language support for ___setConsumerPlanningState -> supplement, fix setting 'swoncond not met' ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
 ## Konstanten
 ######################
-use constant LPOOLLENLIM   => 140;                                                  # Breitenbegrenzung der Ausgabe von List Pooldaten
-use constant KJ2KWH        => 0.0002777777778;                                      # Umrechnungsfaktor kJ in kWh
-use constant KJ2WH         => 0.2777777778;                                         # Umrechnungsfaktor kJ in Wh
-use constant WH2KJ         => 3.6;                                                  # Umrechnungsfaktor Wh in kJ
-use constant DEFLANG       => 'EN';                                                 # default Sprache wenn nicht konfiguriert
-use constant DEFMAXVAR     => 10;                                                   # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
-use constant DEFINTERVAL   => 70;                                                   # Standard Abfrageintervall
-use constant SLIDENUMMAX   => 3;                                                    # max. Anzahl der Arrayelemente in Schieberegistern
-use constant SPLSLIDEMAX   => 20;                                                   # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
+use constant LPOOLLENLIM    => 140;                                                  # Breitenbegrenzung der Ausgabe von List Pooldaten
+use constant KJ2KWH         => 0.0002777777778;                                      # Umrechnungsfaktor kJ in kWh
+use constant KJ2WH          => 0.2777777778;                                         # Umrechnungsfaktor kJ in Wh
+use constant WH2KJ          => 3.6;                                                  # Umrechnungsfaktor Wh in kJ
+use constant DEFLANG        => 'EN';                                                 # default Sprache wenn nicht konfiguriert
+use constant DEFMAXVAR      => 1.5;                                                  # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
+use constant DEFINTERVAL    => 70;                                                   # Standard Abfrageintervall
+use constant SLIDENUMMAX    => 3;                                                    # max. Anzahl der Arrayelemente in Schieberegistern
+use constant SPLSLIDEMAX    => 20;                                                   # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
 
-use constant MAXWEATHERDEV => 3;                                                    # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
-use constant MAXBATTERIES  => 3;                                                    # maximale Anzahl der möglichen Batterien
-use constant MAXCONSUMER   => 16;                                                   # maximale Anzahl der möglichen Consumer (Attribut)
-use constant MAXPRODUCER   => 3;                                                    # maximale Anzahl der möglichen anderen Produzenten (Attribut)
-use constant MAXINVERTER   => 3;                                                    # maximale Anzahl der möglichen Inverter
+use constant MAXWEATHERDEV  => 3;                                                    # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
+use constant MAXBATTERIES   => 3;                                                    # maximale Anzahl der möglichen Batterien
+use constant MAXCONSUMER    => 16;                                                   # maximale Anzahl der möglichen Consumer (Attribut)
+use constant MAXPRODUCER    => 3;                                                    # maximale Anzahl der möglichen anderen Produzenten (Attribut)
+use constant MAXINVERTER    => 3;                                                    # maximale Anzahl der möglichen Inverter
 
-use constant MAXSOCDEF     => 95;                                                   # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
-use constant CARECYCLEDEF  => 20;                                                   # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
-use constant BATSOCCHGDAY  => 5;                                                    # Batterie: prozentuale SoC Anpassung pro Tag
+use constant MAXSOCDEF      => 95;                                                   # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
+use constant CARECYCLEDEF   => 20;                                                   # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
+use constant BATSOCCHGDAY   => 5;                                                    # Batterie: prozentuale SoC Anpassung pro Tag
+
+use constant GMFBLTO        => 30;                                                   # Timeout Aholen Message File aus contrib
+use constant GMFILEREPEAT   => 4600;                                                 # Wiederholungsuntervall Abholen Message File aus contrib
+use constant IDXLIMIT       => 900000;                                               # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
+
+use constant AITRBLTO       => 7200;                                                 # KI Training BlockingCall Timeout
+use constant AIBCTHHLD      => 0.2;                                                  # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
+use constant AITRSTARTDEF   => 2;                                                    # default Stunde f. Start AI-Training
+use constant AISTDUDEF      => 1825;                                                 # default Haltezeit KI Raw Daten (Tage)
+use constant AISPREADUPLIM  => 120;                                                  # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+use constant AISPREADLOWLIM => 80;                                                   # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+use constant AIACCUPLIM     => 130;                                                  # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+use constant AIACCLOWLIM    => 70;                                                   # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+use constant AIACCTRNMIN    => 5500;                                                 # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
+use constant AISPREADTRNMIN => 7000;                                                 # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
+
+use constant SOLAPIREPDEF   => 3600;                                                 # default Abrufintervall SolCast API (s)
+use constant FORAPIREPDEF   => 900;                                                  # default Abrufintervall ForecastSolar API (s)
+use constant OMETEOREPDEF   => 900;                                                  # default Abrufintervall Open-Meteo API (s)
+use constant VRMAPIREPDEF   => 300;                                                  # default Abrufintervall Victron VRM API Forecast
+use constant SOLCMAXREQDEF  => 50;                                                   # max. täglich mögliche Requests SolCast API
+use constant OMETMAXREQ     => 9700;                                                 # Beschränkung auf max. mögliche Requests Open-Meteo API
+use constant LEADTIME       => 3600;                                                 # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
+use constant LAGTIME        => 1800;                                                 # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
 
 ## Standardvariablen
 ######################
@@ -423,31 +438,10 @@ my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";              
 my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Export Filename für DWD Stationskatalog im gpx-Format
 my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";             # Filename-Fragment für PV History Exportfile (wird mit Devicename ergänzt)
 
-my $aitrblto       = 7200;                                                          # KI Training BlockingCall Timeout
-my $aibcthhld      = 0.2;                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
-my $aitrstartdef   = 2;                                                             # default Stunde f. Start AI-Training
-my $aistdudef      = 1825;                                                          # default Haltezeit KI Raw Daten (Tage)
-my $aiSpreadUpLim  = 120;                                                           # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-my $aiSpreadLowLim = 80;                                                            # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-my $aiAccUpLim     = 130;                                                           # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-my $aiAccLowLim    = 70;                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-my $aiAccTRNMin    = 5500;                                                          # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
-my $aiSpreadTRNMin = 7000;                                                          # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
-
 my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat    = 851;                                                           # Wiederholungsintervall Cache File Daten schreiben
-my $gmfblto        = 30;                                                            # Timeout Aholen Message File aus contrib
-
-my $solapirepdef   = 3600;                                                          # default Abrufintervall SolCast API (s)
-my $forapirepdef   = 900;                                                           # default Abrufintervall ForecastSolar API (s)
-my $ometeorepdef   = 900;                                                           # default Abrufintervall Open-Meteo API (s)
-my $vrmapirepdef   = 300;                                                           # default Abrufintervall Victron VRM API Forecast
-my $solcmaxreqdef  = 50;                                                            # max. täglich mögliche Requests SolCast API
-my $ometmaxreq     = 9700;                                                          # Beschränkung auf max. mögliche Requests Open-Meteo API
-my $leadtime       = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
-my $lagtime        = 1800;                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
 
 my $prdef          = 1.0;                                                           # default Performance Ratio (PR)
 my $storeffdef     = 0.9;                                                           # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
@@ -504,8 +498,6 @@ my $cfile        = 'controls_solarforecast.txt';                                
 my $msgfiletest  = 'controls_solarforecast_messages_test.txt';                      # TEST Input-File Notification System
 my $msgfileprod  = 'controls_solarforecast_messages_prod.txt';                      # PRODUKTIVES Input-File Notification System
 my $pPath        = '?format=txt';                                                   # Download Format
-my $gmfilerepeat = 4600;                                                            # Wiederholungsuntervall Abholen Message File aus contrib
-my $idxlimit     = 900000;                                                          # Notification System: Indexe > $idxlimit sind reserviert für Steuerungsaufgaben
 
 my $messagefile = $msgfileprod;
                                                                                     # mögliche Debug-Module
@@ -1023,116 +1015,193 @@ my %htitles = (                                                                 
 my %weather_ids = (
   # s =>  0 , 0 - 3   DWD -> kein signifikantes Wetter
   # s =>  1 , 45 - 99 DWD -> signifikantes Wetter
-  '0'   => { s => '0', icon => 'weather_sun',              txtd => 'sonnig',                                                                   txte => 'sunny'                                                                      },
-  '1'   => { s => '0', icon => 'weather_cloudy_light',     txtd => 'Bewölkung abnehmend',                                                      txte => 'Cloudiness decreasing'                                                      },
-  '2'   => { s => '0', icon => 'weather_cloudy',           txtd => 'Bewölkung unverändert',                                                    txte => 'Cloudiness unchanged'                                                       },
-  '3'   => { s => '0', icon => 'weather_cloudy_heavy',     txtd => 'Bewölkung zunehmend',                                                      txte => 'Cloudiness increasing'                                                      },
-  '4'   => { s => '0', icon => 'unknown',                  txtd => 'Sicht durch Rauch oder Asche vermindert',                                  txte => 'Visibility reduced by smoke or ash'                                         },
-  '5'   => { s => '0', icon => 'unknown',                  txtd => 'trockener Dunst (relative Feuchte < 80 %)',                                txte => 'dry haze (relative humidity < 80 %)'                                        },
-  '6'   => { s => '0', icon => 'unknown',                  txtd => 'verbreiteter Schwebstaub, nicht vom Wind herangeführt',                    txte => 'widespread airborne dust, not brought in by the wind'                       },
-  '7'   => { s => '0', icon => 'unknown',                  txtd => 'Staub oder Sand bzw. Gischt, vom Wind herangeführt',                       txte => 'Dust or sand or spray, brought in by the wind'                              },
-  '8'   => { s => '0', icon => 'unknown',                  txtd => 'gut entwickelte Staub- oder Sandwirbel',                                   txte => 'well-developed dust or sand vortex'                                         },
-  '9'   => { s => '0', icon => 'unknown',                  txtd => 'Staub- oder Sandsturm im Gesichtskreis, aber nicht an der Station',        txte => 'Dust or sand storm in the visual circle, but not at the station'            },
+  '0'   => { s => '0', icon => 'weather_sun',                       txtd => 'wolkenloser Himmel',                                                       txte => 'cloudless sky'                                                              },
+  '1'   => { s => '0', icon => 'weather_cloudy_light',              txtd => 'Bewölkung abnehmend',                                                      txte => 'Cloudiness decreasing'                                                      },
+  '2'   => { s => '0', icon => 'weather_cloudy',                    txtd => 'Bewölkung unverändert',                                                    txte => 'Cloudiness unchanged'                                                       },
+  '3'   => { s => '0', icon => 'weather_cloudy_heavy',              txtd => 'Bewölkung zunehmend',                                                      txte => 'Cloudiness increasing'                                                      },
+  '4'   => { s => '0', icon => 'unknown',                           txtd => 'Sicht durch Rauch oder Asche vermindert',                                  txte => 'Visibility reduced by smoke or ash'                                         },
+  '5'   => { s => '0', icon => 'unknown',                           txtd => 'trockener Dunst (relative Feuchte < 80 %)',                                txte => 'dry haze (relative humidity < 80 %)'                                        },
+  '6'   => { s => '0', icon => 'unknown',                           txtd => 'verbreiteter Schwebstaub, nicht vom Wind herangeführt',                    txte => 'widespread airborne dust, not brought in by the wind'                       },
+  '7'   => { s => '0', icon => 'unknown',                           txtd => 'Staub oder Sand bzw. Gischt, vom Wind herangeführt',                       txte => 'Dust or sand or spray, brought in by the wind'                              },
+  '8'   => { s => '0', icon => 'unknown',                           txtd => 'gut entwickelte Staub- oder Sandwirbel',                                   txte => 'well-developed dust or sand vortex'                                         },
+  '9'   => { s => '0', icon => 'unknown',                           txtd => 'Staub- oder Sandsturm im Gesichtskreis, aber nicht an der Station',        txte => 'Dust or sand storm in the visual circle, but not at the station'            },
 
-  '10'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
-  '11'  => { s => '0', icon => 'weather_rain_fog',         txtd => 'Nebel mit Regen',                                                          txte => 'Fog with rain'                                                              },
-  '12'  => { s => '0', icon => 'weather_fog',              txtd => 'durchgehender Bodennebel',                                                 txte => 'continuous ground fog'                                                      },
-  '13'  => { s => '0', icon => 'unknown',                  txtd => 'Wetterleuchten sichtbar, kein Donner gehört',                              txte => 'Weather light visible, no thunder heard'                                    },
-  '14'  => { s => '0', icon => 'unknown',                  txtd => 'Niederschlag im Gesichtskreis, nicht den Boden erreichend',                txte => 'Precipitation in the visual circle, not reaching the ground'                },
-  '15'  => { s => '0', icon => 'unknown',                  txtd => 'Niederschlag in der Ferne (> 5 km), aber nicht an der Station',            txte => 'Precipitation in the distance (> 5 km), but not at the station'             },
-  '16'  => { s => '0', icon => 'unknown',                  txtd => 'Niederschlag in der Nähe (< 5 km), aber nicht an der Station',             txte => 'Precipitation in the vicinity (< 5 km), but not at the station'             },
-  '17'  => { s => '0', icon => 'unknown',                  txtd => 'Gewitter (Donner hörbar), aber kein Niederschlag an der Station',          txte => 'Thunderstorm (thunder audible), but no precipitation at the station'        },
-  '18'  => { s => '0', icon => 'unknown',                  txtd => 'Markante Böen im Gesichtskreis, aber kein Niederschlag an der Station',    txte => 'marked gusts in the visual circle, but no precipitation at the station'     },
-  '19'  => { s => '0', icon => 'unknown',                  txtd => 'Tromben (trichterförmige Wolkenschläuche) im Gesichtskreis',               txte => 'Trombles (funnel-shaped cloud tubes) in the circle of vision'               },
+  '10'  => { s => '0', icon => 'weather_fog',                       txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
+  '11'  => { s => '0', icon => 'weather_rain_fog',                  txtd => 'Nebel mit Regen',                                                          txte => 'Fog with rain'                                                              },
+  '12'  => { s => '0', icon => 'weather_fog',                       txtd => 'durchgehender Bodennebel',                                                 txte => 'continuous ground fog'                                                      },
+  '13'  => { s => '0', icon => 'unknown',                           txtd => 'Wetterleuchten sichtbar, kein Donner gehört',                              txte => 'Weather light visible, no thunder heard'                                    },
+  '14'  => { s => '0', icon => 'unknown',                           txtd => 'Niederschlag im Gesichtskreis, nicht den Boden erreichend',                txte => 'Precipitation in the visual circle, not reaching the ground'                },
+  '15'  => { s => '0', icon => 'unknown',                           txtd => 'Niederschlag in der Ferne (> 5 km), aber nicht an der Station',            txte => 'Precipitation in the distance (> 5 km), but not at the station'             },
+  '16'  => { s => '0', icon => 'unknown',                           txtd => 'Niederschlag in der Nähe (< 5 km), aber nicht an der Station',             txte => 'Precipitation in the vicinity (< 5 km), but not at the station'             },
+  '17'  => { s => '0', icon => 'unknown',                           txtd => 'Gewitter (Donner hörbar), aber kein Niederschlag an der Station',          txte => 'Thunderstorm (thunder audible), but no precipitation at the station'        },
+  '18'  => { s => '0', icon => 'unknown',                           txtd => 'Markante Böen im Gesichtskreis, aber kein Niederschlag an der Station',    txte => 'marked gusts in the visual circle, but no precipitation at the station'     },
+  '19'  => { s => '0', icon => 'unknown',                           txtd => 'Tromben (trichterförmige Wolkenschläuche) im Gesichtskreis',               txte => 'Trombles (funnel-shaped cloud tubes) in the circle of vision'               },
 
-  '20'  => { s => '0', icon => 'unknown',                  txtd => 'nach Sprühregen oder Schneegriesel',                                       txte => 'after drizzle or snow drizzle'                                              },
-  '21'  => { s => '0', icon => 'unknown',                  txtd => 'nach Regen',                                                               txte => 'after rain'                                                                 },
-  '22'  => { s => '0', icon => 'unknown',                  txtd => 'nach Schnefall',                                                           txte => 'after snowfall'                                                             },
-  '23'  => { s => '0', icon => 'unknown',                  txtd => 'nach Schneeregen oder Eiskörnern',                                         txte => 'after sleet or ice grains'                                                  },
-  '24'  => { s => '0', icon => 'unknown',                  txtd => 'nach gefrierendem Regen',                                                  txte => 'after freezing rain'                                                        },
-  '25'  => { s => '0', icon => 'unknown',                  txtd => 'nach Regenschauer',                                                        txte => 'after rain shower'                                                          },
-  '26'  => { s => '0', icon => 'unknown',                  txtd => 'nach Schneeschauer',                                                       txte => 'after snow shower'                                                          },
-  '27'  => { s => '0', icon => 'unknown',                  txtd => 'nach Graupel- oder Hagelschauer',                                          txte => 'after sleet or hail showers'                                                },
-  '28'  => { s => '0', icon => 'unknown',                  txtd => 'nach Nebel',                                                               txte => 'after fog'                                                                  },
-  '29'  => { s => '0', icon => 'unknown',                  txtd => 'nach Gewitter',                                                            txte => 'after thunderstorm'                                                         },
+  '20'  => { s => '0', icon => 'unknown',                           txtd => 'nach Sprühregen oder Schneegriesel',                                       txte => 'after drizzle or snow drizzle'                                              },
+  '21'  => { s => '0', icon => 'unknown',                           txtd => 'nach Regen',                                                               txte => 'after rain'                                                                 },
+  '22'  => { s => '0', icon => 'unknown',                           txtd => 'nach Schnefall',                                                           txte => 'after snowfall'                                                             },
+  '23'  => { s => '0', icon => 'unknown',                           txtd => 'nach Schneeregen oder Eiskörnern',                                         txte => 'after sleet or ice grains'                                                  },
+  '24'  => { s => '0', icon => 'unknown',                           txtd => 'nach gefrierendem Regen',                                                  txte => 'after freezing rain'                                                        },
+  '25'  => { s => '0', icon => 'unknown',                           txtd => 'nach Regenschauer',                                                        txte => 'after rain shower'                                                          },
+  '26'  => { s => '0', icon => 'unknown',                           txtd => 'nach Schneeschauer',                                                       txte => 'after snow shower'                                                          },
+  '27'  => { s => '0', icon => 'unknown',                           txtd => 'nach Graupel- oder Hagelschauer',                                          txte => 'after sleet or hail showers'                                                },
+  '28'  => { s => '0', icon => 'unknown',                           txtd => 'nach Nebel',                                                               txte => 'after fog'                                                                  },
+  '29'  => { s => '0', icon => 'unknown',                           txtd => 'nach Gewitter',                                                            txte => 'after thunderstorm'                                                         },
 
-  '30'  => { s => '0', icon => 'unknown',                  txtd => 'leichter oder mäßiger Sandsturm, an Intensität abnehmend',                 txte => 'light or moderate sandstorm, decreasing in intensity'                       },
-  '31'  => { s => '0', icon => 'unknown',                  txtd => 'leichter oder mäßiger Sandsturm, unveränderte Intensität',                 txte => 'light or moderate sandstorm, unchanged intensity'                           },
-  '32'  => { s => '0', icon => 'unknown',                  txtd => 'leichter oder mäßiger Sandsturm, an Intensität zunehmend',                 txte => 'light or moderate sandstorm, increasing in intensity'                       },
-  '33'  => { s => '0', icon => 'unknown',                  txtd => 'schwerer Sandsturm, an Intensität abnehmend',                              txte => 'heavy sandstorm, decreasing in intensity'                                   },
-  '34'  => { s => '0', icon => 'unknown',                  txtd => 'schwerer Sandsturm, unveränderte Intensität',                              txte => 'heavy sandstorm, unchanged intensity'                                       },
-  '35'  => { s => '0', icon => 'unknown',                  txtd => 'schwerer Sandsturm, an Intensität zunehmend',                              txte => 'heavy sandstorm, increasing in intensity'                                   },
-  '36'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichtes oder mäßiges Schneefegen, unter Augenhöhe',                       txte => 'light or moderate snow sweeping, below eye level'                           },
-  '37'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'starkes Schneefegen, unter Augenhöhe',                                     txte => 'heavy snow sweeping, below eye level'                                       },
-  '38'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichtes oder mäßiges Schneetreiben, über Augenhöhe',                      txte => 'light or moderate blowing snow, above eye level'                            },
-  '39'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'starkes Schneetreiben, über Augenhöhe',                                    txte => 'heavy snow drifting, above eye level'                                       },
+  '30'  => { s => '0', icon => 'unknown',                           txtd => 'leichter oder mäßiger Sandsturm, an Intensität abnehmend',                 txte => 'light or moderate sandstorm, decreasing in intensity'                       },
+  '31'  => { s => '0', icon => 'unknown',                           txtd => 'leichter oder mäßiger Sandsturm, unveränderte Intensität',                 txte => 'light or moderate sandstorm, unchanged intensity'                           },
+  '32'  => { s => '0', icon => 'unknown',                           txtd => 'leichter oder mäßiger Sandsturm, an Intensität zunehmend',                 txte => 'light or moderate sandstorm, increasing in intensity'                       },
+  '33'  => { s => '0', icon => 'unknown',                           txtd => 'schwerer Sandsturm, an Intensität abnehmend',                              txte => 'heavy sandstorm, decreasing in intensity'                                   },
+  '34'  => { s => '0', icon => 'unknown',                           txtd => 'schwerer Sandsturm, unveränderte Intensität',                              txte => 'heavy sandstorm, unchanged intensity'                                       },
+  '35'  => { s => '0', icon => 'unknown',                           txtd => 'schwerer Sandsturm, an Intensität zunehmend',                              txte => 'heavy sandstorm, increasing in intensity'                                   },
+  '36'  => { s => '0', icon => 'weather_snow_light',                txtd => 'leichtes oder mäßiges Schneefegen, unter Augenhöhe',                       txte => 'light or moderate snow sweeping, below eye level'                           },
+  '37'  => { s => '0', icon => 'weather_snow_heavy',                txtd => 'starkes Schneefegen, unter Augenhöhe',                                     txte => 'heavy snow sweeping, below eye level'                                       },
+  '38'  => { s => '0', icon => 'weather_snow_light',                txtd => 'leichtes oder mäßiges Schneetreiben, über Augenhöhe',                      txte => 'light or moderate blowing snow, above eye level'                            },
+  '39'  => { s => '0', icon => 'weather_snow_heavy',                txtd => 'starkes Schneetreiben, über Augenhöhe',                                    txte => 'heavy snow drifting, above eye level'                                       },
 
-  '40'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel in einiger Entfernung',                                              txte => 'Fog in some distance'                                                       },
-  '41'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel in Schwaden oder Bänken',                                            txte => 'Fog in swaths or banks'                                                     },
-  '42'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel erkennbar, dünner werdend',                                  txte => 'Fog, sky recognizable, thinning'                                            },
-  '43'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel nicht erkennbar, dünner werdend',                            txte => 'Fog, sky not recognizable, thinning'                                        },
-  '44'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel erkennbar, unverändert',                                     txte => 'Fog, sky recognizable, unchanged'                                           },
-  '45'  => { s => '1', icon => 'weather_fog',              txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
-  '46'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel erkennbar, dichter werdend',                                 txte => 'Fog, sky recognizable, becoming denser'                                     },
-  '47'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel nicht erkennbar, dichter werdend',                           txte => 'Fog, sky not visible, becoming denser'                                      },
-  '48'  => { s => '1', icon => 'weather_fog',              txtd => 'Nebel mit Reifbildung',                                                    txte => 'Fog with frost formation'                                                   },
-  '49'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel mit Reifansatz, Himmel nicht erkennbar',                             txte => 'Fog with frost, sky not visible'                                            },
+  '40'  => { s => '0', icon => 'weather_fog',                       txtd => 'Nebel in einiger Entfernung',                                              txte => 'Fog in some distance'                                                       },
+  '41'  => { s => '0', icon => 'weather_fog',                       txtd => 'Nebel in Schwaden oder Bänken',                                            txte => 'Fog in swaths or banks'                                                     },
+  '42'  => { s => '0', icon => 'weather_fog',                       txtd => 'Nebel, Himmel erkennbar, dünner werdend',                                  txte => 'Fog, sky recognizable, thinning'                                            },
+  '43'  => { s => '0', icon => 'weather_fog',                       txtd => 'Nebel, Himmel nicht erkennbar, dünner werdend',                            txte => 'Fog, sky not recognizable, thinning'                                        },
+  '44'  => { s => '0', icon => 'weather_fog',                       txtd => 'Nebel, Himmel erkennbar, unverändert',                                     txte => 'Fog, sky recognizable, unchanged'                                           },
+  '45'  => { s => '1', icon => 'weather_fog',                       txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
+  '46'  => { s => '0', icon => 'weather_fog',                       txtd => 'Nebel, Himmel erkennbar, dichter werdend',                                 txte => 'Fog, sky recognizable, becoming denser'                                     },
+  '47'  => { s => '0', icon => 'weather_fog',                       txtd => 'Nebel, Himmel nicht erkennbar, dichter werdend',                           txte => 'Fog, sky not visible, becoming denser'                                      },
+  '48'  => { s => '1', icon => 'weather_fog',                       txtd => 'Nebel mit Reifbildung',                                                    txte => 'Fog with frost formation'                                                   },
+  '49'  => { s => '0', icon => 'weather_fog',                       txtd => 'Nebel mit Reifansatz, Himmel nicht erkennbar',                             txte => 'Fog with frost, sky not visible'                                            },
 
-  '50'  => { s => '0', icon => 'weather_rain',             txtd => 'unterbrochener leichter Sprühregen',                                       txte => 'intermittent light drizzle'                                                 },
-  '51'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Sprühregen',                                                      txte => 'light drizzle'                                                              },
-  '52'  => { s => '0', icon => 'weather_rain',             txtd => 'unterbrochener mäßiger Sprühregen',                                        txte => 'intermittent moderate drizzle'                                              },
-  '53'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Sprühregen',                                                      txte => 'light drizzle'                                                              },
-  '54'  => { s => '0', icon => 'weather_rain_heavy',       txtd => 'unterbrochener starker Sprühregen',                                        txte => 'intermittent heavy drizzle'                                                 },
-  '55'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'starker Sprühregen',                                                       txte => 'heavy drizzle'                                                              },
-  '56'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter gefrierender Sprühregen',                                         txte => 'light freezing drizzle'                                                     },
-  '57'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'mäßiger oder starker gefrierender Sprühregen',                             txte => 'moderate or heavy freezing drizzle'                                         },
-  '58'  => { s => '0', icon => 'weather_rain_light',       txtd => 'leichter Sprühregen mit Regen',                                            txte => 'light drizzle with rain'                                                    },
-  '59'  => { s => '0', icon => 'weather_rain_heavy',       txtd => 'mäßiger oder starker Sprühregen mit Regen',                                txte => 'moderate or heavy drizzle with rain'                                        },
+  '50'  => { s => '0', icon => 'weather_rain',                      txtd => 'unterbrochener leichter Sprühregen',                                       txte => 'intermittent light drizzle'                                                 },
+  '51'  => { s => '1', icon => 'weather_rain_light',                txtd => 'leichter Sprühregen',                                                      txte => 'light drizzle'                                                              },
+  '52'  => { s => '0', icon => 'weather_rain',                      txtd => 'unterbrochener mäßiger Sprühregen',                                        txte => 'intermittent moderate drizzle'                                              },
+  '53'  => { s => '1', icon => 'weather_rain_light',                txtd => 'leichter Sprühregen',                                                      txte => 'light drizzle'                                                              },
+  '54'  => { s => '0', icon => 'weather_rain_heavy',                txtd => 'unterbrochener starker Sprühregen',                                        txte => 'intermittent heavy drizzle'                                                 },
+  '55'  => { s => '1', icon => 'weather_rain_heavy',                txtd => 'starker Sprühregen',                                                       txte => 'heavy drizzle'                                                              },
+  '56'  => { s => '1', icon => 'weather_rain_light',                txtd => 'leichter gefrierender Sprühregen',                                         txte => 'light freezing drizzle'                                                     },
+  '57'  => { s => '1', icon => 'weather_rain_heavy',                txtd => 'mäßiger oder starker gefrierender Sprühregen',                             txte => 'moderate or heavy freezing drizzle'                                         },
+  '58'  => { s => '0', icon => 'weather_rain_light',                txtd => 'leichter Sprühregen mit Regen',                                            txte => 'light drizzle with rain'                                                    },
+  '59'  => { s => '0', icon => 'weather_rain_heavy',                txtd => 'mäßiger oder starker Sprühregen mit Regen',                                txte => 'moderate or heavy drizzle with rain'                                        },
 
-  '60'  => { s => '0', icon => 'weather_rain_light',       txtd => 'unterbrochener leichter Regen oder einzelne Regentropfen',                 txte => 'intermittent light rain or single raindrops'                                },
-  '61'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Regen',                                                           txte => 'light rain'                                                                 },
-  '62'  => { s => '0', icon => 'weather_rain',             txtd => 'unterbrochener mäßiger Regen',                                             txte => 'intermittent moderate rain'                                                 },
-  '63'  => { s => '1', icon => 'weather_rain',             txtd => 'mäßiger Regen',                                                            txte => 'moderate rain'                                                              },
-  '64'  => { s => '0', icon => 'weather_rain_heavy',       txtd => 'unterbrochener starker Regen',                                             txte => 'intermittent heavy rain'                                                    },
-  '65'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'starker Regen',                                                            txte => 'heavy rain'                                                                 },
-  '66'  => { s => '1', icon => 'weather_rain_snow_light',  txtd => 'leichter gefrierender Regen',                                              txte => 'light freezing rain'                                                        },
-  '67'  => { s => '1', icon => 'weather_rain_snow_heavy',  txtd => 'mäßiger oder starker gefrierender Regen',                                  txte => 'moderate or heavy freezing rain'                                            },
-  '68'  => { s => '0', icon => 'weather_rain_snow_light',  txtd => 'leichter Schneeregen',                                                     txte => 'light sleet'                                                                },
-  '69'  => { s => '0', icon => 'weather_rain_snow_heavy',  txtd => 'mäßiger oder starker Schneeregen',                                         txte => 'moderate or heavy sleet'                                                    },
+  '60'  => { s => '0', icon => 'weather_rain_light',                txtd => 'unterbrochener leichter Regen oder einzelne Regentropfen',                 txte => 'intermittent light rain or single raindrops'                                },
+  '61'  => { s => '1', icon => 'weather_rain_light',                txtd => 'leichter Regen',                                                           txte => 'light rain'                                                                 },
+  '62'  => { s => '0', icon => 'weather_rain',                      txtd => 'unterbrochener mäßiger Regen',                                             txte => 'intermittent moderate rain'                                                 },
+  '63'  => { s => '1', icon => 'weather_rain',                      txtd => 'mäßiger Regen',                                                            txte => 'moderate rain'                                                              },
+  '64'  => { s => '0', icon => 'weather_rain_heavy',                txtd => 'unterbrochener starker Regen',                                             txte => 'intermittent heavy rain'                                                    },
+  '65'  => { s => '1', icon => 'weather_rain_heavy',                txtd => 'starker Regen',                                                            txte => 'heavy rain'                                                                 },
+  '66'  => { s => '1', icon => 'weather_rain_snow_light',           txtd => 'leichter gefrierender Regen',                                              txte => 'light freezing rain'                                                        },
+  '67'  => { s => '1', icon => 'weather_rain_snow_heavy',           txtd => 'mäßiger oder starker gefrierender Regen',                                  txte => 'moderate or heavy freezing rain'                                            },
+  '68'  => { s => '0', icon => 'weather_rain_snow_light',           txtd => 'leichter Schneeregen',                                                     txte => 'light sleet'                                                                },
+  '69'  => { s => '0', icon => 'weather_rain_snow_heavy',           txtd => 'mäßiger oder starker Schneeregen',                                         txte => 'moderate or heavy sleet'                                                    },
 
-  '70'  => { s => '0', icon => 'weather_snow_light',       txtd => 'unterbrochener leichter Schneefall oder einzelne Schneeflocken',           txte => 'intermittent light snowfall or single snowflakes'                           },
-  '71'  => { s => '1', icon => 'weather_snow_light',       txtd => 'leichter Schneefall',                                                      txte => 'light snowfall'                                                             },
-  '72'  => { s => '0', icon => 'weather_snow',             txtd => 'unterbrochener mäßiger Schneefall',                                        txte => 'intermittent moderate snowfall'                                             },
-  '73'  => { s => '1', icon => 'weather_snow',             txtd => 'mäßiger Schneefall',                                                       txte => 'moderate snowfall'                                                          },
-  '74'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'unterbrochener starker Schneefall',                                        txte => 'intermittent heavy snowfall'                                                },
-  '75'  => { s => '1', icon => 'weather_snow_heavy',       txtd => 'starker Schneefall',                                                       txte => 'heavy snowfall'                                                             },
-  '76'  => { s => '0', icon => 'weather_frost',            txtd => 'Eisnadeln (Polarschnee)',                                                  txte => 'Ice needles (polar snow)'                                                   },
-  '77'  => { s => '1', icon => 'weather_frost',            txtd => 'Schneegriesel',                                                            txte => 'Snow drizzle'                                                               },
-  '78'  => { s => '0', icon => 'weather_frost',            txtd => 'Schneekristalle',                                                          txte => 'Snow crystals'                                                              },
-  '79'  => { s => '0', icon => 'weather_frost',            txtd => 'Eiskörner (gefrorene Regentropfen)',                                       txte => 'Ice grains (frozen raindrops)'                                              },
+  '70'  => { s => '0', icon => 'weather_snow_light',                txtd => 'unterbrochener leichter Schneefall oder einzelne Schneeflocken',           txte => 'intermittent light snowfall or single snowflakes'                           },
+  '71'  => { s => '1', icon => 'weather_snow_light',                txtd => 'leichter Schneefall',                                                      txte => 'light snowfall'                                                             },
+  '72'  => { s => '0', icon => 'weather_snow',                      txtd => 'unterbrochener mäßiger Schneefall',                                        txte => 'intermittent moderate snowfall'                                             },
+  '73'  => { s => '1', icon => 'weather_snow',                      txtd => 'mäßiger Schneefall',                                                       txte => 'moderate snowfall'                                                          },
+  '74'  => { s => '0', icon => 'weather_snow_heavy',                txtd => 'unterbrochener starker Schneefall',                                        txte => 'intermittent heavy snowfall'                                                },
+  '75'  => { s => '1', icon => 'weather_snow_heavy',                txtd => 'starker Schneefall',                                                       txte => 'heavy snowfall'                                                             },
+  '76'  => { s => '0', icon => 'weather_frost',                     txtd => 'Eisnadeln (Polarschnee)',                                                  txte => 'Ice needles (polar snow)'                                                   },
+  '77'  => { s => '1', icon => 'weather_frost',                     txtd => 'Schneegriesel',                                                            txte => 'Snow drizzle'                                                               },
+  '78'  => { s => '0', icon => 'weather_frost',                     txtd => 'Schneekristalle',                                                          txte => 'Snow crystals'                                                              },
+  '79'  => { s => '0', icon => 'weather_frost',                     txtd => 'Eiskörner (gefrorene Regentropfen)',                                       txte => 'Ice grains (frozen raindrops)'                                              },
 
-  '80'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Regenschauer',                                                    txte => 'light rain shower'                                                          },
-  '81'  => { s => '1', icon => 'weather_rain',             txtd => 'mäßiger oder starker Regenschauer',                                        txte => 'moderate or heavy rain shower'                                              },
-  '82'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'sehr starker Regenschauer',                                                txte => 'very heavy rain shower'                                                     },
-  '83'  => { s => '0', icon => 'weather_snow',             txtd => 'mäßiger oder starker Schneeregenschauer',                                  txte => 'moderate or heavy sleet shower'                                             },
-  '84'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichter Schneeschauer',                                                   txte => 'light snow shower'                                                          },
-  '85'  => { s => '1', icon => 'weather_snow_light',       txtd => 'leichter Schneeschauer',                                                   txte => 'light snow shower'                                                          },
-  '86'  => { s => '1', icon => 'weather_snow_heavy',       txtd => 'mäßiger oder starker Schneeschauer',                                       txte => 'moderate or heavy snow shower'                                              },
-  '87'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'mäßiger oder starker Graupelschauer',                                      txte => 'moderate or heavy sleet shower'                                             },
-  '88'  => { s => '0', icon => 'unknown',                  txtd => 'leichter Hagelschauer',                                                    txte => 'light hailstorm'                                                            },
-  '89'  => { s => '0', icon => 'unknown',                  txtd => 'mäßiger oder starker Hagelschauer',                                        txte => 'moderate or heavy hailstorm'                                                },
+  '80'  => { s => '1', icon => 'weather_rain_light',                txtd => 'leichter Regenschauer',                                                    txte => 'light rain shower'                                                          },
+  '81'  => { s => '1', icon => 'weather_rain',                      txtd => 'mäßiger oder starker Regenschauer',                                        txte => 'moderate or heavy rain shower'                                              },
+  '82'  => { s => '1', icon => 'weather_rain_heavy',                txtd => 'sehr starker Regenschauer',                                                txte => 'very heavy rain shower'                                                     },
+  '83'  => { s => '0', icon => 'weather_snow',                      txtd => 'mäßiger oder starker Schneeregenschauer',                                  txte => 'moderate or heavy sleet shower'                                             },
+  '84'  => { s => '0', icon => 'weather_snow_light',                txtd => 'leichter Schneeschauer',                                                   txte => 'light snow shower'                                                          },
+  '85'  => { s => '1', icon => 'weather_snow_light',                txtd => 'leichter Schneeschauer',                                                   txte => 'light snow shower'                                                          },
+  '86'  => { s => '1', icon => 'weather_snow_heavy',                txtd => 'mäßiger oder starker Schneeschauer',                                       txte => 'moderate or heavy snow shower'                                              },
+  '87'  => { s => '0', icon => 'weather_snow_heavy',                txtd => 'mäßiger oder starker Graupelschauer',                                      txte => 'moderate or heavy sleet shower'                                             },
+  '88'  => { s => '0', icon => 'unknown',                           txtd => 'leichter Hagelschauer',                                                    txte => 'light hailstorm'                                                            },
+  '89'  => { s => '0', icon => 'weather_sleet',                     txtd => 'mäßiger oder starker Hagelschauer',                                        txte => 'moderate or heavy hailstorm'                                                },
 
-  '90'  => { s => '0', icon => 'weather_thunderstorm',     txtd => '',                                                                         txte => ''                                                                           },
-  '91'  => { s => '0', icon => 'weather_storm',            txtd => '',                                                                         txte => ''                                                                           },
-  '92'  => { s => '0', icon => 'weather_thunderstorm',     txtd => '',                                                                         txte => ''                                                                           },
-  '93'  => { s => '0', icon => 'weather_thunderstorm',     txtd => '',                                                                         txte => ''                                                                           },
-  '94'  => { s => '0', icon => 'weather_thunderstorm',     txtd => '',                                                                         txte => ''                                                                           },
-  '95'  => { s => '1', icon => 'weather_thunderstorm',     txtd => 'leichtes oder mäßiges Gewitter ohne Graupel oder Hagel',                   txte => 'light or moderate thunderstorm without sleet or hail'                       },
-  '96'  => { s => '1', icon => 'weather_storm',            txtd => 'starkes Gewitter ohne Graupel oder Hagel,Gewitter mit Graupel oder Hagel', txte => 'strong thunderstorm without sleet or hail,thunderstorm with sleet or hail'  },
-  '97'  => { s => '0', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Regen oder Schnee',                                   txte => 'heavy thunderstorm with rain or snow'                                       },
-  '98'  => { s => '0', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Sandsturm',                                           txte => 'strong thunderstorm with sandstorm'                                         },
-  '99'  => { s => '1', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Graupel oder Hagel',                                  txte => 'strong thunderstorm with sleet or hail'                                     },
-  '100' => { s => '0', icon => 'weather_night',            txtd => 'sternenklarer Himmel',                                                     txte => 'starry sky'                                                                 },
+  '90'  => { s => '0', icon => 'weather_storm',                     txtd => 'starke Hagelschauer ohne Gewitter',                                        txte => 'heavy hail showers without thunderstorms'                                   },
+  '91'  => { s => '0', icon => 'weather_rain_light',                txtd => 'leichter Regen, letzte Stunde Gewitter hörbar',                            txte => 'light rain, last hour thunderstorm audible'                                 },
+  '92'  => { s => '0', icon => 'weather_rain_heavy',                txtd => 'starker Regen, letzte Stunde Gewitter hörbar',                             txte => 'heavy rain, last hour thunderstorm audible'                                 },
+  '93'  => { s => '0', icon => 'weather_rain_snow_light',           txtd => 'leichter Schnee oder Regen-Hagel, letzte Stunde Gewitter hörbar',          txte => 'light snow or rain hail, thunderstorms audible for the last hour'           },
+  '94'  => { s => '0', icon => 'weather_rain_snow_heavy',           txtd => 'starker Schnee oder Regen-Hagel, letzte Stunde Gewitter hörbar',           txte => 'heavy snow or rain hail, thunderstorm audible for the last hour'            },
+  '95'  => { s => '1', icon => 'weather_thunderstorm',              txtd => 'leichtes oder mäßiges Gewitter mit Regen oder Schnee',                     txte => 'light or moderate thunderstorm with rain or snow'                           },
+  '96'  => { s => '1', icon => 'weather_thunderstorm',              txtd => 'leichtes oder mäßiges Gewitter mit Hagel',                                 txte => 'light or moderate thunderstorm with hail'                                   },
+  '97'  => { s => '0', icon => 'weather_thunderstorm',              txtd => 'schweres Gewitter mit Regen oder Schnee',                                  txte => 'heavy thunderstorm with rain or snow'                                       },
+  '98'  => { s => '0', icon => 'weather_thunderstorm',              txtd => 'Gewitter mit Sandsturm',                                                   txte => 'Thunderstorm with sandstorm'                                                },
+  '99'  => { s => '1', icon => 'weather_thunderstorm',              txtd => 'Gewitter mit Graupel oder Hagel',                                          txte => 'Thunderstorm with sleet or hail'                                            },
+  
+  '100' => { s => '0', icon => 'weather_night_starry',              txtd => 'sternenklarer Himmel',                                                     txte => 'starry sky'                                                                 },
+  '101' => { s => '0', icon => 'weather_night_cloudy_light',        txtd => 'Bewölkung abnehmend',                                                      txte => 'Cloudiness decreasing'                                                      },
+  '102' => { s => '0', icon => 'weather_night_cloudy',              txtd => 'Bewölkung unverändert',                                                    txte => 'Cloudiness unchanged'                                                       },
+  '103' => { s => '0', icon => 'weather_night_cloudy_heavy',        txtd => 'Bewölkung zunehmend',                                                      txte => 'Cloudiness increasing'                                                      },
+  '110' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
+  '111' => { s => '0', icon => 'weather_night_rain_fog',            txtd => 'Nebel mit Regen',                                                          txte => 'Fog with rain'                                                              },
+  '112' => { s => '0', icon => 'weather_night_fog',                 txtd => 'durchgehender Bodennebel',                                                 txte => 'continuous ground fog'                                                      },
+  
+  '136' => { s => '0', icon => 'weather_night_snow_light',          txtd => 'leichtes oder mäßiges Schneefegen, unter Augenhöhe',                       txte => 'light or moderate snow sweeping, below eye level'                           },
+  '137' => { s => '0', icon => 'weather_night_snow_heavy',          txtd => 'starkes Schneefegen, unter Augenhöhe',                                     txte => 'heavy snow sweeping, below eye level'                                       },
+  '138' => { s => '0', icon => 'weather_night_snow_light',          txtd => 'leichtes oder mäßiges Schneetreiben, über Augenhöhe',                      txte => 'light or moderate blowing snow, above eye level'                            },
+  '139' => { s => '0', icon => 'weather_night_snow_heavy',          txtd => 'starkes Schneetreiben, über Augenhöhe',                                    txte => 'heavy snow drifting, above eye level'                                       },
+  
+  '140' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel in einiger Entfernung',                                              txte => 'Fog in some distance'                                                       },
+  '141' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel in Schwaden oder Bänken',                                            txte => 'Fog in swaths or banks'                                                     },
+  '142' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel, Himmel erkennbar, dünner werdend',                                  txte => 'Fog, sky recognizable, thinning'                                            },
+  '143' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel, Himmel nicht erkennbar, dünner werdend',                            txte => 'Fog, sky not recognizable, thinning'                                        },
+  '144' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel, Himmel erkennbar, unverändert',                                     txte => 'Fog, sky recognizable, unchanged'                                           },
+  '145' => { s => '1', icon => 'weather_night_fog',                 txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
+  '146' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel, Himmel erkennbar, dichter werdend',                                 txte => 'Fog, sky recognizable, becoming denser'                                     },
+  '147' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel, Himmel nicht erkennbar, dichter werdend',                           txte => 'Fog, sky not visible, becoming denser'                                      },
+  '148' => { s => '1', icon => 'weather_night_fog',                 txtd => 'Nebel mit Reifbildung',                                                    txte => 'Fog with frost formation'                                                   },
+  '149' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel mit Reifansatz, Himmel nicht erkennbar',                             txte => 'Fog with frost, sky not visible'                                            },
+
+  '150' => { s => '0', icon => 'weather_night_rain',                txtd => 'unterbrochener leichter Sprühregen',                                       txte => 'intermittent light drizzle'                                                 },
+  '151' => { s => '1', icon => 'weather_night_rain_light',          txtd => 'leichter Sprühregen',                                                      txte => 'light drizzle'                                                              },
+  '152' => { s => '0', icon => 'weather_night_rain',                txtd => 'unterbrochener mäßiger Sprühregen',                                        txte => 'intermittent moderate drizzle'                                              },
+  '153' => { s => '1', icon => 'weather_night_rain_light',          txtd => 'leichter Sprühregen',                                                      txte => 'light drizzle'                                                              },
+  '154' => { s => '0', icon => 'weather_night_rain_heavy',          txtd => 'unterbrochener starker Sprühregen',                                        txte => 'intermittent heavy drizzle'                                                 },
+  '155' => { s => '1', icon => 'weather_night_rain_heavy',          txtd => 'starker Sprühregen',                                                       txte => 'heavy drizzle'                                                              },
+  '156' => { s => '1', icon => 'weather_night_rain_light',          txtd => 'leichter gefrierender Sprühregen',                                         txte => 'light freezing drizzle'                                                     },
+  '157' => { s => '1', icon => 'weather_night_rain_heavy',          txtd => 'mäßiger oder starker gefrierender Sprühregen',                             txte => 'moderate or heavy freezing drizzle'                                         },
+  '158' => { s => '0', icon => 'weather_night_rain_light',          txtd => 'leichter Sprühregen mit Regen',                                            txte => 'light drizzle with rain'                                                    },
+  '159' => { s => '0', icon => 'weather_night_rain_heavy',          txtd => 'mäßiger oder starker Sprühregen mit Regen',                                txte => 'moderate or heavy drizzle with rain'                                        },
+
+  '160' => { s => '0', icon => 'weather_night_rain_light',          txtd => 'unterbrochener leichter Regen oder einzelne Regentropfen',                 txte => 'intermittent light rain or single raindrops'                                },
+  '161' => { s => '1', icon => 'weather_night_rain_light',          txtd => 'leichter Regen',                                                           txte => 'light rain'                                                                 },
+  '162' => { s => '0', icon => 'weather_night_rain',                txtd => 'unterbrochener mäßiger Regen',                                             txte => 'intermittent moderate rain'                                                 },
+  '163' => { s => '1', icon => 'weather_night_rain',                txtd => 'mäßiger Regen',                                                            txte => 'moderate rain'                                                              },
+  '164' => { s => '0', icon => 'weather_night_rain_heavy   ',       txtd => 'unterbrochener starker Regen',                                             txte => 'intermittent heavy rain'                                                    },
+  '165' => { s => '1', icon => 'weather_night_rain_heavy',          txtd => 'starker Regen',                                                            txte => 'heavy rain'                                                                 },
+  '166' => { s => '1', icon => 'weather_night_snow_rain_light',     txtd => 'leichter gefrierender Regen',                                              txte => 'light freezing rain'                                                        },
+  '167' => { s => '1', icon => 'weather_night_snow_rain_heavy',     txtd => 'mäßiger oder starker gefrierender Regen',                                  txte => 'moderate or heavy freezing rain'                                            },
+  '168' => { s => '0', icon => 'weather_night_snow_rain_light',     txtd => 'leichter Schneeregen',                                                     txte => 'light sleet'                                                                },
+  '169' => { s => '0', icon => 'weather_night_snow_rain_heavy',     txtd => 'mäßiger oder starker Schneeregen',                                         txte => 'moderate or heavy sleet'                                                    },
+
+  '170' => { s => '0', icon => 'weather_night_snow_light',          txtd => 'unterbrochener leichter Schneefall oder einzelne Schneeflocken',           txte => 'intermittent light snowfall or single snowflakes'                           },
+  '171' => { s => '1', icon => 'weather_night_snow_light',          txtd => 'leichter Schneefall',                                                      txte => 'light snowfall'                                                             },
+  '172' => { s => '0', icon => 'weather_night_snow',                txtd => 'unterbrochener mäßiger Schneefall',                                        txte => 'intermittent moderate snowfall'                                             },
+  '173' => { s => '1', icon => 'weather_night_snow',                txtd => 'mäßiger Schneefall',                                                       txte => 'moderate snowfall'                                                          },
+  '174' => { s => '0', icon => 'weather_night_snow_heavy',          txtd => 'unterbrochener starker Schneefall',                                        txte => 'intermittent heavy snowfall'                                                },
+  '175' => { s => '1', icon => 'weather_night_snow_heavy',          txtd => 'starker Schneefall',                                                       txte => 'heavy snowfall'                                                             },
+  '176' => { s => '0', icon => 'weather_frost',                     txtd => 'Eisnadeln (Polarschnee)',                                                  txte => 'Ice needles (polar snow)'                                                   },
+  '177' => { s => '1', icon => 'weather_frost',                     txtd => 'Schneegriesel',                                                            txte => 'Snow drizzle'                                                               },
+  '178' => { s => '0', icon => 'weather_frost',                     txtd => 'Schneekristalle',                                                          txte => 'Snow crystals'                                                              },
+  '179' => { s => '0', icon => 'weather_frost',                     txtd => 'Eiskörner (gefrorene Regentropfen)',                                       txte => 'Ice grains (frozen raindrops)'                                              },
+
+  '180' => { s => '1', icon => 'weather_night_rain_light',          txtd => 'leichter Regenschauer',                                                    txte => 'light rain shower'                                                          },
+  '181' => { s => '1', icon => 'weather_night_rain',                txtd => 'mäßiger oder starker Regenschauer',                                        txte => 'moderate or heavy rain shower'                                              },
+  '182' => { s => '1', icon => 'weather_night_rain_heavy',          txtd => 'sehr starker Regenschauer',                                                txte => 'very heavy rain shower'                                                     },
+  '183' => { s => '0', icon => 'weather_night_snow',                txtd => 'mäßiger oder starker Schneeregenschauer',                                  txte => 'moderate or heavy sleet shower'                                             },
+  '184' => { s => '0', icon => 'weather_night_snow_light',          txtd => 'leichter Schneeschauer',                                                   txte => 'light snow shower'                                                          },
+  '185' => { s => '1', icon => 'weather_night_snow_light',          txtd => 'leichter Schneeschauer',                                                   txte => 'light snow shower'                                                          },
+  '186' => { s => '1', icon => 'weather_night_snow_heavy',          txtd => 'mäßiger oder starker Schneeschauer',                                       txte => 'moderate or heavy snow shower'                                              },
+  '187' => { s => '0', icon => 'weather_night_snow_heavy',          txtd => 'mäßiger oder starker Graupelschauer',                                      txte => 'moderate or heavy sleet shower'                                             },
+  '189' => { s => '0', icon => 'weather_sleet',                     txtd => 'mäßiger oder starker Hagelschauer',                                        txte => 'moderate or heavy hailstorm'                                                },
+
+  '190' => { s => '0', icon => 'weather_storm',                     txtd => 'starke Hagelschauer ohne Gewitter',                                        txte => 'heavy hail showers without thunderstorms'                                   },
+  '191' => { s => '0', icon => 'weather_night_rain_light',          txtd => 'leichter Regen, letzte Stunde Gewitter hörbar',                            txte => 'light rain, last hour thunderstorm audible'                                 },
+  '192' => { s => '0', icon => 'weather_night_rain_heavy',          txtd => 'starker Regen, letzte Stunde Gewitter hörbar',                             txte => 'heavy rain, last hour thunderstorm audible'                                 },
+  '193' => { s => '0', icon => 'weather_night_snow_rain_light',     txtd => 'leichter Schnee oder Regen-Hagel, letzte Stunde Gewitter hörbar',          txte => 'light snow or rain hail, thunderstorms audible for the last hour'           },
+  '194' => { s => '0', icon => 'weather_night_snow_rain_heavy',     txtd => 'starker Schnee oder Regen-Hagel, letzte Stunde Gewitter hörbar',           txte => 'heavy snow or rain hail, thunderstorm audible for the last hour'            },
+  '195' => { s => '1', icon => 'weather_night_thunderstorm_light',  txtd => 'leichtes oder mäßiges Gewitter mit Regen oder Schnee',                     txte => 'light or moderate thunderstorm with rain or snow'                           },
+  '196' => { s => '1', icon => 'weather_night_thunderstorm_light',  txtd => 'leichtes oder mäßiges Gewitter mit Hagel',                                 txte => 'light or moderate thunderstorm with hail'                                   },
+  '197' => { s => '0', icon => 'weather_night_thunderstorm',        txtd => 'schweres Gewitter mit Regen oder Schnee',                                  txte => 'heavy thunderstorm with rain or snow'                                       },
+  '198' => { s => '0', icon => 'weather_night_thunderstorm',        txtd => 'Gewitter mit Sandsturm',                                                   txte => 'Thunderstorm with sandstorm'                                                },
+  '199' => { s => '1', icon => 'weather_night_thunderstorm',        txtd => 'Gewitter mit Graupel oder Hagel',                                          txte => 'Thunderstorm with sleet or hail'                                            },
 );
 
 my %hef = (                                                                      # Energiedaktoren für Verbrauchertypen
@@ -2664,7 +2733,7 @@ sub __getSolCastData {
       $maxcnt       = $mx{$apikey} if(!$maxcnt || $mx{$apikey} > $maxcnt);
   }
 
-  my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef);
+  my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', SOLCMAXREQDEF);
   my $madc      = sprintf "%.0f", ($apimaxreq / $maxcnt);                                          # max. tägliche Anzahl API Calls
   my $mpk       = $maxcnt;                                                                         # Requestmultiplikator
   
@@ -2677,7 +2746,7 @@ sub __getSolCastData {
       my ($rapi, $wapi) = getStatusApiName ($hash); 
       my $trc           = StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIcalls', $madc);
       my $etxt          = $hqtxt{bnsas}{$lang};
-      $etxt            =~ s{<WT>}{($leadtime/60)}eg;
+      $etxt            =~ s{<WT>}{(LEADTIME/60)}eg;
 
       if ($trc <= 0) {
           readingsSingleUpdate ($hash, 'nextRadiationAPICall', $etxt, 1);
@@ -2688,13 +2757,13 @@ sub __getSolCastData {
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
-      if ($t < $srtime - $leadtime || $t > $sstime + $lagtime) {
+      if ($t < $srtime - LEADTIME || $t > $sstime + LAGTIME) {
           readingsSingleUpdate($hash, 'nextRadiationAPICall', $etxt, 1);
-          return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
+          return "The current time is not between sunrise minus ".(LEADTIME/60)." minutes and sunset";
       }
 
       my $lrt    = StatusAPIVal ($hash, $rapi, '?All', 'lastretrieval_timestamp',            0);
-      my $apiitv = StatusAPIVal ($hash, $rapi, '?All', 'currentAPIinterval',     $solapirepdef);
+      my $apiitv = StatusAPIVal ($hash, $rapi, '?All', 'currentAPIinterval',     SOLAPIREPDEF);
 
       if ($lrt && $t < $lrt + $apiitv) {
           my $rt = $lrt + $apiitv - $t;
@@ -2872,7 +2941,7 @@ sub __solCast_ApiResponse {
           $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
           if ($debug =~ /apiProcess|apiCall/x) {
-              my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef);
+              my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', SOLCMAXREQDEF);
 
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - response status: ".$jdata->{'response_status'}{'message'});
               Log3 ($name, 1, "$name DEBUG> SolCast API Call - todayRemainingAPIrequests: ".StatusAPIVal ($hash, 'SolCast', '?All', 'todayRemainingAPIrequests', $apimaxreq));
@@ -3030,7 +3099,7 @@ sub ___setSolCastAPIcallKeyData {
   $data{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];       # letzte Abrufzeit
   $data{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_timestamp} = $t;                                           # letzter Abrufzeitstempel
   
-  my $apimaxreq = AttrVal       ($name, 'ctrlSolCastAPImaxReq',        $solcmaxreqdef);
+  my $apimaxreq = AttrVal       ($name, 'ctrlSolCastAPImaxReq',        SOLCMAXREQDEF);
   my $mpl       = StatusAPIVal ($hash, 'SolCast', '?All', 'solCastAPIcallMultiplier', 1);
   my $ddc       = StatusAPIVal ($hash, 'SolCast', '?All', 'todayDoneAPIcalls',        0);
 
@@ -3059,18 +3128,18 @@ sub ___setSolCastAPIcallKeyData {
       $dart      = 0 if($dart < 0);
       $drc      += 1;
       
-      $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = $solapirepdef;
+      $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = SOLAPIREPDEF;
       $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
 
-      debugLog ($paref, "apiProcess|apiCall", "SolCast API Call - Sunset: $sunset, remain Sec to Sunset: $dart, new interval: ".StatusAPIVal ($hash, 'SolCast', '?All', 'currentAPIinterval', $solapirepdef));
+      debugLog ($paref, "apiProcess|apiCall", "SolCast API Call - Sunset: $sunset, remain Sec to Sunset: $dart, new interval: ".StatusAPIVal ($hash, 'SolCast', '?All', 'currentAPIinterval', SOLAPIREPDEF));
   }
   else {
-      $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = $solapirepdef;
+      $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = SOLAPIREPDEF;
   }
 
   ####
 
-  my $apiitv = StatusAPIVal ($hash, 'SolCast', '?All', 'currentAPIinterval', $solapirepdef);
+  my $apiitv = StatusAPIVal ($hash, 'SolCast', '?All', 'currentAPIinterval', SOLAPIREPDEF);
 
   if ($debug =~ /apiProcess|apiCall/x) {
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - remaining API Calls: ".($drc - 1));
@@ -3096,18 +3165,18 @@ sub __getForecastSolarData {
 
   if (!$force) {                                                                                   # regulärer API Abruf
       my $etxt   = $hqtxt{bnsas}{$lang};
-      $etxt      =~ s{<WT>}{($leadtime/60)}eg;
+      $etxt      =~ s{<WT>}{(LEADTIME/60)}eg;
       my $date   = strftime "%Y-%m-%d", localtime($t);
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
-      if ($t < $srtime - $leadtime || $t > $sstime + $lagtime) {
+      if ($t < $srtime - LEADTIME || $t > $sstime + LAGTIME) {
           readingsSingleUpdate ($hash, 'nextRadiationAPICall', $etxt, 1);
-          return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
+          return "The current time is not between sunrise minus ".(LEADTIME/60)." minutes and sunset";
       }
 
       my $lrt    = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'lastretrieval_timestamp',            0);
-      my $apiitv = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'currentAPIinterval',     $forapirepdef);
+      my $apiitv = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'currentAPIinterval',     FORAPIREPDEF);
 
       if ($lrt && $t < $lrt + $apiitv) {
           my $rt = $lrt + $apiitv - $t;
@@ -3388,7 +3457,7 @@ sub ___setForeCastAPIcallKeyData {
   my $period = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'requests_limit_period', 3600);        # Requests Limit Periode
   my $limit  = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'requests_limit',          12);        # Request Limit in Periode
 
-  $data{$name}{statusapi}{ForecastSolar}{'?All'}{currentAPIinterval} = $forapirepdef;
+  $data{$name}{statusapi}{ForecastSolar}{'?All'}{currentAPIinterval} = FORAPIREPDEF;
 
   my $interval = int ($period / ($limit / $snum));
   $interval    = 900 if($interval < 900);
@@ -3397,7 +3466,7 @@ sub ___setForeCastAPIcallKeyData {
 
   ####
 
-  my $apiitv  = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'currentAPIinterval', $forapirepdef);
+  my $apiitv  = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'currentAPIinterval', FORAPIREPDEF);
   my $rtyatts = StatusAPIVal ($hash, 'ForecastSolar', '?All', 'retryat_timestamp',  0);
   my $smt     = q{};
 
@@ -3681,7 +3750,7 @@ sub __getVictronSolarData {
   my $hash  = $defs{$name};
 
   my $lrt    = StatusAPIVal ($hash, 'VictronKi', '?All', 'lastretrieval_timestamp', 0);
-  my $apiitv = $vrmapirepdef;
+  my $apiitv = VRMAPIREPDEF;
 
   if (!$force) {
       if ($lrt && $t < $lrt + $apiitv) {
@@ -4122,8 +4191,8 @@ sub __getopenMeteoData {
   my $hash    = $defs{$name};
   my $donearq = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
 
-  if ($donearq >= $ometmaxreq) {
-      my $msg = "The limit of maximum $ometmaxreq daily API requests is reached or already exceeded. Process is exited.";
+  if ($donearq >= OMETMAXREQ) {
+      my $msg = "The limit of maximum OMETMAXREQ daily API requests is reached or already exceeded. Process is exited.";
       Log3 ($name, 1, "$name - ERROR - $msg");
       return $msg;
   }
@@ -4131,13 +4200,13 @@ sub __getopenMeteoData {
   if (!$force) {                                                                                      # regulärer API Abruf
       my $lrt = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'lastretrieval_timestamp', 0);
 
-      if ($lrt && $t < $lrt + $ometeorepdef) {
-          my $rt = $lrt + $ometeorepdef - $t;
+      if ($lrt && $t < $lrt + OMETEOREPDEF) {
+          my $rt = $lrt + OMETEOREPDEF - $t;
           return qq{The waiting time to the next Open-Meteo API call has not expired yet. The remaining waiting time is $rt seconds};
       }
   }
 
-  debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - the daily API requests -> limited to: $ometmaxreq, done: $donearq});
+  debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - the daily API requests -> limited to: OMETMAXREQ, done: $donearq});
 
   my $submodel         = InternalVal ($hash->{NAME}, $reqm, '');
   
@@ -4195,7 +4264,7 @@ sub __openMeteoDWD_ApiRequest {
   my $hash       = $defs{$name};
 
   if (!$allstrings) {                                                        # alle Strings wurden abgerufen
-      my $apiitv = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', $ometeorepdef);
+      my $apiitv = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF);
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
       
       $data{$name}{statusapi}{OpenMeteo}{'?All'}{todayDoneAPIcalls} += 1;
@@ -4430,10 +4499,8 @@ sub __openMeteoDWD_ApiResponse {
           my $don    = $jdata->{hourly}{is_day}[$k];
           my $temp   = $jdata->{hourly}{temperature_2m}[$k];
           my $rain   = $jdata->{hourly}{rain}[$k];                                              # Regen in Millimeter = kg/m2
-          my $wid    = ($don ? 0 : 100) + $jdata->{hourly}{weather_code}[$k];
+          my $wid    = $jdata->{hourly}{weather_code}[$k];
           my $wcc    = $jdata->{hourly}{cloud_cover}[$k];
-
-          if ($k == 0 && $curwid) { $curwid = ($don ? 0 : 100) +  $curwid }
 
           if ($debug =~ /apiProcess/xs) {
               if ($requestmode eq 'MODEL') {
@@ -4570,11 +4637,11 @@ sub ___setOpenMeteoAPIcallKeyData {
   my $dac = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIcalls',    0);
   my $asc = CurrentVal   ($hash, 'allstringscount', 1);
 
-  my $drr = $ometmaxreq - $dar;
+  my $drr = OMETMAXREQ - $dar;
   $drr    = 0 if($drr < 0);
   
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{todayRemainingAPIrequests} = $drr;
-  $data{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval}        = $ometeorepdef;
+  $data{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval}        = OMETEOREPDEF;
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
@@ -4584,12 +4651,12 @@ sub ___setOpenMeteoAPIcallKeyData {
 
   if ($drr) {
       my $optrep = $rmdif / ($drr / ($cequ * $asc));
-      $optrep    = $ometeorepdef if($optrep < $ometeorepdef);
+      $optrep    = OMETEOREPDEF if($optrep < OMETEOREPDEF);
       
       $data{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval} = $optrep;
   }
 
-  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', $ometeorepdef));
+  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF));
 
 return;
 }
@@ -7478,6 +7545,7 @@ sub centralTask {
   ##########################################################################################################################    
 
   delete $data{$name}{circular}{99}{days2care};                                 # 29.12.2024
+  delete $data{$name}{circular}{'00'};                                            # 04.02.2025
   
   $data{$name}{circular}{99}{initdaybatintot01}  = delete $data{$name}{circular}{99}{initdaybatintot}  if(defined $data{$name}{circular}{99}{initdaybatintot});     # 29.12.2024
   $data{$name}{circular}{99}{initdaybatouttot01} = delete $data{$name}{circular}{99}{initdaybatouttot} if(defined $data{$name}{circular}{99}{initdaybatouttot});    # 29.12.2024
@@ -7515,8 +7583,19 @@ sub centralTask {
           $data{$name}{pvhist}{$dy}{$hr}{batout01}      = delete $data{$name}{pvhist}{$dy}{$hr}{batout}      if(defined $data{$name}{pvhist}{$dy}{$hr}{batout});
           $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc});
           $data{$name}{pvhist}{$dy}{$hr}{batsetsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batsetsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batsetsoc});
+                                                                               # 05.02.2025
+          
+          #if (HistoryVal ($hash, $dy, $hr,'DoN', 0)) {
+          #    $data{$name}{pvhist}{$dy}{$hr}{weatherid} -= 100  if(defined $data{$name}{pvhist}{$dy}{$hr}{weatherid} && $data{$name}{pvhist}{$dy}{$hr}{weatherid} > 100);
+          #}
       }
   }
+  
+ # for my $idx (keys %{$data{$name}{nexthours}}) {                              # 05.02.2025
+ #     my $don = NexthoursVal ($hash, $idx, 'DoN', 0);
+ #     next if($don);
+ #     $data{$name}{nexthours}{$idx}{weatherid} -= 100 if(defined $data{$name}{nexthours}{$idx}{weatherid} && $data{$name}{nexthours}{$idx}{weatherid} > 100);
+ # }
   
   my $n = 0;                                                       # 01.02.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_* 
   for my $hh (1..24) {                                            
@@ -8022,7 +8101,7 @@ sub _specialActivities {
   ##################################
   $chour    = int $chour;
   $minute   = int $minute;
-  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', $aitrstartdef);                             # Stunde f. Start AI-Training
+  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', AITRSTARTDEF);                             # Stunde f. Start AI-Training
 
   ## Task 1
   ###########
@@ -8332,7 +8411,7 @@ sub _transferWeatherValues {
 
   my $type = $paref->{type};
 
-  delete $data{$name}{weatherdata};                                                         # Wetterdaten Hash löschen
+  delete $data{$name}{weatherdata};                                                            # Wetterdaten Hash löschen
 
   $paref->{apiu}   = $apiu;                                                                    # API wird verwendet
   $paref->{fcname} = $fcname;
@@ -8357,11 +8436,11 @@ sub _transferWeatherValues {
 
   for my $step (1..MAXWEATHERDEV) {
       $paref->{step} = $step;
-      __readDataWeather ($paref);                                                              # Wetterdaten in einen Hash einlesen
+      __readDataWeather ($paref);                                                           # Wetterdaten in einen Hash einlesen
        delete $paref->{step};
   }
 
-  __mergeDataWeather ($paref);                                                                 # Wetterdaten zusammenfügen
+  __mergeDataWeather ($paref);                                                              # Wetterdaten zusammenfügen
 
   for my $num (0..46) {
       my ($fd, $fh) = calcDayHourMove ($chour, $num);
@@ -8374,7 +8453,7 @@ sub _transferWeatherValues {
       my $temp  = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ttt};                   # Außentemperatur
       my $don   = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{don};                   # Tag/Nacht-Grenze
 
-      my $nhtstr                                     = "NextHour".sprintf "%02d", $num;
+      my $nhtstr                                  = "NextHour".sprintf "%02d", $num;
       $data{$name}{nexthours}{$nhtstr}{weatherid} = $wid;
       $data{$name}{nexthours}{$nhtstr}{wcc}       = $wcc;
       $data{$name}{nexthours}{$nhtstr}{rr1c}      = $rr1c;
@@ -8439,12 +8518,20 @@ sub __readDataWeather {
       my ($fd, $fh) = calcDayHourMove ($chour, $n);
       last if($fd > 1);
 
-      my $wid   = ReadingsNum ($fcname, "fc${fd}_${fh}_ww", undef);                            # Signifikantes Wetter zum Vorhersagezeitpunkt
-      my $wwd   = ReadingsVal ($fcname, "fc${fd}_${fh}_wwd",   '');                            # Wetter Beschreibung
-      my $neff  = ReadingsNum ($fcname, "fc${fd}_${fh}_Neff",   0);                            # Effektiver Bedeckungsgrad zum Vorhersagezeitpunkt
-      my $temp  = ReadingsNum ($fcname, "fc${fd}_${fh}_TTT",    0);                            # 2m-Temperatur zum Vorhersagezeitpunkt
-      my $sunup = ReadingsNum ($fcname, "fc${fd}_${fh}_SunUp",  0);                            # 1 - Tag
+      my $wid   = ReadingsNum ($fcname, "fc${fd}_${fh}_ww",   undef);                          # Signifikantes Wetter zum Vorhersagezeitpunkt
+      my $wwd   = ReadingsVal ($fcname, "fc${fd}_${fh}_wwd",     '');                          # Wetter Beschreibung
+      my $neff  = ReadingsNum ($fcname, "fc${fd}_${fh}_Neff", undef);                          # Effektiver Bedeckungsgrad zum Vorhersagezeitpunkt
+      my $temp  = ReadingsNum ($fcname, "fc${fd}_${fh}_TTT",  undef);                          # 2m-Temperatur zum Vorhersagezeitpunkt
+      my $sunup = ReadingsNum ($fcname, "fc${fd}_${fh}_SunUp",    0);                          # 1 - Tag
 
+      $wid  //= ReadingsNum ($fcname, 'fc0_1__ww',   undef);
+      $neff //= ReadingsNum ($fcname, 'fc0_0__Neff', undef); 
+      $temp //= ReadingsNum ($fcname, 'fc0_1__TTT',  undef); 
+      
+      if (!$sunup && defined $wid && defined $weather_ids{$wid}{icon} && $weather_ids{$wid}{icon} ne 'unknown') {        # Nacht-Icons
+          $wid += 100;
+      }
+          
       my $fh1 = $fh + 1;
       my $fd1 = $fd;
 
@@ -8455,13 +8542,9 @@ sub __readDataWeather {
 
       last if($fd1 > 1);
 
-      my $rr1c = ReadingsNum ($fcname, "fc${fd1}_${fh1}_RR1c", 0);                             # Gesamtniederschlag (1-stündig) letzte 1 Stunde
+      my $rr1c = ReadingsNum ($fcname, "fc${fd1}_${fh1}_RR1c", 0);                             # Gesamtniederschlag (1-stündig) letzte 1 Stunde -> wir schuen in die Zukunft
 
-      if (defined $wid && !$sunup) {
-          $wid += 100;
-      }
-
-      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, ww: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: $temp, Neff: $neff");
+      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, wid: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: $temp, Neff: $neff");
 
       $data{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{ww}   = $wid;
       $data{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{wwd}  = $wwd;
@@ -8490,12 +8573,20 @@ sub ___readDataWeatherAPI {
   my ($rapi, $wapi) = getStatusApiName ($hash); 
   
   for my $idx (sort keys %{$data{$name}{weatherapi}{$wapi}}) {
-      if ($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs) {                                        # valider Weather API Index          
+      if ($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs) {                                                                    # valider Weather API Index          
           my $rr1c = WeatherAPIVal ($hash, $wapi, $idx, 'rr1c', undef);
           my $wid  = WeatherAPIVal ($hash, $wapi, $idx, 'ww',   undef);
           my $neff = WeatherAPIVal ($hash, $wapi, $idx, 'neff', undef);
-          my $don  = WeatherAPIVal ($hash, $wapi, $idx, 'don',  undef);
+          my $don  = WeatherAPIVal ($hash, $wapi, $idx, 'don',      0);
           my $ttt  = WeatherAPIVal ($hash, $wapi, $idx, 'ttt',  undef);
+          
+          $wid  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ww',   undef);
+          $neff //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'neff', undef);
+          $ttt  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ttt',  undef);
+          
+          if (!$don && defined $wid && defined $weather_ids{$wid}{icon} && $weather_ids{$wid}{icon} ne 'unknown') {        # Nacht-Icons
+              $wid += 100;
+          }
 
           $data{$name}{weatherdata}{$idx}{$step}{ww}   = $wid  if(defined $wid);
           $data{$name}{weatherdata}{$idx}{$step}{neff} = $neff if(defined $neff);
@@ -8505,7 +8596,7 @@ sub ___readDataWeatherAPI {
 
           debugLog ($paref, 'collectData', "Weather $step: $idx".
                                            ", don: ". (defined $don  ? $don  : '<undef>').
-                                           ", ww: ".  (defined $wid  ? $wid  : '<undef>').
+                                           ", wid: ". (defined $wid  ? $wid  : '<undef>').
                                            ", RR1c: ".(defined $rr1c ? $rr1c : '<undef>').
                                            ", TTT: ". (defined $ttt  ? $ttt  : '<undef>').
                                            ", Neff: ".(defined $neff ? $neff : '<undef>')
@@ -8570,7 +8661,7 @@ sub __mergeDataWeather {
 
       debugLog ($paref, 'collectData', "Weather merged: $key, ".
                                        "don: $data{$name}{weatherdata}{$key}{merge}{don}, ".
-                                       "ww: ".(defined $data{$name}{weatherdata}{$key}{1}{ww} ? $data{$name}{weatherdata}{$key}{1}{ww} : '<undef>').", ".
+                                       "wid: ".(defined $data{$name}{weatherdata}{$key}{1}{ww} ? $data{$name}{weatherdata}{$key}{1}{ww} : '<undef>').", ".
                                        "RR1c: $data{$name}{weatherdata}{$key}{merge}{rr1c}, ".
                                        "TTT: $data{$name}{weatherdata}{$key}{merge}{ttt}, ".
                                        "Neff: $data{$name}{weatherdata}{$key}{merge}{neff}");
@@ -8856,7 +8947,7 @@ sub _transferAPIRadiationValues {
           $aivar    = sprintf "%.0f", (100 * $pvaifc / $est) if($est);                        # Übereinstimmungsgrad KI Forecast zu API Forecast in %
 
           if ($msg eq 'accurate') {                                                           # KI liefert 'accurate' Treffer -> verwenden
-              if ($airn >= $aiAccTRNMin || ($aivar >= $aiAccLowLim && $aivar <= $aiAccUpLim)) {
+              if ($airn >= AIACCTRNMIN || ($aivar >= AIACCLOWLIM && $aivar <= AIACCUPLIM)) {
                   $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
                   $pvfc  = $pvaifc;
                   $useai = 1;
@@ -8865,7 +8956,7 @@ sub _transferAPIRadiationValues {
               }
           }
           elsif ($msg eq 'spreaded') {                                                        # Abweichung AI von Standardvorhersage begrenzen
-              if ($airn >= $aiSpreadTRNMin || ($aivar >= $aiSpreadLowLim && $aivar <= $aiSpreadUpLim)) {
+              if ($airn >= AISPREADTRNMIN || ($aivar >= AISPREADLOWLIM && $aivar <= AISPREADUPLIM)) {
                   $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
                   $pvfc  = $pvaifc;
                   $useai = 1;
@@ -9813,7 +9904,7 @@ sub _batSocTarget {
           $newtarget = $careSoc;
       }
       
-      my $logadd     = '';
+      my $logadd = '';
 
       if ($newtarget > $csopt && $t > $delayts) {                                              # Erhöhung des SoC (wird ab Sonnenuntergang angewendet)
           $target = $newtarget;
@@ -10752,11 +10843,11 @@ sub ___noPlanRelease {
            $dnp = qq{do not plan because off "todayDoneAPIcalls" is not set};
       }
   }
-  else {                                                                                   # Planung erst ab "$leadtime" vor Sonnenaufgang freigeben
+  else {                                                                                   # Planung erst ab "LEADTIME" vor Sonnenaufgang freigeben
       my $sunrise = CurrentVal ($hash, 'sunriseTodayTs', 32529945600);
 
-      if ($t < $sunrise - $leadtime) {
-          $dnp = "do not plan because off current time is less than sunrise minus ".($leadtime / 3600)." hour";
+      if ($t < $sunrise - LEADTIME) {
+          $dnp = "do not plan because off current time is less than sunrise minus ".(LEADTIME / 3600)." hour";
       }
   }
 
@@ -12273,6 +12364,8 @@ sub _calcDataEveryFullHour {
           $h                 = 24;                                                                # Stunde 24 am Vortag!
       }
       
+      next if(!$h);
+      
       my $hh          = sprintf "%02d", $h;
       $paref->{cpcf}  = ReadingsVal ($name, 'pvCorrectionFactor_'.$hh, '');                       # aktuelles pvCorf-Reading
       $paref->{aihit} = CircularVal ($hash, $hh, 'aihit',  0);                                    # AI verwendet?
@@ -12662,8 +12755,8 @@ sub _genSpecialReadings {
       }
 
       if ($def eq 'apimaxreq') {
-          $def = isSolCastUsed   ($hash) ? (AttrVal ($name, 'ctrlSolCastAPImaxReq', $solcmaxreqdef)) :
-                 isOpenMeteoUsed ($hash) ? $ometmaxreq                                               :
+          $def = isSolCastUsed   ($hash) ? (AttrVal ($name, 'ctrlSolCastAPImaxReq', SOLCMAXREQDEF)) :
+                 isOpenMeteoUsed ($hash) ? OMETMAXREQ                                               :
                  'n.a.';
       }
 
@@ -13510,7 +13603,7 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;(';
           $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIrequests', $solcmaxreqdef);
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIrequests', SOLCMAXREQDEF);
           $api .= ')';
           $api .= '</span>';
       }
@@ -13601,7 +13694,7 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;(';
           $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIrequests', $ometmaxreq);
+          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIrequests', OMETMAXREQ);
           $api .= ')';
           $api .= '</span>';
       }
@@ -14525,6 +14618,7 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
   $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
   $hfcg->{0}{sunaz}   = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
+  $hfcg->{0}{don}     = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'DoN',         0);
 
   $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
   $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
@@ -14646,6 +14740,7 @@ sub _beamGraphicRemainingHours {
               $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
               $hfcg->{$i}{sunalt}  = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'sunalt',    '-');
               $hfcg->{$i}{sunaz}   = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'sunaz',     '-');
+              $hfcg->{$i}{don}     = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'DoN',         0);
               
               $val1 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvfc',  0);
               $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
@@ -14679,7 +14774,8 @@ sub _beamGraphicRemainingHours {
           $hfcg->{$i}{wcc}     = NexthoursVal ($hash, 'NextHour'.$nh, 'wcc',       '-');
           $hfcg->{$i}{sunalt}  = NexthoursVal ($hash, 'NextHour'.$nh, 'sunalt',    '-');
           $hfcg->{$i}{sunaz}   = NexthoursVal ($hash, 'NextHour'.$nh, 'sunaz',     '-');
-          my $stt              = NexthoursVal ($hash, 'NextHour'.$nh, 'starttime', '');
+          $hfcg->{$i}{don}     = NexthoursVal ($hash, 'NextHour'.$nh, 'DoN',         0);
+          my $stt              = NexthoursVal ($hash, 'NextHour'.$nh, 'starttime',  '');
           
           $val1 = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',        0);
           $val4 = NexthoursVal ($hash, 'NextHour'.$nh, 'confc',       0);
@@ -15099,8 +15195,8 @@ sub __dontNightshowSkipSync {
   if ($paref->{skip}{$i} && !$paref->{noSkip}{$i}) {             
      $skip = 1 if($paref->{layersync});                                           # Anwendung bei Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen                     
   }
-  elsif (!$paref->{show_night}      &&  $paref->{hfcg}{$i}{weather} > 99  && 
-         !$paref->{hfcg}{$i}{beam1} && !$paref->{hfcg}{beam2}             && 
+  elsif (!$paref->{show_night}      && !$paref->{hfcg}{$i}{don} && 
+         !$paref->{hfcg}{$i}{beam1} && !$paref->{hfcg}{beam2}   && 
          !$paref->{noSkip}{$i}) {
       
       $paref->{skip}{$i} = 1 if($paref->{layersync});                             # Anwendung bei Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen
@@ -15152,9 +15248,7 @@ sub __weatherOnBeam {
       $ii++;                                                                                                 # wieviele Stunden Icons haben sind beechnet?
       last if($ii > $maxhours || $ii > $barcount);
                                                                                                              # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
-      my ($icon_name, $title) = $hfcg->{$i}{weather} > 100                            ?
-                                weather_icon ($name, $lang, $hfcg->{$i}{weather}-100) :
-                                weather_icon ($name, $lang, $hfcg->{$i}{weather});
+      my ($icon_name, $title) = weather_icon ($name, $lang, $hfcg->{$i}{weather});
 
       $wcc   += 0 if(isNumeric ($wcc));                                                                      # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661
       $title .= ': '.$wcc;
@@ -15169,7 +15263,7 @@ sub __weatherOnBeam {
           debugLog ($paref, "graphic", "unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
       }
 
-      $icon_name .= $hfcg->{$i}{weather} < 100 ? '@'.$colorw : '@'.$colorwn;
+      $icon_name .= $hfcg->{$i}{don} ? '@'.$colorw : '@'.$colorwn;
       my $val     = FW_makeImage ($icon_name) // q{};
 
       if ($val =~ /title="$icon_name"/xs) {                                                                  # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
@@ -16411,16 +16505,16 @@ sub _addHourAiRawdata {
   my $rho  = sprintf "%02d", $h;
 
   if (!$aln) {
-      debugLog     ($paref, 'pvCorrectionRead', "Autolearning is switched off for hour: $h -> skip add AI raw data");
+      debugLog ($paref, 'pvCorrectionRead', "Autolearning is switched off for hour: $h -> skip add AI raw data");
       return;
   }
 
   debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
 
-  $paref->{ood} = 1;                                              # only one Day
+  $paref->{ood} = 1;                                                                                  # only one Day
   $paref->{rho} = $rho;
 
-  aiAddRawData ($paref);                                          # Raw Daten für AI hinzufügen und sichern
+  aiAddRawData ($paref);                                                                              # Raw Daten für AI hinzufügen und sichern
 
   delete $paref->{ood};
   delete $paref->{rho};
@@ -16436,7 +16530,7 @@ sub getMessageFileNonBlocking {
   my $name = $hash->{NAME};
       
   RemoveInternalTimer ($hash, "FHEM::SolarForecast::getMessageFileNonBlocking");
-  InternalTimer       (gettimeofday() + $gmfilerepeat, "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
+  InternalTimer       (gettimeofday() + GMFILEREPEAT, "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
   
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
@@ -16457,7 +16551,7 @@ sub getMessageFileNonBlocking {
   $hash->{HELPER}{GMFRUNNING} = BlockingCall ( "FHEM::SolarForecast::_retrieveMessageFile",
                                                $paref,
                                                "FHEM::SolarForecast::_processMessageFile",
-                                               $gmfblto,
+                                               GMFBLTO,
                                                "FHEM::SolarForecast::_abortGetMessageFile",
                                                $hash
                                              );
@@ -16611,7 +16705,7 @@ sub fillupMessageSystem {
   ## Aufnahme Stand für alt/neu Vergleich + Clear Messages
   ##########################################################
   for my $idx (sort keys %{$data{$name}{messages}}) {    
-      next if($idx >= $idxlimit);
+      next if($idx >= IDXLIMIT);
       $otxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
       $otxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
       $otxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
@@ -16623,7 +16717,7 @@ sub fillupMessageSystem {
   ######################################################################## 
   # Integration File Messages
   for my $mfi (sort keys %{$data{$name}{filemessages}}) {
-      next if($mfi >= $idxlimit);
+      next if($mfi >= IDXLIMIT);
       $midx++;
       $data{$name}{messages}{$midx}{SV} = $data{$name}{filemessages}{$mfi}{SV};
       $data{$name}{messages}{$midx}{DE} = $data{$name}{filemessages}{$mfi}{DE};
@@ -16632,7 +16726,7 @@ sub fillupMessageSystem {
   
   # Integration prepared Messages
   for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
-      next if($smi >= $idxlimit);
+      next if($smi >= IDXLIMIT);
       $midx++;
       $data{$name}{messages}{$midx}{SV} = $data{$name}{preparedmessages}{$smi}{SV};
       $data{$name}{messages}{$midx}{DE} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{DE});
@@ -16649,7 +16743,7 @@ sub fillupMessageSystem {
   ## Vergleich auf geänderte Messages
   #####################################
   for my $idx (sort keys %{$data{$name}{messages}}) {                                     
-      next if($idx >= $idxlimit);
+      next if($idx >= IDXLIMIT);
       $ntxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
       $ntxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
       $ntxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
@@ -16706,7 +16800,7 @@ sub outputMessages {
   my $hc = 0;
 
   for my $key (sort keys %{$data{$name}{messages}}) {
-      next if($key >= $idxlimit);
+      next if($key >= IDXLIMIT);
       
       $hc++;
       #my $enmsg = encode ("utf8", $data{$name}{messages}{$key}{$lang});
@@ -16744,7 +16838,7 @@ sub manageTrain {
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
 
-  if (CircularVal ($hash, 99, 'runTimeTrainAI', 0) < $aibcthhld) {
+  if (CircularVal ($hash, 99, 'runTimeTrainAI', 0) < AIBCTHHLD) {
       BlockingKill ($hash->{HELPER}{AIBLOCKRUNNING}) if(defined $hash->{HELPER}{AIBLOCKRUNNING});
       debugLog     ($paref, 'aiProcess', qq{AI Training is started in main process});
       aiTrain      ($paref);
@@ -16762,7 +16856,7 @@ sub manageTrain {
      $hash->{HELPER}{AIBLOCKRUNNING} = BlockingCall ( "FHEM::SolarForecast::aiTrain",
                                                       $paref,
                                                       "FHEM::SolarForecast::finishTrain",
-                                                      $aitrblto,
+                                                      AITRBLTO,
                                                       "FHEM::SolarForecast::abortTrain",
                                                       $hash
                                                     );
@@ -16771,7 +16865,7 @@ sub manageTrain {
      if (defined $hash->{HELPER}{AIBLOCKRUNNING}) {
          $hash->{HELPER}{AIBLOCKRUNNING}{loglevel} = 3;                                                       # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
 
-         debugLog ($paref, 'aiProcess', qq{AI Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" with Timeout "$aitrblto" started});
+         debugLog ($paref, 'aiProcess', qq{AI Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" with Timeout "AITRBLTO" started});
      }
   }
 
@@ -16855,7 +16949,7 @@ sub aiAddInstancePV {                   ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $type  = $paref->{type};
-  my $taa   = $paref->{taa};          # do train after add
+  my $taa   = $paref->{taa};            # do train after add
 
   my $hash  = $defs{$name};
 
@@ -16879,10 +16973,10 @@ sub aiAddInstancePV {                   ## no critic "not used"
       my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
       next if($rad1h <= 0);
 
-      my $temp   = AiRawdataVal ($hash, $idx, 'temp',  20);
-      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',    0);
-      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c',   0);
-      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt', 0);
+      my $temp   = AiRawdataVal ($hash, $idx, 'temp', undef);
+      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',  undef);
+      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c', undef);
+      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',   0);
 
       eval { $dtree->add_instance (attributes => { rad1h  => $rad1h,
                                                    temp   => $temp,
@@ -16902,7 +16996,7 @@ sub aiAddInstancePV {                   ## no critic "not used"
 
       $data{$name}{current}{aiAddedToTrain}++;
 
-      debugLog ($paref, 'aiProcess', qq{AI Instance added $idx - hod: $hod, sunalt: $sunalt, rad1h: $rad1h, pvrl: $pvrl, wcc: $wcc, rr1c: $rr1c, temp: $temp}, 4);
+      debugLog ($paref, 'aiProcess', "AI Instance added $idx - hod: $hod, sunalt: $sunalt, rad1h: $rad1h, pvrl: $pvrl, wcc: ".(defined $wcc ? $wcc : '-').", rr1c: ".(defined $rr1c ? $rr1c : '-').", temp: ".(defined $temp ? $temp : '-'), 4);
   }
 
   debugLog ($paref, 'aiProcess', "AI Instance add - ".$data{$name}{current}{aiAddedToTrain}." entities added for training ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
@@ -17225,26 +17319,26 @@ sub aiAddRawData {
 
           my $ridx   = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
           
-          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',     20);
+          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',  undef);
           my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt',    0);
           my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',     0); 
-          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',       0);    
-          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',       0);
-          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',      0);  
+          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',   undef);    
+          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',   undef);
+          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',  undef);  
           my $rad1h  = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);          
           
-          my $tbin   = temp2bin   ($temp);     
+          my $tbin   = temp2bin   ($temp)    if(defined $temp);
+          my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
           my $sabin  = sunalt2bin ($sunalt);
-          my $cbin   = cloud2bin  ($wcc);
           
           $data{$name}{aidectree}{airaw}{$ridx}{sunalt}  = $sabin;
           $data{$name}{aidectree}{airaw}{$ridx}{sunaz}   = $sunaz;
           $data{$name}{aidectree}{airaw}{$ridx}{dayname} = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
-          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $tbin;
-          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con;
-          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $cbin;
-          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c;
+          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $tbin  if(defined $tbin);
+          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con   if(defined $con);
+          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $cbin  if(defined $cbin);
+          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c  if(defined $rr1c);
           $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h if(defined $rad1h && $rad1h > 0);
           
           $dosave++;
@@ -17259,7 +17353,7 @@ sub aiAddRawData {
           my $pvrl                                    = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           $data{$name}{aidectree}{airaw}{$ridx}{pvrl} = $pvrl if(defined $pvrl && $pvrl  > 0);
           
-          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: ".($rad1h ? $rad1h : '-').", pvrl: ".($pvrl ? $pvrl : '-').", con: $con, wcc: $cbin, rr1c: $rr1c, temp: $tbin", 4);
+          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: ".(defined $rad1h ? $rad1h : '-').", pvrl: ".(defined $pvrl ? $pvrl : '-').", con: ".(defined $con ? $con : '-').", wcc: ".(defined $cbin ? $cbin : '-').", rr1c: ".(defined $rr1c ? $rr1c : '-').", temp: ".(defined $tbin ? $tbin : '-'), 4);
       }
   }
 
@@ -17292,7 +17386,7 @@ sub aiDelRawData {
       return;
   }
 
-  my $hd   = AttrVal ($name, 'ctrlAIdataStorageDuration', $aistdudef);          # Haltezeit KI Raw Daten (Tage)
+  my $hd   = AttrVal ($name, 'ctrlAIdataStorageDuration', AISTDUDEF);          # Haltezeit KI Raw Daten (Tage)
   my $ht   = time - ($hd * 86400);
   my $day  = strftime "%d", localtime($ht);
   my $didx = _aiMakeIdxRaw ($day, '00', $ht);                                   # Daten mit idx <= $didx löschen
@@ -17799,7 +17893,7 @@ sub _listDataPoolPvHist {
           $ret .= "\n            "                                 if($key eq '99');
 
           if ($key ne '99') {
-              $ret .= "wid: $wid, ";
+              $ret .= "weatherid: $wid, ";
               $ret .= "wcc: $wcc, ";
               $ret .= "rr1c: $rr1c, ";
               $ret .= "pvcorrf: $pvcorrf ";
@@ -20456,8 +20550,10 @@ sub isWeatherDevValid {
   my $valid  = '';
   my $apiu   = '';
   my $fcname = AttrVal ($hash->{NAME}, $wdev, '');                                            # Weather Forecast Device
+  
+  return if(!$fcname);
 
-  if ($fcname) { $valid = 1  }
+  $valid = 1;
   if (!$defs{$fcname} || $defs{$fcname}{TYPE} ne "DWD_OpenData") { $valid = '' }
   
   my ($rapi, $wapi) = getStatusApiName ($hash);                                              # $rapi - Radiation-API, $wapi - Weather-API
@@ -23916,7 +24012,7 @@ to ensure that the system configuration is correct.
            <tr><td> <b>intotal</b>   </td><td>Reading which provides the total battery charge as a continuous counter (optional)                            </td></tr>
            <tr><td> <b>outtotal</b>  </td><td>Reading which provides the total battery discharge as a continuous counter (optional)                         </td></tr>
            <tr><td> <b>cap</b>       </td><td>installed battery capacity. Option can be:                                                                    </td></tr>
-           <tr><td>                  </td><td><b>numerical value</b> - direct indication of the battery capacity in Wh                                      </td></tr>
+           <tr><td>                  </td><td><b>numerical value</b> - direct specification of the battery capacity in Wh without specifying the unit!      </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)              </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                                </td></tr>
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                             </td></tr>
@@ -26399,7 +26495,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)                    </td></tr>
            <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung als fortlaufenden Zähler liefert (optional)                 </td></tr>
            <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität. Option kann sein:                                                        </td></tr>
-           <tr><td>                  </td><td><b>numerischer Wert</b> - direkte Angabe der Batteriekapazität in Wh                                     </td></tr>
+           <tr><td>                  </td><td><b>numerischer Wert</b> - direkte Angabe der Batteriekapazität in Wh ohne die Einheit anzugeben!         </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
            <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
