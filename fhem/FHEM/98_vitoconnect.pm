@@ -91,6 +91,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.7.0"  => "06.02.2025  vitoconnect_installationID checked now for at least length 2, see https://forum.fhem.de/index.php?msg=1333072, error handling when setting attributs automatic introduced",
   "0.6.3"  => "04.02.2025  Small bug fixes, removed warnings",
   "0.6.2"  => "28.01.2025  Very small bugfixes ",
   "0.6.1"  => "28.01.2025  Rework of module documentation",
@@ -2691,15 +2692,15 @@ sub vitoconnect_Attr {
             # Zur Zeit kein prüfung, einfacher String
             if (length($attr_value) != 16)                      {
                 my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be 16 characters long.";
-                Log(5,$name.", vitoconnect_Attr: ".$err);
+                Log(1,$name.", vitoconnect_Attr: ".$err);
                 return $err;
             }
         }
         elsif ($attr_name eq "vitoconnect_installationID")                      {
             # Zur Zeit kein prüfung, einfacher String
-            if (length($attr_value) < 5)                      {
-                my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be at least 5 characters long.";
-                Log(5,$name.", vitoconnect_Attr: ".$err);
+            if (length($attr_value) < 2)                      {
+                my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be at least 2 characters long.";
+                Log(1,$name.", vitoconnect_Attr: ".$err);
                 return $err;
             }
         }
@@ -3050,12 +3051,22 @@ sub vitoconnect_getGwCallback {
                 return;
               } elsif ($num_devices == 1) {
                 readingsSingleUpdate($hash,"state","Genau ein Gateway/Device gefunden",1);
-            
+               
                my ($serial) = keys %devices;
                my $installationId = $devices{$serial}->{installationId};
                Log3($name,4,$name." - getGW exactly one Device found set attr: instID: $installationId, serial $serial");
-               CommandAttr (undef, "$name vitoconnect_installationID $installationId");
-               CommandAttr (undef, "$name vitoconnect_serial $serial");
+               my $result;
+               $result = CommandAttr (undef, "$name vitoconnect_installationID $installationId");
+               if ($result) {
+                Log3($name, 1, "Error setting vitoconnect_installationID: $result");
+                return;
+               }
+               $result = CommandAttr (undef, "$name vitoconnect_serial $serial");
+               if ($result) {
+                Log3($name, 1, "Error setting vitoconnect_serial: $result");
+                return;
+               }
+               Log3($name, 4, "Successfully set vitoconnect_serial and vitoconnect_installationID attributes for $name");
               } else {
                 readingsSingleUpdate($hash,"state","Mehrere Gateways/Devices gefunden, bitte eines auswählen über selectDevice",1);
                 return;
@@ -3656,7 +3667,7 @@ sub vitoconnect_action {
     }
     else                                                                {   # Befehl korrekt ausgeführt
         readingsSingleUpdate($hash,"Aktion_Status","OK: ".$opt." ".$Text,1);    # Reading 'Aktion_Status' setzen
-        # Log3($name,1,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt: ".$err." :: ".$msg); # TODO: Wieder weg machen $err
+        #Log3($name,1,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt: ".$err." :: ".$msg); # TODO: Wieder weg machen $err
         Log3($name,3,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt"); 
         
         # Spezial Readings update
@@ -3668,7 +3679,7 @@ sub vitoconnect_action {
             $Text = "1";
         }
         readingsSingleUpdate($hash,$opt,$Text,1);   # Reading updaten
-        # Log3($name,1,$name.",vitoconnect_action: reading upd1 hash:".$hash." opt:".$opt." text:".$Text); # TODO: Wieder weg machen $err
+        #Log3($name,1,$name.",vitoconnect_action: reading upd1 hash:".$hash." opt:".$opt." text:".$Text); # TODO: Wieder weg machen $err
         
         # Spezial Readings update, activate mit temperatur siehe brenner Vitoladens300C
         if ($feature =~ /(.*)\.deactivate/) {
@@ -3678,7 +3689,7 @@ sub vitoconnect_action {
             $Text = "1";
         }
         readingsSingleUpdate($hash,$opt,$Text,1);   # Reading updaten
-        # Log3($name,1,$name.",vitoconnect_action: reading upd2 hash:".$hash." opt:".$opt." text:".$Text); # TODO: Wieder weg machen $err
+        #Log3($name,1,$name.",vitoconnect_action: reading upd2 hash:".$hash." opt:".$opt." text:".$Text); # TODO: Wieder weg machen $err
         
         
         Log3($name,4,$name.",vitoconnect_action: set feature:".$feature." data:".$data.", korrekt ausgefuehrt"); #4
