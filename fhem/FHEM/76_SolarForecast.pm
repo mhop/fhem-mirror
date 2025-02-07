@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.45.3" => "06.02.2025  __readDataWeather: if no values of hour 01 (00:00+) use val of hour 24 of day before ".
+                           "new special reading todayConsumption ",
   "1.45.2" => "05.02.2025  aiAddRawData: temp, con, wcc, rr1c, rad1h = undef if no value in pvhistory, fix isWeatherDevValid ".
                            "__readDataWeather(API): fix no values of hour 01 (00:00+), weather_ids: more weather entries ".
                            "change weather display management (don), some minor bugfixes ",
@@ -1224,12 +1226,13 @@ my %hcsr = (                                                                    
   todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },
   todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
   todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
-  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
+  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => ' s',   def => '-'         },
   runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
   runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
   allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },
   todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', unit => ' Wh',  def => 0           },
-  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  unit => '',     def => '-'         },
+  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  unit => ' s',   def => '-'         },
+  todayConsumption            => { fnr => 3, fn => \&CircularVal,     par => 99,                  unit => ' Wh',  def => 0           },
   BatPowerIn_Sum              => { fnr => 4, fn => \&CurrentVal,      par => 'batpowerinsum',     unit => ' W',   def => '-'         },
   BatPowerOut_Sum             => { fnr => 4, fn => \&CurrentVal,      par => 'batpoweroutsum',    unit => ' W',   def => '-'         }, 
   SunHours_Remain             => { fnr => 4, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
@@ -7583,19 +7586,8 @@ sub centralTask {
           $data{$name}{pvhist}{$dy}{$hr}{batout01}      = delete $data{$name}{pvhist}{$dy}{$hr}{batout}      if(defined $data{$name}{pvhist}{$dy}{$hr}{batout});
           $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc});
           $data{$name}{pvhist}{$dy}{$hr}{batsetsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batsetsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batsetsoc});
-                                                                               # 05.02.2025
-          
-          #if (HistoryVal ($hash, $dy, $hr,'DoN', 0)) {
-          #    $data{$name}{pvhist}{$dy}{$hr}{weatherid} -= 100  if(defined $data{$name}{pvhist}{$dy}{$hr}{weatherid} && $data{$name}{pvhist}{$dy}{$hr}{weatherid} > 100);
-          #}
       }
   }
-  
- # for my $idx (keys %{$data{$name}{nexthours}}) {                              # 05.02.2025
- #     my $don = NexthoursVal ($hash, $idx, 'DoN', 0);
- #     next if($don);
- #     $data{$name}{nexthours}{$idx}{weatherid} -= 100 if(defined $data{$name}{nexthours}{$idx}{weatherid} && $data{$name}{nexthours}{$idx}{weatherid} > 100);
- # }
   
   my $n = 0;                                                       # 01.02.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_* 
   for my $hh (1..24) {                                            
@@ -8402,14 +8394,11 @@ return;
 sub _transferWeatherValues {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $t     = $paref->{t};                                                                     # Epoche Zeit
   my $chour = $paref->{chour};
   my $hash  = $defs{$name};
 
   my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev1');                 # Standard Weather Forecast Device
   return if(!$valid);
-
-  my $type = $paref->{type};
 
   delete $data{$name}{weatherdata};                                                            # Wetterdaten Hash löschen
 
@@ -8436,7 +8425,7 @@ sub _transferWeatherValues {
 
   for my $step (1..MAXWEATHERDEV) {
       $paref->{step} = $step;
-      __readDataWeather ($paref);                                                           # Wetterdaten in einen Hash einlesen
+      __readDataWeather ($paref);                                                           # Wetterdaten aus Device in Wetter-Hash einlesen
        delete $paref->{step};
   }
 
@@ -8497,6 +8486,7 @@ sub __readDataWeather {
   my $chour = $paref->{chour};                                                                  # aktuelles Datum
   my $type  = $paref->{type};
   my $step  = $paref->{step};
+  my $t     = $paref->{t};
   my $hash  = $defs{$name};
 
   my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$step);             # Weather Forecast Device
@@ -8524,9 +8514,12 @@ sub __readDataWeather {
       my $temp  = ReadingsNum ($fcname, "fc${fd}_${fh}_TTT",  undef);                          # 2m-Temperatur zum Vorhersagezeitpunkt
       my $sunup = ReadingsNum ($fcname, "fc${fd}_${fh}_SunUp",    0);                          # 1 - Tag
 
-      $wid  //= ReadingsNum ($fcname, 'fc0_1__ww',   undef);
-      $neff //= ReadingsNum ($fcname, 'fc0_0__Neff', undef); 
-      $temp //= ReadingsNum ($fcname, 'fc0_1__TTT',  undef); 
+      if (!$n) {                                                                               # Hour 00 -> Werte des vorigen Tag / hour 24 verwenden
+          my $dt  = timestringsFromOffset ($t, 86400);                                          
+          $wid  //= HistoryVal ($name, $dt->{day}, '24', 'weatherid', undef);
+          $neff //= HistoryVal ($name, $dt->{day}, '24', 'wcc',       undef);
+          $temp //= HistoryVal ($name, $dt->{day}, '24', 'temp',      undef);
+      }
       
       if (!$sunup && defined $wid && defined $weather_ids{$wid}{icon} && $weather_ids{$wid}{icon} ne 'unknown') {        # Nacht-Icons
           $wid += 100;
@@ -8544,7 +8537,7 @@ sub __readDataWeather {
 
       my $rr1c = ReadingsNum ($fcname, "fc${fd1}_${fh1}_RR1c", 0);                             # Gesamtniederschlag (1-stündig) letzte 1 Stunde -> wir schuen in die Zukunft
 
-      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, wid: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: $temp, Neff: $neff");
+      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, wid: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: ".(defined $temp ? $temp : '<undef>').", Neff: ".(defined $neff ? $neff : '<undef>'));
 
       $data{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{ww}   = $wid;
       $data{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{wwd}  = $wwd;
@@ -8580,9 +8573,11 @@ sub ___readDataWeatherAPI {
           my $don  = WeatherAPIVal ($hash, $wapi, $idx, 'don',      0);
           my $ttt  = WeatherAPIVal ($hash, $wapi, $idx, 'ttt',  undef);
           
-          $wid  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ww',   undef);
-          $neff //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'neff', undef);
-          $ttt  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ttt',  undef);
+          if ($idx eq 'fc0_0') {
+              $wid  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ww',   undef);
+              $neff //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'neff', undef);
+              $ttt  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ttt',  undef);
+          }
           
           if (!$don && defined $wid && defined $weather_ids{$wid}{icon} && $weather_ids{$wid}{icon} ne 'unknown') {        # Nacht-Icons
               $wid += 100;
@@ -12672,28 +12667,29 @@ return $hdv;
 sub _saveEnergyConsumption {
   my $paref  = shift;
   my $name   = $paref->{name};
+  my $day    = $paref->{day};
   my $chour  = $paref->{chour};
   my $debug  = $paref->{debug};
 
-  my $shr     = sprintf "%02d", ($chour + 1);
-  my $pvrl    = ReadingsNum ($name, 'Today_Hour'.$shr.'_PVreal',          0);   # Reading enthält die Summe aller Inverterdevices
-  my $gfeedin = ReadingsNum ($name, 'Today_Hour'.$shr.'_GridFeedIn',      0);
-  my $gcon    = ReadingsNum ($name, 'Today_Hour'.$shr.'_GridConsumption', 0);
+  my $hod     = sprintf "%02d", ($chour + 1);
+  my $pvrl    = ReadingsNum ($name, 'Today_Hour'.$hod.'_PVreal',          0);   # Reading enthält die Summe aller Inverterdevices
+  my $gfeedin = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridFeedIn',      0);
+  my $gcon    = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridConsumption', 0);
   
   my $batin  = 0;
   my $batout = 0;
   
   for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
-      $batin  += ReadingsNum ($name, 'Today_Hour'.$shr.'_BatIn_'.$bn,  0);
-      $batout += ReadingsNum ($name, 'Today_Hour'.$shr.'_BatOut_'.$bn, 0);
+      $batin  += ReadingsNum ($name, 'Today_Hour'.$hod.'_BatIn_'.$bn,  0);
+      $batout += ReadingsNum ($name, 'Today_Hour'.$hod.'_BatOut_'.$bn, 0);
   }
   
   my $ppreal  = 0;
 
   for my $prn (1..MAXPRODUCER) {                                               # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
       $prn     = sprintf "%02d", $prn;
-      $ppreal += ReadingsNum ($name, 'Today_Hour'.$shr.'_PPreal_'.$prn, 0);
+      $ppreal += ReadingsNum ($name, 'Today_Hour'.$hod.'_PPreal_'.$prn, 0);
   }
   
   my $con     = $pvrl + $ppreal - $gfeedin + $gcon - $batin + $batout;
@@ -12709,7 +12705,7 @@ sub _saveEnergyConsumption {
           $pre = 'DEBUG> - WARNING -';
       }
 
-      Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error and is not saved. Check Readings _PVreal, _GridFeedIn, _GridConsumption, _BatIn_XX, _BatOut_XX of hour >$shr<");
+      Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error and is not saved. Check Readings _PVreal, _GridFeedIn, _GridConsumption, _BatIn_XX, _BatOut_XX of hour >$hod<");
   }
   
   if ($debug =~ /collectData/xs) {
@@ -12717,7 +12713,10 @@ sub _saveEnergyConsumption {
       Log3 ($name, 1, "$name DEBUG> EnergyConsumption result -> $con Wh");
   }
   
-  writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $shr } ) if($dowrite);
+  if ($dowrite) {
+      writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $hod } );
+      $data{$name}{circular}{99}{con} = HistoryVal ($name, $day, '99', 'con', undef);
+  }
 
 return;
 }
@@ -12728,6 +12727,7 @@ return;
 sub _genSpecialReadings {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $day   = $paref->{day};
   my $t     = $paref->{t};              # aktueller UNIX Timestamp
 
   my $hash = $defs{$name};
@@ -12761,20 +12761,16 @@ sub _genSpecialReadings {
       }
 
       if ($hcsr{$kpi}{fnr} == 1) {
-          
           storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $rapi, '?All', $kpi, $def));
       }
-
-      if ($hcsr{$kpi}{fnr} == 2) {
+      elsif ($hcsr{$kpi}{fnr} == 2) {
           $par = $kpi if(!$par);
           storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $par, $def).$hcsr{$kpi}{unit});
       }
-
-      if ($hcsr{$kpi}{fnr} == 3) {
+      elsif ($hcsr{$kpi}{fnr} == 3) {
           storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def).$hcsr{$kpi}{unit});
       }
-
-      if ($hcsr{$kpi}{fnr} == 4) {
+      elsif ($hcsr{$kpi}{fnr} == 4) {
           if ($kpi eq 'SunHours_Remain') {
               my $ss  = &{$hcsr{$kpi}{fn}} ($hash, 'sunsetTodayTs',  $def);
               my $shr = ($ss - $t) / 3600;
@@ -12789,12 +12785,6 @@ sub _genSpecialReadings {
               $smr    = $smr < 0 ? 0 : $smr;
 
               storeReading ($prpo.'_'.$kpi, sprintf "%.0f", $smr);
-          }
-
-          if ($kpi eq 'runTimeTrainAI') {
-              my $rtaitr = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def);
-
-              storeReading ($prpo.'_'.$kpi, $rtaitr);
           }
           
           if ($kpi =~ /BatPower(In|Out)_Sum/xs) {
@@ -18096,17 +18086,7 @@ sub _listDataPoolCircular {
       my $temp     = CircularVal ($hash, $idx, 'temp',                '-');
       my $pvcorrf  = CircularVal ($hash, $idx, 'pvcorrf',             '-');
       my $quality  = CircularVal ($hash, $idx, 'quality',             '-');
-      my $tdayDvtn = CircularVal ($hash, $idx, 'tdayDvtn',            '-');
-      my $ydayDvtn = CircularVal ($hash, $idx, 'ydayDvtn',            '-');
-      my $fitot    = CircularVal ($hash, $idx, 'feedintotal',         '-');
-      my $idfi     = CircularVal ($hash, $idx, 'initdayfeedin',       '-');
-      my $gcontot  = CircularVal ($hash, $idx, 'gridcontotal',        '-');
-      my $idgcon   = CircularVal ($hash, $idx, 'initdaygcon',         '-');
-      my $rtaitr   = CircularVal ($hash, $idx, 'runTimeTrainAI',      '-');
-      my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
-      my $airn     = CircularVal ($hash, $idx, 'aiRulesNumber',       '-');
-      my $aicts    = CircularVal ($hash, $idx, 'attrInvChangedTs',    '-');
-
+     
       my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
       my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
       my $pvrs = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvrlsum', cval => $pvrlsum} );
@@ -18184,8 +18164,21 @@ sub _listDataPoolCircular {
       }
       else {
           my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7);
+          
+          my $con      = CircularVal ($hash, $idx, 'con',                 '-');
+          my $gcontot  = CircularVal ($hash, $idx, 'gridcontotal',        '-');
+          my $idgcon   = CircularVal ($hash, $idx, 'initdaygcon',         '-');
+          my $idfi     = CircularVal ($hash, $idx, 'initdayfeedin',       '-');
+          my $fitot    = CircularVal ($hash, $idx, 'feedintotal',         '-');
+          my $tdayDvtn = CircularVal ($hash, $idx, 'tdayDvtn',            '-');
+          my $ydayDvtn = CircularVal ($hash, $idx, 'ydayDvtn',            '-');
+          my $rtaitr   = CircularVal ($hash, $idx, 'runTimeTrainAI',      '-');
+          my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
+          my $airn     = CircularVal ($hash, $idx, 'aiRulesNumber',       '-');
+          my $aicts    = CircularVal ($hash, $idx, 'attrInvChangedTs',    '-');
+          
           for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
-              $bn = sprintf "%02d", $bn;
+              $bn          = sprintf "%02d", $bn;
               my $idbintot = CircularVal ($hash, $idx, 'initdaybatintot'. $bn, '-');
               my $idboutot = CircularVal ($hash, $idx, 'initdaybatouttot'.$bn, '-');
               my $bintot   = CircularVal ($hash, $idx, 'batintot'.        $bn, '-');
@@ -18210,7 +18203,7 @@ sub _listDataPoolCircular {
           }
           
           $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn \n";
-          $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi \n";
+          $sq .= "      con: $con, feedintotal: $fitot, initdayfeedin: $idfi \n";
           $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon \n";
           $sq .= "      $batvl1\n";
           $sq .= "      $batvl2\n";
@@ -22762,7 +22755,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batoutXX</b>            </td><td>Battery XX discharge (Wh)                                                                                             </td></tr>
             <tr><td> <b>batouttotXX</b>         </td><td>total energy drawn from the battery XX (Wh)                                                                           </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>current total energy charged into the battery XX (Wh)                                                                 </td></tr>
-            <tr><td> <b>confc</b>               </td><td>expected energy consumption (Wh)                                                                                      </td></tr>
+            <tr><td> <b>con</b>                 </td><td>real energy consumption (Wh) of the house on the current day                                                          </td></tr>
+            <tr><td> <b>confc</b>               </td><td>expected energy consumption (Wh) of the house on the current day                                                      </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>remaining days until the battery XX maintenance SoC (default 95%) is reached                                          </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Number of days per cloudy area over the entire term                                                                   </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>total PV energy fed into the public grid (Wh)                                                                         </td></tr>
@@ -23522,6 +23516,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>runTimeLastAPIProc</b>         </td><td>the last process time for processing the received radiation data API data                                            </td></tr>
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>the remaining minutes until sunset of the current day                                                                </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>the remaining hours until sunset of the current day                                                                  </td></tr>
+            <tr><td> <b>todayConsumption</b>           </td><td>the energy consumption of the house on the current day                                                               </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Consumption forecast per hour of the current day (01-24)                                                             </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Consumption forecast from current hour to hour before sunset                                                         </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>          </td><td>the number of radiation data API calls executed on the current day                                                   </td></tr>
@@ -25249,7 +25244,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batoutXX</b>            </td><td>Entladung der Batterie XX (Wh)                                                                                            </td></tr>
             <tr><td> <b>batouttotXX</b>         </td><td>aktuell total aus der Batterie XX entnommene Energie (Wh)                                                                 </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>aktuell total in die Batterie XX geladene Energie (Wh)                                                                    </td></tr>
-            <tr><td> <b>confc</b>               </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
+            <tr><td> <b>con</b>                 </td><td>realer Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                                  </td></tr>
+            <tr><td> <b>confc</b>               </td><td>erwarteter Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                              </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>verbleibende Tage bis der Batterie XX Pflege-SoC (default 95%) erreicht sein soll                                         </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit                                                               </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
@@ -26007,6 +26003,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>runTimeLastAPIProc</b>         </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen Strahlungsdaten-API Daten                               </td></tr>
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
+            <tr><td> <b>todayConsumption</b>           </td><td>der Energieverbrauch des Hauses am aktuellen Tag                                                                </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Verbrauchsprognose pro Stunde des aktuellen Tages (01-24)                                                       </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Verbrauchsprognose von aktueller Stunde bis Stunde vor Sonnenuntergang                                          </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>          </td><td>die Anzahl der am aktuellen Tag ausgeführten Strahlungsdaten-API Calls                                          </td></tr>
