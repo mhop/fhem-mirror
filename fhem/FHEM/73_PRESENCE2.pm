@@ -33,7 +33,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "01.03b";
+my $ModulVersion = "01.03c";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -295,9 +295,23 @@ sub PRESENCE2_Define($$) {
                                       :($^O =~ m/solaris/)      ? "ping $hash->{ADDRESS} 4"
                                       :                           "ping -c 1 -w 1 $hash->{ADDRESS} 2>&1"
                                       ;
+
             $hash->{helper}{os}{search} = $^O =~ m/solaris/? 'is alive'
                                          :                   '(ttl|TTL)=\d+'
                                          ;
+
+            if ($^O !~ m/solaris/ && $^O !~ m/(Win|cygwin)/) {
+              my $pingAttr = "disable:0,1 "
+                        . "pingParam "
+                        . "thresholdAbsence "
+                        . "intervalNormal "
+                        . "intervalPresent "
+                        . "prGroup:multiple,static,dynamic "
+                        . "prGroupDisp:condense,verbose "
+                        . "FhemLog3Std:0,1 "
+                        . $readingFnAttributes;
+              setDevAttrList($hash->{NAME}, $pingAttr);
+            }
 
         }
         elsif($a[2] eq "lan-bluetooth") {
@@ -409,7 +423,7 @@ sub PRESENCE2_Define($$) {
             setDevAttrList($hash->{NAME}, $daemonAttr);
         }
         else {
-            my $msg = "unknown mode \"".$a[2]."\" in define statement: Please use lan-ping, daemon, shellscript, function,bluetooth,lan-bluetooth";
+            my $msg = "unknown mode \"".$a[2]."\" in define statement: Please use lan-ping, daemon, shellscript, function, bluetooth, lan-bluetooth";
             Log 2, "PRESENCE2 ($name) - ".$msg;
             return $msg
         }
@@ -430,7 +444,7 @@ sub PRESENCE2_Define($$) {
        InternalTimer(2,"PRESENCE2_updateConfig", $hash->{helper}{updateConfig});
     }
 
-    PRESENCE2_Log $name, 2, "define gaceful done";
+    PRESENCE2_Log $name, 2, "define done";
 
     return undef;
 }
@@ -865,6 +879,23 @@ sub PRESENCE2_Attr(@) {
               $hash->{helper}{os}{search} = '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}';
             }
         }
+        elsif ($a[2] eq "pingParam" ) {
+            return $a[2] . " only used by ping for Linux" if($hash->{MODE} ne "lan-ping");
+            return $a[2] . " only used by ping for Linux/Windows/CygWin" if($^O =~ m/solaris/ || $^O =~ m/(Win|cygwin)/);
+
+            my $regex = qr/(-[cwi] ?\d{1,3}|-q -[cwi] ?\d{1,3}){0,1} ?(-[cwi] ?\d{1,3}|-q -[cwi] ?\d{1,3}){0,1} ?(-[cwi] ?\d{1,3}|-q -[cwi] ?\d{1,3}|-q){0,1}/ip;
+
+            if ( $a[3] =~ m/$regex/g ) {
+               return $a[2] . " mismatched parameters $a[3]" if length(${^MATCH}) != length($a[3]);
+            } else {
+               return $a[2] . " mismatched parameters $a[3]";
+            }
+
+            $hash->{helper}{os}{Cmd} = ($^O =~ m/(Win|cygwin)/) ? "ping $a[3] $hash->{ADDRESS}"
+                                     : ($^O =~ m/solaris/)      ? "ping $hash->{ADDRESS} 4"
+                                     :                            "ping $a[3] $hash->{ADDRESS} 2>&1"
+                                     ;
+        }
 
     }
 
@@ -915,6 +946,13 @@ sub PRESENCE2_Attr(@) {
 
             $hash->{helper}{os}{Cmd} .= ' ' . $hash->{helper}{os}{hcitoolParam} . ' ' . $hash->{ADDRESS} . ' 2>/dev/null';
 
+        }
+        elsif ($a[2] eq "pingParam" ) {
+
+            $hash->{helper}{os}{Cmd} = ($^O =~ m/(Win|cygwin)/) ? "ping -n 1 -4 $hash->{ADDRESS}"
+                                     : ($^O =~ m/solaris/)      ? "ping $hash->{ADDRESS} 4"
+                                     :                            "ping -c 1 -w 1 $hash->{ADDRESS} 2>&1"
+                                     ;
         }
     }
 
@@ -1183,7 +1221,7 @@ sub PRESENCE2_daemonScanScheduler($;$) {
                                                           , $nonBlockingTimeout
                                                           , "PRESENCE2_daemonAbortedScan"
                                                           , $hash);
-#                $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
+                $hash->{helper}{RUNNING_PID}->{loglevel} = GetVerbose($name);
             }
         }
     }
@@ -1218,17 +1256,19 @@ sub PRESENCE2_daemonScanReply($) {
     delete $hash->{helper}{RUNNING_PID};
 
     foreach my $res (@result){
-        my ($eName,$eSstate) = split('\|',$res);
+      my ($eName, $eSstate) = split('\|',$res);
+      if ($eName) {
         readingsBeginUpdate($defs{$eName});
         PRESENCE2_ProcessState($defs{$eName}, $eSstate);
         readingsEndUpdate($defs{$eName}, 1);
+      }
     }
 
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "state", "active");
     foreach (@result){
-        my ($eName,$eSstate) = split('\|',$_);
-        readingsBulkUpdate($hash, "pr_".$eName, $eSstate);
+        my ($eName, $eSstate) = split('\|',$_);
+        readingsBulkUpdate($hash, "pr_".$eName, $eSstate) if $eName;
     }
     readingsBulkUpdate($hash, 'daemonMaxScanTime', $duration)if ($duration > ReadingsVal($name,'daemonMaxScanTime',0));
     
@@ -1703,26 +1743,25 @@ Options:
     </li><br>
 
     <li><a name="intervalPresent"></a>
-       <b>for future use</b>
-       <dt><code>set &lt;name&gt; intervalPresent &lt;seconds&gt;</code></dt>
+       <dt><code>attr &lt;name&gt; intervalPresent &lt;seconds&gt;</code></dt>
        Time in seconds to check status if the device is in state present. It is adjusted to the deamons cycle.<br>
        Not applicable for daemon entity<br>
     </li><br>
 
     <li><a name="intervalNormal"></a>
-       <dt><code>set &lt;name&gt; intervalNormal &lt;seconds&gt;</code></dt>
+       <dt><code>attr &lt;name&gt; intervalNormal &lt;seconds&gt;</code></dt>
        Time in seconds to check status if the device is in state present. It is adjusted to the deamons cycle.<br>
        Not applicable for daemon entity<br>
     </li><br>
 
     <li><a name="nonblockingTimeOut"></a>
-       <dt><code>nonblockingTimeOut &lt;30..240&gt;</code></dt>
+       <dt><code>attr &lt;name&gt; nonblockingTimeOut &lt;30..240&gt&gt;</code></dt>
        <br>
        timeout for regularly checking presende. Default is 60 (seconds).
     </li><br>
 
     <li><a name="bluetoothHciDevice"</a>
-       <dt><code>set &lt;name&gt; bluetoothHciDevice &lt;hci[0..n]&gt;</code></dt>
+       <dt><code>attr &lt;name&gt; bluetoothHciDevice &lt;hci[0..n]&gt;</code></dt>
        (Only applicable in local “bluetooth” mode and not applicable to Daemon device)<br>
        <br>
        Set a specific bluetooth HCI device to use for scanning. If you have multiple bluetooth modules connected,<br>
@@ -1730,20 +1769,33 @@ Options:
     </li><br>
 
     <li><a name="hcitoolParam"></a>
-       <dt><code>set &lt;name&gt; hcitoolParam &lt;name|info&gt;</code></dt>
+       <dt><code>attr &lt;name&gt; hcitoolParam &lt;name|info&gt;</code></dt>
        (Only applicable in local “bluetooth” mode and not applicable to Daemon device)<br>
        <br>
        Selection of which parameter the hcitool should use to recognize a connected bluetooth device<br>
        Default is &lt;name&gt;
     </li><br>
 
+    <li><a name="pingParam"></a>
+       <dt><code>attr &lt;name&gt; pingParam &lt;params&gt;</code></dt>
+       (Only available if OS is not Solaris or Windows/CygWin)<br>
+       <br>
+       Parameters, other than the IP/Host, as available in the command reference for the operating system command 'ping'.<br>
+       Default for Linux: -c 1 -w 1 <br>
+       Supported Parameters:<br>
+        -q                 quiet output<br> 
+        -c <count>         stop after <count> replies<br> 
+        -w <deadline>      reply wait <deadline> in seconds<br>
+        -i <interval>      seconds between sending each packet<br>
+    </li><br>
+
     <li><a name="disable"></a>
-        <dt><code>set &lt;name&gt; disable &lt;0|1&gt;</code></dt>
+        <dt><code>attr &lt;name&gt; disable &lt;0|1&gt;</code></dt>
         If activated, any check is disabled and state is set to disabled.<br>
     </li><br>
 
     <li><a name="prGroup"></a>
-        <dt><code>set &lt;name&gt; prGroup &lt;static|dynamic|...&gt;</code></dt>
+        <dt><code>attr &lt;name&gt; prGroup &lt;static|dynamic|...&gt;</code></dt>
         By defining a group, several presence devices can be assigned to a group and monitored.<br>
         &lt;static&gt; predefined.<br>
         &lt;dynamic&gt; predefined.<br>
@@ -1752,22 +1804,30 @@ Options:
     </li><br>
 
     <li><a name="prGroupDisp"></a>
-        <dt><code>set &lt;name&gt; prGroupDisp &lt;condense|verbose&gt;</code></dt>
+        <dt><code>attr &lt;name&gt; prGroupDisp &lt;condense|verbose&gt;</code></dt>
         &lt;condense&gt; - Shows presence group information in condensed mode. [default]<br>
         &lt;verbose&gt; - Shows presence group information in verbose mode.<br>
     </li><br>
 
     <li><a name="thresholdAbsence"></a>
+        <dt><code>attr &lt;name&gt; thresholdAbsence &lt;seconds&gt;</code></dt>
         <b>child only</b>
-        <dt><code>set &lt;name&gt; thresholdAbsence &lt;seconds&gt;</code></dt>
     </li><br>
 
-    <li><b><a name="PRESENCE2_presentCycle">presentCycle</a></b></li>
-    This attribut may be set to any (ANY) instance in FHEM. It defines the requested cycle time that a reading of the entiy needs to be renewed. The daemon will check the reading's update in its interval. Upon violation of the required timing the reading will toggle to absent.<br>
-    The Reading to be superviced is defined in attr <i>presentReading</i> and defaults to <i>state</i>.<br>
+    <b>for readings that shall be monitored</b>
+    <li><a name="presentCycle"></a>
+        <dt><code>attr &lt;name&gt; presentCycle &lt;seconds&gt;</code></dt>
+        This attribute is available in every device in FHEM. If set, the reading to be monitored will be from the
+        Attribute <i>presentReading</i> or the default Reading <i>state</i> by the Presence2 daemon for updating
+        checked. If no update takes place within the defined period of time, the reading "presentState" is displayed in the device.
+        set to “send”. In the Presence2 daemon device the reading <i>evt_monitoredDevice</i> is generated and set accordingly.<br>
+    </li><br>
 
-    <li><b><a name="PRESENCE2_presentReading">presentReading</a></b></li>
-    This attribut may be set to any (ANY) instance in FHEM. It defines the reading name that is supervices by <i>presentCycle</i>.<br>
+    <li><a name="presentReading"></a>
+        <dt><code>attr &lt;name&gt; presentReading &lt;name of the reading&gt;</code></dt>
+        This attribute is available in every device in FHEM. It defines the reading that <i>presentCycle</i> monitors
+        becomes. If the attribute is not set, the reading <i>state</i> is monitored.<br>
+    </li><br>
   </ul>
   <br>
 
@@ -2061,26 +2121,25 @@ Optionen:
     </li><br>
 
     <li><a name="intervalPresent"></a>
-       <b> noch nicht verfügbar</b>
-       <dt><code>set &lt;name&gt; intervalPresent &lt;Sekunden&gt;</code></dt>
+       <dt><code>attr &lt;name&gt; intervalPresent &lt;Sekunden&gt;</code></dt>
        Zeit in Sekunden, um den Status zu überprüfen, ob sich das Gerät im Status „Present“ befindet. Es ist an den Dämonenzyklus angepasst.<br>
        Gilt nicht für Daemon-Entitäten<br>
     </li><br>
 
     <li><a name="intervalNormal"></a>
-       <dt><code>set &lt;name&gt; intervalNormal &lt;Sekunden&gt;</code></dt>
+       <dt><code>attr &lt;name&gt; intervalNormal &lt;Sekunden&gt;</code></dt>
        Zeit in Sekunden, um den Status zu überprüfen, ob sich das Gerät im Status „Present“ befindet. Es ist an den Dämonenzyklus angepasst.<br>
        Gilt nicht für Daemon-Entitäten<br>
     </li><br>
 
     <li><a name="nonblockingTimeOut"></a>
-       <dt><code>nonblockingTimeOut &lt;30..240&gt;</code></dt>
+       <dt><code>attr &lt;name&gt; nonblockingTimeOut &lt;30..240&gt;</code></dt>
        <br>
        Timeout f&uuml;r das regelm&auml;&szlig;ige prüfen auf Anwesenheit. Standard ist 60 (Sekunden).
     </li><br>
 
     <li><a name="bluetoothHciDevice"></a>
-       <dt><code>set &lt;name&gt; bluetoothHciDevice &lt;hci[0..n]&gt;</code></dt>
+       <dt><code>attr  &lt;name&gt; bluetoothHciDevice &lt;hci[0..n]&gt;</code></dt>
        (Nur im lokalen Modus "bluetooth" und nicht für Daemon Device anwendbar)<br>
        <br>
        Sofern man mehrere Bluetooth-Empf&auml;nger verf&uuml;gbar hat, kann man mit diesem Attribut ein bestimmten Empf&auml;nger ausw&auml;hlen,<br>
@@ -2088,20 +2147,33 @@ Optionen:
     </li><br>
 
     <li><a name="hcitoolParam"></a>
-       <dt><code>set &lt;name&gt; hcitoolParam &lt;name|info&gt;</code></dt>
+       <dt><code>attr &lt;name&gt; hcitoolParam &lt;name|info&gt;</code></dt>
        (Nur im lokalen Modus "bluetooth" und nicht für Daemon Device anwendbar)<br>
        <br>
        Auswahl über welchen Paramter das hcitool ein verbundenes Bluetooth Device erkennen soll.<br>
        Vorgabe ist &lt;name&gt;
     </li><br>
 
+    <li><a name="pingParam"></a>
+       <dt><code>attr &lt;name&gt; pingParam &lt;params&gt;</code></dt>
+       (Nur verfügbar, wenn OS nicht Solaris oder Windows/CygWin)<br>
+       <br>
+       Parameter, außer der IP/Host, wie sie in der Befehlsrefrenz für das Betriebssystem Kommando 'ping' verfügbar sind.<br>
+       Default für Linux: -c 1 -w 1 <br>
+       Supported Parameters:<br>
+        -q                 quiet output<br> 
+        -c <count>         stop after <count> replies<br> 
+        -w <deadline>      reply wait <deadline> in seconds<br>
+        -i <interval>      seconds between sending each packet<br>
+    </li><br>
+
     <li><a name="disable"></a>
-        <dt><code>set &lt;name&gt; disable &lt;0|1&gt;</code></dt>
+        <dt><code>attr &lt;name&gt; disable &lt;0|1&gt;</code></dt>
         Wenn aktiviert, ist jede Prüfung deaktiviert und der Status wird auf deaktiviert gesetzt.<br>
     </li><br>
 
     <li><a name="prGroup"></a>
-        <dt><code>set &lt;name&gt; prGroup &lt;static|dynamic|...&gt;</code></dt>
+        <dt><code>attr &lt;name&gt; prGroup &lt;static|dynamic|...&gt;</code></dt>
         Durch die Definition einer Gruppe können mehrere Präsenzgeräte einer Gruppe zugeordnet und überwacht werden.<br>
         &lt;static&gt; vordefiniert.<br>
         &lt;dynamic&gt; vordefiniert.<br>
@@ -2110,22 +2182,30 @@ Optionen:
     </li><br>
     
     <li><a name="prGroupDisp"></a>
-        <dt><code>set &lt;name&gt; prGroupDisp &lt;condense|verbose&gt;</code></dt>
+        <dt><code>attr &lt;name&gt; prGroupDisp &lt;condense|verbose&gt;</code></dt>
         &lt;condense&gt; - Zeigt Informationen zur Anwesenheitsgruppe im komprimierten Modus an. [Standard]<br>
         &lt;verbose&gt; – Zeigt Informationen zur Anwesenheitsgruppe im ausführlichen Modus an.<br>
     </li><br>
 
     <li><a name="thresholdAbsence"></a>
         <b>Kind-Prozesse</b>
-        <dt><code>set &lt;name&gt; thresholdAbsence &lt;Sekunden&gt;</code></dt>
+        <dt><code>attr &lt;name&gt; thresholdAbsence &lt;Sekunden&gt;</code></dt>
     </li><br>
 
-    <li><b><a name="PRESENCE2_presentCycle">presentCycle</a></b></li>
-    Dieses Attribut kann auf jede (JEDE) Instanz in FHEM gesetzt werden. Es definiert die erforderliche Zykluszeit, die eine erneute Lesung des Objekts benötigt. Der Daemon überprüft die Aktualisierung des Messwerts in seinem Intervall. Bei Verstoß gegen die erforderliche Zeitspanne wechselt die Anzeige auf „Abwesend“.<br>
-    Der zu überwachende Messwert wird in attr <i>presentReading</i> definiert und ist standardmäßig <i>state</i>.<br>
+    <b>für Devices, die überwacht werden sollen</b>
+    <li><a name="presentCycle"></a>
+        <dt><code>attr &lt;name&gt; presentCycle &lt;Sekunden&gt;</code></dt>
+        Dieses Attribut steht in jedem Device in FHEM zur Verfügung. Wenn gesetzt, wird das zu überwachende Reading aus dem
+        Attribut <i>presentReading</i> oder dem default Reading <i>state</i> durch den Presence2 Daemon auf Aktualisierung
+        überprüft. Findet innerhalb der definierten Zeitspanne keine Aktuallisierung statt wird im Device das Reading "presentState"
+        auf "absend" gesetzt. Im Presence2 Dämon Device wird das Reading <i>evt_monitoredDevice</i> generiert und entsprechend gesetzt.<br>
+    </li><br>
 
-    <li><b><a name="PRESENCE2_presentReading">presentReading</a></b></li>
-    Dieses Attribut kann auf jede (JEDE) Instanz in FHEM gesetzt werden. Es definiert den Lesenamen, der von <i>presentCycle</i> überwacht wird.<br>
+    <li><a name="presentReading"></a>
+        <dt><code>attr &lt;name&gt; presentReading &lt;name des Readings&gt;</code></dt>
+        Dieses Attribut steht in jedem Device in FHEM zur Verfügung. Es definiert das Reading, dass von <i>presentCycle</i> überwacht
+        wird. Wird das Attribut nicht gesetzt, wird das Reading <i>state></i> überwacht.<br>
+    </li><br>
   </ul>
   <br>
 
