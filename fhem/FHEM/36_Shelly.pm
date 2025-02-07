@@ -148,6 +148,8 @@
 # 6.02 Beta4 fix: reading state of ShellyEM50
 # 6.02      fix: command "set <name> button_on" w/o channel
 # 6.02.1    fix: update of input/output readings
+# 6.02.2    fix: update interval if interval is set to 0
+#           new: slat control für rollers Gen2+
 
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
@@ -171,17 +173,17 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.02.1 03.02.2025";
+my $version = "6.02.2 07.02.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
 
 my %shelly_firmware = (  # latest known versions  # as of 29.08.2024
     # used by sub Shelly_firmwarecheck
-    "gen1"        => "1.14.0",
+    "gen1"        => "1.14.0",   # v1.14.1-rc1
     "shelly4"     => "1.6.6",
-    "gen2"        => "1.3.3",   # some:  1.4.4
-    "walldisplay" => "2.2.1"
+    "gen2"        => "1.3.3",   # some:  1.4.4  v1.5.0-beta2
+    "walldisplay" => "2.2.1"         # v2.3.0-beta5
     );
 
 #-- Time slices in seconds for time zone Germany CET/CEST
@@ -200,7 +202,7 @@ my %periods = (
 my %attributes = (
   "modes"          => " mode:relay,roller,white,color",
   "multichannel"  => " defchannel",
-  "roller"        => " pct100:open,closed maxtime maxtime_close maxtime_open",
+  "roller"        => " pct100:open,closed maxtime maxtime_close maxtime_open slat_control slat_pos",
   "dimmer"        => " dimstep",
   "input"         => " showinputs:show,hide",
   "emeter"        => " Energymeter_F Energymeter_P Energymeter_R EMchannels:ABC_,L123_,_ABC,_L123".
@@ -1332,6 +1334,11 @@ sub Shelly_Attr(@) {
     if( $shelly_models{$attrVal}[2]==0 ){  # no dimmer
           $hash->{'.AttrList'} =~ s/ dimstep//;
     }
+    
+    if( $shelly_models{$attrVal}[1]>0 && $mode ne "roller" || $shelly_models{$attrVal}[4]==0 ){  # no roller  or  Gen1
+          $hash->{'.AttrList'} =~ s/ slat_control//;
+          $hash->{'.AttrList'} =~ s/ slat_pos//;
+    }
 
     if( $attrVal =~ /pro3em|proem50/ ){  # "shellyproem50"  "shellypro3em"
           $hash->{'.AttrList'} =~ s/\smaxpower//;
@@ -1663,6 +1670,18 @@ sub Shelly_Attr(@) {
         Shelly_HttpRequest($hash,"/rpc/Cover.SetConfig","?id=0&config={%22$attrName%22:$attrVal}","Shelly_response","config" );
     }
 
+  #---------------------------------------
+  }elsif( $cmd eq "set" && $attrName eq "slat_control" ){
+      $error="The slat_control attribute is set by \'get <name> settings\' only";
+      Log3 $name,1,"[Shelly_Attr] $name\: $error ";
+      return $error;
+  #---------------------------------------
+  }elsif( $cmd eq "set" && $attrName eq "slat_pos" ){
+      if( $attrVal<0 || $attrVal>100 ){
+          $error="slat_pos must be within the range 0...100";
+          Log3 $name,1,"[Shelly_Attr] $name\: $error";
+          return $error;
+      }
   #---------------------------------------
   }elsif( $cmd eq "set" && $attrName eq "pct100" ){
     if( ($shelly_models{$model}[1] == 0 || $mode ne "roller") && $init_done ){
@@ -2425,7 +2444,6 @@ sub Shelly_Set ($@) {
                readingsSingleUpdate($hash,"position",$1,1);
           }
           Shelly_status($hash,"Shelly_Set $cmd",0.8);    # scheduled update if not pending
-      #    Shelly_status($hash,"Shelly_Set $cmd (2nd)",5) if( $cmd =~ /opening|closing/ );  # update in 5 seconds when driving
           return undef;
   #---------------------------
   }elsif( $cmd =~ /actions/ ){
@@ -2932,7 +2950,8 @@ sub Shelly_Set ($@) {
     }elsif( $cmd eq "pct" || $cmd =~ /pos/ || $cmd eq "delta" ){
         my $targetpct = $value;
         my $pos  = ReadingsVal($name,"position","");
-        my $pct  = ReadingsVal($name,"pct",undef);
+        my $pct  = ReadingsVal($name,"pct",0);
+        $pct = 0  if( $pct eq "unknown" );  # when position is lost
              if( $cmd eq "pct" &&  "$value" =~ /[\+-]\d*/ ){
                $targetpct = eval($pct."$value");
              }
@@ -3002,6 +3021,9 @@ sub Shelly_Set ($@) {
                 $targetpct = ($pctnormal ? $targetpct : 100 - $targetpct);
                 $cmd="/rpc/Cover.GoToPosition";
                 $CMD2="?pos=$targetpct&id=$channel";
+                if( AttrVal($name,"slat_control",undef ) eq "enabled" ){
+                   $CMD2 .="&slat_pos=".AttrVal($name,"slat_pos",50 );
+                }
             }else{
                 $cmd="/rpc/$cmd";
                 $CMD2="?id=$channel";
@@ -3473,7 +3495,7 @@ sub Shelly_status(@){
   Log3 $name,5,"[Shelly_status:1] $name: callFn=".($callFn//"undefiniert")." sched=".($scheduled//"no").", helper=".$hash->{helper}{timer}; #4
   if( $scheduled//0 ){  
       Log3 $name,6,"[Shelly_status:1a] $name: set internal Timer  ---and------BYE------";
-      readingsSingleUpdate($hash,"/_nextUpdateTimer","$scheduled Sec $callFn",1)
+      readingsSingleUpdate($hash,"/_nextUpdateTimer","$scheduled sec $callFn",1)
                                                if( AttrVal($name,'timeout',undef) );
       RemoveInternalTimer($hash,"Shelly_status");
       InternalTimer(time()+$scheduled, "Shelly_status", $hash);
@@ -3529,7 +3551,6 @@ sub Shelly_status(@){
       $msg .= "D  next status call scheduled in $timer seconds";
   }
   Log3 $name,4,$msg;
-  readingsSingleUpdate($hash,"/_nextUpdateTimer",($timer>0?$timer:"-")." ".$callFn,1)  if( AttrVal($name,'timeout',undef) );
 } #end Shelly_status()
 
 ##########################
@@ -3620,9 +3641,6 @@ sub Shelly_status1G {
           }      
       }
       Shelly_readingsBulkUpdate($hash,"timer".$subs,$remaining,"time");
-  ##    #-- next update timer
-  ##    $statusTmr1G  = minNum($hash->{INTERVAL},$remaining+0.95)   if( $remaining>0 );
-  ##    Shelly_readingsBulkUpdate($hash,"/_nextUpdateTimer",$statusTmr1G,"time")  if( AttrVal($name,'timeout',undef) );
     }
 
     #-- we have a shellyuni device
@@ -4020,7 +4038,6 @@ sub Shelly_status1G {
       #-- override scheduling next status update: perform multiple updates
       $statusTmr1G = $statusTmr1G / ceil($statusTmr1G/$hash->{INTERVAL});   # use POSIX required
   }
-  Shelly_readingsBulkUpdate($hash,"/_nextUpdateTimer",$statusTmr1G,"time")   if( AttrVal($name,'timeout',undef) );
   Log3 $name,6,"[Shelly_status1G:ti] $name timer=$statusTmr1G INTERVAL=".$hash->{INTERVAL}." helper=".$hash->{helper}{timer};
   
   readingsEndUpdate($hash,1);
@@ -4364,7 +4381,7 @@ sub Shelly_status2G {
   my $timer = $hash->{INTERVAL};  # timer in seconds for next update of status via Shelly_status()
   if( $hash->{helper}{timer}>0 ){
      $timer=$hash->{helper}{timer}; 
-     Log3 $name,2,"$name have set timer to helper";
+     Log3 $name,2,"$name have set timer=$timer to helper";
   }
 
   readingsBeginUpdate($hash);
@@ -4732,8 +4749,10 @@ sub Shelly_status2G {
             $tmrDur =  round($tmrDur,1);
             Log3 $name,4,"[Shelly_status2G:tmr] $name calculated timer$subs from start and duration is $tmrDur"; #5
          }
-         $timer = minNum( $timer, $tmrDur );
-         Log3 $name,4,"[Shelly_status2G:timer] $name calculated update timer is $timer"; #5
+Log3 $name,2,"[Shelly_status2G:timex] $name calculated update timer is $timer vs duration=$tmrDur"; #5
+#         $timer = minNum( $timer, $tmrDur ); 
+         $timer = $hash->{INTERVAL}>0 ? minNum( $hash->{INTERVAL},$tmrDur ) : $tmrDur;# 
+         Log3 $name,2,"[Shelly_status2G:timer] $name calculated update timer is $timer"; #5
          $tmrDur .= " sec = ".FmtDateTime($tmrEnd)  if( $hash->{units} );
          readingsBulkUpdateMonitored($hash,"timer".$subs,$tmrDur);
       }elsif( $jhash->{$CC}{move_started_at} ){  # cover, if moving
@@ -4863,20 +4882,7 @@ sub Shelly_status2G {
   fhem("deletereading $name error",1) if( ReadingsAge($name,"error",-1)>36000 ); # delete after 10 hours, silent
   
   #-- scheduling next status update
-  ##my $callFn=$hash->{callFn};
-  ##$callFn = "ov" if( !defined($callFn) );
-  ##delete $hash->{callFn};
-  Log3 $name,7,"[Shelly_status2G:ti] $name timer=$timer INTERVAL=".$hash->{INTERVAL}." helper=".$hash->{helper}{timer};
-  if( $timer == $hash->{INTERVAL} ){
-      Shelly_status($hash,"Shelly_status2G iv0",$timer);
-  }elsif( $timer < $hash->{INTERVAL} || $hash->{INTERVAL} == 0 ){
-      #-- override scheduling next status update
-      Shelly_status($hash,"Shelly_status2G ov",$timer);
-  }elsif( $timer > $hash->{INTERVAL} + 3 ){
-      #-- override scheduling next status update: perform multiple updates
-      $timer = $timer / ceil($timer/$hash->{INTERVAL});   # use POSIX required
-      Shelly_status($hash,"Shelly_status2G tw",$timer);
-  }
+  Shelly_status($hash,"Shelly_status2G",$timer) if( $timer>0 );
 
   if( $hash->{helper}{timer} == 0  &&  $hash->{INTERVAL}>0 ){
       #-- call settings
@@ -4900,6 +4906,7 @@ sub Shelly_settings2G {
   my $name = $hash->{NAME};
   my $comp = $param->{comp};
   my $model= AttrVal($name,"model","generic");
+  my @chnls=@{$shelly_models{$model}};   # extract the array of 'model' out of the hash 
   my $subs;
   my $range_extender_enable;
 
@@ -5074,12 +5081,20 @@ sub Shelly_settings2G {
           }
         }
 
-        # looking for roller maxtime values
-        if( $shelly_models{$model}[1]>0 && AttrVal($name,"mode","-") eq "roller" ){
+        # looking for roller maxtime and slat-control values
+        if( $shelly_models{$model}[1]>0 && AttrVal($name,"mode","-") eq "roller" ){  # $chnls
            foreach my $limit ( 'maxtime_open','maxtime_close' ){
               my $maxtime=$jhash->{'cover:0'}{$limit};
               # set attribute in silent mode, but do not save to cfg-file
               fhem("attr -silent $name $limit $maxtime") if( AttrVal($name,$limit,0) != $maxtime );
+           }
+           my $sc=$jhash->{'cover:0'}{slat}{enable}//-1;
+           if( $sc == 1 ){
+            #   $sc = $jhash->{'cover:0'}{slat}{open_time};
+            #   $sc .= ",".$jhash->{'cover:0'}{slat}{close_time};
+               fhem("attr -silent $name slat_control enabled");
+           }elsif( $sc == 0 ){
+               fhem("attr -silent $name slat_control disabled");
            }
         }else{
           ### looking for auto_on & auto_off (components: switch & light)
@@ -7673,11 +7688,19 @@ sub Shelly_HttpResponse($){
                 <br/><code>attr &lt;name&gt; maxtime_open &lt;float&gt; </code> Gen2
                 <br/>time needed (in seconds) for a complete drive upward</li>
             <li>
+                <a id="Shelly-attr-slat_control"></a>
+                     <code>attr &lt;name&gt; slat_control enabled|disabled </code> 
+                <br/>whether slat control is enabled by the Shelly</li>
+            <li>
+                <a id="Shelly-attr-slat_pos"></a>
+                     <code>attr &lt;name&gt; slat_pos &lt;0...100&gt;   </code>
+                <br/>percentual value for the pos of the slats</li>
+            <li>
                 <a id="Shelly-attr-pct100"></a>
                 <code>attr &lt;name&gt; pct100 open|closed (default:open) </code>
                 <br/>roller or blind devices only: is pct=100 open or closed ? </li>
         </ul>
-        <br/>For energy meter ShellyPro3EM /ShellyProEM50 
+        <br/>For energy meter ShellyPro3EM/ShellyProEM50 
         <ul>
             <li>
                 <a id="Shelly-attr-Energymeter_P"></a>
@@ -8485,6 +8508,14 @@ sub Shelly_HttpResponse($){
                      <code>attr &lt;name&gt; maxtime_open &lt;int&gt;   </code> Gen1
                 <br/><code>attr &lt;name&gt; maxtime_open &lt;float&gt; </code> Gen2
                 <br/>Benötigte Zeit für das vollständige Öffnen</li>
+            <li>
+                <a id="Shelly-attr-slat_control"></a>
+                     <code>attr &lt;name&gt; slat_control enabled|disabled </code> 
+                <br/>Status der Lamellensteuerung</li>
+            <li>
+                <a id="Shelly-attr-slat_pos"></a>
+                     <code>attr &lt;name&gt; slat_pos &lt;0...100&gt;   </code>
+                <br/>Prozentwert für die Steuerung der Lamellen</li>
             <li>
                 <a id="Shelly-attr-pct100"></a>
                 <code>attr &lt;name&gt; pct100 open|closed (default:open) </code>

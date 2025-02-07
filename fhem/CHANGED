@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 36_Shelly: Slat Control / Roller Gen2+
  - feature: 73_PRESENCE2.pm: neues Attribut pingParam
                   commandRef überarbeitet
  - bugfix:  98_vitoconnect.pm: installationID check at least length 2
