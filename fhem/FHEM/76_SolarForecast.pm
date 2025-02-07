@@ -12715,7 +12715,7 @@ sub _saveEnergyConsumption {
   
   if ($dowrite) {
       writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $hod } );
-      $data{$name}{circular}{99}{con} = HistoryVal ($name, $day, '99', 'con', undef);
+      $data{$name}{circular}{99}{todayConsumption} = HistoryVal ($name, $day, '99', 'con', undef);
   }
 
 return;
@@ -18165,7 +18165,7 @@ sub _listDataPoolCircular {
       else {
           my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7);
           
-          my $con      = CircularVal ($hash, $idx, 'con',                 '-');
+          my $con      = CircularVal ($hash, $idx, 'todayConsumption',    '-');
           my $gcontot  = CircularVal ($hash, $idx, 'gridcontotal',        '-');
           my $idgcon   = CircularVal ($hash, $idx, 'initdaygcon',         '-');
           my $idfi     = CircularVal ($hash, $idx, 'initdayfeedin',       '-');
@@ -18203,7 +18203,7 @@ sub _listDataPoolCircular {
           }
           
           $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn \n";
-          $sq .= "      con: $con, feedintotal: $fitot, initdayfeedin: $idfi \n";
+          $sq .= "      todayConsumption: $con, feedintotal: $fitot, initdayfeedin: $idfi \n";
           $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon \n";
           $sq .= "      $batvl1\n";
           $sq .= "      $batvl2\n";
@@ -22755,7 +22755,6 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batoutXX</b>            </td><td>Battery XX discharge (Wh)                                                                                             </td></tr>
             <tr><td> <b>batouttotXX</b>         </td><td>total energy drawn from the battery XX (Wh)                                                                           </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>current total energy charged into the battery XX (Wh)                                                                 </td></tr>
-            <tr><td> <b>con</b>                 </td><td>real energy consumption (Wh) of the house on the current day                                                          </td></tr>
             <tr><td> <b>confc</b>               </td><td>expected energy consumption (Wh) of the house on the current day                                                      </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>remaining days until the battery XX maintenance SoC (default 95%) is reached                                          </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Number of days per cloudy area over the entire term                                                                   </td></tr>
@@ -22783,6 +22782,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>runTimeTrainAI</b>      </td><td>Duration of the last AI training                                                                                      </td></tr>
             <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp of the last successful AI training                                                                          </td></tr>
             <tr><td> <b>aiRulesNumber</b>       </td><td>Number of rules in the trained AI instance                                                                            </td></tr>
+            <tr><td> <b>todayConsumption</b>    </td><td>real energy consumption (Wh) of the house on the current day                                                          </td></tr>
             <tr><td> <b>tdayDvtn</b>            </td><td>Today's deviation PV forecast/generation in %                                                                         </td></tr>
             <tr><td> <b>temp</b>                </td><td>Outdoor temperature                                                                                                   </td></tr>
             <tr><td> <b>wcc</b>                 </td><td>Degree of cloud cover                                                                                                 </td></tr>
@@ -25244,7 +25244,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batoutXX</b>            </td><td>Entladung der Batterie XX (Wh)                                                                                            </td></tr>
             <tr><td> <b>batouttotXX</b>         </td><td>aktuell total aus der Batterie XX entnommene Energie (Wh)                                                                 </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>aktuell total in die Batterie XX geladene Energie (Wh)                                                                    </td></tr>
-            <tr><td> <b>con</b>                 </td><td>realer Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                                  </td></tr>
             <tr><td> <b>confc</b>               </td><td>erwarteter Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                              </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>verbleibende Tage bis der Batterie XX Pflege-SoC (default 95%) erreicht sein soll                                         </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit                                                               </td></tr>
@@ -25272,6 +25271,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>runTimeTrainAI</b>      </td><td>Laufzeit des letzten KI Trainings                                                                                         </td></tr>
             <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp des letzten erfolgreichen KI Trainings                                                                          </td></tr>
             <tr><td> <b>aiRulesNumber</b>       </td><td>Anzahl der Regeln in der trainierten KI Instanz                                                                           </td></tr>
+            <tr><td> <b>todayConsumption</b>    </td><td>realer Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                                  </td></tr>
             <tr><td> <b>tdayDvtn</b>            </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
             <tr><td> <b>temp</b>                </td><td>Außentemperatur                                                                                                           </td></tr>
             <tr><td> <b>wcc</b>                 </td><td>Grad der Wolkenüberdeckung                                                                                                </td></tr>
