@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.45.4" => "08.02.2025  change constant GMFILEREPEAT + new constant GMFILERANDOM ",
   "1.45.3" => "06.02.2025  __readDataWeather: if no values of hour 01 (00:00+) use val of hour 24 of day before ".
                            "new special reading todayConsumption ",
   "1.45.2" => "05.02.2025  aiAddRawData: temp, con, wcc, rr1c, rad1h = undef if no value in pvhistory, fix isWeatherDevValid ".
@@ -396,7 +397,8 @@ use constant CARECYCLEDEF   => 20;                                              
 use constant BATSOCCHGDAY   => 5;                                                    # Batterie: prozentuale SoC Anpassung pro Tag
 
 use constant GMFBLTO        => 30;                                                   # Timeout Aholen Message File aus contrib
-use constant GMFILEREPEAT   => 4600;                                                 # Wiederholungsuntervall Abholen Message File aus contrib
+use constant GMFILEREPEAT   => 4200;                                                 # Base Wiederholungsuntervall Abholen Message File aus contrib
+use constant GMFILERANDOM   => 8400;                                                 # Random AddOn zu GMFILEREPEAT
 use constant IDXLIMIT       => 900000;                                               # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
 
 use constant AITRBLTO       => 7200;                                                 # KI Training BlockingCall Timeout
@@ -1575,9 +1577,9 @@ sub Define {
   reloadCacheFiles     ($params);
   singleUpdateState    ( {hash => $hash, state => 'initialized', evt => 1} );
 
-  $readyfnlist{$name} = $hash;                                                                                                   # Registrierung in Ready-Schleife
-  InternalTimer (gettimeofday() + $whistrepeat  + int(rand(300)), "FHEM::SolarForecast::periodicWriteMemcache",     $hash, 0);   # Einstieg periodisches Schreiben historische Daten
-  InternalTimer (gettimeofday() + 120           + int(rand(300)), "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
+  $readyfnlist{$name} = $hash;                                                                                                    # Registrierung in Ready-Schleife
+  InternalTimer (gettimeofday() + $whistrepeat  + int(rand(300)),  "FHEM::SolarForecast::periodicWriteMemcache",     $hash, 0);   # Einstieg periodisches Schreiben historische Daten
+  InternalTimer (gettimeofday() + 120           + int(rand(2700)), "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
   
 return;
 }
@@ -12665,11 +12667,11 @@ return $hdv;
 #     Energieverbrauch des Hauses in History speichern
 ################################################################
 sub _saveEnergyConsumption {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $day    = $paref->{day};
-  my $chour  = $paref->{chour};
-  my $debug  = $paref->{debug};
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $day   = $paref->{day};
+  my $chour = $paref->{chour};
+  my $debug = $paref->{debug};
 
   my $hod     = sprintf "%02d", ($chour + 1);
   my $pvrl    = ReadingsNum ($name, 'Today_Hour'.$hod.'_PVreal',          0);   # Reading enthält die Summe aller Inverterdevices
@@ -12685,7 +12687,7 @@ sub _saveEnergyConsumption {
       $batout += ReadingsNum ($name, 'Today_Hour'.$hod.'_BatOut_'.$bn, 0);
   }
   
-  my $ppreal  = 0;
+  my $ppreal = 0;
 
   for my $prn (1..MAXPRODUCER) {                                               # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
       $prn     = sprintf "%02d", $prn;
@@ -13165,7 +13167,7 @@ sub entryGraphic {
   my $clegend = $paref->{clegend};
   $m          = $paref->{modulo} % 2;
 
-  if ($legendtxt && ($clegend eq 'top')) {
+  if ($legendtxt && $clegend eq 'top') {
       $ret .= "<tr class='$htr{$m}{cl}'>";
       $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
       $ret .= $legendtxt;
@@ -16520,7 +16522,7 @@ sub getMessageFileNonBlocking {
   my $name = $hash->{NAME};
       
   RemoveInternalTimer ($hash, "FHEM::SolarForecast::getMessageFileNonBlocking");
-  InternalTimer       (gettimeofday() + GMFILEREPEAT, "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
+  InternalTimer       (gettimeofday() + GMFILEREPEAT + int(rand(GMFILERANDOM)), "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
   
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
