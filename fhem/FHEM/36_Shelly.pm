@@ -150,7 +150,7 @@
 # 6.02.1    fix: update of input/output readings
 # 6.02.2    fix: update interval if interval is set to 0
 #           new: slat control für rollers Gen2+
-
+# 6.02.3    fix: setting of attribute slat_control
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
 
@@ -1673,8 +1673,8 @@ sub Shelly_Attr(@) {
   #---------------------------------------
   }elsif( $cmd eq "set" && $attrName eq "slat_control" ){
       $error="The slat_control attribute is set by \'get <name> settings\' only";
-      Log3 $name,1,"[Shelly_Attr] $name\: $error ";
-      return $error;
+  #    Log3 $name,1,"[Shelly_Attr] $name\: $error ";
+  #    return $error;
   #---------------------------------------
   }elsif( $cmd eq "set" && $attrName eq "slat_pos" ){
       if( $attrVal<0 || $attrVal>100 ){
