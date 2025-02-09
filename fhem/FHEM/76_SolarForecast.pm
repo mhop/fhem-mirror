@@ -34,7 +34,6 @@ package FHEM::SolarForecast;                                                    
 
 use strict;
 use warnings;
-#use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                                           # für Syntaxcheck mit: perl -c /opt/fhem/FHEM/76_SolarForecast.pm
 use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
@@ -160,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.45.5" => "09.02.2025  change constant GMFILEREPEAT, GMFILERANDOM, Pull Message File from GitHub Repo ",
   "1.45.4" => "08.02.2025  change constant GMFILEREPEAT + new constant GMFILERANDOM ",
   "1.45.3" => "06.02.2025  __readDataWeather: if no values of hour 01 (00:00+) use val of hour 24 of day before ".
                            "new special reading todayConsumption ",
@@ -376,50 +376,81 @@ my %vNotesIntern = (
 
 ## Konstanten
 ######################
-use constant LPOOLLENLIM    => 140;                                                  # Breitenbegrenzung der Ausgabe von List Pooldaten
-use constant KJ2KWH         => 0.0002777777778;                                      # Umrechnungsfaktor kJ in kWh
-use constant KJ2WH          => 0.2777777778;                                         # Umrechnungsfaktor kJ in Wh
-use constant WH2KJ          => 3.6;                                                  # Umrechnungsfaktor Wh in kJ
-use constant DEFLANG        => 'EN';                                                 # default Sprache wenn nicht konfiguriert
-use constant DEFMAXVAR      => 1.5;                                                  # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
-use constant DEFINTERVAL    => 70;                                                   # Standard Abfrageintervall
-use constant SLIDENUMMAX    => 3;                                                    # max. Anzahl der Arrayelemente in Schieberegistern
-use constant SPLSLIDEMAX    => 20;                                                   # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
+use constant {
+  LPOOLLENLIM    => 140,                                                            # Breitenbegrenzung der Ausgabe von List Pooldaten
+  KJ2KWH         => 0.0002777777778,                                                # Umrechnungsfaktor kJ in kWh
+  KJ2WH          => 0.2777777778,                                                   # Umrechnungsfaktor kJ in Wh
+  WH2KJ          => 3.6,                                                            # Umrechnungsfaktor Wh in kJ
+  DEFLANG        => 'EN',                                                           # default Sprache wenn nicht konfiguriert
+  DEFMAXVAR      => 1.5,                                                            # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
+  DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
+  SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
+  SPLSLIDEMAX    => 20,                                                             # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
+  WHISTREPEAT    => 851,                                                            # Wiederholungsintervall Cache File Daten schreiben
+  EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 
-use constant MAXWEATHERDEV  => 3;                                                    # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
-use constant MAXBATTERIES   => 3;                                                    # maximale Anzahl der möglichen Batterien
-use constant MAXCONSUMER    => 16;                                                   # maximale Anzahl der möglichen Consumer (Attribut)
-use constant MAXPRODUCER    => 3;                                                    # maximale Anzahl der möglichen anderen Produzenten (Attribut)
-use constant MAXINVERTER    => 3;                                                    # maximale Anzahl der möglichen Inverter
+  MAXWEATHERDEV  => 3,                                                              # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
+  MAXBATTERIES   => 3,                                                              # maximale Anzahl der möglichen Batterien
+  MAXCONSUMER    => 16,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
+  MAXPRODUCER    => 3,                                                              # maximale Anzahl der möglichen anderen Produzenten (Attribut)
+  MAXINVERTER    => 3,                                                              # maximale Anzahl der möglichen Inverter
 
-use constant MAXSOCDEF      => 95;                                                   # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
-use constant CARECYCLEDEF   => 20;                                                   # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
-use constant BATSOCCHGDAY   => 5;                                                    # Batterie: prozentuale SoC Anpassung pro Tag
+  MAXSOCDEF      => 95,                                                             # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
+  CARECYCLEDEF   => 20,                                                             # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
+  BATSOCCHGDAY   => 5,                                                              # Batterie: prozentuale SoC Anpassung pro Tag
 
-use constant GMFBLTO        => 30;                                                   # Timeout Aholen Message File aus contrib
-use constant GMFILEREPEAT   => 4200;                                                 # Base Wiederholungsuntervall Abholen Message File aus contrib
-use constant GMFILERANDOM   => 8400;                                                 # Random AddOn zu GMFILEREPEAT
-use constant IDXLIMIT       => 900000;                                               # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
+  GMFBLTO        => 30,                                                             # Timeout Aholen Message File aus contrib
+  GMFILEREPEAT   => 3600,                                                           # Base Wiederholungsuntervall Abholen Message File aus contrib
+  GMFILERANDOM   => 3600,                                                           # Random AddOn zu GMFILEREPEAT
+  IDXLIMIT       => 900000,                                                         # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
 
-use constant AITRBLTO       => 7200;                                                 # KI Training BlockingCall Timeout
-use constant AIBCTHHLD      => 0.2;                                                  # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
-use constant AITRSTARTDEF   => 2;                                                    # default Stunde f. Start AI-Training
-use constant AISTDUDEF      => 1825;                                                 # default Haltezeit KI Raw Daten (Tage)
-use constant AISPREADUPLIM  => 120;                                                  # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-use constant AISPREADLOWLIM => 80;                                                   # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-use constant AIACCUPLIM     => 130;                                                  # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-use constant AIACCLOWLIM    => 70;                                                   # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-use constant AIACCTRNMIN    => 5500;                                                 # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
-use constant AISPREADTRNMIN => 7000;                                                 # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
+  AITRBLTO       => 7200,                                                           # KI Training BlockingCall Timeout
+  AIBCTHHLD      => 0.2,                                                            # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
+  AITRSTARTDEF   => 2,                                                              # default Stunde f. Start AI-Training
+  AISTDUDEF      => 1825,                                                           # default Haltezeit KI Raw Daten (Tage)
+  AISPREADUPLIM  => 120,                                                            # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+  AISPREADLOWLIM => 80,                                                             # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+  AIACCUPLIM     => 130,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+  AIACCLOWLIM    => 70,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+  AIACCTRNMIN    => 5500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
+  AISPREADTRNMIN => 7000,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
 
-use constant SOLAPIREPDEF   => 3600;                                                 # default Abrufintervall SolCast API (s)
-use constant FORAPIREPDEF   => 900;                                                  # default Abrufintervall ForecastSolar API (s)
-use constant OMETEOREPDEF   => 900;                                                  # default Abrufintervall Open-Meteo API (s)
-use constant VRMAPIREPDEF   => 300;                                                  # default Abrufintervall Victron VRM API Forecast
-use constant SOLCMAXREQDEF  => 50;                                                   # max. täglich mögliche Requests SolCast API
-use constant OMETMAXREQ     => 9700;                                                 # Beschränkung auf max. mögliche Requests Open-Meteo API
-use constant LEADTIME       => 3600;                                                 # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
-use constant LAGTIME        => 1800;                                                 # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
+  SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
+  FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
+  OMETEOREPDEF   => 900,                                                            # default Abrufintervall Open-Meteo API (s)
+  VRMAPIREPDEF   => 300,                                                            # default Abrufintervall Victron VRM API Forecast
+  SOLCMAXREQDEF  => 50,                                                             # max. täglich mögliche Requests SolCast API
+  OMETMAXREQ     => 9700,                                                           # Beschränkung auf max. mögliche Requests Open-Meteo API
+  LEADTIME       => 3600,                                                           # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
+  LAGTIME        => 1800,                                                           # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
+
+  PRDEF          => 1.0,                                                            # default Performance Ratio (PR)
+  STOREFFDEF     => 0.9,                                                            # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
+  TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
+  TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
+  TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
+  
+  DEFMINTIME     => 60,                                                             # default Einplanungsdauer in Minuten
+  DEFCTYPE       => 'other',                                                        # default Verbrauchertyp
+  DEFCMODE       => 'can',                                                          # default Planungsmode der Verbraucher
+  DEFPOPERCENT   => 1.0,                                                            # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
+  DEFHYST        => 0,                                                              # default Hysterese
+  
+  CAICONDEF       => 'clock@gold',                                                  # default consumerAdviceIcon
+  FLOWGSIZEDEF    => 400,                                                           # default flowGraphicSize
+  HISTHOURDEF     => 2,                                                             # default Anzeige vorangegangene Stunden
+  WTHCOLDDEF      => 'C7C979',                                                      # Wetter Icon Tag default Farbe
+  WTHCOLNDEF      => 'C7C7C7',                                                      # Wetter Icon Nacht default Farbe
+  B1COLDEF        => 'FFAC63',                                                      # default Farbe Beam 1
+  B1FONTCOLDEF    => '0D0D0D',                                                      # default Schriftfarbe Beam 1
+  B2COLDEF        => 'C4C4A7',                                                      # default Farbe Beam 2
+  B2FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 2
+  B3COLDEF        => 'BED6C0',                                                      # default Farbe Beam 3
+  B3FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 3
+  B4COLDEF        => 'DBDBD0',                                                      # default Farbe Beam 4
+  B4FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 4
+  FGCDDEF         => 130,                                                           # Abstand Verbrauchericons zueinander
+};
 
 ## Standardvariablen
 ######################
@@ -442,39 +473,10 @@ my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";              
 my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Export Filename für DWD Stationskatalog im gpx-Format
 my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";             # Filename-Fragment für PV History Exportfile (wird mit Devicename ergänzt)
 
-my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
-my $whistrepeat    = 851;                                                           # Wiederholungsintervall Cache File Daten schreiben
-
-my $prdef          = 1.0;                                                           # default Performance Ratio (PR)
-my $storeffdef     = 0.9;                                                           # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
-my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
-my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
-my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
-my $epiecMaxCycles = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
-my $defmintime     = 60;                                                            # default Einplanungsdauer in Minuten
-my $defctype       = 'other';                                                       # default Verbrauchertyp
-my $defcmode       = 'can';                                                         # default Planungsmode der Verbraucher
-my $defpopercent   = 1.0;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
-my $defhyst        = 0;                                                             # default Hysterese
-
-my $caicondef      = 'clock@gold';                                                  # default consumerAdviceIcon
-my $flowGSizedef   = 400;                                                           # default flowGraphicSize
-my $histhourdef    = 2;                                                             # default Anzeige vorangegangene Stunden
-my $wthcolddef     = 'C7C979';                                                      # Wetter Icon Tag default Farbe
-my $wthcolndef     = 'C7C7C7';                                                      # Wetter Icon Nacht default Farbe
-my $b1coldef       = 'FFAC63';                                                      # default Farbe Beam 1
-my $b1fontcoldef   = '0D0D0D';                                                      # default Schriftfarbe Beam 1
-my $b2coldef       = 'C4C4A7';                                                      # default Farbe Beam 2
-my $b2fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 2
-my $b3coldef       = 'BED6C0';                                                      # default Farbe Beam 3
-my $b3fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 3
-my $b4coldef       = 'DBDBD0';                                                      # default Farbe Beam 4
-my $b4fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 4
-my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
 
 my $fgscaledef     = 0.10;                                                          # Flußgrafik: Scale Normativ Icons
 my $strokcolstddef = 'darkorange';                                                  # Flußgrafik: Standardfarbe aktive normale Kette
@@ -497,11 +499,14 @@ my $mooncoldef     = 'lightblue';                                               
 my $actcoldef      = 'orange';                                                      # default Färbung Icon wenn aktiv
 my $inactcoldef    = 'grey';                                                        # default Färbung Icon wenn inaktiv
 
-my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
-my $cfile        = 'controls_solarforecast.txt';                                    # Controlfile Update FTUI-Files
-my $msgfiletest  = 'controls_solarforecast_messages_test.txt';                      # TEST Input-File Notification System
-my $msgfileprod  = 'controls_solarforecast_messages_prod.txt';                      # PRODUKTIVES Input-File Notification System
-my $pPath        = '?format=txt';                                                   # Download Format
+my $bPath          = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';                 # Basispfad Abruf contrib SolarForecast Files
+my $cfile          = 'controls_solarforecast.txt';                                                         # Controlfile Update FTUI-Files
+my $pPath          = '?format=txt';                                                                        # Download Format
+
+my $bghPath        = 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/';   # Basispfad GitHub SolarForecast Files 
+my $msgfiletest    = 'controls_solarforecast_messages_test.txt';                                           # TEST Input-File Notification System
+my $msgfileprod    = 'controls_solarforecast_messages_prod.txt';                                           # PRODUKTIVES Input-File Notification System
+my $pghPath        = '';                                                                                   # GitHub Post Pfad
 
 my $messagefile = $msgfileprod;
                                                                                     # mögliche Debug-Module
@@ -1210,12 +1215,12 @@ my %weather_ids = (
 
 my %hef = (                                                                      # Energiedaktoren für Verbrauchertypen
   "heater"         => { f => 1.00, m => 1.00, l => 1.00, mt => 240         },
-  "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },    # f   = Faktor Energieverbrauch in erster Stunde (wichtig auch für Kalkulation in __calcEnergyPieces !)
+  "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },    # f   = Faktor Energieverbrauch in erster Stunde (wichtig auch für Kalkulation in __calcEnergyPieces !)
   "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
   "dishwasher"     => { f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
   "dryer"          => { f => 0.40, m => 0.40, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
   "washingmachine" => { f => 0.50, m => 0.30, l => 0.40, mt => 120         },
-  "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },
+  "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
 );
 
 my %hcsr = (                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
@@ -1577,9 +1582,9 @@ sub Define {
   reloadCacheFiles     ($params);
   singleUpdateState    ( {hash => $hash, state => 'initialized', evt => 1} );
 
-  $readyfnlist{$name} = $hash;                                                                                                    # Registrierung in Ready-Schleife
-  InternalTimer (gettimeofday() + $whistrepeat  + int(rand(300)),  "FHEM::SolarForecast::periodicWriteMemcache",     $hash, 0);   # Einstieg periodisches Schreiben historische Daten
-  InternalTimer (gettimeofday() + 120           + int(rand(2700)), "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
+  $readyfnlist{$name} = $hash;                                                                                                   # Registrierung in Ready-Schleife
+  InternalTimer (gettimeofday() + WHISTREPEAT  + int(rand(300)), "FHEM::SolarForecast::periodicWriteMemcache",     $hash, 0);   # Einstieg periodisches Schreiben historische Daten
+  InternalTimer (gettimeofday() + 120           + int(rand(300)), "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
   
 return;
 }
@@ -1736,7 +1741,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));
 
-  if (ConsumerVal ($hash, $c, 'type', $defctype) eq 'noSchedule') {
+  if (ConsumerVal ($hash, $c, 'type', DEFCTYPE) eq 'noSchedule') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps}       = 'noSchedule';
@@ -1750,7 +1755,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   }
 
   my $startts  = time;
-  my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
+  my $mintime  = ConsumerVal ($hash, $c, "mintime", DEFMINTIME);
 
   if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
       my (undef, $setshift) = sunShift   ($hash, $c);                                          # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
@@ -3613,15 +3618,15 @@ sub __getDWDSolarData {
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
-                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * KJ2KWH * $peak * $prdef);    # Rad wird in kW/m2 erwartet
+                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF);    # Rad wird in kW/m2 erwartet
               }
               else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
-                  $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * $prdef);
+                  $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);
               }
           }
           else {                                                                                    # Flächenfaktor Fix
               $af = ___areaFactorFix ($ti, $az);                                                    # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
-              $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * $prdef);                         # Rad wird in kW/m2 erwartet
+              $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);                         # Rad wird in kW/m2 erwartet
           }
 
           $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                 # Startzeit wird verwendet, nicht laufende Stunde
@@ -4364,7 +4369,7 @@ return;
 #    pv (Wh)  = GTI * f / 1000 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
 #              (GTI * f) ist bereits in dem API-Ergebnis $rad enthalten in Wh/m2
 #             -> $rad / 1000 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr   (bezogen auf 1 Stunde)
-#             -> my $pv = sprintf "%.0f", ($rad / 1000 * $peak * $prdef);
+#             -> my $pv = sprintf "%.0f", ($rad / 1000 * $peak * PRDEF);
 #
 ################################################################################################
 sub __openMeteoDWD_ApiResponse {
@@ -4499,7 +4504,7 @@ sub __openMeteoDWD_ApiResponse {
 
           my $rad1wh = $jdata->{hourly}{global_tilted_irradiance}[$k];                          # Wh/m2
           my $rad    = 10 * (sprintf "%.0f", ($rad1wh * WH2KJ) / 10);                           # Umrechnung Wh/m2 in kJ/m2 ->
-          my $pv     = sprintf "%.2f", int ($rad1wh / 1000 * $peak * $prdef);                   # Rad wird in kWh/m2 erwartet
+          my $pv     = sprintf "%.2f", int ($rad1wh / 1000 * $peak * PRDEF);                    # Rad wird in kWh/m2 erwartet
           
           my $don    = $jdata->{hourly}{is_day}[$k];
           my $temp   = $jdata->{hourly}{temperature_2m}[$k];
@@ -6817,7 +6822,7 @@ sub periodicWriteMemcache {
   my $name = $hash->{NAME};
 
   RemoveInternalTimer ($hash, "FHEM::SolarForecast::periodicWriteMemcache");
-  InternalTimer       (gettimeofday() + $whistrepeat, "FHEM::SolarForecast::periodicWriteMemcache", $hash, 0);
+  InternalTimer       (gettimeofday() + WHISTREPEAT, "FHEM::SolarForecast::periodicWriteMemcache", $hash, 0);
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
@@ -7974,7 +7979,7 @@ sub _collectAllRegConsumers {
           }
       }
       
-      $hyst = $defhyst if(!$hyst);
+      $hyst = DEFHYST if(!$hyst);
 
       my ($riseshift, $setshift);
 
@@ -7998,15 +8003,15 @@ sub _collectAllRegConsumers {
       delete $data{$name}{consumers}{$c}{icon};
 
       my $rauto = $hc->{auto} // q{};
-      my $ctype = $hc->{type} // $defctype;
+      my $ctype = $hc->{type} // DEFCTYPE;
 
       $data{$name}{consumers}{$c}{name}              = $consumer;                                # Name des Verbrauchers (Device)
       $data{$name}{consumers}{$c}{alias}             = $alias;                                   # Alias des Verbrauchers (Device)
-      $data{$name}{consumers}{$c}{type}              = $hc->{type}         // $defctype;         # Typ des Verbrauchers
+      $data{$name}{consumers}{$c}{type}              = $hc->{type}         // DEFCTYPE;          # Typ des Verbrauchers
       $data{$name}{consumers}{$c}{power}             = $hc->{power};                             # Leistungsaufnahme des Verbrauchers in W
       $data{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
-      $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // $defcmode;         # Planungsmode des Verbrauchers
+      $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // DEFCMODE;         # Planungsmode des Verbrauchers
       $data{$name}{consumers}{$c}{oncom}             = $hc->{on}           // q{};               # Setter Einschaltkommando
       $data{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};               # Setter Ausschaltkommando
       $data{$name}{consumers}{$c}{dswitch}           = $dswitch;                                 # Switchdevice zur Kommandoausführung
@@ -9068,7 +9073,7 @@ sub __calcPVestimates {
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   my $rr1c        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",            0);   # Gesamtniederschlag während der letzten Stunde kg/m2
   my $wcc         = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "wcc",             0);   # effektive Wolkendecke nächste Stunde X
-  my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", $tempbasedef);   # vorhergesagte Temperatur Stunde X
+  my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", TEMPBASEDEF);   # vorhergesagte Temperatur Stunde X
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   $paref->{wcc}  = $wcc;
@@ -9261,8 +9266,8 @@ sub ___calcPeaklossByTemp {
   my $wcc   = $paref->{wcc}  // return (0,0);                                               # vorhergesagte Wolkendecke Stunde X
   my $temp  = $paref->{temp} // return (0,0);                                               # vorhergesagte Temperatur Stunde X
 
-  my $modtemp  = $temp + ($tempmodinc * (1 - ($wcc/100)));                                  # kalkulierte Modultemperatur
-  my $peakloss = sprintf "%.2f", $tempcoeffdef * ($modtemp - $tempbasedef) * $peak / 100;
+  my $modtemp  = $temp + (TEMPMODINC * (1 - ($wcc/100)));                                   # kalkulierte Modultemperatur
+  my $peakloss = sprintf "%.2f", TEMPCOEFFDEF * ($modtemp - TEMPBASEDEF) * $peak / 100;
 
 return ($peakloss, $modtemp);
 }
@@ -10145,7 +10150,7 @@ sub _batChargeRecmd {
           
           ## SOC-Prognose
           #################                                                                         
-          $socwh += $crel ? ($pvfc - $confc) * $storeffdef : -$confc / $storeffdef;              # PV Prognose nur einbeziehen wenn Ladefreigabe                                                                
+          $socwh += $crel ? ($pvfc - $confc) * STOREFFDEF : -$confc / STOREFFDEF;              # PV Prognose nur einbeziehen wenn Ladefreigabe                                                                
           
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -10606,7 +10611,7 @@ sub __calcEnergyPieces {
       delete $data{$name}{consumers}{$c}{epiecHist};
       delete $data{$name}{consumers}{$c}{epiecHour};
 
-      for my $h (1..$epiecMaxCycles) {
+      for my $h (1..EPIECMAXCYCLES) {
           delete $data{$name}{consumers}{$c}{"epiecHist_".$h};
           delete $data{$name}{consumers}{$c}{"epiecHist_".$h."_hours"};
       }
@@ -10614,8 +10619,8 @@ sub __calcEnergyPieces {
 
   delete $data{$name}{consumers}{$c}{epieces};
 
-  my $cotype  = ConsumerVal ($hash, $c, "type",    $defctype  );
-  my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
+  my $cotype  = ConsumerVal ($hash, $c, "type",      DEFCTYPE);
+  my $mintime = ConsumerVal ($hash, $c, "mintime", DEFMINTIME);
 
   if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
       my ($riseshift, $setshift) = sunShift    ($hash, $c);
@@ -10695,7 +10700,7 @@ sub ___csmSpecificEpieces {
       if (ConsumerVal ($hash, $c, "epiecHour", -1) < 0) {                                               # neue Aufzeichnung
           $data{$name}{consumers}{$c}{epiecStartTime} = $t;
           $data{$name}{consumers}{$c}{epiecHist}     += 1;
-          $data{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecMaxCycles);
+          $data{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > EPIECMAXCYCLES);
 
           $ecycle = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
 
@@ -10721,7 +10726,7 @@ sub ___csmSpecificEpieces {
       my $ediff                                               = $etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0);
       $data{$name}{consumers}{$c}{$ecycle}{$epiecHour} = sprintf '%.2f', $ediff;
       $data{$name}{consumers}{$c}{epiecHour}           = $epiecHour;
-      $data{$name}{consumers}{$c}{$epiecHist_hours}    = $ediff ? $epiecHour : $epiecHour - 1;    # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
+      $data{$name}{consumers}{$c}{$epiecHist_hours}    = $ediff ? $epiecHour : $epiecHour - 1;           # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
 
       debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - energy consumption in operating hour $epiecHour (ediff): $ediff});
   }
@@ -10729,21 +10734,21 @@ sub ___csmSpecificEpieces {
       if (ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {
           my $hours = 0;
 
-          for my $h (1..$epiecMaxCycles) {                                                               # durchschnittliche Betriebsstunden über alle epieces ermitteln und aufrunden
+          for my $h (1..EPIECMAXCYCLES) {                                                                # durchschnittliche Betriebsstunden über alle epieces ermitteln und aufrunden
               $hours += ConsumerVal ($hash, $c, "epiecHist_".$h."_hours", 0);
           }
 
-          my $avghours                                   = ceil ($hours / $epiecMaxCycles);
-          $data{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                    # durchschnittliche Betriebsstunden pro Zyklus
+          my $avghours                                   = ceil ($hours / EPIECMAXCYCLES);
+          $data{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                       # durchschnittliche Betriebsstunden pro Zyklus
 
           debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Average operating hours per cycle (epiecAVG_hours): $avghours});
 
-          delete $data{$name}{consumers}{$c}{epiecAVG};                                               # Durchschnitt für epics ermitteln
+          delete $data{$name}{consumers}{$c}{epiecAVG};                                                  # Durchschnitt für epics ermitteln
 
           for my $hour (1..$avghours) {                                                                  # jede Stunde durchlaufen
               my $hoursE = 1;
 
-              for my $h (1..$epiecMaxCycles) {                                                           # jedes epiec durchlaufen
+              for my $h (1..EPIECMAXCYCLES) {                                                            # jedes epiec durchlaufen
                   my $ecycle = "epiecHist_".$h;
 
                   if (defined $data{$name}{consumers}{$c}{$ecycle}{$hour}) {
@@ -10800,7 +10805,7 @@ sub __planInitialSwitchTime {
                       qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
   }
 
-  if (ConsumerVal ($hash, $c, 'type', $defctype) eq 'noSchedule') {
+  if (ConsumerVal ($hash, $c, 'type', DEFCTYPE) eq 'noSchedule') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps} = 'noSchedule';
@@ -10967,7 +10972,7 @@ sub ___doPlanning {
 
   my $mode         = getConsumerPlanningMode ($hash, $c);                                              # Planungsmode 'can' oder 'must'
   my $calias       = ConsumerVal ($hash, $c, 'alias',            '');
-  my $mintime      = ConsumerVal ($hash, $c, 'mintime', $defmintime);                                  # Einplanungsdauer
+  my $mintime      = ConsumerVal ($hash, $c, 'mintime',  DEFMINTIME);                                  # Einplanungsdauer
   my $oldplanstate = ConsumerVal ($hash, $c, 'planstate',        '');                                  # V. 1.35.0
   
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
@@ -11589,7 +11594,7 @@ sub ___switchConsumerOff {
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
   my $auto    = ConsumerVal ($hash, $c, "auto",              1);
   my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
-  my $hyst    = ConsumerVal ($hash, $c, "hysteresis", $defhyst);                                  # Hysterese
+  my $hyst    = ConsumerVal ($hash, $c, "hysteresis",  DEFHYST);                                  # Hysterese
 
   my $mode                     = getConsumerPlanningMode ($hash, $c);                             # Planungsmode 'can' oder 'must'
   my $offcom                   = ConsumerVal             ($hash, $c, 'offcom', '');               # Set Command für "off"
@@ -11685,7 +11690,7 @@ sub ___setConsumerSwitchingState {
   debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - current planning state: $simpCstat});
 
   if (isConsumerPhysOn ($hash, $c) && $simpCstat eq 'starting') {
-      my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
+      my $mintime = ConsumerVal ($hash, $c, "mintime", DEFMINTIME);
 
       if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
           my (undef, $setshift) = sunShift   ($hash, $c);
@@ -13067,7 +13072,7 @@ sub entryGraphic {
   my $layersync  = $2 // 0;
   
   my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
-  my $offset     = -1 * AttrNum ($name, 'graphicHistoryHour', $histhourdef);
+  my $offset     = -1 * AttrNum ($name, 'graphicHistoryHour', HISTHOURDEF);
   my $dlink      = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
 
   if (!$gsel) {
@@ -13086,15 +13091,15 @@ sub entryGraphic {
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'},     # TD-Style
       offset         => $offset,
       hourstyle      => AttrVal    ($name, 'graphicHourStyle',                  ''),
-      colorb1        => AttrVal    ($name, 'graphicBeam1Color',          $b1coldef),
-      colorb2        => AttrVal    ($name, 'graphicBeam2Color',          $b2coldef),
-      fcolor1        => AttrVal    ($name, 'graphicBeam1FontColor',  $b1fontcoldef),
-      fcolor2        => AttrVal    ($name, 'graphicBeam2FontColor',  $b2fontcoldef),
+      colorb1        => AttrVal    ($name, 'graphicBeam1Color',           B1COLDEF),
+      colorb2        => AttrVal    ($name, 'graphicBeam2Color',           B2COLDEF),
+      fcolor1        => AttrVal    ($name, 'graphicBeam1FontColor',   B1FONTCOLDEF),
+      fcolor2        => AttrVal    ($name, 'graphicBeam2FontColor',   B2FONTCOLDEF),
       beam1cont      => AttrVal    ($name, 'graphicBeam1Content',         'pvReal'),
       beam2cont      => AttrVal    ($name, 'graphicBeam2Content',     'pvForecast'),
       beam3cont      => AttrVal    ($name, 'graphicBeam3Content',               ''),
       beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
-      caicon         => AttrVal    ($name, 'consumerAdviceIcon',        $caicondef),                # Consumer AdviceIcon
+      caicon         => AttrVal    ($name, 'consumerAdviceIcon',         CAICONDEF),                # Consumer AdviceIcon
       clegend        => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => AttrVal    ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
       lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
@@ -13106,12 +13111,12 @@ sub entryGraphic {
       show_night     => $show_night,                                                                # alle Balken (Spalten) anzeigen ?
       show_diff      => AttrVal    ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
       weather        => AttrNum    ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
-      colorw         => AttrVal    ($name, 'graphicWeatherColor',      $wthcolddef),                # Wetter Icon Farbe Tag
-      colorwn        => AttrVal    ($name, 'graphicWeatherColorNight', $wthcolndef),                # Wetter Icon Farbe Nacht
+      colorw         => AttrVal    ($name, 'graphicWeatherColor',       WTHCOLDDEF),                # Wetter Icon Farbe Tag
+      colorwn        => AttrVal    ($name, 'graphicWeatherColorNight',  WTHCOLNDEF),                # Wetter Icon Farbe Nacht
       wlalias        => AttrVal    ($name, 'alias',                          $name),
       sheader        => AttrNum    ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
       hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-      flowgsize      => CurrentVal ($hash, 'size',                   $flowGSizedef),                # Größe Energieflußgrafik
+      flowgsize      => CurrentVal ($hash, 'size',                    FLOWGSIZEDEF),                # Größe Energieflußgrafik
       flowgani       => CurrentVal ($hash, 'animate',                            1),                # Animation Energieflußgrafik
       flowgxshift    => CurrentVal ($hash, 'shiftx',                             0),                # X-Verschiebung der Flußgrafikbox (muß negiert werden)
       flowgyshift    => CurrentVal ($hash, 'shifty',                             0),                # Y-Verschiebung der Flußgrafikbox (muß negiert werden)
@@ -13119,7 +13124,7 @@ sub entryGraphic {
       flowgconX      => CurrentVal ($hash, 'showconsumerdummy',                  1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
       flowgconsPower => CurrentVal ($hash, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
       flowgconsTime  => CurrentVal ($hash, 'showconsumerremaintime',             1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
-      flowgconsDist  => CurrentVal ($hash, 'consumerdist',                $fgCDdef),                # Abstand Verbrauchericons zueinander
+      flowgconsDist  => CurrentVal ($hash, 'consumerdist',                 FGCDDEF),                # Abstand Verbrauchericons zueinander
       flowgh2cDist   => CurrentVal ($hash, 'h2consumerdist',                     0),                # Erweiterung des vertikalen Abstandes Haus -> Consumer
       genpvdva       => AttrVal    ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
       lang           => getLang    ($hash),
@@ -13220,10 +13225,10 @@ sub entryGraphic {
           $paref->{chartlvl}  = 2;                                                                         # Balkengrafik Ebene 2
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
-          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',              $b3coldef);
-          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',              $b4coldef);
-          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',      $b3fontcoldef);
-          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',      $b4fontcoldef);
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',               B3COLDEF);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',               B4COLDEF);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',       B3FONTCOLDEF);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',       B4FONTCOLDEF);
           $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height});
           $paref->{weather}   = 0;
 
@@ -15872,7 +15877,7 @@ END3
 
           my $p              = $currentPower;
           $p                 = (($currentPower / $power) * 100) if ($power > 0);
-          $consumer_style    = $p > $defpopercent ? "$stna active_normal" : "$stna inactive";
+          $consumer_style    = $p > DEFPOPERCENT ? "$stna active_normal" : "$stna inactive";
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
           if ($p > 0.5) {
@@ -16533,8 +16538,6 @@ sub getMessageFileNonBlocking {
       Log3 ($name, 3, qq{$name - another Message File Process with PID "$hash->{HELPER}{GMFRUNNING}{pid}" is already running ... get Message File is aborted});
       return;
   }
-  
-  Log3 ($name, 4, "$name - Notification System - Message file >$messagefile< is retrieved non blocking");
 
   my $paref = { name  => $name,
                 block => 1
@@ -16564,8 +16567,11 @@ sub _retrieveMessageFile {
   my $name  = $paref->{name};
   my $block = $paref->{block} // 0;
   
+  Log3 ($name, 4, "$name - Notification System - Message File >$messagefile< is retrieved non blocking");
+  Log3 ($name, 4, "$name - Notification System - Message File Source: GitHub Repository");
+  
   my $valid           = 1;
-  my ($err, $remfile) = __httpBlockingGet ($name, $bPath.$messagefile.$pPath);
+  my ($err, $remfile) = __httpBlockingGet ($name, $bghPath.$messagefile.$pghPath);
   
   $remfile = q{} if($remfile =~ /No\snode\strunk\/fhem\/contrib\/SolarForecast\//xs);
   
@@ -19767,7 +19773,7 @@ sub getConsumerPlanningMode {
   my $c    = shift;
 
   my $name = $hash->{NAME};
-  my $mode = ConsumerVal ($hash, $c, 'mode', $defcmode);                                    # Consumer Planungsmode
+  my $mode = ConsumerVal ($hash, $c, 'mode', DEFCMODE);                                    # Consumer Planungsmode
 
   if ($mode =~ /^(?:can|must)$/xs) {
       return $mode;
@@ -19779,16 +19785,16 @@ sub getConsumerPlanningMode {
   my ($err)     = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );
 
   if ($err) {
-      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to '$defcmode' mode.});
-      return $defcmode;
+      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to 'DEFCMODE' mode.});
+      return DEFCMODE;
   }
   
   $err  = q{};
   $mode = ReadingsVal ($dv, $rd, '');
   
   if ($mode !~ /^(?:can|must)$/xs) {
-      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to '$defcmode' mode.});
-      return $defcmode;
+      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to 'DEFCMODE' mode.});
+      return DEFCMODE;
   }
 
 return $mode;
@@ -19968,7 +19974,7 @@ return 0;
 #  Funktion liefert 1 wenn Consumer logisch "eingeschaltet"
 #  ist, d.h. wenn der Energieverbrauch über einem bestimmten
 #  Schwellenwert oder der prozentuale Verbrauch über dem
-#  Defaultwert $defpopercent ist.
+#  Defaultwert DEFPOPERCENT ist.
 #
 #  Logisch "on" schließt physisch "on" mit ein.
 ################################################################
@@ -20004,7 +20010,7 @@ sub isConsumerLogOn {
 
   $data{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
 
-  if ($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher ist logisch aktiv
+  if ($pcurr > $pthreshold || $currpowerpercent > DEFPOPERCENT) {                          # Verbraucher ist logisch aktiv
       return 1;
   }
 
@@ -20456,7 +20462,7 @@ sub isSunPath {
   my $c    = shift;
 
   my $is      = 0;
-  my $mintime = ConsumerVal ($hash, $c, 'mintime', $defmintime);
+  my $mintime = ConsumerVal ($hash, $c, 'mintime', DEFMINTIME);
 
   if ($mintime =~ /SunPath/xsi) {
       $is = 1;
@@ -23056,7 +23062,7 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="18%"> <col width="82%"> </colgroup>
-            <tr><td> <b>&lt;Icon&gt@&lt;Colour&gt</b> </td><td>Activation recommendation is represented by icon and colour (optional) (default: light_light_dim_100@gold)  </td></tr>
+            <tr><td> <b>&lt;Icon&gt@&lt;Colour&gt</b> </td><td>Activation recommendation is represented by icon and colour (optional) (default: clock@gold)                </td></tr>
             <tr><td>                                  </td><td>(the planning data is displayed as mouse-over text)                                                         </td></tr>
             <tr><td> <b>times</b>                     </td><td>the planning status and the planned switching times are displayed as text                                   </td></tr>
             <tr><td> <b>none</b>                      </td><td>no display of the planning data                                                                             </td></tr>
@@ -25543,7 +25549,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="18%"> <col width="82%"> </colgroup>
-            <tr><td> <b>&lt;Icon&gt@&lt;Farbe&gt</b>  </td><td>Aktivierungsempfehlung wird durch Icon und Farbe (optional) dargestellt (default: light_light_dim_100@gold)   </td></tr>
+            <tr><td> <b>&lt;Icon&gt@&lt;Farbe&gt</b>  </td><td>Aktivierungsempfehlung wird durch Icon und Farbe (optional) dargestellt (default: clock@gold)                 </td></tr>
             <tr><td>                                  </td><td>(die Planungsdaten werden als Mouse-Over Text angezeigt)                                                      </td></tr>
             <tr><td> <b>times</b>                     </td><td>es werden der Planungsstatus und die geplanten Schaltzeiten als Text angezeigt                                </td></tr>
             <tr><td> <b>none</b>                      </td><td>keine Anzeige der Planungsdaten                                                                               </td></tr>
