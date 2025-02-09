@@ -14,5 +14,5 @@
 #################################################################################################################################
 
 1|SV|1
-1|DE|Ab Version 1.45.3 (Update am 08.02.) kann das Reading special_todayConsumption via Attribut ctrlSpecialReadings erstellt werden.
-1|EN|As of version 1.45.3 (update on 08.02.), the reading special_todayConsumption can be created via the ctrlSpecialReadings attribute.
+1|DE|Ab dem Release 1.45.5 werden Mitteilungen vom GitHub Repository statt SVN abgeholt. <br>Bitte das Update am 10.02. ausführen. 
+1|EN|As of release 1.45.5, messages are fetched from the GitHub repository. <br>Please carry out the update on 10.02.
