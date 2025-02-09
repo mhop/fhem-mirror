@@ -820,6 +820,7 @@ SVG_readgplotfile($$$)
   };
 
   foreach my $l (@svgplotfile) {
+    $l =~ s/\r//g;
     $l = "$l\n" unless $l =~ m/\n$/;
 
     map { $l =~ s/%($_)%/&$prSubst($1)/ge } keys %$pr if($plotReplace);
