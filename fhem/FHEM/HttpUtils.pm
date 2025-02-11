@@ -10,7 +10,8 @@ use Digest::SHA qw(sha256_hex);
 use vars qw($SSL_ERROR);
 
 # Note: video does not work for every browser (Forum #73214)
-my %ext2MIMEType= qw{
+use vars qw(%ext2MIMEType);
+%ext2MIMEType= qw{
   bmp   image/bmp
   css   text/css
   gif   image/gif
