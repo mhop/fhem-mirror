@@ -1,7 +1,6 @@
 # $Id$
-# This modules handles the communication with a TCM 120 or TCM 310 / TCM 400J /
-# TCM 515 EnOcean transceiver chip. As the protocols are radically different,
-# this is actually 2 drivers in one.
+# This modules handles the communication with a TCM 120 or TCM 310 / TCM 400J / TCM 515 EnOcean transceiver chip.
+# As the protocols are radically different, this is actually 2 drivers in one.
 # See also:
 #  TCM_120_User_Manual_V1.53_02.pdf
 #  EnOcean Serial Protocol 3 (ESP3) (for the TCM 310, TCM 400J, TCM 515)
@@ -23,6 +22,20 @@ sub TCM_Parse120($$$);
 sub TCM_Parse310($$$);
 sub TCM_CRC8($);
 sub TCM_CSUM($);
+
+# ESP3 response codes
+my %esp3Rc = (
+  "00" => "OK",
+  "01" => "ERROR",
+  "02" => "NOT_SUPPORTED",
+  "03" => "WRONG_PARAM",
+  "04" => "OPERATION_DENIED",
+  "05" => "LOCK_SET",
+  "07" => "NO_FREE_BUFFER",
+  "82" => "FLASH_HW_ERROR",
+  "90" => "BASEID_OUT_OF_RANGE",
+  "91" => "BASEID_MAX_REACHED",
+);
 
 sub TCM_Initialize($) {
   my ($hash) = @_;
@@ -276,11 +289,8 @@ sub TCM_Write($$$$) {
   my $bstring;
   if ($hash->{MODEL} eq "ESP2") {
     # TCM 120 (ESP2)
-    if (!$header) {
-      # command with ESP2 format
-      $bstring = $msg;
-    } else {
-      # command with ESP3 format
+    if ($header) {
+      # ESP3 packet
       my $packetType = hex(substr($header, 6, 2));
       if ($packetType != 1) {
         Log3 $name, 1, "TCM $name Packet Type not supported.";
@@ -296,7 +306,7 @@ sub TCM_Write($$$$) {
       # translate the RORG to ORG
       my %rorgmap = ("F6"=>"05",
                      "D5"=>"06",
-                     "A5"=>"07",
+                     "A5"=>"07"
                     );
       if($rorgmap{$rorg}) {
         $rorg = $rorgmap{$rorg};
@@ -308,6 +318,9 @@ sub TCM_Write($$$$) {
       } else {
         $bstring = "6B" . $rorg . substr ($msg, 2);
       }
+    } else {
+      # ESP2 packet
+      $bstring = $msg;
     }
     $bstring = "A55A" . $bstring . TCM_CSUM($bstring);
   } else {
@@ -319,10 +332,11 @@ sub TCM_Write($$$$) {
     }
     $hash->{helper}{telegramSentTimeLast} = gettimeofday();
     if (exists $hash->{helper}{SetAwaitCmdResp}) {
-      push(@{$hash->{helper}{awaitCmdResp}}, 1);
+      #push(@{$hash->{helper}{awaitCmdResp}}, 1);
+      push(@{$hash->{helper}{awaitCmdResp}}, $hash->{helper}{SetAwaitCmdResp});
       delete $hash->{helper}{SetAwaitCmdResp};
     } else {
-      push(@{$hash->{helper}{awaitCmdResp}}, 0);
+      push(@{$hash->{helper}{awaitCmdResp}}, undef);
     }
     #Log3 $name, 5, "TCM $name awaitCmdResp: " . join(' ', @{$hash->{helper}{awaitCmdResp}});
   }
@@ -331,6 +345,7 @@ sub TCM_Write($$$$) {
   DevIo_SimpleWrite($hash, $bstring, 1);
   # next commands will be sent with a delay
   usleep(int(AttrVal($name, "sendInterval", 100)) * 1000);
+  return undef;
 }
 
 # ESP2 CRC
@@ -368,7 +383,7 @@ my @u8CRC8Table = (
   0x3e, 0x39, 0x30, 0x37, 0x22, 0x25, 0x2c, 0x2b, 0x06, 0x01, 0x08, 0x0f, 0x1a,
   0x1d, 0x14, 0x13, 0xae, 0xa9, 0xa0, 0xa7, 0xb2, 0xb5, 0xbc, 0xbb, 0x96, 0x91,
   0x98, 0x9f, 0x8a, 0x8D, 0x84, 0x83, 0xde, 0xd9, 0xd0, 0xd7, 0xc2, 0xc5, 0xcc,
-  0xcb, 0xe6, 0xe1, 0xe8, 0xef, 0xfa, 0xfd, 0xf4, 0xf3 );
+  0xcb, 0xe6, 0xe1, 0xe8, 0xef, 0xfa, 0xfd, 0xf4, 0xf3);
 
 # ESP3 CRC
 # Used in the TCM310
@@ -460,7 +475,7 @@ sub TCM_Read($) {
       push(@{$hash->{helper}{rcvCounter}}, time() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
     }
 
-    if(length($data) >= 4) {
+    if (length($data) >= 4) {
       $data =~ s/.*A55A/A55A/ if($data !~ m/^A55A/);
       $data = "" if($data !~ m/^A55A/);
     }
@@ -468,11 +483,11 @@ sub TCM_Read($) {
   } else {
     # TCM310 / ESP3
 
-    while($data =~ m/^55(....)(..)(..)(..)/) {
+    while ($data =~ m/^55(....)(..)(..)(..)/) {
       my ($ldata, $lodata, $packetType, $crc) = (hex($1), hex($2), hex($3), $4);
-      my $tlen = 2*(7+$ldata+$lodata);
+      my $tlen = 2 * (7 + $ldata + $lodata);
       # data telegram incomplete
-      last if(length($data) < $tlen);
+      last if (length($data) < $tlen);
       my $rest = substr($data, $tlen);
       $data = substr($data, 0, $tlen);
 
@@ -482,14 +497,14 @@ sub TCM_Read($) {
       my $mdata = substr($data, 12, $ldata * 2);
       my $odata = substr($data, 12 + $ldata * 2, $lodata * 2);
       my $mycrc = TCM_CRC8($hdr);
-      if($mycrc ne $crc) {
+      if ($mycrc ne $crc) {
         Log3 $name, 2, "TCM $name wrong header checksum: got $crc, computed $mycrc" ;
         $data = $rest;
         next;
       }
       $mycrc = TCM_CRC8($mdata . $odata);
       $crc  = substr($data, -2);
-      if($mycrc ne $crc) {
+      if ($mycrc ne $crc) {
         Log3 $name, 2, "TCM $name wrong data checksum: got $crc, computed $mycrc" ;
         $data = $rest;
         next;
@@ -524,27 +539,20 @@ sub TCM_Read($) {
 
       } elsif ($packetType == 2) {
         # packet type RESPONSE
-        if (defined $hash->{helper}{awaitCmdResp}[0] && $hash->{helper}{awaitCmdResp}[0]) {
-          # do not execute if transceiver command answer is expected
-          $data .= $rest;
-          last;
-        }
-        shift(@{$hash->{helper}{awaitCmdResp}});
         $mdata =~ m/^(..)(.*)$/;
         my $rc = $1;
-        my %codes = (
-          "00" => "OK",
-          "01" => "ERROR",
-          "02" => "NOT_SUPPORTED",
-          "03" => "WRONG_PARAM",
-          "04" => "OPERATION_DENIED",
-          "05" => "LOCK_SET",
-          "82" => "FLASH_HW_ERROR",
-          "90" => "BASEID_OUT_OF_RANGE",
-          "91" => "BASEID_MAX_REACHED",
-        );
-        my $rcTxt = $codes{$rc} if($codes{$rc});
-        Log3 $name, $rc eq "00" ? 5 : 2, "TCM $name RESPONSE: $rcTxt";
+        my $rcTxt = exists($esp3Rc{$rc}) ? $esp3Rc{$rc} : $rc;
+        if (defined $hash->{helper}{awaitCmdResp}[0] && $hash->{helper}{awaitCmdResp}[0]) {
+          # received command response message
+          TCM_Parse310($hash, $mdata, shift(@{$hash->{helper}{awaitCmdResp}}));
+          # do not execute if transceiver command answer is expected
+          #$data .= $rest;
+          #last;
+        } else {
+          # received sent data response messages
+          shift(@{$hash->{helper}{awaitCmdResp}});
+          Log3 $name, $rc eq "00" ? 5 : 2, "TCM $name RESPONSE: $rcTxt";
+        }
         #$packetType = sprintf "%01X", $packetType;
         #EnOcean:PacketType:ResposeCode:MessageData:OptionalData
         #Dispatch($hash, "EnOcean:$packetType:$1:$2:$odata", undef);
@@ -564,9 +572,9 @@ sub TCM_Read($) {
           Dispatch($hash, "EnOcean:$packetType:$eventCode:$messageData", undef);
         } elsif (hex($eventCode) == 4) {
           # CO_READY
-          my @resetCause = ('voltage_supply_drop', 'reset_pin', 'watchdog', 'flywheel', 'parity_error', 'hw_parity_error', 'memory_request_error', 'wake_up', 'wake_up', 'unknown');
+          my @resetCause = ('voltage_supply_drop', 'reset_pin', 'watchdog', 'flywheel', 'parity_error', 'hw_parity_error', 'memory_request_error', 'wake_up_pin_0', 'wake_up_pin_1', 'unknown', 'wake_up_uart', 'sw_reset');
           my @secureMode = ('standard', 'extended');
-          $hash->{RESET_CAUSE} = $resetCause[hex($messageData)];
+          $hash->{RESET_CAUSE} = $resetCause[hex($messageData)] // $messageData;
           $hash->{SECURE_MODE} = $secureMode[hex($odata)];
           DoTrigger($name, "EVENT: RESET_CAUSE: $hash->{RESET_CAUSE}");
           DoTrigger($name, "EVENT: SECURE_MODE: $hash->{SECURE_MODE}");
@@ -676,9 +684,7 @@ my %parsetbl120 = (
 );
 
 # Parse TCM 120
-sub
-TCM_Parse120($$$)
-{
+sub TCM_Parse120($$$) {
   my ($hash,$rawmsg,$ret) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 5, "TCM $name Parse $rawmsg";
@@ -702,29 +708,16 @@ TCM_Parse120($$$)
   return $msg;
 }
 
-# Parse Table TCM 310
-my %rc310 = (
-  "00" => "OK",
-  "01" => "ERROR",
-  "02" => "NOT_SUPPORTED",
-  "03" => "WRONG_PARAM",
-  "04" => "OPERATION_DENIED",
-  "05" => "LOCK_SET",
-  "82" => "FLASH_HW_ERROR",
-  "90" => "BASEID_OUT_OF_RANGE",
-  "91" => "BASEID_MAX_REACHED",
-);
-
 # Parse TCM 310
 sub TCM_Parse310($$$) {
-  my ($hash,$rawmsg,$ptr) = @_;
+  my ($hash, $rawmsg, $ptr) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 5, "TCM $name TCM_Parse $rawmsg";
   my $rc = substr($rawmsg, 0, 2);
   my $msg = "";
-  if($rc ne "00") {
-    $msg = $rc310{$rc};
-    $msg = "Unknown return code $rc" if(!$msg);
+  if ($rc ne "00") {
+    $msg = $esp3Rc{$rc};
+    $msg = "Unknown return code $rc" if (!$msg);
   } else {
     my @ans;
     foreach my $k (sort keys %{$ptr}) {
@@ -736,7 +729,7 @@ sub TCM_Parse310($$$) {
       } else {
         $data = substr($rawmsg, $off*2, $len*2);
       }
-      if($type) {
+      if ($type) {
         if ($type eq "STR") {
           $data = pack('H*', $data);
           ####
@@ -859,7 +852,7 @@ sub TCM_Get($@) {
       my $cmdHex = $cmdhash->{cmd};
       my $oCmdHex = '';
       $oCmdHex = $cmdhash->{oCmd} if (exists $cmdhash->{oCmd});
-      $hash->{helper}{SetAwaitCmdResp} = 1;
+      $hash->{helper}{SetAwaitCmdResp} = $cmdhash;
       TCM_Write($hash, $hash, sprintf("%04X%02X%02X", length($cmdHex)/2, length($oCmdHex)/2, $cmdhash->{packetType}), $cmdHex . $oCmdHex);
       ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
       $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
@@ -923,9 +916,9 @@ sub TCM_ClearTeach($) {
   Log3 $hash->{NAME}, 3, "TCM $hash->{NAME} set teach 0";
   if($hash->{MODEL} ne 'ESP2') {
     # signal telegram learn mode status
-    my $cmdhex = 'D011B' . 'F' x 17 . '0' x 10;
+    my $cmdhex = 'D011B' . 'F' x 17 . $hash->{ChipID} . '0' x 2;
     my ($err, $msg);
-    $hash->{helper}{SetAwaitCmdResp} = 1;
+    $hash->{helper}{SetAwaitCmdResp} = $sets310{'teach'};
     TCM_Write($hash, $hash, sprintf("%04X00%02X", length($cmdhex)/2, 1), $cmdhex);
     ($err, $msg) = TCM_ReadAnswer($hash, "set teach");
      if(!$err) {
@@ -1006,7 +999,7 @@ sub TCM_Set($@) {
       delete $modules{"$hash->{TYPE}"}{Teach};
       return if ($hash->{MODEL} eq "ESP2");
       # signal telegram learn mode status
-      $cmdHex = 'D011B' . 'F' x 17 . '0' x 10;
+      $cmdHex = 'D011B' . 'F' x 17 . $hash->{ChipID} . '0' x 2;
     } else {
       while (my ($iDev, $iHash) = each (%{$modules{"$hash->{TYPE}"}{devHash}})) {
         #Log3 $name, 2, "TCM $name clear Teach flag ioDev: $iDev ioHash: $iHash ioDevName: " . $defs{"$iHash->{NAME}"}->{NAME};
@@ -1020,8 +1013,8 @@ sub TCM_Set($@) {
       return if ($hash->{MODEL} eq "ESP2");
       # signal telegram learn mode status
       my $remainTime = $arg < 10 ? 1 : int($arg / 10);
-      $remainTime = $remainTime > 254 ? $remainTime : 254;
-      $cmdHex = 'D0114F' . sprintf("%02X", $remainTime) . 'F' x 14 . '0' x 10;
+      $remainTime = $remainTime < 254 ? $remainTime : 254;
+      $cmdHex = 'D0114F' . sprintf("%02X", $remainTime) . 'F' x 14 . $hash->{ChipID} . '0' x 2;
     }
   }
 
@@ -1049,7 +1042,7 @@ sub TCM_Set($@) {
       delete $hash->{TRANSMIT_FAILED};
       return;
     }
-    $hash->{helper}{SetAwaitCmdResp} = 1;
+    $hash->{helper}{SetAwaitCmdResp} = $cmdhash;
     TCM_Write($hash, $hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "set $cmd");
     if(!$err) {
@@ -1238,18 +1231,7 @@ sub TCM_ReadAnswer($$) {
             shift(@{$hash->{helper}{awaitCmdResp}});
             $mdata =~ m/^(..)(.*)$/;
             my $rc = $1;
-            my %codes = (
-              "00" => "OK",
-              "01" => "ERROR",
-              "02" => "NOT_SUPPORTED",
-              "03" => "WRONG_PARAM",
-              "04" => "OPERATION_DENIED",
-              "05" => "LOCK_SET",
-              "82" => "FLASH_HW_ERROR",
-              "90" => "BASEID_OUT_OF_RANGE",
-              "91" => "BASEID_MAX_REACHED",
-            );
-            my $rcTxt = $codes{$rc} if($codes{$rc});
+            my $rcTxt = $esp3Rc{$rc} if ($esp3Rc{$rc});
             Log3 $name, $rc eq "00" ? 5 : 2, "TCM $name RESPONSE: $rcTxt";
             #$packetType = sprintf "%01X", $packetType;
             #EnOcean:PacketType:ResposeCode:MessageData:OptionalData
@@ -1269,7 +1251,7 @@ sub TCM_ReadAnswer($$) {
             Dispatch($hash, "EnOcean:$packetTypeHex:$eventCode:$messageData", undef);
           } elsif (hex($eventCode) == 4) {
             # CO_READY
-            my @resetCause = ('voltage_supply_drop', 'reset_pin', 'watchdog', 'flywheel', 'parity_error', 'hw_parity_error', 'memory_request_error', 'wake_up', 'wake_up', 'unknown');
+            my @resetCause = ('voltage_supply_drop', 'reset_pin', 'watchdog', 'flywheel', 'parity_error', 'hw_parity_error', 'memory_request_error', 'wake_up_pin_0', 'wake_up_pin_1', 'unknown', 'wake_up_uart', 'sw_reset');
             my @secureMode = ('standard', 'extended');
             $hash->{RESET_CAUSE} = $resetCause[hex($messageData)];
             $hash->{SECURE_MODE} = $secureMode[hex($odata)];
