@@ -159,6 +159,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.45.6" => "12.02.2025  Notification System: print out next planned file pull, timestringsFromOffset: allow +- offsets ".
+                           "new sub _calcConsumptionForecast_circular to prepare the evaluation of consumption days in pvCircular ",
   "1.45.5" => "09.02.2025  change constant GMFILEREPEAT, GMFILERANDOM, Pull Message File from GitHub Repo ",
   "1.45.4" => "08.02.2025  change constant GMFILEREPEAT + new constant GMFILERANDOM ",
   "1.45.3" => "06.02.2025  __readDataWeather: if no values of hour 01 (00:00+) use val of hour 24 of day before ".
@@ -366,11 +368,6 @@ my %vNotesIntern = (
                            "delete wrp from circular & airaw, remove rain2bin, __getDWDSolarData: change \$runh, ".
                            "fix  Illegal division by zero Forum: https://forum.fhem.de/index.php?msg=1304009 ".
                            "DWD API: check age of Rad1h data, store pvcorrf of sunalt with value 200+x in pvCircular ",
-  "1.16.1" => "14.02.2024  ___isCatFiltered: add eval for regex evaluation, add sunaz to AI raw and get, fillup AI hash ",
-  "1.16.0" => "12.02.2024  new command get dwdCatalog ",
-  "1.15.5" => "11.02.2024  change forecastQualities output, new limits for 'accurate' and 'spreaded' results from AI ".
-                           "checkPlantConfig: change common check info output ".
-                           "fix load Astro ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -382,7 +379,7 @@ use constant {
   KJ2WH          => 0.2777777778,                                                   # Umrechnungsfaktor kJ in Wh
   WH2KJ          => 3.6,                                                            # Umrechnungsfaktor Wh in kJ
   DEFLANG        => 'EN',                                                           # default Sprache wenn nicht konfiguriert
-  DEFMAXVAR      => 1.5,                                                            # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
+  DEFMAXVAR      => 0.75,                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
   DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
   SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
   SPLSLIDEMAX    => 20,                                                             # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
@@ -401,7 +398,7 @@ use constant {
 
   GMFBLTO        => 30,                                                             # Timeout Aholen Message File aus contrib
   GMFILEREPEAT   => 3600,                                                           # Base Wiederholungsuntervall Abholen Message File aus contrib
-  GMFILERANDOM   => 3600,                                                           # Random AddOn zu GMFILEREPEAT
+  GMFILERANDOM   => 10800,                                                          # Random AddOn zu GMFILEREPEAT
   IDXLIMIT       => 900000,                                                         # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
 
   AITRBLTO       => 7200,                                                           # KI Training BlockingCall Timeout
@@ -450,6 +447,33 @@ use constant {
   B4COLDEF        => 'DBDBD0',                                                      # default Farbe Beam 4
   B4FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 4
   FGCDDEF         => 130,                                                           # Abstand Verbrauchericons zueinander
+  
+  FGSCALEDEF      => 0.10,                                                          # Flußgrafik: Scale Normativ Icons
+  STROKCOLSTDDEF  => 'darkorange',                                                  # Flußgrafik: Standardfarbe aktive normale Kette
+  STROKCOLSIGDEF  => 'red',                                                         # Flußgrafik: Standardfarbe aktive Signal-Kette
+  STROKCOLINADEF  => 'gray',                                                        # Flußgrafik: Standardfarbe inaktive Kette
+  STROKWIDTHDEF   => 25,                                                            # Flußgrafik: Standard Breite der Kette
+  PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
+  CICONDEF        => 'light_light_dim_100',                                         # default Consumer-Icon
+  CICONCOLDEF     => 'darkorange',                                                  # default Consumer-Icon Färbung
+  BICONDEF        => 'measure_battery_75',                                          # default Batterie-Icon
+  BICCOLRCDDEF    => 'grey',                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
+  BICCOLNRCDDEF   => '#cccccc',                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
+  BCHGICONCOLDEF  => 'darkorange',                                                  # default 'Aufladen' Batterie-Icon Färbung
+  BDCHICONCOLDEF  => '#b32400',                                                     # default 'Entladen' Batterie-Icon Färbung
+  HOMEICONDEF     => 'control_building_control@grey',                               # default Home-Icon
+  NODEICONDEF     => 'virtualbox',                                                  # default Knoten-Icon
+  INVICONDEF      => 'weather_sun',                                                 # default Inverter-icon
+  MOONICONDEF     => 2,                                                             # default Mond-Phase (aus %hmoon)
+  MOONCOLDEF      => 'lightblue',                                                   # default Mond Färbung
+  ACTCOLDEF       => 'orange',                                                      # default Färbung Icon wenn aktiv
+  INACTCOLDEF     => 'grey',                                                        # default Färbung Icon wenn inaktiv
+  
+  BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                 # Basispfad Abruf contrib SolarForecast Files
+  PPATH           => '?format=txt',                                                                        # Download Format
+  CFILE           => 'controls_solarforecast.txt',                                                         # Controlfile Update FTUI-Files  
+  BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',   # Basispfad GitHub SolarForecast Files
+  PGHPATH         => '',                                                                                   # GitHub Post Pfad
 };
 
 ## Standardvariablen
@@ -477,36 +501,9 @@ my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                 
 my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
-
-my $fgscaledef     = 0.10;                                                          # Flußgrafik: Scale Normativ Icons
-my $strokcolstddef = 'darkorange';                                                  # Flußgrafik: Standardfarbe aktive normale Kette
-my $strokcolsigdef = 'red';                                                         # Flußgrafik: Standardfarbe aktive Signal-Kette
-my $strokcolinadef = 'gray';                                                        # Flußgrafik: Standardfarbe inaktive Kette
-my $strokwidthdef  = 25;                                                            # Flußgrafik: Standard Breite der Kette
-my $prodicondef    = 'sani_garden_pump';                                            # default Producer-Icon
-my $cicondef       = 'light_light_dim_100';                                         # default Consumer-Icon
-my $ciconcoldef    = 'darkorange';                                                  # default Consumer-Icon Färbung
-my $bicondef       = 'measure_battery_75';                                          # default Batterie-Icon
-my $biccolrcddef   = 'grey';                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
-my $biccolnrcddef  = '#cccccc';                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
-my $bchgiconcoldef = 'darkorange';                                                  # default 'Aufladen' Batterie-Icon Färbung
-my $bdchiconcoldef = '#b32400';                                                     # default 'Entladen' Batterie-Icon Färbung
-my $homeicondef    = 'control_building_control@grey';                               # default Home-Icon
-my $nodeicondef    = 'virtualbox';                                                  # default Knoten-Icon
-my $invicondef     = 'weather_sun';                                                 # default Inverter-icon
-my $moonicondef    = 2;                                                             # default Mond-Phase (aus %hmoon)
-my $mooncoldef     = 'lightblue';                                                   # default Mond Färbung
-my $actcoldef      = 'orange';                                                      # default Färbung Icon wenn aktiv
-my $inactcoldef    = 'grey';                                                        # default Färbung Icon wenn inaktiv
-
-my $bPath          = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';                 # Basispfad Abruf contrib SolarForecast Files
-my $cfile          = 'controls_solarforecast.txt';                                                         # Controlfile Update FTUI-Files
-my $pPath          = '?format=txt';                                                                        # Download Format
-
-my $bghPath        = 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/';   # Basispfad GitHub SolarForecast Files 
+ 
 my $msgfiletest    = 'controls_solarforecast_messages_test.txt';                                           # TEST Input-File Notification System
 my $msgfileprod    = 'controls_solarforecast_messages_prod.txt';                                           # PRODUKTIVES Input-File Notification System
-my $pghPath        = '';                                                                                   # GitHub Post Pfad
 
 my $messagefile = $msgfileprod;
                                                                                     # mögliche Debug-Module
@@ -824,8 +821,10 @@ my %hqtxt = (                                                                # H
               DE => qq{Wichtigkeit}                                                                                         },
   number => { EN => qq{Number},
               DE => qq{Nummer}                                                                                              },
-  ludich => { EN => qq{last update Input channels},
-              DE => qq{letzte Aktualisierung Eingangskan&auml;le}                                                           },  
+  impcha => { EN => qq{Input channels},
+              DE => qq{Eingangskan&auml;le}                                                                                 },  
+  scedld => { EN => qq{scheduled},
+              DE => qq{geplant}                                                                                             }, 
   ctnsly => { EN => qq{continuously},
               DE => qq{fortlaufend}                                                                                         },
   yday   => { EN => qq{yesterday},
@@ -5360,7 +5359,7 @@ sub _ftuiFramefiles {
 
   my $ret;
   my $upddo = 0;
-  my $cfurl = $bPath.$cfile.$pPath;
+  my $cfurl = BPATH.CFILE.PPATH;
 
   for my $file (@fs) {
       my $lencheck = 1;
@@ -5368,8 +5367,8 @@ sub _ftuiFramefiles {
       my ($cmerr, $cmupd, $cmmsg, $cmrec, $cmfile, $cmlen) = checkModVer ($name, $file, $cfurl);
 
       if ($cmerr && $cmmsg =~ /Automatic\scheck/xs && $cmrec =~ /Compare\syour\slocal/xs) {        # lokales control file ist noch nicht vorhanden -> update ohne Längencheck
-          $cmfile   = 'FHEM/'.$cfile;
-          $file     = $cfile;
+          $cmfile   = 'FHEM/'.CFILE;
+          $file     = CFILE;
           $lencheck = 0;
           $cmerr    = 0;
           $cmupd    = 1;
@@ -5388,9 +5387,7 @@ sub _ftuiFramefiles {
                                   root     => $root,
                                   cmfile   => $cmfile,
                                   cmlen    => $cmlen,
-                                  bPath    => $bPath,
                                   file     => $file,
-                                  pPath    => $pPath,
                                   lencheck => $lencheck
                                 }
                               );
@@ -5403,11 +5400,9 @@ sub _ftuiFramefiles {
   ################################
   $ret = __updPreFile ( { name     => $name,
                           root     => $root,
-                          cmfile   => 'FHEM/'.$cfile,
+                          cmfile   => 'FHEM/'.CFILE,
                           cmlen    => 0,
-                          bPath    => $bPath,
-                          file     => $cfile,
-                          pPath    => $pPath,
+                          file     => CFILE,
                           lencheck => 0,
                           finalupd => 1
                         }
@@ -5432,9 +5427,7 @@ sub __updPreFile {
   my $root     = $pars->{root};
   my $cmfile   = $pars->{cmfile};
   my $cmlen    = $pars->{cmlen};
-  my $bPath    = $pars->{bPath};
   my $file     = $pars->{file};
-  my $pPath    = $pars->{pPath};
   my $lencheck = $pars->{lencheck};
   my $finalupd = $pars->{finalupd} // 0;
 
@@ -5458,7 +5451,7 @@ sub __updPreFile {
       }
   }
 
-  ($err, my $remFile) = __httpBlockingGet ($name, $bPath.$file.$pPath);
+  ($err, my $remFile) = __httpBlockingGet ($name, BPATH.$file.PPATH);
 
   if ($err) {
       Log3 ($name, 1, "$name - $err");
@@ -7573,6 +7566,7 @@ sub centralTask {
   deleteReadingspec ($hash, 'Today_.*_BatIn');                                  # 30.12.2024 
   deleteReadingspec ($hash, 'Today_.*_BatOut');                                 # 30.12.2024  
   deleteReadingspec ($hash, 'statistic_.*');                                    # 02.01.2025
+  readingsDelete    ($hash, '.migrated');                                       # 01.02.25
   
   for my $ck (keys %{$data{$name}{circular}}) {                                 # 30.12.2024
       $data{$name}{circular}{$ck}{batin01}  = delete $data{$name}{circular}{$ck}{batin}  if(defined $data{$name}{circular}{$ck}{batin});
@@ -7629,8 +7623,6 @@ sub centralTask {
   if ($n) {
       Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
   }
-      
-  readingsDelete ($hash, '.migrated');
   
   ##########################################################################################################################
 
@@ -7705,6 +7697,9 @@ sub centralTask {
   _batChargeRecmd             ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
   _calcConsumptionForecast    ($centpars);                                            # Verbrauchsprognose erstellen
+  
+  _calcConsumptionForecast_circular ($centpars);                                      # Test neue Verbrauchsprognose 
+  
   _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
   _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
   _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
@@ -8522,7 +8517,7 @@ sub __readDataWeather {
       my $sunup = ReadingsNum ($fcname, "fc${fd}_${fh}_SunUp",    0);                          # 1 - Tag
 
       if (!$n) {                                                                               # Hour 00 -> Werte des vorigen Tag / hour 24 verwenden
-          my $dt  = timestringsFromOffset ($t, 86400);                                          
+          my $dt  = timestringsFromOffset ($t, -86400);                                          
           $wid  //= HistoryVal ($name, $dt->{day}, '24', 'weatherid', undef);
           $neff //= HistoryVal ($name, $dt->{day}, '24', 'wcc',       undef);
           $temp //= HistoryVal ($name, $dt->{day}, '24', 'temp',      undef);
@@ -11093,7 +11088,6 @@ return;
 sub ___saveEhodpieces {
   my $paref   = shift;
   my $name    = $paref->{name};
-  my $type    = $paref->{type};
   my $c       = $paref->{consumer};
   my $startts = $paref->{startts};                                           # Unix Timestamp für geplanten Switch on
   my $stopts  = $paref->{stopts};                                            # Unix Timestamp für geplanten Switch off
@@ -11116,7 +11110,7 @@ sub ___saveEhodpieces {
           last;
       }
 
-      $chod                                                 = sprintf '%02d', $chod;
+      $chod                                          = sprintf '%02d', $chod;
       $data{$name}{consumers}{$c}{ehodpieces}{$chod} = sprintf '%.2f', $ep if($ep);
 
       $p++;
@@ -12063,7 +12057,7 @@ sub _calcConsumptionForecast {
        my $tomcon                                 = sprintf "%.0f", medianArray (\@cona);
        $data{$name}{current}{tomorrowconsumption} = $tomcon;                                           # prognostizierter Verbrauch (Median) aller (gleicher) Wochentage
 
-       debugLog ($paref, 'consumption|consumption_long', "estimated Consumption for tomorrow: $tomcon, days for avg: $dnum");
+       debugLog ($paref, 'consumption|consumption_long', "estimated Consumption for tomorrow: $tomcon, days for median: $dnum");
   }
   else {
       my $lang = $paref->{lang};
@@ -12131,7 +12125,7 @@ sub _calcConsumptionForecast {
               }
           }
 
-          push @conhfcex, ($hcon - $consumerco) if($hcon >= $consumerco);                                               # prognostizierter Verbrauch (Median) Ex registrierter Verbraucher
+          push @conhfcex, ($hcon - $consumerco) if($hcon >= $consumerco);                           # prognostizierter Verbrauch (Median) Ex registrierter Verbraucher
           push @conhfc,   $hcon;
           
           $dnum++;
@@ -12150,6 +12144,135 @@ sub _calcConsumptionForecast {
 
            debugLog ($paref, 'consumption|consumption_long', "estimated Consumption for $nhday -> starttime: $nhtime, confc: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
       }
+  }
+
+return;
+}
+
+################################################################
+#     Energieverbrauch Vorhersage kalkulieren (Median)
+################################################################
+sub _calcConsumptionForecast_circular {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $chour   = $paref->{chour};
+  my $t       = $paref->{t};
+  my $day     = $paref->{day};                                                                          # aktuelles Tagdatum (01...31)
+  my $dayname = $paref->{dayname};                                                                      # aktueller Tagname
+
+  my $hash    = $defs{$name};
+  my $acref   = $data{$name}{consumers};
+  my $swdfcfc = AttrVal ($name, 'affectConsForecastIdentWeekdays', 0);                                  # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
+    
+  ## Beachtung der letzten X Tage falls gesetzt
+  ###############################################
+  my $acld = AttrVal ($name, 'affectConsForecastLastDays', 0);
+
+  ## Verbrauchsvorhersage für den kommenden Tag
+  ##############################################
+  my $dt         = timestringsFromOffset ($t, 86400);
+  my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname kommender Tag
+  
+  my (@cona, $exconfc, $csme, %usage);
+  
+  $usage{tom}{con} = 0;
+
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day (new median) ###################");
+
+  ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
+  ###############################################################
+  for my $h (1..24) {                                                                                   # Median für jede Stunde / Tag berechnen
+      my $hh = sprintf "%02d", $h;
+      
+      my @conh;
+      
+      if ($swdfcfc) {                                                                                   # nur gleiche Tage (Mo...So) einbeziehen der Stunde
+          push @conh, @{$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}};
+      }
+      else {
+          for my $dy (keys %{$data{$name}{circular}{$hh}{con_all}}) {                                   # alle aufgezeichneten Wochentage in der Stunde berücksichtigen
+              push @conh, @{$data{$name}{circular}{$hh}{con_all}{$dy}};
+          }
+      }
+
+      my $hnum = scalar @conh;
+      
+      if ($hnum) {
+          my $hcon          = sprintf "%.0f", medianArray (\@conh);                                    
+          $usage{$hh}{con}  = $hcon;                                                                    # prognostizierter Verbrauch (Median) der Stunde hh (Hour of Day)
+          $usage{$hh}{num}  = $hnum;
+          $usage{tom}{con} += $hcon;                                                                    # Summe prognostizierter Verbrauch (Median) des Tages 
+          $usage{tom}{num} += $hnum;
+      }
+  }
+  
+  ## historische Werte Verbraucher exkludieren / geplante inkludieren
+  #####################################################################
+  my $tomnum = $usage{tom}{num} // 0;
+  
+  if ($tomnum) {
+      my $exnum = 0;
+      my $ex    = 0;
+      
+      for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
+          next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
+
+          if ($swdfcfc) {                                                                              # nur gleiche Tage (Mo...So) einbeziehen
+              my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
+              next if(!$hdn || $hdn ne $tomdayname);
+          }
+
+          for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
+              $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                        # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+
+              if ($exconfc) {
+                  ## Tageswert Excludes finden und summieren
+                  ############################################
+                  $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
+                  
+                  if ($csme > 0) {
+                      $ex   += $csme;
+                      $exnum++;
+                  
+                      debugLog ($paref, 'consumption|consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
+                  }
+                  
+                  ## hist. On-Stunden aller Tage aufnehmen
+                  ##########################################
+                  for my $h (1..24) {
+                      my $hh = sprintf "%02d", $h;
+                      $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
+                  
+                      if ($csme) {
+                          $usage{$hh}{histcon} += $csme;
+                          $usage{$hh}{histnum}++;
+                      }
+                  }              
+              }
+          }
+      }
+      
+      for my $h (1..24) {                          
+          my $hh = sprintf "%02d", $h;
+          
+          if (defined $usage{$hh}{histnum}) {
+              my $exhcon        = sprintf "%.0f", ($usage{$hh}{histcon} / $usage{$hh}{histnum});       # durchschnittlichen Verbrauchswert 
+              $usage{$hh}{con} -= $exhcon;
+          
+              debugLog ($paref, 'consumption|consumption_long', "excl. $exhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{histnum});
+          }
+      
+          debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
+      } 
+      
+      $ex               = sprintf "%.0f", ($ex / $exnum) if($exnum);                                   # Ex Tageswert Durchschnitt bilden
+      $usage{tom}{con} -= $ex;
+      
+      debugLog ($paref, 'consumption|consumption_long', "estimated cons Tomorrow: ".$usage{tom}{con}." Wh, Considered value numbers: $tomnum, exclude: $ex Wh (avg of $exnum)");
+  }
+  else {
+      my $lang = $paref->{lang};
+      # $data{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};
   }
 
 return;
@@ -12359,7 +12482,7 @@ sub _calcDataEveryFullHour {
       next if($h > $chour);
       
       if (int $chour == 0) {                                                                      # 00:XX -> Stunde 24 des Vortages speichern
-          my $dt             = timestringsFromOffset ($t, 3600);
+          my $dt             = timestringsFromOffset ($t, -3600);
           $paref->{yt}       = $t - 3600;                                                         # Timestamp Vortag
           $paref->{yday}     = $dt->{day};                                                        # vorheriger Tag (range 01 .. 31)
           $paref->{ydayname} = $dt->{dayname};
@@ -12533,19 +12656,19 @@ sub _addCon2CircArray {
   my $paref    = shift;
   my $name     = $paref->{name};
   my $h        = $paref->{h};
-  my $yday     = $paref->{yday};                                              # vorheriger Tag (falls gesetzt)
-  my $day      = $paref->{day};                                               # aktueller Tag (range 01 to 31)
+  my $yday     = $paref->{yday};                                                  # vorheriger Tag (falls gesetzt)
+  my $day      = $paref->{day};                                                   # aktueller Tag (range 01 to 31)
   my $dayname  = $paref->{dayname}; 
   my $ydayname = $paref->{ydayname};
 
   my $hash  = $defs{$name};
 
-  $day      = $yday     if(defined $yday);                                    # der vergangene Tag soll verarbeitet werden
-  $dayname  = $ydayname if(defined $ydayname);                                # Name des Vortages
+  $day      = $yday     if(defined $yday);                                        # der vergangene Tag soll verarbeitet werden
+  $dayname  = $ydayname if(defined $ydayname);                                    # Name des Vortages
   my $hh    = sprintf "%02d", $h;
-  my $con   = HistoryVal ($hash, $day, $hh, 'con', 0);                        # Consumption der abgefragten Stunde
+  my $con   = HistoryVal ($hash, $day, $hh, 'con', 0);                            # Consumption der abgefragten Stunde
   
-  push @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}, $con;             # Wert zum Speicherarray hinzufügen
+  push @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}, $con if($con >= 0);   # Wert zum Speicherarray hinzufügen
   
   debugLog ($paref, 'saveData2Cache', "add consumption into Array (con_all) in Circular - day: $day, hod: $hh, con: $con");
 
@@ -14349,9 +14472,7 @@ sub _graphicConsumerLegend {
   my ($clegendstyle, $clegend) = split '_', $paref->{clegend};
   my $clink                    = $paref->{clink};
 
-  my $type                     = $paref->{type};
   my @consumers                = sort{$a<=>$b} keys %{$data{$name}{consumers}};              # definierte Verbraucher ermitteln
-
   $clegend                     = '' if($clegendstyle eq 'none' || !int @consumers);
   $paref->{clegend}            = $clegend;
 
@@ -15446,7 +15567,7 @@ sub _flowGraphic {
   my $cc             = CurrentVal  ($hash, 'consumption',             0);
   
   my $cc_dummy   = $cc;
-  my $scale      = $fgscaledef;
+  my $scale      = FGSCALEDEF;
   my $pdist      = 130;                                                        # Abstand Producer zueinander
   my $hasbat     = 1;                                                          # initial Batterie vorhanden
   my $stna       = $name;
@@ -15634,10 +15755,10 @@ sub _flowGraphic {
                    !$node2grid && !$cgc && $bat2home ? "$stna grid_gray"  :
                    "$stna grid_red";
   
-  my $strokecolstd = CurrentVal ($hash, 'strokecolstd', $strokcolstddef);
-  my $strokecolsig = CurrentVal ($hash, 'strokecolsig', $strokcolsigdef);
-  my $strokecolina = CurrentVal ($hash, 'strokecolina', $strokcolinadef);
-  my $strokewidth  = CurrentVal ($hash, 'strokewidth',  $strokwidthdef);  
+  my $strokecolstd = CurrentVal ($hash, 'strokecolstd', STROKCOLSTDDEF);
+  my $strokecolsig = CurrentVal ($hash, 'strokecolsig', STROKCOLSIGDEF);
+  my $strokecolina = CurrentVal ($hash, 'strokecolina', STROKCOLINADEF);
+  my $strokewidth  = CurrentVal ($hash, 'strokewidth',   STROKWIDTHDEF);  
   
   my $ret = << "END0";
       <style>
@@ -15751,7 +15872,7 @@ END1
   
   ## Home Icon
   ##############
-  my $hicon        = FW_makeImage    ($homeicondef, '');
+  my $hicon        = FW_makeImage    (HOMEICONDEF, '');
   ($scale, $hicon) = __normIconScale ($name, $hicon);
   
   $ret .= qq{<g id="home_$stna" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
@@ -15763,7 +15884,7 @@ END1
   if ($flowgconX) {   
       my $dumtxt       = $htitles{dumtxt}{$lang};  
       my $dumcol       = $cc_dummy <= 0 ? '@grey' : q{};                                          # Einfärbung Consumer Dummy
-      my $dicon        = FW_makeImage    ($cicondef.$dumcol, '');
+      my $dicon        = FW_makeImage    (CICONDEF.$dumcol, '');
       ($scale, $dicon) = __normIconScale ($name, $dicon);
       
       $ret .= qq{<g id="dummy_$stna" transform="translate(660,360),scale($scale)">};
@@ -16148,10 +16269,10 @@ sub __substituteIcon {
   my $txt = '';
 
   if ($ptyp eq 'consumer') {                                                             # Icon Consumer 
-      ($icon, $color) = split '@', ConsumerVal ($hash, $pn, 'icon', $cicondef);
+      ($icon, $color) = split '@', ConsumerVal ($hash, $pn, 'icon', CICONDEF);
       
       if (!$color) {
-          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? $ciconcoldef : '';
+          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? CICONCOLDEF : '';
       }
   }
   elsif ($ptyp eq 'battery') {                                                           # Icon Batterie 
@@ -16181,9 +16302,9 @@ sub __substituteIcon {
               ($icon, $color) = split '@', $ircmd;
               $icon           = $icon    ? $icon    : 
                                 $socicon ? $socicon :
-                                $bicondef;                                               # nur Farbe angegeben  
+                                BICONDEF;                                                # nur Farbe angegeben  
                                 
-              $color  //= $biccolrcddef;
+              $color  //= BICCOLRCDDEF;
               
               if ($flag eq 'hist') {                                                     # erreichter SoC vergangener Stunden
                   $pretxt = $htitles{onlybatw}{$lang}." $pn: $msg1";
@@ -16196,9 +16317,9 @@ sub __substituteIcon {
               ($icon, $color) = split '@', $inorcmd;
               $icon           = $icon    ? $icon    : 
                                 $socicon ? $socicon :
-                                $bicondef;                                               # nur Farbe angegeben  
+                                BICONDEF;                                                # nur Farbe angegeben  
                                 
-              $color  //= $biccolnrcddef;
+              $color  //= BICCOLNRCDDEF;
               $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bncharel}{$lang};
           }
       }
@@ -16208,27 +16329,27 @@ sub __substituteIcon {
                ($icon, $color) = split '@', $icharge;
                $icon           = $icon    ? $icon    : 
                                  $socicon ? $socicon :
-                                 $bicondef;                                              # nur Farbe angegeben
+                                 BICONDEF;                                               # nur Farbe angegeben
                                  
-               $color //= $bchgiconcoldef;
+               $color //= BCHGICONCOLDEF;
                $txt     = "$pretxt\nStatus: ".$htitles{ischawth}{$lang}.' '.$pcurr.' W'.$soctxt;
            }
            elsif ($pcurr < 0) {                                                          # Batterie wird entladen
                ($icon, $color) = split '@', $idischrg;
                $icon           = $icon    ? $icon    : 
                                  $socicon ? $socicon :
-                                 $bicondef;                                              # nur Farbe angegeben
+                                 BICONDEF;                                               # nur Farbe angegeben
                                  
-               $color //= $bdchiconcoldef;  
+               $color //= BDCHICONCOLDEF;  
                $txt     = "$pretxt\nStatus: ".$htitles{isdchawt}{$lang}.' '.(abs $pcurr).' W'.$soctxt;               
            }
            else {                                                                        # Standby
                ($icon, $color) = split '@', $ircmd;
                $icon           = $icon    ? $icon    : 
                                  $socicon ? $socicon :
-                                 $bicondef;                                              # nur Farbe angegeben  
+                                 BICONDEF;                                               # nur Farbe angegeben  
                                 
-               $color //= $biccolrcddef;
+               $color //= BICCOLRCDDEF;
                $txt     = "$pretxt\nStatus: Standby".$soctxt;
            }
       }
@@ -16241,7 +16362,7 @@ sub __substituteIcon {
       }
   }
   elsif ($ptyp eq 'producer') {                                                          # Icon Producer
-      ($icon, $color) = split '@', ProducerVal ($hash, $pn, 'picon', $prodicondef); 
+      ($icon, $color) = split '@', ProducerVal ($hash, $pn, 'picon', PRODICONDEF); 
       $txt            = ProducerVal ($hash, $pn, 'palias', ''); 
       
       if (!$pcurr) {
@@ -16249,35 +16370,35 @@ sub __substituteIcon {
       }      
   }
   elsif ($ptyp eq 'inverter') {                                                          # Inverter, Smartloader
-      my ($iday, $inight) = split ':', InverterVal ($hash, $pn, 'iicon', $invicondef);
+      my ($iday, $inight) = split ':', InverterVal ($hash, $pn, 'iicon', INVICONDEF);
       
       if ($don || $pcurr) {                                                              # Tag -> eigenes Icon oder Standard
           $txt            = InverterVal ($hash, $pn, 'ialias', '');
-          $iday           = $iday ? $iday : $invicondef;
+          $iday           = $iday ? $iday : INVICONDEF;
           ($icon, $color) = split '@', $iday;
-          $color          = !$pcurr ? $inactcoldef :
-                            $color  ? $color       : 
-                            $actcoldef;
+          $color          = !$pcurr ? INACTCOLDEF :
+                            $color  ? $color      : 
+                            ACTCOLDEF;
       }
       else {                                                                           # Nacht -> eigenes Icon oder Mondphase
-          my $mpi = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
+          my $mpi = CurrentVal ($hash, 'moonPhaseI', MOONICONDEF);
           
           if ($inight) {                                                               # eigenes Icon + ggf. Farbe
               ($icon, $color) = split '@', $inight;
-              $color          = $color ? $color : $inactcoldef;
+              $color          = $color ? $color : INACTCOLDEF;
           }
           else {
-              $icon           = $hmoon{$mpi}{icon}.'@'.$mooncoldef;
+              $icon           = $hmoon{$mpi}{icon}.'@'.MOONCOLDEF;
               $txt            = $hmoon{$mpi}{$lang};
               ($icon, $color) = split '@', $icon;
           }
       }
   }
   elsif ($ptyp eq 'node') {                                                            # Knoten-Icon
-      ($icon, $color) = split '@', $nodeicondef;
-      $color          = !$pcurr ? $inactcoldef :
-                        $color  ? $color       : 
-                        $actcoldef;
+      ($icon, $color) = split '@', NODEICONDEF;
+      $color          = !$pcurr ? INACTCOLDEF :
+                        $color  ? $color      : 
+                        ACTCOLDEF;
   }
 
   $icon .= '@'.$color if($color);
@@ -16305,15 +16426,15 @@ return $p;
 #    berechne Icon width, height auf Sollnormativ
 #    width:   470pt
 #    height:  470pt
-#    scale:   0.10   Normativ $fgscaledef
+#    scale:   0.10   Normativ FGSCALEDEF
 ################################################################
 sub __normIconScale {
   my $name = shift;
   my $icon = shift;
   my $dim  = shift // 470;                                                     # Dimension
   
-  my $hscale           = $fgscaledef;                                          # Scale Normativ
-  my $wscale           = $fgscaledef;
+  my $hscale           = FGSCALEDEF;                                          # Scale Normativ
+  my $wscale           = FGSCALEDEF;
   my ($width,  $wunit) = $icon =~ /width="(\d+\.\d+|\d+)(.*?)"/xs;
   my ($height, $hunit) = $icon =~ /height="(\d+\.\d+|\d+)(.*?)"/xs;
   
@@ -16344,7 +16465,7 @@ sub __normIconScale {
   $icon =~ s/width="(.*?)"/width="$widthnormpt"/;
   $icon =~ s/height="(.*?)"/height="$heightnormpt"/;
   
-return ($fgscaledef, $icon);
+return (FGSCALEDEF, $icon);
 }
 
 ################################################################
@@ -16519,15 +16640,18 @@ sub _addHourAiRawdata {
 return;
 }
 
-###############################################################
-#     Abruf und Einlesen Messagefile nonBlocking
-###############################################################
+####################################################################################################
+#                       Abruf und Einlesen Messagefile nonBlocking
+#  $data{$name}{filemessages}{999000}{TSNEXT}: Timestamp nächster Pull Message File
+####################################################################################################
 sub getMessageFileNonBlocking {
   my $hash = shift;
   my $name = $hash->{NAME};
+  
+  my $tsnext = gettimeofday() + GMFILEREPEAT + int(rand(GMFILERANDOM));
       
-  RemoveInternalTimer ($hash, "FHEM::SolarForecast::getMessageFileNonBlocking");
-  InternalTimer       (gettimeofday() + GMFILEREPEAT + int(rand(GMFILERANDOM)), "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
+  RemoveInternalTimer ($hash,   "FHEM::SolarForecast::getMessageFileNonBlocking");
+  InternalTimer       ($tsnext, "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
   
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
@@ -16539,8 +16663,9 @@ sub getMessageFileNonBlocking {
       return;
   }
 
-  my $paref = { name  => $name,
-                block => 1
+  my $paref = { name   => $name,
+                tsnext => $tsnext,
+                block  => 1
               };
 
   $hash->{HELPER}{GMFRUNNING} = BlockingCall ( "FHEM::SolarForecast::_retrieveMessageFile",
@@ -16560,7 +16685,7 @@ return;
 }
 
 ###############################################################
-#         Message File aus contrib abholen
+#         Message File aus Quelle abholen
 ###############################################################
 sub _retrieveMessageFile {
   my $paref = shift;
@@ -16571,7 +16696,7 @@ sub _retrieveMessageFile {
   Log3 ($name, 4, "$name - Notification System - Message File Source: GitHub Repository");
   
   my $valid           = 1;
-  my ($err, $remfile) = __httpBlockingGet ($name, $bghPath.$messagefile.$pghPath);
+  my ($err, $remfile) = __httpBlockingGet ($name, BGHPATH.$messagefile.PGHPATH);
   
   $remfile = q{} if($remfile =~ /No\snode\strunk\/fhem\/contrib\/SolarForecast\//xs);
   
@@ -16606,7 +16731,7 @@ return;
 }
 
 ###############################################################
-#     Folgeroutine nach Message File aus contrib abholen
+#     Folgeroutine nach Message File aus Quelle abholen
 ###############################################################
 sub _processMessageFile {
   my $serial = decode_base64 (shift);
@@ -16623,19 +16748,21 @@ sub _processMessageFile {
 return;
 }
 
-######################################################################
+####################################################################################################
 #      Messagefile für Notification System lesen
 #  Filestruktur:
 #  0|SV|1
 #  0|DE|Mitteilung ....
 #  0|EN|Message...
-#  $data{$name}{messages}{999000}{TS}: Timestamp Stand Message File
-######################################################################
+#  $data{$name}{messages}{999000}{TS}:         Timestamp Stand Message File
+#  $data{$name}{filemessages}{999000}{TSNEXT}: Timestamp nächster Pull Message File
+####################################################################################################
 sub __readFileMessages {                  
-  my $paref = shift;
-  my $name  = $paref->{name};
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $tsnext = $paref->{tsnext};
   
-  my $hash  = $defs{$name};
+  my $hash   = $defs{$name};
 
   open (FD, "$root/FHEM/$messagefile") or do { return $! };
   
@@ -16655,7 +16782,8 @@ sub __readFileMessages {
       $data{$name}{filemessages}{$l[0]}{$l[1]} = $l[2];
   }
   
-  $data{$name}{filemessages}{999000}{TS} = time;
+  $data{$name}{filemessages}{999000}{TS}     = time;
+  $data{$name}{filemessages}{999000}{TSNEXT} = $tsnext;
 
 return;
 }
@@ -16676,7 +16804,7 @@ sub _abortGetMessageFile {
 return;
 }
 
-##########################################################################
+####################################################################################################
 #             Mitteilungssystem füllen
 #  Schweregrad SV:
 #  0 - keine Mitteilung
@@ -16685,10 +16813,11 @@ return;
 #  3 - Fehler / Problem
 #
 #  Statusspeicher:
-#  $data{$name}{messages}{999999}{RD}: 1 - gelesen, 0 - ungelesen
-#  $data{$name}{messages}{999000}{TS}: Timestamp Stand Message File
-#  $data{$name}{messages}{999500}{TS}: Timestamp Stand prepared Messages
-##########################################################################
+#  $data{$name}{messages}{999999}{RD}:         1 - gelesen, 0 - ungelesen
+#  $data{$name}{messages}{999000}{TS}:         Timestamp Stand Message File
+#  $data{$name}{filemessages}{999000}{TSNEXT}: Timestamp nächster Pull Message File
+#  $data{$name}{messages}{999500}{TS}:         Timestamp Stand prepared Messages
+####################################################################################################
 sub fillupMessageSystem {           
   my $paref = shift;
   my $hash  = $paref->{hash};
@@ -16731,8 +16860,9 @@ sub fillupMessageSystem {
       $data{$name}{messages}{$midx}{EN} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{EN});  
   }
   
-  $data{$name}{messages}{999000}{TS} = $data{$name}{filemessages}{999000}{TS}     // 0;
-  $data{$name}{messages}{999500}{TS} = $data{$name}{preparedmessages}{999500}{TS} // 0;
+  $data{$name}{messages}{999000}{TS}     = $data{$name}{filemessages}{999000}{TS}     // 0;
+  $data{$name}{messages}{999000}{TSNEXT} = $data{$name}{filemessages}{999000}{TSNEXT} // 0;   
+  $data{$name}{messages}{999500}{TS}     = $data{$name}{preparedmessages}{999500}{TS} // 0;
   
   ########################################################################
   ## Ende Messages auffüllen
@@ -16772,9 +16902,14 @@ sub outputMessages {
   my $lang  = $paref->{lang};
   
   my ($micon, $midx) = fillupMessageSystem ($paref);                                                 # Ergebnisse füllen (sind leer wenn Browser nicht refreshed)
-  my $tnf            = $data{$name}{messages}{999000}{TS}                                     ? 
+  my $tfl            = $data{$name}{messages}{999000}{TS}                                     ? 
                        (timestampToTimestring ($data{$name}{messages}{999000}{TS}, $lang))[0] :
                        'n.a.';
+                       
+  my $tfn            = $data{$name}{messages}{999000}{TSNEXT}                                     ?
+                       (timestampToTimestring ($data{$name}{messages}{999000}{TSNEXT}, $lang))[0] :
+                       'n.a.';
+                       
   my $tpm            = $data{$name}{messages}{999500}{TS}  ?
                        (timestampToTimestring ($data{$name}{messages}{999500}{TS}, $lang))[0] :
                        'n.a.';
@@ -16782,7 +16917,7 @@ sub outputMessages {
   ############
   my $out  = qq{<html>};
   $out    .= qq{<b>$hqtxt{msgsys}{$lang}</b> <br><br>};  
-  $out    .= qq{$hqtxt{ludich}{$lang} - <b>File:</b> $tnf, <b>System:</b> $tpm  <br>};       
+  $out    .= qq{$hqtxt{impcha}{$lang} - <b>File:</b> $tfl ($hqtxt{scedld}{$lang}: $tfn), <b>System:</b> $tpm  <br>};       
   $out    .= qq{($hqtxt{dmgsig}{$lang})  <br><br>};
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
@@ -17334,7 +17469,7 @@ sub aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{dayname} = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
           $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $tbin  if(defined $tbin);
-          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con   if(defined $con);
+          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con   if(defined $con && $con >= 0);
           $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $cbin  if(defined $cbin);
           $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c  if(defined $rr1c);
           $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h if(defined $rad1h && $rad1h > 0);
@@ -19116,7 +19251,7 @@ sub checkPlantConfig {
       $result->{'FTUI Widget Files'}{note}    .= qq{There is no need to install SolarForecast FTUI widgets.<br>};
   }
   else {
-      my $cfurl = $bPath.$cfile.$pPath;
+      my $cfurl = BPATH.CFILE.PPATH;
 
       for my $file (@fs) {
           ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVer ($name, $file, $cfurl);
@@ -19518,13 +19653,13 @@ sub timestringsFromOffset {
   my $epoch  = shift;
   my $offset = shift // 0;
   
-  return if($epoch !~ /[0-9]/xs);
+  return if($epoch !~ /^-?[0-9]*(.[0-9]*)?$/xs);
 
   if (length ($epoch) == 13) {                                                                  # Millisekunden
       $epoch = $epoch / 1000;
   }
   
-  my @ts = localtime ($epoch - $offset);
+  my @ts = localtime ($epoch + $offset);                                                        # Offset kann pos. oder negativ sein
   
   my $dt = {
       year    => (strftime "%Y",       (@ts)),                                                  # Jahr
