@@ -186,7 +186,7 @@ sub TCM_InitSerialCom($) {
   # default transceiver parameter
   if ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
     my %setCmdRestore = (mode => "00",
-                         maturity => "01",
+                         maturity => "00",
                          repeater => "RepEnable: 00 RepLevel: 00",
                          smartAckMailboxMax => 0
                         );
@@ -888,7 +888,7 @@ my %sets310 = (
   "filterDelAll" => {packetType => 5, cmd => "0D"},
   "filterEnable" => {packetType => 5, cmd => "0E", arg => "0[01]0[0189]"},
   "init" => {},
-  "maturity" => {packetType => 5, cmd => "10", arg => "0[0-1]"},
+  "maturity" => {packetType => 5, cmd => "10", arg => "0[0-2]"},
   "mode" => {packetType => 5, cmd => "1C", arg => "0[0-1]"},
   "noiseThreshold" => {packetType => 5, cmd => "32", arg => "2E|2F|3[0-8]"},
   "pskAdd" => {arg => "[0-9a-fA-F]{32}"},
@@ -1750,9 +1750,9 @@ sub TCM_Shutdown($) {
       <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
     <li><a id="TCM-set-init">init</a><br>
       Initialize serial communication and transceiver configuration</li>
-    <li><a id="TCM-set-maturity">maturity</a> [00|01]<br>
+    <li><a id="TCM-set-maturity">maturity</a> [00|01|02]<br>
       Waiting till end of maturity time before received radio telegrams will transmit:
-      radio telegrams are send immediately = 00, after the maturity time is elapsed = 01</li>
+      radio telegrams are send immediately = 00 (default mode), after the maturity time is elapsed = 01, all received Sub-telegrams shall be forwarded immediately = 02</li>
     <li><a id="TCM-set-mode">mode</a> [00|01]<br>
       mode = 00: Compatible mode - ERP1 - gateway uses Packet Type 1 to transmit and receive radio telegrams<br>
       mode = 01: Advanced mode - ERP2 - gateway uses Packet Type 10 to transmit and receive radio telegrams
