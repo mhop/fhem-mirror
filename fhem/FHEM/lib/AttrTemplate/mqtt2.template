@@ -3898,6 +3898,43 @@ set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model shellyPlus_2pm_roller_invert_1
 setreading DEVICE attrTemplateVersion 20231227
 
+# Shelly Plus 2 PM using original firmware (as of 1.5.0beta) in roller mode.
+# based on alkazaa suggestion, https://forum.fhem.de/index.php?topic=140770.0
+name:shellyPlus_2pm_venetian_blinds_invert_0
+filter:TYPE=MQTT2_DEVICE
+desc:Early version of the template - for second generation shelly devices (names with "plus", with power measurement). NOTE: requires to activate generic status update in firmware settings (if not available: reset device to factory defaults) and activation of the roller mode.<br>NOTE: Please wait some seconds to allow Shelly device to complete reboot.
+order:A_20c1a1
+par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyp(lus|ro4pm)[^/:_]{4,}+)> ? $1 : undef }
+par:ICON;ICON as set, defaults to fts_shutter;{ AttrVal('DEVICE','icon','fts_shutter') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic DEV_TPC
+attr DEVICE comment Shelly Plus 2 PM in Roller-Mode. 100=opened / 0=closed
+attr DEVICE readingList $\DEVICETOPIC/online:.* online\
+  $\DEVICETOPIC/status/mqtt:.* { json2nameValue($EVENT, 'mqtt_', $JSONMAP) }\
+  $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT, 'sys_', $JSONMAP) }\
+  $\DEVICETOPIC/status/cover_0:.* { json2nameValue($EVENT, 'status_', $JSONMAP) }\
+  fhem2shelly/rpc:.* {}
+attr DEVICE setList open:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.Open","params": {"id":0}}\
+  close:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.Close","params": {"id":0}}\
+  half:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.GoToPosition","params": {"id":0,"pos":50}}\
+  stop:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.Stop","params": {"id":0}}\
+  pct:slider,0,1,100 $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.GoToPosition","params": {"id":0,"pos":$EVTPART1}}\
+  pctSlats:slider,0,1,100 $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Cover.GoToPosition","params": {"id":0,"slat_pos":$EVTPART1}}\
+  x_update:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Update","params": {"stage":"stable"}}\
+  x_reboot:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Reboot"}\
+  x_eco:true,false $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Sys.SetConfig","params": {"config": {"device": {"eco_mode": $EVTPART1}}}}
+attr DEVICE jsonMap status_state:state status_current_pos:pct status_slat_pos:pctSlats status_temperature_tC:temperature sta_ip:ip
+attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 0:fts_shutter_100 100:fts_shutter_10 9\d:fts_shutter_10 8\d:fts_shutter_20 7\d:fts_shutter_30 6\d:fts_shutter_40 5\d:fts_shutter_50 4\d:fts_shutter_60 3\d:fts_shutter_70 2\d:fts_shutter_80 1\d:fts_shutter_90 0\d:fts_shutter_100 set_.*:fts_shutter_updown
+attr DEVICE stateFormat online\
+pct
+attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
+attr DEVICE webCmd :open:close:half:stop:pct
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE setStateList open close half stop pct
+set DEVICE attrTemplate speechcontrol_type_blind
+attr DEVICE model shellyPlus_2pm_venetian_blinds_invert_0
+setreading DEVICE attrTemplateVersion 20250213
+
 
 name:shellypro4pm
 filter:TYPE=MQTT2_DEVICE
