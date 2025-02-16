@@ -69,6 +69,7 @@ SVG_Initialize($)
   $hash->{DefFn} = "SVG_Define";
   no warnings 'qw';
   my @attrList = qw(
+    axis_width
     captionLeft:1,0"
     captionPos:right,left,auto
     endPlotNow:1,0
@@ -1444,7 +1445,7 @@ SVG_render($$$$$$$$$$)
   $use_right_axis = $nr_right_axis if( !defined($use_right_axis) );
 
   my $th = 16;                          # "Font" height
-  my $axis_width = ($SVG_ss ? 2 : 3)*$th;
+  my $axis_width = AttrVal($name, "axis_width", ($SVG_ss ? 2 : 3)*$th);
   my ($x, $y) = ($axis_width*$nr_left_axis,  1.2*$th);      # Rect offset
 
   ######################
@@ -2621,6 +2622,27 @@ plotAsPng(@)
   <a id="SVG-attr"></a>
   <b>Attributes</b>
   <ul>
+    <a id="SVG-attr-axis_width"></a>
+    <li>axis_width<br>
+        Distance left and right used for displaying the value range.
+        If not specified, it is 48 for desktop and 32 for smallscreen.
+        </li><br>
+
+    <a id="SVG-attr-captionLeft"></a>
+    <li>captionLeft<br>
+      Show the legend on the left side (deprecated, will be autoconverted to
+      captionPos)
+      </li><br>
+
+    <a id="SVG-attr-captionPos"></a>
+    <li>captionPos<br>
+      right - Show the legend on the right side (default)<br>
+      left - Show the legend on the left side<br>
+      auto - Show the legend labels on the left or on the right side depending
+      on the axis it belongs to<br>
+      </li><br>
+
+
     <a id="SVG-attr-endPlotNow"></a>
     <li>endPlotNow<br>
         If this attribute is set to 1, then day and hour plots will
@@ -2641,20 +2663,6 @@ plotAsPng(@)
         If this attribute is set to 1, then week and month plots will
         end today. Else the current week or the current month will be shown.
         </li><br>
-
-    <a id="SVG-attr-captionLeft"></a>
-    <li>captionLeft<br>
-      Show the legend on the left side (deprecated, will be autoconverted to
-      captionPos)
-      </li><br>
-
-    <a id="SVG-attr-captionPos"></a>
-    <li>captionPos<br>
-      right - Show the legend on the right side (default)<br>
-      left - Show the legend on the left side<br>
-      auto - Show the legend labels on the left or on the right side depending
-      on the axis it belongs to<br>
-      </li><br>
 
     <a id="SVG-attr-fixedrange"></a>
     <li>fixedrange [offset]<br>
@@ -2913,6 +2921,13 @@ plotAsPng(@)
   <a id="SVG-attr"></a>
   <b>Attribute</b>
   <ul>
+    <a id="SVG-attr-axis_width"></a>
+    <li>axis_width<br>
+        Abstand reserviert f&uuml;r die Darstellung der Messgr&ouml;&szlig;en.
+        Falls nicht gesetzt, wird 48 f&uuml;r Desktop und 32 f&uuml;r
+        smallscreen verwendet.
+        </li><br>
+
     <a id="SVG-attr-captionLeft"></a>
     <li>captionLeft<br>
       Anzeigen der Legende auf der linken Seite. &Uuml;berholt, wird
