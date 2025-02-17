@@ -64,11 +64,13 @@ sub vitoconnect_getResource;            # API call for all Gateways
 sub vitoconnect_getResourceCallback;    # Get all API readings
 sub vitoconnect_getPowerLast;           # Write the power reading of the full last day to the DB
 
-sub vitoconnect_action;                 # 
+sub vitoconnect_action;                 # Send call to API
+
+sub vitoconnect_getErrorCode;           # Resolve Error code 
 
 sub vitoconnect_StoreKeyValue;          # Werte verschlüsselt speichern
 sub vitoconnect_ReadKeyValue;           # verschlüsselte Werte auslesen
-sub DeleteKeyValue;                     # verschlüsselte Werte löschen
+sub vitoconnect_DeleteKeyValue;         # verschlüsselte Werte löschen
 
 
 package main;
@@ -91,6 +93,12 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.7.6"  => "17.02.2025  removed usage of html libraries",
+  "0.7.5"  => "16.02.2025  Get mapped error codes and store them in readings",
+  "0.7.4"  => "16.02.2025  Removed Unknow attr vitoconnect, small bugfix DeleteKeyValue",
+  "0.7.3"  => "16.02.2025  Write *.err file in case of error. Fixed DeleteKeyValue thanks Schlimbo",
+  "0.7.2"  => "07.02.2025  Attr logging improved",
+  "0.7.1"  => "07.02.2025  Code cleanups",
   "0.7.0"  => "06.02.2025  vitoconnect_installationID checked now for at least length 2, see https://forum.fhem.de/index.php?msg=1333072, error handling when setting attributs automatic introduced",
   "0.6.3"  => "04.02.2025  Small bug fixes, removed warnings",
   "0.6.2"  => "28.01.2025  Very small bugfixes ",
@@ -121,6 +129,7 @@ my $callback_uri  = "http://localhost:4200/";
 my $apiURL        = "https://api.viessmann.com/iot/v1/equipment/";
 my $iotURL_V1     = "https://api.viessmann.com/iot/v1/equipment/";
 my $iotURL_V2     = "https://api.viessmann.com/iot/v2/features/";
+my $errorURL_V3   = "https://api.viessmann.com/service-documents/v3/error-database";
 
 my $RequestListMapping; # Über das Attribut Mapping definierte Readings zum überschreiben der RequestList
 my %translations;       # Über das Attribut translations definierte Readings zum überschreiben der RequestList
@@ -1246,7 +1255,7 @@ sub vitoconnect_Initialize {
     my ($hash) = @_;
     $hash->{DefFn}   = \&vitoconnect_Define;    # wird beim 'define' eines Gerätes aufgerufen
     $hash->{UndefFn} = \&vitoconnect_Undef;     # # wird beim Löschen einer Geräteinstanz aufgerufen
-    $hash->{DeleteFn} = \&DeleteKeyValue;
+    $hash->{DeleteFn} = \&vitoconnect_DeleteKeyValue;
     $hash->{SetFn}   = \&vitoconnect_Set;       # set-Befehle
     $hash->{GetFn}   = \&vitoconnect_Get;       # get-Befehle
     $hash->{AttrFn}  = \&vitoconnect_Attr;      # Attribute setzen/ändern/löschen
@@ -2635,7 +2644,7 @@ sub vitoconnect_Set_Roger {
 sub vitoconnect_Attr {
     my ($cmd,$name,$attr_name,$attr_value ) = @_;
     
-    Log(5,$name.", ".$cmd ." vitoconnect_: ".$attr_name." value: ".$attr_value);
+    Log(5,$name.", ".$cmd ." vitoconnect_: ".($attr_name // 'undef')." value: ".($attr_value // 'undef'));
     if ($cmd eq "set")  {
         if ($attr_name eq "vitoconnect_raw_readings" )      {
             if ($attr_value !~ /^0|1$/)                     {
@@ -2689,7 +2698,6 @@ sub vitoconnect_Attr {
             }
         }
         elsif ($attr_name eq "vitoconnect_serial")                      {
-            # Zur Zeit kein prüfung, einfacher String
             if (length($attr_value) != 16)                      {
                 my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be 16 characters long.";
                 Log(1,$name.", vitoconnect_Attr: ".$err);
@@ -2697,7 +2705,6 @@ sub vitoconnect_Attr {
             }
         }
         elsif ($attr_name eq "vitoconnect_installationID")                      {
-            # Zur Zeit kein prüfung, einfacher String
             if (length($attr_value) < 2)                      {
                 my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be at least 2 characters long.";
                 Log(1,$name.", vitoconnect_Attr: ".$err);
@@ -2710,6 +2717,8 @@ sub vitoconnect_Attr {
         }
         else                                                {
             # return "Unknown attr $attr_name";
+            # This will return all attr, e.g. room. We do not want to see messages here.
+            # Log(1,$name.", ".$cmd ." Unknow attr vitoconnect_: ".($attr_name // 'undef')." value: ".($attr_value // 'undef'));
         }
     }
     elsif ($cmd eq "del") {
@@ -3562,6 +3571,14 @@ sub vitoconnect_getResourceCallback {
                  Log(5,$name.", -call setpower $Reading");
                  vitoconnect_getPowerLast ($hash,$name,$Reading);
                 }
+                
+                # Get error codes from API
+                if ($Reading eq "device.messages.errors.raw.entries") {
+                 Log(5,$name.", -call getErrorCode $Reading");
+                 if (defined $comma_separated_string && $comma_separated_string ne '') {
+                  vitoconnect_getErrorCode ($hash,$name,$comma_separated_string);
+                 }
+                }
             }
         }
 
@@ -3627,6 +3644,77 @@ sub vitoconnect_getPowerLast {
         }
     }
 
+    return;
+}
+
+
+#####################################################################################################################
+# Error Code auslesesn
+#####################################################################################################################
+sub vitoconnect_getErrorCode {
+    my ($hash, $name, $comma_separated_string) = @_;
+    #$comma_separated_string = "customer, c2, warning, 2025-02-03T17:25:19.000Z"; # debug
+
+    if (defined $comma_separated_string && $comma_separated_string ne '') {
+        my $serial = ReadingsVal($name, "device.serial.value", "");
+        my $materialNumber = substr($serial, 0, 7); #"7733738"; #debug
+        my @values = split(/, /, $comma_separated_string);
+        my $Reading = "device.messages.errors.mapped";
+
+        my $fault_counter = -1;
+        my $cause_counter = -1;
+
+        for (my $i = 0; $i < @values; $i += 4) {
+            my $errorCode = $values[$i + 1];
+
+            my $param = {
+                url => "https://api.viessmann.com/service-documents/v3/error-database?materialNumber=$materialNumber&errorCode=$errorCode&countryCode=EN&languageCode=en",
+                hash => $hash,
+                timeout => $hash->{timeout},  # Timeout von Internals = 15s
+                method => "GET",  # Methode auf GET ändern
+                sslargs => { SSL_verify_mode => 0 },
+            };
+            Log3($name, 3, $name . ", vitoconnect_getErrorCode url=" . $param->{url});
+
+            my ($err, $msg) = HttpUtils_BlockingGet($param);
+            my $decode_json = eval { decode_json($msg) };
+            Log3($name, 5, $name . ", vitoconnect_getErrorCode debug err=$err msg=" . $msg . " json=" . Dumper($decode_json));  # wieder weg
+
+            if (defined($err) && $err ne "") {   # Fehler bei Befehlsausführung
+                Log3($name, 1, $name . ", vitoconnect_getErrorCode call finished with error, err:" . $err);
+            } elsif (exists $decode_json->{statusCode} && $decode_json->{statusCode} ne "") {
+                Log3($name, 1, $name . ", vitoconnect_getErrorCode call finished with error, status code:" . $decode_json->{statusCode});
+            } else {   # Befehl korrekt ausgeführt
+                Log3($name, 3, $name . ", vitoconnect_getErrorCode: finished ok");
+                if (exists $decode_json->{faultCodes} && @{$decode_json->{faultCodes}}) {
+                    foreach my $fault (@{$decode_json->{faultCodes}}) {
+                        $fault_counter++;
+                        my $fault_code = $fault->{faultCode};
+                        my $system_characteristics = $fault->{systemCharacteristics};
+                        # remove html paragraphs
+                        $system_characteristics =~ s/<\/?p>//g;
+                        readingsBulkUpdate($hash, $Reading . ".$fault_counter.faultCode", $fault_code);
+                        readingsBulkUpdate($hash, $Reading . ".$fault_counter.systemCharacteristics", $system_characteristics);
+
+                        foreach my $cause (@{$fault->{causes}}) {
+                            $cause_counter++;
+                            my $cause_text = $cause->{cause};
+                            my $measure = $cause->{measure};
+                            # remove html paragraphs
+                            $cause_text =~ s/<\/?p>//g;
+                            $measure =~ s/<\/?p>//g;
+                            readingsBulkUpdate($hash, $Reading . ".$fault_counter.faultCodes.$cause_counter.cause", $cause_text);
+                            readingsBulkUpdate($hash, $Reading . ".$fault_counter.faultCodes.$cause_counter.measure", $measure);
+                        }
+                    }
+                } else {
+                    Log3($name, 1, $name . ", vitoconnect_getErrorCode no faultcode in json found. json=" . Dumper($decode_json));
+                }
+            }
+        }
+    } else {
+        Log3($name, 1, $name . " , vitoconnect_getErrorCode the variable \$comma_separated_string does not exist or is empty");
+    }
     return;
 }
 
@@ -3704,6 +3792,7 @@ sub vitoconnect_action {
 sub vitoconnect_errorHandling {
     my ($hash,$items) = @_;
     my $name          = $hash->{NAME};
+    my $gw            = AttrVal( $name, 'vitoconnect_serial', 0 );
     
     #Log3 $name, 1, "$name - errorHandling StatusCode: $items->{statusCode} ";
     
@@ -3713,6 +3802,7 @@ sub vitoconnect_errorHandling {
              . "errorType: " . ($items->{errorType} // 'undef') . " "
              . "message: " . ($items->{message} // 'undef') . " "
              . "error: " . ($items->{error} // 'undef');
+             
             readingsSingleUpdate(
                $hash,
                "state",
@@ -3758,6 +3848,13 @@ sub vitoconnect_errorHandling {
                   . "errorType: $items->{errorType} "
                   . "message: $items->{message} "
                   . "error: $items->{error}";
+                  
+                my $dir         = path( AttrVal("global","logdir","log"));
+                my $file        = $dir->child("vitoconnect_" . $gw . ".err");
+                my $file_handle = $file->openw_utf8();
+                $file_handle->print(Dumper($items));                            # Datei 'vitoconnect_serial.err' schreiben
+                Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
+                
                 InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
@@ -3838,13 +3935,15 @@ sub vitoconnect_ReadKeyValue {
 #####################################################################################################################
 # verschlüsselte Werte löschen
 #####################################################################################################################
-sub DeleteKeyValue {
-    my ($hash,$kName) = @_;     # Übergabe-Parameter
+sub vitoconnect_DeleteKeyValue {
+    my ($hash,$kName) = @_;    # Übergabe-Parameter
     my $name = $hash->{NAME};
 
     Log3( $name, 5,$name." - called function Delete()" );
 
-    my $index = $hash->{TYPE}."_".$hash->{NAME}."_".$kName;
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    setKeyValue( $index, undef );
+    $index = $hash->{TYPE}."_".$hash->{NAME}."_apiKey";
     setKeyValue( $index, undef );
 
     return;
