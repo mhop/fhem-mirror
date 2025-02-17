@@ -159,10 +159,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.46.0" => "16.02.2025  Notification System: print out last/next file pull if no messages are present, improvements and activation of ".
+  "1.46.0" => "17.02.2025  Notification System: print out last/next file pull if no messages are present, improvements and activation of ".
                            "_calcConsForecast_circular, checkPlantConfig: add Data Memory check pvHistory 'con' ".
                            "sunalt2bin/cloud2bin: classification of values improved, affectConsForecastLastDays: max to 180 ".
-                           "set reset consumption to reset consumptionHistory ",
+                           "set reset consumption to reset consumptionHistory, improve Debug Info ".
+                           "fix error: https://forum.fhem.de/index.php?msg=1334123 ",
   "1.45.6" => "12.02.2025  Notification System: print out next planned file pull, timestringsFromOffset: allow +- offsets ".
                            "new sub _calcConsForecast_circular to prepare the evaluation of consumption days in pvCircular ",
   "1.45.5" => "09.02.2025  change constant GMFILEREPEAT, GMFILERANDOM, Pull Message File from GitHub Repo ",
@@ -11500,7 +11501,7 @@ sub ___switchConsumerOn {
                       qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($startts, $lang))[0] : "undef")
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime: $iilt}.($rlt ? ", remainLockTime: $rlt seconds" : ''));
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - in Context 'switch on' => }.
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Check Context 'switch on' => }.
                       qq{swoncond: $swoncond, on-command: $oncom }
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon})   if($swoncond && $infon);
@@ -11512,7 +11513,12 @@ sub ___switchConsumerOn {
       }
   }
 
-  my $isintable  = isInterruptable ($hash, $c, 0, 1);                                             # mit Ausgabe Interruptable Info im Debug
+  my $isintable = isInterruptable ($hash, $c, 0, 1);                                              # mit Ausgabe Interruptable Info im Debug
+  
+  if ($debug =~ /consumerSwitching${c}/x) {
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable});
+  }
+
   my $isConsRcmd = isConsRcmd      ($hash, $c);
 
   my $supplmnt         = ConsumerVal ($hash, $c, 'planSupplement', '');
@@ -11617,7 +11623,7 @@ sub ___switchConsumerOff {
   my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
 
   if ($debug =~ /consumerSwitching${c}/x) {                                                       # nur für Debugging
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - in Context 'switch off' => }.
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Check Context 'switch off' => }.
                       qq{swoffcond: $swoffcond, off-command: $offcom}
            );
 
@@ -12197,8 +12203,8 @@ sub _calcConsForecast_circular {
       my $mix = 0;
       
       if ($swdfcfc) {                                                                                   # nur bestimmten Tag (Mo...So) einbeziehen der Stunde
-          push @conh,    @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}};
-          push @conhtom, @{$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}};                        # für den nächsten Tag
+          push @conh,    @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}    if(defined ${$data{$name}{circular}{$hh}{con_all}{"$dayname"}}[0]);
+          push @conhtom, @{$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}} if(defined ${$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}}[0]);          # für den nächsten Tag
       }
       else {                                                                                            # alle aufgezeichneten Wochentage in der Stunde berücksichtigen
           for my $dy (keys %{$data{$name}{circular}{$hh}{con_all}}) {                                   # den max Index aller Tagesarrays ermitteln                                 
@@ -20404,7 +20410,7 @@ sub isAddSwitchOffCond {
   if (defined $condval) {
       if ($condval =~ m/^$swoffcondregex$/x) {
           $info   = qq{value "$condval" matches the Regex "$swoffcondregex" \n};
-          $info  .= "-> !Interrupt! ";
+          $info  .= "-> Check successful ";
           $swoff  = 1;
       }
       else {
@@ -20417,7 +20423,7 @@ sub isAddSwitchOffCond {
 
           if ($condval =~ m/^$swoffcondregex$/x) {
               $info   = qq{value "$condval" (included hysteresis = $hyst) matches the Regex "$swoffcondregex" \n};
-              $info  .= "-> !Interrupt! ";
+              $info  .= "-> Check successful ";
               $swoff  = 1;
           }
           else {
@@ -20576,11 +20582,11 @@ sub isInterruptable {
       return 1;
   }
 
-  my $debug = getDebug ($hash);                                                            # Debug Module
-
   my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c, $intable, $hyst);
   Log3 ($name, 1, "$name - $err") if($err);
-
+  
+  my $debug = getDebug ($hash);                                                           # Debug Module
+  
   if ($print && $debug =~ /consumerSwitching${c}/x) {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Info: $info});
   }
