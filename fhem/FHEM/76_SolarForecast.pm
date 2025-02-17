@@ -159,8 +159,13 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.46.0" => "17.02.2025  Notification System: print out last/next file pull if no messages are present, improvements and activation of ".
+                           "_calcConsForecast_circular, checkPlantConfig: add Data Memory check pvHistory 'con' ".
+                           "sunalt2bin/cloud2bin: classification of values improved, affectConsForecastLastDays: max to 180 ".
+                           "set reset consumption to reset consumptionHistory, improve Debug Info ".
+                           "fix error: https://forum.fhem.de/index.php?msg=1334123 ",
   "1.45.6" => "12.02.2025  Notification System: print out next planned file pull, timestringsFromOffset: allow +- offsets ".
-                           "new sub _calcConsumptionForecast_circular to prepare the evaluation of consumption days in pvCircular ",
+                           "new sub _calcConsForecast_circular to prepare the evaluation of consumption days in pvCircular ",
   "1.45.5" => "09.02.2025  change constant GMFILEREPEAT, GMFILERANDOM, Pull Message File from GitHub Repo ",
   "1.45.4" => "08.02.2025  change constant GMFILEREPEAT + new constant GMFILERANDOM ",
   "1.45.3" => "06.02.2025  __readDataWeather: if no values of hour 01 (00:00+) use val of hour 24 of day before ".
@@ -356,18 +361,6 @@ my %vNotesIntern = (
   "1.16.6" => "11.03.2024  plantConfigCheck: join forecastProperties with ',' ",
   "1.16.5" => "04.03.2024  setPVhistory: code changes, plantConfigCheck: check forecastRefresh ".
                            "check age of weather data according to used MOSMIX variant ",
-  "1.16.4" => "02.03.2024  __getDWDSolarData: change check reading to fcx_12_x, internal code changes ".
-                           "plantConfiguration: save/restore relevant readings AND attributes ".
-                           "visual LED display whether the weather data is current (age < 2h) ",
-  "1.16.3" => "24.02.2024  store pvcorrf, quality, pvrlsum, pvfcsum, dnumsum with value <sunalt2bin>.<cloud2bin> in pvCircular ".
-                           "get pvcorrf / quality from neff in combination with sun altitude (CircularSunCloudkorrVal) ".
-                           "delete CircularCloudkorrVal, show sun position in beamgrafic weather mouse over ".
-                           "split pvCorrection into pvCorrectionRead and pvCorrectionWrite ".
-                           "_checkSetupNotComplete: improve setup Wizzard for ForecastSolar-API ",
-  "1.16.2" => "22.02.2024  minor changes, R101 -> RR1c, rr1c instead of weatherrainprob, delete wrp r101 ".
-                           "delete wrp from circular & airaw, remove rain2bin, __getDWDSolarData: change \$runh, ".
-                           "fix  Illegal division by zero Forum: https://forum.fhem.de/index.php?msg=1304009 ".
-                           "DWD API: check age of Rad1h data, store pvcorrf of sunalt with value 200+x in pvCircular ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -383,6 +376,7 @@ use constant {
   DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
   SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
   SPLSLIDEMAX    => 20,                                                             # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
+  CONDAYSLIDEMAX => 30,                                                             # max. Anzahl der Arrayelemente im Register pvCircular -> con_all -> <Tag>
   WHISTREPEAT    => 851,                                                            # Wiederholungsintervall Cache File Daten schreiben
   EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 
@@ -428,6 +422,7 @@ use constant {
   TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
   
   DEFMINTIME     => 60,                                                             # default Einplanungsdauer in Minuten
+  CONSFCLDAYS    => 60,                                                             # die Stundenwerte der letzten CONSFCLDAYS Tage zur Kalkulation der Verbrauchvorhersage einbezogen
   DEFCTYPE       => 'other',                                                        # default Verbrauchertyp
   DEFCMODE       => 'can',                                                          # default Planungsmode der Verbraucher
   DEFPOPERCENT   => 1.0,                                                            # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
@@ -468,6 +463,7 @@ use constant {
   MOONCOLDEF      => 'lightblue',                                                   # default Mond Färbung
   ACTCOLDEF       => 'orange',                                                      # default Färbung Icon wenn aktiv
   INACTCOLDEF     => 'grey',                                                        # default Färbung Icon wenn inaktiv
+  LOCALE_TIME     => setlocale (POSIX::LC_TIME),                                    # installierte locale abfragen
   
   BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                 # Basispfad Abruf contrib SolarForecast Files
   PPATH           => '?format=txt',                                                                        # Download Format
@@ -502,8 +498,8 @@ my @draattrmust    = qw(Rad1h);                                                 
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
  
-my $msgfiletest    = 'controls_solarforecast_messages_test.txt';                                           # TEST Input-File Notification System
-my $msgfileprod    = 'controls_solarforecast_messages_prod.txt';                                           # PRODUKTIVES Input-File Notification System
+my $msgfiletest    = 'controls_solarforecast_messages_test.txt';                    # TEST Input-File Notification System
+my $msgfileprod    = 'controls_solarforecast_messages_prod.txt';                    # PRODUKTIVES Input-File Notification System
 
 my $messagefile = $msgfileprod;
                                                                                     # mögliche Debug-Module
@@ -704,6 +700,17 @@ my %hmoon = (
   5 => { icon => 'weather_moon_phases_6',      DE => 'abnehmender Mond',  EN => 'waning moon'         },
   6 => { icon => 'weather_moon_phases_7_half', DE => 'letztes Viertel',   EN => 'last quarter'        },
   7 => { icon => 'weather_moon_phases_8',      DE => 'abnehmende Sichel', EN => 'decreasing crescent' },
+);
+
+                                                                             # gekürzte Wochentagsnamen nach locale
+my %habwdn = (                                                            
+  '1' => { DE => 'Mo', EN => 'Mon' },
+  '2' => { DE => 'Di', EN => 'Tue' },
+  '3' => { DE => 'Mi', EN => 'Wed' },
+  '4' => { DE => 'Do', EN => 'Thu' },
+  '5' => { DE => 'Fr', EN => 'Fri' },
+  '6' => { DE => 'Sa', EN => 'Sat' },
+  '7' => { DE => 'So', EN => 'Sun' },
 );
 
 my %hrepl = (                                                                # Zeichenersetzungen
@@ -984,6 +991,10 @@ my %htitles = (                                                                 
                 DE => qq{Mitteilungen sind vorhanden - dr&#252;cke die Taste um sie zu &#246;ffnen}                },
   nomsgfo  => { EN => qq{there are no new messages},
                 DE => qq{es sind keine neuen Mitteilungen vorhanden}                                               },
+  lstmsgc  => { EN => qq{last message call},
+                DE => qq{letzter Mitteilungsabruf}                                                                 },
+  nxtmsgc  => { EN => qq{next message call},
+                DE => qq{n&auml;chster Mitteilungsabruf}                                                           },
   scaresps => { EN => qq{API request successful},
                 DE => qq{API Abfrage erfolgreich}                                                                  },
   dwfcrsu  => { EN => qq{Weather data are up to date according to used DWD model},
@@ -1458,7 +1469,7 @@ sub Initialize {
   $hash->{AttrList}           = "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
-                                "affectConsForecastLastDays:slider,1,1,31 ".
+                                "affectConsForecastLastDays:selectnumbers,1,1,180,0,lin ".
                                 "affectSolCastPercentile:select,10,50,90 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
@@ -1612,7 +1623,7 @@ sub Set {
                batteryTriggerSet
                consumerMaster
                consumerPlanning
-               consumption
+               consumptionHistory
                energyH4TriggerSet
                powerTriggerSet
                pvCorrection
@@ -2224,7 +2235,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'consumption') {
+  if ($prop eq 'consumptionHistory') {
       my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
       my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
@@ -5686,7 +5697,7 @@ sub _attrconsumer {                      ## no critic "not used"
       return $err if($err);
 
       if (!$h->{type} || !exists $h->{power}) {
-          return qq{The syntax of "$aName" is not correct. Please consider the commandref.};
+          return qq{The syntax of "$aName" is not correct. Please consider the command reference.};
       }
 
       my $alowt = grep (/^$h->{type}$/, @ctypes) ? 1 : 0;
@@ -5702,7 +5713,11 @@ sub _attrconsumer {                      ## no critic "not used"
       if ($h->{power} !~ /^[0-9]+$/xs) {
           return qq{The key "power" must be specified only by numbers without decimal places};
       }
-
+      
+      if (defined $h->{exconfc} && $h->{exconfc} !~ /^[012]$/xs) {
+          return qq{The key "exconfc" is not set correct. Please consider the command reference.};
+      }
+      
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
           if ($h->{mode} =~ /.*:.*/xs) {
               my ($dv, $rd) = split ':', $h->{mode};
@@ -7546,9 +7561,9 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################    
-
   delete $data{$name}{circular}{99}{days2care};                                 # 29.12.2024
   delete $data{$name}{circular}{'00'};                                            # 04.02.2025
+  # delete $data{$name}{circular}{1};
   
   $data{$name}{circular}{99}{initdaybatintot01}  = delete $data{$name}{circular}{99}{initdaybatintot}  if(defined $data{$name}{circular}{99}{initdaybatintot});     # 29.12.2024
   $data{$name}{circular}{99}{initdaybatouttot01} = delete $data{$name}{circular}{99}{initdaybatouttot} if(defined $data{$name}{circular}{99}{initdaybatouttot});    # 29.12.2024
@@ -7696,9 +7711,9 @@ sub centralTask {
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
   _batChargeRecmd             ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
-  _calcConsumptionForecast    ($centpars);                                            # Verbrauchsprognose erstellen
+  # _calcConsumptionForecast    ($centpars);                                            # Verbrauchsprognose erstellen
   
-  _calcConsumptionForecast_circular ($centpars);                                      # Test neue Verbrauchsprognose 
+  _calcConsForecast_circular  ($centpars);                                            # neue Verbrauchsprognose über pvCircular
   
   _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
   _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
@@ -9492,10 +9507,10 @@ sub _transferMeterValues {
   my $ftuf    = $ftunit =~ /^kWh$/xi ? 1000 : 1;
   my $fitotal = ReadingsNum ($medev, $ft, 0) * $ftuf;                                                # Einspeisung total (Wh)
 
-  $data{$name}{circular}{99}{gridcontotal}   = $gctotal;                                             # Total Netzbezug speichern
-  $data{$name}{circular}{99}{feedintotal}    = $fitotal;                                             # Total Feedin speichern
-  $data{$name}{current}{gridconsumption} = int $gco;                                                 # Current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-  $data{$name}{current}{gridfeedin}      = int $gfin;                                                # Wert current grid Feed in
+  $data{$name}{circular}{99}{gridcontotal} = $gctotal;                                               # Total Netzbezug speichern
+  $data{$name}{circular}{99}{feedintotal}  = $fitotal;                                               # Total Feedin speichern
+  $data{$name}{current}{gridconsumption}   = int $gco;                                               # Current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  $data{$name}{current}{gridfeedin}        = int $gfin;                                              # Wert current grid Feed in
 
   debugLog ($paref, "collectData", "collect Meter data - device: $medev =>");
   debugLog ($paref, "collectData", "gcon: $gco W, gfeedin: $gfin W, contotal: $gctotal Wh, feedtotal: $fitotal Wh");
@@ -9507,7 +9522,7 @@ sub _transferMeterValues {
   my $gfdaypast = 0;
   my $docon     = 0;
 
-  for my $hour (0..int $chour) {                                                                     # alle bisherigen Erzeugungen des Tages summieren
+  for my $hour (0..int $chour) {                                                                         # alle bisherigen Erzeugungen des Tages summieren
       $gcdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridConsumption", 0);
       $gfdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridFeedIn",      0);
   }
@@ -9541,9 +9556,11 @@ sub _transferMeterValues {
       }
 
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_GridConsumption', $gctotthishour.' Wh');
-      $data{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                         # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      $data{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                               # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
       writeToHistory ( { paref => $paref, key => 'gcons', val => $gctotthishour, hour => $nhour } );
+      
+      debugLog ($paref, "saveData2Cache|collectData", "write to pvHistory - day: $paref->{day}, hod: $nhour, GridConsumption (gcons): $gctotthishour Wh");
   }
 
   ## Management der in das Netz eingespeister (nur vom Meter gemessene) Energie
@@ -9555,7 +9572,7 @@ sub _transferMeterValues {
       $data{$name}{circular}{99}{initdayfeedin} = 0;
       Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy feed in to grid was reset and is registered with >0<.");
   }
-  elsif ($gfdaypast == 0) {                                                                              # Management der Stundenberechnung auf Basis Totalwerte GridFeedIn
+  elsif ($gfdaypast == 0) {                                                                                 # Management der Stundenberechnung auf Basis Totalwerte GridFeedIn
       if (defined $idfin) {
           $dofeed = 1;
       }
@@ -10209,7 +10226,6 @@ return;
 sub _createSummaries {
   my $paref  = shift;
   my $name   = $paref->{name};
-  my $type   = $paref->{type};
   my $day    = $paref->{day};
   my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
   my $minute = $paref->{minute};                                                                      # aktuelle Minute
@@ -10316,7 +10332,7 @@ sub _createSummaries {
   my $pvgen   = 0;
   my $pv2grid = 0;                                                                                      # PV-Erzeugung zu Grid-only
 
-  for my $in (1..MAXINVERTER) {                                                                        # Summe alle Inverter
+  for my $in (1..MAXINVERTER) {                                                                         # Summe alle Inverter
       $in      = sprintf "%02d", $in;
       my $pvi  = InverterVal ($hash, $in, 'igeneration', 0);
       my $feed = InverterVal ($hash, $in, 'ifeed',      '');
@@ -10326,7 +10342,7 @@ sub _createSummaries {
   
   my $othprod = 0;                                                                                      # Summe Otherproducer
 
-  for my $pn (1..MAXPRODUCER) {                                                                        # Erzeugung sonstiger Producer hinzufügen
+  for my $pn (1..MAXPRODUCER) {                                                                         # Erzeugung sonstiger Producer hinzufügen
       $pn       = sprintf "%02d", $pn;
       $othprod += ProducerVal ($hash, $pn, 'pgeneration', 0);
   }
@@ -10385,7 +10401,6 @@ return;
 sub _manageConsumerData {
   my $paref   = shift;
   my $name    = $paref->{name};
-  my $type    = $paref->{type};
   my $t       = $paref->{t};                                                 # aktuelle Zeit
   my $chour   = $paref->{chour};
   my $day     = $paref->{day};
@@ -10588,7 +10603,6 @@ return;
 sub __calcEnergyPieces {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
 
   my $hash = $defs{$name};
@@ -10766,7 +10780,7 @@ sub ___csmSpecificEpieces {
           }
       }
 
-      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                    # epiecHour auf initialwert setzen für nächsten durchlauf
+      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                       # epiecHour auf initialwert setzen für nächsten durchlauf
   }
 
 return;
@@ -10923,7 +10937,7 @@ sub ___doPlanning {
   ##########################################################################################
   for my $idx (sort keys %{$nh}) {
       my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',    0);
-      my $confcex = NexthoursVal ($hash, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer
+      my $confcex = NexthoursVal ($hash, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
 
       my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierter Energieüberschuß (kann negativ sein)
 
@@ -11486,7 +11500,7 @@ sub ___switchConsumerOn {
                       qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($startts, $lang))[0] : "undef")
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime: $iilt}.($rlt ? ", remainLockTime: $rlt seconds" : ''));
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - in Context 'switch on' => }.
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Check Context 'switch on' => }.
                       qq{swoncond: $swoncond, on-command: $oncom }
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon})   if($swoncond && $infon);
@@ -11498,7 +11512,12 @@ sub ___switchConsumerOn {
       }
   }
 
-  my $isintable  = isInterruptable ($hash, $c, 0, 1);                                             # mit Ausgabe Interruptable Info im Debug
+  my $isintable = isInterruptable ($hash, $c, 0, 1);                                              # mit Ausgabe Interruptable Info im Debug
+  
+  if ($debug =~ /consumerSwitching${c}/x) {
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable});
+  }
+
   my $isConsRcmd = isConsRcmd      ($hash, $c);
 
   my $supplmnt         = ConsumerVal ($hash, $c, 'planSupplement', '');
@@ -11603,7 +11622,7 @@ sub ___switchConsumerOff {
   my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
 
   if ($debug =~ /consumerSwitching${c}/x) {                                                       # nur für Debugging
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - in Context 'switch off' => }.
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Check Context 'switch off' => }.
                       qq{swoffcond: $swoffcond, off-command: $offcom}
            );
 
@@ -12152,7 +12171,7 @@ return;
 ################################################################
 #     Energieverbrauch Vorhersage kalkulieren (Median)
 ################################################################
-sub _calcConsumptionForecast_circular {
+sub _calcConsForecast_circular {
   my $paref   = shift;
   my $name    = $paref->{name};
   my $chour   = $paref->{chour};
@@ -12162,119 +12181,203 @@ sub _calcConsumptionForecast_circular {
 
   my $hash    = $defs{$name};
   my $acref   = $data{$name}{consumers};
-  my $swdfcfc = AttrVal ($name, 'affectConsForecastIdentWeekdays', 0);                                  # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
-    
-  ## Beachtung der letzten X Tage falls gesetzt
-  ###############################################
-  my $acld = AttrVal ($name, 'affectConsForecastLastDays', 0);
+  my $swdfcfc = AttrVal ($name, 'affectConsForecastIdentWeekdays',      0);                             # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
+  my $acld    = AttrVal ($name, 'affectConsForecastLastDays', CONSFCLDAYS);                             # Beachtung Stundenwerte der letzten X Tage falls gesetzt
 
-  ## Verbrauchsvorhersage für den kommenden Tag
-  ##############################################
   my $dt         = timestringsFromOffset ($t, 86400);
   my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname kommender Tag
+  my $lct        = LOCALE_TIME =~ /^de_/xs ? 'DE' : 'EN';
   
   my (@cona, $exconfc, $csme, %usage);
-  
   $usage{tom}{con} = 0;
-
-  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day (new median) ###################");
 
   ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
   ###############################################################
   for my $h (1..24) {                                                                                   # Median für jede Stunde / Tag berechnen
-      my $hh = sprintf "%02d", $h;
+      my $dt      = timestringsFromOffset ($t, $h * 3600);
+      my $dayname = $dt->{dayname};       
+      my $hh      = sprintf "%02d", $h;
       
-      my @conh;
+      my (@conh, @conhtom);
+      my $mix = 0;
       
-      if ($swdfcfc) {                                                                                   # nur gleiche Tage (Mo...So) einbeziehen der Stunde
-          push @conh, @{$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}};
+      if ($swdfcfc) {                                                                                   # nur bestimmten Tag (Mo...So) einbeziehen der Stunde
+          push @conh,    @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}    if(defined ${$data{$name}{circular}{$hh}{con_all}{"$dayname"}}[0]);
+          push @conhtom, @{$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}} if(defined ${$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}}[0]);          # für den nächsten Tag
       }
-      else {
-          for my $dy (keys %{$data{$name}{circular}{$hh}{con_all}}) {                                   # alle aufgezeichneten Wochentage in der Stunde berücksichtigen
-              push @conh, @{$data{$name}{circular}{$hh}{con_all}{$dy}};
+      else {                                                                                            # alle aufgezeichneten Wochentage in der Stunde berücksichtigen
+          for my $dy (keys %{$data{$name}{circular}{$hh}{con_all}}) {                                   # den max Index aller Tagesarrays ermitteln                                 
+              my $ai = $#{$data{$name}{circular}{$hh}{con_all}{$dy}};
+              $mix   = $ai if($ai > $mix);
           }
-      }
-
-      my $hnum = scalar @conh;
-      
-      if ($hnum) {
-          my $hcon          = sprintf "%.0f", medianArray (\@conh);                                    
-          $usage{$hh}{con}  = $hcon;                                                                    # prognostizierter Verbrauch (Median) der Stunde hh (Hour of Day)
-          $usage{$hh}{num}  = $hnum;
-          $usage{tom}{con} += $hcon;                                                                    # Summe prognostizierter Verbrauch (Median) des Tages 
-          $usage{tom}{num} += $hnum;
-      }
-  }
-  
-  ## historische Werte Verbraucher exkludieren / geplante inkludieren
-  #####################################################################
-  my $tomnum = $usage{tom}{num} // 0;
-  
-  if ($tomnum) {
-      my $exnum = 0;
-      my $ex    = 0;
-      
-      for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
-          next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
-
-          if ($swdfcfc) {                                                                              # nur gleiche Tage (Mo...So) einbeziehen
-              my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
-              next if(!$hdn || $hdn ne $tomdayname);
-          }
-
-          for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
-              $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                        # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
-
-              if ($exconfc) {
-                  ## Tageswert Excludes finden und summieren
-                  ############################################
-                  $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
-                  
-                  if ($csme > 0) {
-                      $ex   += $csme;
-                      $exnum++;
-                  
-                      debugLog ($paref, 'consumption|consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
-                  }
-                  
-                  ## hist. On-Stunden aller Tage aufnehmen
-                  ##########################################
-                  for my $h (1..24) {
-                      my $hh = sprintf "%02d", $h;
-                      $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
-                  
-                      if ($csme) {
-                          $usage{$hh}{histcon} += $csme;
-                          $usage{$hh}{histnum}++;
-                      }
-                  }              
+          
+          for my $i (0..$mix) {                                                                         # Werte sortiert nach Alter aufsteigend in Array einfügen
+              for my $dy (sort keys %habwdn) {
+                  push @conh,    ${$data{$name}{circular}{$hh}{con_all}{$habwdn{$dy}{$lct}}}[$i] if(defined ${$data{$name}{circular}{$hh}{con_all}{$habwdn{$dy}{$lct}}}[$i]);
+                  push @conhtom, @conh;
               }
           }
       }
       
-      for my $h (1..24) {                          
-          my $hh = sprintf "%02d", $h;
-          
-          if (defined $usage{$hh}{histnum}) {
-              my $exhcon        = sprintf "%.0f", ($usage{$hh}{histcon} / $usage{$hh}{histnum});       # durchschnittlichen Verbrauchswert 
-              $usage{$hh}{con} -= $exhcon;
-          
-              debugLog ($paref, 'consumption|consumption_long', "excl. $exhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{histnum});
+      my $hnum    = scalar @conh;
+      my $hnumtom = scalar @conhtom;
+      
+      if ($hnum) {
+          if ($hnum > $acld) {
+              @conh = splice (@conh, $acld * -1);
+              $hnum = scalar @conh;
           }
+          
+          my $hcon         = sprintf "%.0f", medianArray (\@conh);                                    
+          $usage{$hh}{con} = $hcon;                                                                     # prognostizierter Verbrauch (Median) der Stunde hh (Hour of Day)
+          $usage{$hh}{num} = $hnum;
+      }
       
-          debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
-      } 
+      if ($hnumtom) {
+          if ($hnumtom > $acld) {
+              @conhtom = splice (@conhtom, $acld * -1);
+              $hnumtom = scalar @conhtom;
+          }
+          
+          my $hcontom       = sprintf "%.0f", medianArray (\@conhtom);                                    
+          $usage{tom}{con} += $hcontom;                                                                 # Summe prognostizierter Verbrauch (Median) des Tages 
+          $usage{tom}{num} += $hnumtom;
+      }   
+  }
+  
+  ## Excludes / Includes vorbereiten
+  ####################################
+  my $exnum = 0;
+  my $ex    = 0;
+  my $lap   = 1;
+  
+  for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
+      next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
+                
+      for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
+          $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                        
+
+          if ($exconfc) {                                                                          
+              ## Tageswert Excludes finden und summieren
+              ############################################
+              if ($exconfc == 1) {                                                                 # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+                  my $do = 1;
+                  
+                  if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+                      my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
+                      $do = 0 if(!$hdn || $hdn ne $tomdayname);
+                  }
+                  
+                  if ($do) {
+                      $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
+                      
+                      if ($csme > 0) {
+                          $ex   += $csme;
+                          $exnum++;
+                      
+                          debugLog ($paref, 'consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
+                      }
+                  }
+              }
+              
+              ## hist. On-Stunden aller Tage aufnehmen
+              ##########################################                  
+              for my $h (1..24) {                                                                 # excludieren ob exconfc 1 oder 2
+                  my $hh = sprintf "%02d", $h;
+                  $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
+              
+                  if ($csme) {
+                      $usage{$hh}{histcon} += $csme;
+                      $usage{$hh}{histnum}++;
+                  }
+                  
+                  if ($exconfc == 2 && $lap == 1) {                                               # Planungsdaten des Consumers inkludieren
+                      my $ehp = $data{$name}{consumers}{$c}{ehodpieces}{$hh};
+                      
+                      if (defined $ehp) {
+                          $usage{$hh}{plancon} += $ehp;
+                          $usage{$hh}{plannum}++;                       
+                      }                          
+                  }
+              }              
+          }
+      }
       
-      $ex               = sprintf "%.0f", ($ex / $exnum) if($exnum);                                   # Ex Tageswert Durchschnitt bilden
-      $usage{tom}{con} -= $ex;
+      $lap++;
+  }
+  
+  ## effektiven StundenForecast berechnen
+  #########################################
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next Hours (new median) ###################");
+
+  for my $h (1..24) {                          
+      my $hh = sprintf "%02d", $h;
       
-      debugLog ($paref, 'consumption|consumption_long', "estimated cons Tomorrow: ".$usage{tom}{con}." Wh, Considered value numbers: $tomnum, exclude: $ex Wh (avg of $exnum)");
+      if (defined $usage{$hh}{histnum}) {                                                             # historische Stundenverbräuche exkludieren
+          my $exhcon        = sprintf "%.0f", ($usage{$hh}{histcon} / $usage{$hh}{histnum});          # durchschnittlichen Verbrauchswert 
+          $usage{$hh}{con} -= $exhcon;
+      
+          debugLog ($paref, 'consumption_long', "excl. hist $exhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{histnum});
+      }
+      
+      $usage{$hh}{conex} = $usage{$hh}{con};
+      
+      if (defined $usage{$hh}{plannum}) {                                                             # geplante Stundenverbräuche inkludieren
+          my $inhcon        = sprintf "%.0f", ($usage{$hh}{plancon} / $usage{$hh}{plannum});
+          $usage{$hh}{con} += $inhcon;
+          
+          debugLog ($paref, 'consumption_long', "incl. planned $inhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{plannum});
+      }
+  
+      debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
+  } 
+  
+  ## nächsten Tageswert Excludes berücksichtigen
+  ################################################
+  my $tomnum = $usage{tom}{num} // 0;
+  
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day (new median) ###################");
+  
+  if ($tomnum) {
+      if ($exnum) {
+          $ex               = sprintf "%.0f", ($ex / $exnum);                                        # Ex Tageswert Durchschnitt bilden
+          $usage{tom}{con} -= $ex;
+      }
+      
+      $data{$name}{current}{tomorrowconsumption} = $usage{tom}{con};
+      debugLog ($paref, 'consumption|consumption_long', "estimated cons Tomorrow: ".$usage{tom}{con}." Wh, Individual hourly values considered: $tomnum, exclude: $ex Wh (avg of $exnum entities)");
   }
   else {
-      my $lang = $paref->{lang};
-      # $data{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};
+      my $lang                                   = $paref->{lang};
+      $data{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};  
+      debugLog ($paref, 'consumption|consumption_long', "no estimated cons for Tomorrow: ".$hqtxt{wfmdcf}{$lang});      
   }
+    
+  ## Ergebnisse speichern
+  ########################
+  debugLog ($paref, 'saveData2Cache|consumption_long', "################### Store Consumption forecast values (new median) ###################");
+  
+  for my $k (sort keys %{$data{$name}{nexthours}}) {
+      my $nhst = NexthoursVal ($hash, $k, "starttime", undef);                                         # Startzeit
+      next if(!$nhst);
 
+      my $utime = timestringToTimestamp ($nhst);
+      my $nhday = strftime "%a", localtime($utime);                                                    # Wochentagsname des NextHours Key
+      my $nhhr  = sprintf "%02d", int (strftime "%H", localtime($utime)) + 1;                          # Stunde des Tages vom NextHours Key (01,02,...24)
+  
+      $data{$name}{nexthours}{$k}{confcEx} = $usage{$nhhr}{conex};                            
+      $data{$name}{nexthours}{$k}{confc}   = $usage{$nhhr}{con};                                       # prognostizierter Verbrauch (Median)
+      
+      debugLog ($paref, 'saveData2Cache|consumption_long', "store '$k' hod '$nhhr' confc: $usage{$nhhr}{con}, confcEx: $usage{$nhhr}{conex}");
+  
+      if (NexthoursVal ($hash, $k, 'today', 0)) {                                                      # nur Werte des aktuellen Tags speichern
+          $data{$name}{circular}{$nhhr}{confc} = $usage{$nhhr}{con};
+          writeToHistory ( { paref => $paref, key => 'confc', val => $usage{$nhhr}{con}, hour => $nhhr } );
+          
+          debugLog ($paref, 'saveData2Cache|consumption_long', "store circular/history hod '$nhhr' confc: $usage{$nhhr}{con}");
+      }  
+  }
+  
 return;
 }
 
@@ -12670,6 +12773,8 @@ sub _addCon2CircArray {
   
   push @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}, $con if($con >= 0);   # Wert zum Speicherarray hinzufügen
   
+  limitArray ($data{$name}{circular}{$hh}{con_all}{"$dayname"}, CONDAYSLIDEMAX); 
+  
   debugLog ($paref, 'saveData2Cache', "add consumption into Array (con_all) in Circular - day: $day, hod: $hh, con: $con");
 
 return;
@@ -12846,6 +12951,9 @@ sub _saveEnergyConsumption {
   if ($dowrite) {
       writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $hod } );
       $data{$name}{circular}{99}{todayConsumption} = HistoryVal ($name, $day, '99', 'con', undef);
+      
+      debugLog ($paref, 'consumption', "consumption calculated - day: $day, hod: $hod, con: $con Wh");
+      debugLog ($paref, 'saveData2Cache|consumption', "write pvCircular consumption - hod: 99, todayConsumption: ".HistoryVal ($name, $day, '99', 'con', 'undef')." Wh");
   }
 
 return;
@@ -12946,7 +13054,7 @@ sub _genSpecialReadings {
 
               my $dgcon  = $cgcon - $idgcon;
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dgcon).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $dgcon).' Wh');
           }
           
           if ($kpi eq 'todayBatInSum') {                                                                       # Summe tägl. Ladeenergie (alle Batterien) 
@@ -13644,10 +13752,16 @@ sub _graphicHeader {
 
       ## Message-Icon
       #################
+      my $tfl            = $data{$name}{messages}{999000}{TS}                                     ? 
+                           (timestampToTimestring ($data{$name}{messages}{999000}{TS}, $lang))[0] :
+                           'n.a.';
+      my $tfn            = $data{$name}{messages}{999000}{TSNEXT}                                     ?
+                           (timestampToTimestring ($data{$name}{messages}{999000}{TSNEXT}, $lang))[0] :
+                           'n.a.';
       my ($micon, $midx) = fillupMessageSystem ($paref);
       $img               = FW_makeImage ($micon);
       my $msgicon        = $midx ? "<a onClick=$cmdoutmsg>$img</a>" : $img;
-      my $msgtitle       = $midx ? $htitles{outpmsg}{$lang} : $htitles{nomsgfo}{$lang};
+      my $msgtitle       = $midx ? $htitles{outpmsg}{$lang} : $htitles{nomsgfo}{$lang}."\n\n$htitles{lstmsgc}{$lang}: $tfl \n$htitles{nxtmsgc}{$lang}: $tfn";          
       
       ## Update-Icon
       ################
@@ -18410,21 +18524,21 @@ sub _listDataPoolNextHours {
           $socs        .= "soc${bn}: $socxx";
       }
 
-      $sq        .= "\n" if($sq);
-      $sq        .= $idx." => ";
-      $sq        .= "starttime: $nhts, hourofday: $hod, today: $today";
-      $sq        .= "\n              ";
-      $sq        .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc";
-      $sq        .= "\n              ";
-      $sq        .= "confcEx: $confcex, DoN: $don, weatherid: $wid, wcc: $wcc, rr1c: $rr1c, temp=$temp";
-      $sq        .= "\n              ";
-      $sq        .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt";
-      $sq        .= "\n              ";
-      $sq        .= "rrange: $rrange, crange: $crang, correff: $pvcorrf";
-      $sq        .= "\n              ";
-      $sq        .= $socs;
-      $sq        .= "\n              ";
-      $sq        .= $rcdbat;
+      $sq .= "\n" if($sq);
+      $sq .= $idx." => ";
+      $sq .= "starttime: $nhts, hourofday: $hod, today: $today";
+      $sq .= "\n              ";
+      $sq .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit";
+      $sq .= "\n              ";
+      $sq .= "confc: $confc, confcEx: $confcex, weatherid: $wid, wcc: $wcc, rr1c: $rr1c, temp=$temp";
+      $sq .= "\n              ";
+      $sq .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt, DoN: $don";
+      $sq .= "\n              ";
+      $sq .= "rrange: $rrange, crange: $crang, correff: $pvcorrf";
+      $sq .= "\n              ";
+      $sq .= $socs;
+      $sq .= "\n              ";
+      $sq .= $rcdbat;
   }
 
 return $sq;
@@ -18755,6 +18869,7 @@ sub checkPlantConfig {
       'Common Settings'      => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'FTUI Widget Files'    => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Perl Modules'         => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Data Memory'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
 
   my $sub = sub {
@@ -19238,7 +19353,33 @@ sub checkPlantConfig {
       $result->{'Perl Modules'}{note}   .= qq{AI::DecisionTree <br>};
   }
   
+  ## Datenspeicher Check
+  ########################
+  my $confault = 0;
   
+  for my $dy (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
+      for my $hh (sort{$a<=>$b} keys %{$data{$name}{pvhist}{$dy}}) {
+          my $hcon = HistoryVal ($hash, $dy, $hh, 'con', 0);                                        # historische Verbrauchswerte
+      
+          if ($hcon < 0) {                                                                          # V1.45.7
+              $confault++;
+              Log3 ($name, 1, "$name - WARNING - The stored Energy consumption of day/hour $dy/$hh is negative. This appears to be an error. The incorrect value can be deleted with 'set $name reset consumption $dy $hh'.");
+          }
+      }
+  }
+    
+  if ($confault) {
+      $result->{'Data Memory'}{state}   = $warn;
+      $result->{'Data Memory'}{result} .= qq{There may be '$confault' incorrect value(s) in the 'con' key of the pvHistory Storage. <br>};
+      $result->{'Data Memory'}{note}   .= qq{See Logfile for detailed information and how these value(s) could be corrected. <br>};
+      $result->{'Data Memory'}{warn}    = 1;
+  }
+
+  if (!$result->{'Data Memory'}{info} && !$result->{'Data Memory'}{warn} && !$result->{'Data Memory'}{fault}) {
+      $result->{'Data Memory'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
+      $result->{'Data Memory'}{note}   .= qq{<br>checked Data Memory: <br>};
+      $result->{'Data Memory'}{note}   .= qq{pvHistory key 'con' <br>};
+  }
   
   ## FTUI Widget Support
   ########################
@@ -20268,7 +20409,7 @@ sub isAddSwitchOffCond {
   if (defined $condval) {
       if ($condval =~ m/^$swoffcondregex$/x) {
           $info   = qq{value "$condval" matches the Regex "$swoffcondregex" \n};
-          $info  .= "-> !Interrupt! ";
+          $info  .= "-> Check successful ";
           $swoff  = 1;
       }
       else {
@@ -20281,7 +20422,7 @@ sub isAddSwitchOffCond {
 
           if ($condval =~ m/^$swoffcondregex$/x) {
               $info   = qq{value "$condval" (included hysteresis = $hyst) matches the Regex "$swoffcondregex" \n};
-              $info  .= "-> !Interrupt! ";
+              $info  .= "-> Check successful ";
               $swoff  = 1;
           }
           else {
@@ -20440,11 +20581,11 @@ sub isInterruptable {
       return 1;
   }
 
-  my $debug = getDebug ($hash);                                                            # Debug Module
-
   my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c, $intable, $hyst);
   Log3 ($name, 1, "$name - $err") if($err);
-
+  
+  my $debug = getDebug ($hash);                                                           # Debug Module
+  
   if ($print && $debug =~ /consumerSwitching${c}/x) {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Info: $info});
   }
@@ -21108,43 +21249,43 @@ sub cloud2bin {
 
   my $bin = $val == 100 ? '100' :
             $val >  97  ? '100' :
-            $val >  95  ? '95'  :
+            $val >= 95  ? '95'  :
             $val >  92  ? '95'  :
-            $val >  90  ? '90'  :
+            $val >= 90  ? '90'  :
             $val >  87  ? '90'  :
-            $val >  85  ? '85'  :
+            $val >= 85  ? '85'  :
             $val >  82  ? '85'  :
-            $val >  80  ? '80'  :
+            $val >= 80  ? '80'  :
             $val >  77  ? '80'  :
-            $val >  75  ? '75'  :
+            $val >= 75  ? '75'  :
             $val >  72  ? '75'  :
-            $val >  70  ? '70'  :
+            $val >= 70  ? '70'  :
             $val >  67  ? '70'  :
-            $val >  65  ? '65'  :
+            $val >= 65  ? '65'  :
             $val >  62  ? '65'  :
-            $val >  60  ? '60'  :
+            $val >= 60  ? '60'  :
             $val >  57  ? '60'  :
-            $val >  55  ? '55'  :
+            $val >= 55  ? '55'  :
             $val >  52  ? '55'  :
-            $val >  50  ? '50'  :
+            $val >= 50  ? '50'  :
             $val >  47  ? '50'  :
-            $val >  45  ? '45'  :
+            $val >= 45  ? '45'  :
             $val >  42  ? '45'  :
-            $val >  40  ? '40'  :
+            $val >= 40  ? '40'  :
             $val >  37  ? '40'  :
-            $val >  35  ? '35'  :
+            $val >= 35  ? '35'  :
             $val >  32  ? '35'  :
-            $val >  30  ? '30'  :
+            $val >= 30  ? '30'  :
             $val >  27  ? '30'  :
-            $val >  25  ? '25'  :
+            $val >= 25  ? '25'  :
             $val >  22  ? '25'  :
-            $val >  20  ? '20'  :
+            $val >= 20  ? '20'  :
             $val >  17  ? '20'  :
-            $val >  15  ? '15'  :
+            $val >= 15  ? '15'  :
             $val >  12  ? '15'  :
-            $val >  10  ? '10'  :
+            $val >= 10  ? '10'  :
             $val >  7   ? '10'  :
-            $val >  5   ? '05'  :
+            $val >= 5   ? '05'  :
             $val >  2   ? '05'  :
             '00';
 
@@ -21159,39 +21300,39 @@ sub sunalt2bin {
 
   my $bin = $val == 90  ? 90  :
             $val >  87  ? 90  :
-            $val >  85  ? 85  :
+            $val >= 85  ? 85  :
             $val >  82  ? 85  :
-            $val >  80  ? 80  :
+            $val >= 80  ? 80  :
             $val >  77  ? 80  :
-            $val >  75  ? 75  :
+            $val >= 75  ? 75  :
             $val >  72  ? 75  :
-            $val >  70  ? 70  :
+            $val >= 70  ? 70  :
             $val >  67  ? 70  :
-            $val >  65  ? 65  :
+            $val >= 65  ? 65  :
             $val >  62  ? 65  :
-            $val >  60  ? 60  :
+            $val >= 60  ? 60  :
             $val >  57  ? 60  :
-            $val >  55  ? 55  :
+            $val >= 55  ? 55  :
             $val >  52  ? 55  :
-            $val >  50  ? 50  :
+            $val >= 50  ? 50  :
             $val >  47  ? 50  :
-            $val >  45  ? 45  :
+            $val >= 45  ? 45  :
             $val >  42  ? 45  :
-            $val >  40  ? 40  :
+            $val >= 40  ? 40  :
             $val >  37  ? 40  :
-            $val >  35  ? 35  :
+            $val >= 35  ? 35  :
             $val >  32  ? 35  :
-            $val >  30  ? 30  :
+            $val >= 30  ? 30  :
             $val >  27  ? 30  :
-            $val >  25  ? 25  :
+            $val >= 25  ? 25  :
             $val >  22  ? 25  :
-            $val >  20  ? 20  :
+            $val >= 20  ? 20  :
             $val >  17  ? 20  :
-            $val >  15  ? 15  :
+            $val >= 15  ? 15  :
             $val >  12  ? 15  :
-            $val >  10  ? 10  :
+            $val >= 10  ? 10  :
             $val >  7   ? 10  :
-            $val >  5   ? 5   :
+            $val >= 5   ? 5   :
             $val >  2   ? 5   :
             0;
 
@@ -22568,37 +22709,37 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>deletes an existing AI instance including all training data and reinitialises it                                        </td></tr>
-            <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                       </td></tr>
-            <tr><td> <b>consumerPlanning</b>   </td><td>deletes the planning data of all registered consumers                                                                   </td></tr>
-            <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                  </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Consumer number&gt; </ul>                                               </td></tr>
-            <tr><td>                           </td><td>The module carries out an automatic rescheduling of the consumer circuit.                                               </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>deletes the current and historical data of all registered consumers from the memory                                     </td></tr>
-            <tr><td>                           </td><td>The defined consumer attributes remain and the data is collected again.                                                 </td></tr>
-            <tr><td>                           </td><td>To delete the data of only one consumer use:                                                                            </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Consumer number&gt; </ul>                                                 </td></tr>
-            <tr><td> <b>consumption</b>        </td><td>deletes the stored consumption values of the house                                                                      </td></tr>
-            <tr><td>                           </td><td>To delete the consumption values of a specific day:                                                                     </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
-            <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                           </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumption 08 10) </ul>   </td></tr>
-            <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                </td></tr>
-            <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                     </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>deletes the readings pvCorrectionFactor*                                                                                </td></tr>
-            <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                  </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                    </td></tr>
-            <tr><td>                           </td><td>To delete stored PV correction factors of a certain hour from the caches:                                               </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;  </ul>                                                      </td></tr>
-            <tr><td>                           </td><td><ul>(e.g. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                    </td></tr>
-            <tr><td> <b>pvHistory</b>          </td><td>deletes the memory of all historical days (01 ... 31)                                                                   </td></tr>
-            <tr><td>                           </td><td>To delete a specific historical day:                                                                                    </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
-            <tr><td>                           </td><td>To delete a specific hour of a historical day:                                                                          </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt; &lt;Hour&gt;  (e.g. set &lt;name&gt; reset pvHistory 08 10) </ul>      </td></tr>
-            <tr><td> <b>roofIdentPair</b>      </td><td>deletes all saved SolCast API Rooftop ID / API Key pairs.                                                               </td></tr>
-            <tr><td>                           </td><td>To delete a specific pair, specify its key &lt;pk&gt;:                                                                  </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (e.g. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>deletes an existing AI instance including all training data and reinitialises it                                                      </td></tr>
+            <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                                     </td></tr>
+            <tr><td> <b>consumerPlanning</b>   </td><td>deletes the planning data of all registered consumers                                                                                 </td></tr>
+            <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Consumer number&gt; </ul>                                                             </td></tr>
+            <tr><td>                           </td><td>The module carries out an automatic rescheduling of the consumer circuit.                                                             </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>deletes the current and historical data of all registered consumers from the memory                                                   </td></tr>
+            <tr><td>                           </td><td>The defined consumer attributes remain and the data is collected again.                                                               </td></tr>
+            <tr><td>                           </td><td>To delete the data of only one consumer use:                                                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Consumer number&gt; </ul>                                                               </td></tr>
+            <tr><td> <b>consumptionHistory</b> </td><td>deletes the stored consumption values of the house from the pvHistory memory                                                          </td></tr>
+            <tr><td>                           </td><td>To delete the consumption values of a specific day:                                                                                   </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumptionHistory 08) </ul>                 </td></tr>
+            <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                                         </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumptionHistory 08 10) </ul>   </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                              </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                                   </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>deletes the readings pvCorrectionFactor*                                                                                              </td></tr>
+            <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                  </td></tr>
+            <tr><td>                           </td><td>To delete stored PV correction factors of a certain hour from the caches:                                                             </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;  </ul>                                                                    </td></tr>
+            <tr><td>                           </td><td><ul>(e.g. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                  </td></tr>
+            <tr><td> <b>pvHistory</b>          </td><td>deletes the memory of all historical days (01 ... 31)                                                                                 </td></tr>
+            <tr><td>                           </td><td>To delete a specific historical day:                                                                                                  </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset pvHistory 08) </ul>                                   </td></tr>
+            <tr><td>                           </td><td>To delete a specific hour of a historical day:                                                                                        </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt; &lt;Hour&gt;  (e.g. set &lt;name&gt; reset pvHistory 08 10) </ul>                    </td></tr>
+            <tr><td> <b>roofIdentPair</b>      </td><td>deletes all saved SolCast API Rooftop ID / API Key pairs.                                                                             </td></tr>
+            <tr><td>                           </td><td>To delete a specific pair, specify its key &lt;pk&gt;:                                                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (e.g. set &lt;name&gt; reset roofIdentPair p1) </ul>                            </td></tr>
          </table>
       </ul>
       </li>
@@ -23155,22 +23296,26 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-affectConsForecastIdentWeekdays"></a>
        <li><b>affectConsForecastIdentWeekdays </b><br>
          If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast. <br>
-         Otherwise, all weekdays are used equally for calculation. <br>
-         Any additional attribute 
-		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>
-		 is also taken into account. <br>
+         Otherwise, all weekdays are used equally for the calculation. <br>
+         The number of weekdays included is determined by the attribute  
+		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>. <br>      
          (default: 0)
        </li>
        <br>
        
        <a id="SolarForecast-attr-affectConsForecastLastDays"></a>
        <li><b>affectConsForecastLastDays </b><br>
-         The specified past days (1..31) are included in the calculation of the consumption forecast. <br>
+         The specified number of historical daily values is included in the calculation of the consumption forecast. <br>
          For example, with the attribute value “1” only the previous day is taken into account, with the value “14” the previous 14 days. <br>
-         If an additional attribute 
-         <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a> 
-         is set, the specified number of past weekdays of the same type (Mon .. Sun) is taken into account. <br>
-         (default: all days available in pvHistory)
+         The days actually taken into account may be less than specified if there are not enough values in the internal memory
+         are available. <br>
+         (default: 60) <br><br>
+         
+         <b>Note:</b> With an additionally set attribute 
+		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
+		 the specified number of past weekdays of the same type (Mon .. Sun) is taken into account. <br>
+         In this case, if a value of “8” is set, the same weekdays of the past 8 weeks are taken into account.
+         are taken into account. <br>         
        </li>
        <br>
 
@@ -23395,9 +23540,10 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                      </td></tr>
             <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
-            <tr><td> <b>exconfc</b>        </td><td>Use of the consumer's recorded energy consumption to create the consumption forecast (optional).                                                  </td></tr>
-            <tr><td>                       </td><td><b>0</b> - the consumer's historical energy consumption is used to create the consumption forecast (default)                                      </td></tr>
-            <tr><td>                       </td><td><b>1</b> - the consumer's historical energy consumption is excluded from the consumption forecast.                                                </td></tr>
+            <tr><td> <b>exconfc</b>        </td><td>Indicator for using the historical energy consumption of the consumer (optional).                                                                 </td></tr>
+            <tr><td>                       </td><td><b>0</b> - the stored energy consumption shares are retained as part of the general consumption forecast (default)                                </td></tr>
+            <tr><td>                       </td><td><b>1</b> - the general consumption forecast is reduced by the stored energy consumption shares.                                                   </td></tr>
+            <tr><td>                       </td><td><b>2</b> - as with '1', but the consumer's planning data is included in the forecast for the coming hours.                                        </td></tr>
          </table>
          </ul>
        <br>
@@ -25056,37 +25202,37 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainingsdaten und initialisiert sie neu                              </td></tr>
-            <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                          </td></tr>
-            <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                </td></tr>
-            <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                   </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                             </td></tr>
-            <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                            </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher                            </td></tr>
-            <tr><td>                           </td><td>Die definierten Consumer Attribute bleiben bestehen und die Daten werden neu gesammelt.                                 </td></tr>
-            <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                           </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                               </td></tr>
-            <tr><td> <b>consumption</b>        </td><td>löscht die gespeicherten Verbrauchswerte des Hauses                                                                     </td></tr>
-            <tr><td>                           </td><td>Um die Verbrauchswerte eines bestimmten Tages zu löschen:                                                               </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
-            <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                  </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumption 08 10) </ul> </td></tr>
-            <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
-            <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                         </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvCorrectionFactor*                                                                                 </td></tr>
-            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                            </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                    </td></tr>
-            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                                 </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                    </td></tr>
-            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                    </td></tr>
-            <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                                 </td></tr>
-            <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                        </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
-            <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                           </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>    </td></tr>
-            <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                        </td></tr>
-            <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                            </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainingsdaten und initialisiert sie neu                                            </td></tr>
+            <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                                        </td></tr>
+            <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                              </td></tr>
+            <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                                 </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                                           </td></tr>
+            <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                                          </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher                                          </td></tr>
+            <tr><td>                           </td><td>Die definierten Consumer Attribute bleiben bestehen und die Daten werden neu gesammelt.                                               </td></tr>
+            <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                                         </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                                             </td></tr>
+            <tr><td> <b>consumptionHistory</b> </td><td>löscht die gespeicherten Verbrauchswerte des Hauses aus dem pvHistory Speicher                                                        </td></tr>
+            <tr><td>                           </td><td>Um die Verbrauchswerte eines bestimmten Tages zu löschen:                                                                             </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumptionHistory 08) </ul>                 </td></tr>
+            <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumptionHistory 08 10) </ul> </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                                            </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                                       </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvCorrectionFactor*                                                                                               </td></tr>
+            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                  </td></tr>
+            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                                               </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                                  </td></tr>
+            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                  </td></tr>
+            <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                                               </td></tr>
+            <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                                      </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                                   </td></tr>
+            <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                                         </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>                  </td></tr>
+            <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                                      </td></tr>
+            <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>                            </td></tr>
          </table>
       </ul>
       </li>
@@ -25643,21 +25789,26 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>affectConsForecastIdentWeekdays </b><br>
          Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
          Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet. <br>
-         Ein eventuell zusätzlich gesetztes Attribut 
+         Die Anzahl der einbezogenen Wochentage wird durch das Attribut  
 		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>
-		 wird gleichfalls berücksichtigt. <br>      
+		 bestimmt. <br>      
          (default: 0)
        </li>
        <br>
        
        <a id="SolarForecast-attr-affectConsForecastLastDays"></a>
        <li><b>affectConsForecastLastDays </b><br>
-         Es werden die angegebenen vergangenen Tage (1..31) bei der Berechnung der Verbrauchsprognose einbezogen. <br>
+         Es wird die angegebene Anzahl historischer Tageswerte bei der Berechnung der Verbrauchsprognose einbezogen. <br>
          So wird z.B. mit dem Attributwert "1" nur der vorangegangene Tag berücksichtigt, mit dem Wert "14" die vergangenen 14 Tage. <br>
-         Bei einem zusätzlich gesetzten Attribut 
+         Die tatsächlich berücksichtigten Tage können geringer als angegeben sein wenn noch nicht genügend Werte im internen Speicher
+         vorhanden sind. <br>
+         (default: 60) <br><br>
+         
+         <b>Hinweis:</b> Bei einem zusätzlich gesetzten Attribut 
 		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
 		 wird die angegebene Anzahl vergangener gleicher Wochentage (Mo .. So) berücksichtigt. <br>
-         (default: alle in pvHistory vorhandenen Tage)
+         In diesem Fall werden bei einem gesetzten Wert von "8" die gleichen Wochentage der vergangenen 8 Wochen
+         berücksichtigt. <br>         
        </li>
        <br>
 
@@ -25881,9 +26032,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>Hat das Reading den Wert 0 oder ist nicht vorhanden, wird der Verbraucher eingeblendet.                                                            </td></tr>
             <tr><td>                       </td><td>Die Wirkung der möglichen Readingwerte 1, 2 und 3 ist wie beschrieben.                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>exconfc</b>        </td><td>Verwendung des aufgezeichneten Energieverbrauchs des Verbrauchers zur Erstellung der Verbrauchsprognose (optional).                                </td></tr>
-            <tr><td>                       </td><td><b>0</b> - der historische Energieverbrauch des Verbrauchers wird zur Erstellung der Verbrauchsprognose verwendet (default)                        </td></tr>
-            <tr><td>                       </td><td><b>1</b> - der historische Energieverbrauch des Verbrauchers wird von der Verbrauchsprognose ausgeschlossen.                                       </td></tr>
+            <tr><td> <b>exconfc</b>        </td><td>Kennzeichen zur Verwendung des historischen Energieverbrauchs des Verbrauchers (optional).                                                         </td></tr>
+            <tr><td>                       </td><td><b>0</b> - die gespeicherten Energieverbrauchsanteile bleiben als Bestandteil der allgemeinen Verbrauchsprognose erhalten (default)                </td></tr>
+            <tr><td>                       </td><td><b>1</b> - die allgemeine Verbrauchsprognose wird um die gespeicherten Energieverbrauchsanteile reduziert.                                         </td></tr>
+            <tr><td>                       </td><td><b>2</b> - wie bei '1', jedoch gehen die Planungsdaten des Verbrauchers bei der Prognose der kommenden Stunden wieder mit ein.                     </td></tr>
          </table>
          </ul>
        <br>
