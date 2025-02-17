@@ -12176,6 +12176,7 @@ sub _calcConsForecast_circular {
   my $name    = $paref->{name};
   my $chour   = $paref->{chour};
   my $t       = $paref->{t};
+  my $date    = $paref->{date};                                                                         # aktuelles Datum
   my $day     = $paref->{day};                                                                          # aktuelles Tagdatum (01...31)
   my $dayname = $paref->{dayname};                                                                      # aktueller Tagname
 
@@ -12187,6 +12188,7 @@ sub _calcConsForecast_circular {
   my $dt         = timestringsFromOffset ($t, 86400);
   my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname kommender Tag
   my $lct        = LOCALE_TIME =~ /^de_/xs ? 'DE' : 'EN';
+  my $st         = timestringToTimestamp ("$date 00:00:00");                                            # Startzeit 00:00 am aktuellen Tag
   
   my (@cona, $exconfc, $csme, %usage);
   $usage{tom}{con} = 0;
@@ -12194,7 +12196,7 @@ sub _calcConsForecast_circular {
   ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
   ###############################################################
   for my $h (1..24) {                                                                                   # Median für jede Stunde / Tag berechnen
-      my $dt      = timestringsFromOffset ($t, $h * 3600);
+      my $dt      = timestringsFromOffset ($st, $h * 3559);                                             # eine Sek. weniger als 1 Stunde
       my $dayname = $dt->{dayname};       
       my $hh      = sprintf "%02d", $h;
       
