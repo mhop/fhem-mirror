@@ -93,6 +93,8 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.7.8"  => "17.02.2025  fixed undef warning thanks cnkru",
+  "0.7.7"  => "17.02.2025  introduced clearMappedErrors",
   "0.7.6"  => "17.02.2025  removed usage of html libraries",
   "0.7.5"  => "16.02.2025  Get mapped error codes and store them in readings",
   "0.7.4"  => "16.02.2025  Removed Unknow attr vitoconnect, small bugfix DeleteKeyValue",
@@ -1360,7 +1362,7 @@ sub vitoconnect_Set {
     my ($hash,$name,$opt,@args ) = @_;  # Übergabe-Parameter
     
     # Standard Parameter setzen
-    my $val = "unknown value $opt, choose one of update:noArg clearReadings:noArg password apiKey logResponseOnce:noArg ";
+    my $val = "unknown value $opt, choose one of update:noArg clearReadings:noArg password apiKey logResponseOnce:noArg clearMappedErrors:noArg ";
     Log(5,$name.", -vitoconnect_Set started: ". $opt); #debug
     
     # Setter für die Geräteauswahl dynamisch erstellen  
@@ -1439,6 +1441,10 @@ sub vitoconnect_Set {
         readingsSingleUpdate($hash,"state","Kein Gateway/Device gefunden, bitte Setup überprüfen",1);  
         }
         return;
+    }
+    elsif ($opt eq "clearMappedErrors" ){
+     AnalyzeCommand($hash,"deletereading ".$name." device.messages.errors.mapped.*");
+     return;
     }
 
 
@@ -3797,11 +3803,10 @@ sub vitoconnect_errorHandling {
     #Log3 $name, 1, "$name - errorHandling StatusCode: $items->{statusCode} ";
     
         if (defined $items->{statusCode} && !$items->{statusCode} eq "")    {
-            Log3 $name, 4,
-               "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
-             . "errorType: " . ($items->{errorType} // 'undef') . " "
-             . "message: " . ($items->{message} // 'undef') . " "
-             . "error: " . ($items->{error} // 'undef');
+            Log3 $name, 4, "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
+                         . "errorType: " . ($items->{errorType} // 'undef') . " "
+                         . "message: " . ($items->{message} // 'undef') . " "
+                         . "error: " . ($items->{error} // 'undef');
              
             readingsSingleUpdate(
                $hash,
@@ -3842,13 +3847,12 @@ sub vitoconnect_errorHandling {
             else {
                 readingsSingleUpdate($hash,"state","unbekannter Fehler, bitte den Entwickler informieren!",1);
                 Log3 $name, 1, "$name - unbekannter Fehler: "
-                  . "Bitte den Entwickler informieren!";
-                Log3 $name, 1,
-                    "$name - statusCode: $items->{statusCode} "
-                  . "errorType: $items->{errorType} "
-                  . "message: $items->{message} "
-                  . "error: $items->{error}";
-                  
+                             . "Bitte den Entwickler informieren!";
+                Log3 $name, 1, "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
+                             . "errorType: " . ($items->{errorType} // 'undef') . " "
+                             . "message: " . ($items->{message} // 'undef') . " "
+                             . "error: " . ($items->{error} // 'undef');
+             
                 my $dir         = path( AttrVal("global","logdir","log"));
                 my $file        = $dir->child("vitoconnect_" . $gw . ".err");
                 my $file_handle = $file->openw_utf8();
@@ -4016,6 +4020,9 @@ sub vitoconnect_DeleteKeyValue {
         <a id="vitoconnect-set-clearReadings"></a>
         <li><code>clearReadings</code><br>
             Clear all readings immediately.</li> 
+        <a id="vitoconnect-set-clearMappedErrors"></a>
+        <li><code>clearMappedErrors</code><br>
+            Clear all mapped errors immediately.</li> 
         <a id="vitoconnect-set-password"></a>
         <li><code>password passwd</code><br>
             Store password in the key store.</li>
@@ -4248,7 +4255,10 @@ sub vitoconnect_DeleteKeyValue {
         </li>
         <a id="vitoconnect-set-clearReadings"></a>
         <li><code>clearReadings</code><br>
-            Löscht sofort alle Werte.</li> 
+            Löscht sofort alle Werte.</li>
+        <a id="vitoconnect-set-clearMappedErrors"></a>
+        <li><code>clearMappedErrors</code><br>
+            Löscht sofort alle gemappten Fehler Werte.</li> 
         <a id="vitoconnect-set-password"></a>
         <li><code>password passwd</code><br>
             Speichert das Passwort im Schlüsselbund.</li>
