@@ -34,7 +34,6 @@ package FHEM::SolarForecast;                                                    
 
 use strict;
 use warnings;
-#use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                                           # für Syntaxcheck mit: perl -c /opt/fhem/FHEM/76_SolarForecast.pm
 use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
@@ -160,6 +159,16 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.46.0" => "16.02.2025  Notification System: print out last/next file pull if no messages are present, improvements and activation of ".
+                           "_calcConsForecast_circular, checkPlantConfig: add Data Memory check pvHistory 'con' ".
+                           "sunalt2bin/cloud2bin: classification of values improved, affectConsForecastLastDays: max to 180 ".
+                           "set reset consumption to reset consumptionHistory ",
+  "1.45.6" => "12.02.2025  Notification System: print out next planned file pull, timestringsFromOffset: allow +- offsets ".
+                           "new sub _calcConsForecast_circular to prepare the evaluation of consumption days in pvCircular ",
+  "1.45.5" => "09.02.2025  change constant GMFILEREPEAT, GMFILERANDOM, Pull Message File from GitHub Repo ",
+  "1.45.4" => "08.02.2025  change constant GMFILEREPEAT + new constant GMFILERANDOM ",
+  "1.45.3" => "06.02.2025  __readDataWeather: if no values of hour 01 (00:00+) use val of hour 24 of day before ".
+                           "new special reading todayConsumption ",
   "1.45.2" => "05.02.2025  aiAddRawData: temp, con, wcc, rr1c, rad1h = undef if no value in pvhistory, fix isWeatherDevValid ".
                            "__readDataWeather(API): fix no values of hour 01 (00:00+), weather_ids: more weather entries ".
                            "change weather display management (don), some minor bugfixes ",
@@ -351,71 +360,116 @@ my %vNotesIntern = (
   "1.16.6" => "11.03.2024  plantConfigCheck: join forecastProperties with ',' ",
   "1.16.5" => "04.03.2024  setPVhistory: code changes, plantConfigCheck: check forecastRefresh ".
                            "check age of weather data according to used MOSMIX variant ",
-  "1.16.4" => "02.03.2024  __getDWDSolarData: change check reading to fcx_12_x, internal code changes ".
-                           "plantConfiguration: save/restore relevant readings AND attributes ".
-                           "visual LED display whether the weather data is current (age < 2h) ",
-  "1.16.3" => "24.02.2024  store pvcorrf, quality, pvrlsum, pvfcsum, dnumsum with value <sunalt2bin>.<cloud2bin> in pvCircular ".
-                           "get pvcorrf / quality from neff in combination with sun altitude (CircularSunCloudkorrVal) ".
-                           "delete CircularCloudkorrVal, show sun position in beamgrafic weather mouse over ".
-                           "split pvCorrection into pvCorrectionRead and pvCorrectionWrite ".
-                           "_checkSetupNotComplete: improve setup Wizzard for ForecastSolar-API ",
-  "1.16.2" => "22.02.2024  minor changes, R101 -> RR1c, rr1c instead of weatherrainprob, delete wrp r101 ".
-                           "delete wrp from circular & airaw, remove rain2bin, __getDWDSolarData: change \$runh, ".
-                           "fix  Illegal division by zero Forum: https://forum.fhem.de/index.php?msg=1304009 ".
-                           "DWD API: check age of Rad1h data, store pvcorrf of sunalt with value 200+x in pvCircular ",
-  "1.16.1" => "14.02.2024  ___isCatFiltered: add eval for regex evaluation, add sunaz to AI raw and get, fillup AI hash ",
-  "1.16.0" => "12.02.2024  new command get dwdCatalog ",
-  "1.15.5" => "11.02.2024  change forecastQualities output, new limits for 'accurate' and 'spreaded' results from AI ".
-                           "checkPlantConfig: change common check info output ".
-                           "fix load Astro ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
 ## Konstanten
 ######################
-use constant LPOOLLENLIM    => 140;                                                  # Breitenbegrenzung der Ausgabe von List Pooldaten
-use constant KJ2KWH         => 0.0002777777778;                                      # Umrechnungsfaktor kJ in kWh
-use constant KJ2WH          => 0.2777777778;                                         # Umrechnungsfaktor kJ in Wh
-use constant WH2KJ          => 3.6;                                                  # Umrechnungsfaktor Wh in kJ
-use constant DEFLANG        => 'EN';                                                 # default Sprache wenn nicht konfiguriert
-use constant DEFMAXVAR      => 1.5;                                                  # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
-use constant DEFINTERVAL    => 70;                                                   # Standard Abfrageintervall
-use constant SLIDENUMMAX    => 3;                                                    # max. Anzahl der Arrayelemente in Schieberegistern
-use constant SPLSLIDEMAX    => 20;                                                   # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
+use constant {
+  LPOOLLENLIM    => 140,                                                            # Breitenbegrenzung der Ausgabe von List Pooldaten
+  KJ2KWH         => 0.0002777777778,                                                # Umrechnungsfaktor kJ in kWh
+  KJ2WH          => 0.2777777778,                                                   # Umrechnungsfaktor kJ in Wh
+  WH2KJ          => 3.6,                                                            # Umrechnungsfaktor Wh in kJ
+  DEFLANG        => 'EN',                                                           # default Sprache wenn nicht konfiguriert
+  DEFMAXVAR      => 0.75,                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
+  DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
+  SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
+  SPLSLIDEMAX    => 20,                                                             # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
+  CONDAYSLIDEMAX => 30,                                                             # max. Anzahl der Arrayelemente im Register pvCircular -> con_all -> <Tag>
+  WHISTREPEAT    => 851,                                                            # Wiederholungsintervall Cache File Daten schreiben
+  EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 
-use constant MAXWEATHERDEV  => 3;                                                    # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
-use constant MAXBATTERIES   => 3;                                                    # maximale Anzahl der möglichen Batterien
-use constant MAXCONSUMER    => 16;                                                   # maximale Anzahl der möglichen Consumer (Attribut)
-use constant MAXPRODUCER    => 3;                                                    # maximale Anzahl der möglichen anderen Produzenten (Attribut)
-use constant MAXINVERTER    => 3;                                                    # maximale Anzahl der möglichen Inverter
+  MAXWEATHERDEV  => 3,                                                              # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
+  MAXBATTERIES   => 3,                                                              # maximale Anzahl der möglichen Batterien
+  MAXCONSUMER    => 16,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
+  MAXPRODUCER    => 3,                                                              # maximale Anzahl der möglichen anderen Produzenten (Attribut)
+  MAXINVERTER    => 3,                                                              # maximale Anzahl der möglichen Inverter
 
-use constant MAXSOCDEF      => 95;                                                   # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
-use constant CARECYCLEDEF   => 20;                                                   # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
-use constant BATSOCCHGDAY   => 5;                                                    # Batterie: prozentuale SoC Anpassung pro Tag
+  MAXSOCDEF      => 95,                                                             # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
+  CARECYCLEDEF   => 20,                                                             # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
+  BATSOCCHGDAY   => 5,                                                              # Batterie: prozentuale SoC Anpassung pro Tag
 
-use constant GMFBLTO        => 30;                                                   # Timeout Aholen Message File aus contrib
-use constant GMFILEREPEAT   => 4600;                                                 # Wiederholungsuntervall Abholen Message File aus contrib
-use constant IDXLIMIT       => 900000;                                               # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
+  GMFBLTO        => 30,                                                             # Timeout Aholen Message File aus contrib
+  GMFILEREPEAT   => 3600,                                                           # Base Wiederholungsuntervall Abholen Message File aus contrib
+  GMFILERANDOM   => 10800,                                                          # Random AddOn zu GMFILEREPEAT
+  IDXLIMIT       => 900000,                                                         # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
 
-use constant AITRBLTO       => 7200;                                                 # KI Training BlockingCall Timeout
-use constant AIBCTHHLD      => 0.2;                                                  # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
-use constant AITRSTARTDEF   => 2;                                                    # default Stunde f. Start AI-Training
-use constant AISTDUDEF      => 1825;                                                 # default Haltezeit KI Raw Daten (Tage)
-use constant AISPREADUPLIM  => 120;                                                  # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-use constant AISPREADLOWLIM => 80;                                                   # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-use constant AIACCUPLIM     => 130;                                                  # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-use constant AIACCLOWLIM    => 70;                                                   # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-use constant AIACCTRNMIN    => 5500;                                                 # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
-use constant AISPREADTRNMIN => 7000;                                                 # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
+  AITRBLTO       => 7200,                                                           # KI Training BlockingCall Timeout
+  AIBCTHHLD      => 0.2,                                                            # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
+  AITRSTARTDEF   => 2,                                                              # default Stunde f. Start AI-Training
+  AISTDUDEF      => 1825,                                                           # default Haltezeit KI Raw Daten (Tage)
+  AISPREADUPLIM  => 120,                                                            # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+  AISPREADLOWLIM => 80,                                                             # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
+  AIACCUPLIM     => 130,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+  AIACCLOWLIM    => 70,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+  AIACCTRNMIN    => 5500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
+  AISPREADTRNMIN => 7000,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
 
-use constant SOLAPIREPDEF   => 3600;                                                 # default Abrufintervall SolCast API (s)
-use constant FORAPIREPDEF   => 900;                                                  # default Abrufintervall ForecastSolar API (s)
-use constant OMETEOREPDEF   => 900;                                                  # default Abrufintervall Open-Meteo API (s)
-use constant VRMAPIREPDEF   => 300;                                                  # default Abrufintervall Victron VRM API Forecast
-use constant SOLCMAXREQDEF  => 50;                                                   # max. täglich mögliche Requests SolCast API
-use constant OMETMAXREQ     => 9700;                                                 # Beschränkung auf max. mögliche Requests Open-Meteo API
-use constant LEADTIME       => 3600;                                                 # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
-use constant LAGTIME        => 1800;                                                 # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
+  SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
+  FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
+  OMETEOREPDEF   => 900,                                                            # default Abrufintervall Open-Meteo API (s)
+  VRMAPIREPDEF   => 300,                                                            # default Abrufintervall Victron VRM API Forecast
+  SOLCMAXREQDEF  => 50,                                                             # max. täglich mögliche Requests SolCast API
+  OMETMAXREQ     => 9700,                                                           # Beschränkung auf max. mögliche Requests Open-Meteo API
+  LEADTIME       => 3600,                                                           # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
+  LAGTIME        => 1800,                                                           # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
+
+  PRDEF          => 1.0,                                                            # default Performance Ratio (PR)
+  STOREFFDEF     => 0.9,                                                            # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
+  TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
+  TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
+  TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
+  
+  DEFMINTIME     => 60,                                                             # default Einplanungsdauer in Minuten
+  CONSFCLDAYS    => 60,                                                             # die Stundenwerte der letzten CONSFCLDAYS Tage zur Kalkulation der Verbrauchvorhersage einbezogen
+  DEFCTYPE       => 'other',                                                        # default Verbrauchertyp
+  DEFCMODE       => 'can',                                                          # default Planungsmode der Verbraucher
+  DEFPOPERCENT   => 1.0,                                                            # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
+  DEFHYST        => 0,                                                              # default Hysterese
+  
+  CAICONDEF       => 'clock@gold',                                                  # default consumerAdviceIcon
+  FLOWGSIZEDEF    => 400,                                                           # default flowGraphicSize
+  HISTHOURDEF     => 2,                                                             # default Anzeige vorangegangene Stunden
+  WTHCOLDDEF      => 'C7C979',                                                      # Wetter Icon Tag default Farbe
+  WTHCOLNDEF      => 'C7C7C7',                                                      # Wetter Icon Nacht default Farbe
+  B1COLDEF        => 'FFAC63',                                                      # default Farbe Beam 1
+  B1FONTCOLDEF    => '0D0D0D',                                                      # default Schriftfarbe Beam 1
+  B2COLDEF        => 'C4C4A7',                                                      # default Farbe Beam 2
+  B2FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 2
+  B3COLDEF        => 'BED6C0',                                                      # default Farbe Beam 3
+  B3FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 3
+  B4COLDEF        => 'DBDBD0',                                                      # default Farbe Beam 4
+  B4FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 4
+  FGCDDEF         => 130,                                                           # Abstand Verbrauchericons zueinander
+  
+  FGSCALEDEF      => 0.10,                                                          # Flußgrafik: Scale Normativ Icons
+  STROKCOLSTDDEF  => 'darkorange',                                                  # Flußgrafik: Standardfarbe aktive normale Kette
+  STROKCOLSIGDEF  => 'red',                                                         # Flußgrafik: Standardfarbe aktive Signal-Kette
+  STROKCOLINADEF  => 'gray',                                                        # Flußgrafik: Standardfarbe inaktive Kette
+  STROKWIDTHDEF   => 25,                                                            # Flußgrafik: Standard Breite der Kette
+  PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
+  CICONDEF        => 'light_light_dim_100',                                         # default Consumer-Icon
+  CICONCOLDEF     => 'darkorange',                                                  # default Consumer-Icon Färbung
+  BICONDEF        => 'measure_battery_75',                                          # default Batterie-Icon
+  BICCOLRCDDEF    => 'grey',                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
+  BICCOLNRCDDEF   => '#cccccc',                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
+  BCHGICONCOLDEF  => 'darkorange',                                                  # default 'Aufladen' Batterie-Icon Färbung
+  BDCHICONCOLDEF  => '#b32400',                                                     # default 'Entladen' Batterie-Icon Färbung
+  HOMEICONDEF     => 'control_building_control@grey',                               # default Home-Icon
+  NODEICONDEF     => 'virtualbox',                                                  # default Knoten-Icon
+  INVICONDEF      => 'weather_sun',                                                 # default Inverter-icon
+  MOONICONDEF     => 2,                                                             # default Mond-Phase (aus %hmoon)
+  MOONCOLDEF      => 'lightblue',                                                   # default Mond Färbung
+  ACTCOLDEF       => 'orange',                                                      # default Färbung Icon wenn aktiv
+  INACTCOLDEF     => 'grey',                                                        # default Färbung Icon wenn inaktiv
+  LOCALE_TIME     => setlocale (POSIX::LC_TIME),                                    # installierte locale abfragen
+  
+  BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                 # Basispfad Abruf contrib SolarForecast Files
+  PPATH           => '?format=txt',                                                                        # Download Format
+  CFILE           => 'controls_solarforecast.txt',                                                         # Controlfile Update FTUI-Files  
+  BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',   # Basispfad GitHub SolarForecast Files
+  PGHPATH         => '',                                                                                   # GitHub Post Pfad
+};
 
 ## Standardvariablen
 ######################
@@ -438,66 +492,13 @@ my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";              
 my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Export Filename für DWD Stationskatalog im gpx-Format
 my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";             # Filename-Fragment für PV History Exportfile (wird mit Devicename ergänzt)
 
-my $calcmaxd       = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
-my $whistrepeat    = 851;                                                           # Wiederholungsintervall Cache File Daten schreiben
-
-my $prdef          = 1.0;                                                           # default Performance Ratio (PR)
-my $storeffdef     = 0.9;                                                           # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
-my $tempcoeffdef   = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
-my $tempmodinc     = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
-my $tempbasedef    = 25;                                                            # Temperatur Module bei Nominalleistung
-my $epiecMaxCycles = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
-my $defmintime     = 60;                                                            # default Einplanungsdauer in Minuten
-my $defctype       = 'other';                                                       # default Verbrauchertyp
-my $defcmode       = 'can';                                                         # default Planungsmode der Verbraucher
-my $defpopercent   = 1.0;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
-my $defhyst        = 0;                                                             # default Hysterese
-
-my $caicondef      = 'clock@gold';                                                  # default consumerAdviceIcon
-my $flowGSizedef   = 400;                                                           # default flowGraphicSize
-my $histhourdef    = 2;                                                             # default Anzeige vorangegangene Stunden
-my $wthcolddef     = 'C7C979';                                                      # Wetter Icon Tag default Farbe
-my $wthcolndef     = 'C7C7C7';                                                      # Wetter Icon Nacht default Farbe
-my $b1coldef       = 'FFAC63';                                                      # default Farbe Beam 1
-my $b1fontcoldef   = '0D0D0D';                                                      # default Schriftfarbe Beam 1
-my $b2coldef       = 'C4C4A7';                                                      # default Farbe Beam 2
-my $b2fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 2
-my $b3coldef       = 'BED6C0';                                                      # default Farbe Beam 3
-my $b3fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 3
-my $b4coldef       = 'DBDBD0';                                                      # default Farbe Beam 4
-my $b4fontcoldef   = '000000';                                                      # default Schriftfarbe Beam 4
-my $fgCDdef        = 130;                                                           # Abstand Verbrauchericons zueinander
-
-my $fgscaledef     = 0.10;                                                          # Flußgrafik: Scale Normativ Icons
-my $strokcolstddef = 'darkorange';                                                  # Flußgrafik: Standardfarbe aktive normale Kette
-my $strokcolsigdef = 'red';                                                         # Flußgrafik: Standardfarbe aktive Signal-Kette
-my $strokcolinadef = 'gray';                                                        # Flußgrafik: Standardfarbe inaktive Kette
-my $strokwidthdef  = 25;                                                            # Flußgrafik: Standard Breite der Kette
-my $prodicondef    = 'sani_garden_pump';                                            # default Producer-Icon
-my $cicondef       = 'light_light_dim_100';                                         # default Consumer-Icon
-my $ciconcoldef    = 'darkorange';                                                  # default Consumer-Icon Färbung
-my $bicondef       = 'measure_battery_75';                                          # default Batterie-Icon
-my $biccolrcddef   = 'grey';                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
-my $biccolnrcddef  = '#cccccc';                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
-my $bchgiconcoldef = 'darkorange';                                                  # default 'Aufladen' Batterie-Icon Färbung
-my $bdchiconcoldef = '#b32400';                                                     # default 'Entladen' Batterie-Icon Färbung
-my $homeicondef    = 'control_building_control@grey';                               # default Home-Icon
-my $nodeicondef    = 'virtualbox';                                                  # default Knoten-Icon
-my $invicondef     = 'weather_sun';                                                 # default Inverter-icon
-my $moonicondef    = 2;                                                             # default Mond-Phase (aus %hmoon)
-my $mooncoldef     = 'lightblue';                                                   # default Mond Färbung
-my $actcoldef      = 'orange';                                                      # default Färbung Icon wenn aktiv
-my $inactcoldef    = 'grey';                                                        # default Färbung Icon wenn inaktiv
-
-my $bPath = 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/';   # Basispfad Abruf contrib SolarForecast Files
-my $cfile        = 'controls_solarforecast.txt';                                    # Controlfile Update FTUI-Files
-my $msgfiletest  = 'controls_solarforecast_messages_test.txt';                      # TEST Input-File Notification System
-my $msgfileprod  = 'controls_solarforecast_messages_prod.txt';                      # PRODUKTIVES Input-File Notification System
-my $pPath        = '?format=txt';                                                   # Download Format
+ 
+my $msgfiletest    = 'controls_solarforecast_messages_test.txt';                    # TEST Input-File Notification System
+my $msgfileprod    = 'controls_solarforecast_messages_prod.txt';                    # PRODUKTIVES Input-File Notification System
 
 my $messagefile = $msgfileprod;
                                                                                     # mögliche Debug-Module
@@ -700,6 +701,17 @@ my %hmoon = (
   7 => { icon => 'weather_moon_phases_8',      DE => 'abnehmende Sichel', EN => 'decreasing crescent' },
 );
 
+                                                                             # gekürzte Wochentagsnamen nach locale
+my %habwdn = (                                                            
+  '1' => { DE => 'Mo', EN => 'Mon' },
+  '2' => { DE => 'Di', EN => 'Tue' },
+  '3' => { DE => 'Mi', EN => 'Wed' },
+  '4' => { DE => 'Do', EN => 'Thu' },
+  '5' => { DE => 'Fr', EN => 'Fri' },
+  '6' => { DE => 'Sa', EN => 'Sat' },
+  '7' => { DE => 'So', EN => 'Sun' },
+);
+
 my %hrepl = (                                                                # Zeichenersetzungen
   '0'  => 'a',
   '1'  => 'b',
@@ -815,8 +827,10 @@ my %hqtxt = (                                                                # H
               DE => qq{Wichtigkeit}                                                                                         },
   number => { EN => qq{Number},
               DE => qq{Nummer}                                                                                              },
-  ludich => { EN => qq{last update Input channels},
-              DE => qq{letzte Aktualisierung Eingangskan&auml;le}                                                           },  
+  impcha => { EN => qq{Input channels},
+              DE => qq{Eingangskan&auml;le}                                                                                 },  
+  scedld => { EN => qq{scheduled},
+              DE => qq{geplant}                                                                                             }, 
   ctnsly => { EN => qq{continuously},
               DE => qq{fortlaufend}                                                                                         },
   yday   => { EN => qq{yesterday},
@@ -976,6 +990,10 @@ my %htitles = (                                                                 
                 DE => qq{Mitteilungen sind vorhanden - dr&#252;cke die Taste um sie zu &#246;ffnen}                },
   nomsgfo  => { EN => qq{there are no new messages},
                 DE => qq{es sind keine neuen Mitteilungen vorhanden}                                               },
+  lstmsgc  => { EN => qq{last message call},
+                DE => qq{letzter Mitteilungsabruf}                                                                 },
+  nxtmsgc  => { EN => qq{next message call},
+                DE => qq{n&auml;chster Mitteilungsabruf}                                                           },
   scaresps => { EN => qq{API request successful},
                 DE => qq{API Abfrage erfolgreich}                                                                  },
   dwfcrsu  => { EN => qq{Weather data are up to date according to used DWD model},
@@ -1206,12 +1224,12 @@ my %weather_ids = (
 
 my %hef = (                                                                      # Energiedaktoren für Verbrauchertypen
   "heater"         => { f => 1.00, m => 1.00, l => 1.00, mt => 240         },
-  "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },    # f   = Faktor Energieverbrauch in erster Stunde (wichtig auch für Kalkulation in __calcEnergyPieces !)
+  "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },    # f   = Faktor Energieverbrauch in erster Stunde (wichtig auch für Kalkulation in __calcEnergyPieces !)
   "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
   "dishwasher"     => { f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
   "dryer"          => { f => 0.40, m => 0.40, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
   "washingmachine" => { f => 0.50, m => 0.30, l => 0.40, mt => 120         },
-  "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },
+  "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
 );
 
 my %hcsr = (                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
@@ -1224,12 +1242,13 @@ my %hcsr = (                                                                    
   todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 0           },
   todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
   todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  unit => '',     def => 'apimaxreq' },
-  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
+  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => ' s',   def => '-'         },
   runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
   runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => '-'         },
   allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },
   todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', unit => ' Wh',  def => 0           },
-  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  unit => '',     def => '-'         },
+  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  unit => ' s',   def => '-'         },
+  todayConsumption            => { fnr => 3, fn => \&CircularVal,     par => 99,                  unit => ' Wh',  def => 0           },
   BatPowerIn_Sum              => { fnr => 4, fn => \&CurrentVal,      par => 'batpowerinsum',     unit => ' W',   def => '-'         },
   BatPowerOut_Sum             => { fnr => 4, fn => \&CurrentVal,      par => 'batpoweroutsum',    unit => ' W',   def => '-'         }, 
   SunHours_Remain             => { fnr => 4, fn => \&CurrentVal,      par => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
@@ -1449,7 +1468,7 @@ sub Initialize {
   $hash->{AttrList}           = "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
-                                "affectConsForecastLastDays:slider,1,1,31 ".
+                                "affectConsForecastLastDays:selectnumbers,1,1,180,0,lin ".
                                 "affectSolCastPercentile:select,10,50,90 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
@@ -1573,7 +1592,7 @@ sub Define {
   singleUpdateState    ( {hash => $hash, state => 'initialized', evt => 1} );
 
   $readyfnlist{$name} = $hash;                                                                                                   # Registrierung in Ready-Schleife
-  InternalTimer (gettimeofday() + $whistrepeat  + int(rand(300)), "FHEM::SolarForecast::periodicWriteMemcache",     $hash, 0);   # Einstieg periodisches Schreiben historische Daten
+  InternalTimer (gettimeofday() + WHISTREPEAT  + int(rand(300)), "FHEM::SolarForecast::periodicWriteMemcache",     $hash, 0);   # Einstieg periodisches Schreiben historische Daten
   InternalTimer (gettimeofday() + 120           + int(rand(300)), "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
   
 return;
@@ -1603,7 +1622,7 @@ sub Set {
                batteryTriggerSet
                consumerMaster
                consumerPlanning
-               consumption
+               consumptionHistory
                energyH4TriggerSet
                powerTriggerSet
                pvCorrection
@@ -1731,7 +1750,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));
 
-  if (ConsumerVal ($hash, $c, 'type', $defctype) eq 'noSchedule') {
+  if (ConsumerVal ($hash, $c, 'type', DEFCTYPE) eq 'noSchedule') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps}       = 'noSchedule';
@@ -1745,7 +1764,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   }
 
   my $startts  = time;
-  my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
+  my $mintime  = ConsumerVal ($hash, $c, "mintime", DEFMINTIME);
 
   if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
       my (undef, $setshift) = sunShift   ($hash, $c);                                          # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
@@ -2215,7 +2234,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'consumption') {
+  if ($prop eq 'consumptionHistory') {
       my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
       my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
@@ -3608,15 +3627,15 @@ sub __getDWDSolarData {
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
-                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * KJ2KWH * $peak * $prdef);    # Rad wird in kW/m2 erwartet
+                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF);    # Rad wird in kW/m2 erwartet
               }
               else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
-                  $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * $prdef);
+                  $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);
               }
           }
           else {                                                                                    # Flächenfaktor Fix
               $af = ___areaFactorFix ($ti, $az);                                                    # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
-              $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * $prdef);                         # Rad wird in kW/m2 erwartet
+              $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);                         # Rad wird in kW/m2 erwartet
           }
 
           $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                 # Startzeit wird verwendet, nicht laufende Stunde
@@ -4359,7 +4378,7 @@ return;
 #    pv (Wh)  = GTI * f / 1000 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
 #              (GTI * f) ist bereits in dem API-Ergebnis $rad enthalten in Wh/m2
 #             -> $rad / 1000 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr   (bezogen auf 1 Stunde)
-#             -> my $pv = sprintf "%.0f", ($rad / 1000 * $peak * $prdef);
+#             -> my $pv = sprintf "%.0f", ($rad / 1000 * $peak * PRDEF);
 #
 ################################################################################################
 sub __openMeteoDWD_ApiResponse {
@@ -4494,7 +4513,7 @@ sub __openMeteoDWD_ApiResponse {
 
           my $rad1wh = $jdata->{hourly}{global_tilted_irradiance}[$k];                          # Wh/m2
           my $rad    = 10 * (sprintf "%.0f", ($rad1wh * WH2KJ) / 10);                           # Umrechnung Wh/m2 in kJ/m2 ->
-          my $pv     = sprintf "%.2f", int ($rad1wh / 1000 * $peak * $prdef);                   # Rad wird in kWh/m2 erwartet
+          my $pv     = sprintf "%.2f", int ($rad1wh / 1000 * $peak * PRDEF);                    # Rad wird in kWh/m2 erwartet
           
           my $don    = $jdata->{hourly}{is_day}[$k];
           my $temp   = $jdata->{hourly}{temperature_2m}[$k];
@@ -5350,7 +5369,7 @@ sub _ftuiFramefiles {
 
   my $ret;
   my $upddo = 0;
-  my $cfurl = $bPath.$cfile.$pPath;
+  my $cfurl = BPATH.CFILE.PPATH;
 
   for my $file (@fs) {
       my $lencheck = 1;
@@ -5358,8 +5377,8 @@ sub _ftuiFramefiles {
       my ($cmerr, $cmupd, $cmmsg, $cmrec, $cmfile, $cmlen) = checkModVer ($name, $file, $cfurl);
 
       if ($cmerr && $cmmsg =~ /Automatic\scheck/xs && $cmrec =~ /Compare\syour\slocal/xs) {        # lokales control file ist noch nicht vorhanden -> update ohne Längencheck
-          $cmfile   = 'FHEM/'.$cfile;
-          $file     = $cfile;
+          $cmfile   = 'FHEM/'.CFILE;
+          $file     = CFILE;
           $lencheck = 0;
           $cmerr    = 0;
           $cmupd    = 1;
@@ -5378,9 +5397,7 @@ sub _ftuiFramefiles {
                                   root     => $root,
                                   cmfile   => $cmfile,
                                   cmlen    => $cmlen,
-                                  bPath    => $bPath,
                                   file     => $file,
-                                  pPath    => $pPath,
                                   lencheck => $lencheck
                                 }
                               );
@@ -5393,11 +5410,9 @@ sub _ftuiFramefiles {
   ################################
   $ret = __updPreFile ( { name     => $name,
                           root     => $root,
-                          cmfile   => 'FHEM/'.$cfile,
+                          cmfile   => 'FHEM/'.CFILE,
                           cmlen    => 0,
-                          bPath    => $bPath,
-                          file     => $cfile,
-                          pPath    => $pPath,
+                          file     => CFILE,
                           lencheck => 0,
                           finalupd => 1
                         }
@@ -5422,9 +5437,7 @@ sub __updPreFile {
   my $root     = $pars->{root};
   my $cmfile   = $pars->{cmfile};
   my $cmlen    = $pars->{cmlen};
-  my $bPath    = $pars->{bPath};
   my $file     = $pars->{file};
-  my $pPath    = $pars->{pPath};
   my $lencheck = $pars->{lencheck};
   my $finalupd = $pars->{finalupd} // 0;
 
@@ -5448,7 +5461,7 @@ sub __updPreFile {
       }
   }
 
-  ($err, my $remFile) = __httpBlockingGet ($name, $bPath.$file.$pPath);
+  ($err, my $remFile) = __httpBlockingGet ($name, BPATH.$file.PPATH);
 
   if ($err) {
       Log3 ($name, 1, "$name - $err");
@@ -5683,7 +5696,7 @@ sub _attrconsumer {                      ## no critic "not used"
       return $err if($err);
 
       if (!$h->{type} || !exists $h->{power}) {
-          return qq{The syntax of "$aName" is not correct. Please consider the commandref.};
+          return qq{The syntax of "$aName" is not correct. Please consider the command reference.};
       }
 
       my $alowt = grep (/^$h->{type}$/, @ctypes) ? 1 : 0;
@@ -5699,7 +5712,11 @@ sub _attrconsumer {                      ## no critic "not used"
       if ($h->{power} !~ /^[0-9]+$/xs) {
           return qq{The key "power" must be specified only by numbers without decimal places};
       }
-
+      
+      if (defined $h->{exconfc} && $h->{exconfc} !~ /^[012]$/xs) {
+          return qq{The key "exconfc" is not set correct. Please consider the command reference.};
+      }
+      
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
           if ($h->{mode} =~ /.*:.*/xs) {
               my ($dv, $rd) = split ':', $h->{mode};
@@ -6812,7 +6829,7 @@ sub periodicWriteMemcache {
   my $name = $hash->{NAME};
 
   RemoveInternalTimer ($hash, "FHEM::SolarForecast::periodicWriteMemcache");
-  InternalTimer       (gettimeofday() + $whistrepeat, "FHEM::SolarForecast::periodicWriteMemcache", $hash, 0);
+  InternalTimer       (gettimeofday() + WHISTREPEAT, "FHEM::SolarForecast::periodicWriteMemcache", $hash, 0);
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
@@ -7543,9 +7560,9 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################    
-
   delete $data{$name}{circular}{99}{days2care};                                 # 29.12.2024
   delete $data{$name}{circular}{'00'};                                            # 04.02.2025
+  # delete $data{$name}{circular}{1};
   
   $data{$name}{circular}{99}{initdaybatintot01}  = delete $data{$name}{circular}{99}{initdaybatintot}  if(defined $data{$name}{circular}{99}{initdaybatintot});     # 29.12.2024
   $data{$name}{circular}{99}{initdaybatouttot01} = delete $data{$name}{circular}{99}{initdaybatouttot} if(defined $data{$name}{circular}{99}{initdaybatouttot});    # 29.12.2024
@@ -7563,6 +7580,7 @@ sub centralTask {
   deleteReadingspec ($hash, 'Today_.*_BatIn');                                  # 30.12.2024 
   deleteReadingspec ($hash, 'Today_.*_BatOut');                                 # 30.12.2024  
   deleteReadingspec ($hash, 'statistic_.*');                                    # 02.01.2025
+  readingsDelete    ($hash, '.migrated');                                       # 01.02.25
   
   for my $ck (keys %{$data{$name}{circular}}) {                                 # 30.12.2024
       $data{$name}{circular}{$ck}{batin01}  = delete $data{$name}{circular}{$ck}{batin}  if(defined $data{$name}{circular}{$ck}{batin});
@@ -7583,19 +7601,8 @@ sub centralTask {
           $data{$name}{pvhist}{$dy}{$hr}{batout01}      = delete $data{$name}{pvhist}{$dy}{$hr}{batout}      if(defined $data{$name}{pvhist}{$dy}{$hr}{batout});
           $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc});
           $data{$name}{pvhist}{$dy}{$hr}{batsetsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batsetsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batsetsoc});
-                                                                               # 05.02.2025
-          
-          #if (HistoryVal ($hash, $dy, $hr,'DoN', 0)) {
-          #    $data{$name}{pvhist}{$dy}{$hr}{weatherid} -= 100  if(defined $data{$name}{pvhist}{$dy}{$hr}{weatherid} && $data{$name}{pvhist}{$dy}{$hr}{weatherid} > 100);
-          #}
       }
   }
-  
- # for my $idx (keys %{$data{$name}{nexthours}}) {                              # 05.02.2025
- #     my $don = NexthoursVal ($hash, $idx, 'DoN', 0);
- #     next if($don);
- #     $data{$name}{nexthours}{$idx}{weatherid} -= 100 if(defined $data{$name}{nexthours}{$idx}{weatherid} && $data{$name}{nexthours}{$idx}{weatherid} > 100);
- # }
   
   my $n = 0;                                                       # 01.02.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_* 
   for my $hh (1..24) {                                            
@@ -7630,8 +7637,6 @@ sub centralTask {
   if ($n) {
       Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
   }
-      
-  readingsDelete ($hash, '.migrated');
   
   ##########################################################################################################################
 
@@ -7705,7 +7710,10 @@ sub centralTask {
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
   _batChargeRecmd             ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
-  _calcConsumptionForecast    ($centpars);                                            # Verbrauchsprognose erstellen
+  # _calcConsumptionForecast    ($centpars);                                            # Verbrauchsprognose erstellen
+  
+  _calcConsForecast_circular  ($centpars);                                            # neue Verbrauchsprognose über pvCircular
+  
   _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
   _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
   _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
@@ -7980,7 +7988,7 @@ sub _collectAllRegConsumers {
           }
       }
       
-      $hyst = $defhyst if(!$hyst);
+      $hyst = DEFHYST if(!$hyst);
 
       my ($riseshift, $setshift);
 
@@ -8004,15 +8012,15 @@ sub _collectAllRegConsumers {
       delete $data{$name}{consumers}{$c}{icon};
 
       my $rauto = $hc->{auto} // q{};
-      my $ctype = $hc->{type} // $defctype;
+      my $ctype = $hc->{type} // DEFCTYPE;
 
       $data{$name}{consumers}{$c}{name}              = $consumer;                                # Name des Verbrauchers (Device)
       $data{$name}{consumers}{$c}{alias}             = $alias;                                   # Alias des Verbrauchers (Device)
-      $data{$name}{consumers}{$c}{type}              = $hc->{type}         // $defctype;         # Typ des Verbrauchers
+      $data{$name}{consumers}{$c}{type}              = $hc->{type}         // DEFCTYPE;          # Typ des Verbrauchers
       $data{$name}{consumers}{$c}{power}             = $hc->{power};                             # Leistungsaufnahme des Verbrauchers in W
       $data{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
-      $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // $defcmode;         # Planungsmode des Verbrauchers
+      $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // DEFCMODE;         # Planungsmode des Verbrauchers
       $data{$name}{consumers}{$c}{oncom}             = $hc->{on}           // q{};               # Setter Einschaltkommando
       $data{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};               # Setter Ausschaltkommando
       $data{$name}{consumers}{$c}{dswitch}           = $dswitch;                                 # Switchdevice zur Kommandoausführung
@@ -8402,14 +8410,11 @@ return;
 sub _transferWeatherValues {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $t     = $paref->{t};                                                                     # Epoche Zeit
   my $chour = $paref->{chour};
   my $hash  = $defs{$name};
 
   my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev1');                 # Standard Weather Forecast Device
   return if(!$valid);
-
-  my $type = $paref->{type};
 
   delete $data{$name}{weatherdata};                                                            # Wetterdaten Hash löschen
 
@@ -8436,7 +8441,7 @@ sub _transferWeatherValues {
 
   for my $step (1..MAXWEATHERDEV) {
       $paref->{step} = $step;
-      __readDataWeather ($paref);                                                           # Wetterdaten in einen Hash einlesen
+      __readDataWeather ($paref);                                                           # Wetterdaten aus Device in Wetter-Hash einlesen
        delete $paref->{step};
   }
 
@@ -8497,6 +8502,7 @@ sub __readDataWeather {
   my $chour = $paref->{chour};                                                                  # aktuelles Datum
   my $type  = $paref->{type};
   my $step  = $paref->{step};
+  my $t     = $paref->{t};
   my $hash  = $defs{$name};
 
   my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$step);             # Weather Forecast Device
@@ -8524,9 +8530,12 @@ sub __readDataWeather {
       my $temp  = ReadingsNum ($fcname, "fc${fd}_${fh}_TTT",  undef);                          # 2m-Temperatur zum Vorhersagezeitpunkt
       my $sunup = ReadingsNum ($fcname, "fc${fd}_${fh}_SunUp",    0);                          # 1 - Tag
 
-      $wid  //= ReadingsNum ($fcname, 'fc0_1__ww',   undef);
-      $neff //= ReadingsNum ($fcname, 'fc0_0__Neff', undef); 
-      $temp //= ReadingsNum ($fcname, 'fc0_1__TTT',  undef); 
+      if (!$n) {                                                                               # Hour 00 -> Werte des vorigen Tag / hour 24 verwenden
+          my $dt  = timestringsFromOffset ($t, -86400);                                          
+          $wid  //= HistoryVal ($name, $dt->{day}, '24', 'weatherid', undef);
+          $neff //= HistoryVal ($name, $dt->{day}, '24', 'wcc',       undef);
+          $temp //= HistoryVal ($name, $dt->{day}, '24', 'temp',      undef);
+      }
       
       if (!$sunup && defined $wid && defined $weather_ids{$wid}{icon} && $weather_ids{$wid}{icon} ne 'unknown') {        # Nacht-Icons
           $wid += 100;
@@ -8544,7 +8553,7 @@ sub __readDataWeather {
 
       my $rr1c = ReadingsNum ($fcname, "fc${fd1}_${fh1}_RR1c", 0);                             # Gesamtniederschlag (1-stündig) letzte 1 Stunde -> wir schuen in die Zukunft
 
-      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, wid: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: $temp, Neff: $neff");
+      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, wid: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: ".(defined $temp ? $temp : '<undef>').", Neff: ".(defined $neff ? $neff : '<undef>'));
 
       $data{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{ww}   = $wid;
       $data{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{wwd}  = $wwd;
@@ -8580,9 +8589,11 @@ sub ___readDataWeatherAPI {
           my $don  = WeatherAPIVal ($hash, $wapi, $idx, 'don',      0);
           my $ttt  = WeatherAPIVal ($hash, $wapi, $idx, 'ttt',  undef);
           
-          $wid  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ww',   undef);
-          $neff //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'neff', undef);
-          $ttt  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ttt',  undef);
+          if ($idx eq 'fc0_0') {
+              $wid  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ww',   undef);
+              $neff //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'neff', undef);
+              $ttt  //= WeatherAPIVal ($hash, $wapi, 'fc0_1', 'ttt',  undef);
+          }
           
           if (!$don && defined $wid && defined $weather_ids{$wid}{icon} && $weather_ids{$wid}{icon} ne 'unknown') {        # Nacht-Icons
               $wid += 100;
@@ -9071,7 +9082,7 @@ sub __calcPVestimates {
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   my $rr1c        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",            0);   # Gesamtniederschlag während der letzten Stunde kg/m2
   my $wcc         = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "wcc",             0);   # effektive Wolkendecke nächste Stunde X
-  my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", $tempbasedef);   # vorhergesagte Temperatur Stunde X
+  my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", TEMPBASEDEF);   # vorhergesagte Temperatur Stunde X
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   $paref->{wcc}  = $wcc;
@@ -9264,8 +9275,8 @@ sub ___calcPeaklossByTemp {
   my $wcc   = $paref->{wcc}  // return (0,0);                                               # vorhergesagte Wolkendecke Stunde X
   my $temp  = $paref->{temp} // return (0,0);                                               # vorhergesagte Temperatur Stunde X
 
-  my $modtemp  = $temp + ($tempmodinc * (1 - ($wcc/100)));                                  # kalkulierte Modultemperatur
-  my $peakloss = sprintf "%.2f", $tempcoeffdef * ($modtemp - $tempbasedef) * $peak / 100;
+  my $modtemp  = $temp + (TEMPMODINC * (1 - ($wcc/100)));                                   # kalkulierte Modultemperatur
+  my $peakloss = sprintf "%.2f", TEMPCOEFFDEF * ($modtemp - TEMPBASEDEF) * $peak / 100;
 
 return ($peakloss, $modtemp);
 }
@@ -9495,10 +9506,10 @@ sub _transferMeterValues {
   my $ftuf    = $ftunit =~ /^kWh$/xi ? 1000 : 1;
   my $fitotal = ReadingsNum ($medev, $ft, 0) * $ftuf;                                                # Einspeisung total (Wh)
 
-  $data{$name}{circular}{99}{gridcontotal}   = $gctotal;                                             # Total Netzbezug speichern
-  $data{$name}{circular}{99}{feedintotal}    = $fitotal;                                             # Total Feedin speichern
-  $data{$name}{current}{gridconsumption} = int $gco;                                                 # Current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-  $data{$name}{current}{gridfeedin}      = int $gfin;                                                # Wert current grid Feed in
+  $data{$name}{circular}{99}{gridcontotal} = $gctotal;                                               # Total Netzbezug speichern
+  $data{$name}{circular}{99}{feedintotal}  = $fitotal;                                               # Total Feedin speichern
+  $data{$name}{current}{gridconsumption}   = int $gco;                                               # Current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  $data{$name}{current}{gridfeedin}        = int $gfin;                                              # Wert current grid Feed in
 
   debugLog ($paref, "collectData", "collect Meter data - device: $medev =>");
   debugLog ($paref, "collectData", "gcon: $gco W, gfeedin: $gfin W, contotal: $gctotal Wh, feedtotal: $fitotal Wh");
@@ -9547,6 +9558,8 @@ sub _transferMeterValues {
       $data{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                         # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
       writeToHistory ( { paref => $paref, key => 'gcons', val => $gctotthishour, hour => $nhour } );
+      
+      debugLog ($paref, "saveData2Cache|collectData", "write to pvHistory - day: $paref->{day}, hod: $nhour, GridConsumption (gcons): $gctotthishour Wh");
   }
 
   ## Management der in das Netz eingespeister (nur vom Meter gemessene) Energie
@@ -10148,7 +10161,7 @@ sub _batChargeRecmd {
           
           ## SOC-Prognose
           #################                                                                         
-          $socwh += $crel ? ($pvfc - $confc) * $storeffdef : -$confc / $storeffdef;              # PV Prognose nur einbeziehen wenn Ladefreigabe                                                                
+          $socwh += $crel ? ($pvfc - $confc) * STOREFFDEF : -$confc / STOREFFDEF;              # PV Prognose nur einbeziehen wenn Ladefreigabe                                                                
           
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -10212,7 +10225,6 @@ return;
 sub _createSummaries {
   my $paref  = shift;
   my $name   = $paref->{name};
-  my $type   = $paref->{type};
   my $day    = $paref->{day};
   my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
   my $minute = $paref->{minute};                                                                      # aktuelle Minute
@@ -10319,7 +10331,7 @@ sub _createSummaries {
   my $pvgen   = 0;
   my $pv2grid = 0;                                                                                      # PV-Erzeugung zu Grid-only
 
-  for my $in (1..MAXINVERTER) {                                                                        # Summe alle Inverter
+  for my $in (1..MAXINVERTER) {                                                                         # Summe alle Inverter
       $in      = sprintf "%02d", $in;
       my $pvi  = InverterVal ($hash, $in, 'igeneration', 0);
       my $feed = InverterVal ($hash, $in, 'ifeed',      '');
@@ -10329,7 +10341,7 @@ sub _createSummaries {
   
   my $othprod = 0;                                                                                      # Summe Otherproducer
 
-  for my $pn (1..MAXPRODUCER) {                                                                        # Erzeugung sonstiger Producer hinzufügen
+  for my $pn (1..MAXPRODUCER) {                                                                         # Erzeugung sonstiger Producer hinzufügen
       $pn       = sprintf "%02d", $pn;
       $othprod += ProducerVal ($hash, $pn, 'pgeneration', 0);
   }
@@ -10591,7 +10603,6 @@ return;
 sub __calcEnergyPieces {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
 
   my $hash = $defs{$name};
@@ -10609,7 +10620,7 @@ sub __calcEnergyPieces {
       delete $data{$name}{consumers}{$c}{epiecHist};
       delete $data{$name}{consumers}{$c}{epiecHour};
 
-      for my $h (1..$epiecMaxCycles) {
+      for my $h (1..EPIECMAXCYCLES) {
           delete $data{$name}{consumers}{$c}{"epiecHist_".$h};
           delete $data{$name}{consumers}{$c}{"epiecHist_".$h."_hours"};
       }
@@ -10617,8 +10628,8 @@ sub __calcEnergyPieces {
 
   delete $data{$name}{consumers}{$c}{epieces};
 
-  my $cotype  = ConsumerVal ($hash, $c, "type",    $defctype  );
-  my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
+  my $cotype  = ConsumerVal ($hash, $c, "type",      DEFCTYPE);
+  my $mintime = ConsumerVal ($hash, $c, "mintime", DEFMINTIME);
 
   if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
       my ($riseshift, $setshift) = sunShift    ($hash, $c);
@@ -10698,7 +10709,7 @@ sub ___csmSpecificEpieces {
       if (ConsumerVal ($hash, $c, "epiecHour", -1) < 0) {                                               # neue Aufzeichnung
           $data{$name}{consumers}{$c}{epiecStartTime} = $t;
           $data{$name}{consumers}{$c}{epiecHist}     += 1;
-          $data{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecMaxCycles);
+          $data{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > EPIECMAXCYCLES);
 
           $ecycle = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
 
@@ -10724,7 +10735,7 @@ sub ___csmSpecificEpieces {
       my $ediff                                               = $etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0);
       $data{$name}{consumers}{$c}{$ecycle}{$epiecHour} = sprintf '%.2f', $ediff;
       $data{$name}{consumers}{$c}{epiecHour}           = $epiecHour;
-      $data{$name}{consumers}{$c}{$epiecHist_hours}    = $ediff ? $epiecHour : $epiecHour - 1;    # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
+      $data{$name}{consumers}{$c}{$epiecHist_hours}    = $ediff ? $epiecHour : $epiecHour - 1;           # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
 
       debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - energy consumption in operating hour $epiecHour (ediff): $ediff});
   }
@@ -10732,21 +10743,21 @@ sub ___csmSpecificEpieces {
       if (ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {
           my $hours = 0;
 
-          for my $h (1..$epiecMaxCycles) {                                                               # durchschnittliche Betriebsstunden über alle epieces ermitteln und aufrunden
+          for my $h (1..EPIECMAXCYCLES) {                                                                # durchschnittliche Betriebsstunden über alle epieces ermitteln und aufrunden
               $hours += ConsumerVal ($hash, $c, "epiecHist_".$h."_hours", 0);
           }
 
-          my $avghours                                   = ceil ($hours / $epiecMaxCycles);
-          $data{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                    # durchschnittliche Betriebsstunden pro Zyklus
+          my $avghours                                   = ceil ($hours / EPIECMAXCYCLES);
+          $data{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                       # durchschnittliche Betriebsstunden pro Zyklus
 
           debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Average operating hours per cycle (epiecAVG_hours): $avghours});
 
-          delete $data{$name}{consumers}{$c}{epiecAVG};                                               # Durchschnitt für epics ermitteln
+          delete $data{$name}{consumers}{$c}{epiecAVG};                                                  # Durchschnitt für epics ermitteln
 
           for my $hour (1..$avghours) {                                                                  # jede Stunde durchlaufen
               my $hoursE = 1;
 
-              for my $h (1..$epiecMaxCycles) {                                                           # jedes epiec durchlaufen
+              for my $h (1..EPIECMAXCYCLES) {                                                            # jedes epiec durchlaufen
                   my $ecycle = "epiecHist_".$h;
 
                   if (defined $data{$name}{consumers}{$c}{$ecycle}{$hour}) {
@@ -10769,7 +10780,7 @@ sub ___csmSpecificEpieces {
           }
       }
 
-      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                    # epiecHour auf initialwert setzen für nächsten durchlauf
+      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                       # epiecHour auf initialwert setzen für nächsten durchlauf
   }
 
 return;
@@ -10803,7 +10814,7 @@ sub __planInitialSwitchTime {
                       qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
   }
 
-  if (ConsumerVal ($hash, $c, 'type', $defctype) eq 'noSchedule') {
+  if (ConsumerVal ($hash, $c, 'type', DEFCTYPE) eq 'noSchedule') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps} = 'noSchedule';
@@ -10926,7 +10937,7 @@ sub ___doPlanning {
   ##########################################################################################
   for my $idx (sort keys %{$nh}) {
       my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',    0);
-      my $confcex = NexthoursVal ($hash, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer
+      my $confcex = NexthoursVal ($hash, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
 
       my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierter Energieüberschuß (kann negativ sein)
 
@@ -10970,7 +10981,7 @@ sub ___doPlanning {
 
   my $mode         = getConsumerPlanningMode ($hash, $c);                                              # Planungsmode 'can' oder 'must'
   my $calias       = ConsumerVal ($hash, $c, 'alias',            '');
-  my $mintime      = ConsumerVal ($hash, $c, 'mintime', $defmintime);                                  # Einplanungsdauer
+  my $mintime      = ConsumerVal ($hash, $c, 'mintime',  DEFMINTIME);                                  # Einplanungsdauer
   my $oldplanstate = ConsumerVal ($hash, $c, 'planstate',        '');                                  # V. 1.35.0
   
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
@@ -11091,7 +11102,6 @@ return;
 sub ___saveEhodpieces {
   my $paref   = shift;
   my $name    = $paref->{name};
-  my $type    = $paref->{type};
   my $c       = $paref->{consumer};
   my $startts = $paref->{startts};                                           # Unix Timestamp für geplanten Switch on
   my $stopts  = $paref->{stopts};                                            # Unix Timestamp für geplanten Switch off
@@ -11114,7 +11124,7 @@ sub ___saveEhodpieces {
           last;
       }
 
-      $chod                                                 = sprintf '%02d', $chod;
+      $chod                                          = sprintf '%02d', $chod;
       $data{$name}{consumers}{$c}{ehodpieces}{$chod} = sprintf '%.2f', $ep if($ep);
 
       $p++;
@@ -11592,7 +11602,7 @@ sub ___switchConsumerOff {
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
   my $auto    = ConsumerVal ($hash, $c, "auto",              1);
   my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
-  my $hyst    = ConsumerVal ($hash, $c, "hysteresis", $defhyst);                                  # Hysterese
+  my $hyst    = ConsumerVal ($hash, $c, "hysteresis",  DEFHYST);                                  # Hysterese
 
   my $mode                     = getConsumerPlanningMode ($hash, $c);                             # Planungsmode 'can' oder 'must'
   my $offcom                   = ConsumerVal             ($hash, $c, 'offcom', '');               # Set Command für "off"
@@ -11688,7 +11698,7 @@ sub ___setConsumerSwitchingState {
   debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - current planning state: $simpCstat});
 
   if (isConsumerPhysOn ($hash, $c) && $simpCstat eq 'starting') {
-      my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
+      my $mintime = ConsumerVal ($hash, $c, "mintime", DEFMINTIME);
 
       if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
           my (undef, $setshift) = sunShift   ($hash, $c);
@@ -12061,7 +12071,7 @@ sub _calcConsumptionForecast {
        my $tomcon                                 = sprintf "%.0f", medianArray (\@cona);
        $data{$name}{current}{tomorrowconsumption} = $tomcon;                                           # prognostizierter Verbrauch (Median) aller (gleicher) Wochentage
 
-       debugLog ($paref, 'consumption|consumption_long', "estimated Consumption for tomorrow: $tomcon, days for avg: $dnum");
+       debugLog ($paref, 'consumption|consumption_long', "estimated Consumption for tomorrow: $tomcon, days for median: $dnum");
   }
   else {
       my $lang = $paref->{lang};
@@ -12129,7 +12139,7 @@ sub _calcConsumptionForecast {
               }
           }
 
-          push @conhfcex, ($hcon - $consumerco) if($hcon >= $consumerco);                                               # prognostizierter Verbrauch (Median) Ex registrierter Verbraucher
+          push @conhfcex, ($hcon - $consumerco) if($hcon >= $consumerco);                           # prognostizierter Verbrauch (Median) Ex registrierter Verbraucher
           push @conhfc,   $hcon;
           
           $dnum++;
@@ -12150,6 +12160,219 @@ sub _calcConsumptionForecast {
       }
   }
 
+return;
+}
+
+################################################################
+#     Energieverbrauch Vorhersage kalkulieren (Median)
+################################################################
+sub _calcConsForecast_circular {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $chour   = $paref->{chour};
+  my $t       = $paref->{t};
+  my $day     = $paref->{day};                                                                          # aktuelles Tagdatum (01...31)
+  my $dayname = $paref->{dayname};                                                                      # aktueller Tagname
+
+  my $hash    = $defs{$name};
+  my $acref   = $data{$name}{consumers};
+  my $swdfcfc = AttrVal ($name, 'affectConsForecastIdentWeekdays',      0);                             # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
+  my $acld    = AttrVal ($name, 'affectConsForecastLastDays', CONSFCLDAYS);                             # Beachtung Stundenwerte der letzten X Tage falls gesetzt
+
+  my $dt         = timestringsFromOffset ($t, 86400);
+  my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname kommender Tag
+  my $lct        = LOCALE_TIME =~ /^de_/xs ? 'DE' : 'EN';
+  
+  my (@cona, $exconfc, $csme, %usage);
+  $usage{tom}{con} = 0;
+
+  ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
+  ###############################################################
+  for my $h (1..24) {                                                                                   # Median für jede Stunde / Tag berechnen
+      my $dt      = timestringsFromOffset ($t, $h * 3600);
+      my $dayname = $dt->{dayname};       
+      my $hh      = sprintf "%02d", $h;
+      
+      my (@conh, @conhtom);
+      my $mix = 0;
+      
+      if ($swdfcfc) {                                                                                   # nur bestimmten Tag (Mo...So) einbeziehen der Stunde
+          push @conh,    @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}};
+          push @conhtom, @{$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}};                        # für den nächsten Tag
+      }
+      else {                                                                                            # alle aufgezeichneten Wochentage in der Stunde berücksichtigen
+          for my $dy (keys %{$data{$name}{circular}{$hh}{con_all}}) {                                   # den max Index aller Tagesarrays ermitteln                                 
+              my $ai = $#{$data{$name}{circular}{$hh}{con_all}{$dy}};
+              $mix   = $ai if($ai > $mix);
+          }
+          
+          for my $i (0..$mix) {                                                                         # Werte sortiert nach Alter aufsteigend in Array einfügen
+              for my $dy (sort keys %habwdn) {
+                  push @conh,    ${$data{$name}{circular}{$hh}{con_all}{$habwdn{$dy}{$lct}}}[$i] if(defined ${$data{$name}{circular}{$hh}{con_all}{$habwdn{$dy}{$lct}}}[$i]);
+                  push @conhtom, @conh;
+              }
+          }
+      }
+      
+      my $hnum    = scalar @conh;
+      my $hnumtom = scalar @conhtom;
+      
+      if ($hnum) {
+          if ($hnum > $acld) {
+              @conh = splice (@conh, $acld * -1);
+              $hnum = scalar @conh;
+          }
+          
+          my $hcon         = sprintf "%.0f", medianArray (\@conh);                                    
+          $usage{$hh}{con} = $hcon;                                                                     # prognostizierter Verbrauch (Median) der Stunde hh (Hour of Day)
+          $usage{$hh}{num} = $hnum;
+      }
+      
+      if ($hnumtom) {
+          if ($hnumtom > $acld) {
+              @conhtom = splice (@conhtom, $acld * -1);
+              $hnumtom = scalar @conhtom;
+          }
+          
+          my $hcontom       = sprintf "%.0f", medianArray (\@conhtom);                                    
+          $usage{tom}{con} += $hcontom;                                                                 # Summe prognostizierter Verbrauch (Median) des Tages 
+          $usage{tom}{num} += $hnumtom;
+      }   
+  }
+  
+  ## Excludes / Includes vorbereiten
+  ####################################
+  my $exnum = 0;
+  my $ex    = 0;
+  my $lap   = 1;
+  
+  for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
+      next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
+                
+      for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
+          $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                        
+
+          if ($exconfc) {                                                                          
+              ## Tageswert Excludes finden und summieren
+              ############################################
+              if ($exconfc == 1) {                                                                 # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+                  my $do = 1;
+                  
+                  if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+                      my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
+                      $do = 0 if(!$hdn || $hdn ne $tomdayname);
+                  }
+                  
+                  if ($do) {
+                      $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
+                      
+                      if ($csme > 0) {
+                          $ex   += $csme;
+                          $exnum++;
+                      
+                          debugLog ($paref, 'consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
+                      }
+                  }
+              }
+              
+              ## hist. On-Stunden aller Tage aufnehmen
+              ##########################################                  
+              for my $h (1..24) {                                                                 # excludieren ob exconfc 1 oder 2
+                  my $hh = sprintf "%02d", $h;
+                  $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
+              
+                  if ($csme) {
+                      $usage{$hh}{histcon} += $csme;
+                      $usage{$hh}{histnum}++;
+                  }
+                  
+                  if ($exconfc == 2 && $lap == 1) {                                               # Planungsdaten des Consumers inkludieren
+                      my $ehp = $data{$name}{consumers}{$c}{ehodpieces}{$hh};
+                      
+                      if (defined $ehp) {
+                          $usage{$hh}{plancon} += $ehp;
+                          $usage{$hh}{plannum}++;                       
+                      }                          
+                  }
+              }              
+          }
+      }
+      
+      $lap++;
+  }
+  
+  ## effektiven StundenForecast berechnen
+  #########################################
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next Hours (new median) ###################");
+
+  for my $h (1..24) {                          
+      my $hh = sprintf "%02d", $h;
+      
+      if (defined $usage{$hh}{histnum}) {                                                             # historische Stundenverbräuche exkludieren
+          my $exhcon        = sprintf "%.0f", ($usage{$hh}{histcon} / $usage{$hh}{histnum});          # durchschnittlichen Verbrauchswert 
+          $usage{$hh}{con} -= $exhcon;
+      
+          debugLog ($paref, 'consumption_long', "excl. hist $exhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{histnum});
+      }
+      
+      $usage{$hh}{conex} = $usage{$hh}{con};
+      
+      if (defined $usage{$hh}{plannum}) {                                                             # geplante Stundenverbräuche inkludieren
+          my $inhcon        = sprintf "%.0f", ($usage{$hh}{plancon} / $usage{$hh}{plannum});
+          $usage{$hh}{con} += $inhcon;
+          
+          debugLog ($paref, 'consumption_long', "incl. planned $inhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{plannum});
+      }
+  
+      debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
+  } 
+  
+  ## nächsten Tageswert Excludes berücksichtigen
+  ################################################
+  my $tomnum = $usage{tom}{num} // 0;
+  
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day (new median) ###################");
+  
+  if ($tomnum) {
+      if ($exnum) {
+          $ex               = sprintf "%.0f", ($ex / $exnum);                                        # Ex Tageswert Durchschnitt bilden
+          $usage{tom}{con} -= $ex;
+      }
+      
+      $data{$name}{current}{tomorrowconsumption} = $usage{tom}{con};
+      debugLog ($paref, 'consumption|consumption_long', "estimated cons Tomorrow: ".$usage{tom}{con}." Wh, Individual hourly values considered: $tomnum, exclude: $ex Wh (avg of $exnum entities)");
+  }
+  else {
+      my $lang                                   = $paref->{lang};
+      $data{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};  
+      debugLog ($paref, 'consumption|consumption_long', "no estimated cons for Tomorrow: ".$hqtxt{wfmdcf}{$lang});      
+  }
+    
+  ## Ergebnisse speichern
+  ########################
+  debugLog ($paref, 'saveData2Cache|consumption_long', "################### Store Consumption forecast values (new median) ###################");
+  
+  for my $k (sort keys %{$data{$name}{nexthours}}) {
+      my $nhst = NexthoursVal ($hash, $k, "starttime", undef);                                         # Startzeit
+      next if(!$nhst);
+
+      my $utime = timestringToTimestamp ($nhst);
+      my $nhday = strftime "%a", localtime($utime);                                                    # Wochentagsname des NextHours Key
+      my $nhhr  = sprintf "%02d", int (strftime "%H", localtime($utime)) + 1;                          # Stunde des Tages vom NextHours Key (01,02,...24)
+  
+      $data{$name}{nexthours}{$k}{confcEx} = $usage{$nhhr}{conex};                            
+      $data{$name}{nexthours}{$k}{confc}   = $usage{$nhhr}{con};                                       # prognostizierter Verbrauch (Median)
+      
+      debugLog ($paref, 'saveData2Cache|consumption_long', "store '$k' hod '$nhhr' confc: $usage{$nhhr}{con}, confcEx: $usage{$nhhr}{conex}");
+  
+      if (NexthoursVal ($hash, $k, 'today', 0)) {                                                      # nur Werte des aktuellen Tags speichern
+          $data{$name}{circular}{$nhhr}{confc} = $usage{$nhhr}{con};
+          writeToHistory ( { paref => $paref, key => 'confc', val => $usage{$nhhr}{con}, hour => $nhhr } );
+          
+          debugLog ($paref, 'saveData2Cache|consumption_long', "store circular/history hod '$nhhr' confc: $usage{$nhhr}{con}");
+      }  
+  }
+  
 return;
 }
 
@@ -12357,7 +12580,7 @@ sub _calcDataEveryFullHour {
       next if($h > $chour);
       
       if (int $chour == 0) {                                                                      # 00:XX -> Stunde 24 des Vortages speichern
-          my $dt             = timestringsFromOffset ($t, 3600);
+          my $dt             = timestringsFromOffset ($t, -3600);
           $paref->{yt}       = $t - 3600;                                                         # Timestamp Vortag
           $paref->{yday}     = $dt->{day};                                                        # vorheriger Tag (range 01 .. 31)
           $paref->{ydayname} = $dt->{dayname};
@@ -12531,19 +12754,21 @@ sub _addCon2CircArray {
   my $paref    = shift;
   my $name     = $paref->{name};
   my $h        = $paref->{h};
-  my $yday     = $paref->{yday};                                              # vorheriger Tag (falls gesetzt)
-  my $day      = $paref->{day};                                               # aktueller Tag (range 01 to 31)
+  my $yday     = $paref->{yday};                                                  # vorheriger Tag (falls gesetzt)
+  my $day      = $paref->{day};                                                   # aktueller Tag (range 01 to 31)
   my $dayname  = $paref->{dayname}; 
   my $ydayname = $paref->{ydayname};
 
   my $hash  = $defs{$name};
 
-  $day      = $yday     if(defined $yday);                                    # der vergangene Tag soll verarbeitet werden
-  $dayname  = $ydayname if(defined $ydayname);                                # Name des Vortages
+  $day      = $yday     if(defined $yday);                                        # der vergangene Tag soll verarbeitet werden
+  $dayname  = $ydayname if(defined $ydayname);                                    # Name des Vortages
   my $hh    = sprintf "%02d", $h;
-  my $con   = HistoryVal ($hash, $day, $hh, 'con', 0);                        # Consumption der abgefragten Stunde
+  my $con   = HistoryVal ($hash, $day, $hh, 'con', 0);                            # Consumption der abgefragten Stunde
   
-  push @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}, $con;             # Wert zum Speicherarray hinzufügen
+  push @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}, $con if($con >= 0);   # Wert zum Speicherarray hinzufügen
+  
+  limitArray ($data{$name}{circular}{$hh}{con_all}{"$dayname"}, CONDAYSLIDEMAX); 
   
   debugLog ($paref, 'saveData2Cache', "add consumption into Array (con_all) in Circular - day: $day, hod: $hh, con: $con");
 
@@ -12670,30 +12895,31 @@ return $hdv;
 #     Energieverbrauch des Hauses in History speichern
 ################################################################
 sub _saveEnergyConsumption {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $chour  = $paref->{chour};
-  my $debug  = $paref->{debug};
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $day   = $paref->{day};
+  my $chour = $paref->{chour};
+  my $debug = $paref->{debug};
 
-  my $shr     = sprintf "%02d", ($chour + 1);
-  my $pvrl    = ReadingsNum ($name, 'Today_Hour'.$shr.'_PVreal',          0);   # Reading enthält die Summe aller Inverterdevices
-  my $gfeedin = ReadingsNum ($name, 'Today_Hour'.$shr.'_GridFeedIn',      0);
-  my $gcon    = ReadingsNum ($name, 'Today_Hour'.$shr.'_GridConsumption', 0);
+  my $hod     = sprintf "%02d", ($chour + 1);
+  my $pvrl    = ReadingsNum ($name, 'Today_Hour'.$hod.'_PVreal',          0);   # Reading enthält die Summe aller Inverterdevices
+  my $gfeedin = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridFeedIn',      0);
+  my $gcon    = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridConsumption', 0);
   
   my $batin  = 0;
   my $batout = 0;
   
   for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
-      $batin  += ReadingsNum ($name, 'Today_Hour'.$shr.'_BatIn_'.$bn,  0);
-      $batout += ReadingsNum ($name, 'Today_Hour'.$shr.'_BatOut_'.$bn, 0);
+      $batin  += ReadingsNum ($name, 'Today_Hour'.$hod.'_BatIn_'.$bn,  0);
+      $batout += ReadingsNum ($name, 'Today_Hour'.$hod.'_BatOut_'.$bn, 0);
   }
   
-  my $ppreal  = 0;
+  my $ppreal = 0;
 
   for my $prn (1..MAXPRODUCER) {                                               # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
       $prn     = sprintf "%02d", $prn;
-      $ppreal += ReadingsNum ($name, 'Today_Hour'.$shr.'_PPreal_'.$prn, 0);
+      $ppreal += ReadingsNum ($name, 'Today_Hour'.$hod.'_PPreal_'.$prn, 0);
   }
   
   my $con     = $pvrl + $ppreal - $gfeedin + $gcon - $batin + $batout;
@@ -12709,7 +12935,7 @@ sub _saveEnergyConsumption {
           $pre = 'DEBUG> - WARNING -';
       }
 
-      Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error and is not saved. Check Readings _PVreal, _GridFeedIn, _GridConsumption, _BatIn_XX, _BatOut_XX of hour >$shr<");
+      Log3 ($name, $vl, "$name $pre The calculated Energy consumption of the house is negative. This appears to be an error and is not saved. Check Readings _PVreal, _GridFeedIn, _GridConsumption, _BatIn_XX, _BatOut_XX of hour >$hod<");
   }
   
   if ($debug =~ /collectData/xs) {
@@ -12717,7 +12943,13 @@ sub _saveEnergyConsumption {
       Log3 ($name, 1, "$name DEBUG> EnergyConsumption result -> $con Wh");
   }
   
-  writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $shr } ) if($dowrite);
+  if ($dowrite) {
+      writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $hod } );
+      $data{$name}{circular}{99}{todayConsumption} = HistoryVal ($name, $day, '99', 'con', undef);
+      
+      debugLog ($paref, 'consumption', "consumption calculated - day: $day, hod: $hod, con: $con Wh");
+      debugLog ($paref, 'saveData2Cache|consumption', "write pvCircular consumption - hod: 99, todayConsumption: ".HistoryVal ($name, $day, '99', 'con', 'undef')." Wh");
+  }
 
 return;
 }
@@ -12728,6 +12960,7 @@ return;
 sub _genSpecialReadings {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $day   = $paref->{day};
   my $t     = $paref->{t};              # aktueller UNIX Timestamp
 
   my $hash = $defs{$name};
@@ -12761,20 +12994,16 @@ sub _genSpecialReadings {
       }
 
       if ($hcsr{$kpi}{fnr} == 1) {
-          
           storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $rapi, '?All', $kpi, $def));
       }
-
-      if ($hcsr{$kpi}{fnr} == 2) {
+      elsif ($hcsr{$kpi}{fnr} == 2) {
           $par = $kpi if(!$par);
           storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $par, $def).$hcsr{$kpi}{unit});
       }
-
-      if ($hcsr{$kpi}{fnr} == 3) {
+      elsif ($hcsr{$kpi}{fnr} == 3) {
           storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def).$hcsr{$kpi}{unit});
       }
-
-      if ($hcsr{$kpi}{fnr} == 4) {
+      elsif ($hcsr{$kpi}{fnr} == 4) {
           if ($kpi eq 'SunHours_Remain') {
               my $ss  = &{$hcsr{$kpi}{fn}} ($hash, 'sunsetTodayTs',  $def);
               my $shr = ($ss - $t) / 3600;
@@ -12789,12 +13018,6 @@ sub _genSpecialReadings {
               $smr    = $smr < 0 ? 0 : $smr;
 
               storeReading ($prpo.'_'.$kpi, sprintf "%.0f", $smr);
-          }
-
-          if ($kpi eq 'runTimeTrainAI') {
-              my $rtaitr = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $kpi, $def);
-
-              storeReading ($prpo.'_'.$kpi, $rtaitr);
           }
           
           if ($kpi =~ /BatPower(In|Out)_Sum/xs) {
@@ -12826,7 +13049,7 @@ sub _genSpecialReadings {
 
               my $dgcon  = $cgcon - $idgcon;
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dgcon).' Wh');
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $dgcon).' Wh');
           }
           
           if ($kpi eq 'todayBatInSum') {                                                                       # Summe tägl. Ladeenergie (alle Batterien) 
@@ -13075,7 +13298,7 @@ sub entryGraphic {
   my $layersync  = $2 // 0;
   
   my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
-  my $offset     = -1 * AttrNum ($name, 'graphicHistoryHour', $histhourdef);
+  my $offset     = -1 * AttrNum ($name, 'graphicHistoryHour', HISTHOURDEF);
   my $dlink      = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
 
   if (!$gsel) {
@@ -13094,15 +13317,15 @@ sub entryGraphic {
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'},     # TD-Style
       offset         => $offset,
       hourstyle      => AttrVal    ($name, 'graphicHourStyle',                  ''),
-      colorb1        => AttrVal    ($name, 'graphicBeam1Color',          $b1coldef),
-      colorb2        => AttrVal    ($name, 'graphicBeam2Color',          $b2coldef),
-      fcolor1        => AttrVal    ($name, 'graphicBeam1FontColor',  $b1fontcoldef),
-      fcolor2        => AttrVal    ($name, 'graphicBeam2FontColor',  $b2fontcoldef),
+      colorb1        => AttrVal    ($name, 'graphicBeam1Color',           B1COLDEF),
+      colorb2        => AttrVal    ($name, 'graphicBeam2Color',           B2COLDEF),
+      fcolor1        => AttrVal    ($name, 'graphicBeam1FontColor',   B1FONTCOLDEF),
+      fcolor2        => AttrVal    ($name, 'graphicBeam2FontColor',   B2FONTCOLDEF),
       beam1cont      => AttrVal    ($name, 'graphicBeam1Content',         'pvReal'),
       beam2cont      => AttrVal    ($name, 'graphicBeam2Content',     'pvForecast'),
       beam3cont      => AttrVal    ($name, 'graphicBeam3Content',               ''),
       beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
-      caicon         => AttrVal    ($name, 'consumerAdviceIcon',        $caicondef),                # Consumer AdviceIcon
+      caicon         => AttrVal    ($name, 'consumerAdviceIcon',         CAICONDEF),                # Consumer AdviceIcon
       clegend        => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => AttrVal    ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
       lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
@@ -13114,12 +13337,12 @@ sub entryGraphic {
       show_night     => $show_night,                                                                # alle Balken (Spalten) anzeigen ?
       show_diff      => AttrVal    ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
       weather        => AttrNum    ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
-      colorw         => AttrVal    ($name, 'graphicWeatherColor',      $wthcolddef),                # Wetter Icon Farbe Tag
-      colorwn        => AttrVal    ($name, 'graphicWeatherColorNight', $wthcolndef),                # Wetter Icon Farbe Nacht
+      colorw         => AttrVal    ($name, 'graphicWeatherColor',       WTHCOLDDEF),                # Wetter Icon Farbe Tag
+      colorwn        => AttrVal    ($name, 'graphicWeatherColorNight',  WTHCOLNDEF),                # Wetter Icon Farbe Nacht
       wlalias        => AttrVal    ($name, 'alias',                          $name),
       sheader        => AttrNum    ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
       hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-      flowgsize      => CurrentVal ($hash, 'size',                   $flowGSizedef),                # Größe Energieflußgrafik
+      flowgsize      => CurrentVal ($hash, 'size',                    FLOWGSIZEDEF),                # Größe Energieflußgrafik
       flowgani       => CurrentVal ($hash, 'animate',                            1),                # Animation Energieflußgrafik
       flowgxshift    => CurrentVal ($hash, 'shiftx',                             0),                # X-Verschiebung der Flußgrafikbox (muß negiert werden)
       flowgyshift    => CurrentVal ($hash, 'shifty',                             0),                # Y-Verschiebung der Flußgrafikbox (muß negiert werden)
@@ -13127,7 +13350,7 @@ sub entryGraphic {
       flowgconX      => CurrentVal ($hash, 'showconsumerdummy',                  1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
       flowgconsPower => CurrentVal ($hash, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
       flowgconsTime  => CurrentVal ($hash, 'showconsumerremaintime',             1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
-      flowgconsDist  => CurrentVal ($hash, 'consumerdist',                $fgCDdef),                # Abstand Verbrauchericons zueinander
+      flowgconsDist  => CurrentVal ($hash, 'consumerdist',                 FGCDDEF),                # Abstand Verbrauchericons zueinander
       flowgh2cDist   => CurrentVal ($hash, 'h2consumerdist',                     0),                # Erweiterung des vertikalen Abstandes Haus -> Consumer
       genpvdva       => AttrVal    ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
       lang           => getLang    ($hash),
@@ -13175,7 +13398,7 @@ sub entryGraphic {
   my $clegend = $paref->{clegend};
   $m          = $paref->{modulo} % 2;
 
-  if ($legendtxt && ($clegend eq 'top')) {
+  if ($legendtxt && $clegend eq 'top') {
       $ret .= "<tr class='$htr{$m}{cl}'>";
       $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
       $ret .= $legendtxt;
@@ -13228,10 +13451,10 @@ sub entryGraphic {
           $paref->{chartlvl}  = 2;                                                                         # Balkengrafik Ebene 2
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
-          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',              $b3coldef);
-          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',              $b4coldef);
-          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',      $b3fontcoldef);
-          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',      $b4fontcoldef);
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',               B3COLDEF);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',               B4COLDEF);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',       B3FONTCOLDEF);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',       B4FONTCOLDEF);
           $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height});
           $paref->{weather}   = 0;
 
@@ -13524,10 +13747,16 @@ sub _graphicHeader {
 
       ## Message-Icon
       #################
+      my $tfl            = $data{$name}{messages}{999000}{TS}                                     ? 
+                           (timestampToTimestring ($data{$name}{messages}{999000}{TS}, $lang))[0] :
+                           'n.a.';
+      my $tfn            = $data{$name}{messages}{999000}{TSNEXT}                                     ?
+                           (timestampToTimestring ($data{$name}{messages}{999000}{TSNEXT}, $lang))[0] :
+                           'n.a.';
       my ($micon, $midx) = fillupMessageSystem ($paref);
       $img               = FW_makeImage ($micon);
       my $msgicon        = $midx ? "<a onClick=$cmdoutmsg>$img</a>" : $img;
-      my $msgtitle       = $midx ? $htitles{outpmsg}{$lang} : $htitles{nomsgfo}{$lang};
+      my $msgtitle       = $midx ? $htitles{outpmsg}{$lang} : $htitles{nomsgfo}{$lang}."\n\n$htitles{lstmsgc}{$lang}: $tfl \n$htitles{nxtmsgc}{$lang}: $tfn";          
       
       ## Update-Icon
       ################
@@ -14352,9 +14581,7 @@ sub _graphicConsumerLegend {
   my ($clegendstyle, $clegend) = split '_', $paref->{clegend};
   my $clink                    = $paref->{clink};
 
-  my $type                     = $paref->{type};
   my @consumers                = sort{$a<=>$b} keys %{$data{$name}{consumers}};              # definierte Verbraucher ermitteln
-
   $clegend                     = '' if($clegendstyle eq 'none' || !int @consumers);
   $paref->{clegend}            = $clegend;
 
@@ -15449,7 +15676,7 @@ sub _flowGraphic {
   my $cc             = CurrentVal  ($hash, 'consumption',             0);
   
   my $cc_dummy   = $cc;
-  my $scale      = $fgscaledef;
+  my $scale      = FGSCALEDEF;
   my $pdist      = 130;                                                        # Abstand Producer zueinander
   my $hasbat     = 1;                                                          # initial Batterie vorhanden
   my $stna       = $name;
@@ -15637,10 +15864,10 @@ sub _flowGraphic {
                    !$node2grid && !$cgc && $bat2home ? "$stna grid_gray"  :
                    "$stna grid_red";
   
-  my $strokecolstd = CurrentVal ($hash, 'strokecolstd', $strokcolstddef);
-  my $strokecolsig = CurrentVal ($hash, 'strokecolsig', $strokcolsigdef);
-  my $strokecolina = CurrentVal ($hash, 'strokecolina', $strokcolinadef);
-  my $strokewidth  = CurrentVal ($hash, 'strokewidth',  $strokwidthdef);  
+  my $strokecolstd = CurrentVal ($hash, 'strokecolstd', STROKCOLSTDDEF);
+  my $strokecolsig = CurrentVal ($hash, 'strokecolsig', STROKCOLSIGDEF);
+  my $strokecolina = CurrentVal ($hash, 'strokecolina', STROKCOLINADEF);
+  my $strokewidth  = CurrentVal ($hash, 'strokewidth',   STROKWIDTHDEF);  
   
   my $ret = << "END0";
       <style>
@@ -15754,7 +15981,7 @@ END1
   
   ## Home Icon
   ##############
-  my $hicon        = FW_makeImage    ($homeicondef, '');
+  my $hicon        = FW_makeImage    (HOMEICONDEF, '');
   ($scale, $hicon) = __normIconScale ($name, $hicon);
   
   $ret .= qq{<g id="home_$stna" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung           
@@ -15766,7 +15993,7 @@ END1
   if ($flowgconX) {   
       my $dumtxt       = $htitles{dumtxt}{$lang};  
       my $dumcol       = $cc_dummy <= 0 ? '@grey' : q{};                                          # Einfärbung Consumer Dummy
-      my $dicon        = FW_makeImage    ($cicondef.$dumcol, '');
+      my $dicon        = FW_makeImage    (CICONDEF.$dumcol, '');
       ($scale, $dicon) = __normIconScale ($name, $dicon);
       
       $ret .= qq{<g id="dummy_$stna" transform="translate(660,360),scale($scale)">};
@@ -15880,7 +16107,7 @@ END3
 
           my $p              = $currentPower;
           $p                 = (($currentPower / $power) * 100) if ($power > 0);
-          $consumer_style    = $p > $defpopercent ? "$stna active_normal" : "$stna inactive";
+          $consumer_style    = $p > DEFPOPERCENT ? "$stna active_normal" : "$stna inactive";
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
           if ($p > 0.5) {
@@ -16151,10 +16378,10 @@ sub __substituteIcon {
   my $txt = '';
 
   if ($ptyp eq 'consumer') {                                                             # Icon Consumer 
-      ($icon, $color) = split '@', ConsumerVal ($hash, $pn, 'icon', $cicondef);
+      ($icon, $color) = split '@', ConsumerVal ($hash, $pn, 'icon', CICONDEF);
       
       if (!$color) {
-          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? $ciconcoldef : '';
+          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? CICONCOLDEF : '';
       }
   }
   elsif ($ptyp eq 'battery') {                                                           # Icon Batterie 
@@ -16184,9 +16411,9 @@ sub __substituteIcon {
               ($icon, $color) = split '@', $ircmd;
               $icon           = $icon    ? $icon    : 
                                 $socicon ? $socicon :
-                                $bicondef;                                               # nur Farbe angegeben  
+                                BICONDEF;                                                # nur Farbe angegeben  
                                 
-              $color  //= $biccolrcddef;
+              $color  //= BICCOLRCDDEF;
               
               if ($flag eq 'hist') {                                                     # erreichter SoC vergangener Stunden
                   $pretxt = $htitles{onlybatw}{$lang}." $pn: $msg1";
@@ -16199,9 +16426,9 @@ sub __substituteIcon {
               ($icon, $color) = split '@', $inorcmd;
               $icon           = $icon    ? $icon    : 
                                 $socicon ? $socicon :
-                                $bicondef;                                               # nur Farbe angegeben  
+                                BICONDEF;                                                # nur Farbe angegeben  
                                 
-              $color  //= $biccolnrcddef;
+              $color  //= BICCOLNRCDDEF;
               $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bncharel}{$lang};
           }
       }
@@ -16211,27 +16438,27 @@ sub __substituteIcon {
                ($icon, $color) = split '@', $icharge;
                $icon           = $icon    ? $icon    : 
                                  $socicon ? $socicon :
-                                 $bicondef;                                              # nur Farbe angegeben
+                                 BICONDEF;                                               # nur Farbe angegeben
                                  
-               $color //= $bchgiconcoldef;
+               $color //= BCHGICONCOLDEF;
                $txt     = "$pretxt\nStatus: ".$htitles{ischawth}{$lang}.' '.$pcurr.' W'.$soctxt;
            }
            elsif ($pcurr < 0) {                                                          # Batterie wird entladen
                ($icon, $color) = split '@', $idischrg;
                $icon           = $icon    ? $icon    : 
                                  $socicon ? $socicon :
-                                 $bicondef;                                              # nur Farbe angegeben
+                                 BICONDEF;                                               # nur Farbe angegeben
                                  
-               $color //= $bdchiconcoldef;  
+               $color //= BDCHICONCOLDEF;  
                $txt     = "$pretxt\nStatus: ".$htitles{isdchawt}{$lang}.' '.(abs $pcurr).' W'.$soctxt;               
            }
            else {                                                                        # Standby
                ($icon, $color) = split '@', $ircmd;
                $icon           = $icon    ? $icon    : 
                                  $socicon ? $socicon :
-                                 $bicondef;                                              # nur Farbe angegeben  
+                                 BICONDEF;                                               # nur Farbe angegeben  
                                 
-               $color //= $biccolrcddef;
+               $color //= BICCOLRCDDEF;
                $txt     = "$pretxt\nStatus: Standby".$soctxt;
            }
       }
@@ -16244,7 +16471,7 @@ sub __substituteIcon {
       }
   }
   elsif ($ptyp eq 'producer') {                                                          # Icon Producer
-      ($icon, $color) = split '@', ProducerVal ($hash, $pn, 'picon', $prodicondef); 
+      ($icon, $color) = split '@', ProducerVal ($hash, $pn, 'picon', PRODICONDEF); 
       $txt            = ProducerVal ($hash, $pn, 'palias', ''); 
       
       if (!$pcurr) {
@@ -16252,35 +16479,35 @@ sub __substituteIcon {
       }      
   }
   elsif ($ptyp eq 'inverter') {                                                          # Inverter, Smartloader
-      my ($iday, $inight) = split ':', InverterVal ($hash, $pn, 'iicon', $invicondef);
+      my ($iday, $inight) = split ':', InverterVal ($hash, $pn, 'iicon', INVICONDEF);
       
       if ($don || $pcurr) {                                                              # Tag -> eigenes Icon oder Standard
           $txt            = InverterVal ($hash, $pn, 'ialias', '');
-          $iday           = $iday ? $iday : $invicondef;
+          $iday           = $iday ? $iday : INVICONDEF;
           ($icon, $color) = split '@', $iday;
-          $color          = !$pcurr ? $inactcoldef :
-                            $color  ? $color       : 
-                            $actcoldef;
+          $color          = !$pcurr ? INACTCOLDEF :
+                            $color  ? $color      : 
+                            ACTCOLDEF;
       }
       else {                                                                           # Nacht -> eigenes Icon oder Mondphase
-          my $mpi = CurrentVal ($hash, 'moonPhaseI', $moonicondef);
+          my $mpi = CurrentVal ($hash, 'moonPhaseI', MOONICONDEF);
           
           if ($inight) {                                                               # eigenes Icon + ggf. Farbe
               ($icon, $color) = split '@', $inight;
-              $color          = $color ? $color : $inactcoldef;
+              $color          = $color ? $color : INACTCOLDEF;
           }
           else {
-              $icon           = $hmoon{$mpi}{icon}.'@'.$mooncoldef;
+              $icon           = $hmoon{$mpi}{icon}.'@'.MOONCOLDEF;
               $txt            = $hmoon{$mpi}{$lang};
               ($icon, $color) = split '@', $icon;
           }
       }
   }
   elsif ($ptyp eq 'node') {                                                            # Knoten-Icon
-      ($icon, $color) = split '@', $nodeicondef;
-      $color          = !$pcurr ? $inactcoldef :
-                        $color  ? $color       : 
-                        $actcoldef;
+      ($icon, $color) = split '@', NODEICONDEF;
+      $color          = !$pcurr ? INACTCOLDEF :
+                        $color  ? $color      : 
+                        ACTCOLDEF;
   }
 
   $icon .= '@'.$color if($color);
@@ -16308,15 +16535,15 @@ return $p;
 #    berechne Icon width, height auf Sollnormativ
 #    width:   470pt
 #    height:  470pt
-#    scale:   0.10   Normativ $fgscaledef
+#    scale:   0.10   Normativ FGSCALEDEF
 ################################################################
 sub __normIconScale {
   my $name = shift;
   my $icon = shift;
   my $dim  = shift // 470;                                                     # Dimension
   
-  my $hscale           = $fgscaledef;                                          # Scale Normativ
-  my $wscale           = $fgscaledef;
+  my $hscale           = FGSCALEDEF;                                          # Scale Normativ
+  my $wscale           = FGSCALEDEF;
   my ($width,  $wunit) = $icon =~ /width="(\d+\.\d+|\d+)(.*?)"/xs;
   my ($height, $hunit) = $icon =~ /height="(\d+\.\d+|\d+)(.*?)"/xs;
   
@@ -16347,7 +16574,7 @@ sub __normIconScale {
   $icon =~ s/width="(.*?)"/width="$widthnormpt"/;
   $icon =~ s/height="(.*?)"/height="$heightnormpt"/;
   
-return ($fgscaledef, $icon);
+return (FGSCALEDEF, $icon);
 }
 
 ################################################################
@@ -16522,15 +16749,18 @@ sub _addHourAiRawdata {
 return;
 }
 
-###############################################################
-#     Abruf und Einlesen Messagefile nonBlocking
-###############################################################
+####################################################################################################
+#                       Abruf und Einlesen Messagefile nonBlocking
+#  $data{$name}{filemessages}{999000}{TSNEXT}: Timestamp nächster Pull Message File
+####################################################################################################
 sub getMessageFileNonBlocking {
   my $hash = shift;
   my $name = $hash->{NAME};
+  
+  my $tsnext = gettimeofday() + GMFILEREPEAT + int(rand(GMFILERANDOM));
       
-  RemoveInternalTimer ($hash, "FHEM::SolarForecast::getMessageFileNonBlocking");
-  InternalTimer       (gettimeofday() + GMFILEREPEAT, "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
+  RemoveInternalTimer ($hash,   "FHEM::SolarForecast::getMessageFileNonBlocking");
+  InternalTimer       ($tsnext, "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
   
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
@@ -16541,11 +16771,10 @@ sub getMessageFileNonBlocking {
       Log3 ($name, 3, qq{$name - another Message File Process with PID "$hash->{HELPER}{GMFRUNNING}{pid}" is already running ... get Message File is aborted});
       return;
   }
-  
-  Log3 ($name, 4, "$name - Notification System - Message file >$messagefile< is retrieved non blocking");
 
-  my $paref = { name  => $name,
-                block => 1
+  my $paref = { name   => $name,
+                tsnext => $tsnext,
+                block  => 1
               };
 
   $hash->{HELPER}{GMFRUNNING} = BlockingCall ( "FHEM::SolarForecast::_retrieveMessageFile",
@@ -16565,15 +16794,18 @@ return;
 }
 
 ###############################################################
-#         Message File aus contrib abholen
+#         Message File aus Quelle abholen
 ###############################################################
 sub _retrieveMessageFile {
   my $paref = shift;
   my $name  = $paref->{name};
   my $block = $paref->{block} // 0;
   
+  Log3 ($name, 4, "$name - Notification System - Message File >$messagefile< is retrieved non blocking");
+  Log3 ($name, 4, "$name - Notification System - Message File Source: GitHub Repository");
+  
   my $valid           = 1;
-  my ($err, $remfile) = __httpBlockingGet ($name, $bPath.$messagefile.$pPath);
+  my ($err, $remfile) = __httpBlockingGet ($name, BGHPATH.$messagefile.PGHPATH);
   
   $remfile = q{} if($remfile =~ /No\snode\strunk\/fhem\/contrib\/SolarForecast\//xs);
   
@@ -16608,7 +16840,7 @@ return;
 }
 
 ###############################################################
-#     Folgeroutine nach Message File aus contrib abholen
+#     Folgeroutine nach Message File aus Quelle abholen
 ###############################################################
 sub _processMessageFile {
   my $serial = decode_base64 (shift);
@@ -16625,19 +16857,21 @@ sub _processMessageFile {
 return;
 }
 
-######################################################################
+####################################################################################################
 #      Messagefile für Notification System lesen
 #  Filestruktur:
 #  0|SV|1
 #  0|DE|Mitteilung ....
 #  0|EN|Message...
-#  $data{$name}{messages}{999000}{TS}: Timestamp Stand Message File
-######################################################################
+#  $data{$name}{messages}{999000}{TS}:         Timestamp Stand Message File
+#  $data{$name}{filemessages}{999000}{TSNEXT}: Timestamp nächster Pull Message File
+####################################################################################################
 sub __readFileMessages {                  
-  my $paref = shift;
-  my $name  = $paref->{name};
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $tsnext = $paref->{tsnext};
   
-  my $hash  = $defs{$name};
+  my $hash   = $defs{$name};
 
   open (FD, "$root/FHEM/$messagefile") or do { return $! };
   
@@ -16657,7 +16891,8 @@ sub __readFileMessages {
       $data{$name}{filemessages}{$l[0]}{$l[1]} = $l[2];
   }
   
-  $data{$name}{filemessages}{999000}{TS} = time;
+  $data{$name}{filemessages}{999000}{TS}     = time;
+  $data{$name}{filemessages}{999000}{TSNEXT} = $tsnext;
 
 return;
 }
@@ -16678,7 +16913,7 @@ sub _abortGetMessageFile {
 return;
 }
 
-##########################################################################
+####################################################################################################
 #             Mitteilungssystem füllen
 #  Schweregrad SV:
 #  0 - keine Mitteilung
@@ -16687,10 +16922,11 @@ return;
 #  3 - Fehler / Problem
 #
 #  Statusspeicher:
-#  $data{$name}{messages}{999999}{RD}: 1 - gelesen, 0 - ungelesen
-#  $data{$name}{messages}{999000}{TS}: Timestamp Stand Message File
-#  $data{$name}{messages}{999500}{TS}: Timestamp Stand prepared Messages
-##########################################################################
+#  $data{$name}{messages}{999999}{RD}:         1 - gelesen, 0 - ungelesen
+#  $data{$name}{messages}{999000}{TS}:         Timestamp Stand Message File
+#  $data{$name}{filemessages}{999000}{TSNEXT}: Timestamp nächster Pull Message File
+#  $data{$name}{messages}{999500}{TS}:         Timestamp Stand prepared Messages
+####################################################################################################
 sub fillupMessageSystem {           
   my $paref = shift;
   my $hash  = $paref->{hash};
@@ -16733,8 +16969,9 @@ sub fillupMessageSystem {
       $data{$name}{messages}{$midx}{EN} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{EN});  
   }
   
-  $data{$name}{messages}{999000}{TS} = $data{$name}{filemessages}{999000}{TS}     // 0;
-  $data{$name}{messages}{999500}{TS} = $data{$name}{preparedmessages}{999500}{TS} // 0;
+  $data{$name}{messages}{999000}{TS}     = $data{$name}{filemessages}{999000}{TS}     // 0;
+  $data{$name}{messages}{999000}{TSNEXT} = $data{$name}{filemessages}{999000}{TSNEXT} // 0;   
+  $data{$name}{messages}{999500}{TS}     = $data{$name}{preparedmessages}{999500}{TS} // 0;
   
   ########################################################################
   ## Ende Messages auffüllen
@@ -16774,9 +17011,14 @@ sub outputMessages {
   my $lang  = $paref->{lang};
   
   my ($micon, $midx) = fillupMessageSystem ($paref);                                                 # Ergebnisse füllen (sind leer wenn Browser nicht refreshed)
-  my $tnf            = $data{$name}{messages}{999000}{TS}                                     ? 
+  my $tfl            = $data{$name}{messages}{999000}{TS}                                     ? 
                        (timestampToTimestring ($data{$name}{messages}{999000}{TS}, $lang))[0] :
                        'n.a.';
+                       
+  my $tfn            = $data{$name}{messages}{999000}{TSNEXT}                                     ?
+                       (timestampToTimestring ($data{$name}{messages}{999000}{TSNEXT}, $lang))[0] :
+                       'n.a.';
+                       
   my $tpm            = $data{$name}{messages}{999500}{TS}  ?
                        (timestampToTimestring ($data{$name}{messages}{999500}{TS}, $lang))[0] :
                        'n.a.';
@@ -16784,7 +17026,7 @@ sub outputMessages {
   ############
   my $out  = qq{<html>};
   $out    .= qq{<b>$hqtxt{msgsys}{$lang}</b> <br><br>};  
-  $out    .= qq{$hqtxt{ludich}{$lang} - <b>File:</b> $tnf, <b>System:</b> $tpm  <br>};       
+  $out    .= qq{$hqtxt{impcha}{$lang} - <b>File:</b> $tfl ($hqtxt{scedld}{$lang}: $tfn), <b>System:</b> $tpm  <br>};       
   $out    .= qq{($hqtxt{dmgsig}{$lang})  <br><br>};
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
@@ -17336,7 +17578,7 @@ sub aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{dayname} = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
           $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $tbin  if(defined $tbin);
-          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con   if(defined $con);
+          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con   if(defined $con && $con >= 0);
           $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $cbin  if(defined $cbin);
           $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c  if(defined $rr1c);
           $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h if(defined $rad1h && $rad1h > 0);
@@ -18096,17 +18338,7 @@ sub _listDataPoolCircular {
       my $temp     = CircularVal ($hash, $idx, 'temp',                '-');
       my $pvcorrf  = CircularVal ($hash, $idx, 'pvcorrf',             '-');
       my $quality  = CircularVal ($hash, $idx, 'quality',             '-');
-      my $tdayDvtn = CircularVal ($hash, $idx, 'tdayDvtn',            '-');
-      my $ydayDvtn = CircularVal ($hash, $idx, 'ydayDvtn',            '-');
-      my $fitot    = CircularVal ($hash, $idx, 'feedintotal',         '-');
-      my $idfi     = CircularVal ($hash, $idx, 'initdayfeedin',       '-');
-      my $gcontot  = CircularVal ($hash, $idx, 'gridcontotal',        '-');
-      my $idgcon   = CircularVal ($hash, $idx, 'initdaygcon',         '-');
-      my $rtaitr   = CircularVal ($hash, $idx, 'runTimeTrainAI',      '-');
-      my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
-      my $airn     = CircularVal ($hash, $idx, 'aiRulesNumber',       '-');
-      my $aicts    = CircularVal ($hash, $idx, 'attrInvChangedTs',    '-');
-
+     
       my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
       my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
       my $pvrs = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvrlsum', cval => $pvrlsum} );
@@ -18184,8 +18416,21 @@ sub _listDataPoolCircular {
       }
       else {
           my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7);
+          
+          my $con      = CircularVal ($hash, $idx, 'todayConsumption',    '-');
+          my $gcontot  = CircularVal ($hash, $idx, 'gridcontotal',        '-');
+          my $idgcon   = CircularVal ($hash, $idx, 'initdaygcon',         '-');
+          my $idfi     = CircularVal ($hash, $idx, 'initdayfeedin',       '-');
+          my $fitot    = CircularVal ($hash, $idx, 'feedintotal',         '-');
+          my $tdayDvtn = CircularVal ($hash, $idx, 'tdayDvtn',            '-');
+          my $ydayDvtn = CircularVal ($hash, $idx, 'ydayDvtn',            '-');
+          my $rtaitr   = CircularVal ($hash, $idx, 'runTimeTrainAI',      '-');
+          my $fsaitr   = CircularVal ($hash, $idx, 'aitrainLastFinishTs', '-');
+          my $airn     = CircularVal ($hash, $idx, 'aiRulesNumber',       '-');
+          my $aicts    = CircularVal ($hash, $idx, 'attrInvChangedTs',    '-');
+          
           for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
-              $bn = sprintf "%02d", $bn;
+              $bn          = sprintf "%02d", $bn;
               my $idbintot = CircularVal ($hash, $idx, 'initdaybatintot'. $bn, '-');
               my $idboutot = CircularVal ($hash, $idx, 'initdaybatouttot'.$bn, '-');
               my $bintot   = CircularVal ($hash, $idx, 'batintot'.        $bn, '-');
@@ -18210,7 +18455,7 @@ sub _listDataPoolCircular {
           }
           
           $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn \n";
-          $sq .= "      feedintotal: $fitot, initdayfeedin: $idfi \n";
+          $sq .= "      todayConsumption: $con, feedintotal: $fitot, initdayfeedin: $idfi \n";
           $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon \n";
           $sq .= "      $batvl1\n";
           $sq .= "      $batvl2\n";
@@ -18274,21 +18519,21 @@ sub _listDataPoolNextHours {
           $socs        .= "soc${bn}: $socxx";
       }
 
-      $sq        .= "\n" if($sq);
-      $sq        .= $idx." => ";
-      $sq        .= "starttime: $nhts, hourofday: $hod, today: $today";
-      $sq        .= "\n              ";
-      $sq        .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, confc: $confc";
-      $sq        .= "\n              ";
-      $sq        .= "confcEx: $confcex, DoN: $don, weatherid: $wid, wcc: $wcc, rr1c: $rr1c, temp=$temp";
-      $sq        .= "\n              ";
-      $sq        .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt";
-      $sq        .= "\n              ";
-      $sq        .= "rrange: $rrange, crange: $crang, correff: $pvcorrf";
-      $sq        .= "\n              ";
-      $sq        .= $socs;
-      $sq        .= "\n              ";
-      $sq        .= $rcdbat;
+      $sq .= "\n" if($sq);
+      $sq .= $idx." => ";
+      $sq .= "starttime: $nhts, hourofday: $hod, today: $today";
+      $sq .= "\n              ";
+      $sq .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit";
+      $sq .= "\n              ";
+      $sq .= "confc: $confc, confcEx: $confcex, weatherid: $wid, wcc: $wcc, rr1c: $rr1c, temp=$temp";
+      $sq .= "\n              ";
+      $sq .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt, DoN: $don";
+      $sq .= "\n              ";
+      $sq .= "rrange: $rrange, crange: $crang, correff: $pvcorrf";
+      $sq .= "\n              ";
+      $sq .= $socs;
+      $sq .= "\n              ";
+      $sq .= $rcdbat;
   }
 
 return $sq;
@@ -18619,6 +18864,7 @@ sub checkPlantConfig {
       'Common Settings'      => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'FTUI Widget Files'    => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Perl Modules'         => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Data Memory'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
 
   my $sub = sub {
@@ -19102,7 +19348,33 @@ sub checkPlantConfig {
       $result->{'Perl Modules'}{note}   .= qq{AI::DecisionTree <br>};
   }
   
+  ## Datenspeicher Check
+  ########################
+  my $confault = 0;
   
+  for my $dy (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
+      for my $hh (sort{$a<=>$b} keys %{$data{$name}{pvhist}{$dy}}) {
+          my $hcon = HistoryVal ($hash, $dy, $hh, 'con', 0);                                        # historische Verbrauchswerte
+      
+          if ($hcon < 0) {                                                                          # V1.45.7
+              $confault++;
+              Log3 ($name, 1, "$name - WARNING - The stored Energy consumption of day/hour $dy/$hh is negative. This appears to be an error. The incorrect value can be deleted with 'set $name reset consumption $dy $hh'.");
+          }
+      }
+  }
+    
+  if ($confault) {
+      $result->{'Data Memory'}{state}   = $warn;
+      $result->{'Data Memory'}{result} .= qq{There may be '$confault' incorrect value(s) in the 'con' key of the pvHistory Storage. <br>};
+      $result->{'Data Memory'}{note}   .= qq{See Logfile for detailed information and how these value(s) could be corrected. <br>};
+      $result->{'Data Memory'}{warn}    = 1;
+  }
+
+  if (!$result->{'Data Memory'}{info} && !$result->{'Data Memory'}{warn} && !$result->{'Data Memory'}{fault}) {
+      $result->{'Data Memory'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
+      $result->{'Data Memory'}{note}   .= qq{<br>checked Data Memory: <br>};
+      $result->{'Data Memory'}{note}   .= qq{pvHistory key 'con' <br>};
+  }
   
   ## FTUI Widget Support
   ########################
@@ -19115,7 +19387,7 @@ sub checkPlantConfig {
       $result->{'FTUI Widget Files'}{note}    .= qq{There is no need to install SolarForecast FTUI widgets.<br>};
   }
   else {
-      my $cfurl = $bPath.$cfile.$pPath;
+      my $cfurl = BPATH.CFILE.PPATH;
 
       for my $file (@fs) {
           ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVer ($name, $file, $cfurl);
@@ -19517,13 +19789,13 @@ sub timestringsFromOffset {
   my $epoch  = shift;
   my $offset = shift // 0;
   
-  return if($epoch !~ /[0-9]/xs);
+  return if($epoch !~ /^-?[0-9]*(.[0-9]*)?$/xs);
 
   if (length ($epoch) == 13) {                                                                  # Millisekunden
       $epoch = $epoch / 1000;
   }
   
-  my @ts = localtime ($epoch - $offset);
+  my @ts = localtime ($epoch + $offset);                                                        # Offset kann pos. oder negativ sein
   
   my $dt = {
       year    => (strftime "%Y",       (@ts)),                                                  # Jahr
@@ -19772,7 +20044,7 @@ sub getConsumerPlanningMode {
   my $c    = shift;
 
   my $name = $hash->{NAME};
-  my $mode = ConsumerVal ($hash, $c, 'mode', $defcmode);                                    # Consumer Planungsmode
+  my $mode = ConsumerVal ($hash, $c, 'mode', DEFCMODE);                                    # Consumer Planungsmode
 
   if ($mode =~ /^(?:can|must)$/xs) {
       return $mode;
@@ -19784,16 +20056,16 @@ sub getConsumerPlanningMode {
   my ($err)     = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );
 
   if ($err) {
-      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to '$defcmode' mode.});
-      return $defcmode;
+      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to 'DEFCMODE' mode.});
+      return DEFCMODE;
   }
   
   $err  = q{};
   $mode = ReadingsVal ($dv, $rd, '');
   
   if ($mode !~ /^(?:can|must)$/xs) {
-      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to '$defcmode' mode.});
-      return $defcmode;
+      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to 'DEFCMODE' mode.});
+      return DEFCMODE;
   }
 
 return $mode;
@@ -19973,7 +20245,7 @@ return 0;
 #  Funktion liefert 1 wenn Consumer logisch "eingeschaltet"
 #  ist, d.h. wenn der Energieverbrauch über einem bestimmten
 #  Schwellenwert oder der prozentuale Verbrauch über dem
-#  Defaultwert $defpopercent ist.
+#  Defaultwert DEFPOPERCENT ist.
 #
 #  Logisch "on" schließt physisch "on" mit ein.
 ################################################################
@@ -20009,7 +20281,7 @@ sub isConsumerLogOn {
 
   $data{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
 
-  if ($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher ist logisch aktiv
+  if ($pcurr > $pthreshold || $currpowerpercent > DEFPOPERCENT) {                          # Verbraucher ist logisch aktiv
       return 1;
   }
 
@@ -20461,7 +20733,7 @@ sub isSunPath {
   my $c    = shift;
 
   my $is      = 0;
-  my $mintime = ConsumerVal ($hash, $c, 'mintime', $defmintime);
+  my $mintime = ConsumerVal ($hash, $c, 'mintime', DEFMINTIME);
 
   if ($mintime =~ /SunPath/xsi) {
       $is = 1;
@@ -20972,43 +21244,43 @@ sub cloud2bin {
 
   my $bin = $val == 100 ? '100' :
             $val >  97  ? '100' :
-            $val >  95  ? '95'  :
+            $val >= 95  ? '95'  :
             $val >  92  ? '95'  :
-            $val >  90  ? '90'  :
+            $val >= 90  ? '90'  :
             $val >  87  ? '90'  :
-            $val >  85  ? '85'  :
+            $val >= 85  ? '85'  :
             $val >  82  ? '85'  :
-            $val >  80  ? '80'  :
+            $val >= 80  ? '80'  :
             $val >  77  ? '80'  :
-            $val >  75  ? '75'  :
+            $val >= 75  ? '75'  :
             $val >  72  ? '75'  :
-            $val >  70  ? '70'  :
+            $val >= 70  ? '70'  :
             $val >  67  ? '70'  :
-            $val >  65  ? '65'  :
+            $val >= 65  ? '65'  :
             $val >  62  ? '65'  :
-            $val >  60  ? '60'  :
+            $val >= 60  ? '60'  :
             $val >  57  ? '60'  :
-            $val >  55  ? '55'  :
+            $val >= 55  ? '55'  :
             $val >  52  ? '55'  :
-            $val >  50  ? '50'  :
+            $val >= 50  ? '50'  :
             $val >  47  ? '50'  :
-            $val >  45  ? '45'  :
+            $val >= 45  ? '45'  :
             $val >  42  ? '45'  :
-            $val >  40  ? '40'  :
+            $val >= 40  ? '40'  :
             $val >  37  ? '40'  :
-            $val >  35  ? '35'  :
+            $val >= 35  ? '35'  :
             $val >  32  ? '35'  :
-            $val >  30  ? '30'  :
+            $val >= 30  ? '30'  :
             $val >  27  ? '30'  :
-            $val >  25  ? '25'  :
+            $val >= 25  ? '25'  :
             $val >  22  ? '25'  :
-            $val >  20  ? '20'  :
+            $val >= 20  ? '20'  :
             $val >  17  ? '20'  :
-            $val >  15  ? '15'  :
+            $val >= 15  ? '15'  :
             $val >  12  ? '15'  :
-            $val >  10  ? '10'  :
+            $val >= 10  ? '10'  :
             $val >  7   ? '10'  :
-            $val >  5   ? '05'  :
+            $val >= 5   ? '05'  :
             $val >  2   ? '05'  :
             '00';
 
@@ -21023,39 +21295,39 @@ sub sunalt2bin {
 
   my $bin = $val == 90  ? 90  :
             $val >  87  ? 90  :
-            $val >  85  ? 85  :
+            $val >= 85  ? 85  :
             $val >  82  ? 85  :
-            $val >  80  ? 80  :
+            $val >= 80  ? 80  :
             $val >  77  ? 80  :
-            $val >  75  ? 75  :
+            $val >= 75  ? 75  :
             $val >  72  ? 75  :
-            $val >  70  ? 70  :
+            $val >= 70  ? 70  :
             $val >  67  ? 70  :
-            $val >  65  ? 65  :
+            $val >= 65  ? 65  :
             $val >  62  ? 65  :
-            $val >  60  ? 60  :
+            $val >= 60  ? 60  :
             $val >  57  ? 60  :
-            $val >  55  ? 55  :
+            $val >= 55  ? 55  :
             $val >  52  ? 55  :
-            $val >  50  ? 50  :
+            $val >= 50  ? 50  :
             $val >  47  ? 50  :
-            $val >  45  ? 45  :
+            $val >= 45  ? 45  :
             $val >  42  ? 45  :
-            $val >  40  ? 40  :
+            $val >= 40  ? 40  :
             $val >  37  ? 40  :
-            $val >  35  ? 35  :
+            $val >= 35  ? 35  :
             $val >  32  ? 35  :
-            $val >  30  ? 30  :
+            $val >= 30  ? 30  :
             $val >  27  ? 30  :
-            $val >  25  ? 25  :
+            $val >= 25  ? 25  :
             $val >  22  ? 25  :
-            $val >  20  ? 20  :
+            $val >= 20  ? 20  :
             $val >  17  ? 20  :
-            $val >  15  ? 15  :
+            $val >= 15  ? 15  :
             $val >  12  ? 15  :
-            $val >  10  ? 10  :
+            $val >= 10  ? 10  :
             $val >  7   ? 10  :
-            $val >  5   ? 5   :
+            $val >= 5   ? 5   :
             $val >  2   ? 5   :
             0;
 
@@ -22432,37 +22704,37 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>deletes an existing AI instance including all training data and reinitialises it                                        </td></tr>
-            <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                       </td></tr>
-            <tr><td> <b>consumerPlanning</b>   </td><td>deletes the planning data of all registered consumers                                                                   </td></tr>
-            <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                  </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Consumer number&gt; </ul>                                               </td></tr>
-            <tr><td>                           </td><td>The module carries out an automatic rescheduling of the consumer circuit.                                               </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>deletes the current and historical data of all registered consumers from the memory                                     </td></tr>
-            <tr><td>                           </td><td>The defined consumer attributes remain and the data is collected again.                                                 </td></tr>
-            <tr><td>                           </td><td>To delete the data of only one consumer use:                                                                            </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Consumer number&gt; </ul>                                                 </td></tr>
-            <tr><td> <b>consumption</b>        </td><td>deletes the stored consumption values of the house                                                                      </td></tr>
-            <tr><td>                           </td><td>To delete the consumption values of a specific day:                                                                     </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
-            <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                           </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumption 08 10) </ul>   </td></tr>
-            <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                </td></tr>
-            <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                     </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>deletes the readings pvCorrectionFactor*                                                                                </td></tr>
-            <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                  </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                    </td></tr>
-            <tr><td>                           </td><td>To delete stored PV correction factors of a certain hour from the caches:                                               </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;  </ul>                                                      </td></tr>
-            <tr><td>                           </td><td><ul>(e.g. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                    </td></tr>
-            <tr><td> <b>pvHistory</b>          </td><td>deletes the memory of all historical days (01 ... 31)                                                                   </td></tr>
-            <tr><td>                           </td><td>To delete a specific historical day:                                                                                    </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
-            <tr><td>                           </td><td>To delete a specific hour of a historical day:                                                                          </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt; &lt;Hour&gt;  (e.g. set &lt;name&gt; reset pvHistory 08 10) </ul>      </td></tr>
-            <tr><td> <b>roofIdentPair</b>      </td><td>deletes all saved SolCast API Rooftop ID / API Key pairs.                                                               </td></tr>
-            <tr><td>                           </td><td>To delete a specific pair, specify its key &lt;pk&gt;:                                                                  </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (e.g. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>deletes an existing AI instance including all training data and reinitialises it                                                      </td></tr>
+            <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                                     </td></tr>
+            <tr><td> <b>consumerPlanning</b>   </td><td>deletes the planning data of all registered consumers                                                                                 </td></tr>
+            <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Consumer number&gt; </ul>                                                             </td></tr>
+            <tr><td>                           </td><td>The module carries out an automatic rescheduling of the consumer circuit.                                                             </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>deletes the current and historical data of all registered consumers from the memory                                                   </td></tr>
+            <tr><td>                           </td><td>The defined consumer attributes remain and the data is collected again.                                                               </td></tr>
+            <tr><td>                           </td><td>To delete the data of only one consumer use:                                                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Consumer number&gt; </ul>                                                               </td></tr>
+            <tr><td> <b>consumptionHistory</b> </td><td>deletes the stored consumption values of the house from the pvHistory memory                                                          </td></tr>
+            <tr><td>                           </td><td>To delete the consumption values of a specific day:                                                                                   </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumptionHistory 08) </ul>                 </td></tr>
+            <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                                         </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumptionHistory 08 10) </ul>   </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                              </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                                   </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>deletes the readings pvCorrectionFactor*                                                                                              </td></tr>
+            <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                  </td></tr>
+            <tr><td>                           </td><td>To delete stored PV correction factors of a certain hour from the caches:                                                             </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;  </ul>                                                                    </td></tr>
+            <tr><td>                           </td><td><ul>(e.g. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                  </td></tr>
+            <tr><td> <b>pvHistory</b>          </td><td>deletes the memory of all historical days (01 ... 31)                                                                                 </td></tr>
+            <tr><td>                           </td><td>To delete a specific historical day:                                                                                                  </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset pvHistory 08) </ul>                                   </td></tr>
+            <tr><td>                           </td><td>To delete a specific hour of a historical day:                                                                                        </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt; &lt;Hour&gt;  (e.g. set &lt;name&gt; reset pvHistory 08 10) </ul>                    </td></tr>
+            <tr><td> <b>roofIdentPair</b>      </td><td>deletes all saved SolCast API Rooftop ID / API Key pairs.                                                                             </td></tr>
+            <tr><td>                           </td><td>To delete a specific pair, specify its key &lt;pk&gt;:                                                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (e.g. set &lt;name&gt; reset roofIdentPair p1) </ul>                            </td></tr>
          </table>
       </ul>
       </li>
@@ -22762,7 +23034,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batoutXX</b>            </td><td>Battery XX discharge (Wh)                                                                                             </td></tr>
             <tr><td> <b>batouttotXX</b>         </td><td>total energy drawn from the battery XX (Wh)                                                                           </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>current total energy charged into the battery XX (Wh)                                                                 </td></tr>
-            <tr><td> <b>confc</b>               </td><td>expected energy consumption (Wh)                                                                                      </td></tr>
+            <tr><td> <b>confc</b>               </td><td>expected energy consumption (Wh) of the house on the current day                                                      </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>remaining days until the battery XX maintenance SoC (default 95%) is reached                                          </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Number of days per cloudy area over the entire term                                                                   </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>total PV energy fed into the public grid (Wh)                                                                         </td></tr>
@@ -22789,6 +23061,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>runTimeTrainAI</b>      </td><td>Duration of the last AI training                                                                                      </td></tr>
             <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp of the last successful AI training                                                                          </td></tr>
             <tr><td> <b>aiRulesNumber</b>       </td><td>Number of rules in the trained AI instance                                                                            </td></tr>
+            <tr><td> <b>todayConsumption</b>    </td><td>real energy consumption (Wh) of the house on the current day                                                          </td></tr>
             <tr><td> <b>tdayDvtn</b>            </td><td>Today's deviation PV forecast/generation in %                                                                         </td></tr>
             <tr><td> <b>temp</b>                </td><td>Outdoor temperature                                                                                                   </td></tr>
             <tr><td> <b>wcc</b>                 </td><td>Degree of cloud cover                                                                                                 </td></tr>
@@ -23018,22 +23291,26 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-affectConsForecastIdentWeekdays"></a>
        <li><b>affectConsForecastIdentWeekdays </b><br>
          If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast. <br>
-         Otherwise, all weekdays are used equally for calculation. <br>
-         Any additional attribute 
-		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>
-		 is also taken into account. <br>
+         Otherwise, all weekdays are used equally for the calculation. <br>
+         The number of weekdays included is determined by the attribute  
+		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>. <br>      
          (default: 0)
        </li>
        <br>
        
        <a id="SolarForecast-attr-affectConsForecastLastDays"></a>
        <li><b>affectConsForecastLastDays </b><br>
-         The specified past days (1..31) are included in the calculation of the consumption forecast. <br>
+         The specified number of historical daily values is included in the calculation of the consumption forecast. <br>
          For example, with the attribute value “1” only the previous day is taken into account, with the value “14” the previous 14 days. <br>
-         If an additional attribute 
-         <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a> 
-         is set, the specified number of past weekdays of the same type (Mon .. Sun) is taken into account. <br>
-         (default: all days available in pvHistory)
+         The days actually taken into account may be less than specified if there are not enough values in the internal memory
+         are available. <br>
+         (default: 60) <br><br>
+         
+         <b>Note:</b> With an additionally set attribute 
+		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
+		 the specified number of past weekdays of the same type (Mon .. Sun) is taken into account. <br>
+         In this case, if a value of “8” is set, the same weekdays of the past 8 weeks are taken into account.
+         are taken into account. <br>         
        </li>
        <br>
 
@@ -23060,7 +23337,7 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="18%"> <col width="82%"> </colgroup>
-            <tr><td> <b>&lt;Icon&gt@&lt;Colour&gt</b> </td><td>Activation recommendation is represented by icon and colour (optional) (default: light_light_dim_100@gold)  </td></tr>
+            <tr><td> <b>&lt;Icon&gt@&lt;Colour&gt</b> </td><td>Activation recommendation is represented by icon and colour (optional) (default: clock@gold)                </td></tr>
             <tr><td>                                  </td><td>(the planning data is displayed as mouse-over text)                                                         </td></tr>
             <tr><td> <b>times</b>                     </td><td>the planning status and the planned switching times are displayed as text                                   </td></tr>
             <tr><td> <b>none</b>                      </td><td>no display of the planning data                                                                             </td></tr>
@@ -23258,9 +23535,10 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                      </td></tr>
             <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
-            <tr><td> <b>exconfc</b>        </td><td>Use of the consumer's recorded energy consumption to create the consumption forecast (optional).                                                  </td></tr>
-            <tr><td>                       </td><td><b>0</b> - the consumer's historical energy consumption is used to create the consumption forecast (default)                                      </td></tr>
-            <tr><td>                       </td><td><b>1</b> - the consumer's historical energy consumption is excluded from the consumption forecast.                                                </td></tr>
+            <tr><td> <b>exconfc</b>        </td><td>Indicator for using the historical energy consumption of the consumer (optional).                                                                 </td></tr>
+            <tr><td>                       </td><td><b>0</b> - the stored energy consumption shares are retained as part of the general consumption forecast (default)                                </td></tr>
+            <tr><td>                       </td><td><b>1</b> - the general consumption forecast is reduced by the stored energy consumption shares.                                                   </td></tr>
+            <tr><td>                       </td><td><b>2</b> - as with '1', but the consumer's planning data is included in the forecast for the coming hours.                                        </td></tr>
          </table>
          </ul>
        <br>
@@ -23522,6 +23800,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>runTimeLastAPIProc</b>         </td><td>the last process time for processing the received radiation data API data                                            </td></tr>
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>the remaining minutes until sunset of the current day                                                                </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>the remaining hours until sunset of the current day                                                                  </td></tr>
+            <tr><td> <b>todayConsumption</b>           </td><td>the energy consumption of the house on the current day                                                               </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Consumption forecast per hour of the current day (01-24)                                                             </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Consumption forecast from current hour to hour before sunset                                                         </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>          </td><td>the number of radiation data API calls executed on the current day                                                   </td></tr>
@@ -24918,37 +25197,37 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainingsdaten und initialisiert sie neu                              </td></tr>
-            <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                          </td></tr>
-            <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                </td></tr>
-            <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                   </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                             </td></tr>
-            <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                            </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher                            </td></tr>
-            <tr><td>                           </td><td>Die definierten Consumer Attribute bleiben bestehen und die Daten werden neu gesammelt.                                 </td></tr>
-            <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                           </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                               </td></tr>
-            <tr><td> <b>consumption</b>        </td><td>löscht die gespeicherten Verbrauchswerte des Hauses                                                                     </td></tr>
-            <tr><td>                           </td><td>Um die Verbrauchswerte eines bestimmten Tages zu löschen:                                                               </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumption 08) </ul>                 </td></tr>
-            <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                  </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumption &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumption 08 10) </ul> </td></tr>
-            <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                              </td></tr>
-            <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                         </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvCorrectionFactor*                                                                                 </td></tr>
-            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                            </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                    </td></tr>
-            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                                 </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                    </td></tr>
-            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                    </td></tr>
-            <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                                 </td></tr>
-            <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                        </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                     </td></tr>
-            <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                           </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>    </td></tr>
-            <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                        </td></tr>
-            <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                            </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>              </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainingsdaten und initialisiert sie neu                                            </td></tr>
+            <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                                        </td></tr>
+            <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                              </td></tr>
+            <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                                 </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                                           </td></tr>
+            <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                                          </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher                                          </td></tr>
+            <tr><td>                           </td><td>Die definierten Consumer Attribute bleiben bestehen und die Daten werden neu gesammelt.                                               </td></tr>
+            <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                                         </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                                             </td></tr>
+            <tr><td> <b>consumptionHistory</b> </td><td>löscht die gespeicherten Verbrauchswerte des Hauses aus dem pvHistory Speicher                                                        </td></tr>
+            <tr><td>                           </td><td>Um die Verbrauchswerte eines bestimmten Tages zu löschen:                                                                             </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumptionHistory 08) </ul>                 </td></tr>
+            <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumptionHistory 08 10) </ul> </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                                            </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                                       </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvCorrectionFactor*                                                                                               </td></tr>
+            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                  </td></tr>
+            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                                               </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                                  </td></tr>
+            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                  </td></tr>
+            <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                                               </td></tr>
+            <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                                      </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                                   </td></tr>
+            <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                                         </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>                  </td></tr>
+            <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                                      </td></tr>
+            <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>                            </td></tr>
          </table>
       </ul>
       </li>
@@ -25249,7 +25528,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batoutXX</b>            </td><td>Entladung der Batterie XX (Wh)                                                                                            </td></tr>
             <tr><td> <b>batouttotXX</b>         </td><td>aktuell total aus der Batterie XX entnommene Energie (Wh)                                                                 </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>aktuell total in die Batterie XX geladene Energie (Wh)                                                                    </td></tr>
-            <tr><td> <b>confc</b>               </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr>
+            <tr><td> <b>confc</b>               </td><td>erwarteter Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                              </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>verbleibende Tage bis der Batterie XX Pflege-SoC (default 95%) erreicht sein soll                                         </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit                                                               </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
@@ -25276,6 +25555,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>runTimeTrainAI</b>      </td><td>Laufzeit des letzten KI Trainings                                                                                         </td></tr>
             <tr><td> <b>aitrainLastFinishTs</b> </td><td>Timestamp des letzten erfolgreichen KI Trainings                                                                          </td></tr>
             <tr><td> <b>aiRulesNumber</b>       </td><td>Anzahl der Regeln in der trainierten KI Instanz                                                                           </td></tr>
+            <tr><td> <b>todayConsumption</b>    </td><td>realer Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                                  </td></tr>
             <tr><td> <b>tdayDvtn</b>            </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
             <tr><td> <b>temp</b>                </td><td>Außentemperatur                                                                                                           </td></tr>
             <tr><td> <b>wcc</b>                 </td><td>Grad der Wolkenüberdeckung                                                                                                </td></tr>
@@ -25504,21 +25784,26 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>affectConsForecastIdentWeekdays </b><br>
          Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
          Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet. <br>
-         Ein eventuell zusätzlich gesetztes Attribut 
+         Die Anzahl der einbezogenen Wochentage wird durch das Attribut  
 		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>
-		 wird gleichfalls berücksichtigt. <br>      
+		 bestimmt. <br>      
          (default: 0)
        </li>
        <br>
        
        <a id="SolarForecast-attr-affectConsForecastLastDays"></a>
        <li><b>affectConsForecastLastDays </b><br>
-         Es werden die angegebenen vergangenen Tage (1..31) bei der Berechnung der Verbrauchsprognose einbezogen. <br>
+         Es wird die angegebene Anzahl historischer Tageswerte bei der Berechnung der Verbrauchsprognose einbezogen. <br>
          So wird z.B. mit dem Attributwert "1" nur der vorangegangene Tag berücksichtigt, mit dem Wert "14" die vergangenen 14 Tage. <br>
-         Bei einem zusätzlich gesetzten Attribut 
+         Die tatsächlich berücksichtigten Tage können geringer als angegeben sein wenn noch nicht genügend Werte im internen Speicher
+         vorhanden sind. <br>
+         (default: 60) <br><br>
+         
+         <b>Hinweis:</b> Bei einem zusätzlich gesetzten Attribut 
 		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
 		 wird die angegebene Anzahl vergangener gleicher Wochentage (Mo .. So) berücksichtigt. <br>
-         (default: alle in pvHistory vorhandenen Tage)
+         In diesem Fall werden bei einem gesetzten Wert von "8" die gleichen Wochentage der vergangenen 8 Wochen
+         berücksichtigt. <br>         
        </li>
        <br>
 
@@ -25545,7 +25830,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="18%"> <col width="82%"> </colgroup>
-            <tr><td> <b>&lt;Icon&gt@&lt;Farbe&gt</b>  </td><td>Aktivierungsempfehlung wird durch Icon und Farbe (optional) dargestellt (default: light_light_dim_100@gold)   </td></tr>
+            <tr><td> <b>&lt;Icon&gt@&lt;Farbe&gt</b>  </td><td>Aktivierungsempfehlung wird durch Icon und Farbe (optional) dargestellt (default: clock@gold)                 </td></tr>
             <tr><td>                                  </td><td>(die Planungsdaten werden als Mouse-Over Text angezeigt)                                                      </td></tr>
             <tr><td> <b>times</b>                     </td><td>es werden der Planungsstatus und die geplanten Schaltzeiten als Text angezeigt                                </td></tr>
             <tr><td> <b>none</b>                      </td><td>keine Anzeige der Planungsdaten                                                                               </td></tr>
@@ -25742,9 +26027,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>Hat das Reading den Wert 0 oder ist nicht vorhanden, wird der Verbraucher eingeblendet.                                                            </td></tr>
             <tr><td>                       </td><td>Die Wirkung der möglichen Readingwerte 1, 2 und 3 ist wie beschrieben.                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>exconfc</b>        </td><td>Verwendung des aufgezeichneten Energieverbrauchs des Verbrauchers zur Erstellung der Verbrauchsprognose (optional).                                </td></tr>
-            <tr><td>                       </td><td><b>0</b> - der historische Energieverbrauch des Verbrauchers wird zur Erstellung der Verbrauchsprognose verwendet (default)                        </td></tr>
-            <tr><td>                       </td><td><b>1</b> - der historische Energieverbrauch des Verbrauchers wird von der Verbrauchsprognose ausgeschlossen.                                       </td></tr>
+            <tr><td> <b>exconfc</b>        </td><td>Kennzeichen zur Verwendung des historischen Energieverbrauchs des Verbrauchers (optional).                                                         </td></tr>
+            <tr><td>                       </td><td><b>0</b> - die gespeicherten Energieverbrauchsanteile bleiben als Bestandteil der allgemeinen Verbrauchsprognose erhalten (default)                </td></tr>
+            <tr><td>                       </td><td><b>1</b> - die allgemeine Verbrauchsprognose wird um die gespeicherten Energieverbrauchsanteile reduziert.                                         </td></tr>
+            <tr><td>                       </td><td><b>2</b> - wie bei '1', jedoch gehen die Planungsdaten des Verbrauchers bei der Prognose der kommenden Stunden wieder mit ein.                     </td></tr>
          </table>
          </ul>
        <br>
@@ -26007,6 +26293,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>runTimeLastAPIProc</b>         </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen Strahlungsdaten-API Daten                               </td></tr>
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
+            <tr><td> <b>todayConsumption</b>           </td><td>der Energieverbrauch des Hauses am aktuellen Tag                                                                </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Verbrauchsprognose pro Stunde des aktuellen Tages (01-24)                                                       </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Verbrauchsprognose von aktueller Stunde bis Stunde vor Sonnenuntergang                                          </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>          </td><td>die Anzahl der am aktuellen Tag ausgeführten Strahlungsdaten-API Calls                                          </td></tr>
