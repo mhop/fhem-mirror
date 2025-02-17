@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 98_vitoconnect.pm: Mapped error codes stored in readings
+ - bugfix:  98_vitoconnect.pm: DeleteKeyValue thanks to Schlimbo
  - change:  76_SolarForecast: version 1.45.6
  - change:  76_SolarForecast: pull message file from GitHub Repo instead SVN
  - change:  76_SolarForecast: add random period get message file
