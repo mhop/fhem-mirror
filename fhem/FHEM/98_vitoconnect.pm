@@ -78,7 +78,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use JSON;
-use JSON::XS qw( decode_json );
+#use JSON::XS qw( decode_json ); #Could be faster, but caused error for Schlimbo PERL WARNING: Prototype mismatch: sub main::decode_json ($;$$) vs ($) at /usr/local/lib/perl5/5.36.3/Exporter.pm line 63.
 use HttpUtils;
 use Encode qw(decode encode);
 use Data::Dumper;
@@ -93,6 +93,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.8.0"  => "18.02.2025  enhanced error mapping now also language dependent, closing of file_handles, removed JSON::XS",
   "0.7.8"  => "17.02.2025  fixed undef warning thanks cnkru",
   "0.7.7"  => "17.02.2025  introduced clearMappedErrors",
   "0.7.6"  => "17.02.2025  removed usage of html libraries",
@@ -3028,6 +3029,7 @@ sub vitoconnect_getGwCallback {
             my $file        = $dir->child("gw.json");
             my $file_handle = $file->openw_utf8();
             $file_handle->print(Dumper($items));            # Datei 'gw.json' schreiben
+            $file_handle->close();
             Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
             }
             
@@ -3156,6 +3158,7 @@ sub vitoconnect_getInstallationCallback {
             my $file        = $dir->child("installation_" . $gw . ".json");
             my $file_handle = $file->openw_utf8();
             $file_handle->print(Dumper($items));                # Datei 'installation.json' schreiben
+            $file_handle->close();
             Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
         }
             
@@ -3225,6 +3228,7 @@ sub vitoconnect_getInstallationFeaturesCallback {
             my $file        = $dir->child("installation_features_" . $gw . ".json");
             my $file_handle = $file->openw_utf8();
             $file_handle->print(Dumper($decode_json));                # Datei 'installation.json' schreiben
+            $file_handle->close();
             Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
         }
         
@@ -3291,6 +3295,7 @@ sub vitoconnect_getDeviceCallback {
             my $file        = $dir->child($filename);
             my $file_handle = $file->openw_utf8();
             $file_handle->print(Dumper($items));            # Datei 'device.json' schreiben
+            $file_handle->close();
             Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
         }
         if (AttrVal( $name, 'vitoconnect_gw_readings', 0 ) eq "1") {
@@ -3367,6 +3372,7 @@ sub vitoconnect_getFeaturesCallback {
             my $file        = $dir->child("gw_features_" . $gw . ".json");
             my $file_handle = $file->openw_utf8();
             $file_handle->print(Dumper($decode_json));                # Datei 'installation.json' schreiben
+            $file_handle->close();
             Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
       }
     
@@ -3448,8 +3454,8 @@ sub vitoconnect_getResourceCallback {
             my $dir         = path(AttrVal("global","logdir","log"));   # Verzeichnis
             my $file        = $dir->child("resource_".$gw.".json");             # Dateiname
             my $file_handle = $file->openw_utf8();
-            #$file_handle->print(Dumper($items));                       # Datei 'resource.json' schreiben
             $file_handle->print(Dumper($response_body));                        # Datei 'resource.json' schreiben
+            $file_handle->close();
             Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
             $hash->{".logResponseOnce"} = 0;
         }
@@ -3660,8 +3666,16 @@ sub vitoconnect_getPowerLast {
 sub vitoconnect_getErrorCode {
     my ($hash, $name, $comma_separated_string) = @_;
     #$comma_separated_string = "customer, c2, warning, 2025-02-03T17:25:19.000Z"; # debug
+    my $language = AttrVal( 'global', 'language', 0 );
+    my %severity_translations = (
+    'note'          => 'Hinweis',
+    'warning'       => 'Warnung',
+    'error'         => 'Fehler',
+    'criticalError' => 'kritischer Fehler'
+     );
 
     if (defined $comma_separated_string && $comma_separated_string ne '') {
+
         my $serial = ReadingsVal($name, "device.serial.value", "");
         my $materialNumber = substr($serial, 0, 7); #"7733738"; #debug
         my @values = split(/, /, $comma_separated_string);
@@ -3669,21 +3683,25 @@ sub vitoconnect_getErrorCode {
 
         my $fault_counter = -1;
         my $cause_counter = -1;
-
+        
         for (my $i = 0; $i < @values; $i += 4) {
             my $errorCode = $values[$i + 1];
+            my $severity = $values[$i + 2];
+            if (uc($language) eq 'DE') {
+            $severity = $severity_translations{$severity};
+            }
 
             my $param = {
-                url => "https://api.viessmann.com/service-documents/v3/error-database?materialNumber=$materialNumber&errorCode=$errorCode&countryCode=EN&languageCode=en",
+                url => "https://api.viessmann.com/service-documents/v3/error-database?materialNumber=$materialNumber&errorCode=$errorCode&countryCode=${\uc($language)}&languageCode=${\lc($language)}",
                 hash => $hash,
                 timeout => $hash->{timeout},  # Timeout von Internals = 15s
                 method => "GET",  # Methode auf GET ändern
                 sslargs => { SSL_verify_mode => 0 },
             };
-            Log3($name, 3, $name . ", vitoconnect_getErrorCode url=" . $param->{url});
+            Log3($name, 5, $name . ", vitoconnect_getErrorCode url=" . $param->{url});
 
             my ($err, $msg) = HttpUtils_BlockingGet($param);
-            my $decode_json = eval { decode_json($msg) };
+            my $decode_json = eval { JSON->new->decode($msg) };#decode_json($msg) };
             Log3($name, 5, $name . ", vitoconnect_getErrorCode debug err=$err msg=" . $msg . " json=" . Dumper($decode_json));  # wieder weg
 
             if (defined($err) && $err ne "") {   # Fehler bei Befehlsausführung
@@ -3691,15 +3709,16 @@ sub vitoconnect_getErrorCode {
             } elsif (exists $decode_json->{statusCode} && $decode_json->{statusCode} ne "") {
                 Log3($name, 1, $name . ", vitoconnect_getErrorCode call finished with error, status code:" . $decode_json->{statusCode});
             } else {   # Befehl korrekt ausgeführt
-                Log3($name, 3, $name . ", vitoconnect_getErrorCode: finished ok");
+                Log3($name, 5, $name . ", vitoconnect_getErrorCode: finished ok");
                 if (exists $decode_json->{faultCodes} && @{$decode_json->{faultCodes}}) {
                     foreach my $fault (@{$decode_json->{faultCodes}}) {
                         $fault_counter++;
                         my $fault_code = $fault->{faultCode};
                         my $system_characteristics = $fault->{systemCharacteristics};
                         # remove html paragraphs
-                        $system_characteristics =~ s/<\/?p>//g;
+                        $system_characteristics =~ s/<\/?(p|q)>//g;
                         readingsBulkUpdate($hash, $Reading . ".$fault_counter.faultCode", $fault_code);
+                        readingsBulkUpdate($hash, $Reading . ".$fault_counter.severity", $severity);
                         readingsBulkUpdate($hash, $Reading . ".$fault_counter.systemCharacteristics", $system_characteristics);
 
                         foreach my $cause (@{$fault->{causes}}) {
@@ -3707,8 +3726,8 @@ sub vitoconnect_getErrorCode {
                             my $cause_text = $cause->{cause};
                             my $measure = $cause->{measure};
                             # remove html paragraphs
-                            $cause_text =~ s/<\/?p>//g;
-                            $measure =~ s/<\/?p>//g;
+                            $cause_text =~ s/<\/?(p|q)>//g;
+                            $measure =~ s/<\/?(p|q)>//g;
                             readingsBulkUpdate($hash, $Reading . ".$fault_counter.faultCodes.$cause_counter.cause", $cause_text);
                             readingsBulkUpdate($hash, $Reading . ".$fault_counter.faultCodes.$cause_counter.measure", $measure);
                         }
@@ -3857,6 +3876,7 @@ sub vitoconnect_errorHandling {
                 my $file        = $dir->child("vitoconnect_" . $gw . ".err");
                 my $file_handle = $file->openw_utf8();
                 $file_handle->print(Dumper($items));                            # Datei 'vitoconnect_serial.err' schreiben
+                $file_handle->close();
                 Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
                 
                 InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
