@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 98_vitoconnect.pm: enhanced error mapping 
+                               now also language dependent
+ - bugfix:  98_vitoconnect.pm: closing of file_handles, removed JSON::XS
  - feature: 76_SolarForecast: in setupStringDeclination integers between 
                               0 and 90 can now be freely specified
  - feature: 98_vitoconnect.pm: introduced set clearMappedErrors
