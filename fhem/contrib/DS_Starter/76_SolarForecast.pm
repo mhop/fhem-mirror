@@ -159,7 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstancePV ",
+  "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstancePV instead, _calcConsForecast_circular: include epiecAVG ",
   "1.46.1" => "18.02.2025  improve temp2bin, correct Log output to consumptionHistory, set setupStringDeclination can be free integer between 0..90 ",
   "1.46.0" => "17.02.2025  Notification System: print out last/next file pull if no messages are present, improvements and activation of ".
                            "_calcConsForecast_circular, checkPlantConfig: add Data Memory check pvHistory 'con' ".
@@ -11821,15 +11821,15 @@ sub __getCyclesAndRuntime {
   if (isConsumerLogOn ($hash, $c, $pcurr)) {                                                                                             # Verbraucher ist logisch "an"
         if (ConsumerVal ($hash, $c, 'onoff', 'off') eq 'off') {                                                                          # Status im letzen Zyklus war "off"
             $data{$name}{consumers}{$c}{onoff}          = 'on';
-            $data{$name}{consumers}{$c}{startTime}      = $t;                                                                     # startTime ist nicht von "Automatic" abhängig -> nicht identisch mit planswitchon !!!
+            $data{$name}{consumers}{$c}{startTime}      = $t;                                                                            # startTime ist nicht von "Automatic" abhängig -> nicht identisch mit planswitchon !!!
             $data{$name}{consumers}{$c}{cycleStarttime} = $t;
             $data{$name}{consumers}{$c}{cycleTime}      = 0;
             $data{$name}{consumers}{$c}{lastMinutesOn}  = ConsumerVal ($hash, $c, 'minutesOn', 0);
 
-            $data{$name}{consumers}{$c}{cycleDayNum}++;                                                                           # Anzahl der On-Schaltungen am Tag
+            $data{$name}{consumers}{$c}{cycleDayNum}++;                                                                                  # Anzahl der On-Schaltungen am Tag
         }
         else {
-            $data{$name}{consumers}{$c}{cycleTime} = (($t - ConsumerVal ($hash, $c, 'cycleStarttime', $t)) / 60);                 # Minuten
+            $data{$name}{consumers}{$c}{cycleTime} = (($t - ConsumerVal ($hash, $c, 'cycleStarttime', $t)) / 60);                        # Minuten
         }
 
         $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, 'startTime', $t));
@@ -11839,14 +11839,14 @@ sub __getCyclesAndRuntime {
             my $runtime                                   = (($t - ConsumerVal ($hash, $c, 'startTime', $t)) / 60);                      # in Minuten ! (gettimeofday sind ms !)
             $data{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, 'lastMinutesOn', 0) + $runtime;
         }
-        else {                                                                             # Stundenwechsel
+        else {                                                                                                                           # Stundenwechsel
             if (ConsumerVal ($hash, $c, 'onoff', 'off') eq 'on') {                                                                       # Status im letzen Zyklus war "on"
                 my $newst                                         = timestringToTimestamp ($date.' '.sprintf("%02d",  $chour).':00:00');
                 $data{$name}{consumers}{$c}{startTime}     = $newst;
-                $data{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($hash, $c, 'startTime', $newst)) / 60;            # in Minuten ! (gettimeofday sind ms !)
+                $data{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($hash, $c, 'startTime', $newst)) / 60;                   # in Minuten ! (gettimeofday sind ms !)
                 $data{$name}{consumers}{$c}{lastMinutesOn} = 0;
 
-                if ($day ne $startday) {                                                   # Tageswechsel
+                if ($day ne $startday) {                                                                                                 # Tageswechsel
                     $data{$name}{consumers}{$c}{cycleDayNum} = 1;
                 }
             }
@@ -11854,13 +11854,13 @@ sub __getCyclesAndRuntime {
   }
   else {                                                                                                                                 # Verbraucher soll nicht aktiv sein
       $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, 'startTime', 1));
-      $startday  = strftime "%d", localtime(ConsumerVal ($hash, $c, 'startTime', 1));                                                   # aktueller Tag  (range 01 to 31)
+      $startday  = strftime "%d", localtime(ConsumerVal ($hash, $c, 'startTime', 1));                                                    # aktueller Tag  (range 01 to 31)
 
-      if ($chour ne $starthour) {                                                          # Stundenwechsel
+      if ($chour ne $starthour) {                                                                                                        # Stundenwechsel
           $data{$name}{consumers}{$c}{minutesOn} = 0;
       }
 
-      if ($day ne $startday) {                                                             # Tageswechsel
+      if ($day ne $startday) {                                                                                                           # Tageswechsel
           $data{$name}{consumers}{$c}{cycleDayNum} = 0;
       }
 
@@ -12026,7 +12026,7 @@ sub _calcConsForecast_circular {
   ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
   ###############################################################
   for my $h (1..24) {                                                                                   # Median für jede Stunde / Tag berechnen
-      my $dt      = timestringsFromOffset ($st, $h * 3559);                                             # eine Sek. weniger als 1 Stunde
+      $dt         = timestringsFromOffset ($st, $h * 3559);                                             # eine Sek. weniger als 1 Stunde
       my $dayname = $dt->{dayname};       
       my $hh      = sprintf "%02d", $h;
       
@@ -12116,7 +12116,9 @@ sub _calcConsForecast_circular {
               
               ## hist. On-Stunden aller Tage aufnehmen
               ##########################################                  
-              for my $h (1..24) {                                                                 # excludieren ob exconfc 1 oder 2
+              my $epiecelem = 1;
+              
+              for my $h (1..24) {                                                                   # excludieren ob exconfc 1 oder 2
                   my $hh = sprintf "%02d", $h;
                   $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
               
@@ -12125,10 +12127,20 @@ sub _calcConsForecast_circular {
                       $usage{$hh}{histnum}++;
                   }
                   
-                  if ($exconfc == 2 && $lap == 1) {                                               # Planungsdaten des Consumers inkludieren                            
-                      if (defined $data{$name}{consumers}{$c}{epiecAVG}{1}) {
-                          $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{1};
-                          $usage{$hh}{plannum}++;                       
+                  if ($exconfc == 2 && $lap == 1) {                                                 # AVG-Daten des Consumers inkludieren   
+                      my $rt     = $st + (3600 * ($h - 1));                                         # Schleifenlaufzeit
+                      my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
+                      my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
+                        
+                      if ($rt >= $plson && $rt <= $plsoff) {                 
+                          if (defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}) {
+                              $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem};
+                              $usage{$hh}{plannum}++; 
+                              
+                              debugLog ($paref, 'consumption_long', "consumer '$c' register epiecAVG: ".$data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}." Wh for include in Hour $hh");
+                              
+                              $epiecelem++;
+                          }                          
                       }                     
                   }
               }              
@@ -17408,21 +17420,17 @@ sub aiAddRawData {
           my $con    = HistoryVal ($hash, $pvd, $hod, 'con',   undef);    
           my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',   undef);
           my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',  undef);  
-          my $rad1h  = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);          
-          
-          #my $tbin   = temp2bin   ($temp)    if(defined $temp);
-          #my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
-          #my $sabin  = sunalt2bin ($sunalt);
+          my $rad1h  = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
           
           $data{$name}{aidectree}{airaw}{$ridx}{sunalt}  = $sunalt;
           $data{$name}{aidectree}{airaw}{$ridx}{sunaz}   = $sunaz;
           $data{$name}{aidectree}{airaw}{$ridx}{dayname} = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
-          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $temp  if(defined $temp);
-          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con   if(defined $con && $con >= 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $wcc   if(defined $wcc);
-          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c  if(defined $rr1c);
-          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h if(defined $rad1h && $rad1h > 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = sprintf "%.0f", $temp  if(defined $temp);
+          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con                   if(defined $con && $con >= 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $wcc                   if(defined $wcc);
+          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c                  if(defined $rr1c);
+          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h                 if(defined $rad1h && $rad1h > 0);
           
           $dosave++;
           
@@ -21785,7 +21793,7 @@ return $def;
 ###################################################################################################################
 # Wert des consumer-Hash zurückliefern
 # Usage:
-# ConsumerVal ($hash or $name, $co, $key, $def)
+# ConsumerVal ($hash or $name, $co, $key, $def)              
 #
 # $co:  Consumer Nummer (01,02,03,...)
 # $key: name            - Name des Verbrauchers (Device)
@@ -21817,6 +21825,8 @@ return $def;
 #       ehodpieces      - geplante Energiescheiben nach Tagesstunde (hour of day) (Hash)
 #       dswoncond       - Device zur Lieferung einer zusätzliche Einschaltbedingung
 #       planstate       - Planungsstatus
+#       planswitchon    - geplante Switch-On Zeit
+#       planswitchoff   - geplante Switch-Off Zeit
 #       planSupplement  - Ergänzung zum Planungsstatus
 #       rswoncond       - Reading zur Lieferung einer zusätzliche Einschaltbedingung
 #       swoncondregex   - Regex einer zusätzliche Einschaltbedingung
