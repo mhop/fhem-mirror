@@ -1192,7 +1192,8 @@ Example:
     define BlindDown at *{twilight("myTwilight","sr_indoor","7:30","9:00")} set xxxx position 100
     # xxxx is a defined blind
 </pre>
-
+<br>
+Note: you may want to set <a href="#at-attr-computeAfterInit">computeAfterInit</a> attribute to this at.
 </ul>
 
 =end html
@@ -1362,7 +1363,8 @@ Anwendungsbeispiel:
     define BlindDown at *{twilight("myTwilight","sr_indoor","7:30","9:00")} set xxxx position 100
     # xxxx ist ein definiertes Rollo
 </pre>
-
+<br>
+Siehe dazu auch das <a href="#at-attr-computeAfterInit">computeAfterInit</a> Attribut zum at-Modul.
 </ul>
 
 =end html_DE
