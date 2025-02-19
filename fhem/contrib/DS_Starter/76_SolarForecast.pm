@@ -159,7 +159,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstancePV instead, _calcConsForecast_circular: include epiecAVG ",
+  "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstancePV instead, _calcConsForecast_circular: include epiecAVG ".
+                           "fix NOTIFYDEV for consumers, change MAXINVERTER to 4 ",
   "1.46.1" => "18.02.2025  improve temp2bin, correct Log output to consumptionHistory, set setupStringDeclination can be free integer between 0..90 ",
   "1.46.0" => "17.02.2025  Notification System: print out last/next file pull if no messages are present, improvements and activation of ".
                            "_calcConsForecast_circular, checkPlantConfig: add Data Memory check pvHistory 'con' ".
@@ -386,7 +387,7 @@ use constant {
   MAXBATTERIES   => 3,                                                              # maximale Anzahl der möglichen Batterien
   MAXCONSUMER    => 16,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
   MAXPRODUCER    => 3,                                                              # maximale Anzahl der möglichen anderen Produzenten (Attribut)
-  MAXINVERTER    => 3,                                                              # maximale Anzahl der möglichen Inverter
+  MAXINVERTER    => 4,                                                              # maximale Anzahl der möglichen Inverter
 
   MAXSOCDEF      => 95,                                                             # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
   CARECYCLEDEF   => 20,                                                             # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
@@ -1766,8 +1767,8 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
       return;
   }
 
-  my $startts  = time;
-  my $mintime  = ConsumerVal ($hash, $c, "mintime", DEFMINTIME);
+  my $startts = time;
+  my $mintime = ConsumerVal ($hash, $c, "mintime", DEFMINTIME);
 
   if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
       my (undef, $setshift) = sunShift   ($hash, $c);                                          # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
@@ -11999,13 +12000,13 @@ return ($simpCstat, $starttime, $stoptime, $supplmnt);
 #     Energieverbrauch Vorhersage kalkulieren (Median)
 ################################################################
 sub _calcConsForecast_circular {
-  my $paref   = shift;
-  my $name    = $paref->{name};
-  my $chour   = $paref->{chour};
-  my $t       = $paref->{t};
-  my $date    = $paref->{date};                                                                         # aktuelles Datum
-  my $day     = $paref->{day};                                                                          # aktuelles Tagdatum (01...31)
-  my $dayname = $paref->{dayname};                                                                      # aktueller Tagname
+  my $paref     = shift;
+  my $name      = $paref->{name};
+  my $chour     = $paref->{chour};
+  my $t         = $paref->{t};
+  my $date      = $paref->{date};                                                                       # aktuelles Datum
+  my $day       = $paref->{day};                                                                        # aktuelles Tagdatum (01...31)
+  my $todayname = $paref->{dayname};                                                                    # aktueller Tagname
 
   my $hash    = $defs{$name};
   my $acref   = $data{$name}{consumers};
@@ -12087,19 +12088,18 @@ sub _calcConsForecast_circular {
   
   for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
       next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
-                
+      my $do = 1;
+      
       for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
           $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);                                        
 
           if ($exconfc) {                                                                          
               ## Tageswert Excludes finden und summieren
               ############################################
-              if ($exconfc == 1) {                                                                 # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
-                  my $do = 1;
-                  
+              if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen                  
                   if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
                       my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
-                      $do = 0 if(!$hdn || $hdn ne $tomdayname);
+                      $do     = 0 if(!$hdn || $hdn ne $tomdayname);
                   }
                   
                   if ($do) {
@@ -12114,36 +12114,47 @@ sub _calcConsForecast_circular {
                   }
               }
               
-              ## hist. On-Stunden aller Tage aufnehmen
-              ##########################################                  
-              my $epiecelem = 1;
+              ## Stundenweise exkludes und inkludes aufnehmen
+              #################################################                
+              $do = 1;
+              if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+                  my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
+                  $do     = 0 if(!$hdn || $hdn ne $todayname);
+              }
               
-              for my $h (1..24) {                                                                   # excludieren ob exconfc 1 oder 2
-                  my $hh = sprintf "%02d", $h;
-                  $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
-              
-                  if ($csme) {
-                      $usage{$hh}{histcon} += $csme;
-                      $usage{$hh}{histnum}++;
-                  }
+              if ($do) {
+                  my $epiecelem = 1;
                   
-                  if ($exconfc == 2 && $lap == 1) {                                                 # AVG-Daten des Consumers inkludieren   
-                      my $rt     = $st + (3600 * ($h - 1));                                         # Schleifenlaufzeit
-                      my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
-                      my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
-                        
-                      if ($rt >= $plson && $rt <= $plsoff) {                 
-                          if (defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}) {
-                              $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem};
-                              $usage{$hh}{plannum}++; 
-                              
-                              debugLog ($paref, 'consumption_long', "consumer '$c' register epiecAVG: ".$data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}." Wh for include in Hour $hh");
-                              
-                              $epiecelem++;
-                          }                          
-                      }                     
+                  for my $h (1..24) {                                                                   # excludieren ob exconfc 1 oder 2
+                      my $hh = sprintf "%02d", $h;
+                      $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
+                  
+                      if ($csme) {
+                          $csme                 = sprintf "%.2f", $csme;
+                          $usage{$hh}{histcon} += $csme;
+                          $usage{$hh}{histnum}++;
+                          
+                          debugLog ($paref, 'consumption_long', "consumer '$c' register for exclude day $n, hod: $hh - ".$csme." Wh");
+                      }
+                      
+                      if ($exconfc == 2 && $lap == 1) {                                                 # AVG-Daten des Consumers inkludieren   
+                          my $rt     = $st + (3600 * ($h - 1));                                         # Schleifenlaufzeit
+                          my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
+                          my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
+                            
+                          if ($rt >= $plson && $rt <= $plsoff) {                 
+                              if (defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}) {
+                                  $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem};
+                                  $usage{$hh}{plannum}++; 
+                                  
+                                  debugLog ($paref, 'consumption_long', "consumer '$c' register epiecAVG: ".$data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}." Wh for include in Hour $hh");
+                                  
+                                  $epiecelem++;
+                              }                          
+                          }                     
+                      }
                   }
-              }              
+              }
           }
       }
       
@@ -19819,10 +19830,10 @@ sub createAssociatedWith {
       push @cd, $medev;
 
       for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {            # Consumer Devices
-          my $consumer = AttrVal ($name, "consumer${c}", "");
-          my ($ac,$hc) = parseParams ($consumer);
-          my $codev    = $ac->[0]         // '';
-          my $dswitch  = $hc->{switchdev} // '';                             # alternatives Schaltdevice
+          my $consumer  = AttrVal ($name, "consumer${c}", "");
+          my ($ac,$hc)  = parseParams ($consumer);
+          my ($codev)   = split ":", ($ac->[0] // '');
+          my ($dswitch) = split ":", ($hc->{switchdev} // '');               # alternatives Schaltdevice
           push @cd, $codev   if($codev);
           push @cd, $dswitch if($dswitch);
       }
