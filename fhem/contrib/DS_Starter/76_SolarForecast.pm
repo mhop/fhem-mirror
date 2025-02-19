@@ -159,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstancePV ",
   "1.46.1" => "18.02.2025  improve temp2bin, correct Log output to consumptionHistory, set setupStringDeclination can be free integer between 0..90 ",
   "1.46.0" => "17.02.2025  Notification System: print out last/next file pull if no messages are present, improvements and activation of ".
                            "_calcConsForecast_circular, checkPlantConfig: add Data Memory check pvHistory 'con' ".
@@ -12018,6 +12019,9 @@ sub _calcConsForecast_circular {
   
   my (@cona, $exconfc, $csme, %usage);
   $usage{tom}{con} = 0;
+  
+  debugLog ($paref, 'consumption|consumption_long', "################### Start Consumption forecast ###################");
+  debugLog ($paref, 'consumption_long', "Basics - installed locale: ".LOCALE_TIME.", used scheme: $lct");
 
   ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
   ###############################################################
@@ -12025,6 +12029,8 @@ sub _calcConsForecast_circular {
       my $dt      = timestringsFromOffset ($st, $h * 3559);                                             # eine Sek. weniger als 1 Stunde
       my $dayname = $dt->{dayname};       
       my $hh      = sprintf "%02d", $h;
+      
+      debugLog ($paref, 'consumption_long', "process Today dayname: $dayname, Tomorrow dayname: $tomdayname") if($h == 1);
       
       my (@conh, @conhtom);
       my $mix = 0;
@@ -17052,10 +17058,14 @@ sub aiAddInstancePV {                   ## no critic "not used"
       my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',  undef);
       my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c', undef);
       my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',   0);
+      
+      my $tbin   = temp2bin   ($temp)    if(defined $temp);
+      my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
+      my $sabin  = sunalt2bin ($sunalt);
 
       eval { $dtree->add_instance (attributes => { rad1h  => $rad1h,
-                                                   temp   => $temp,
-                                                   wcc    => $wcc,
+                                                   temp   => $tbin,
+                                                   wcc    => $cbin,
                                                    rr1c   => $rr1c,
                                                    sunalt => $sunalt,
                                                    hod    => $hod
@@ -17402,17 +17412,17 @@ sub aiAddRawData {
           my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',  undef);  
           my $rad1h  = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);          
           
-          my $tbin   = temp2bin   ($temp)    if(defined $temp);
-          my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
-          my $sabin  = sunalt2bin ($sunalt);
+          #my $tbin   = temp2bin   ($temp)    if(defined $temp);
+          #my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
+          #my $sabin  = sunalt2bin ($sunalt);
           
-          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}  = $sabin;
+          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}  = $sunalt;
           $data{$name}{aidectree}{airaw}{$ridx}{sunaz}   = $sunaz;
           $data{$name}{aidectree}{airaw}{$ridx}{dayname} = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
-          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $tbin  if(defined $tbin);
+          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = $temp  if(defined $temp);
           $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con   if(defined $con && $con >= 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $cbin  if(defined $cbin);
+          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $wcc   if(defined $wcc);
           $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c  if(defined $rr1c);
           $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h if(defined $rad1h && $rad1h > 0);
           
@@ -17428,7 +17438,7 @@ sub aiAddRawData {
           my $pvrl                                    = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           $data{$name}{aidectree}{airaw}{$ridx}{pvrl} = $pvrl if(defined $pvrl && $pvrl  > 0);
           
-          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sabin, sunaz: $sunaz, rad1h: ".(defined $rad1h ? $rad1h : '-').", pvrl: ".(defined $pvrl ? $pvrl : '-').", con: ".(defined $con ? $con : '-').", wcc: ".(defined $cbin ? $cbin : '-').", rr1c: ".(defined $rr1c ? $rr1c : '-').", temp: ".(defined $tbin ? $tbin : '-'), 4);
+          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sunalt, sunaz: $sunaz, rad1h: ".(defined $rad1h ? $rad1h : '-').", pvrl: ".(defined $pvrl ? $pvrl : '-').", con: ".(defined $con ? $con : '-').", wcc: ".(defined $wcc ? $wcc : '-').", rr1c: ".(defined $rr1c ? $rr1c : '-').", temp: ".(defined $temp ? $temp : '-'), 4);
       }
   }
 
