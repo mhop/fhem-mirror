@@ -5893,7 +5893,7 @@ sub _attrctrlDebug {                     ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $aName = $paref->{aName};
-  my $aVal  = $paref->{aVal};
+  my $aVal  = $paref->{aVal} // '';
 
   my $te = 'consumerSwitching';
 
@@ -12125,13 +12125,11 @@ sub _calcConsForecast_circular {
                       $usage{$hh}{histnum}++;
                   }
                   
-                  if ($exconfc == 2 && $lap == 1) {                                               # Planungsdaten des Consumers inkludieren
-                      my $ehp = $data{$name}{consumers}{$c}{ehodpieces}{$hh};
-                      
-                      if (defined $ehp) {
-                          $usage{$hh}{plancon} += $ehp;
+                  if ($exconfc == 2 && $lap == 1) {                                               # Planungsdaten des Consumers inkludieren                            
+                      if (defined $data{$name}{consumers}{$c}{epiecAVG}{1}) {
+                          $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{1};
                           $usage{$hh}{plannum}++;                       
-                      }                          
+                      }                     
                   }
               }              
           }
@@ -12149,7 +12147,7 @@ sub _calcConsForecast_circular {
       
       if (defined $usage{$hh}{histnum}) {                                                             # historische Stundenverbräuche exkludieren
           my $exhcon        = sprintf "%.0f", ($usage{$hh}{histcon} / $usage{$hh}{histnum});          # durchschnittlichen Verbrauchswert 
-          $usage{$hh}{con} -= $exhcon;
+          $usage{$hh}{con} -= $exhcon if($usage{$hh}{con} > $exhcon);
       
           debugLog ($paref, 'consumption_long', "excl. hist $exhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{histnum});
       }
