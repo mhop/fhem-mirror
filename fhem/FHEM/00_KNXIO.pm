@@ -82,9 +82,10 @@
 # 25/04/2024 changed _open for mode S
 #            replaced/removed experimental given/when
 # 19/08/2024 fix error-msg when mode S fails to open
-# xx/11/2024 replace getimeofday w. Time::HiRes::time
+# 07/11/2024 replace getimeofday w. Time::HiRes::time
 #            use AttrNum instead of AttrVal where possible
 #            PBP remove postfix if
+# xx/01/2025 add a few responseIDs in readH fn.
 
 
 package KNXIO; ## no critic 'package'
@@ -415,7 +416,8 @@ sub KNXIO_ReadH {
 
 	my $name = $hash->{NAME};
 
-	if ( unpack('n',$buf) != 0x0610) {
+	my ($header, $responseID, $total_length) = unpack('nnn',$buf);
+	if ($header != 0x0610) {
 		KNXIO_Log ($name, 3, 'invalid Frame Header received - discarded');
 		return;
 	}
@@ -425,23 +427,34 @@ sub KNXIO_ReadH {
 	my $rxseqcntr = 0;
 	my $txseqcntr = 0;
 	my $errcode = 0;
-	my $responseID = unpack('x2n',$buf);
 
 	my %resIDs = (
+	   0x0201 => sub { # search request
+		KNXIO_Log ($name, 4, 'SearchRequest received');
+		return;
+	   },
 	   0x0202 => sub { # Search response
 		KNXIO_Log ($name, 4, 'SearchResponse received');
 		my (@contolpointIp, $controlpointPort) =  unpack('x6CCCn',$buf);
+		return;
+	   },
+	   0x0203 => sub { # Decription request
+		KNXIO_Log ($name, 4, 'DescriptionRequest received');
 		return;
 	   },
 	   0x0204 => sub {  # Decription response
 		KNXIO_Log ($name, 4, 'DescriptionResponse received');
 		return;
 	   },
-	   0x0206 => sub { # Connection response
+	   0x0205 => sub {  # Connect request
+		KNXIO_Log ($name, 4, 'ConnectionRequest received');
+		return;
+	   },
+	   0x0206 => sub { # Connect response
 		($hash->{KNXIOhelper}->{CCID},$errcode) = unpack('x6CC',$buf); # save Comm Channel ID,errcode
 		RemoveInternalTimer($hash,\&KNXIO_keepAlive);
 		if ($errcode > 0) {
-			KNXIO_Log ($name, 3, q{ConnectionResponse received } .
+			KNXIO_Log ($name, 3, q{ConnectResponse received } .
 				qq{CCID= $hash->{KNXIOhelper}->{CCID} Status=} . KNXIO_errCodes($errcode));
 			KNXIO_disconnect($hash,2);
 			return;
@@ -452,6 +465,10 @@ sub KNXIO_ReadH {
 		KNXIO_handleConn($hash);
 		$hash->{KNXIOhelper}->{SEQUENCECNTR} = 0;
 		InternalTimer(Time::HiRes::time() + 60, \&KNXIO_keepAlive, $hash); # start keepalive
+		return;
+	   },
+	   0x0207 => sub { # ConnectionState request
+		KNXIO_Log ($name, 4, 'ConnectioStatenRequest received');
 		return;
 	   },
 	   0x0208 => sub { # ConnectionState response
@@ -1047,8 +1064,8 @@ sub KNXIO_dispatch2 {
 
 	my $name = $hash->{NAME};
 
-	$hash->{'msg_count'}++;
-	$hash->{'msg_time'} = TimeNow();
+	$hash->{'MSGCNT'}++;
+	$hash->{'MSGTIME'} = TimeNow();
 
 	Dispatch($hash, $buf);
 
@@ -1132,8 +1149,8 @@ sub KNXIO_closeDev {
 
 	delete $hash->{stacktrace}; # clean
 	delete $hash->{nextOpenDelay};
-	delete $hash->{'msg_count'};
-	delete $hash->{'msg_time'};
+	delete $hash->{'MSGCNT'};
+	delete $hash->{'MSGTIME'};
 
 #NO!	delete $hash->{'.CCID'};
 	delete $hash->{KNXIOhelper}->{SEQUENCECNTR};
@@ -1479,7 +1496,8 @@ __END__
 <li><b>S</b> Socket mode - communicate via KNXD's UNIX-socket on localhost. default Socket-path&colon; 
   <code>/var/run/knx</code><br/> 
   Path might be different, depending on knxd-version or -config specification! 
-  This mode is tested ok with KNXD version 0.14.30. It does NOT work with ver. 0.10.0!
+  This mode is tested ok with KNXD version 0.14.30. It does NOT work with ver. 0.10.0!</br>
+  If you run FHEM and KNXD in Docker, this is the preferred mode to run both in network-mode bridge - see wiki!.
 </li>
 <li><b>X</b> Special mode - for details see KNXIO-wiki!
 </li>
