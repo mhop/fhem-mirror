@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  98_vitoconnect: replace U+FFFD (unknown character with [VUC] 
+                            see https://forum.fhem.de/index.php?msg=1334504
+                            fill reason in error case from extended payload
  - feature: 10_KNX: new attribute readingNmap
  - feature: 76_SolarForecast: max. possible inverters set to 4
  - feature: 98_vitoconnect.pm: enhanced error mapping 
