@@ -93,6 +93,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.8.1"  => "20.02.2025  replace U+FFFD (unknown character with [VUC] see https://forum.fhem.de/index.php?msg=1334504, also fill reason in error case from extended payload",
   "0.8.0"  => "18.02.2025  enhanced error mapping now also language dependent, closing of file_handles, removed JSON::XS",
   "0.7.8"  => "17.02.2025  fixed undef warning thanks cnkru",
   "0.7.7"  => "17.02.2025  introduced clearMappedErrors",
@@ -3527,6 +3528,8 @@ sub vitoconnect_getResourceCallback {
                 
                 my $Type  = $properties->{$key}->{type};
                 my $Value = $properties->{$key}->{value};
+                $Value =~ s/\x{FFFD}+/[VUC]/g; # Ersetze aufeinanderfolgende Vorkommen von U+FFFD durch "unknown characters" siehe https://forum.fhem.de/index.php?msg=1334504
+                #$Value =~ s/[^[:print:]]+//g; # Behalte alle druckbaren Zeichen 
                 my $comma_separated_string = "";
                 if ( $Type eq "array" ) {
                     if ( defined($Value) ) {
@@ -3825,7 +3828,8 @@ sub vitoconnect_errorHandling {
             Log3 $name, 4, "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
                          . "errorType: " . ($items->{errorType} // 'undef') . " "
                          . "message: " . ($items->{message} // 'undef') . " "
-                         . "error: " . ($items->{error} // 'undef');
+                         . "error: " . ($items->{error} // 'undef') . " "
+                         . "reason: " . ($items->{extendedPayload}->{reason} // 'undef');
              
             readingsSingleUpdate(
                $hash,
@@ -3833,7 +3837,8 @@ sub vitoconnect_errorHandling {
                "statusCode: " . ($items->{statusCode} // 'undef') . " "
              . "errorType: " . ($items->{errorType} // 'undef') . " "
              . "message: " . ($items->{message} // 'undef') . " "
-             . "error: " . ($items->{error} // 'undef'),
+             . "error: " . ($items->{error} // 'undef') . " "
+             . "reason: " . ($items->{extendedPayload}->{reason} // 'undef'),
                1
             );
             if ( $items->{statusCode} eq "401" ) {
@@ -3870,7 +3875,8 @@ sub vitoconnect_errorHandling {
                 Log3 $name, 1, "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
                              . "errorType: " . ($items->{errorType} // 'undef') . " "
                              . "message: " . ($items->{message} // 'undef') . " "
-                             . "error: " . ($items->{error} // 'undef');
+                             . "error: " . ($items->{error} // 'undef') . " "
+                             . "reason: " . ($items->{extendedPayload}->{reason} // 'undef');
              
                 my $dir         = path( AttrVal("global","logdir","log"));
                 my $file        = $dir->child("vitoconnect_" . $gw . ".err");
