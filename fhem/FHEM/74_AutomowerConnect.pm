@@ -75,6 +75,7 @@ sub Initialize() {
                           "mowingAreaLimits:textField-long " .
                           "mowingAreaHull:textField-long " .
                           "mowerAutoSyncTime:1,0 " .
+                          "mowerTimeZone " .
                           "propertyLimits:textField-long " .
                           "scaleToMeterXY " .
                           "showMap:1,0 " .
@@ -194,7 +195,7 @@ __END__
 
     <li><a id='AutomowerConnect-set-dateTime'>dateTime</a><br>
       <code>set &lt;name&gt; dateTime &lt;timestamp / s&gt;</code><br>
-      Syncronize the mower time to timestamp. The default (empty Input field) timestamp is for local time of the machine the mower is defined, see also <a href="#AutomowerConnect-attr-mowerAutoSyncTime">mowerAutoSyncTime</a>.</li>
+      Syncronize the mower time to system time of the machine the mower is defined. Appears only if <a href="#AutomowerConnect-attr-mowerAutoSyncTime">mowerAutoSyncTime</a> is not set, see also <a href="#AutomowerConnect-attr-mowerTimeZone">mowerTimeZone</a>.</li>
 
     <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
       <code>set &lt;name&gt; confirmError</code><br>
@@ -390,6 +391,11 @@ __END__
     <li><a id='AutomowerConnect-attr-mowerAutoSyncTime'>mowerAutoSyncTime</a><br>
       <code>attr &lt;name&gt; mowerAutoSyncTime &lt;<b>0</b>,1&gt;</code><br>
       Synchronizes mower time if DST changes, on (1) or not (0 default).</li>
+
+    <li><a id='AutomowerConnect-attr-mowerTimeZone'>mowerTimeZone</a><br>
+      <code>attr &lt;name&gt; mowerTimeZone &lt;area/location&gt;</code><br>
+      Sets the mower time zone for the setter dateTime and the attribute mowerAutoSyncTime. When not set the time zone defaults to local time zone of the FHEM-Server. It has to be set only if the mower runs in a different time zone.For a list of valid area/location entrys use the linux command <code>timedatectl list-timezones</code>.<br>
+      Example for germany: Europe/Berlin</li>
 
    <li><a id='AutomowerConnect-attr-chargingStationCoordinates'>chargingStationCoordinates</a><br>
       <code>attr &lt;name&gt; chargingStationCoordinates &lt;longitude&gt;&lt;separator&gt;&lt;latitude&gt;</code><br>
@@ -588,7 +594,7 @@ __END__
     <li>mower_commandStatus - Status of the last sent command cleared each status update</li>
     <li>mower_currentZone - Zone name with activity MOWING in the last status time stamp interval and number of way points in parenthesis.</li>
     <li>mower_inactiveReason - They are NONE, PLANNING, SEARCHING_FOR_SATELLITES.</li>
-    <li>mower_wsEvent - websocket connection events (status-event, positions-event, settings-event)</li>
+    <li>mower_wsEvent - websocket connection events (battery-event-v2, calendar-event-v2, cuttingHeight-event-v2, headLights-event-v2, messages-event-v2, mower-event-v2, planner-event-v2 and position-event-v2)</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>
@@ -739,8 +745,7 @@ __END__
 
     <li><a id='AutomowerConnect-set-dateTime'>dateTime</a><br>
       <code>set &lt;name&gt; dateTime &lt;timestamp / s&gt;</code><br>
-      Synchronisiert die Zeit im Mäher. Timestamp, ist die Zeit in Sekunden seit  1. Januar 1970, 00:00 Uhr UTC unter Berücksichtigung der Zeitzone und DST.
-      Der Standardwert (leeres Eingabefeld) verwendet die lokale Zeit des Rechners auf dem der Mäher definiert ist, siehe auch <a href="#AutomowerConnect-attr-mowerAutoSyncTime">mowerAutoSyncTime</a></li>
+       Setzt die Mäherzeit auf die Systemzeit des Rechners auf dem der Mäher definiert ist, erscheint nur wenn <a href="#AutomowerConnect-attr-mowerAutoSyncTime">mowerAutoSyncTime</a> nicht gesetzt ist, siehe auch <a href="#AutomowerConnect-attr-mowerTimeZone">mowerTimeZone</a></li>
 
     <li><a id='AutomowerConnect-set-confirmError'>confirmError</a><br>
       <code>set &lt;name&gt; confirmError</code><br>
@@ -917,6 +922,11 @@ __END__
     <li><a id='AutomowerConnect-attr-mowerAutoSyncTime'>mowerAutoSyncTime</a><br>
       <code>attr &lt;name&gt; mowerAutoSyncTime &lt;<b>0</b>,1&gt;</code><br>
       Synchronisiert die Zeit im Mäher, bei einer Zeitumstellung, ein (1) aus (0 Standard).</li>
+
+    <li><a id='AutomowerConnect-attr-mowerTimeZone'>mowerTimeZone</a><br>
+      <code>attr &lt;name&gt; mowerTimeZone &lt;area/location&gt;</code><br>
+      Setzt die Zeitzone für den Setter dateTime und das Attribut mowerAutoSyncTime. Wenn das Attribut nicht gesetzt ist wird die Zeitzone des FHEM-Servers verwendet. Es muss nur gesetzt werden, wenn der Mäher in einer anderen Zeitzone arbeitet. Eine Liste der gültigen Area/Location Angabe kann mit dem Linuxbefehl <code>timedatectl list-timezones</code> angezeigt werden.<br>
+      Beispiel für Deutschland: Europe/Berlin</li>
 
     <li><a id='AutomowerConnect-attr-mowerCuttingWidth'>mowerCuttingWidth</a><br>
       <code>attr &lt;name&gt; mowerCuttingWidth &lt;cutting width&gt;</code><br>
@@ -1106,7 +1116,7 @@ __END__
     <li>mower_commandStatus - Status des letzten uebermittelten Kommandos wird duch Statusupdate zurückgesetzt.</li>
     <li>mower_currentZone - Name der Zone im aktuell abgefragten Intervall der Statuszeitstempel , in der der Mäher gemäht hat und Anzahl der Wegpunkte in der Zone in Klammern.</li>
     <li>mower_inactiveReason - Gründe für Inaktivität: NONE, PLANNING, SEARCHING_FOR_SATELLITES.</li>
-    <li>mower_wsEvent - Events der Websocketverbindung (status-event, positions-event, settings-event)</li>
+    <li>mower_wsEvent - Events der Websocketverbindung (battery-event-v2, calendar-event-v2, cuttingHeight-event-v2, headLights-event-v2, messages-event-v2, mower-event-v2, planner-event-v2 and position-event-v2)</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>
