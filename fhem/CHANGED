@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 76_SolarForecast: new version 1.46.3
  - bugfix:  98_vitoconnect: replace U+FFFD (unknown character with [VUC] 
                             see https://forum.fhem.de/index.php?msg=1334504
                             fill reason in error case from extended payload
