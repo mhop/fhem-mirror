@@ -93,6 +93,8 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.8.3"  => "23.02.2025  fix order of days in type schedule readings",
+  "0.8.2"  => "22.02.2025  improved State reading in case of unknown error",
   "0.8.1"  => "20.02.2025  replace U+FFFD (unknown character with [VUC] see https://forum.fhem.de/index.php?msg=1334504, also fill reason in error case from extended payload",
   "0.8.0"  => "18.02.2025  enhanced error mapping now also language dependent, closing of file_handles, removed JSON::XS",
   "0.7.8"  => "17.02.2025  fixed undef warning thanks cnkru",
@@ -3431,6 +3433,7 @@ sub vitoconnect_getResourceCallback {
     my $hash   = $param->{hash};
     my $name   = $hash->{NAME};
     my $gw     = AttrVal( $name, 'vitoconnect_serial', 0 );
+    my @days = qw(mon tue wed thu fri sat sun); # Reihenfolge der Wochentage festlegen für type Schedule
     
     Log(5,$name.", -getResourceCallback started");
     Log3($name,5,$name." getResourceCallback calles with gw:".$gw); 
@@ -3566,13 +3569,19 @@ sub vitoconnect_getResourceCallback {
                         my $hash_value = $Value->{$hash_key};
                         $comma_separated_string .= $hash_value . ", ";
                     }
-                # Entferne das letzte Komma und Leerzeichen
-                $comma_separated_string =~ s/, $//;
-                readingsBulkUpdate($hash,$Reading,$comma_separated_string);
+                    # Entferne das letzte Komma und Leerzeichen
+                    $comma_separated_string =~ s/, $//;
+                    readingsBulkUpdate($hash,$Reading,$comma_separated_string);
                 }
                 elsif ( $Type eq "Schedule" ) {
-                    my $Result = encode_json($Value);
-                    readingsBulkUpdate($hash,$Reading,$Result);
+                    my @schedule;
+                    foreach my $day (@days) {
+                     if (exists $Value->{$day}) {
+                      push @schedule, { $day => $Value->{$day} };
+                     }
+                    }
+                    my $Result = encode_json(\@schedule);
+                    readingsBulkUpdate($hash, $Reading, $Result);
                     Log3($name, 5, "$name - $Reading: $Result ($Type)");
                 }
                 else {
@@ -3869,7 +3878,9 @@ sub vitoconnect_errorHandling {
                 return(1);
             }
             else {
-                readingsSingleUpdate($hash,"state","unbekannter Fehler, bitte den Entwickler informieren!",1);
+                readingsSingleUpdate($hash,"state","unbekannter Fehler, bitte den Entwickler informieren! (Typ: "
+                                     . ($items->{errorType} // 'undef') . " Grund: "
+                                     . ($items->{extendedPayload}->{reason} // 'NA') . ")",1);
                 Log3 $name, 1, "$name - unbekannter Fehler: "
                              . "Bitte den Entwickler informieren!";
                 Log3 $name, 1, "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
