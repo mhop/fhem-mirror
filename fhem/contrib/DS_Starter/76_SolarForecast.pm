@@ -159,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.46.4" => "23.02.2025  _flowGraphic: fix clculation of node2home (Forum: https://forum.fhem.de/index.php?msg=1334798)",
   "1.46.3" => "22.02.2025  new sub getConsumerMintime, consumer key 'mintime' can handle a device/reading combination that deliver minutes ".
                            "reports violation of the continuity specification for battery in/out energy ",
   "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstancePV instead, _calcConsForecast_circular: include epiecAVG ".
@@ -15627,6 +15628,8 @@ sub _flowGraphic {
       $bat2home = 0;
       $soc      = 0;
   }
+  
+  debugLog ($paref, 'graphic', "Battery initial summary - batin: $batin, bat2home: $bat2home");
 
   ## Resultierende von Laden und Entladen berechnen
   ###################################################
@@ -15636,6 +15639,8 @@ sub _flowGraphic {
 
   if ($x > 0) { $batin = $x; } else { $bat2home = abs $x; }                    # es darf nur $batin ODER $bat2home mit einem Wert > 0 geben
 
+  debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, bat2home: $bat2home");
+  
   my $bat_color = $soc < 26 ? "$stna bat25" :
                   $soc < 76 ? "$stna bat50" :
                   "$stna bat75";
@@ -15739,16 +15744,17 @@ sub _flowGraphic {
       $cnsmr->{$c}{ptyp} = 'consumer';
   }
 
-  my $consumercount   = keys %{$cnsmr};
-  my @consumers       = sort{$a<=>$b} keys %{$cnsmr};
+  my $consumercount = keys %{$cnsmr};
+  $flowgcons        = 0 if(!$consumercount);                                            # Consumer Anzeige ausschalten wenn keine Consumer definiert
+  my @consumers     = sort{$a<=>$b} keys %{$cnsmr};
 
-  ## Werte / SteuerungVars anpassen
-  ###################################
+  ## Knotensummen Erzeuger - Batterie - Home ermitteln
+  ######################################################
   my $pnodesum  = __normDecPlaces ($ppall + $pv2node);                      # Erzeugung Summe im Knoten
   $pnodesum    += abs $node2bat if($node2bat < 0);                          # Batterie ist voll und SolarLader liefert an Knoten
   $node2bat    -= $pv2bat;                                                  # Knoten-Bat -> abzüglich Direktladung (pv2bat)
-  $flowgcons    = 0 if(!$consumercount);                                    # Consumer Anzeige ausschalten wenn keine Consumer definiert
-  my $node2home = __normDecPlaces ($cself + $ppall);                        # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
+  #my $node2home = __normDecPlaces ($cself + $ppall);                        # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
+  my $node2home = __normDecPlaces ($pnodesum - $node2bat);                  # V 1.46.4 - Energiefluß vom Knoten zum Haus
 
 
   ## SVG Box initialisieren mit Grid-Icon
