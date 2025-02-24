@@ -93,7 +93,8 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
-  "0.8.3"  => "23.02.2025  fix order of days in type schedule readings",
+  "0.8.4"  => "24.02.2025  also order mode, start, end, position in schedule",
+  "0.8.3"  => "23.02.2025  fix order of days for type schedule readings",
   "0.8.2"  => "22.02.2025  improved State reading in case of unknown error",
   "0.8.1"  => "20.02.2025  replace U+FFFD (unknown character with [VUC] see https://forum.fhem.de/index.php?msg=1334504, also fill reason in error case from extended payload",
   "0.8.0"  => "18.02.2025  enhanced error mapping now also language dependent, closing of file_handles, removed JSON::XS",
@@ -3577,10 +3578,15 @@ sub vitoconnect_getResourceCallback {
                     my @schedule;
                     foreach my $day (@days) {
                      if (exists $Value->{$day}) {
-                      push @schedule, { $day => $Value->{$day} };
+                       foreach my $entry (@{$Value->{$day}}) {
+                         my $ordered_entry = sprintf('{"mode":"%s","start":"%s","end":"%s","position":%d}',
+                                             $entry->{mode}, $entry->{start}, $entry->{end}, $entry->{position}
+                       );
+                       push @schedule, sprintf('{"%s":%s}', $day, $ordered_entry);
+                       }
                      }
                     }
-                    my $Result = encode_json(\@schedule);
+                    my $Result = '[' . join(',', @schedule) . ']';
                     readingsBulkUpdate($hash, $Reading, $Result);
                     Log3($name, 5, "$name - $Reading: $Result ($Type)");
                 }
