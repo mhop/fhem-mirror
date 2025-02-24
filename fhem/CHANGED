@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  98_vitoconnect: order mode, start, end, position in schedule
  - bugfix:  98_vitoconnect: fix order of days for type schedule readings
                             improved state reading in case of unknown error
  - change:  74_AutomowerConnect: mandatory update for websocket-v2 events
