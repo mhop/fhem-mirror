@@ -159,7 +159,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.46.4" => "23.02.2025  _flowGraphic: fix clculation of node2home (Forum: https://forum.fhem.de/index.php?msg=1334798)",
+  "1.46.4" => "23.02.2025  _flowGraphic: fix clculation of node2home (Forum: https://forum.fhem.de/index.php?msg=1334798) ".
+                           "_transferBatteryValues: change Debug Logging ",
   "1.46.3" => "22.02.2025  new sub getConsumerMintime, consumer key 'mintime' can handle a device/reading combination that deliver minutes ".
                            "reports violation of the continuity specification for battery in/out energy ",
   "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstancePV instead, _calcConsForecast_circular: include epiecAVG ".
@@ -9626,6 +9627,7 @@ sub _transferBatteryValues {
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
+  my $debug = $paref->{debug};
 
   my $hash    = $defs{$name};
   my $num     = 0;
@@ -9687,10 +9689,9 @@ sub _transferBatteryValues {
           delete $data{$name}{batteries}{$bn}{binstcap};
       }
 
-      my $debug = $paref->{debug};
       if ($debug =~ /collectData/x) {
-          Log3 ($name, 1, "$name DEBUG> collect Battery data: device=$badev =>");
-          Log3 ($name, 1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
+          Log3 ($name, 1, "$name DEBUG> collect Battery Readings data: device=$badev =>");
+          Log3 ($name, 1, "$name DEBUG> pin: $pbi W, pout: $pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
       }
 
       my $params;
@@ -9703,6 +9704,11 @@ sub _transferBatteryValues {
           };
 
           ($pbo,$pbi) = substSpecialCases ($params);
+
+          if ($debug =~ /collectData/x) {
+              Log3 ($name, 1, "$name DEBUG> Battery Power data after resolving the special case 'pin eq -pout' =>");
+              Log3 ($name, 1, "$name DEBUG> pin: $pbi W, pout: $pbo W");
+          }
       }
 
       if ($pou eq "-pin") {                                                                        # Spezialfall pout bei neg. pin
@@ -9713,6 +9719,11 @@ sub _transferBatteryValues {
           };
 
           ($pbi,$pbo) = substSpecialCases ($params);
+          
+          if ($debug =~ /collectData/x) {
+              Log3 ($name, 1, "$name DEBUG> Battery Power data after resolving the special case 'pou eq -pin' =>");
+              Log3 ($name, 1, "$name DEBUG> pin: $pbi W, pout: $pbo W");
+          }
       }
 
       # Batterielade, -entladeenergie in Circular speichern
@@ -15751,11 +15762,11 @@ sub _flowGraphic {
   ## Knotensummen Erzeuger - Batterie - Home ermitteln
   ######################################################
   my $pnodesum  = __normDecPlaces ($ppall + $pv2node);                      # Erzeugung Summe im Knoten
-  $pnodesum    += abs $node2bat if($node2bat < 0);                          # Batterie ist voll und SolarLader liefert an Knoten
   $node2bat    -= $pv2bat;                                                  # Knoten-Bat -> abzüglich Direktladung (pv2bat)
+  $pnodesum    -= $node2bat;                                                # V 1.46.4 - Batterie ist voll und SolarLader liefert an Knoten
+  
   #my $node2home = __normDecPlaces ($cself + $ppall);                        # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
-  my $node2home = __normDecPlaces ($pnodesum - $node2bat);                  # V 1.46.4 - Energiefluß vom Knoten zum Haus
-
+  my $node2home = __normDecPlaces ($pnodesum - $node2grid);                 # V 1.46.4 - Energiefluß vom Knoten zum Haus
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
