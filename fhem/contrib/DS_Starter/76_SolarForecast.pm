@@ -15722,7 +15722,7 @@ sub _flowGraphic {
   my $node2bat           = $batin;
 
   if ($batin) {                                                                          # Batterie wird geladen
-      my $home2bat = $batin - ($pv2node + $pv2bat);
+      my $home2bat = $batin - ($ppall + $pv2node + $pv2bat);                             # V 1.46.4: add $ppall
 
       if ($home2bat > 1) {                                                               # Batterieladung wird anteilig aus Hausnetz geladen
           $node2bat           -= $home2bat;
@@ -15763,7 +15763,8 @@ sub _flowGraphic {
   ######################################################
   my $pnodesum  = __normDecPlaces ($ppall + $pv2node);                      # Erzeugung Summe im Knoten
   $node2bat    -= $pv2bat;                                                  # Knoten-Bat -> abzüglich Direktladung (pv2bat)
-  $pnodesum    -= $node2bat if($node2bat < 0);                              # V 1.46.4 - Batterie ist voll und SolarLader liefert an Knoten
+  #Log3 ($name, 1, "$name - pv2bat: $pv2bat, node2bat:$node2bat ");
+  $pnodesum    += $node2bat < 0 ? abs $node2bat : - $node2bat;              # V 1.46.4 - Batterie ist voll und SolarLader liefert an Knoten
   
   #my $node2home = __normDecPlaces ($cself + $ppall);                        # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
   my $node2home = __normDecPlaces ($pnodesum - $node2grid);                 # V 1.46.4 - Energiefluß vom Knoten zum Haus
