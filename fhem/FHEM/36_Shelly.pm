@@ -151,6 +151,10 @@
 # 6.02.2    fix: update interval if interval is set to 0
 #           new: slat control für rollers Gen2+
 # 6.02.3    fix: setting of attribute slat_control
+# 6.02.4    fix: checking os regarding command hostname
+# 6.03      new: commands script_start, script_stop
+#           fix: recognition of ShellyI4Gen3
+
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
 
@@ -173,7 +177,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.02.2 07.02.2025";
+my $version = "6.03 24.02.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -216,18 +220,19 @@ my %shelly_dropdowns = (
 #-- these we may get on request
     "Gets"  => "status:noArg settings:noArg registers:noArg config version:noArg model:noArg actions:noArg readingsGroup:Device,Firmware,Network,Status",
 #-- these we may set
-    "Shelly"=> "config interval password reboot:noArg update:noArg name clear:disconnects,error,energy,responsetimes",
-    "Actions"=>" actions",  # create,delete,disable,enable,update
-    "Onoff" => " on off toggle on-for-timer off-for-timer",## on-till off-till on-till-overnight off-till-overnight blink intervals",
-    "Multi" => " ON:noArg OFF:noArg xtrachannels:noArg",
-    "Rol"   => " closed open stop:noArg pct:slider,0,1,100 delta zero:noArg predefAttr:noArg",
-    "RgbwW" => " pct:slider,1,1,100 dim dimup dimdown dim-for-timer",   ## later we add calibrate for shellydimmer
-    "BulbW" => " ct:colorpicker,CT,3000,10,6500 pct:slider,1,1,100",
-    "RgbwC" => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100 effect:select,Off,1,2,3",
-    "Input" => " input:momentary,toggle,edge,detached,activation", 
-    "Input1"=> ",momentary_on_release",  # only Shelly1
-    "Input2"=> ",cycle",                  # only ShellyPlus2
-    "Therm" => " target, thermostat_type:heating,cooling thermostat_output:straight,invert"    # Wall display thermostat target temperature °C
+    "Shelly"  => "config interval password reboot:noArg update:noArg name clear:disconnects,error,energy,responsetimes",
+    "Actions" => " actions",  # create,delete,disable,enable,update
+    "Scripts" => " script_start script_stop",
+    "Onoff"   => " on off toggle on-for-timer off-for-timer",## on-till off-till on-till-overnight off-till-overnight blink intervals",
+    "Multi"   => " ON:noArg OFF:noArg xtrachannels:noArg",
+    "Rol"     => " closed open stop:noArg pct:slider,0,1,100 delta zero:noArg predefAttr:noArg",
+    "RgbwW"   => " pct:slider,1,1,100 dim dimup dimdown dim-for-timer",   ## later we add calibrate for shellydimmer
+    "BulbW"   => " ct:colorpicker,CT,3000,10,6500 pct:slider,1,1,100",
+    "RgbwC"   => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100 effect:select,Off,1,2,3",
+    "Input"   => " input:momentary,toggle,edge,detached,activation", 
+    "Input1"  => ",momentary_on_release",  # only Shelly1
+    "Input2"  => ",cycle",                  # only ShellyPlus2
+    "Therm"   => " target, thermostat_type:heating,cooling thermostat_output:straight,invert"    # Wall display thermostat target temperature °C
 );
 ## may be used for RgbwC:
 ##  "hsv:colorpicker,HSV"
@@ -304,7 +309,7 @@ my %shelly_vendor_ids = (
     "S3SW-001X16EU"   => ["shellyplus1",    "Shelly 1 Gen3",           0x1018],   ##new
     "S3SW-001P16EU"   => ["shellyplus1pm",  "Shelly 1PM Gen3",         0x1019],   ##new
     "S3SW-002P16EU"   => ["shellyplus2pm",  "Shelly 2PM Gen3",         0x1005],   # added 10/2024
-    "S3SN-0024X"      => ["shellyi4gen3",   "Shelly i4 Gen3",          0x1812],   ## (AC), new
+    "S3SN-0024X"      => ["shellyplusi4",   "Shelly i4 Gen3",          0x1812],   ## (AC), new
     "S3SN-0U12A"      => ["generic",        "Shelly H&T Gen3",         0x1809],   ## new, not yet implemented
     "S3DM-0010WW"     => ["shellyplus010v", "Shelly Dimmer 0/1-10V PM Gen3",0x1072], ## new
     "S3PL-00112EU"    => ["shellyplusplug", "Shelly Plug S MTR Gen3",  0x1805],   # added 10/2024
@@ -313,6 +318,7 @@ my %shelly_vendor_ids = (
     "S3EM-002CXEU"    => ["generic",        "Shelly EM Gen3",          0x1027],   # added 10/2024
     "S3EM-003CXCEU63" => ["generic",        "Shelly 3EM 63 Gen3",      0x1026],   # added 01/2025    
     "S3PL-10112EU"    => ["shellyplusplug", "Shelly AZ Plug",          0x1850],   # added 01/2025  amazon compatible
+    "S3PL-20112EU"    => ["shellyplusplug", "Shelly Outdoor Plug S Gen3",0x1853],   # added 02/2025
     ## Mini Gen3 Devices
     "S3SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen3",      0x1015],
     "S3SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1 PM Mini Gen3",   0x1016],
@@ -327,6 +333,7 @@ my %shelly_vendor_ids = (
     "SPSW-002PE16EU"  => ["shellypro2pm",   "Shelly Pro 2PM"],    ## not listed by KB
     "SPSW-202PE16EU"  => ["shellypro2pm",   "Shelly Pro 2PM v.1"],
     "SPSH-002PE16EU"  => ["shellyprodual",  "Shelly Pro Dual Cover/Shutter PM"],
+    "SPDC-0D5PE16EU"  => ["shellyplusrgbwpm", "Shelly Pro RGBWW PM",  0x2012],    # added 02/2025  <<<< two channels of White not supported here
     "SPDM-001PE01EU"  => ["shellyprodm1pm", "Shelly Pro Dimmer 1PM"], ##new
     "SPDM-002PE01EU"  => ["shellyprodm2pm", "Shelly Pro Dimmer 2PM"],
     "SPSW-003XE16EU"  => ["shellypro3",     "Shelly Pro 3"],
@@ -408,7 +415,7 @@ my %shelly_models = (
     "shellyprodm1pm"=> [0,0,1, 1,2,2,  0,0,0],    # 1 dimmer with 2 inputs
     "shellyprodm2pm"=> [0,0,2, 2,2,4,  0,0,0],    # 2 dimmer with each 2 inputs
     "shellyproem50" => [1,0,0, 0,1,0,  1,0,0],    # has two single-phase meter and one relay
-    "shellypro3em"  => [0,0,0, 0,1,0,  3,0,0],    # has one (1) three-phase meter in triphase profile
+    "shellypro3em"  => [0,0,0, 0,1,0,  3,0,2],    # has one (1) three-phase meter in triphase profile or (3) meter in monophase-profile
     "shellyprodual" => [0,2,0, 4,1,4,  0,0,0],
     "shellypmmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to ShellyPlusPM
     "walldisplay1"  => [1,0,0, 0,2,1,  0,0,0]     # similar to ShellyPlus1PM
@@ -1038,11 +1045,16 @@ if(0){
       fhem("attr -silent $name host_dns $host");
   }   
   if($init_done && !AttrVal($name,"host_ip",undef) ){
-      my $host_ip = qx(hostname --all-ip-addresses); # only on linux, otherwise we get something else
-      $host_ip =~ s/ .*\n$//;
+      my $host_ip = "host-ip";
+      if( $^O eq "linux" ){  # $^O contains the OS under which perl was build
+          $host_ip = qx(hostname --all-ip-addresses); # only on linux, otherwise we get something else
+          $host_ip =~ s/ .*\n$//;
+      }
       if( $host_ip !~ m/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/ ){ # ip4
           fhem("attr -silent $name host_ip xxx.xxx.xxx.xxx");
-          Log3 $name,1,"[Shelly_define] Please set attribute \'host_ip\' first";
+          Log3 $name,1,"[Shelly_define] $name: Please set attribute \'host_ip\'  ($^O)";
+      }else{
+          Log3 $name,1,"[Shelly_define] $name: \'host_ip\'=$host_ip";      
       }
   }
   return undef;
@@ -1067,7 +1079,7 @@ sub Shelly_getModel {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $call = $param->{cmd};
-  my ($model_id,$model,$mode,$auth,$mac,$profile);
+  my ($model_id,$model,$mode,$auth,$mac);
 
   if( $call eq "/shelly" ){  # the /shelly call is not blocked by authentication!
       if( defined($jhash->{type}) ){ #1G
@@ -1102,12 +1114,6 @@ sub Shelly_getModel {
           $attr{$hash->{NAME}}{mode} = "switch";
           Log3 $name,1,"[Shelly_getModel] device $name is of model >walldisplay< and set to mode >switch<";
       }
-      ### Gen2 energy meter are working in 'monophase' profile and (if applicant) in 'triphase' profile
-      ### ShellyPlus2PM may work in profiles 'switch' or 'cover'
-      if( defined($jhash->{profile}) ){
-          $profile = $jhash->{profile};
-          Log3 $name,1,"[Shelly_getModel] device $name is working in profile <$profile>";
-      }
       
   }elsif( $call eq "/settings" ){
       if( defined($jhash->{device}{type}) ){
@@ -1128,21 +1134,16 @@ sub Shelly_getModel {
           Log3 $name,2,"[Shelly_getModel] type not found, proposed model of device $name is \'generic\'";
           $model_id = "unknown";
           $model = "generic";
-      }      
-      if( defined($jhash->{profile}) ){   # see above "/shelly"
-          $profile = $jhash->{profile};
-          Log3 $name,1,"[Shelly_getModel] device $name is working in profile <$profile>";
-      }
+      }  
   }
   if( defined($model_id) ){
-        Log3 $name,4,"[Shelly_getModel] device $name is of model_ID $model_id";
-        $model = $shelly_vendor_ids{$model_id}[0];
-        my $device_name = $shelly_vendor_ids{$model_id}[1];
-        my $device_family = $shelly_family{substr($model_id,0,2)};
+        Log3 $name,4,"[Shelly_getModel] device $name is of model_ID \'$model_id\'";
         readingsSingleUpdate($hash,"model_ID",$model_id,1);
-        readingsSingleUpdate($hash,"model_family",$device_family,1);
-        readingsSingleUpdate($hash,"model_name",$device_name,1);
+        readingsSingleUpdate($hash,"model_family",$shelly_family{substr($model_id,0,2)},1);
         readingsSingleUpdate($hash,"model_function",$shelly_category{substr($model_id,2,2)}//"unknown",1);
+        readingsSingleUpdate($hash,"model_name",$shelly_vendor_ids{$model_id}[1],1);
+        #--------
+        $model = $shelly_vendor_ids{$model_id}[0];
         if ( $model ){
             Log3 $name,4,"[Shelly_getModel] $call: discovered model=$model for device $name";
         }else{
@@ -1173,18 +1174,29 @@ sub Shelly_getModel {
         }
     }
     Shelly_Attr("set",$name,"model",$model,undef); # set the .AttrList
-    if( defined($mode) && $shelly_models{$model}[8]>1 ){  # must be a multi-mode device
-        $mode =~ s/switch/relay/;  # we use 1st-Gen modes
-        $mode =~ s/cover/roller/;
-        Log3 $name,3,"[Shelly_getModel] $call: the mode/profile of device $name is set to \'$mode\' ";
-        $attr{$hash->{NAME}}{mode} = $mode;
-    }else{
-        delete($attr{$hash->{NAME}}{mode});
-    }
-  }  
-  if( defined($profile) && substr($model_id,2,2) eq "EM" ){
-     readingsSingleUpdate($hash,"model_profile",$profile,1);
   }
+  
+  # mode / profile
+      ### Gen2 energy meter are working in 'monophase' profile and (if applicant) in 'triphase' profile
+      ### ShellyPlus/Pro2PM may work in profiles 'switch' or 'cover'
+      ### RGBW devices may work in profiles 'white' or 'color'
+  if( defined($mode) && defined($model) ){
+     if( $shelly_models{$model}[8]>1 ){
+         $mode =~ s/switch/relay/;  # we use 1st-Gen modes
+         $mode =~ s/cover/roller/;
+         Log3 $name,1,"[Shelly_getModel] $call: the mode/profile of device $name is set to \'$mode\' ";
+         $attr{$hash->{NAME}}{mode} = $mode;
+         Log3 $name,1,"[Shelly_getModel] device $name is working in profile \'$mode\'";
+         readingsSingleUpdate($hash,"model_profile",$mode,1)  if( substr($model_id,2,2) eq "EM" );   # reading is deprecated
+     }else{
+         Log3 $name,1,"[Shelly_getModel] found mode \'$mode\' for device $name, but we don't have a multimode-definition";
+     }
+  }else{
+         Log3 $name,1,"[Shelly_getModel] no mode/profile found for device $name";
+         delete($attr{$hash->{NAME}}{mode});
+  }
+  
+  # auth
   if( defined($auth) && $auth==1 && !defined(AttrVal($name,"shellyuser",undef)) && $shelly_models{$model}[4]==0 ){
      Shelly_error_handling($hash,"Shelly_getModel","Authentication required",1);
      return;
@@ -1194,7 +1206,7 @@ sub Shelly_getModel {
 
   delete($hash->{helper}{Sets}); # build up the sets-dropdown with next refresh
 
-  if( $param->{cmd} eq "/shelly" && $shelly_models{$model}[8]>1  && $shelly_models{$model}[4]==0 ){
+  if( $param->{cmd} eq "/shelly" && $shelly_models{$model}[8]>1  && $shelly_models{$model}[4]==0 && !defined($mode) ){
         # searching for 'mode' of multimode Gen1 devices, eg. ShellyRGBW
         Log 1,"[Shelly_getModel] searching for mode of $name";
         Shelly_HttpRequest($hash,"/settings",undef,"Shelly_getModel" );
@@ -2221,6 +2233,8 @@ sub Shelly_Set ($@) {
       # Gen2 devices only
       $newkeys .= $shelly_dropdowns{Actions}
                                     if( $shelly_models{$model}[4]>-1 ); ## all Gens
+      $newkeys .= $shelly_dropdowns{Scripts}
+                                    if( $shelly_models{$model}[4]>=1 ); ## Gen2+
       # most of devices, except roller, metering
       $newkeys .= $shelly_dropdowns{Onoff}
                                     if( ($mode ne "thermostat" && $mode ne "roller" && $shelly_models{$model}[0]>0) ||  $shelly_models{$model}[2]>0 || $shelly_models{$model}[7]>0 );
@@ -3438,9 +3452,17 @@ sub Shelly_Set ($@) {
          Log3 $name,1,"[Shelly_Set] ".$msg;
       }
       return $msg;
+      
   }elsif( $cmd =~ /blink|intervals|off-till|on-till/ ){
       Log3 $name,4,"[Shelly_Set] calling SetExtension \'$cmd\' for $name";
       SetExtensions($hash,$hash->{helper}{Sets},$name,$cmd,@args);
+      
+  }elsif( $cmd =~ /script/ ){ # script_start script_stop
+      $cmd =~ s/_/\./;
+      $cmd =~ s/s/S/g; # Script.Start Script.Stop
+      Log3 $name,4,"[Shelly_Set] calling script function $cmd and id $value"; #4
+      Shelly_HttpRequest($hash,"/rpc/$cmd","?id=$value","Shelly_response","scripts",1 ); #1=call silent
+      
   ####****** BLU ***********
   }elsif( $cmd =~ /event/ ){
       Log3 $name,4,"[Shelly_Set:BLU] calling Shelly BLUE \'$cmd\' for $name";
@@ -3561,7 +3583,7 @@ sub Shelly_getEMvalues($){
   my $model = AttrVal($name,"model","generic");
  
   my $EMcall="EM1.GetStatus";
-  $EMcall="EM.GetStatus"  if( ReadingsVal($name,"model_profile","nn") eq "triphase");
+  $EMcall="EM.GetStatus"  if( ReadingsVal($name,"model_profile","monophase") eq "triphase");
   Shelly_HttpRequest($hash,"/rpc/$EMcall","?id=0","Shelly_procEMvalues" );
 } #end Shelly_getEMvalues()
 
@@ -3572,7 +3594,7 @@ sub Shelly_getEnergyData($){
   return if( $hash->{INTERVAL} == 0 );
   
   my $EMcall="EM1Data.GetStatus";
-  $EMcall="EMData.GetStatus"  if( ReadingsVal($name,"model_profile","nn") eq "triphase");
+  $EMcall="EMData.GetStatus"  if( ReadingsVal($name,"model_profile","monophase") eq "triphase");
   Shelly_HttpRequest($hash,"/rpc/$EMcall","?id=0","Shelly_procEnergyData" );
 } #end Shelly_getEnergyData()
 
@@ -4749,10 +4771,10 @@ sub Shelly_status2G {
             $tmrDur =  round($tmrDur,1);
             Log3 $name,4,"[Shelly_status2G:tmr] $name calculated timer$subs from start and duration is $tmrDur"; #5
          }
-Log3 $name,2,"[Shelly_status2G:timex] $name calculated update timer is $timer vs duration=$tmrDur"; #5
+Log3 $name,6,"[Shelly_status2G:timex] $name calculated update timer is $timer vs duration=$tmrDur"; #5
 #         $timer = minNum( $timer, $tmrDur ); 
          $timer = $hash->{INTERVAL}>0 ? minNum( $hash->{INTERVAL},$tmrDur ) : $tmrDur;# 
-         Log3 $name,2,"[Shelly_status2G:timer] $name calculated update timer is $timer"; #5
+         Log3 $name,6,"[Shelly_status2G:timer] $name calculated update timer is $timer"; #5
          $tmrDur .= " sec = ".FmtDateTime($tmrEnd)  if( $hash->{units} );
          readingsBulkUpdateMonitored($hash,"timer".$subs,$tmrDur);
       }elsif( $jhash->{$CC}{move_started_at} ){  # cover, if moving
@@ -5270,7 +5292,9 @@ sub Shelly_settings2G {
            Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_name",$client,undef,undef,$timestamp );
            $xi++;
       }
-      Shelly_readingsBulkUpdate($hash,"ap_clients",$xi,undef,undef,FmtDateTime($jhash->{ts}) );   # Total number of clients
+      # Total number of clients
+    # Shelly_readingsBulkUpdate($hash,"ap_clients",$xi,undef,undef,FmtDateTime($jhash->{ts}) );     $jhash->{ts}  is null
+      readingsBulkUpdateIfChanged($hash,"ap_clients",$xi);
       ###--- start next request
       if( $model !~ /display/ ){
           Shelly_HttpRequest($hash,"/rpc/BLE.CloudRelay.List",undef,"Shelly_settings2G","BLEclients" );
@@ -5531,7 +5555,7 @@ sub Shelly_procEMvalues {
   my $power=0;  # cumulated active power
 
   my (@emchannels,$mpsub,$mpch);  
-  if( ReadingsVal($name,"model_profile","nn") eq "triphase" ){
+  if( ReadingsVal($name,"model_profile","monophase") eq "triphase" ){
     # triphase
     @emchannels = ("a_","b_","c_","total_");
     $mpsub="";
@@ -5613,7 +5637,7 @@ sub Shelly_procEMvalues {
 
   ### ----------------------------------------
   ### get cumulated values in monophase profile
-  if( ReadingsVal($name,"model_profile","nn") ne "triphase" ){
+  if( ReadingsVal($name,"model_profile","monophase") ne "triphase" ){
           if( $id==0 ){   # initialize helper values
               $hash->{helper}{'act_power'}  = 0;
               $hash->{helper}{'aprt_power'}  = 0;
@@ -5644,7 +5668,7 @@ sub Shelly_procEMvalues {
   readingsEndUpdate($hash,1);
   #~~~~~~~~~~~~~~~~~~~~~
   
-  if( ReadingsVal($name,"model_profile","nn") ne "triphase"    &&    ++$id < $shelly_models{$model}[3] ){
+  if( ReadingsVal($name,"model_profile","monophase") ne "triphase"    &&    ++$id < $shelly_models{$model}[3] ){
          Shelly_HttpRequest($hash,"/rpc/EM1.GetStatus","?id=$id","Shelly_procEMvalues" );
          return;
   }
@@ -5693,7 +5717,7 @@ sub Shelly_procEnergyData {
   my ($active_energy,$return_energy,$deltaEnergy,$deltaAge);
   
   my (@emchannels,$mpsub,$mpch);  
-  if( ReadingsVal($name,"model_profile","nn") eq "triphase" ){
+  if( ReadingsVal($name,"model_profile","monophase") eq "triphase" ){
     # triphase: we have for the channel 0:
     # a_total_act_energy
     # a_total_act_ret_energy
@@ -5765,7 +5789,7 @@ sub Shelly_procEnergyData {
         } 
         
   ### ~~~~~~~~~~Triphase~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      
-  if( ReadingsVal($name,"model_profile","nn") eq "triphase" ){
+  if( ReadingsVal($name,"model_profile","monophase") eq "triphase" ){
   ### 3. calculate a power value from the difference of Energy measures
         $deltaAge = $unixtime - $hash->{helper}{timestamp_last};
         $hash->{helper}{timestamp_last} = $unixtime;
@@ -5781,7 +5805,7 @@ sub Shelly_procEnergyData {
   }  # Triphase/
 
   ############ Balancing ######################
-  if( ReadingsVal($name,"model_profile","nn") eq "triphase"  
+  if( ReadingsVal($name,"model_profile","monophase") eq "triphase"  
     &&  AttrVal($name,"Balancing",1) == 1 
     &&  $hash->{helper}{powerCnt} ){   # don't divide by zero
       Log3 $name,5,"[Shelly_procEnergyData] processing Balancing";
@@ -5852,13 +5876,13 @@ sub Shelly_procEnergyData {
   }  # Balancing/ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      
   readingsEndUpdate($hash,1);
 
-  if( ReadingsVal($name,"model_profile","nn") ne "triphase"    &&    ++$id < $shelly_models{$model}[3] ){
+  if( ReadingsVal($name,"model_profile","monophase") ne "triphase"    &&    ++$id < $shelly_models{$model}[3] ){
          Shelly_HttpRequest($hash,"/rpc/EM1Data.GetStatus","?id=$id","Shelly_procEnergyData" );
          return;
   }
   
   # last run: get total values  for monophase profile
-  if( ReadingsVal($name,"model_profile","nn") ne "triphase"  ){
+  if( ReadingsVal($name,"model_profile","monophase") ne "triphase"  ){
       readingsBeginUpdate($hash);
       my ($val,$unit);
       #    $reading = $pr.$mapping{E1}{'total_'}.$ps;
@@ -6180,6 +6204,34 @@ if(0){
       delete $hash->{CMD};
 
   #---------------------------
+  }elsif( $comp =~ /target/ ){
+          Log3 $name,3,"[Shelly_response:target] $name: got answer from a target call";  ##3
+  
+  #---------------------------
+  }elsif( $comp =~ /script/ ){ # returned data:  was_running
+      my $was_running = $jhash->{'was_running'};
+      #  $was_running =~ s/0|(false)/was not running/;
+      #  $was_running =~ s/1|(true)/was running/;
+      my $script_state;
+      if( $cmd =~ /Start/ ){
+          if( $was_running =~ /0|(false)/ ){
+              $script_state = "started";
+          }else{
+              $script_state = "has already been started";
+          }
+      }else{ # Stop
+          if( $was_running =~ /0|(false)/ ){
+              $script_state = "was already stopped";
+          }else{
+              $script_state = "stopped";
+          }
+      }
+      $urlcmd =~ s/\?//;
+      Log3 $name,2,"[Shelly_response:script] $name: got answer from $comp call: script $urlcmd $script_state";  ##2
+      # Script.List
+      Shelly_HttpRequest($hash,"/rpc/Script.List",undef,"Shelly_settings2G","scripts",1 ); #call silent
+ 
+  #---------------------------
   }elsif( $comp =~ /config/ ){
         $timer=1.25;
 
@@ -6230,7 +6282,8 @@ if(0){
         # Gen2 Sys.SetConfig  Cover.SetConfig Wifi.SetConfig etc.
         }elsif( $cmd =~ /SetConfig/ ){
             if( defined( $jhash->{restart_required}) ){
-                Log3 $name,1,"[Shelly_response:config] device $name has set Config successfull, Restart required: ".($jhash->{restart_required}?"YES":"NO");
+                Log3 $name,1,"[Shelly_response:config] device $name has set Config successfull, Restart required: "
+                            .($jhash->{restart_required}?"YES":"NO");
             }
             #call settings
             Shelly_HttpRequest($hash,"/rpc/Shelly.GetConfig",undef,"Shelly_settings2G","config" );
@@ -6929,9 +6982,17 @@ sub Shelly_firmwarecheck {
   my (@num_fw,@num_upd,$firmwareV,$updateV);
   my $txt ="-";
   my $icon="/";
+
+  #-- we don't have info about an update (really no update,  no internet)
+  if( !defined($update) ){  #gen2 only
+      $update = $model =~ /walldisplay/ ? $shelly_firmware{walldisplay} : $shelly_firmware{gen2};
+      ($firmware,$update,$txt,$icon) = cmpVersions( $firmware,$update );  
+      if( $icon ne "OK" ){  
+          $txt = "check internet for update min. $update";
+      }
   
   #-- existing fw is beta
-  if( $firmware =~ /(rc)|(beta)/ ){
+  }elsif( $firmware =~ /(rc)|(beta)/ ){
       ($firmware,$update,$txt,$icon) = cmpVersions( $firmware,$update );
       if( $icon eq "OK" ){  
           $txt = "downgrade possible to latest stable $update";
@@ -6939,14 +7000,6 @@ sub Shelly_firmwarecheck {
       }
       if( defined($beta) && $beta ne "none" ){
           $txt .= ", check for new beta-version "; 
-      }
-
-  #-- we don't have info about an update (really no update,  no internet)
-  }elsif( !defined($update) ){  #gen2 only
-      $update = $model =~ /walldisplay/ ? $shelly_firmware{walldisplay} : $shelly_firmware{gen2};
-      ($firmware,$update,$txt,$icon) = cmpVersions( $firmware,$update );  
-      if( $icon ne "OK" ){  
-          $txt = "check internet for update min. $update";
       }
       
   #-- we have a non-beta existing fw and no update / gen1
@@ -7075,7 +7128,8 @@ sub Shelly_error_handling {
         readingsBulkUpdateIfChanged($hash,"network",$errN,1);
         readingsBulkUpdateIfChanged($hash,"network_connection","offline");
         readingsBulkUpdateIfChanged($hash,"error","network",1);
-        readingsBulkUpdate($hash,"network_disconnects",ReadingsNum($name,"network_disconnects",0)+1)   if( ReadingsVal($name,"state","") ne $errS );
+        readingsBulkUpdate($hash,"network_disconnects",ReadingsNum($name,"network_disconnects",0)+1)
+                                                                       if( ReadingsVal($name,"state","") ne $errS );
         if( $multiplyIntervalOnError > 1 && $intv < 43200 ){
             #increase the INTERNAL update interval, but do not exceed 43200sec=12hours
             $intv=minNum($multiplyIntervalOnError*$intv,43200);
@@ -7086,7 +7140,7 @@ sub Shelly_error_handling {
         # other errors
         readingsBulkUpdateIfChanged($hash,"error",$errE,1);
     }
-    Log3 $name,$verbose,$msg;
+    Log3 $name,$verbose,$msg  if( ReadingsVal($name,"state","-") ne "Error: Network");
     readingsBulkUpdateMonitored($hash,"state",$errS, 1 ); 
     if( $flag==0 ){
        readingsEndUpdate($hash,1);
@@ -7427,6 +7481,16 @@ sub Shelly_HttpResponse($){
             <a id="Shelly-set-reboot"></a>
             <code>set &lt;name&gt; reboot</code>
             <br>Reboot the Shelly
+            </li>
+        <li>
+            <a id="Shelly-set-script_start"></a>
+            <code>set &lt;name&gt; script_start &lt;id&gt;</code>
+            <br>Start of script &lt;id&gt;
+            </li>
+        <li>
+            <a id="Shelly-set-script_stop"></a>
+            <code>set &lt;name&gt; script_stop &lt;id&gt;</code>
+            <br>Stopping the script &lt;id&gt;
             </li>
         <li>
             <a id="Shelly-set-clear"></a>
@@ -8012,15 +8076,25 @@ sub Shelly_HttpResponse($){
             <a id="Shelly-set-password"></a>
             <code>set &lt;name&gt; password &lt;password&gt;</code>
             <br>Setzen des Passwortes für das Shelly Web Interface
+            <code>set &lt;name&gt; password </code>
+            <br>Entfernen des in Fhem gespeicherten Passwortes (Aufruf ohne Parameter)
             </li>
             Bei Shelly-Geräten der 1. Generation muss zuvor das Attribut 'shellyuser' gesetzt sein.
-            Ein in Fhem gespeichertes Passwort wird durch Aufruf ohne Parameter entfernt:
-            <code>set &lt;name&gt; password </code>
             Hinweis: Beim Umbenennen des Devices mit 'rename' geht das Passwort verloren
         <li>
             <a id="Shelly-set-reboot"></a>
             <code>set &lt;name&gt; reboot</code>
             <br>Neustarten des Shelly
+            </li>
+        <li>
+            <a id="Shelly-set-script_start"></a>
+            <code>set &lt;name&gt; script_start &lt;id&gt;</code>
+            <br>Starten des Scripts &lt;id&gt;
+            </li>
+        <li>
+            <a id="Shelly-set-script_stop"></a>
+            <code>set &lt;name&gt; script_stop &lt;id&gt;</code>
+            <br>Stoppen des Scripts &lt;id&gt;
             </li>
         <li>
             <a id="Shelly-set-clear"></a>
