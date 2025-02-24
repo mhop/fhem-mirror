@@ -93,6 +93,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.8.5"  => "24.02.2025  fix error when calling setter from FHEMWEB",
   "0.8.4"  => "24.02.2025  also order mode, start, end, position in schedule",
   "0.8.3"  => "23.02.2025  fix order of days for type schedule readings",
   "0.8.2"  => "22.02.2025  improved State reading in case of unknown error",
@@ -1385,20 +1386,26 @@ sub vitoconnect_Set {
     return "set ".$name." needs at least one argument" unless (defined($opt) );
     
     # Setter für Device Werte rufen
+    my $return;
     if  (AttrVal( $name, 'vitoconnect_raw_readings', 0 ) eq "1" ) {
         #use new dynamic parsing of JSON to get raw setters
-        $val .= vitoconnect_Set_New ($hash,$name,$opt,@args) // '';
+        $return = vitoconnect_Set_New ($hash,$name,$opt,@args);
     } 
     elsif  (AttrVal( $name, 'vitoconnect_mapping_roger', 0 ) eq "1" ) {
         #use roger setters
-        $val .= vitoconnect_Set_Roger ($hash,$name,$opt,@args) // '';
+        $return = vitoconnect_Set_Roger ($hash,$name,$opt,@args) // '';
     } 
     else {
         #use svn setters
-    $val .= vitoconnect_Set_SVN ($hash,$name,$opt,@args) // '';
+        $return = vitoconnect_Set_SVN ($hash,$name,$opt,@args) // '';
     }
     
-
+    # Check if val was returned or action exected with return;
+    if (defined $return) {
+      $val .= $return;
+    } else {
+      return;
+    }
 
     if  ($opt eq "update")                            {   # set <name> update: update readings immeadiatlely
         RemoveInternalTimer($hash);                         # bisherigen Timer löschen
@@ -1451,7 +1458,6 @@ sub vitoconnect_Set {
      AnalyzeCommand($hash,"deletereading ".$name." device.messages.errors.mapped.*");
      return;
     }
-
 
 return $val;
 }
