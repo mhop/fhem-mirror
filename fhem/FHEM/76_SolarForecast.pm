@@ -159,6 +159,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.46.4" => "25.02.2025  _flowGraphic: fix clculation of node2home (Forum: https://forum.fhem.de/index.php?msg=1334798) ".
+                           "_transferBatteryValues: change Debug Logging ",
   "1.46.3" => "22.02.2025  new sub getConsumerMintime, consumer key 'mintime' can handle a device/reading combination that deliver minutes ".
                            "reports violation of the continuity specification for battery in/out energy ",
   "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstancePV instead, _calcConsForecast_circular: include epiecAVG ".
@@ -9625,6 +9627,7 @@ sub _transferBatteryValues {
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
   my $day   = $paref->{day};
+  my $debug = $paref->{debug};
 
   my $hash    = $defs{$name};
   my $num     = 0;
@@ -9686,10 +9689,9 @@ sub _transferBatteryValues {
           delete $data{$name}{batteries}{$bn}{binstcap};
       }
 
-      my $debug = $paref->{debug};
       if ($debug =~ /collectData/x) {
-          Log3 ($name, 1, "$name DEBUG> collect Battery data: device=$badev =>");
-          Log3 ($name, 1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
+          Log3 ($name, 1, "$name DEBUG> collect Battery Readings data: device=$badev =>");
+          Log3 ($name, 1, "$name DEBUG> pin: $pbi W, pout: $pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
       }
 
       my $params;
@@ -9702,6 +9704,11 @@ sub _transferBatteryValues {
           };
 
           ($pbo,$pbi) = substSpecialCases ($params);
+
+          if ($debug =~ /collectData/x) {
+              Log3 ($name, 1, "$name DEBUG> Battery Power data after resolving the special case 'pin eq -pout' =>");
+              Log3 ($name, 1, "$name DEBUG> pin: $pbi W, pout: $pbo W");
+          }
       }
 
       if ($pou eq "-pin") {                                                                        # Spezialfall pout bei neg. pin
@@ -9712,6 +9719,11 @@ sub _transferBatteryValues {
           };
 
           ($pbi,$pbo) = substSpecialCases ($params);
+          
+          if ($debug =~ /collectData/x) {
+              Log3 ($name, 1, "$name DEBUG> Battery Power data after resolving the special case 'pou eq -pin' =>");
+              Log3 ($name, 1, "$name DEBUG> pin: $pbi W, pout: $pbo W");
+          }
       }
 
       # Batterielade, -entladeenergie in Circular speichern
@@ -15586,12 +15598,12 @@ sub _flowGraphic {
   my $cself          = ReadingsNum ($name, 'Current_SelfConsumption', 0);
   my $cc             = CurrentVal  ($hash, 'consumption',             0);
 
-  my $cc_dummy   = $cc;
-  my $scale      = FGSCALEDEF;
-  my $pdist      = 130;                                                        # Abstand Producer zueinander
-  my $hasbat     = 1;                                                          # initial Batterie vorhanden
-  my $stna       = $name;
-  $stna         .= int (rand (1500));
+  my $cc_dummy  = $cc;
+  my $scale     = FGSCALEDEF;
+  my $pdist     = 130;                                                         # Abstand Producer zueinander
+  my $hasbat    = 1;                                                           # initial Batterie vorhanden
+  my $stna      = $name;
+  $stna        .= int (rand (1500));
 
   my ($lcp, $y_pos, $y_pos1);
 
@@ -15627,6 +15639,8 @@ sub _flowGraphic {
       $bat2home = 0;
       $soc      = 0;
   }
+  
+  debugLog ($paref, 'graphic', "Battery initial summary - batin: $batin, bat2home: $bat2home");
 
   ## Resultierende von Laden und Entladen berechnen
   ###################################################
@@ -15636,6 +15650,8 @@ sub _flowGraphic {
 
   if ($x > 0) { $batin = $x; } else { $bat2home = abs $x; }                    # es darf nur $batin ODER $bat2home mit einem Wert > 0 geben
 
+  debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, bat2home: $bat2home");
+  
   my $bat_color = $soc < 26 ? "$stna bat25" :
                   $soc < 76 ? "$stna bat50" :
                   "$stna bat75";
@@ -15706,7 +15722,7 @@ sub _flowGraphic {
   my $node2bat           = $batin;
 
   if ($batin) {                                                                          # Batterie wird geladen
-      my $home2bat = $batin - ($pv2node + $pv2bat);
+      my $home2bat = $batin - ($ppall + $pv2node + $pv2bat);                             # V 1.46.4: add $ppall
 
       if ($home2bat > 1) {                                                               # Batterieladung wird anteilig aus Hausnetz geladen
           $node2bat           -= $home2bat;
@@ -15739,33 +15755,33 @@ sub _flowGraphic {
       $cnsmr->{$c}{ptyp} = 'consumer';
   }
 
-  my $consumercount   = keys %{$cnsmr};
-  my @consumers       = sort{$a<=>$b} keys %{$cnsmr};
+  my $consumercount = keys %{$cnsmr};
+  $flowgcons        = 0 if(!$consumercount);                                            # Consumer Anzeige ausschalten wenn keine Consumer definiert
+  my @consumers     = sort{$a<=>$b} keys %{$cnsmr};
 
-  ## Werte / SteuerungVars anpassen
-  ###################################
-  my $pnodesum  = __normDecPlaces ($ppall + $pv2node);                      # Erzeugung Summe im Knoten
-  $pnodesum    += abs $node2bat if($node2bat < 0);                          # Batterie ist voll und SolarLader liefert an Knoten
-  $node2bat    -= $pv2bat;                                                  # Knoten-Bat -> abzüglich Direktladung (pv2bat)
-  $flowgcons    = 0 if(!$consumercount);                                    # Consumer Anzeige ausschalten wenn keine Consumer definiert
-  my $node2home = __normDecPlaces ($cself + $ppall);                        # Energiefluß vom Knoten zum Haus: Selbstverbrauch + alle Producer (Batterie-In/Solar-Ladegeräte sind nicht in SelfConsumtion enthalten)
-
+  ## Knotensummen Erzeuger - Batterie - Home ermitteln
+  ######################################################
+  my $pnodesum   = __normDecPlaces ($ppall + $pv2node);                                 # Erzeugung Summe im Knoten
+  $node2bat     -= $pv2bat;                                                             # Knoten-Bat -> abzüglich Direktladung (pv2bat)
+  $pnodesum     += $node2bat < 0 ? abs $node2bat : 0;                                   # V 1.46.4 - Batterie ist voll und SolarLader liefert an Knoten
+  my $node2home  = $pnodesum - $node2grid - ($node2bat > 0 ? $node2bat : 0);            # V 1.46.4 - Energiefluß vom Knoten zum Haus
+  $node2home     = __normDecPlaces ($node2home);                                        # V 1.46.4
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
-  my $vbwidth    = 800;                                                     # width and height specify the viewBox size
-  my $vbminx     = -10 * $flowgxshift;                                      # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
-  my $vbminy     = $doproducerrow ? -25 : 125;                              # Grafik höher positionieren wenn keine Poducerreihe angezeigt
+  my $vbwidth    = 800;                                                                 # width and height specify the viewBox size
+  my $vbminx     = -10 * $flowgxshift;                                                  # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
+  my $vbminy     = $doproducerrow ? -25 : 125;                                          # Grafik höher positionieren wenn keine Poducerreihe angezeigt
 
   my $vbhight    = !$flowgcons     ? 380 :
                    !$flowgconsTime ? 590 :
                    610;
   $vbhight      += $exth2cdist;
 
-  if ($doproducerrow) {$vbhight += 100};                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
+  if ($doproducerrow) {$vbhight += 100};                                                # Höhe Box vergrößern wenn Poducerreihe angezeigt
 
-  $vbminy       -= $flowgyshift;                                            # Y-Verschiebung berücksichtigen
-  $vbhight      += $flowgyshift;                                            # Y-Verschiebung berücksichtigen
+  $vbminy       -= $flowgyshift;                                                        # Y-Verschiebung berücksichtigen
+  $vbhight      += $flowgyshift;                                                        # Y-Verschiebung berücksichtigen
 
   my $vbox       = "$vbminx $vbminy $vbwidth $vbhight";
   my $svgstyle   = 'width:98%; height:'.$flowgsize.'px;';

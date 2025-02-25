@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  76_SolarForecast: version 1.46.4
  - bugfix:  36_Shelly: recognition of ShellyI4Gen3
  - bugfix:  98_vitoconnect: fix error when calling setter from FHEMWEB
  - bugfix:  98_vitoconnect: order mode, start, end, position in schedule
