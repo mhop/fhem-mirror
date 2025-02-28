@@ -1275,13 +1275,13 @@ my %hcsr = (                                                                    
   for my $csr (1..MAXCONSUMER) {
       $csr                                       = sprintf "%02d", $csr;
 
-      $hcsr{'currentRunMtsConsumer_'.$csr}{fnr}  = 4;
+      $hcsr{'currentRunMtsConsumer_'.$csr}{fnr}  = 5;
       $hcsr{'currentRunMtsConsumer_'.$csr}{fn}   = \&ConsumerVal;
       $hcsr{'currentRunMtsConsumer_'.$csr}{par}  = 'cycleTime';
       $hcsr{'currentRunMtsConsumer_'.$csr}{unit} = ' min';
       $hcsr{'currentRunMtsConsumer_'.$csr}{def}  = 0;
 
-      $hcsr{'runTimeAvgDayConsumer_'.$csr}{fnr}  = 4;
+      $hcsr{'runTimeAvgDayConsumer_'.$csr}{fnr}  = 5;
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{fn}   = \&ConsumerVal;
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{par}  = 'runtimeAvgDay';
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{unit} = ' min';
@@ -1291,19 +1291,19 @@ my %hcsr = (                                                                    
   for my $bn (1..MAXBATTERIES) {
       $bn                                      = sprintf "%02d", $bn;
 
-      $hcsr{'daysUntilBatteryCare_'.$bn}{fnr}  = 4;
+      $hcsr{'daysUntilBatteryCare_'.$bn}{fnr}  = 5;
       $hcsr{'daysUntilBatteryCare_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'daysUntilBatteryCare_'.$bn}{par}  = 99;
       $hcsr{'daysUntilBatteryCare_'.$bn}{unit} = '';
       $hcsr{'daysUntilBatteryCare_'.$bn}{def}  = '-';
 
-      $hcsr{'todayBatIn_'.$bn}{fnr}  = 4;
+      $hcsr{'todayBatIn_'.$bn}{fnr}  = 5;
       $hcsr{'todayBatIn_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'todayBatIn_'.$bn}{par}  = 99;
       $hcsr{'todayBatIn_'.$bn}{unit} = ' Wh';
       $hcsr{'todayBatIn_'.$bn}{def}  = 0;
 
-      $hcsr{'todayBatOut_'.$bn}{fnr}  = 4;
+      $hcsr{'todayBatOut_'.$bn}{fnr}  = 5;
       $hcsr{'todayBatOut_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'todayBatOut_'.$bn}{par}  = 99;
       $hcsr{'todayBatOut_'.$bn}{unit} = ' Wh';
