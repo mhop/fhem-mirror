@@ -414,8 +414,8 @@ use constant {
   AISPREADLOWLIM => 80,                                                             # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
   AIACCUPLIM     => 150,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-  AIACCTRNMIN    => 2500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
-  AISPREADTRNMIN => 5000,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
+  AIACCTRNMIN    => 1000,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
+  AISPREADTRNMIN => 2000,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
 
   SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
   FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
@@ -14824,7 +14824,7 @@ sub _beamGraphicFirstHour {
   #######################################
   for my $bn (1..MAXBATTERIES) {
       $bn               = sprintf "%02d", $bn;
-      $hbsocs->{0}{$bn} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0);
+      $hbsocs->{0}{$bn} = sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0);
   }
 
   ## Zuordnung Werte zu den Balken entsprechend Selektion
@@ -14975,7 +14975,7 @@ sub _beamGraphicRemainingHours {
           ########################################
           for my $bn (1..MAXBATTERIES) {
               $bn                = sprintf "%02d", $bn;
-              $hbsocs->{$i}{$bn} = NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0);
+              $hbsocs->{$i}{$bn} = sprintf "%.1f", NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0);
           }
 
           my $day_str = ($stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs)[2];
