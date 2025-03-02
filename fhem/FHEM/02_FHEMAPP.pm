@@ -144,7 +144,7 @@ BEGIN {
 # Constants and defaults
 #########################################################################
 	use constant {
-		FA_VERSION 					=> '1.2.0',			#Version of this Modul
+		FA_VERSION 					=> '1.2.2',			#Version of this Modul
 		FA_VERSION_FILENAME 		=> 'CHANGELOG.md',	#Default Version Filename
 		FA_INIT_INTERVAL			=> 60,				#Default Startup Interval
 		FA_DEFAULT_INTERVAL		=> 3600,			#Default Interval
@@ -934,12 +934,17 @@ sub Request_Releases_Response($)
         Log($name,"url ".$param->{url}." returned: $data",5);                                                         
 		#Log3 $name, 3, Dumper $data;
 		
-		my $rels =  decode_json($data);
+		my $rels;
+        if ( !eval { $rels = decode_json($data); 1 } ) { 
+            return Log3(undef, 1, "JSON decoding error, >$data< seems not to be valid JSON data: $@");
+        }
 
 		my $latestPre=undef;
 		my $latestFull=undef;
 
-		foreach my $rel (@{$rels}){
+        return if ref $rels ne 'ARRAY';
+
+		for my $rel (@{$rels}){
 			Log($name,"Release: " . $rel->{tag_name},5);
 			my $isVer=version_compare($rel->{tag_name},FA_VERSION_LOWEST);
 			Log($name,"Lowest: " . FA_VERSION_LOWEST . " is: $isVer",5);
@@ -1550,7 +1555,7 @@ sub StopLoop
 		
 
 		Log3 $verbRef,$verb,'['.$name.']: '.$msg;
-		return undef
+		return;
 	}
 
 	#========================================================================
@@ -1606,6 +1611,9 @@ sub StopLoop
 
 
 
+1;
+
+__END__
 
 #########################################################################
 # HELP - Documentation for FHEM help command in EN and DE
