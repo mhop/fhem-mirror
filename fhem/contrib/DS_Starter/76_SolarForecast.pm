@@ -14825,6 +14825,7 @@ sub _beamGraphicFirstHour {
   for my $bn (1..MAXBATTERIES) {
       $bn               = sprintf "%02d", $bn;
       $hbsocs->{0}{$bn} = sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0);
+      $hbsocs->{0}{$bn} = 100 if($hbsocs->{0}{$bn} >= 100);
   }
 
   ## Zuordnung Werte zu den Balken entsprechend Selektion
@@ -14837,7 +14838,7 @@ sub _beamGraphicFirstHour {
                          $beam1cont eq 'energycosts'         ? $val6 :
                          $beam1cont eq 'gridfeedin'          ? $val7 :
                          $beam1cont eq 'feedincome'          ? $val8 :
-                         $beam1cont =~ /batsocforecast_/xs   ? ($hbsocs->{0}{(split '_', $beam1cont)[1]} < 100 ? sprintf "%.1f", $hbsocs->{0}{(split '_', $beam1cont)[1]} : 100) :
+                         $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{0}{(split '_', $beam1cont)[1]} :
                          undef;
 
   $hfcg->{0}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
@@ -14848,7 +14849,7 @@ sub _beamGraphicFirstHour {
                          $beam2cont eq 'energycosts'         ? $val6 :
                          $beam2cont eq 'gridfeedin'          ? $val7 :
                          $beam2cont eq 'feedincome'          ? $val8 :
-                         $beam2cont =~ /batsocforecast_/xs   ? ($hbsocs->{0}{(split '_', $beam2cont)[1]} < 100 ? sprintf "%.1f", $hbsocs->{0}{(split '_', $beam2cont)[1]} : 100) :
+                         $beam2cont =~ /batsocforecast_/xs   ? $hbsocs->{0}{(split '_', $beam2cont)[1]} :
                          undef;
 
   $hfcg->{0}{beam1}  //= 0;
@@ -14946,7 +14947,8 @@ sub _beamGraphicRemainingHours {
               #######################################
               for my $bn (1..MAXBATTERIES) {
                   $bn                = sprintf "%02d", $bn;
-                  $hbsocs->{$i}{$bn} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0);
+                  $hbsocs->{$i}{$bn} = sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0);
+                  $hbsocs->{$i}{$bn} = 100 if($hbsocs->{$i}{$bn} >= 100);
               }
 
               $hfcg->{$i}{day_str} = $ds;
@@ -14976,6 +14978,7 @@ sub _beamGraphicRemainingHours {
           for my $bn (1..MAXBATTERIES) {
               $bn                = sprintf "%02d", $bn;
               $hbsocs->{$i}{$bn} = sprintf "%.1f", NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0);
+              $hbsocs->{$i}{$bn} = 100 if($hbsocs->{$i}{$bn} >= 100);
           }
 
           my $day_str = ($stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs)[2];
@@ -14996,7 +14999,7 @@ sub _beamGraphicRemainingHours {
                               $beam1cont eq 'energycosts'         ? $val6 :
                               $beam1cont eq 'gridfeedin'          ? $val7 :
                               $beam1cont eq 'feedincome'          ? $val8 :
-                              $beam1cont =~ /batsocforecast_/xs   ? ($hbsocs->{$i}{(split '_', $beam1cont)[1]} < 100 ? sprintf "%.1f", $hbsocs->{$i}{(split '_', $beam1cont)[1]} : 100) : 
+                              $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam1cont)[1]} : 
                               undef;
 
       $hfcg->{$i}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
@@ -15007,7 +15010,7 @@ sub _beamGraphicRemainingHours {
                               $beam2cont eq 'energycosts'         ? $val6 :
                               $beam2cont eq 'gridfeedin'          ? $val7 :
                               $beam2cont eq 'feedincome'          ? $val8 :
-                              $beam2cont =~ /batsocforecast_/xs   ? ($hbsocs->{$i}{(split '_', $beam2cont)[1]} < 100 ? sprintf "%.1f", $hbsocs->{$i}{(split '_', $beam2cont)[1]} : 100) :
+                              $beam2cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam2cont)[1]} :
                               undef;
 
       $hfcg->{$i}{time_str} = sprintf ('%02d', $hfcg->{$i}{time}-1).$hourstyle;
