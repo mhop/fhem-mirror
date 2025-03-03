@@ -406,7 +406,7 @@ use constant {
   GMFILERANDOM   => 10800,                                                          # Random AddOn zu GMFILEREPEAT
   IDXLIMIT       => 900000,                                                         # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
 
-  AINUMTREES     => 30,                                                             # Anzahl der Entscheidungsbäume im Ensemble
+  AINUMTREES     => 10,                                                             # Anzahl der Entscheidungsbäume im Ensemble
   AITRBLTO       => 7200,                                                           # KI Training BlockingCall Timeout
   AIBCTHHLD      => 0.2,                                                            # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
   AITRSTARTDEF   => 2,                                                              # default Stunde f. Start AI-Training
