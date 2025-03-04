@@ -59,7 +59,6 @@ use FHEM::SynoModules::SMUtils qw (checkModVer
                                    getClHash
                                    moduleVersion
                                    trim
-                                   delHashRefDeep
                                   );                                                 # Hilfsroutinen Modul
 
 use Data::Dumper;
@@ -163,7 +162,7 @@ BEGIN {
 my %vNotesIntern = (
   "1.47.0" => "03.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
                            "_beamGraphic.*: change decimal places für battery SoC, set aiDecTree: change addInstances to addInstAndTrain ".
-                           "addInstAndTrain is generally executed non-blocking ",
+                           "addInstAndTrain is generally executed non-blocking, _batChargeRecmd: use effective surplus for soc forecast ",
   "1.46.5" => "28.02.2025  new ctrlSpecialReadings  key todayConsumptionForecastDay ",
   "1.46.4" => "25.02.2025  _flowGraphic: fix clculation of node2home (Forum: https://forum.fhem.de/index.php?msg=1334798) ".
                            "_transferBatteryValues: change Debug Logging ",
@@ -860,6 +859,8 @@ my %hqtxt = (                                                                # H
               DE => qq{der PV Vorhersagewert f&uuml;r die aktuelle Stunde wird von der KI Unterst&uuml;tzung geliefert}     },
   ailatr => { EN => qq{last AI training:},
               DE => qq{letztes KI-Training:}                                                                                },
+  ailgrt => { EN => qq{last AI result generation time:},
+              DE => qq{letzte KI-Ergebnis Generierungsdauer:}                                                               },
   aitris => { EN => qq{Runtime in seconds:},
               DE => qq{Laufzeit in Sekunden:}                                                                               },
   airule => { EN => qq{List of strings that describe the tree in rule-form},
@@ -1426,7 +1427,7 @@ my %hfspvh = (
 # $data{$name}{func}                                                          # temporäre interne Funktionen
 # $data{$name}{dwdcatalog}                                                    # temporärer Speicher DWD Stationskatalog
 # $data{$name}{strings}                                                       # temporärer Speicher Stringkonfiguration
-# $data{$name}{aidectree}{object}                                             # AI Decision Tree Object
+# $data{$name}{aidectree}{object}                                             # AI Decision Tree Object (im BlockingCall)
 # $data{$name}{messages}                                                      # Mitteilungssystem - permanent erneuerter Speicher
 # $data{$name}{filemessages}                                                  # Mitteilungssystem - Input vom Message File
 # $data{$name}{preparedmessages}                                              # Mitteilungssystem - vorbereitete Messages innerhalb des Code
@@ -5357,6 +5358,9 @@ sub __getaiRuleStrings {                 ## no critic "not used"
   my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
   $atf    = '<b>'.$hqtxt{ailatr}{$lang}.' </b>'.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
   my $art = $hqtxt{aitris}{$lang}.' '.CircularVal ($hash, 99, 'runTimeTrainAI', '-');
+  
+  my $agt = CurrentVal  ($hash, 'aiLastGetResultTime', '');
+  $agt    = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
 
   if (@rsl) {
       my $l = scalar @rsl;
@@ -5372,6 +5376,8 @@ sub __getaiRuleStrings {                 ## no critic "not used"
       $rs  .= "Depth: ".$hqtxt{aidept}{$lang};
       $rs  .= "\n\n";
       $rs  .= $atf.' / '.$art;
+      $rs  .= "\n";
+      $rs  .= $agt;
       $rs  .= "\n\n";
       $rs  .= join "\n", @rsl;
   }
@@ -10216,8 +10222,10 @@ sub _batChargeRecmd {
           if ( !$num && ($pvCu - $curcon) >= $inplim )           {$crel = 1}                     # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
 
           ## SOC-Prognose
-          #################
-          $socwh += $crel ? ($pvfc - $confc) * STOREFFDEF : -$confc / STOREFFDEF;              # PV Prognose nur einbeziehen wenn Ladefreigabe
+          #################                                                                      # change V 1.47.0
+          my $fceff = $pvfc - $confc;                                                            # effektiver PV Überschuß (effektiver Verbrauch wenn < 0)
+          $socwh   += $crel ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) : 
+                      ($fceff > 0 ? 0 : $fceff / STOREFFDEF);                                    # PV Prognose nur einbeziehen wenn Ladefreigabe
 
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -14100,12 +14108,14 @@ sub __createAIicon {
   $aitit   =~ s/<NAME>/$name/xs;
 
   my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
+  my $art = CurrentVal  ($hash, 'aiLastGetResultTime', ''),
   $atf    = $hqtxt{ailatr}{$lang}.' '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
+  $art    = $hqtxt{ailgrt}{$lang}.' '.($art ? ($art * 1000).' ms' : '-');
 
   my $aiimg  = $aidtabs          ? '--' :
                $aicanuse ne 'ok' ? '-'  :
                $aitst ne 'ok'    ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
-               $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}.' &#10;'.$atf) :
+               $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}.' &#10;'.$atf.' &#10;'.$art) :
                FW_makeImage ('10px-kreis-gelb.png', $hqtxt{aiwook}{$lang}.' &#10;'.$atf);
 
   my $aiicon = qq{<a title="$aitit">$aiimg</a>};
@@ -17166,9 +17176,7 @@ sub aiAddInstance {
   }
 
   $paref->{cst} = $cst;
-  
   $serial = aiTrain ($paref);
-  
   delete $paref->{cst};
 
 return $serial;
@@ -17291,10 +17299,6 @@ sub aiFinishTrain {
 
   delete $data{$name}{circular}{99}{aiRulesNumber};
 
-  delHashRefDeep ($data{$name}{aidectree}{object});
-  delete $data{$name}{aidectree}{object};
-
-  $data{$name}{current}{aiAddedToTrain}           = 0;
   $data{$name}{current}{aicanuse}                 = $aicanuse;
   $data{$name}{current}{aitrainstate}             = $aitrainstate;
   $data{$name}{current}{aiaddistate}              = $aiaddistate;
@@ -17338,11 +17342,7 @@ sub aiAbortTrain {
 
   delete $hash->{HELPER}{AIBLOCKRUNNING};
 
-  delHashRefDeep ($data{$name}{aidectree}{object});
-  delete $data{$name}{aidectree}{object};
-
   $data{$name}{current}{aitrainstate}   = 'Traing (Child) process timed out';
-  $data{$name}{current}{aiAddedToTrain} = 0;
 
 return;
 }
@@ -17365,6 +17365,8 @@ sub aiGetResult {
 
   my $rad1h = NexthoursVal ($hash, $nhtstr, 'rad1h', 0);
   return "no rad1h for hod: $hod" if($rad1h <= 0);
+  
+  my $cst = [gettimeofday];                                                         # aiGetResult Startzeit
 
   debugLog ($paref, 'aiData', "Start AI result check for hod: $hod");
   
@@ -17457,6 +17459,8 @@ sub aiGetResult {
 #      return ('spreaded', $avg_prediction);
 #  }
 
+  setTimeTracking ($hash, $cst, 'aiLastGetResultTime');                      # aiGetResult-Laufzeit ermitteln
+  
 return 'No AI decision delivered';
 }
 
@@ -20257,7 +20261,7 @@ sub setTimeTracking {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  $data{$name}{current}{$tkn} = sprintf "%.4f", tv_interval($st);
+  $data{$name}{current}{$tkn} = sprintf "%.5f", tv_interval($st);
 
 return;
 }
