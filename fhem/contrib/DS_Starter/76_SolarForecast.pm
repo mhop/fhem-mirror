@@ -160,9 +160,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.47.0" => "03.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
+  "1.47.0" => "04.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
                            "_beamGraphic.*: change decimal places für battery SoC, set aiDecTree: change addInstances to addInstAndTrain ".
-                           "addInstAndTrain is generally executed non-blocking, _batChargeRecmd: use effective surplus for soc forecast ",
+                           "addInstAndTrain is generally executed non-blocking, _batChargeRecmd: use effective surplus for soc forecast ".
+                           "_transferBatteryValues: change verbose 2 -> 3 ",
   "1.46.5" => "28.02.2025  new ctrlSpecialReadings  key todayConsumptionForecastDay ",
   "1.46.4" => "25.02.2025  _flowGraphic: fix clculation of node2home (Forum: https://forum.fhem.de/index.php?msg=1334798) ".
                            "_transferBatteryValues: change Debug Logging ",
@@ -9763,7 +9764,7 @@ sub _transferBatteryValues {
 
       if ($batinthishour < 0) {
           $batinthishour = 0;
-          my $vl         = 2;
+          my $vl         = 3;
           my $pre        = '- WARNING -';
 
           if ($debug =~ /collectData/xs) {
@@ -9794,7 +9795,7 @@ sub _transferBatteryValues {
 
       if ($batoutthishour < 0) {
           $batoutthishour = 0;
-          my $vl          = 2;
+          my $vl          = 3;
           my $pre         = '- WARNING -';
 
           if ($debug =~ /collectData/xs) {
@@ -10226,7 +10227,6 @@ sub _batChargeRecmd {
           my $fceff = $pvfc - $confc;                                                            # effektiver PV Überschuß (effektiver Verbrauch wenn < 0)
           $socwh   += $crel ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) : 
                       ($fceff > 0 ? 0 : $fceff / STOREFFDEF);                                    # PV Prognose nur einbeziehen wenn Ladefreigabe
-          #$socwh += $crel ? ($pvfc - $confc) * STOREFFDEF : -$confc / STOREFFDEF;               # -> alte Kalk
           
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -14835,6 +14835,7 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{beam1}  //= 0;
   $hfcg->{0}{beam2}  //= 0;
   $hfcg->{0}{diff}     = sprintf "%.1f", ($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
+  $hfcg->{0}{diff}    = sprintf "%.0f", $hfcg->{0}{diff} if(int ($hfcg->{0}{diff}) - $hfcg->{0}{diff} == 0);
 
   my $epc = CurrentVal ($hash, 'ePurchasePriceCcy', 0);
   my $efc = CurrentVal ($hash, 'eFeedInTariffCcy',  0);
@@ -14998,6 +14999,7 @@ sub _beamGraphicRemainingHours {
       $hfcg->{$i}{beam1} //= 0;
       $hfcg->{$i}{beam2} //= 0;
       $hfcg->{$i}{diff}    = sprintf "%.1f", ($hfcg->{$i}{beam1} - $hfcg->{$i}{beam2});
+      $hfcg->{$i}{diff}    = sprintf "%.0f", $hfcg->{$i}{diff} if(int ($hfcg->{$i}{diff}) - $hfcg->{$i}{diff} == 0);
 
       $maxVal = $hfcg->{$i}{beam1} if($hfcg->{$i}{beam1} > $maxVal);
       $maxCon = $hfcg->{$i}{beam2} if($hfcg->{$i}{beam2} > $maxCon);
