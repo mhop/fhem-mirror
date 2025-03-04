@@ -10218,15 +10218,16 @@ sub _batChargeRecmd {
 
           my $sfmargin = $whneed * 0.25;                                                         # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
 
-          if ( $whneed + $sfmargin >= $spday || $t >  $maxfctim) {$crel = 1}                     # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-          if ( !$num && ($pvCu - $curcon) >= $inplim )           {$crel = 1}                     # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
+          if ( $whneed + $sfmargin >= $spday || ($today && $t > $maxfctim)) {$crel = 1}          # change V 1.47.0: Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+          if ( !$num && ($pvCu - $curcon) >= $inplim )                      {$crel = 1}          # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
 
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
           my $fceff = $pvfc - $confc;                                                            # effektiver PV Überschuß (effektiver Verbrauch wenn < 0)
           $socwh   += $crel ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) : 
                       ($fceff > 0 ? 0 : $fceff / STOREFFDEF);                                    # PV Prognose nur einbeziehen wenn Ladefreigabe
-
+          #$socwh += $crel ? ($pvfc - $confc) * STOREFFDEF : -$confc / STOREFFDEF;               # -> alte Kalk
+          
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
                     $socwh > $batinstcap  ? $batinstcap  :
