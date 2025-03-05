@@ -12315,7 +12315,9 @@ sub _calcConsForecast_circular {
           debugLog ($paref, 'consumption_long', "incl. planned $inhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{plannum});
       }
 
-      debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
+      if (defined $usage{$hh}{num}) {                                                                 # V 1.47.0
+          debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
+      }
   }
 
   ## nächsten Tageswert Excludes berücksichtigen
@@ -12351,6 +12353,8 @@ sub _calcConsForecast_circular {
       my $nhday = strftime "%a", localtime($utime);                                                    # Wochentagsname des NextHours Key
       my $nhhr  = sprintf "%02d", int (strftime "%H", localtime($utime)) + 1;                          # Stunde des Tages vom NextHours Key (01,02,...24)
 
+      next if(!defined $usage{$nhhr}{con});                                                            # V 1.47.0
+      
       $data{$name}{nexthours}{$k}{confcEx} = $usage{$nhhr}{conex};
       $data{$name}{nexthours}{$k}{confc}   = $usage{$nhhr}{con};                                       # prognostizierter Verbrauch (Median)
 
