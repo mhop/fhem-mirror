@@ -160,10 +160,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.47.0" => "04.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
+  "1.47.0" => "05.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
                            "_beamGraphic.*: change decimal places für battery SoC, set aiDecTree: change addInstances to addInstAndTrain ".
                            "addInstAndTrain is generally executed non-blocking, _batChargeRecmd: use effective surplus for soc forecast, ".
-                           "consider !ctrlBatSocManagement for permanent Bat loading release, _transferBatteryValues: change verbose 2 -> 3 ",
+                           "consider !ctrlBatSocManagement for permanent Bat loading release, _transferBatteryValues: change verbose 2 -> 3 ".
+                           "new attr aiControl, attr ctrlAIdataStorageDuration, ctrlAIshiftTrainStart are obsolete ",
   "1.46.5" => "28.02.2025  new ctrlSpecialReadings  key todayConsumptionForecastDay ",
   "1.46.4" => "25.02.2025  _flowGraphic: fix clculation of node2home (Forum: https://forum.fhem.de/index.php?msg=1334798) ".
                            "_transferBatteryValues: change Debug Logging ",
@@ -550,8 +551,9 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    affectConsForecastInPlanning affectSolCastPercentile
+                   aiControl
                    consumerLegend consumerAdviceIcon consumerLink
-                   ctrlAIdataStorageDuration ctrlBackupFilesKeep
+                   ctrlBackupFilesKeep
                    ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
                    ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings
                    ctrlShowLink ctrlSolCastAPImaxReq
@@ -680,6 +682,7 @@ my %hattr = (                                                                # H
   setupStringPeak           => { fn => \&_attrStringPeak          },
   setupRoofTops             => { fn => \&_attrRoofTops            },
   flowGraphicControl        => { fn => \&_attrflowGraphicControl  },
+  aiControl                 => { fn => \&_attraiControl           },
 );
 
   for my $bn (1..MAXBATTERIES) {
@@ -1486,11 +1489,10 @@ sub Initialize {
                                 "affectConsForecastInPlanning:1,0 ".
                                 "affectConsForecastLastDays:selectnumbers,1,1,180,0,lin ".
                                 "affectSolCastPercentile:select,10,50,90 ".
+                                "aiControl:textField-long ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
                                 "consumerLink:0,1 ".
-                                "ctrlAIdataStorageDuration ".
-                                "ctrlAIshiftTrainStart:slider,1,1,23 ".
                                 "ctrlBackupFilesKeep ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#10 ".
@@ -1556,8 +1558,8 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  # my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";
-  # $hash->{AttrList} .= " graphicBeam1MaxVal:$av1 ctrlAreaFactorUsage:$av1 ";
+  my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';                          # 07.03.2025
+  $hash->{AttrList} .= " ctrlAIdataStorageDuration:$av ctrlAIshiftTrainStart:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -1565,8 +1567,7 @@ sub Initialize {
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
-   $hash->{AttrRenameMap} = { "setupBatteryDev"       => "setupBatteryDev01",          # 28.12.24
-                              "ctrlBatSocManagement"  => "ctrlBatSocManagement01",     # 01.01.25
+   $hash->{AttrRenameMap} = { "ctrlBatSocManagement"  => "ctrlBatSocManagement01",     # 01.01.25
                               "ctrlStatisticReadings" => "ctrlSpecialReadings",        # 02.01.25
                             };
 
@@ -5599,16 +5600,17 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  #if ($cmd eq 'set' && $aName =~ /^graphicBeam1MaxVal|ctrlAreaFactorUsage$/) {
-  #    my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
-  #    if (!$init_done) {
-  #        Log3 ($name, 1, "$name - $msg");
-  #        return qq{Device "$name" -> $msg};
-  #    }
-  #    else {
-  #        return $msg;
-  #    }
-  #}
+  if ($cmd eq 'set' && $aName =~ /^ctrlAIdataStorageDuration|ctrlAIshiftTrainStart$/) {
+      #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
+      my $msg = "The attribute $aName is replaced by 'aiControl'. Please press 'save config' when restart is finished.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg");
+          #return qq{Device "$name" -> $msg};
+      }
+      else {
+          return $msg;
+      }
+  }
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -5662,7 +5664,7 @@ sub Attr {
   }
 
   if ($cmd eq 'set') {
-      if ($aName eq 'ctrlInterval' || $aName eq 'ctrlBackupFilesKeep' || $aName eq 'ctrlAIdataStorageDuration') {
+      if ($aName eq 'ctrlInterval' || $aName eq 'ctrlBackupFilesKeep') {
           unless ($aVal =~ /^[0-9]+$/x) {
               return qq{Invalid value for $aName. Use only figures 0-9!};
           }
@@ -6032,7 +6034,7 @@ sub _attraiControl {                     ## no critic "not used"
 
   for my $av ( qw( aiStorageDuration 
                    aiTrainStart 
-                   aiTrees
+                   aiTreesPV
                  ) ) {
 
       delete $data{$name}{current}{$av};
@@ -6042,7 +6044,7 @@ sub _attraiControl {                     ## no critic "not used"
       my $valid = {
           aiStorageDuration => '\d+',
           aiTrainStart      => '(1?[1-9]|10|2[0-3])',
-          aiTrees           => '(1?[1-9]|10|[2-4][0-9]|50)',
+          aiTreesPV         => '(1?[1-9]|10|[2-4][0-9]|50)',
       };
 
       my ($a, $h) = parseParams ($aVal);
@@ -7709,6 +7711,18 @@ sub centralTask {
   if ($n) {
       Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
   }
+  
+  my $fg1 = AttrVal ($name, 'ctrlAIdataStorageDuration', undef);                     # 07.03.2025
+  my $fg2 = AttrVal ($name, 'ctrlAIshiftTrainStart',     undef);
+  
+  my $newval;
+  $newval .= "aiStorageDuration=$fg1 "    if(defined $fg1);
+  $newval .= "aiTrainStart=$fg2 "         if(defined $fg2);
+
+  if ($newval) {
+      CommandAttr (undef, "$name aiControl $newval");
+      ::CommandDeleteAttr (undef, "$name ctrlAIdataStorageDuration|ctrlAIshiftTrainStart");
+  }
 
   ##########################################################################################################################
 
@@ -8179,8 +8193,8 @@ sub _specialActivities {
   ## bestimmte einmalige Aktionen
   ##################################
   $chour    = int $chour;
-  $minute   = int $minute;
-  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', AITRSTARTDEF);                             # Stunde f. Start AI-Training
+  $minute   = int $minute;                         
+  my $aitrh = CurrentVal ($name, 'aiTrainStart', AITRSTARTDEF);                                   # Stunde f. Start AI-Training
 
   ## Task 1
   ###########
@@ -17163,8 +17177,10 @@ sub aiAddInstance {
 
       return $serial;
   }
-
-  for my $tn (1 .. AINUMTREES) {                                                # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
+  
+  my $numtrees = CurrentVal ($name, 'aiTreesPV', AINUMTREES);
+  
+  for my $tn (1 .. $numtrees) {                                                 # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
       my @sampled       = sample_data (\@pvhdata);
       my ($err, $dtree) = aiInit ($paref);
       
@@ -17256,8 +17272,9 @@ sub aiTrain {
   
   my @ensemble;                                                                 # Erstelle das Ensemble
   my %entities;
+  my $numtrees = CurrentVal ($name, 'aiTreesPV', AINUMTREES);
 
-  for my $tn (1 .. AINUMTREES) {                                                # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
+  for my $tn (1 .. $numtrees) {                                                 # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
       my $dtree = $object->{$tn}{dtree};                                        # dtree Objekt
       my $enum  = $object->{$tn}{enum};                                         # Anazhl Elemente im Tree
       
@@ -17705,7 +17722,6 @@ return;
 sub aiDelRawData {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
 
   my $hash = $defs{$name};
 
@@ -17713,7 +17729,7 @@ sub aiDelRawData {
       return;
   }
 
-  my $hd   = AttrVal ($name, 'ctrlAIdataStorageDuration', AISTDUDEF);          # Haltezeit KI Raw Daten (Tage)
+  my $hd   = CurrentVal ($name, 'aiStorageDuration', AISTDUDEF);                # Haltezeit KI Raw Daten (Tage)
   my $ht   = time - ($hd * 86400);
   my $day  = strftime "%d", localtime($ht);
   my $didx = _aiMakeIdxRaw ($day, '00', $ht);                                   # Daten mit idx <= $didx löschen
@@ -23485,12 +23501,49 @@ to ensure that the system configuration is correct.
          (default: 50)
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-aiControl"></a>
+       <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+         By optionally specifying the following key=value pairs, various properties of the AI support can be
+         properties of the AI support can be influenced. <br>
+		 AI support for PV forecast autocorrection is activated with the set command 
+		 <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> switched on. <br>
+         The entry can be made in several lines.
+         <br><br>
 
-        <a id="SolarForecast-attr-alias"></a>
-        <li><b>alias </b> <br>
-          In connection with "ctrlShowLink" any display name.
-        </li>
-        <br>
+         <ul>
+         <table>
+         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
+            <tr><td> <b>aiTrainStart</b>      </td><td>Daily training takes place when using the internal AI.                                                                        </td></tr>
+            <tr><td>                          </td><td>Training starts approx. 15 minutes after the hour specified in this key.                                                      </td></tr>
+            <tr><td>                          </td><td>For example, with a set value of '3', training would start at around 03:15.                                                   </td></tr>
+            <tr><td>                          </td><td>Value: <b>1 ... 23</b>, default: 2                                                                                            </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+			<tr><td> <b>aiStorageDuration</b> </td><td>Training data is collected and stored for the module's internal AI.                                                           </td></tr>
+            <tr><td>                          </td><td>This data is deleted when it has exceeded the specified holding period (days).                                                </td></tr>
+			<tr><td>                          </td><td>Value: <b>Integer</b>, default: 1825                                                                                          </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+            <tr><td> <b>aiTreesPV</b>         </td><td>Defines the number of AI decision trees (random forests). A higher number increases the                                       </td></tr>
+            <tr><td>                          </td><td>accuracy and robustness of AI prediction, but requires more CPU and RAM resources.                                            </td></tr>
+			<tr><td>                          </td><td><b>Note:</b> Only carry out an increase in small steps and in consideration of the performance of the hardware!               </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+			<tr><td>                          </td><td>Value: <b>1 ... 50</b>, default: 10                                                                                           </td></tr>
+        </table>
+         </ul>
+
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 
+       </ul>
+
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-alias"></a>
+       <li><b>alias </b> <br>
+         In connection with "ctrlShowLink" any display name.
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-consumerAdviceIcon"></a>
        <li><b>consumerAdviceIcon </b><br>
@@ -23717,24 +23770,6 @@ to ensure that the system configuration is correct.
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:05 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                 <br>
          <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                        <br>
        </ul>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAIdataStorageDuration"></a>
-       <li><b>ctrlAIdataStorageDuration &lt;Tage&gt;</b> <br>
-         If the corresponding prerequisites are met, training data is collected and stored for the
-         module-internal AI. <br>
-         The data is deleted when it has exceeded the specified holding period (days).<br>
-         (default: 1825)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
-       <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
-         Daily training takes place when using the internal AI.<br>
-         Training begins approx. 15 minutes after the hour specified in the attribute. <br>
-         For example, with a set value of '3', training would start at around 03:15. <br>
-         (default: 2)
        </li>
        <br>
 
@@ -25990,12 +26025,49 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          (default: 50)
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-aiControl"></a>
+       <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+         Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene
+         Eigenschaften der KI Unterstützung beeinflusst werden. <br>
+		 Die KI Unterstützung der PV Prognose Autokorrektur wird mit dem Set-Befehl 
+		 <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> eingeschaltet. <br>
+         Die Eingabe kann mehrzeilig erfolgen.
+         <br><br>
 
-        <a id="SolarForecast-attr-alias"></a>
-        <li><b>alias </b> <br>
-          In Verbindung mit "ctrlShowLink" ein beliebiger Anzeigename.
-        </li>
-        <br>
+         <ul>
+         <table>
+         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
+            <tr><td> <b>aiTrainStart</b>      </td><td>Bei Nutzung der internen KI erfolgt ein tägliches Training.                                                                   </td></tr>
+            <tr><td>                          </td><td>Der Start des Trainings erfolgt ca. 15 Minuten nach der in diesem Schlüssel festgelegten vollen Stunde.                       </td></tr>
+            <tr><td>                          </td><td>Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten.                                    </td></tr>
+            <tr><td>                          </td><td>Wert: <b>1 ... 23</b>, default: 2                                                                                             </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+			<tr><td> <b>aiStorageDuration</b> </td><td>Es werden Trainingsdaten für die modulinterne KI gesammelt und gespeichert.                                                   </td></tr>
+            <tr><td>                          </td><td>Diese Daten werden gelöscht, wenn sie die angegebene Haltedauer (Tage) überschritten haben.                                   </td></tr>
+			<tr><td>                          </td><td>Wert: <b>Ganzzahl</b>, default: 1825                                                                                          </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+            <tr><td> <b>aiTreesPV</b>         </td><td>Legt die Anzahl der KI-Entscheidungsbäume (Random Forests) fest. Eine höhere Anzahl steigert die                              </td></tr>
+            <tr><td>                          </td><td>Genauigkeit und Robustheit der KI Vorhersage, erfordert aber mehr CPU und RAM Ressourcen.                                     </td></tr>
+			<tr><td>                          </td><td><b>Hinweis:</b> Eine Erhöhung nur in kleinen Schritten und unter Beachtung der Leistungsfähigkeit der Hardware durchführen!   </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+			<tr><td>                          </td><td>Wert: <b>1 ... 50</b>, default: 10                                                                                            </td></tr>
+        </table>
+         </ul>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 
+       </ul>
+
+       </li>
+       <br>
+
+       <a id="SolarForecast-attr-alias"></a>
+       <li><b>alias </b> <br>
+         In Verbindung mit "ctrlShowLink" ein beliebiger Anzeigename.
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-consumerAdviceIcon"></a>
        <li><b>consumerAdviceIcon </b><br>
@@ -26221,24 +26293,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                              <br>
          <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                   <br>
        </ul>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAIdataStorageDuration"></a>
-       <li><b>ctrlAIdataStorageDuration &lt;Tage&gt;</b> <br>
-         Sind die entsprechenden Voraussetzungen gegeben, werden Trainingsdaten für die modulinterne KI gesammelt und
-         gespeichert. <br>
-         Die Daten werden gelöscht wenn sie die angegebene Haltedauer (Tage) überschritten haben.<br>
-         (default: 1825)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
-       <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
-         Bei Nutzung der internen KI erfolgt ein tägliches Training.<br>
-         Der Start des Trainings erfolgt ca. 15 Minuten nach der im Attribut festgelegten vollen Stunde. <br>
-         Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten. <br>
-         (default: 2)
        </li>
        <br>
 
