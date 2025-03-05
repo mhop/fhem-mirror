@@ -162,8 +162,8 @@ BEGIN {
 my %vNotesIntern = (
   "1.47.0" => "04.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
                            "_beamGraphic.*: change decimal places für battery SoC, set aiDecTree: change addInstances to addInstAndTrain ".
-                           "addInstAndTrain is generally executed non-blocking, _batChargeRecmd: use effective surplus for soc forecast ".
-                           "_transferBatteryValues: change verbose 2 -> 3 ",
+                           "addInstAndTrain is generally executed non-blocking, _batChargeRecmd: use effective surplus for soc forecast, ".
+                           "consider !ctrlBatSocManagement for permanent Bat loading release, _transferBatteryValues: change verbose 2 -> 3 ",
   "1.46.5" => "28.02.2025  new ctrlSpecialReadings  key todayConsumptionForecastDay ",
   "1.46.4" => "25.02.2025  _flowGraphic: fix clculation of node2home (Forum: https://forum.fhem.de/index.php?msg=1334798) ".
                            "_transferBatteryValues: change Debug Logging ",
@@ -5959,7 +5959,6 @@ return;
 sub _attrflowGraphicControl {            ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
 
@@ -6013,6 +6012,50 @@ sub _attrflowGraphicControl {            ## no critic "not used"
           }
           else {
               return "The key '$key=$h->{$key}' is not specified correctly. Please use a valid value.";
+          }
+      }
+  }
+
+return;
+}
+
+################################################################
+#                  Attr aiControl
+################################################################
+sub _attraiControl {                     ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $cmd   = $paref->{cmd};
+
+  my $hash  = $defs{$name};
+
+  for my $av ( qw( aiStorageDuration 
+                   aiTrainStart 
+                   aiTrees
+                 ) ) {
+
+      delete $data{$name}{current}{$av};
+  }
+
+  if ($cmd eq 'set') {
+      my $valid = {
+          aiStorageDuration => '\d+',
+          aiTrainStart      => '(1?[1-9]|10|2[0-3])',
+          aiTrees           => '(1?[1-9]|10|[2-4][0-9]|50)',
+      };
+
+      my ($a, $h) = parseParams ($aVal);
+
+      for my $key (keys %{$h}) {
+          my $comp = $valid->{$key};
+          next if(!$comp);
+
+          if ($h->{$key} =~ /^$comp$/xs) {
+              $data{$name}{current}{$key} = $h->{$key};
+          }
+          else {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
       }
   }
@@ -10221,6 +10264,7 @@ sub _batChargeRecmd {
 
           if ( $whneed + $sfmargin >= $spday || ($today && $t > $maxfctim)) {$crel = 1}          # change V 1.47.0: Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
           if ( !$num && ($pvCu - $curcon) >= $inplim )                      {$crel = 1}          # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
+          if ( !$cgbt )                                                     {$crel = 1}          # immer Ladefreigabe wenn kein BatSoc-Management
 
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
@@ -14835,7 +14879,7 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{beam1}  //= 0;
   $hfcg->{0}{beam2}  //= 0;
   $hfcg->{0}{diff}     = sprintf "%.1f", ($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
-  $hfcg->{0}{diff}    = sprintf "%.0f", $hfcg->{0}{diff} if(int ($hfcg->{0}{diff}) - $hfcg->{0}{diff} == 0);
+  $hfcg->{0}{diff}     = sprintf "%.0f", $hfcg->{0}{diff} if(int ($hfcg->{0}{diff}) - $hfcg->{0}{diff} == 0);
 
   my $epc = CurrentVal ($hash, 'ePurchasePriceCcy', 0);
   my $efc = CurrentVal ($hash, 'eFeedInTariffCcy',  0);
