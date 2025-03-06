@@ -38,7 +38,8 @@ use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
 use Math::Trig;
-use List::Util qw(max);
+use List::Util qw(max shuffle);
+use Scalar::Util qw(blessed);
 
 eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
 eval "use FHEM::Utility::CTZ qw(:all);1;" or my $ctzAbsent     = 1;                  ## no critic 'eval'
@@ -159,12 +160,17 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.47.0" => "05.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
+                           "_beamGraphic.*: change decimal places für battery SoC, set aiDecTree: change addInstances to addInstAndTrain ".
+                           "addInstAndTrain is generally executed non-blocking, _batChargeRecmd: use effective surplus for soc forecast, ".
+                           "consider !ctrlBatSocManagement for permanent Bat loading release, _transferBatteryValues: change verbose 2 -> 3 ".
+                           "new attr aiControl, attr ctrlAIdataStorageDuration, ctrlAIshiftTrainStart are obsolete ",
   "1.46.5" => "28.02.2025  new ctrlSpecialReadings  key todayConsumptionForecastDay ",
   "1.46.4" => "25.02.2025  _flowGraphic: fix clculation of node2home (Forum: https://forum.fhem.de/index.php?msg=1334798) ".
                            "_transferBatteryValues: change Debug Logging ",
   "1.46.3" => "22.02.2025  new sub getConsumerMintime, consumer key 'mintime' can handle a device/reading combination that deliver minutes ".
                            "reports violation of the continuity specification for battery in/out energy ",
-  "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstancePV instead, _calcConsForecast_circular: include epiecAVG ".
+  "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstance instead, _calcConsForecast_circular: include epiecAVG ".
                            "fix NOTIFYDEV for consumers, change MAXINVERTER to 4 ",
   "1.46.1" => "18.02.2025  improve temp2bin, correct Log output to consumptionHistory, set setupStringDeclination can be free integer between 0..90 ",
   "1.46.0" => "17.02.2025  Notification System: print out last/next file pull if no messages are present, improvements and activation of ".
@@ -358,7 +364,7 @@ my %vNotesIntern = (
                            "integrate OpenMeteoWorld-API with the 'Best match' Weather model ",
   "1.17.1" => "27.03.2024  add AI to OpenMeteoDWD-API, changed AI train debuglog, new attr ctrlAIshiftTrainStart ".
                            "_specialActivities: split tasks to several time slots, bugfixes ".
-                           "AI: modify aiAddInstancePV, Customize pattern training data ".
+                           "AI: modify aiAddInstance, Customize pattern training data ".
                            "add batteryTrigger to save plantconfig, valDecTree: more infos in get aiRuleStrings ",
   "1.17.0" => "24.03.2024  new DWD ICON API, change defmaxvar from 0.5 to 0.8, attr ctrlWeatherDev1 can select OpenMeteoDWD-API ",
   "1.16.8" => "16.03.2024  plantConfigCheck: adjust pvCorrectionFactor_Auto check, settings of forecastRefresh ".
@@ -367,8 +373,6 @@ my %vNotesIntern = (
                            "destroy runtime data when delete device ",
   "1.16.7" => "12.03.2024  prevent duplicates in NOTIFYDEV, Forum: https://forum.fhem.de/index.php?msg=1306875 ",
   "1.16.6" => "11.03.2024  plantConfigCheck: join forecastProperties with ',' ",
-  "1.16.5" => "04.03.2024  setPVhistory: code changes, plantConfigCheck: check forecastRefresh ".
-                           "check age of weather data according to used MOSMIX variant ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -403,16 +407,17 @@ use constant {
   GMFILERANDOM   => 10800,                                                          # Random AddOn zu GMFILEREPEAT
   IDXLIMIT       => 900000,                                                         # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
 
+  AINUMTREES     => 10,                                                             # Anzahl der Entscheidungsbäume im Ensemble
   AITRBLTO       => 7200,                                                           # KI Training BlockingCall Timeout
   AIBCTHHLD      => 0.2,                                                            # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
   AITRSTARTDEF   => 2,                                                              # default Stunde f. Start AI-Training
   AISTDUDEF      => 1825,                                                           # default Haltezeit KI Raw Daten (Tage)
   AISPREADUPLIM  => 120,                                                            # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
   AISPREADLOWLIM => 80,                                                             # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-  AIACCUPLIM     => 130,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-  AIACCLOWLIM    => 70,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-  AIACCTRNMIN    => 5500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
-  AISPREADTRNMIN => 7000,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
+  AIACCUPLIM     => 150,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+  AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+  AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
+  AISPREADTRNMIN => 5500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
 
   SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
   FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
@@ -546,8 +551,9 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    affectConsForecastInPlanning affectSolCastPercentile
+                   aiControl
                    consumerLegend consumerAdviceIcon consumerLink
-                   ctrlAIdataStorageDuration ctrlBackupFilesKeep
+                   ctrlBackupFilesKeep
                    ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
                    ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings
                    ctrlShowLink ctrlSolCastAPImaxReq
@@ -676,6 +682,7 @@ my %hattr = (                                                                # H
   setupStringPeak           => { fn => \&_attrStringPeak          },
   setupRoofTops             => { fn => \&_attrRoofTops            },
   flowGraphicControl        => { fn => \&_attrflowGraphicControl  },
+  aiControl                 => { fn => \&_attraiControl           },
 );
 
   for my $bn (1..MAXBATTERIES) {
@@ -856,6 +863,8 @@ my %hqtxt = (                                                                # H
               DE => qq{der PV Vorhersagewert f&uuml;r die aktuelle Stunde wird von der KI Unterst&uuml;tzung geliefert}     },
   ailatr => { EN => qq{last AI training:},
               DE => qq{letztes KI-Training:}                                                                                },
+  ailgrt => { EN => qq{last AI result generation time:},
+              DE => qq{letzte KI-Ergebnis Generierungsdauer:}                                                               },
   aitris => { EN => qq{Runtime in seconds:},
               DE => qq{Laufzeit in Sekunden:}                                                                               },
   airule => { EN => qq{List of strings that describe the tree in rule-form},
@@ -1422,7 +1431,7 @@ my %hfspvh = (
 # $data{$name}{func}                                                          # temporäre interne Funktionen
 # $data{$name}{dwdcatalog}                                                    # temporärer Speicher DWD Stationskatalog
 # $data{$name}{strings}                                                       # temporärer Speicher Stringkonfiguration
-# $data{$name}{aidectree}{object}                                             # AI Decision Tree Object
+# $data{$name}{aidectree}{object}                                             # AI Decision Tree Object (im BlockingCall)
 # $data{$name}{messages}                                                      # Mitteilungssystem - permanent erneuerter Speicher
 # $data{$name}{filemessages}                                                  # Mitteilungssystem - Input vom Message File
 # $data{$name}{preparedmessages}                                              # Mitteilungssystem - vorbereitete Messages innerhalb des Code
@@ -1480,11 +1489,10 @@ sub Initialize {
                                 "affectConsForecastInPlanning:1,0 ".
                                 "affectConsForecastLastDays:selectnumbers,1,1,180,0,lin ".
                                 "affectSolCastPercentile:select,10,50,90 ".
+                                "aiControl:textField-long ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
                                 "consumerLink:0,1 ".
-                                "ctrlAIdataStorageDuration ".
-                                "ctrlAIshiftTrainStart:slider,1,1,23 ".
                                 "ctrlBackupFilesKeep ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#10 ".
@@ -1550,8 +1558,8 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  # my $av1 = "obsolete#-#the#attribute#will#be#deleted#soon";
-  # $hash->{AttrList} .= " graphicBeam1MaxVal:$av1 ctrlAreaFactorUsage:$av1 ";
+  my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';                          # 07.03.2025
+  $hash->{AttrList} .= " ctrlAIdataStorageDuration:$av ctrlAIshiftTrainStart:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -1559,8 +1567,7 @@ sub Initialize {
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
-   $hash->{AttrRenameMap} = { "setupBatteryDev"       => "setupBatteryDev01",          # 28.12.24
-                              "ctrlBatSocManagement"  => "ctrlBatSocManagement01",     # 01.01.25
+   $hash->{AttrRenameMap} = { "ctrlBatSocManagement"  => "ctrlBatSocManagement01",     # 01.01.25
                               "ctrlStatisticReadings" => "ctrlSpecialReadings",        # 02.01.25
                             };
 
@@ -1708,7 +1715,7 @@ sub Set {
   ## KI spezifische Setter
   ##########################
   if ($ipai) {
-      $setlist .= "aiDecTree:addInstances,addRawData,train ";
+      $setlist .= "aiDecTree:addInstAndTrain,addRawData ";
   }
 
   ## Batterie spezifische Setter
@@ -2355,8 +2362,6 @@ sub _setreset {                          ## no critic "not used"
           }
       }
 
-      aiInit ($paref);
-
       return;
   }
 
@@ -2545,16 +2550,11 @@ sub _setaiDecTree {                   ## no critic "not used"
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return;
 
-  if ($prop eq 'addInstances') {
-      aiAddInstancePV ($paref);
+  if ($prop eq 'addInstAndTrain') {
+      aiManageInstance ($paref);
   }
-
-  if ($prop eq 'addRawData') {
+  elsif ($prop eq 'addRawData') {
       aiAddRawData ($paref);
-  }
-
-  if ($prop eq 'train') {
-      manageTrain ($paref);
   }
 
 return;
@@ -5330,35 +5330,56 @@ sub __getaiRuleStrings {                 ## no critic "not used"
 
   return 'the AI usage is not prepared' if(!isPrepared4AI ($hash));
 
-  my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
-
-  if (!$dtree) {
-      return 'AI trained object is missed';
-  }
+  my $objref = AiDetreeVal ($hash, 'aitrained', '');
+  return 'AI trained object is missed or not an ARRAY' if(ref $objref ne 'ARRAY');
 
   my $rs = 'no rules delivered';
-  my (@rsl, $nodes, $depth);
-
-  eval { @rsl   = $dtree->rule_statements();                          # Returns a list of strings that describe the tree in rule-form
-         $nodes = $dtree->nodes();                                    # Returns the number of nodes in the trained decision tree
-         $depth = $dtree->depth();                                    # Returns the depth of the tree. This is the maximum number of decisions that would need to be made to classify an unseen instance, i.e. the length of the longest path from the tree's root to a leaf.
-         1;
-       }
-       or do { return $@;
-             };
+  my (@rsl, %entities);
+  my $tn = 0;
+  
+  for my $dtree (@{$objref}) {
+      eval { my @rules = $dtree->rule_statements();                      # Returns a list of strings that describe the tree in rule-form
+             $tn++;
+             
+             if ($tn == 1) {                                             # nur den ersten Tree ausgeben
+                 push @rsl, '&nbsp;';
+                 push @rsl, 'Tree: '.$tn;
+                 push @rsl, '&nbsp;';
+                 push @rsl, @rules;                             
+             }
+             
+             $entities{$tn}{rules} = scalar @rules;                      # Anzahl der Regeln
+             $entities{$tn}{nodes} = $dtree->nodes();                    # Returns the number of nodes in the trained decision tree
+             $entities{$tn}{depth} = $dtree->depth();                    # Returns the depth of the tree. This is the maximum number of decisions that would need to be made to classify an unseen instance, i.e. the length of the longest path from the tree's root to a leaf.             
+             1;
+           }
+           or do { return $@;
+                 };
+  }
 
   my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
   $atf    = '<b>'.$hqtxt{ailatr}{$lang}.' </b>'.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
   my $art = $hqtxt{aitris}{$lang}.' '.CircularVal ($hash, 99, 'runTimeTrainAI', '-');
+  
+  my $agt = CurrentVal  ($hash, 'aiLastGetResultTime', '');
+  $agt    = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
 
   if (@rsl) {
       my $l = scalar @rsl;
-      $rs   = "<b>Number of Rules: $l / Number of Nodes: $nodes / Depth: $depth</b>\n";
+      $rs   = "<b>Trained AI Object contains an Ensemble of $tn trees (only the first Tree is printed out)</b>\n\n";
+      
+      for my $tree (1..$tn) {
+          $rs .= "<b>Tree: $tree</b> -> Number of Rules: $entities{$tree}{rules} / Number of Nodes: $entities{$tree}{nodes} / Depth: $entities{$tree}{depth} \n";
+      }
+      
+      $rs  .= "\n\n";
       $rs  .= "Rules: ".$hqtxt{airule}{$lang}."\n";
       $rs  .= "Nodes: ".$hqtxt{ainode}{$lang}."\n";
       $rs  .= "Depth: ".$hqtxt{aidept}{$lang};
       $rs  .= "\n\n";
       $rs  .= $atf.' / '.$art;
+      $rs  .= "\n";
+      $rs  .= $agt;
       $rs  .= "\n\n";
       $rs  .= join "\n", @rsl;
   }
@@ -5579,16 +5600,17 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  #if ($cmd eq 'set' && $aName =~ /^graphicBeam1MaxVal|ctrlAreaFactorUsage$/) {
-  #    my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
-  #    if (!$init_done) {
-  #        Log3 ($name, 1, "$name - $msg");
-  #        return qq{Device "$name" -> $msg};
-  #    }
-  #    else {
-  #        return $msg;
-  #    }
-  #}
+  if ($cmd eq 'set' && $aName =~ /^ctrlAIdataStorageDuration|ctrlAIshiftTrainStart$/) {
+      #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
+      my $msg = "The attribute $aName is replaced by 'aiControl'. Please press 'save config' when restart is finished.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg");
+          #return qq{Device "$name" -> $msg};
+      }
+      else {
+          return $msg;
+      }
+  }
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -5642,7 +5664,7 @@ sub Attr {
   }
 
   if ($cmd eq 'set') {
-      if ($aName eq 'ctrlInterval' || $aName eq 'ctrlBackupFilesKeep' || $aName eq 'ctrlAIdataStorageDuration') {
+      if ($aName eq 'ctrlInterval' || $aName eq 'ctrlBackupFilesKeep') {
           unless ($aVal =~ /^[0-9]+$/x) {
               return qq{Invalid value for $aName. Use only figures 0-9!};
           }
@@ -5939,7 +5961,6 @@ return;
 sub _attrflowGraphicControl {            ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
 
@@ -5993,6 +6014,50 @@ sub _attrflowGraphicControl {            ## no critic "not used"
           }
           else {
               return "The key '$key=$h->{$key}' is not specified correctly. Please use a valid value.";
+          }
+      }
+  }
+
+return;
+}
+
+################################################################
+#                  Attr aiControl
+################################################################
+sub _attraiControl {                     ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $cmd   = $paref->{cmd};
+
+  my $hash  = $defs{$name};
+
+  for my $av ( qw( aiStorageDuration 
+                   aiTrainStart 
+                   aiTreesPV
+                 ) ) {
+
+      delete $data{$name}{current}{$av};
+  }
+
+  if ($cmd eq 'set') {
+      my $valid = {
+          aiStorageDuration => '\d+',
+          aiTrainStart      => '(1?[1-9]|10|2[0-3])',
+          aiTreesPV         => '(1?[1-9]|10|[2-4][0-9]|50)',
+      };
+
+      my ($a, $h) = parseParams ($aVal);
+
+      for my $key (keys %{$h}) {
+          my $comp = $valid->{$key};
+          next if(!$comp);
+
+          if ($h->{$key} =~ /^$comp$/xs) {
+              $data{$name}{current}{$key} = $h->{$key};
+          }
+          else {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
       }
   }
@@ -7055,18 +7120,28 @@ sub readCacheFile {
   my $hash      = $defs{$name};
 
   if ($cachename eq 'aitrained') {
-      my ($err, $dtree) = fileRetrieve ($file);
+      my ($err, $objref) = fileRetrieve ($file);
 
-      if (!$err && $dtree) {
-          my $valid = $dtree->isa('AI::DecisionTree');
-
-          if ($valid) {
-              $data{$name}{aidectree}{aitrained}  = $dtree;
-              $data{$name}{current}{aitrainstate} = 'ok';
-
-              Log3 ($name, 3, qq{$name - cached data "$title" restored});
-              return;
+      if (!$err && $objref) {
+          if (ref $objref ne 'ARRAY') {
+              return "The file $file was restored but the content is not an ARRAY";
           }
+          
+          for my $obj (@{$objref}) {
+              my $class = blessed ($obj);
+              my $valid = $obj->isa('AI::DecisionTree');
+              return 'The trained object is not AI::DecisionTree' if(!$valid);
+          }
+          
+          undef @{$data{$name}{aidectree}{aitrained}};
+          delete $data{$name}{aidectree}{aitrained};
+          
+          push @{$data{$name}{aidectree}{aitrained}}, @{$objref};
+          
+          $data{$name}{current}{aitrainstate} = 'ok';
+
+          Log3 ($name, 3, qq{$name - cached data "$title" restored});
+          return;
       }
 
       delete $data{$name}{circular}{99}{aitrainLastFinishTs};
@@ -7177,10 +7252,14 @@ sub writeCacheToFile {
   my ($error, $err, $lw);
 
   if ($cachename eq 'aitrained') {
-      my $dtree = AiDetreeVal ($hash, 'aitrained', '');
-      return if(ref $dtree ne 'AI::DecisionTree');
+      my $objref = AiDetreeVal ($hash, 'aitrained', '');
+      return 'trained object is not an ARRAY' if(ref $objref ne 'ARRAY');
+      
+      for my $obj (@{$objref}) {
+          return 'wrong trained object' if(ref $obj ne 'AI::DecisionTree');
+      }
 
-      $error = fileStore ($dtree, $file);
+      $error = fileStore ($objref, $file);
 
       if ($error) {
           $err = qq{ERROR while writing AI data to file "$file": $error};
@@ -7580,37 +7659,12 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  delete $data{$name}{circular}{99}{days2care};                                 # 29.12.2024
-  delete $data{$name}{circular}{'00'};                                            # 04.02.2025
-  # delete $data{$name}{circular}{1};
-
-  $data{$name}{circular}{99}{initdaybatintot01}  = delete $data{$name}{circular}{99}{initdaybatintot}  if(defined $data{$name}{circular}{99}{initdaybatintot});     # 29.12.2024
-  $data{$name}{circular}{99}{initdaybatouttot01} = delete $data{$name}{circular}{99}{initdaybatouttot} if(defined $data{$name}{circular}{99}{initdaybatouttot});    # 29.12.2024
-  $data{$name}{circular}{99}{batintot01}         = delete $data{$name}{circular}{99}{batintot}         if(defined $data{$name}{circular}{99}{batintot});            # 29.12.2024
-  $data{$name}{circular}{99}{batouttot01}        = delete $data{$name}{circular}{99}{batouttot}        if(defined $data{$name}{circular}{99}{batouttot});           # 29.12.2024
-  $data{$name}{circular}{99}{lastTsMaxSocRchd01} = delete $data{$name}{circular}{99}{lastTsMaxSocRchd} if(defined $data{$name}{circular}{99}{lastTsMaxSocRchd});    # 30.12.2024
-  $data{$name}{circular}{99}{nextTsMaxSocChge01} = delete $data{$name}{circular}{99}{nextTsMaxSocChge} if(defined $data{$name}{circular}{99}{nextTsMaxSocChge});    # 30.12.2024
-
-  readingsDelete    ($hash, 'Current_BatCharge');                               # 30.12.2024
-  readingsDelete    ($hash, 'Current_PowerBatOut');                             # 30.12.2024
-  readingsDelete    ($hash, 'Current_PowerBatIn');                              # 30.12.2024
-  readingsDelete    ($hash, 'Battery_OptimumTargetSoC');                        # 30.12.2024
-  readingsDelete    ($hash, 'Battery_ChargeRequest');                           # 30.12.2024
-  readingsDelete    ($hash, 'Battery_ChargeRecommended');                       # 30.12.2024
-  deleteReadingspec ($hash, 'Today_.*_BatIn');                                  # 30.12.2024
-  deleteReadingspec ($hash, 'Today_.*_BatOut');                                 # 30.12.2024
-  deleteReadingspec ($hash, 'statistic_.*');                                    # 02.01.2025
+  delete $data{$name}{circular}{'00'};                                          # 04.02.2025
   readingsDelete    ($hash, '.migrated');                                       # 01.02.25
 
   for my $ck (keys %{$data{$name}{circular}}) {                                 # 30.12.2024
       $data{$name}{circular}{$ck}{batin01}  = delete $data{$name}{circular}{$ck}{batin}  if(defined $data{$name}{circular}{$ck}{batin});
       $data{$name}{circular}{$ck}{batout01} = delete $data{$name}{circular}{$ck}{batout} if(defined $data{$name}{circular}{$ck}{batout});
-  }
-
-  for my $pn (1..MAXPRODUCER) {                                                # 30.12.2024
-      $pn       = sprintf "%02d", $pn;
-      readingsDelete ($hash, 'Current_PP'.$pn);
-      deleteReadingspec    ($hash, '.*PPreal'.$pn);
   }
 
   for my $dy (sort keys %{$data{$name}{pvhist}}) {                              # 01.01.2025
@@ -7656,6 +7710,18 @@ sub centralTask {
 
   if ($n) {
       Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
+  }
+  
+  my $fg1 = AttrVal ($name, 'ctrlAIdataStorageDuration', undef);                     # 07.03.2025
+  my $fg2 = AttrVal ($name, 'ctrlAIshiftTrainStart',     undef);
+  
+  my $newval;
+  $newval .= "aiStorageDuration=$fg1 "    if(defined $fg1);
+  $newval .= "aiTrainStart=$fg2 "         if(defined $fg2);
+
+  if ($newval) {
+      CommandAttr (undef, "$name aiControl $newval");
+      ::CommandDeleteAttr (undef, "$name ctrlAIdataStorageDuration|ctrlAIshiftTrainStart");
   }
 
   ##########################################################################################################################
@@ -8127,8 +8193,8 @@ sub _specialActivities {
   ## bestimmte einmalige Aktionen
   ##################################
   $chour    = int $chour;
-  $minute   = int $minute;
-  my $aitrh = AttrVal ($name, 'ctrlAIshiftTrainStart', AITRSTARTDEF);                             # Stunde f. Start AI-Training
+  $minute   = int $minute;                         
+  my $aitrh = CurrentVal ($name, 'aiTrainStart', AITRSTARTDEF);                                   # Stunde f. Start AI-Training
 
   ## Task 1
   ###########
@@ -8282,11 +8348,8 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 6 started");
 
-          aiDelRawData ($paref);                                                            # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
-
-          $paref->{taa} = 1;
-          aiAddInstancePV ($paref);                                                         # AI PV-Forecast füllen, trainieren und sichern
-          delete $paref->{taa};
+          aiDelRawData     ($paref);                                                           # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
+          aiManageInstance ($paref);                                                           # AI PV-Forecast füllen, trainieren und sichern
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 6 finished");
       }
@@ -9758,7 +9821,7 @@ sub _transferBatteryValues {
 
       if ($batinthishour < 0) {
           $batinthishour = 0;
-          my $vl         = 2;
+          my $vl         = 3;
           my $pre        = '- WARNING -';
 
           if ($debug =~ /collectData/xs) {
@@ -9789,7 +9852,7 @@ sub _transferBatteryValues {
 
       if ($batoutthishour < 0) {
           $batoutthishour = 0;
-          my $vl          = 2;
+          my $vl          = 3;
           my $pre         = '- WARNING -';
 
           if ($debug =~ /collectData/xs) {
@@ -10213,13 +10276,16 @@ sub _batChargeRecmd {
 
           my $sfmargin = $whneed * 0.25;                                                         # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
 
-          if ( $whneed + $sfmargin >= $spday || $t >  $maxfctim) {$crel = 1}                     # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-          if ( !$num && ($pvCu - $curcon) >= $inplim )           {$crel = 1}                     # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
+          if ( $whneed + $sfmargin >= $spday || ($today && $t > $maxfctim)) {$crel = 1}          # change V 1.47.0: Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+          if ( !$num && ($pvCu - $curcon) >= $inplim )                      {$crel = 1}          # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
+          if ( !$cgbt )                                                     {$crel = 1}          # immer Ladefreigabe wenn kein BatSoc-Management
 
           ## SOC-Prognose
-          #################
-          $socwh += $crel ? ($pvfc - $confc) * STOREFFDEF : -$confc / STOREFFDEF;              # PV Prognose nur einbeziehen wenn Ladefreigabe
-
+          #################                                                                      # change V 1.47.0
+          my $fceff = $pvfc - $confc;                                                            # effektiver PV Überschuß (effektiver Verbrauch wenn < 0)
+          $socwh   += $crel ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) : 
+                      ($fceff > 0 ? 0 : $fceff / STOREFFDEF);                                    # PV Prognose nur einbeziehen wenn Ladefreigabe
+          
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
                     $socwh > $batinstcap  ? $batinstcap  :
@@ -11575,7 +11641,7 @@ sub ___switchConsumerOn {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable});
   }
 
-  my $isConsRcmd = isConsRcmd      ($hash, $c);
+  my $isConsRcmd = isConsRcmd ($hash, $c);
 
   my $supplmnt         = ConsumerVal ($hash, $c, 'planSupplement', '');
   $paref->{supplement} = '' if($supplmnt =~ /swoncond\snot|swoncond\snicht/xs && $swoncond);
@@ -11902,12 +11968,12 @@ sub __getCyclesAndRuntime {
         $startday  = strftime "%d", localtime(ConsumerVal ($hash, $c, 'startTime', $t));                                                 # aktueller Tag  (range 01 to 31)
 
         if ($chour eq $starthour) {
-            my $runtime                                   = (($t - ConsumerVal ($hash, $c, 'startTime', $t)) / 60);                      # in Minuten ! (gettimeofday sind ms !)
+            my $runtime                            = (($t - ConsumerVal ($hash, $c, 'startTime', $t)) / 60);                             # in Minuten ! (gettimeofday sind ms !)
             $data{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, 'lastMinutesOn', 0) + $runtime;
         }
         else {                                                                                                                           # Stundenwechsel
             if (ConsumerVal ($hash, $c, 'onoff', 'off') eq 'on') {                                                                       # Status im letzen Zyklus war "on"
-                my $newst                                         = timestringToTimestamp ($date.' '.sprintf("%02d",  $chour).':00:00');
+                my $newst                                  = timestringToTimestamp ($date.' '.sprintf("%02d",  $chour).':00:00');
                 $data{$name}{consumers}{$c}{startTime}     = $newst;
                 $data{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($hash, $c, 'startTime', $newst)) / 60;                   # in Minuten ! (gettimeofday sind ms !)
                 $data{$name}{consumers}{$c}{lastMinutesOn} = 0;
@@ -12249,7 +12315,9 @@ sub _calcConsForecast_circular {
           debugLog ($paref, 'consumption_long', "incl. planned $inhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{plannum});
       }
 
-      debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
+      if (defined $usage{$hh}{num}) {                                                                 # V 1.47.0
+          debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
+      }
   }
 
   ## nächsten Tageswert Excludes berücksichtigen
@@ -12285,6 +12353,8 @@ sub _calcConsForecast_circular {
       my $nhday = strftime "%a", localtime($utime);                                                    # Wochentagsname des NextHours Key
       my $nhhr  = sprintf "%02d", int (strftime "%H", localtime($utime)) + 1;                          # Stunde des Tages vom NextHours Key (01,02,...24)
 
+      next if(!defined $usage{$nhhr}{con});                                                            # V 1.47.0
+      
       $data{$name}{nexthours}{$k}{confcEx} = $usage{$nhhr}{conex};
       $data{$name}{nexthours}{$k}{confc}   = $usage{$nhhr}{con};                                       # prognostizierter Verbrauch (Median)
 
@@ -14101,12 +14171,14 @@ sub __createAIicon {
   $aitit   =~ s/<NAME>/$name/xs;
 
   my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
+  my $art = CurrentVal  ($hash, 'aiLastGetResultTime', ''),
   $atf    = $hqtxt{ailatr}{$lang}.' '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
+  $art    = $hqtxt{ailgrt}{$lang}.' '.($art ? ($art * 1000).' ms' : '-');
 
   my $aiimg  = $aidtabs          ? '--' :
                $aicanuse ne 'ok' ? '-'  :
                $aitst ne 'ok'    ? FW_makeImage ('10px-kreis-rot.png', $aitst) :
-               $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}.' &#10;'.$atf) :
+               $aihit            ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{aiwhit}{$lang}.' &#10;'.$atf.' &#10;'.$art) :
                FW_makeImage ('10px-kreis-gelb.png', $hqtxt{aiwook}{$lang}.' &#10;'.$atf);
 
   my $aiicon = qq{<a title="$aitit">$aiimg</a>};
@@ -14794,7 +14866,8 @@ sub _beamGraphicFirstHour {
   #######################################
   for my $bn (1..MAXBATTERIES) {
       $bn               = sprintf "%02d", $bn;
-      $hbsocs->{0}{$bn} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0);
+      $hbsocs->{0}{$bn} = sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0);
+      $hbsocs->{0}{$bn} = 100 if($hbsocs->{0}{$bn} >= 100);
   }
 
   ## Zuordnung Werte zu den Balken entsprechend Selektion
@@ -14823,7 +14896,8 @@ sub _beamGraphicFirstHour {
 
   $hfcg->{0}{beam1}  //= 0;
   $hfcg->{0}{beam2}  //= 0;
-  $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
+  $hfcg->{0}{diff}     = sprintf "%.1f", ($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
+  $hfcg->{0}{diff}     = sprintf "%.0f", $hfcg->{0}{diff} if(int ($hfcg->{0}{diff}) - $hfcg->{0}{diff} == 0);
 
   my $epc = CurrentVal ($hash, 'ePurchasePriceCcy', 0);
   my $efc = CurrentVal ($hash, 'eFeedInTariffCcy',  0);
@@ -14916,7 +14990,8 @@ sub _beamGraphicRemainingHours {
               #######################################
               for my $bn (1..MAXBATTERIES) {
                   $bn                = sprintf "%02d", $bn;
-                  $hbsocs->{$i}{$bn} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0);
+                  $hbsocs->{$i}{$bn} = sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0);
+                  $hbsocs->{$i}{$bn} = 100 if($hbsocs->{$i}{$bn} >= 100);
               }
 
               $hfcg->{$i}{day_str} = $ds;
@@ -14945,7 +15020,8 @@ sub _beamGraphicRemainingHours {
           ########################################
           for my $bn (1..MAXBATTERIES) {
               $bn                = sprintf "%02d", $bn;
-              $hbsocs->{$i}{$bn} = NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0);
+              $hbsocs->{$i}{$bn} = sprintf "%.1f", NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0);
+              $hbsocs->{$i}{$bn} = 100 if($hbsocs->{$i}{$bn} >= 100);
           }
 
           my $day_str = ($stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs)[2];
@@ -14966,7 +15042,7 @@ sub _beamGraphicRemainingHours {
                               $beam1cont eq 'energycosts'         ? $val6 :
                               $beam1cont eq 'gridfeedin'          ? $val7 :
                               $beam1cont eq 'feedincome'          ? $val8 :
-                              $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam1cont)[1]} :
+                              $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam1cont)[1]} : 
                               undef;
 
       $hfcg->{$i}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
@@ -14984,7 +15060,8 @@ sub _beamGraphicRemainingHours {
 
       $hfcg->{$i}{beam1} //= 0;
       $hfcg->{$i}{beam2} //= 0;
-      $hfcg->{$i}{diff}    = $hfcg->{$i}{beam1} - $hfcg->{$i}{beam2};
+      $hfcg->{$i}{diff}    = sprintf "%.1f", ($hfcg->{$i}{beam1} - $hfcg->{$i}{beam2});
+      $hfcg->{$i}{diff}    = sprintf "%.0f", $hfcg->{$i}{diff} if(int ($hfcg->{$i}{diff}) - $hfcg->{$i}{diff} == 0);
 
       $maxVal = $hfcg->{$i}{beam1} if($hfcg->{$i}{beam1} > $maxVal);
       $maxCon = $hfcg->{$i}{beam2} if($hfcg->{$i}{beam2} > $maxCon);
@@ -17010,52 +17087,269 @@ sub outputMessages {
 return $out;
 }
 
-###############################################################
-#    Eintritt in den KI Train Prozess normal/Blocking
-###############################################################
-sub manageTrain {
+#####################################################################
+#    Eintritt in den KI AddInstance & Train Prozess normal/Blocking
+#####################################################################
+sub aiManageInstance {
   my $paref = shift;
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
+  
+  return if(!isPrepared4AI ($hash));
 
-  if (CircularVal ($hash, 99, 'runTimeTrainAI', 0) < AIBCTHHLD) {
-      BlockingKill ($hash->{HELPER}{AIBLOCKRUNNING}) if(defined $hash->{HELPER}{AIBLOCKRUNNING});
-      debugLog     ($paref, 'aiProcess', qq{AI Training is started in main process});
-      aiTrain      ($paref);
+  delete $hash->{HELPER}{AIBLOCKRUNNING} if(defined $hash->{HELPER}{AIBLOCKRUNNING}{pid} && $hash->{HELPER}{AIBLOCKRUNNING}{pid} =~ /DEAD/xs);
+
+  if (defined $hash->{HELPER}{AIBLOCKRUNNING}{pid}) {
+      Log3 ($name, 3, qq{$name - another AI AddInstance & Training with PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" is already running ... start Training aborted});
+      return;
   }
-  else {
-     delete $hash->{HELPER}{AIBLOCKRUNNING} if(defined $hash->{HELPER}{AIBLOCKRUNNING}{pid} && $hash->{HELPER}{AIBLOCKRUNNING}{pid} =~ /DEAD/xs);
 
-     if (defined $hash->{HELPER}{AIBLOCKRUNNING}{pid}) {
-         Log3 ($name, 3, qq{$name - another AI Training with PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" is already running ... start Training aborted});
-         return;
-     }
+  $hash->{HELPER}{AIBLOCKRUNNING} = BlockingCall ( "FHEM::SolarForecast::aiAddInstance",
+                                                   $paref,
+                                                   "FHEM::SolarForecast::aiFinishTrain",
+                                                   AITRBLTO,
+                                                   "FHEM::SolarForecast::aiAbortTrain",
+                                                   $hash
+                                                 );
 
-     $paref->{block} = 1;
+  if (defined $hash->{HELPER}{AIBLOCKRUNNING}) {
+      $hash->{HELPER}{AIBLOCKRUNNING}{loglevel} = 3;                                                       # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
 
-     $hash->{HELPER}{AIBLOCKRUNNING} = BlockingCall ( "FHEM::SolarForecast::aiTrain",
-                                                      $paref,
-                                                      "FHEM::SolarForecast::finishTrain",
-                                                      AITRBLTO,
-                                                      "FHEM::SolarForecast::abortTrain",
-                                                      $hash
-                                                    );
-
-
-     if (defined $hash->{HELPER}{AIBLOCKRUNNING}) {
-         $hash->{HELPER}{AIBLOCKRUNNING}{loglevel} = 3;                                                       # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
-
-         debugLog ($paref, 'aiProcess', qq{AI Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" with Timeout "AITRBLTO" started});
-     }
+      debugLog ($paref, 'aiProcess', qq{AI AddInstance & Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" with Timeout "AITRBLTO" started});
   }
 
 return;
 }
 
+################################################################
+#     KI Instanz(en) aus Raw Daten Hash erzeugen
+#     mit Ensemble-Algorithmus
+################################################################
+sub aiAddInstance {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hash  = $defs{$name};
+
+  my $serial;
+
+  if (!isPrepared4AI ($hash)) {
+      my $err = CurrentVal ($hash, 'aicanuse', '');
+      $serial = encode_base64 (Serialize ( { name         => $name,
+                                             aitrainstate => "aiAddInstance not performed: $err",
+                                             aiaddistate  => "aiAddInstance not performed: $err",
+                                             aicanuse     => $err
+                                           }
+                                         ), "");
+
+      return $serial;
+  }
+  
+  my $cst = [gettimeofday];                                                  # Train Startzeit
+  
+  my @pvhdata;
+  
+  for my $idx (sort keys %{$data{$name}{aidectree}{airaw}}) {
+      next if(!$idx);
+
+      my $pvrl = AiRawdataVal ($hash, $idx, 'pvrl', undef);
+      next if(!defined $pvrl);
+
+      my $hod  = AiRawdataVal ($hash, $idx, 'hod', undef);
+      next if(!defined $hod);
+
+      my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
+      next if($rad1h <= 0);
+
+      my $temp   = AiRawdataVal ($hash, $idx, 'temp', undef);
+      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',  undef);
+      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c', undef);
+      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',   0);
+
+      my $tbin   = temp2bin   ($temp)    if(defined $temp);
+      my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
+      my $sabin  = sunalt2bin ($sunalt);
+
+      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, rr1c => $rr1c, sunalt => $sunalt, hod => $hod, pvrl => $pvrl };
+  }
+  
+  if (!scalar @pvhdata) {
+      $serial = encode_base64 (Serialize ( { name         => $name,
+                                             aitrainstate => "aiAddInstance not performed due to no Raw data",
+                                             aiaddistate  => "aiAddInstance not performed due to no Raw data"
+                                           }
+                                         ), "");
+
+      return $serial;
+  }
+  
+  my $numtrees = CurrentVal ($name, 'aiTreesPV', AINUMTREES);
+  
+  for my $tn (1 .. $numtrees) {                                                 # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
+      my @sampled       = sample_data (\@pvhdata);
+      my ($err, $dtree) = aiInit ($paref);
+      
+      if ($err) {
+          Log3 ($name, 2, "$name - ERROR - AI::DecisionTree init error: $err");
+          $serial = encode_base64 (Serialize ( { name         => $name,
+                                                 aitrainstate => "aiAddInstance AI::DecisionTree init error: $err",
+                                                 aiaddistate  => "aiAddInstance AI::DecisionTree init error: $err",
+                                               }
+                                             ), "");
+
+          return $serial;
+      }
+      
+      Log3 ($name, 3, "$name - AI::DecisionTree initialized") if($tn == 1);
+      
+      my $aiAddedToTrain = 0;
+
+      for my $instance (@sampled) {
+          eval { $dtree->add_instance (attributes => { rad1h  => $instance->{rad1h},
+                                                       temp   => $instance->{temp},
+                                                       wcc    => $instance->{wcc},
+                                                       rr1c   => $instance->{rr1c},
+                                                       sunalt => $instance->{sunalt},
+                                                       hod    => $instance->{hod}
+                                                     },
+                                                     result => $instance->{pvrl}
+                                      );
+                 1;
+               }
+               or do { Log3 ($name, 1, "$name - aiAddInstance ERROR: $@");
+                       $serial = encode_base64 (Serialize ( { name         => $name,
+                                                              aiaddistate  => $@,
+                                                            }
+                                                          ), "");
+
+                       return $serial;
+                     };
+                     
+          $aiAddedToTrain++;
+          
+          debugLog ($paref, 'aiProcess', "AI Instance added Tree $tn - ".
+                                         "hod: $instance->{hod}, ".
+                                         "sunalt: $instance->{sunalt}, ".
+                                         "rad1h: $instance->{rad1h}, pvrl: instance->{pvrl}, ".
+                                         "wcc: ".(defined $instance->{wcc}   ? $instance->{wcc}  : '-').", ".
+                                         "rr1c: ".(defined $instance->{rr1c} ? $instance->{rr1c} : '-').", ".
+                                         "temp: ".(defined $instance->{temp} ? $instance->{temp} : '-'), 
+                                         4);
+      }
+      
+      debugLog ($paref, 'aiProcess', "AI Instance add - Tree: $tn -> ".$aiAddedToTrain." entities added for training ".(AttrVal ($name, 'verbose', 3) < 4 ? '(set verbose 4 for output more detail)' : ''));
+      
+      $data{$name}{aidectree}{object}{$tn}{dtree} = $dtree;
+      $data{$name}{aidectree}{object}{$tn}{enum}  = $aiAddedToTrain;
+  }
+
+  $paref->{cst} = $cst;
+  $serial = aiTrain ($paref);
+  delete $paref->{cst};
+
+return $serial;
+}
+
+################################################################
+#     KI trainieren
+################################################################
+sub aiTrain {          
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $cst   = $paref->{cst};                                  # Train Startzeit
+
+  my $hash = $defs{$name};
+  my ($serial, $err);
+                                              
+  my $object = AiDetreeVal ($hash, 'object', undef);
+
+  if (!$object) {
+      $err    = 'no AI::DecisionTree object present';
+      $serial = encode_base64 (Serialize ( {name         => $name,
+                                            aitrainstate => "Train: not performed -> $err",
+                                            aiinitstate  => "Init: $err",
+                                            aicanuse     => 'ok'
+                                           }
+                                         ), "");
+                                         
+      return $serial;
+  }
+  
+  my @ensemble;                                                                 # Erstelle das Ensemble
+  my %entities;
+  my $numtrees = CurrentVal ($name, 'aiTreesPV', AINUMTREES);
+
+  for my $tn (1 .. $numtrees) {                                                 # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
+      my $dtree = $object->{$tn}{dtree};                                        # dtree Objekt
+      my $enum  = $object->{$tn}{enum};                                         # Anazhl Elemente im Tree
+      
+      eval { $dtree->train();
+             1;
+           }
+           or do { Log3 ($name, 1, "$name - aiTrain ERROR: $@");
+                   $err    = (split / at/, $@)[0];
+                   $serial = encode_base64 (Serialize ( {name         => $name,
+                                                         aitrainstate => "Train: $err",
+                                                         aicanuse     => 'ok'
+                                                        }
+                                                      ), "");
+
+                   return $serial;
+                 };
+                 
+      push @ensemble, $dtree;
+      
+      $entities{$tn}  = $enum;
+      $entities{rn}  += scalar $dtree->rule_statements();
+  }
+  
+  undef @{$data{$name}{aidectree}{aitrained}};
+  delete $data{$name}{aidectree}{aitrained};
+  
+  push @{$data{$name}{aidectree}{aitrained}}, @ensemble;
+
+  $err = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
+  my $rn;
+
+  if (!$err) {
+      $rn = delete $entities{rn};
+      
+      while (my ($tree, $ent) = each %entities) {
+          debugLog ($paref, 'aiProcess', "AI trained Tree: $tree, number of entities: $ent");
+      }
+      
+      debugLog ($paref, 'aiProcess', qq{Training instances and their associated information where purged from the AI object});
+      debugLog ($paref, 'aiProcess', qq{AI trained and saved data into file: }.$aitrained.$name);
+  }
+  else {
+      $serial = encode_base64 (Serialize ( {name         => $name,
+                                            aitrainstate => "Train performed but not written -> $err",
+                                            aicanuse     => 'ok'
+                                           }
+                                         ), "");
+                                         
+      return $serial;
+  }
+
+  setTimeTracking ($hash, $cst, 'runTimeTrainAI');                                                     # Zyklus-Laufzeit ermitteln
+
+  $serial = encode_base64 (Serialize ( {name                => $name,
+                                        aitrainstate        => 'ok',
+                                        runTimeTrainAI      => CurrentVal ($hash, 'runTimeTrainAI', ''),
+                                        aitrainLastFinishTs => int time,
+                                        aiRulesNumber       => $rn,                                    # Returns a list of strings that describe the tree in rule-form
+                                        aicanuse            => 'ok',
+                                        aiaddistate         => 'ok'
+                                       }
+                                     )
+                                     , "");
+
+return $serial;
+}
+
 ###############################################################
 #    Restaufgaben nach AI Train
 ###############################################################
-sub finishTrain {
+sub aiFinishTrain {
   my $serial = decode_base64 (shift);
 
   my $paref = eval { thaw ($serial) };                                             # Deserialisierung
@@ -17069,12 +17363,13 @@ sub finishTrain {
   my $aiinitstate     = $paref->{aiinitstate};
   my $aitrainFinishTs = $paref->{aitrainLastFinishTs};
   my $aiRulesNumber   = $paref->{aiRulesNumber};
+  my $aiaddistate     = $paref->{aiaddistate} // 'ok';
 
   delete $data{$name}{circular}{99}{aiRulesNumber};
 
-  $data{$name}{current}{aiAddedToTrain}           = 0;
   $data{$name}{current}{aicanuse}                 = $aicanuse;
   $data{$name}{current}{aitrainstate}             = $aitrainstate;
+  $data{$name}{current}{aiaddistate}              = $aiaddistate;
   $data{$name}{current}{aiinitstate}              = $aiinitstate     if(defined $aiinitstate);
   $data{$name}{circular}{99}{runTimeTrainAI}      = $runTimeTrainAI  if(defined $runTimeTrainAI);  # !! in Circular speichern um zu persistieren, setTimeTracking speichert zunächst in Current !!
   $data{$name}{circular}{99}{aitrainLastFinishTs} = $aitrainFinishTs if(defined $aitrainFinishTs);
@@ -17106,169 +17401,16 @@ return;
 ####################################################################################################
 #                    Abbruchroutine BlockingCall Timeout
 ####################################################################################################
-sub abortTrain {
-  my $hash   = shift;
-  my $cause  = shift // "Timeout: process terminated";
-  my $name   = $hash->{NAME};
-  my $type   = $hash->{TYPE};
+sub aiAbortTrain {
+  my $hash  = shift;
+  my $cause = shift // "Timeout: process terminated";
+  my $name  = $hash->{NAME};
 
   Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{AIBLOCKRUNNING}{fn} pid:$hash->{HELPER}{AIBLOCKRUNNING}{pid} aborted: $cause");
 
-  delete($hash->{HELPER}{AIBLOCKRUNNING});
+  delete $hash->{HELPER}{AIBLOCKRUNNING};
 
   $data{$name}{current}{aitrainstate}   = 'Traing (Child) process timed out';
-  $data{$name}{current}{aiAddedToTrain} = 0;
-
-return;
-}
-
-################################################################
-#     KI Instanz(en) aus Raw Daten Hash erzeugen
-################################################################
-sub aiAddInstancePV {                   ## no critic "not used"
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $taa   = $paref->{taa};            # do train after add
-
-  my $hash  = $defs{$name};
-
-  return if(!isPrepared4AI ($hash));
-
-  my $err = aiInit ($paref);
-  return if($err);
-  my $dtree = AiDetreeVal ($hash, 'object', undef);
-
-  $data{$name}{current}{aiAddedToTrain} = 0;
-
-  for my $idx (sort keys %{$data{$name}{aidectree}{airaw}}) {
-      next if(!$idx);
-
-      my $pvrl = AiRawdataVal ($hash, $idx, 'pvrl', undef);
-      next if(!defined $pvrl);
-
-      my $hod  = AiRawdataVal ($hash, $idx, 'hod', undef);
-      next if(!defined $hod);
-
-      my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
-      next if($rad1h <= 0);
-
-      my $temp   = AiRawdataVal ($hash, $idx, 'temp', undef);
-      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',  undef);
-      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c', undef);
-      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',   0);
-
-      my $tbin   = temp2bin   ($temp)    if(defined $temp);
-      my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
-      my $sabin  = sunalt2bin ($sunalt);
-
-      eval { $dtree->add_instance (attributes => { rad1h  => $rad1h,
-                                                   temp   => $tbin,
-                                                   wcc    => $cbin,
-                                                   rr1c   => $rr1c,
-                                                   sunalt => $sunalt,
-                                                   hod    => $hod
-                                                 },
-                                                 result => $pvrl
-                                  );
-             1;
-           }
-           or do { Log3 ($name, 1, "$name - aiAddInstancePV ERROR: $@");
-                   $data{$name}{current}{aiaddistate} = $@;
-                   return;
-                 };
-
-      $data{$name}{current}{aiAddedToTrain}++;
-
-      debugLog ($paref, 'aiProcess', "AI Instance added $idx - hod: $hod, sunalt: $sunalt, rad1h: $rad1h, pvrl: $pvrl, wcc: ".(defined $wcc ? $wcc : '-').", rr1c: ".(defined $rr1c ? $rr1c : '-').", temp: ".(defined $temp ? $temp : '-'), 4);
-  }
-
-  debugLog ($paref, 'aiProcess', "AI Instance add - ".$data{$name}{current}{aiAddedToTrain}." entities added for training ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
-
-  $data{$name}{aidectree}{object}    = $dtree;
-  $data{$name}{current}{aiaddistate} = 'ok';
-
-  if ($taa) {
-      manageTrain ($paref);
-  }
-
-return;
-}
-
-################################################################
-#     KI trainieren
-################################################################
-sub aiTrain {                            ## no critic "not used"
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $block = $paref->{block} // 0;
-
-  my $hash = $defs{$name};
-  my ($serial, $err);
-
-  if (!isPrepared4AI ($hash)) {
-      $err    = CurrentVal ($hash, 'aicanuse', '');
-      $serial = encode_base64 (Serialize ( { name         => $name,
-                                             aitrainstate => "Train: not performed -> $err",
-                                             aicanuse     => $err
-                                           }
-                                         ), "");
-
-      $block ? return ($serial) : return \&finishTrain ($serial);
-  }
-
-  my $cst   = [gettimeofday];                                           # Zyklus-Startzeit
-  my $dtree = AiDetreeVal ($hash, 'object', undef);
-
-  if (!$dtree) {
-      $err    = 'no AI::DecisionTree object present';
-      $serial = encode_base64 (Serialize ( {name         => $name,
-                                            aitrainstate => "Train: not performed -> $err",
-                                            aiinitstate  => "Init: $err",
-                                            aicanuse     => 'ok'
-                                           }
-                                         ), "");
-      $block ? return ($serial) : return \&finishTrain ($serial);
-  }
-
-  eval { $dtree->train();
-         1;
-       }
-       or do { Log3 ($name, 1, "$name - aiTrain ERROR: $@");
-               $err    = (split / at/, $@)[0];
-               $serial = encode_base64 (Serialize ( {name         => $name,
-                                                     aitrainstate => "Train: $err",
-                                                     aicanuse     => 'ok'
-                                                    }
-                                                  ), "");
-
-               $block ? return ($serial) : return \&finishTrain ($serial);
-             };
-
-  $data{$name}{aidectree}{aitrained} = $dtree;
-  $err                                  = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
-
-  if (!$err) {
-      debugLog ($paref, 'aiProcess', qq{AI trained number of entities: }. $data{$name}{current}{aiAddedToTrain});
-      debugLog ($paref, 'aiProcess', qq{AI trained and saved data into file: }.$aitrained.$name);
-      debugLog ($paref, 'aiProcess', qq{Training instances and their associated information where purged from the AI object});
-  }
-
-  setTimeTracking ($hash, $cst, 'runTimeTrainAI');                                                     # Zyklus-Laufzeit ermitteln
-
-  $serial = encode_base64 (Serialize ( {name                => $name,
-                                        aitrainstate        => 'ok',
-                                        runTimeTrainAI      => CurrentVal ($hash, 'runTimeTrainAI', ''),
-                                        aitrainLastFinishTs => int time,
-                                        aiRulesNumber       => scalar $dtree->rule_statements(),       # Returns a list of strings that describe the tree in rule-form
-                                        aicanuse            => 'ok'
-                                       }
-                                     )
-                                     , "");
-
-  delete $data{$name}{current}{runTimeTrainAI};
-
-  $block ? return ($serial) : return \&finishTrain ($serial);
 
 return;
 }
@@ -17279,7 +17421,6 @@ return;
 sub aiGetResult {
   my $paref  = shift;
   my $name   = $paref->{name};
-  my $type   = $paref->{type};
   my $hod    = $paref->{hod};
   my $nhtstr = $paref->{nhtstr};
 
@@ -17287,17 +17428,16 @@ sub aiGetResult {
 
   return 'AI usage is not prepared' if(!isPrepared4AI ($hash, 'full'));
 
-  my $dtree = AiDetreeVal ($hash, 'aitrained', undef);
-
-  if (!$dtree) {
-      return 'AI trained object is missed';
-  }
+  my $objref = AiDetreeVal ($hash, 'aitrained', '');
+  return 'AI trained object is missed or not an ARRAY' if(ref $objref ne 'ARRAY');
 
   my $rad1h = NexthoursVal ($hash, $nhtstr, 'rad1h', 0);
   return "no rad1h for hod: $hod" if($rad1h <= 0);
+  
+  my $cst = [gettimeofday];                                                         # aiGetResult Startzeit
 
   debugLog ($paref, 'aiData', "Start AI result check for hod: $hod");
-
+  
   my $wcc    = NexthoursVal ($hash, $nhtstr, 'wcc',     0);
   my $rr1c   = NexthoursVal ($hash, $nhtstr, 'rr1c',    0);
   my $temp   = NexthoursVal ($hash, $nhtstr, 'temp',   20);
@@ -17307,49 +17447,89 @@ sub aiGetResult {
   my $tbin  = temp2bin   ($temp);
   my $cbin  = cloud2bin  ($wcc);
   my $sabin = sunalt2bin ($sunalt);
-
-  my $pvaifc;
-
-  eval { $pvaifc = $dtree->get_result (attributes => { rad1h  => $rad1h,
-                                                       temp   => $tbin,
-                                                       wcc    => $cbin,
-                                                       rr1c   => $rr1c,
-                                                       sunalt => $sabin,
-                                                       sunaz  => $sunaz,
-                                                       hod    => $hod
-                                                     }
-                                      );
-       };
-
-  if ($@) {
-      Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
-      return $@;
+  
+  my $new_data = {                                                                 # Prognose für neue Daten
+      rad1h  => $rad1h,
+      temp   => $tbin,
+      wcc    => $cbin,
+      rr1c   => $rr1c,
+      sunalt => $sabin,
+      sunaz  => $sunaz,
+      hod    => $hod
+  };
+    
+  ## Accurate Decision
+  ######################
+  my @total_prediction;
+  my $tn = 0;
+  
+  for my $dtree (@{$objref}) {
+      $tn++;
+      my $res;
+      
+      eval { $res = $dtree->get_result (attributes => $new_data);
+             push @total_prediction, $res if(defined $res);
+             1;
+           }
+           or do { Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
+                   return $@;
+                 };
+                 
+      debugLog ($paref, 'aiData', "got AI result from Tree number $tn: $res") if(defined $res);
   }
+  
+  my $tprnum = scalar @total_prediction;
 
-  if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $pvaifc (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)});
-      return ('accurate', $pvaifc);
+  if ($tprnum) {
+      my $avg_prediction = sprintf '%.0f', avgArray (\@total_prediction, $tprnum);
+      # my $avg_prediction = sprintf '%.0f', medianArray (\@total_prediction);
+      
+      debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $avg_prediction (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)});
+      return ('accurate', $avg_prediction);
   }
+  
+  ## Spread Decision
+  ####################
+#  undef @total_prediction;
+#  $tn = 0;
+  
+#  debugLog ($paref, 'aiData', qq{AI no accurate result found with initial value "Rad1h: $rad1h" (hod: $hod)});
+  
+#  for my $dtree (@{$objref}) {
+#      $tn++;
+      
+#      debugLog ($paref, 'aiData', "Start get AI spreaded result from Tree number $tn");
+      
+#      my ($msg, $res) = _aiGetSpread ( { name   => $name,
+#                                         rad1h  => $rad1h,
+#                                         temp   => $tbin,
+#                                         wcc    => $cbin,
+#                                         rr1c   => $rr1c,
+#                                         sunalt => $sabin,
+#                                         sunaz  => $sunaz,
+#                                         hod    => $hod,
+#                                         dtree  => $dtree,
+#                                         debug  => $paref->{debug}
+#                                       }
+#                                     );
+     
+#      push @total_prediction, $res if($msg eq 'spreaded');                                            
+#  }
 
-  (my $msg, $pvaifc) = _aiGetSpread ( { name   => $name,
-                                        type   => $type,
-                                        rad1h  => $rad1h,
-                                        temp   => $tbin,
-                                        wcc    => $cbin,
-                                        rr1c   => $rr1c,
-                                        sunalt => $sabin,
-                                        sunaz  => $sunaz,
-                                        hod    => $hod,
-                                        dtree  => $dtree,
-                                        debug  => $paref->{debug}
-                                      }
-                                    );
+#  my $sprnum = scalar @total_prediction;
 
-  if (defined $pvaifc) {
-      return ($msg, $pvaifc);
-  }
 
-return 'No AI decition delivered';
+#  if ($sprnum) {
+#      my $avg_prediction = sprintf '%.0f', avgArray (\@total_prediction, $sprnum);
+#      # my $avg_prediction = sprintf '%.0f', medianArray (\@total_prediction);
+      
+#      debugLog ($paref, 'aiData', qq{AI spreaded result found: pvaifc: $avg_prediction (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)});
+#      return ('spreaded', $avg_prediction);
+#  }
+
+  setTimeTracking ($hash, $cst, 'aiLastGetResultTime');                      # aiGetResult-Laufzeit ermitteln
+  
+return 'No AI decision delivered';
 }
 
 ################################################################
@@ -17372,9 +17552,6 @@ sub _aiGetSpread {
 
   my ($pos, $neg, $p, $n);
 
-  debugLog ($paref, 'aiData', qq{AI no accurate result found with initial value "Rad1h: $rad1h" (hod: $hod)});
-  debugLog ($paref, 'aiData', qq{AI test Rad1h variance "$dtn" and positive/negative spread with step size "$step"});
-
   my $gra = {
       temp   => $temp,
       wcc    => $wcc,
@@ -17391,11 +17568,10 @@ sub _aiGetSpread {
       debugLog ($paref, 'aiData', qq{AI positive test value "Rad1h: $p"});
 
       eval { $pos = $dtree->get_result (attributes => $gra);
-           };
-
-      if ($@) {
-          return $@;
-      }
+             1;
+           }
+           or do { return $@;
+                 };
 
       if ($pos) {
           debugLog ($paref, 'aiData', qq{AI positive tolerance hit: $pos Wh});
@@ -17411,11 +17587,10 @@ sub _aiGetSpread {
       debugLog ($paref, 'aiData', qq{AI negative test value "Rad1h: $n"});
 
       eval { $neg = $dtree->get_result (attributes => $gra);
-           };
-
-      if ($@) {
-          return $@;
-      }
+             1;
+           }
+           or do { return $@;
+                 };
 
       if ($neg) {
           debugLog ($paref, 'aiData', qq{AI negative tolerance hit: $neg Wh});
@@ -17423,14 +17598,13 @@ sub _aiGetSpread {
       }
   }
 
-  my $pvaifc = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : undef;
+  my $result = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : undef;
 
-  if (defined $pvaifc) {
-      debugLog ($paref, 'aiData', qq{AI determined average result: pvaifc: $pvaifc Wh (hod: $hod, sunaz: $sunaz, sunalt: $sunalt, wcc: $wcc, rr1c: $rr1c, temp: $temp)});
-      return ('spreaded', $pvaifc);
+  if (defined $result) {
+      return ('spreaded', $result);
   }
 
-return 'No AI decition delivered';
+return 'No AI decision delivered';
 }
 
 ################################################################
@@ -17439,8 +17613,6 @@ return 'No AI decition delivered';
 sub aiInit {                   ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
-
   my $hash  = $defs{$name};
 
   if (!isPrepared4AI ($hash)) {
@@ -17453,17 +17625,13 @@ sub aiInit {                   ## no critic "not used"
       debugLog ($paref, 'aiProcess', $err);
 
       $data{$name}{current}{aiinitstate} = $err;
-      return $err;
+      return ($err);
   }
 
   my $dtree = new AI::DecisionTree ( verbose => 0, noise_mode => 'pick_best' );
-
-  $data{$name}{aidectree}{object}    = $dtree;
   $data{$name}{current}{aiinitstate} = 'ok';
 
-  Log3 ($name, 3, "$name - AI::DecisionTree initialized");
-
-return;
+return ('', $dtree);
 }
 
 ################################################################
@@ -17558,7 +17726,6 @@ return;
 sub aiDelRawData {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
 
   my $hash = $defs{$name};
 
@@ -17566,7 +17733,7 @@ sub aiDelRawData {
       return;
   }
 
-  my $hd   = AttrVal ($name, 'ctrlAIdataStorageDuration', AISTDUDEF);          # Haltezeit KI Raw Daten (Tage)
+  my $hd   = CurrentVal ($name, 'aiStorageDuration', AISTDUDEF);                # Haltezeit KI Raw Daten (Tage)
   my $ht   = time - ($hd * 86400);
   my $day  = strftime "%d", localtime($ht);
   my $didx = _aiMakeIdxRaw ($day, '00', $ht);                                   # Daten mit idx <= $didx löschen
@@ -17610,6 +17777,17 @@ sub _aiMakeIdxRaw {
   $ridx   .= $day.$hod;
 
 return $ridx;
+}
+
+################################################################
+#     Hilfsfunktion zum Erstellen einer Stichprobe
+################################################################
+sub sample_data {                                                             
+  my $data        = shift;
+  my @shuffled    = shuffle @$data;
+  my $sample_size = int (scalar (@$data) * 0.8);
+  
+return @shuffled[0 .. $sample_size - 1];                                  # Teilmenge zurückgeben
 }
 
 ################################################################
@@ -20150,7 +20328,7 @@ sub setTimeTracking {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  $data{$name}{current}{$tkn} = sprintf "%.4f", tv_interval($st);
+  $data{$name}{current}{$tkn} = sprintf "%.5f", tv_interval($st);
 
 return;
 }
@@ -21545,6 +21723,7 @@ return;
 #             dayname        - Tagesname (Kürzel)
 #             csmt${c}       - Totalconsumption Consumer $c (1..MAXCONSUMER)
 #             csme${c}       - Consumption Consumer $c (1..MAXCONSUMER) in $hod
+#             minutescsm${c} - Laufzeit des Consumers in Minuten in $hod
 #             sunaz          - Azimuth der Sonne (in Dezimalgrad)
 #             sunalt         - Höhe der Sonne (in Dezimalgrad)
 #    $def: Defaultwert
@@ -22378,12 +22557,12 @@ to ensure that the system configuration is correct.
 
       <ul>
        <table>
-       <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-          <tr><td> <b>addInstances</b>  </td><td>- The AI is enriched with the currently available PV, radiation and environmental data.                </td></tr>
-          <tr><td> <b>addRawData</b>    </td><td>- Relevant PV, radiation and environmental data are extracted and stored for later use.                </td></tr>
-          <tr><td> <b>train</b>         </td><td>- The AI is trained with the available data.                                                           </td></tr>
-          <tr><td>                      </td><td>&nbsp;&nbsp;Successfully generated decision data is stored in the file system.                         </td></tr>
-        </table>
+       <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+          <tr><td> <b>addInstAndTrain</b>  </td><td>The AI is enriched with the currently available PV, radiation and environmental data.                </td></tr>
+          <tr><td>                         </td><td>The AI is then trained using the historical data.                                                    </td></tr>
+          <tr><td>                         </td><td>Successfully generated decision trees are saved in the file system.                                  </td></tr>
+          <tr><td> <b>addRawData</b>       </td><td>Relevant PV, radiation and environmental data are extracted and stored for later use.                </td></tr>
+         </table>
       </ul>
     </li>
     </ul>
@@ -23326,12 +23505,49 @@ to ensure that the system configuration is correct.
          (default: 50)
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-aiControl"></a>
+       <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+         By optionally specifying the following key=value pairs, various properties of the AI support can be
+         properties of the AI support can be influenced. <br>
+		 AI support for PV forecast autocorrection is activated with the set command 
+		 <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> switched on. <br>
+         The entry can be made in several lines.
+         <br><br>
 
-        <a id="SolarForecast-attr-alias"></a>
-        <li><b>alias </b> <br>
-          In connection with "ctrlShowLink" any display name.
-        </li>
-        <br>
+         <ul>
+         <table>
+         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
+            <tr><td> <b>aiTrainStart</b>      </td><td>Daily training takes place when using the internal AI.                                                                        </td></tr>
+            <tr><td>                          </td><td>Training starts approx. 15 minutes after the hour specified in this key.                                                      </td></tr>
+            <tr><td>                          </td><td>For example, with a set value of '3', training would start at around 03:15.                                                   </td></tr>
+            <tr><td>                          </td><td>Value: <b>1 ... 23</b>, default: 2                                                                                            </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+			<tr><td> <b>aiStorageDuration</b> </td><td>Training data is collected and stored for the module's internal AI.                                                           </td></tr>
+            <tr><td>                          </td><td>This data is deleted when it has exceeded the specified holding period (days).                                                </td></tr>
+			<tr><td>                          </td><td>Value: <b>Integer</b>, default: 1825                                                                                          </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+            <tr><td> <b>aiTreesPV</b>         </td><td>Defines the number of AI decision trees (random forests). A higher number increases the                                       </td></tr>
+            <tr><td>                          </td><td>accuracy and robustness of AI prediction, but requires more CPU and RAM resources.                                            </td></tr>
+			<tr><td>                          </td><td><b>Note:</b> Only carry out an increase in small steps and in consideration of the performance of the hardware!               </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+			<tr><td>                          </td><td>Value: <b>1 ... 50</b>, default: 10                                                                                           </td></tr>
+        </table>
+         </ul>
+
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 
+       </ul>
+
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-alias"></a>
+       <li><b>alias </b> <br>
+         In connection with "ctrlShowLink" any display name.
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-consumerAdviceIcon"></a>
        <li><b>consumerAdviceIcon </b><br>
@@ -23558,24 +23774,6 @@ to ensure that the system configuration is correct.
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:05 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                 <br>
          <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                        <br>
        </ul>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAIdataStorageDuration"></a>
-       <li><b>ctrlAIdataStorageDuration &lt;Tage&gt;</b> <br>
-         If the corresponding prerequisites are met, training data is collected and stored for the
-         module-internal AI. <br>
-         The data is deleted when it has exceeded the specified holding period (days).<br>
-         (default: 1825)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
-       <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
-         Daily training takes place when using the internal AI.<br>
-         Training begins approx. 15 minutes after the hour specified in the attribute. <br>
-         For example, with a set value of '3', training would start at around 03:15. <br>
-         (default: 2)
        </li>
        <br>
 
@@ -24874,11 +25072,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
        <table>
-       <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-          <tr><td> <b>addInstances</b>  </td><td>- Die KI wird mit den aktuell vorhandenen PV-, Strahlungs- und Umweltdaten angereichert.                                  </td></tr>
-          <tr><td> <b>addRawData</b>    </td><td>- Relevante PV-, Strahlungs- und Umweltdaten werden extrahiert und für die spätere Verwendung gespeichert.                </td></tr>
-          <tr><td> <b>train</b>         </td><td>- Die KI wird mit den verfügbaren Daten trainiert.                                                                        </td></tr>
-          <tr><td>                      </td><td>&nbsp;&nbsp;Erfolgreich generierte Entscheidungsdaten werden im Filesystem gespeichert.                                   </td></tr>
+       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+          <tr><td> <b>addInstAndTrain</b>  </td><td>Die KI wird mit den aktuell vorhandenen PV-, Strahlungs- und Umweltdaten angereichert.                                  </td></tr>
+          <tr><td>                         </td><td>Anschließend wird die KI mit den historischen Daten trainiert.                                                          </td></tr>
+          <tr><td>                         </td><td>Erfolgreich generierte Entscheidungsbäume werden im Filesystem gespeichert.                                             </td></tr>
+          <tr><td> <b>addRawData</b>       </td><td>Relevante PV-, Strahlungs- und Umweltdaten werden extrahiert und für die spätere Verwendung gespeichert.                </td></tr>
         </table>
       </ul>
     </li>
@@ -25831,12 +26029,49 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          (default: 50)
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-aiControl"></a>
+       <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+         Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene
+         Eigenschaften der KI Unterstützung beeinflusst werden. <br>
+		 Die KI Unterstützung der PV Prognose Autokorrektur wird mit dem Set-Befehl 
+		 <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> eingeschaltet. <br>
+         Die Eingabe kann mehrzeilig erfolgen.
+         <br><br>
 
-        <a id="SolarForecast-attr-alias"></a>
-        <li><b>alias </b> <br>
-          In Verbindung mit "ctrlShowLink" ein beliebiger Anzeigename.
-        </li>
-        <br>
+         <ul>
+         <table>
+         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
+            <tr><td> <b>aiTrainStart</b>      </td><td>Bei Nutzung der internen KI erfolgt ein tägliches Training.                                                                   </td></tr>
+            <tr><td>                          </td><td>Der Start des Trainings erfolgt ca. 15 Minuten nach der in diesem Schlüssel festgelegten vollen Stunde.                       </td></tr>
+            <tr><td>                          </td><td>Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten.                                    </td></tr>
+            <tr><td>                          </td><td>Wert: <b>1 ... 23</b>, default: 2                                                                                             </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+			<tr><td> <b>aiStorageDuration</b> </td><td>Es werden Trainingsdaten für die modulinterne KI gesammelt und gespeichert.                                                   </td></tr>
+            <tr><td>                          </td><td>Diese Daten werden gelöscht, wenn sie die angegebene Haltedauer (Tage) überschritten haben.                                   </td></tr>
+			<tr><td>                          </td><td>Wert: <b>Ganzzahl</b>, default: 1825                                                                                          </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+            <tr><td> <b>aiTreesPV</b>         </td><td>Legt die Anzahl der KI-Entscheidungsbäume (Random Forests) fest. Eine höhere Anzahl steigert die                              </td></tr>
+            <tr><td>                          </td><td>Genauigkeit und Robustheit der KI Vorhersage, erfordert aber mehr CPU und RAM Ressourcen.                                     </td></tr>
+			<tr><td>                          </td><td><b>Hinweis:</b> Eine Erhöhung nur in kleinen Schritten und unter Beachtung der Leistungsfähigkeit der Hardware durchführen!   </td></tr>
+			<tr><td>                          </td><td>                                                                                                                              </td></tr>
+			<tr><td>                          </td><td>Wert: <b>1 ... 50</b>, default: 10                                                                                            </td></tr>
+        </table>
+         </ul>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 
+       </ul>
+
+       </li>
+       <br>
+
+       <a id="SolarForecast-attr-alias"></a>
+       <li><b>alias </b> <br>
+         In Verbindung mit "ctrlShowLink" ein beliebiger Anzeigename.
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-consumerAdviceIcon"></a>
        <li><b>consumerAdviceIcon </b><br>
@@ -26062,24 +26297,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                              <br>
          <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                   <br>
        </ul>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAIdataStorageDuration"></a>
-       <li><b>ctrlAIdataStorageDuration &lt;Tage&gt;</b> <br>
-         Sind die entsprechenden Voraussetzungen gegeben, werden Trainingsdaten für die modulinterne KI gesammelt und
-         gespeichert. <br>
-         Die Daten werden gelöscht wenn sie die angegebene Haltedauer (Tage) überschritten haben.<br>
-         (default: 1825)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlAIshiftTrainStart"></a>
-       <li><b>ctrlAIshiftTrainStart &lt;1...23&gt;</b> <br>
-         Bei Nutzung der internen KI erfolgt ein tägliches Training.<br>
-         Der Start des Trainings erfolgt ca. 15 Minuten nach der im Attribut festgelegten vollen Stunde. <br>
-         Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten. <br>
-         (default: 2)
        </li>
        <br>
 
@@ -27297,6 +27514,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "MIME::Base64": 0,
         "Math::Trig": 0,
         "List::Util": 0,
+        "Scalar::Util": 0,
         "Storable": 0
       },
       "recommends": {
