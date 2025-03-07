@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.47.2" => "07.03.2025  __getDWDSolarData: change calc when af == 0",
+  "1.47.1" => "07.03.2025  __substituteIcon: consider Tooltip content if ctrlBatSocManagementXX is set ",
   "1.47.0" => "05.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
                            "_beamGraphic.*: change decimal places für battery SoC, set aiDecTree: change addInstances to addInstAndTrain ".
                            "addInstAndTrain is generally executed non-blocking, _batChargeRecmd: use effective surplus for soc forecast, ".
@@ -3633,11 +3635,11 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
 
-              if ($cafd eq 'trackFlex' && $wcc >= 80) {                                             # Direktstrahlung + Diffusstrahlung
+              if ( $wcc >= 80 || !(1 * $af) ) {                                                     # V 1.47.2 Direktstrahlung + Diffusstrahlung
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
-                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF);    # Rad wird in kW/m2 erwartet
+                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF);     # Rad wird in kW/m2 erwartet
               }
               else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
                   $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);
@@ -3645,10 +3647,10 @@ sub __getDWDSolarData {
           }
           else {                                                                                    # Flächenfaktor Fix
               $af = ___areaFactorFix ($ti, $az);                                                    # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
-              $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);                         # Rad wird in kW/m2 erwartet
+              $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);                          # Rad wird in kW/m2 erwartet
           }
 
-          $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                 # Startzeit wird verwendet, nicht laufende Stunde
+          $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                        # Startzeit wird verwendet, nicht laufende Stunde
 
           debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, Afactor: $af ($cafd)");
       }
@@ -15630,15 +15632,15 @@ sub __batteryOnBeam {
           }
 
           my ($bicon, $title) = __substituteIcon ( { name  => $name,                                  # Icon / Status des Batterie Devices
-                                                      pn    => $bn,
-                                                      ptyp  => 'battery',
-                                                      flag  => $hfcg->{$i}{'rcdchargebat'.$bn},
-                                                      msg1  => $balias,
-                                                      soc   => $soc,
-                                                      pcurr => $bpower,
-                                                      lang  => $lang
-                                                    }
-                                                  );
+                                                     pn    => $bn,
+                                                     ptyp  => 'battery',
+                                                     flag  => $hfcg->{$i}{'rcdchargebat'.$bn},
+                                                     msg1  => $balias,
+                                                     soc   => $soc,
+                                                     pcurr => $bpower,
+                                                     lang  => $lang
+                                                   }
+                                                 );
 
           $title   .= defined $currsoc ? "\n".$htitles{socbacur}{$lang}.": ".$currsoc." %" : '';
           my $image = defined $hfcg->{$i}{'rcdchargebat'.$bn} ? FW_makeImage ($bicon) : '';
@@ -16420,6 +16422,8 @@ sub __substituteIcon {
       $inorcmd  = $inorcmd  ? $inorcmd  : '';
       $icharge  = $icharge  ? $icharge  : '';
       $idischrg = $idischrg ? $idischrg : '';
+      
+      my $cgbt = AttrVal ($name, 'ctrlBatSocManagement'.$pn, '');
 
       if (defined $flag) {                                                               # Empfehlungszeitraum
           if ($flag) {                                                                   # Ladefreigabe
@@ -16434,7 +16438,7 @@ sub __substituteIcon {
                   $pretxt = $htitles{onlybatw}{$lang}." $pn: $msg1";
               }
               else {                                                                     # prognostizierte Ladefreigabe
-                  $pretxt = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bcharrel}{$lang};
+                  $pretxt = $htitles{onlybatw}{$lang}." $pn: $msg1".($cgbt ? "\n".$htitles{bcharrel}{$lang} : '');
               }
           }
           else {                                                                         # keine Ladefreigabe
@@ -16444,7 +16448,7 @@ sub __substituteIcon {
                                 BICONDEF;                                                # nur Farbe angegeben
 
               $color  //= BICCOLNRCDDEF;
-              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".$htitles{bncharel}{$lang};
+              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".($cgbt ? "\n".$htitles{bncharel}{$lang} : '');
           }
       }
 
