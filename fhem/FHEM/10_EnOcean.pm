@@ -15636,9 +15636,11 @@ sub EnOcean_Notify(@) {
           $devName eq AttrVal($name, "setpointRefDev", "") &&
           $parts[0] eq "setpoint") {
         if (AttrVal($name, "subType", '') =~ m/^hvac\.0(1|4|6)$/) {
-          my @setCmd = ($name, "setpoint", $parts[1]);
-          EnOcean_Set($hash, @setCmd);
-          #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
+          if (ReadingsVal($name, "setpoint", 0) != $parts[1] && ReadingsVal($name, "operationMode", 'off') ne 'summerMode') {
+            my @setCmd = ($name, "setpoint", $parts[1]);
+            EnOcean_Set($hash, @setCmd);
+            #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
+          }
         }
       }
 
@@ -15646,7 +15648,7 @@ sub EnOcean_Notify(@) {
           $devName eq AttrVal($name, "setpointTempRefDev", "") &&
           $parts[0] eq "setpointTemp") {
         if (AttrVal($name, "subType", '') =~ m/^hvac\.0(1|4|6)$/) {
-          if (ReadingsVal($name, "setpointTemp", 0) != $parts[1]) {
+          if (ReadingsVal($name, "setpointTemp", 0) != $parts[1] && ReadingsVal($name, "operationMode", 'off') ne 'summerMode') {
             my @setCmd = ($name, "setpointTemp", $parts[1]);
             EnOcean_Set($hash, @setCmd);
             #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
