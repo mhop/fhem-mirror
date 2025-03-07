@@ -93,6 +93,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.8.6"  => "24.02.2025  Adapt schedule data before sending",
   "0.8.5"  => "24.02.2025  fix error when calling setter from FHEMWEB",
   "0.8.4"  => "24.02.2025  also order mode, start, end, position in schedule",
   "0.8.3"  => "23.02.2025  fix order of days for type schedule readings",
@@ -1623,9 +1624,26 @@ sub vitoconnect_Set_New {
                             my $otherData = '';
                             if ($param->{type} eq 'number') {
                              $data = "{\"$paramName\":@args";
-                            } else {
+                            } 
+                            elsif ($param->{type} eq 'Schedule') {
+                             my $decoded_args = decode_json($args[0]);
+                             
+                             # Transformieren der Datenstruktur
+                             my %schedule;
+                             foreach my $day (@$decoded_args) {
+                                 foreach my $key (keys %$day) {
+                                     push @{$schedule{$key}}, $day->{$key};
+                                 }
+                             }
+                             
+                             # Konvertieren der transformierten Datenstruktur in JSON
+                             my $schedule_data = encode_json(\%schedule);
+                             $data = "{\"$paramName\":$schedule_data";
+                            }
+                            else {
                              $data = "{\"$paramName\":\"@args\"";
                             }
+                            Log(5,$name.", -vitoconnect_Set_New, paramName:".$paramName.", args:".Dumper(\@args));
                             
                             # 2 params, one can be set the other must just be read and handed overload
                             # This logic ensures that we get the correct names in an unsortet JSON
@@ -3790,8 +3808,8 @@ sub vitoconnect_action {
         method  => "POST",
         sslargs => { SSL_verify_mode => 0 },
     };
-    Log3($name,3,$name.", vitoconnect_action url=" .$param->{url});
-    Log3($name,3,$name.", vitoconnect_action data=".$param->{data});
+    Log3($name,3,$name.", vitoconnect_action url=" .$param->{url}); # change back to 3
+    Log3($name,3,$name.", vitoconnect_action data=".$param->{data}); # change back to 3
 #   https://wiki.fhem.de/wiki/HttpUtils#HttpUtils_BlockingGet
     (my $err,my $msg) = HttpUtils_BlockingGet($param);
     my $decode_json = eval {decode_json($msg)};
