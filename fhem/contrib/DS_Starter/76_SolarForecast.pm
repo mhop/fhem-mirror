@@ -3652,7 +3652,7 @@ sub __getDWDSolarData {
 
           $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                        # Startzeit wird verwendet, nicht laufende Stunde
 
-          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, Afactor: $af ($cafd)");
+          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, AF: $af, dirfac: $sdr");
       }
   }
 
