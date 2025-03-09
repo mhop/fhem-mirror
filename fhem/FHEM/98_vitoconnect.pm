@@ -93,6 +93,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.8.7"  => "09.03.2025  Fix return value when using SVN or Roger",
   "0.8.6"  => "24.02.2025  Adapt schedule data before sending",
   "0.8.5"  => "24.02.2025  fix error when calling setter from FHEMWEB",
   "0.8.4"  => "24.02.2025  also order mode, start, end, position in schedule",
@@ -1394,14 +1395,14 @@ sub vitoconnect_Set {
     } 
     elsif  (AttrVal( $name, 'vitoconnect_mapping_roger', 0 ) eq "1" ) {
         #use roger setters
-        $return = vitoconnect_Set_Roger ($hash,$name,$opt,@args) // '';
+        $return = vitoconnect_Set_Roger ($hash,$name,$opt,@args);
     } 
     else {
         #use svn setters
-        $return = vitoconnect_Set_SVN ($hash,$name,$opt,@args) // '';
+        $return = vitoconnect_Set_SVN ($hash,$name,$opt,@args);
     }
     
-    # Check if val was returned or action exected with return;
+    # Check if val was returned or action executed with return;
     if (defined $return) {
       $val .= $return;
     } else {
