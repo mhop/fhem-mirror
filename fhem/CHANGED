@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  76_SolarForecast: version 1.47.2, add weatherid property
  - bugfix:  98_vitoconnect: Fix return value when using SVN or Roger
  - feature: 76_SolarForecast: version 1.47.1
  - bugfix:  98_vitoconnect: Adapt schedule data before sending

@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.47.2" => "09.03.2025  __getDWDSolarData: change calc when af == 0, aiAddInstance: add weatherid property ".
+                           "overwrite wcc = 0 if wid = 0 -> give wid priority over wcc ",
   "1.47.1" => "07.03.2025  __substituteIcon: consider Tooltip content if ctrlBatSocManagementXX is set ",
   "1.47.0" => "05.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
                            "_beamGraphic.*: change decimal places für battery SoC, set aiDecTree: change addInstances to addInstAndTrain ".
@@ -1049,6 +1051,9 @@ my %htitles = (                                                                 
                 DE => qq{Die Wetterdaten sind veraltet.\nPr&uuml;fen sie die Anlage mit 'set <NAME> plantConfiguration check'.}                                                         },
 );
 
+# Wetterintertretation
+# https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/01_num_vorhersagemodelle/01c_wetterinterpretation/wetter_interpretation.pdf?__blob=publicationFile&v=7
+#################################################
 my %weather_ids = (
   # s =>  0 , 0 - 3   DWD -> kein signifikantes Wetter
   # s =>  1 , 45 - 99 DWD -> signifikantes Wetter
@@ -3614,7 +3619,7 @@ sub __getDWDSolarData {
 
           my ($af, $pv, $sdr, $wcc);
 
-          if ($cafd =~ /track/xs) {                                                            # Flächenfaktor Sonnenstand geführt
+          if ($cafd eq 'trackFlex') {                                                          # Flächenfaktor Sonnenstand geführt
               ($af, $sdr, $wcc) = ___areaFactorTrack ( { name   => $name,
                                                          day    => $day,
                                                          dday   => $dday,
@@ -3634,24 +3639,27 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
 
-              if ($cafd eq 'trackFlex' && $wcc >= 80) {                                             # Direktstrahlung + Diffusstrahlung
+              if ($wcc >= 80 || !$af) {                                                             # V 1.47.2 Anpassung Direktstrahlung + Diffusstrahlung
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
-                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF);    # Rad wird in kW/m2 erwartet
+                  $pv = (($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF;                       # Rad wird in kW/m2 erwartet
               }
               else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
-                  $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);
+                  $pv = $rad * $af * KJ2KWH * $peak * PRDEF;
               }
           }
           else {                                                                                    # Flächenfaktor Fix
               $af = ___areaFactorFix ($ti, $az);                                                    # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
-              $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);                         # Rad wird in kW/m2 erwartet
+              $pv = $rad * $af * KJ2KWH * $peak * PRDEF;                                            # Rad wird in kW/m2 erwartet
           }
+          
+          $af = sprintf "%.2f", $af;
+          $pv = sprintf "%.1f", $pv;
+          
+          $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                        # Startzeit wird verwendet, nicht laufende Stunde
 
-          $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                 # Startzeit wird verwendet, nicht laufende Stunde
-
-          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, Afactor: $af ($cafd)");
+          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, AF: $af, dirfac: $sdr");
       }
   }
 
@@ -3682,7 +3690,7 @@ sub ___areaFactorFix {
   $af    = $af * $y - 0.00785953342909065    + 1.1197340251684106E-6  * $x2 - 8.99915952119488E-11  * $x4;
   $af    = $af * $y - 0.8432627150525525     + 0.00010392051567819936 * $x2 - 3.979206287671085E-9  * $x4;
   $af    = $af * $y + 99.49627151067648      - 0.006340200119196879   * $x2 + 2.052575360270524E-7  * $x4;
-  $af    = sprintf "%.2f", ($af / 100);                                                                       # Prozenz in Faktor
+  $af    = $af / 100;                                                                                        # Prozenz in Faktor
 
 return $af;
 }
@@ -3752,7 +3760,6 @@ sub ___areaFactorTrack {
   my $daf = $nx * $sx + $ny * $sy + $nz * $sz;
   $daf    = max ($daf, 0);
   $daf   += 1 if($daf);
-  $daf    = sprintf "%.2f", $daf;
 
   ## Schätzung Anteil Direktstrahlung an Globalstrahlung
   ########################################################
@@ -8540,6 +8547,8 @@ sub _transferWeatherValues {
       my $rr1c  = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{rr1c};                  # Gesamtniederschlag (1-stündig) letzte 1 Stunde
       my $temp  = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ttt};                   # Außentemperatur
       my $don   = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{don};                   # Tag/Nacht-Grenze
+      
+      $wcc = 0 if(!$wid || $wid == 100);                                                    # V 1.47.2
 
       my $nhtstr                                  = "NextHour".sprintf "%02d", $num;
       $data{$name}{nexthours}{$nhtstr}{weatherid} = $wid;
@@ -9239,9 +9248,9 @@ sub __calcPVestimates {
       $peaksum += $peak;
   }
 
-  $data{$name}{current}{allstringspeak} = $peaksum;                                           # temperaturbedingte Korrektur der installierten Peakleistung in W
-  $pvsum                                       = $peaksum if($peaksum && $pvsum > $peaksum);         # Vorhersage nicht größer als die Summe aller PV-Strings Peak
-  $pvsum                                       = sprintf "%.0f", $pvsum;
+  $data{$name}{current}{allstringspeak} = $peaksum;                                                 # temperaturbedingte Korrektur der installierten Peakleistung in W
+  $pvsum                                = $peaksum if($peaksum && $pvsum > $peaksum);               # Vorhersage nicht größer als die Summe aller PV-Strings Peak
+  $pvsum                                = sprintf "%.0f", $pvsum;
 
   if ($debug =~ /radiationProcess/xs) {
       $lh = {                                                                                        # Log-Hash zur Ausgabe
@@ -16447,7 +16456,7 @@ sub __substituteIcon {
                                 BICONDEF;                                                # nur Farbe angegeben
 
               $color  //= BICCOLNRCDDEF;
-              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".($cgbt ? "\n".$htitles{bncharel}{$lang} : '');
+              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1".($cgbt ? "\n".$htitles{bncharel}{$lang} : '');
           }
       }
 
@@ -17163,16 +17172,17 @@ sub aiAddInstance {
       my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
       next if($rad1h <= 0);
 
-      my $temp   = AiRawdataVal ($hash, $idx, 'temp', undef);
-      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',  undef);
-      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c', undef);
-      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',   0);
+      my $temp   = AiRawdataVal ($hash, $idx, 'temp',      undef);
+      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',       undef);
+      my $wid    = AiRawdataVal ($name, $idx, 'weatherid', undef);
+      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c',      undef);
+      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',        0);
 
       my $tbin   = temp2bin   ($temp)    if(defined $temp);
       my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
       my $sabin  = sunalt2bin ($sunalt);
 
-      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, rr1c => $rr1c, sunalt => $sunalt, hod => $hod, pvrl => $pvrl };
+      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, wid => $wid, rr1c => $rr1c, sunalt => $sunalt, hod => $hod, pvrl => $pvrl };
   }
   
   if (!scalar @pvhdata) {
@@ -17210,6 +17220,7 @@ sub aiAddInstance {
           eval { $dtree->add_instance (attributes => { rad1h  => $instance->{rad1h},
                                                        temp   => $instance->{temp},
                                                        wcc    => $instance->{wcc},
+                                                       wid    => $instance->{wid},
                                                        rr1c   => $instance->{rr1c},
                                                        sunalt => $instance->{sunalt},
                                                        hod    => $instance->{hod}
@@ -17234,6 +17245,7 @@ sub aiAddInstance {
                                          "sunalt: $instance->{sunalt}, ".
                                          "rad1h: $instance->{rad1h}, pvrl: instance->{pvrl}, ".
                                          "wcc: ".(defined $instance->{wcc}   ? $instance->{wcc}  : '-').", ".
+                                         "wid: ".(defined $instance->{wid}   ? $instance->{wid}  : '-').", ".
                                          "rr1c: ".(defined $instance->{rr1c} ? $instance->{rr1c} : '-').", ".
                                          "temp: ".(defined $instance->{temp} ? $instance->{temp} : '-'), 
                                          4);
@@ -17441,11 +17453,12 @@ sub aiGetResult {
 
   debugLog ($paref, 'aiData', "Start AI result check for hod: $hod");
   
-  my $wcc    = NexthoursVal ($hash, $nhtstr, 'wcc',     0);
-  my $rr1c   = NexthoursVal ($hash, $nhtstr, 'rr1c',    0);
-  my $temp   = NexthoursVal ($hash, $nhtstr, 'temp',   20);
-  my $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt',  0);
-  my $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',   0);
+  my $wcc    = NexthoursVal ($hash, $nhtstr, 'wcc',       0);
+  my $wid    = NexthoursVal ($name, $nhtstr, 'weatherid', 0);
+  my $rr1c   = NexthoursVal ($hash, $nhtstr, 'rr1c',      0);
+  my $temp   = NexthoursVal ($hash, $nhtstr, 'temp',     20);
+  my $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt',    0);
+  my $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',     0);
 
   my $tbin  = temp2bin   ($temp);
   my $cbin  = cloud2bin  ($wcc);
@@ -17455,6 +17468,7 @@ sub aiGetResult {
       rad1h  => $rad1h,
       temp   => $tbin,
       wcc    => $cbin,
+      wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sabin,
       sunaz  => $sunaz,
@@ -17507,6 +17521,7 @@ sub aiGetResult {
 #                                         rad1h  => $rad1h,
 #                                         temp   => $tbin,
 #                                         wcc    => $cbin,
+#                                         wid    => $wid,
 #                                         rr1c   => $rr1c,
 #                                         sunalt => $sabin,
 #                                         sunaz  => $sunaz,
@@ -17544,6 +17559,7 @@ sub _aiGetSpread {
   my $rad1h  = $paref->{rad1h};
   my $temp   = $paref->{temp};
   my $wcc    = $paref->{wcc};
+  my $wid    = $paref->{wid};
   my $rr1c   = $paref->{rr1c};
   my $sunalt = $paref->{sunalt};
   my $sunaz  = $paref->{sunaz};
@@ -17558,6 +17574,7 @@ sub _aiGetSpread {
   my $gra = {
       temp   => $temp,
       wcc    => $wcc,
+      wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sunalt,
       sunaz  => $sunaz,
@@ -17668,29 +17685,35 @@ sub aiAddRawData {
       }
 
       last if(int $pvd > int $day);
+      
+      if (!$ood) {                                                           # V 1.47.2 -> für manuelles Auffüllen mit Setter
+          $dayname = HistoryVal ($hash, $pvd, 99, 'dayname', undef);
+      }
 
       for my $hod (sort keys %{$data{$name}{pvhist}{$pvd}}) {
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
 
           my $ridx   = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
 
-          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',  undef);
-          my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt',    0);
-          my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',     0);
-          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',   undef);
-          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',   undef);
-          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',  undef);
-          my $rad1h  = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
+          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',      undef);
+          my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt',        0);
+          my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',         0);
+          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',       undef);
+          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',       undef);
+          my $wid    = HistoryVal ($hash, $pvd, $hod, 'weatherid', undef);            # Wetter ID
+          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',      undef);
+          my $rad1h  = HistoryVal ($hash, $pvd, $hod, 'rad1h',     undef);
 
-          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}  = $sunalt;
-          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}   = $sunaz;
-          $data{$name}{aidectree}{airaw}{$ridx}{dayname} = $dayname;
-          $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
-          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = sprintf "%.0f", $temp  if(defined $temp);
-          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con                   if(defined $con && $con >= 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $wcc                   if(defined $wcc);
-          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c                  if(defined $rr1c);
-          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h                 if(defined $rad1h && $rad1h > 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}    = $sunalt;
+          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}     = $sunaz;
+          $data{$name}{aidectree}{airaw}{$ridx}{dayname}   = $dayname;
+          $data{$name}{aidectree}{airaw}{$ridx}{hod}       = $hod;
+          $data{$name}{aidectree}{airaw}{$ridx}{temp}      = sprintf "%.0f", $temp            if(defined $temp);
+          $data{$name}{aidectree}{airaw}{$ridx}{con}       = $con                             if(defined $con && $con >= 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{wcc}       = $wcc                             if(defined $wcc);
+          $data{$name}{aidectree}{airaw}{$ridx}{weatherid} = $wid >= 100 ? $wid - 100 : $wid  if(defined $wid);
+          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}      = $rr1c                            if(defined $rr1c);
+          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}     = $rad1h                           if(defined $rad1h && $rad1h > 0);
 
           $dosave++;
 
@@ -18062,19 +18085,20 @@ sub listDataPool {
       $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
 
       for my $idx (sort keys %{$h}) {
-          my $hod    = AiRawdataVal ($name, $idx, 'hod',     '-');
-          my $sunalt = AiRawdataVal ($name, $idx, 'sunalt',  '-');
-          my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',   '-');
-          my $rad1h  = AiRawdataVal ($name, $idx, 'rad1h',   '-');
-          my $wcc    = AiRawdataVal ($name, $idx, 'wcc',     '-');
-          my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',    '-');
-          my $pvrl   = AiRawdataVal ($name, $idx, 'pvrl',    '-');
-          my $temp   = AiRawdataVal ($name, $idx, 'temp',    '-');
-          my $nod    = AiRawdataVal ($name, $idx, 'dayname', '-');
-          my $con    = AiRawdataVal ($name, $idx, 'con',     '-');
+          my $hod    = AiRawdataVal ($name, $idx, 'hod',       '-');
+          my $sunalt = AiRawdataVal ($name, $idx, 'sunalt',    '-');
+          my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',     '-');
+          my $rad1h  = AiRawdataVal ($name, $idx, 'rad1h',     '-');
+          my $wcc    = AiRawdataVal ($name, $idx, 'wcc',       '-');
+          my $wid    = AiRawdataVal ($name, $idx, 'weatherid', '-');
+          my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',      '-');
+          my $pvrl   = AiRawdataVal ($name, $idx, 'pvrl',      '-');
+          my $temp   = AiRawdataVal ($name, $idx, 'temp',      '-');
+          my $nod    = AiRawdataVal ($name, $idx, 'dayname',   '-');
+          my $con    = AiRawdataVal ($name, $idx, 'con',       '-');
 
           $sq       .= "\n";
-          $sq       .= "$idx => hod: $hod, nod: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, pvrl: $pvrl, con: $con, temp: $temp";
+          $sq       .= "$idx => hod: $hod, nod: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, wid: $wid, rr1c: $rr1c, pvrl: $pvrl, con: $con, temp: $temp";
       }
   }
 
