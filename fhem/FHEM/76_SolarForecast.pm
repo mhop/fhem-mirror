@@ -160,6 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.47.3" => "11.03.2025  adjust weather_ids and management of significant weather, _calcDataEveryFullHour: change attrInvChangedTs Management ".
+                           "split __batteryOnBeam into _beamFillupBatValues and itself, expand bat key 'show' by top, bottom ".
+                           "__getDWDSolarData: use always diffuse radiation as part of global radiation ",
   "1.47.2" => "09.03.2025  __getDWDSolarData: change calc when af == 0, aiAddInstance: add weatherid property ".
                            "overwrite wcc = 0 if wid = 0 -> give wid priority over wcc ",
   "1.47.1" => "07.03.2025  __substituteIcon: consider Tooltip content if ctrlBatSocManagementXX is set ",
@@ -1053,14 +1056,27 @@ my %htitles = (                                                                 
 
 # Wetterintertretation
 # https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/01_num_vorhersagemodelle/01c_wetterinterpretation/wetter_interpretation.pdf?__blob=publicationFile&v=7
+#
+# Falls keiner ww-Schlüssel >= 45 eintritt, wird das Wetter als nicht signifikant eingestuft. An 
+# Gitterpunkten ohne signifikantes Wetter wird der Gesamtbedeckungsgrad, verschlüsselt 
+# 
+# Wenn ferner keine der zuvor genannten Nebelbedingungen erfüllt ist, wird lediglich der 
+# Gesamtbedeckungsgrad verschlüsselt. 
+#  0.00 % -   6.25 % dann ww=0,
+#  6.25 % -  43.75 % dann ww=1,
+# 43.75 % -  81.25 % dann ww=2,
+# 81.25 % - 100.00 % dann ww=3,
+#
+# ww = 00 wolkenlos 
+# ww = 01 leicht bewölkt 
+# ww = 02 wolkig 
+# ww = 03 stark bewölkt bis bedeckt 
 #################################################
 my %weather_ids = (
-  # s =>  0 , 0 - 3   DWD -> kein signifikantes Wetter
-  # s =>  1 , 45 - 99 DWD -> signifikantes Wetter
   '0'   => { s => '0', icon => 'weather_sun',                       txtd => 'wolkenloser Himmel',                                                       txte => 'cloudless sky'                                                              },
-  '1'   => { s => '0', icon => 'weather_cloudy_light',              txtd => 'Bewölkung abnehmend',                                                      txte => 'Cloudiness decreasing'                                                      },
-  '2'   => { s => '0', icon => 'weather_cloudy',                    txtd => 'Bewölkung unverändert',                                                    txte => 'Cloudiness unchanged'                                                       },
-  '3'   => { s => '0', icon => 'weather_cloudy_heavy',              txtd => 'Bewölkung zunehmend',                                                      txte => 'Cloudiness increasing'                                                      },
+  '1'   => { s => '0', icon => 'weather_cloudy_light',              txtd => 'leicht bewölkt',                                                           txte => 'slightly cloudy'                                                            },
+  '2'   => { s => '0', icon => 'weather_cloudy',                    txtd => 'wolkig',                                                                   txte => 'cloudy'                                                                     },
+  '3'   => { s => '0', icon => 'weather_cloudy_heavy',              txtd => 'stark bewölkt bis bedeckt',                                                txte => 'very cloudy to overcast'                                                    },
   '4'   => { s => '0', icon => 'unknown',                           txtd => 'Sicht durch Rauch oder Asche vermindert',                                  txte => 'Visibility reduced by smoke or ash'                                         },
   '5'   => { s => '0', icon => 'unknown',                           txtd => 'trockener Dunst (relative Feuchte < 80 %)',                                txte => 'dry haze (relative humidity < 80 %)'                                        },
   '6'   => { s => '0', icon => 'unknown',                           txtd => 'verbreiteter Schwebstaub, nicht vom Wind herangeführt',                    txte => 'widespread airborne dust, not brought in by the wind'                       },
@@ -1168,9 +1184,9 @@ my %weather_ids = (
   '99'  => { s => '1', icon => 'weather_thunderstorm',              txtd => 'Gewitter mit Graupel oder Hagel',                                          txte => 'Thunderstorm with sleet or hail'                                            },
 
   '100' => { s => '0', icon => 'weather_night_starry',              txtd => 'sternenklarer Himmel',                                                     txte => 'starry sky'                                                                 },
-  '101' => { s => '0', icon => 'weather_night_cloudy_light',        txtd => 'Bewölkung abnehmend',                                                      txte => 'Cloudiness decreasing'                                                      },
-  '102' => { s => '0', icon => 'weather_night_cloudy',              txtd => 'Bewölkung unverändert',                                                    txte => 'Cloudiness unchanged'                                                       },
-  '103' => { s => '0', icon => 'weather_night_cloudy_heavy',        txtd => 'Bewölkung zunehmend',                                                      txte => 'Cloudiness increasing'                                                      },
+  '101' => { s => '0', icon => 'weather_night_cloudy_light',        txtd => 'leicht bewölkt',                                                           txte => 'slightly cloudy'                                                            },
+  '102' => { s => '0', icon => 'weather_night_cloudy',              txtd => 'wolkig',                                                                   txte => 'cloudy'                                                                     },
+  '103' => { s => '0', icon => 'weather_night_cloudy_heavy',        txtd => 'stark bewölkt bis bedeckt',                                                txte => 'very cloudy to overcast'                                                    },
   '110' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
   '111' => { s => '0', icon => 'weather_night_rain_fog',            txtd => 'Nebel mit Regen',                                                          txte => 'Fog with rain'                                                              },
   '112' => { s => '0', icon => 'weather_night_fog',                 txtd => 'durchgehender Bodennebel',                                                 txte => 'continuous ground fog'                                                      },
@@ -3639,15 +3655,15 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
 
-              if ($wcc >= 80 || !$af) {                                                             # V 1.47.2 Anpassung Direktstrahlung + Diffusstrahlung
+              #if ($wcc >= 80 || !$af) {                                                            # V 1.47.3
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
                   $pv = (($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF;                       # Rad wird in kW/m2 erwartet
-              }
-              else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
-                  $pv = $rad * $af * KJ2KWH * $peak * PRDEF;
-              }
+              #}
+              #else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
+              #    $pv = $rad * $af * KJ2KWH * $peak * PRDEF;
+              #}
           }
           else {                                                                                    # Flächenfaktor Fix
               $af = ___areaFactorFix ($ti, $az);                                                    # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
@@ -6403,6 +6419,15 @@ sub _attrBatteryDev {                    ## no critic "not used"
       if (!$h->{pin} || !$h->{pout} || !$h->{cap}) {
           return qq{One or more of the keys 'pin, pout, cap' are missing. Please note the command reference.};
       }
+      
+      if ($h->{show} && $h->{show} =~ /:/xs) {
+          my ($show, $pos) = split ':', $h->{show};
+          $pos //= 'xx';
+          
+          if ($pos !~ /^top|bottom$/xs) {
+              return qq{The key 'show' is not set correctly. Please note the command reference.};
+          }
+      }
 
       if (($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
          ($h->{pout} !~ /-/xs && $h->{pout} !~ /:/xs)) {
@@ -6416,6 +6441,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{batteries}{$bn}{basynchron};
       delete $data{$name}{batteries}{$bn}{bicon};
       delete $data{$name}{batteries}{$bn}{bshowingraph};
+      delete $data{$name}{batteries}{$bn}{bposingraph};
   }
   elsif ($paref->{cmd} eq 'del') {
       readingsDelete    ($hash, 'Current_PowerBatIn_'.$bn);
@@ -8548,7 +8574,10 @@ sub _transferWeatherValues {
       my $temp  = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ttt};                   # Außentemperatur
       my $don   = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{don};                   # Tag/Nacht-Grenze
       
-      $wcc = 0 if(!$wid || $wid == 100);                                                    # V 1.47.2
+      if (defined $wid && (!$wid || $wid == 100)) {
+          $wcc = 0;                                                                         # V 1.47.2
+          debugLog ($paref, 'collectData', "Adjust cloud cover ratio (wcc) due to significant weather (ww) - ww: $wid -> wcc: $wcc");
+      }
 
       my $nhtstr                                  = "NextHour".sprintf "%02d", $num;
       $data{$name}{nexthours}{$nhtstr}{weatherid} = $wid;
@@ -9748,6 +9777,13 @@ sub _transferBatteryValues {
       my $btotout = ReadingsNum ($badev, $bout,     0) * $boutuf;                                # totale Batterieentladung (Wh)
       my $btotin  = ReadingsNum ($badev, $bin,      0) * $binuf;                                 # totale Batterieladung (Wh)
       my $soc     = ReadingsNum ($badev, $batchr,   0);
+      
+      my $show    = $h->{show} // 0;                                                             # Batterie in Balkengrafik anzeigen
+      my $pos     = 'top';
+      
+      if ($show =~ /:/xs) {
+          ($show, $pos) = split ':', $show;
+      }
 
       if ($instcap) {
           if (!isNumeric ($instcap)) {                                                           # wenn $instcap Reading Wert abfragen
@@ -9901,7 +9937,8 @@ sub _transferBatteryValues {
       $data{$name}{batteries}{$bn}{bcharge}      = $soc;                                                 # Batterie SoC (%)
       $data{$name}{batteries}{$bn}{basynchron}   = $h->{asynchron} // 0;                                 # asynchroner Modus = X
       $data{$name}{batteries}{$bn}{bicon}        = $h->{icon} if($h->{icon});                            # Batterie Icon
-      $data{$name}{batteries}{$bn}{bshowingraph} = $h->{show} // 0;                                      # Batterie in Balkengrafik anzeigen
+      $data{$name}{batteries}{$bn}{bshowingraph} = $show;                                                # Batterie in Balkengrafik anzeigen
+      $data{$name}{batteries}{$bn}{bposingraph}  = $pos;                                                 # Anzeigeposition in Balkengrafik
       $data{$name}{batteries}{$bn}{bchargewh}    = BatteryVal ($name, $bn, 'binstcap', 0) * $soc / 100;  # Batterie SoC (Wh)
 
       writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, hour => $nhour } );
@@ -12551,15 +12588,18 @@ sub _calcDataEveryFullHour {
   my $chour = $paref->{chour};
   my $t     = $paref->{t};                                                            # aktuelle Unix-Zeit
 
-  my $hash = $defs{$name};
-  my $idts = CircularVal ($hash, 99, "attrInvChangedTs", '');                         # Definitionstimestamp des Attr setupInverterDev01
-
-  return if(!$idts);
-
+  my $hash        = $defs{$name};
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   if ($acu) {
       readingsSingleUpdate ($hash, '.pvCorrectionFactor_Auto_Soll', ($aln ? $acu : $acu.' noLearning'), 0) if($acu =~ /on/xs);
+      
+      my $idts = CircularVal ($hash, 99, "attrInvChangedTs", '');                         # Definitionstimestamp des Attr setupInverterDev01
+      
+      if (!$idts) {                                                                       # V 1.47.3
+          $data{$name}{circular}{99}{attrInvChangedTs} = int $t;
+          return;
+      }
 
       if ($t - $idts < 7200) {
           my $rmh = sprintf "%.2f", ((7200 - ($t - $idts)) / 3600);
@@ -13340,7 +13380,7 @@ sub entryGraphic {
       beam3cont      => AttrVal    ($name, 'graphicBeam3Content',               ''),
       beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
       caicon         => AttrVal    ($name, 'consumerAdviceIcon',         CAICONDEF),                # Consumer AdviceIcon
-      clegend        => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
+      clegendpos     => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => AttrVal    ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
       lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
       kw             => AttrVal    ($name, 'graphicEnergyUnit',               'Wh'),
@@ -13371,7 +13411,8 @@ sub entryGraphic {
       debug          => getDebug   ($hash),                                                         # Debug Module
   };
 
-  my $ret = q{};
+  my $colspan = $maxhours + 2;
+  my $ret     = q{};
 
   $ret .= "<span>$dlink </span><br>"  if(AttrVal($name, 'ctrlShowLink', 0));
 
@@ -13386,7 +13427,7 @@ sub entryGraphic {
 
   # Verbraucherlegende und Steuerung
   ###################################
-  my $legendtxt = _graphicConsumerLegend ($paref);
+  my $cnmlegend = _graphicConsumerLegend ($paref);
 
   # Headerzeile und/oder Verbraucherlegende ausblenden
   ######################################################
@@ -13395,7 +13436,7 @@ sub entryGraphic {
   }
 
   if ($gsel =~ /_noCons/xs) {
-      $legendtxt = q{};
+      $cnmlegend = q{};
   }
 
   $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
@@ -13403,19 +13444,19 @@ sub entryGraphic {
 
   if ($header) {                                                                                            # Header ausgeben
       $ret .= "<tr class='$htr{$m}{cl}'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td>";
+      $ret .= "<td colspan='$colspan' align='center' style='word-break: normal'>$header</td>";
       $ret .= "</tr>";
 
       $paref->{modulo}++;
   }
 
-  my $clegend = $paref->{clegend};
-  $m          = $paref->{modulo} % 2;
+  my $clegendpos = $paref->{clegendpos};
+  $m             = $paref->{modulo} % 2;
 
-  if ($legendtxt && $clegend eq 'top') {
+  if ($cnmlegend && $clegendpos eq 'top') {
       $ret .= "<tr class='$htr{$m}{cl}'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
-      $ret .= $legendtxt;
+      $ret .= "<td colspan='$colspan' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
+      $ret .= $cnmlegend;
       $ret .= "</td>";
       $ret .= "</tr>";
 
@@ -13432,15 +13473,15 @@ sub entryGraphic {
   if ($gsel =~ /both/xs || $gsel =~ /forecast/xs) {
       my %hfcg1;
       $paref->{chartlvl} = 1;                                                                              # Balkengrafik Ebene 1
-
+      $paref->{hfcg}     = \%hfcg1;                                                                        # hfcg = hash forecast graphic
+      
       ## Werte aktuelle Stunde
       ##########################
-      $paref->{hfcg}     = \%hfcg1;                                                                        # hfcg = hash forecast graphic
       $paref->{thishour} = _beamGraphicFirstHour ($paref);
 
       ## get consumer list and display it in Graphics
       #################################################
-      #_showConsumerInGraphicBeam ($paref);                                                               # keine Verwendung zur Zeit
+      #_showConsumerInGraphicBeam ($paref);                                                                # keine Verwendung zur Zeit
 
       ## Werte restliche Stunden
       ############################
@@ -13449,8 +13490,15 @@ sub entryGraphic {
       $paref->{maxCon} = $back->{maxCon};
       $paref->{maxDif} = $back->{maxDif};                                                                  # für Typ diff
       $paref->{minDif} = $back->{minDif};                                                                  # für Typ diff
+ 
+      ## Batteriewerte füllen
+      #########################
+      _beamFillupBatValues ($paref);
 
-      $ret .= _beamGraphic ($paref);
+      # Balkengrafik Ausgabe
+      ########################
+      $ret .= _beamGraphic    ($paref);
+      $ret .= _levelSeparator ($paref);
 
       delete $paref->{maxVal};                                                                             # bereinigen vor nächster Ebene
       delete $paref->{maxCon};
@@ -13471,10 +13519,10 @@ sub entryGraphic {
           $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',       B4FONTCOLDEF);
           $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height});
           $paref->{weather}   = 0;
-
+          $paref->{hfcg}      = \%hfcg2;
+          
           # Werte aktuelle Stunde
           ##########################
-          $paref->{hfcg}     = \%hfcg2;
           $paref->{thishour} = _beamGraphicFirstHour ($paref);
 
           # Werte restliche Stunden
@@ -13484,10 +13532,15 @@ sub entryGraphic {
           $paref->{maxCon} = $back->{maxCon};
           $paref->{maxDif} = $back->{maxDif};                                                             # für Typ diff
           $paref->{minDif} = $back->{minDif};                                                             # für Typ diff
+          
+          ## Batteriewerte füllen
+          #########################
+          _beamFillupBatValues ($paref);
 
           # Balkengrafik Ausgabe
           ########################
-          $ret .= _beamGraphic ($paref);
+          $ret .= _beamGraphic    ($paref);
+          $ret .= _levelSeparator ($paref);
 
           delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
           delete $paref->{maxCon};
@@ -13505,7 +13558,7 @@ sub entryGraphic {
   if ($gsel =~ /both/xs || $gsel =~ /flow/xs) {
       $ret  .= "<tr class='$htr{$m}{cl}'>";
       my $fg = _flowGraphic ($paref);
-      $ret  .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
+      $ret  .= "<td colspan='$colspan' align='center' style='word-break: normal'>";
       $ret  .= "$fg</td>";
       $ret  .= "</tr>";
 
@@ -13516,11 +13569,11 @@ sub entryGraphic {
 
   # Legende unten
   #################
-  if ($legendtxt && ($clegend eq 'bottom')) {
+  if ($cnmlegend && ($clegendpos eq 'bottom')) {
       $ret .= "<tr class='$htr{$m}{cl}'>";
-      #$ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
-      $ret .= "$legendtxt</td>";
+      #$ret .= "<td colspan='$colspan' align='center' style='word-break: normal'>";
+      $ret .= "<td colspan='$colspan' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
+      $ret .= "$cnmlegend</td>";
       $ret .= "</tr>";
   }
 
@@ -14521,6 +14574,23 @@ return ($val, $unit);
 }
 
 ################################################################
+#            Erstellung des Ebenentrenners
+################################################################
+sub _levelSeparator {
+  my $paref    = shift;
+  my $dstyle   = $paref->{dstyle};                        # TD-Style
+  my $maxhours = $paref->{maxhours}; 
+  
+  my $colspan  = $maxhours + 2;
+  
+  my $ret = "<tr>";
+  $ret   .= "<td colspan='$colspan' align='center' $dstyle><hr></td>";
+  $ret   .= "</tr>";
+
+return $ret;
+}
+
+################################################################
 #    Consumer in forecastGraphic (Balken) anzeigen
 #    (Hat zur Zeit keine Wirkung !)
 ################################################################
@@ -14594,12 +14664,12 @@ return;
 sub _graphicConsumerLegend {
   my $paref                    = shift;
   my $name                     = $paref->{name};
-  my ($clegendstyle, $clegend) = split '_', $paref->{clegend};
+  my ($clegendstyle, $clegend) = split '_', $paref->{clegendpos};
   my $clink                    = $paref->{clink};
 
   my @consumers                = sort{$a<=>$b} keys %{$data{$name}{consumers}};              # definierte Verbraucher ermitteln
   $clegend                     = '' if($clegendstyle eq 'none' || !int @consumers);
-  $paref->{clegend}            = $clegend;
+  $paref->{clegendpos}         = $clegend;
 
   return if(!$clegend );
 
@@ -15090,6 +15160,67 @@ return $back;
 }
 
 ################################################################
+#   Batteriewerte zur Anzeige in Balkengrafik vorbereiten
+#   Anzeigehash mit Werten auffüllen
+################################################################
+sub _beamFillupBatValues {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hfcg  = $paref->{hfcg};
+
+  my $hash = $defs{$name};
+  my $hh;
+
+  for my $idx (sort keys %{$data{$name}{nexthours}}) {
+      for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
+          $bn      = sprintf "%02d", $bn;
+          my $rcdc = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, undef);
+          my $stt  = NexthoursVal ($name, $idx, 'starttime',        undef);
+          next if(!defined $stt || !defined $rcdc);
+
+          my (undef,undef,$day_str,$time_str) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
+
+          $hh->{$day_str}{$time_str}{'rcdchargebat'.$bn} = $rcdc;
+          $hh->{$day_str}{$time_str}{'soc'.$bn}          = NexthoursVal ($name, $idx, 'soc'.$bn, undef);
+      }
+  }
+
+  for my $kdx (sort keys %{$hfcg}) {
+      next if(!isNumeric ($kdx));
+
+      my $ds = $hfcg->{$kdx}{day_str};
+      my $ts = $hfcg->{$kdx}{time_str};
+
+      next if(!defined $ds || !defined $ts);
+
+      $ts = (split ":", $ts)[0];                                           # Forum: https://forum.fhem.de/index.php?msg=1332721
+
+      for my $bn (1..MAXBATTERIES) {
+          $bn = sprintf "%02d", $bn;
+          $ds = sprintf "%02d", $ds;
+
+          ## Einfügen prepared NextHour Werte
+          #####################################
+          $hfcg->{$kdx}{'rcdchargebat'.$bn} = $hh->{$ds}{$ts}{'rcdchargebat'.$bn} if(defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn});
+          $hfcg->{$kdx}{'soc'.$bn}          = $hh->{$ds}{$ts}{'soc'.$bn}          if(defined $hh->{$ds}{$ts}{'soc'.$bn});
+
+          ## Auffüllen mit History Werten (Achtung: Stundenverschieber relativ zu Nexthours)
+          ####################################################################################
+          if (!defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn}) {
+              my $histsoc = HistoryVal ($hash, $ds, (sprintf "%02d", $ts+1), 'batsoc'.$bn, undef);
+
+              if (defined $histsoc) {
+                  $hfcg->{$kdx}{'soc'.$bn}          = $histsoc;
+                  $hfcg->{$kdx}{'rcdchargebat'.$bn} = 'hist';
+              }
+          }
+      }
+  }
+
+return;
+}
+
+################################################################
 #    Balkenausgabe für forecastGraphic
 ################################################################
 sub _beamGraphic {
@@ -15125,11 +15256,19 @@ sub _beamGraphic {
   # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
 
   my ($val, $z2, $z3, $z4, $he, $titz2, $titz3);
-
-  my $ret      = q{};
-  $ret        .= __weatherOnBeam ($paref) if($weather);
-  $ret        .= __batteryOnBeam ($paref);
-  my $m        = $paref->{modulo} % 2;
+ 
+  $paref->{beampos} = 'top';                                                                                    # Lagedefinition "über den Balken"
+  my $ret           = q{};
+  
+  ## Wetteranzeige über den Balken
+  ##################################
+  $ret .= __weatherOnBeam ($paref) if($weather);
+  
+  ## Batterieanzeige über den Balken
+  ####################################
+  $ret .= __batteryOnBeam ($paref);
+  
+  my $m = $paref->{modulo} % 2;
 
   if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
@@ -15221,7 +15360,7 @@ sub _beamGraphic {
           my $maxValBeam = 0;                                                                                   # ToDo:  maxValBeam noch aus maxVal ableiten
 
           if ($maxValBeam) {                                                                                    # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
-              $px_pos = int($height/2);
+              $px_pos = int ($height/2);
               $px_neg = $height - $px_pos;                                                                      # Rundungsfehler vermeiden
           }
           else {                                                                                                # Dynamische hoch/runter Verschiebung der Null-Linie
@@ -15231,7 +15370,7 @@ sub _beamGraphic {
               }
               else {
                   if ($maxDif > 0) {
-                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));                         # Wieviel % entfallen auf unten ?
+                      $px_neg = int ($height * abs($minDif) / ($maxDif + abs($minDif)));                        # Wieviel % entfallen auf unten ?
                       $px_pos = $height - $px_neg;                                                              # der Rest ist oben
                   }
                   else {                                                                                        # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
@@ -15243,11 +15382,11 @@ sub _beamGraphic {
 
           if ($hfcg->{$i}{diff} >= 0) {                                                                         # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
               $z2 = $hfcg->{$i}{diff};
-              $z3 = abs($minDif);
+              $z3 = abs ($minDif);
           }
           else {
               $z2 = $maxDif;
-              $z3 = abs($hfcg->{$i}{diff});                                                                     # Nur Betrag ohne Vorzeichen
+              $z3 = abs ($hfcg->{$i}{diff});                                                                    # Nur Betrag ohne Vorzeichen
           }
 
           $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
@@ -15265,7 +15404,6 @@ sub _beamGraphic {
 
       ## Erstellung der Balken
       ##########################
-
       # das style des nächsten TD bestimmt ganz wesentlich das gesammte Design
       # das \n erleichtert das lesen des Seitenquelltext beim debugging
       # vertical-align:bottom damit alle Balken und Ausgaben wirklich auf der gleichen Grundlinie sitzen
@@ -15403,6 +15541,8 @@ sub _beamGraphic {
           $ret .= "</td></tr>";
       }
 
+      ## die Zeitleiste
+      ###################
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
       $ret .= $hfcg->{$i}{time} == $thishour ?                                                                                           # wenn Hervorhebung nur bei gesetztem Attr 'graphicHistoryHour' ? dann hinzufügen: "&& $offset < 0"
                                    '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' :
@@ -15417,6 +15557,14 @@ sub _beamGraphic {
 
   $ret .= "<td class='solarfc'></td>";
   $ret .= "</tr>";
+  
+  $paref->{beampos} = 'bottom';                                                                         # Lagedefinition "unter den Balken"
+
+  ## Batterieanzeige unterhalb der Balken
+  #########################################
+  $ret .= __batteryOnBeam ($paref);
+  
+  delete $paref->{beampos};
 
 return $ret;
 }
@@ -15528,82 +15676,32 @@ return $ret;
 }
 
 ################################################################
-#         Batterieladeempfehlung in Balkengrafik
+#         Batterieanzeige in Balkengrafik
+# vorbereitete Werte (_beamFillupBatValues) in Anzeige einfügen
 ################################################################
 sub __batteryOnBeam {
-  my $paref      = shift;
-  my $name       = $paref->{name};
-  my $maxhours   = $paref->{maxhours};
-  my $show_night = $paref->{show_night};                                         # alle Balken (Spalten) anzeigen?
-  my $width      = $paref->{width};
-  my $lang       = $paref->{lang};
-  my $hfcg       = $paref->{hfcg};
-  my $t          = $paref->{t};
-  my $barcount   = $paref->{barcount} // 9999;                                   # Sync Anzahl Balken dieser Ebene mit voriger Ebene
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $maxhours = $paref->{maxhours};
+  my $width    = $paref->{width};
+  my $lang     = $paref->{lang};
+  my $hfcg     = $paref->{hfcg};
+  my $t        = $paref->{t};
+  my $barcount = $paref->{barcount} // 9999;                                                          # Sync Anzahl Balken dieser Ebene mit voriger Ebene
 
-  my $hash = $defs{$name};
-  my $hh;
-
-  for my $idx (sort keys %{$data{$name}{nexthours}}) {
-      for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
-          $bn      = sprintf "%02d", $bn;
-          my $rcdc = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, undef);
-          my $stt  = NexthoursVal ($name, $idx, 'starttime',        undef);
-          next if(!defined $stt || !defined $rcdc);
-
-          my (undef,undef,$day_str,$time_str) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
-
-          $hh->{$day_str}{$time_str}{'rcdchargebat'.$bn} = $rcdc;
-          $hh->{$day_str}{$time_str}{'soc'.$bn}          = NexthoursVal ($name, $idx, 'soc'.$bn, undef);
-      }
-  }
-
-  for my $kdx (sort keys %{$hfcg}) {
-      next if(!isNumeric ($kdx));
-
-      my $ds = $hfcg->{$kdx}{day_str};
-      my $ts = $hfcg->{$kdx}{time_str};
-
-      next if(!defined $ds || !defined $ts);
-
-      $ts = (split ":", $ts)[0];                                           # Forum: https://forum.fhem.de/index.php?msg=1332721
-
-      for my $bn (1..MAXBATTERIES) {
-          $bn = sprintf "%02d", $bn;
-          $ds = sprintf "%02d", $ds;
-
-          ## Einfügen prepared NextHour Werte
-          #####################################
-          $hfcg->{$kdx}{'rcdchargebat'.$bn} = $hh->{$ds}{$ts}{'rcdchargebat'.$bn} if(defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn});
-          $hfcg->{$kdx}{'soc'.$bn}          = $hh->{$ds}{$ts}{'soc'.$bn}          if(defined $hh->{$ds}{$ts}{'soc'.$bn});
-
-          ## Auffüllen mit History Werten (Achtung: Stundenverschieber relativ zu Nexthours)
-          ####################################################################################
-          if (!defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn}) {
-              my $histsoc = HistoryVal ($hash, $ds, (sprintf "%02d", $ts+1), 'batsoc'.$bn, undef);
-
-              if (defined $histsoc) {
-                  $hfcg->{$kdx}{'soc'.$bn}          = $histsoc;
-                  $hfcg->{$kdx}{'rcdchargebat'.$bn} = 'hist';
-              }
-          }
-      }
-  }
-
-  ## Werte in Anzeigehash einfügen
-  ##################################
   my $m     = $paref->{modulo} % 2;
   my $day   = strftime "%d", localtime($t);                                                           # aktueller Tag (range 01 .. 31)
   my $chour = strftime "%H", localtime($t);                                                           # aktuelle Stunde in 24h format (00-23)
   my $ret   = q{};
 
-  for my $bn (1..MAXBATTERIES) {                                                                     # für jede definierte Batterie
+  for my $bn (1..MAXBATTERIES) {                                                                      # für jede definierte Batterie
       $bn = sprintf "%02d", $bn;
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
-      my $bshow = BatteryVal ($name, $bn, 'bshowingraph', 0);
-      next if($bshow != $paref->{chartlvl});                                                          # Anzeige nur auf Grafikebene "chartlvl"
+      my $bshow = BatteryVal ($name, $bn, 'bshowingraph',     0);
+      my $bpos  = BatteryVal ($name, $bn, 'bposingraph', 'totp');
+      next if($bshow != $paref->{chartlvl} || $bpos ne $paref->{beampos});                            # Anzeige nur auf Grafikebene "chartlvl" bzw. oberhalb/unterhalb der Balken
 
       $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                            # freier Platz am Anfang
       my $ii       = 0;
@@ -24546,8 +24644,8 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>show</b>      </td><td>Control of the battery display in the bar graph (optional)                                                    </td></tr>
            <tr><td>                  </td><td><b>0</b> - no display of the device (default)                                                                 </td></tr>
-           <tr><td>                  </td><td><b>1</b> - Display of the device in the bar chart level 1                                                     </td></tr>
-           <tr><td>                  </td><td><b>2</b> - Display of the device in the bar chart level 2                                                     </td></tr>
+           <tr><td>                  </td><td><b>1[:top|bottom]</b> - Display of the device in the bar chart level 1 (above|below) the beam                 </td></tr>
+           <tr><td>                  </td><td><b>2[:top|bottom]</b> - Display of the device in the bar chart level 2 (above|below) the beam                 </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>asynchron</b> </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                   </td></tr>
            <tr><td>                  </td><td>event processing (asynchronous).                                                                              </td></tr>
@@ -24569,7 +24667,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh show=2:bottom icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
        </ul>
        <br>
 
@@ -27067,8 +27165,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>show</b>      </td><td>Steuerung der Anzeige der Batterie in der Balkengrafik (optional)                                        </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Anzeige des Gerätes (default)                                                           </td></tr>
-           <tr><td>                  </td><td><b>1</b> - Anzeige des Gerätes in der Balkengrafik Ebene 1                                               </td></tr>
-           <tr><td>                  </td><td><b>2</b> - Anzeige des Gerätes in der Balkengrafik Ebene 2                                               </td></tr>
+           <tr><td>                  </td><td><b>1[:top|bottom]</b> - Anzeige des Gerätes in der Balkengrafik Ebene 1 (über|unter) den Balken          </td></tr>
+           <tr><td>                  </td><td><b>2[:top|bottom]</b> - Anzeige des Gerätes in der Balkengrafik Ebene 2 (über|unter) den Balken          </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>asynchron</b> </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch           </td></tr>
            <tr><td>                  </td><td>Eventverarbeitung (asynchron).                                                                           </td></tr>
@@ -27090,7 +27188,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh show=2:bottom icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
        </ul>
        <br>
 
