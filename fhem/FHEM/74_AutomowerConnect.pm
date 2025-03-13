@@ -25,10 +25,10 @@
 ################################################################################
 
 package FHEM::AutomowerConnect;
-our $cvsid = '$Id$';
 use strict;
 use warnings;
 use POSIX;
+our $cvsid = '$Id$';
 
 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use GPUtils qw(:all);
@@ -53,41 +53,41 @@ sub Initialize() {
   $hash->{RenameFn}     = \&FHEM::Devices::AMConnect::Common::Rename;
   $hash->{FW_detailFn}  = \&FHEM::Devices::AMConnect::Common::FW_detailFn;
   # $hash->{FW_summaryFn} = \&FHEM::Devices::AMConnect::Common::FW_summaryFn;
-  $hash->{ReadFn}       = \&FHEM::Devices::AMConnect::Common::wsRead; 
+  $hash->{ReadFn}       = \&FHEM::Devices::AMConnect::Common::wsRead;
   $hash->{ReadyFn}      = \&FHEM::Devices::AMConnect::Common::wsReady;
   $hash->{SetFn}        = \&FHEM::Devices::AMConnect::Common::Set;
   $hash->{AttrFn}       = \&FHEM::Devices::AMConnect::Common::Attr;
-  $hash->{AttrList}     = "disable:1,0 " .
-                          "disabledForIntervals " .
-                          "mapImagePath " .
-                          "mapImageWidthHeight " .
-                          "mapImageCoordinatesToRegister:textField-long " .
-                          "mapImageCoordinatesUTM:textField-long " .
-                          "mapImageZoom " .
-                          "mapBackgroundColor " .
-                          "mapDesignAttributes:textField-long " .
-                          "mapZones:textField-long " .
-                          "chargingStationCoordinates " .
-                          "chargingStationImagePosition:left,top,right,bottom,center " .
-                          "mowerCuttingWidth " .
-                          "mowerPanel:textField-long,85 " .
-                          "mowerSchedule:textField-long " .
-                          "mowingAreaLimits:textField-long " .
-                          "mowingAreaHull:textField-long " .
-                          "mowerAutoSyncTime:1,0 " .
-                          "mowerTimeZone " .
-                          "propertyLimits:textField-long " .
-                          "scaleToMeterXY " .
-                          "showMap:1,0 " .
-                          "weekdaysToResetWayPoints " .
-                          "numberOfWayPointsToDisplay " .
-                          "addPollingMinInterval " .
-                          "addPositionPolling:1,0 " .
+  $hash->{AttrList}     = 'disable:1,0 ' .
+                          'disabledForIntervals ' .
+                          'mapImagePath ' .
+                          'mapImageWidthHeight ' .
+                          'mapImageCoordinatesToRegister:textField-long ' .
+                          'mapImageCoordinatesUTM:textField-long ' .
+                          'mapImageZoom ' .
+                          'mapBackgroundColor ' .
+                          'mapDesignAttributes:textField-long ' .
+                          'mapZones:textField-long ' .
+                          'chargingStationCoordinates ' .
+                          'chargingStationImagePosition:left,top,right,bottom,center ' .
+                          'mowerCuttingWidth ' .
+                          'mowerPanel:textField-long,85 ' .
+                          'mowerSchedule:textField-long ' .
+                          'mowingAreaLimits:textField-long ' .
+                          'mowingAreaHull:textField-long ' .
+                          'mowerAutoSyncTime:1,0 ' .
+                          'mowerTimeZone ' .
+                          'propertyLimits:textField-long ' .
+                          'scaleToMeterXY ' .
+                          'showMap:1,0 ' .
+                          'weekdaysToResetWayPoints ' .
+                          'numberOfWayPointsToDisplay ' .
+                          'addPollingMinInterval ' .
+                          'addPositionPolling:1,0 ' .
                           $::readingFnAttributes;
 
   $::data{FWEXT}{AutomowerConnect}{SCRIPT} = 'automowerconnect.js';
 
-  return undef;
+  return;
 }
 
 ##############################################################
@@ -135,6 +135,10 @@ __END__
     <li>The module uses client credentials as grant type for authorization.</li>
     <br>
     <li>The module downloads third party software from external server necessary to calculate the hull of mowing area.</li>
+    <br>
+    <li>The perl module Readonly must be installed.<br>
+    Install the debian package libreadonly-perl or via CPAN the module Readonly if not already present.
+    </li>
     <br>
   </ul>
   <br>
@@ -484,7 +488,7 @@ __END__
 
     <li><a id='AutomowerConnect-attr-addPollingMinInterval'>addPollingMinInterval</a><br>
       <code>attr &lt;name&gt; addPollingMinInterval &lt;interval in seconds&gt;</code><br>
-      Set minimum intervall for additional polling triggered by status-event, default 0 (no polling). Gets periodically statistics data from mower. Make sure to be within API limits (10000 calls per month).</li>
+      Set minimum intervall for additional polling triggered by any websocket event, default 0 (no polling). Gets periodically mower data. Make sure to be within API limits (10000 calls per month).</li>
 
     <li><a id='AutomowerConnect-attr-addPositionPolling'>addPositionPolling</a><br>
       <code>attr &lt;name&gt; addPositionPolling &lt;[1|<b>0</b>]&gt;</code><br>
@@ -655,7 +659,11 @@ __END__
     <li>Das Modul nutzt Client Credentials als Granttype zur Authorisierung.</li>
     <br>
     <li>Das Modul läd Drittsoftware, die zur Berechnung der Hüllkurve des Mähbereiches erforderlich ist, von einem externem Server.</li>
-  <br>
+    <br>
+    <li>Das Perlmodul Readonly muss installiert sein.<br>
+    Wenn nicht bereits vorhanden, das Debianaket libreadonly-perl installieren oder per CPAN das Perlmodul Readonly.
+    </li>
+    <br>
   </ul>
   <br>
   <a id="AutomowerConnectDefine"></a>
@@ -1008,11 +1016,11 @@ __END__
 
     <li><a id='AutomowerConnect-attr-addPollingMinInterval'>addPollingMinInterval</a><br>
       <code>attr &lt;name&gt; addPollingMinInterval &lt;interval in seconds&gt;</code><br>
-      Setzt das Mindestintervall für zusätzliches Polling der API nach einem status-event, default 0 (kein Polling). Liest periodisch zusätzlich statistische Daten vom Mäher. Es muss sichergestellt werden, das die API Begrenzung (10000 Anfragen pro Monat) eingehalten wird.</li>
+      Setzt das Mindestintervall für zusätzliches Polling der API nach einem websocket event, default 0 (kein Polling). Liest periodisch zusätzlich Mäherdaten von der API. Es muss sichergestellt werden, das die API Begrenzung (10000 Anfragen pro Monat) eingehalten wird.</li>
 
     <li><a id='AutomowerConnect-attr-addPositionPolling'>addPositionPolling</a><br>
       <code>attr &lt;name&gt; addPositionPolling &lt;[1|<b>0</b>]&gt;</code><br>
-      Setzt das Positionspolling, default 0 (kein Positionpolling). Liest periodisch Positiondaten des Mähers, an Stelle der über Websocket gelieferten Daten. Das Attribut ist nur wirksam, wenn durch das Attribut addPollingMinInterval das Polling eingeschaltet ist.</li>
+      Setzt das Positionspolling, default 0 (kein Positionpolling). Wertet periodisch die API Positiondaten des Mähers aus, statt der über Websocket gelieferten Daten. Das Attribut ist nur wirksam, wenn durch das Attribut addPollingMinInterval das Polling eingeschaltet ist.</li>
 
     <li><a id='AutomowerConnect-attr-mowingAreaHull'>mowingAreaHull</a><br>
       <code>attr &lt;name&gt; mowingAreaHull &lt;use button 'mowingAreaHullToAttribute' to fill the attribute&gt;</code><br><br>
@@ -1132,8 +1140,8 @@ __END__
     <li>statistics_newGeoDataSets - Anzahl der neuen Datensätze zwischen den letzten zwei unterschiedlichen Zeitstempeln</li>
     <li>statistics_numberOfCollisions - Anzahl der Kollisionen (laufender Tag/letzter Tag/alle Tage)</li>
     <li>status_connected - Status der Verbindung zwischen dem Automower und der Husqvarna Cloud.</li>
-    <li>status_statusTimestamp - Lokalzeit des letzten Statusupdates in der API</li>
-    <li>status_statusTimestampDiff - Zeitdifferenz zwischen dem letzten und vorletzten Statusupdate.</li>
+    <li>status_statusTimestamp - Lokalzeit des letzten Updates der API</li>
+    <li>status_statusTimestampDiff - Zeitdifferenz zwischen dem letzten und vorletzten Update.</li>
     <li>system_name - Name des Automowers</li>
     <li>third_party_library - Info, dass die JS-Bibliothek geladen wurde. Das Reading kann bedenkenlos gelöscht werden.</li>
   </ul>
