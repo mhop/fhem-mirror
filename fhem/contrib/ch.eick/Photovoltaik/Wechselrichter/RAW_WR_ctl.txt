@@ -13,6 +13,17 @@ defmod WR_ctl DOIF #############################################################
   ::CommandGet(undef, "WR_2_API 20_Statistic_EnergyFlow");;                                ## Zuerst WR_2 und anschließend\
   set_Exec("wait_Statistic",2,'::CommandGet(undef, "WR_1_API 20_Statistic_EnergyFlow")');; ## WR_1, damit die Schwarm Werte stimmen\
 \
+   ## Schattenmanagement \
+   if ($hour == 9)   {\
+     ::CommandSet(undef, "WR_1_API 40_02_Generator_ShadowMgmt 0");;       ## Komplett aus\
+   }\
+   if ($hour == 16) {\
+     ::CommandSet(undef, "WR_1_API 40_02_Generator_ShadowMgmt 2");;       ## Im Westen unten einschalten\
+   }\
+   if ($hour == 21) {\
+     ::CommandSet(undef, "WR_1_API 40_02_Generator_ShadowMgmt 1");;       ## Schattenmanagement für den Osten vorbereiten\
+   }\
+\
   if (AttrVal("$SELF","verbose",0) >=3) {\
       Log 3, "$SELF cmd_1  : Abfrage der Statistiken";;\
     }\
@@ -37,16 +48,16 @@ defmod WR_ctl DOIF #############################################################
      )\
     and\
   (\
-    ([05:00-22:00] and [:03]                                             ## In der PV-Zeit jede Stunde aktualisieren\
+    ([05:00-22:00] and [:05]                                             ## In der PV-Zeit jede Stunde aktualisieren\
     )\
     or [$SELF:ui_command_1] eq "2_KI_Prognose"                           ## Hier wird das uiTable select ausgewertet\
   )\
    ) {\
 \
   if ($hour == 5) {\
-    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load('full',curdate(),'none')");;\
+    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load_new('full',curdate(),'none')");;\
   } else {\
-    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load('update',curdate(),'none')");;\
+    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load_new('update',curdate(),'none')");;\
   }\
 \
   if (AttrVal("$SELF","verbose",0) >=3) {\
@@ -106,7 +117,7 @@ defmod WR_ctl DOIF #############################################################
            SELECT VALUE FROM history\
            WHERE DEVICE='WR_0_KSEM'\
              AND READING='Active_energy-'\
-             AND TIMESTAMP > curdate() - interval 1 month\
+             AND TIMESTAMP > curdate() - INTERVAL 1 MONTH\
              AND TIMESTAMP <= concat(curdate(),' 00:01')\
            ORDER BY TIMESTAMP desc\
            LIMIT 1;;") ;;\
@@ -116,7 +127,7 @@ defmod WR_ctl DOIF #############################################################
            SELECT VALUE FROM history\
            WHERE DEVICE='WR_0_KSEM'\
              AND READING='Active_energy+'\
-             AND TIMESTAMP > curdate() - interval 1 month\
+             AND TIMESTAMP > curdate() - INTERVAL 1 MONTH\
              AND TIMESTAMP <= concat(curdate(),' 00:01')\
            ORDER BY TIMESTAMP desc\
            LIMIT 1;;") ;;\
@@ -127,7 +138,7 @@ defmod WR_ctl DOIF #############################################################
       SELECT VALUE FROM history\
            WHERE DEVICE='WR_0_KSEM'\
              AND READING='Active_energy-'\
-             AND TIMESTAMP > curdate() - interval 1 month\
+             AND TIMESTAMP > curdate() - INTERVAL 1 MONTH\
              AND TIMESTAMP <= subdate(curdate(), (day(curdate())-1))\
            ORDER BY TIMESTAMP desc\
            LIMIT 1;;") ;;\
@@ -137,7 +148,7 @@ defmod WR_ctl DOIF #############################################################
       SELECT VALUE FROM history\
            WHERE DEVICE='WR_0_KSEM'\
              AND READING='Active_energy+'\
-             AND TIMESTAMP > curdate() - interval 1 month\
+             AND TIMESTAMP > curdate() - INTERVAL 2 MONTH\
              AND TIMESTAMP <= LAST_DAY(SUBDATE(curdate(), INTERVAL 1 MONTH))\
            ORDER BY TIMESTAMP desc\
            LIMIT 1;;") ;;\
@@ -188,6 +199,17 @@ package ui_Table;;\
   $TD{0..6}{1..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
   $TD{0..6}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
 \
+sub FUNC_batt {\
+    my($val)=@_;;\
+    my $ret="position:absolute;;left:".(90*$val/100)."px;;width:90px;;height:20px;;background:linear-gradient( to right,#F8F8E0 ".(90-(90*$val/100))."px,rgba(0,0,0,0) ".(90-(90*$val/100))."px);;";;\
+    return $ret;;\
+  }\
+\
+sub FUNC_batt_new {\
+    my($val)=@_;;\
+    my $ret="position:absolute;;left:0px;;width:".(90*$val/100)."px;;height:20px;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;";;\
+    return $ret;;\
+  }\
 }\
 \
 "KI Prognose Kommando Auswahl<dd>Mittags Limit Inverter_Max_Power / KI Status</dd>"|\
@@ -196,7 +218,7 @@ widget([$SELF:ui_command_1],"uzsuDropDown,---,2_KI_Prognose,3_WR_ctl_Diagramm") 
 ""|\
 "MySQL ".[LogDBRep_PV_KI_Prognose:state]."<br> KI ".([LogDBRep_PV_KI_Prognose:state] ne "done") ? "waiting" : [LogDBRep_PV_KI_Prognose:PV_KI_Prognose]\
 \
-"Statistiken"|\
+"Statistiken  <a href='http://192.168.178.40:4001/d/W-Y51Dmgk/pv_anlage_1?orgId=1&from=now%2Fd&to=now%2Fd&refresh=5m'>=> Grafana Diagramme</a>"|\
 Yield(0)|\
 Yield('Tag')|\
 Yield('4h')|\
@@ -224,7 +246,7 @@ sprintf("%d kWh",::round([WR_1:SW_Yield_Yearly]/1000 ,0))\
 (::ReadingsVal("WR_1_API","DigitalOutputs_ConfigurationFlags",0) == 9) ? "<span style='color:green'>Lüfter An </span><br>" : "<br>".sprintf("%.1f °C",::ReadingsVal("WR_1","Battery_temperature",0))|\
 sprintf("%d Wh",::ReadingsVal("WR_1","Actual_Battery_charge_usable_P",0))|\
 Status_Speicher()|\
-[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P]." W<br>".sprintf("%d %%",[WR_1:Act_state_of_charge])\
+FUNC_Status([WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],-10,"green",[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],"orange",[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],15,"red",[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P])." W<br><div style='border-width:2px;;border-style:solid;;border-color:gray;;position:relative;;width:90px;;height:20px;;padding:0px 0px;;display:inline-block;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;'>".STY(" ",FUNC_batt([WR_1:Act_state_of_charge])).STY(::round([WR_1:Act_state_of_charge],0)."%","font-size:16px;;position:absolute;;top:2px;;left:30px")."</div>"\
 \
 "WR_1_API<dd>Kommando Auswahl</dd>"|\
 widget([$SELF:ui_command_2],"uzsuDropDown,---,20_Statistic_EnergyFlow,4_WR_1_API_init_Werte") |\
@@ -405,7 +427,7 @@ sub WR_ctl_Format {\
 }\
 \
 \
-"Statistiken ".::POSIX::strftime("%Y-%m-%d",localtime(::time_str2num(::ReadingsTimestamp("WR_1_API", "auth_me_authenticated",0))))." in kWh"|\
+"Statistiken ".::POSIX::strftime("%Y-%m-%d",localtime(::time_str2num(::ReadingsTimestamp("WR_1_API", "Statistic_Autarky_Day",0))))." in kWh"|\
 "<span style=font-weight:bold>aktuell</span>"|\
 "<span style=font-weight:bold>heute".WR_ctl_Format("_Dx","WR_1_API","SW_Statistic_Yield")."</span>"|\
 |\
@@ -487,7 +509,7 @@ WR_ctl_Format("time_Year","WR_1_API","SW_Statistic_Autarky")\
 
 attr WR_ctl userReadings Yield_fc0_current:Yield_fc0_18.* { my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;; ::ReadingsVal("$NAME","Yield_fc0_".sprintf("%02d",$hour),0)/1000 },\
 Yield_fc1_current:Yield_fc1_18.* { my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;; ::ReadingsVal("$NAME","Yield_fc1_".sprintf("%02d",$hour),0)/1000 }
-attr WR_ctl verbose 3
+attr WR_ctl verbose 2
 
 setstate WR_ctl 2023-06-21 11:33:15 SpeicherMidday_Inverter_Max_Power 9000
 setstate WR_ctl 2024-01-24 16:03:00 ui_command_1 ---

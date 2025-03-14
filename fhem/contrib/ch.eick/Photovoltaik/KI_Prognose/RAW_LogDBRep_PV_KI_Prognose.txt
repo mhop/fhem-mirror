@@ -1,16 +1,20 @@
 defmod LogDBRep_PV_KI_Prognose DbRep LogDB
 attr LogDBRep_PV_KI_Prognose DbLogExclude .*
-attr LogDBRep_PV_KI_Prognose comment Version 2023.02.23 12:00\
+attr LogDBRep_PV_KI_Prognose comment Version 2025.03.14 12:00\
 \
 Hier wird die Vorbereitung für die KI PV-Leistungsprognose durchgeführt\
 \
-sqlCmd call dwd_load(curdate(),'none');;\
+call dwd_load('update',curdate(),'none');;\
+call dwd_load('full',curdate(),'none');;\
 [none|show] zum Anzeigen des Ergebnisses\
 \
 executeAfterProc:\
-<absoluter Skript Name> <DbLog IP-Adresse> <FHEM IP-Adresse> <DbRep Name> <Wechselricher Name> <Prefix Reading Name>
+<absoluter Skript Name> <DbLog IP-Adresse> <FHEM IP-Adresse> <DbRep Name> <Wechselricher Name> <Prefix Reading Name>\
+\
+Bei verbose>=3 kommen Prognose Meldungen aus dem Python Skript.
 attr LogDBRep_PV_KI_Prognose executeAfterProc "/opt/fhem/python/bin/PV_KI_Prognose.py 192.168.178.40 192.168.178.40 LogDBRep_PV_KI_Prognose WR_ctl Yield_fc"
 attr LogDBRep_PV_KI_Prognose room System
-attr LogDBRep_PV_KI_Prognose verbose 3
+attr LogDBRep_PV_KI_Prognose verbose 2
 
-setstate LogDBRep_PV_KI_Prognose 2024-01-25 14:07:24 sqlCmd call dwd_load(curdate(),'none');;
+setstate LogDBRep_PV_KI_Prognose 2025-03-14 14:05:04 sqlCmd call dwd_load('update',curdate(),'none');;
+setstate LogDBRep_PV_KI_Prognose 2025-03-14 14:05:04 sqlResultNumRows 1
