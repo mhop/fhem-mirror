@@ -870,7 +870,7 @@ sub EnOcean_Initialize($) {
                       "signal:off,on signOfLife:off,on signOfLifeInterval signOfLifeLostMax:0,1,2,3,4,5,6,7,8,9 setpointTempRefDev shutTime shutTimeCloses " .
                       "subDef subDef0 subDefI subDefA subDefB subDefC subDefD subDefH subDefW " .
                       "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
-                      "summerMode:auto,off,on switchMode:switch,pushbutton " .
+                      "summerMode:auto,off,on summerModeTempRefDev summerModeTempTreshold:slider,5,1,30 switchMode:switch,pushbutton " .
                       "switchHysteresis switchType:direction,universal,channel,central " .
                       "teachMethod:1BS,4BS,confirm,GP,RPS,smartAck,STE,UTE temperatureRefDev " .
                       "temperatureScale:C,F,default,no_change timeNotation:12,24,default,no_change " .
@@ -8534,7 +8534,7 @@ sub EnOcean_Parse($$) {
       my $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
       my $wakeUpCycle = 600;
       # calc wakeup cycle
-      if ($summerMode eq 'off') {
+      if ($operationMode ne 'summerMode') {
         $summerMode = 0;
         if ($timeDiff == 0 || $window eq 'open') {
           $wakeUpCycle = 1200;
@@ -8542,6 +8542,13 @@ sub EnOcean_Parse($$) {
           $wakeUpCycle = 120;
         } elsif ($timeDiff > 1200) {
           $wakeUpCycle = 1200;
+        } elsif ($waitingCmds eq "summerMode") {
+          $summerMode = 8;
+          if ($manufID eq '049') {
+            $wakeUpCycle = 28800;
+          } else {
+            $wakeUpCycle = 3600;
+          }
         } else {
           $wakeUpCycle = int($timeDiff);
         }
@@ -8760,8 +8767,8 @@ sub EnOcean_Parse($$) {
           readingsSingleUpdate($hash, 'setpointSetRestore', $setpointSet, 1);
         }
         $setpointSet = $setpointSummerMode;
-        $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        $db[2] = (40 - $temperature) * 255 / 40;
         push @event, "1:maintenanceMode:off";
         push @event, "1:operationMode:summerMode";
         #readingsDelete($hash, "setpointSet");
@@ -8823,8 +8830,8 @@ sub EnOcean_Parse($$) {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
         $setpointSet = $setpointSummerMode;
-        $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        $db[2] = (40 - $temperature) * 255 / 40;
         push @event, "1:maintenanceMode:off";
         push @event, "1:operationMode:summerMode";
         $waitingCmds = 0;
@@ -8970,10 +8977,16 @@ sub EnOcean_Parse($$) {
       my $summerMode = AttrVal($name, "summerMode", "off");
       my $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
       my $wakeUpCycle = $wakeUpCycle{AttrVal($name, "wakeUpCycle", 300)};
-      if ($summerMode eq 'off' && $wakeUpCycle >= 50) {
-        # set default Wake-up Cycle (300 s)
-        $wakeUpCycle = 9;
-      } elsif ($summerMode eq 'on') {
+      if ($operationMode ne 'summerMode') {
+        if ($wakeUpCycle >= 50) {
+          # set default Wake-up Cycle (300 s)
+          $wakeUpCycle = 9;
+        } elsif ($waitingCmds eq "summerMode") {
+          $setpointSet = $setpointSummerMode;
+          readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+          $wakeUpCycle = 50 if ($wakeUpCycle < 50);
+        }
+      } else {
         if ($waitingCmds ne "summerMode") {
           $waitingCmds = "no_change";
           readingsDelete($hash, "waitingCmds");
@@ -9111,8 +9124,9 @@ sub EnOcean_Parse($$) {
       } elsif ($waitingCmds eq "summerMode") {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-        $setpointSet = 100;
-        readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        #$setpointSet = $setpointSummerMode;
+        #$setpointSet = 100;
+        #readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:summerMode";
         #readingsDelete($hash, "setpointSet");
@@ -9165,8 +9179,9 @@ sub EnOcean_Parse($$) {
       } elsif ($operationMode eq "summerMode") {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-        $setpointSet = 100;
-        readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
+        #$setpointSet = $setpointSummerMode;
+        #$setpointSet = 100;
+        #readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:summerMode";
         #readingsDelete($hash, "setpointSet");
@@ -9263,7 +9278,7 @@ sub EnOcean_Parse($$) {
       my $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
       my $wakeUpCycle = 600;
       # calc wakeup cycle
-      if ($summerMode eq 'off') {
+      if ($operationMode ne 'summerMode') {
         $summerMode = 0;
         if ($timeDiff == 0 || $window eq 'open') {
           $wakeUpCycle = 600;
@@ -9271,6 +9286,9 @@ sub EnOcean_Parse($$) {
           $wakeUpCycle = 120;
         } elsif ($timeDiff > 7200) {
           $wakeUpCycle = 7200;
+        } elsif ($waitingCmds eq "summerMode") {
+          $summerMode = 8;
+          $wakeUpCycle = 28800;
         } else {
           $wakeUpCycle = int($timeDiff);
         }
@@ -15081,7 +15099,7 @@ sub EnOcean_Attr(@) {
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, 'waitingCmds', 'runInit');
         readingsBulkUpdate($hash, 'operationMode', ReadingsVal($name, 'operationModeRestore', 'setpoint'));
-        readingsBulkUpdate($hash, 'setpointTemp', ReadingsVal($name, 'setpointTempRestore', 20));
+        readingsBulkUpdate($hash, 'setpointTempSet', ReadingsVal($name, 'setpointTempRestore', 20));
         readingsEndUpdate($hash, 0);
         CommandDeleteReading(undef, "$name .*Restore");
 
@@ -15092,6 +15110,19 @@ sub EnOcean_Attr(@) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "summerModeTempRefDev") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal eq 'auto') {
+    }
+    
+  } elsif ($attrName eq "summerModeTempTreshold") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^\d+?$/ || $attrVal < 5 || $attrVal > 30) {
+      $err = "attribute-value [$attrName] = $attrVal is not a integer number or not valid";
+    }
+    
   } elsif ($attrName =~ m/^subDef.?|postmasterID/) {
     if (!defined $attrVal){
 
@@ -15317,6 +15348,10 @@ sub EnOcean_Notify(@) {
         if (AttrVal($name, "demandRespRefDev", undef) eq $1) {
           CommandAttr(undef, "$name demandRespRefDev $2");
         }
+      } elsif (defined AttrVal($name, "summerModeTempRefDev", undef)) {
+        if (AttrVal($name, "summerModeTempRefDev", undef) eq $1) {
+          CommandAttr(undef, "$name summerModeTempRefDev $2");
+        }
       }
       #Log3($name, 5, "EnOcean $name <notify> RENAMED old: $1 new: $2");
 
@@ -15345,6 +15380,10 @@ sub EnOcean_Notify(@) {
       } elsif (defined AttrVal($name, "demandRespRefDev", undef)) {
         if (AttrVal($name, "demandRespRefDev", undef) eq $1) {
           CommandDeleteAttr(undef, "$name demandRespRefDev");
+        }
+      } elsif (defined AttrVal($name, "summerModeTempRefDev", undef)) {
+        if (AttrVal($name, "summerModeTempRefDev", undef) eq $1) {
+          CommandDeleteAttr(undef, "$name summerModeTempRefDev");
         }
       }
       #Log3($name, 5, "EnOcean $name <notify> DELETED $1");
@@ -15652,6 +15691,37 @@ sub EnOcean_Notify(@) {
             my @setCmd = ($name, "setpointTemp", $parts[1]);
             EnOcean_Set($hash, @setCmd);
             #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
+          }
+        }
+      }
+
+      if (defined(AttrVal($name, 'summerModeTempRefDev', undef))) {
+      # automatic switching to summer mode depending on the temperature of the reference device
+        my ($refDev, $refDevReading) = split(/:/, AttrVal($name, 'summerModeTempRefDev', ''));
+        $refDevReading = $refDevReading // 'temperature';
+        if ($devName eq $refDev && $parts[0] eq $refDevReading) {
+          if (AttrVal($name, "subType", '') =~ m/^hvac\.0(1|4|6)$/ && AttrVal($name, 'summerMode', 'off') eq 'auto') {
+            my $treshold = AttrVal($name, 'summerModeTempTreshold', 16);
+            my $operationMode = ReadingsVal($name, 'operationMode', 'off');
+            if ($parts[1] > $treshold && $operationMode ne 'summerMode') {
+              # set summerMode
+              readingsBeginUpdate($hash);
+              readingsBulkUpdate($hash, 'waitingCmds', 'summerMode');
+              readingsBulkUpdate($hash, 'operationModeRestore', ReadingsVal($name, 'operationMode', 'setpoint'));
+              readingsBulkUpdate($hash, 'setpointTempRestore', ReadingsVal($name, 'setpointTemp', 20));
+              readingsBulkUpdate($hash, 'operationMode', 'setpoint');
+              readingsEndUpdate($hash, 0);
+              Log3 $name, 3, "EnOcean set $name summerMode on";
+            } elsif ($parts[1] < $treshold - 1 && $operationMode eq 'summerMode') {
+              # reset summerMode
+              readingsBeginUpdate($hash);
+              readingsBulkUpdate($hash, 'waitingCmds', 'runInit');
+              readingsBulkUpdate($hash, 'operationMode', ReadingsVal($name, 'operationModeRestore', 'setpoint'));
+              readingsBulkUpdate($hash, 'setpointTempSet', ReadingsVal($name, 'setpointTempRestore', 20));
+              readingsEndUpdate($hash, 0);
+              CommandDeleteReading(undef, "$name .*Restore");            
+              Log3 $name, 3, "EnOcean set $name summerMode off";
+            }
           }
         }
       }
@@ -20077,6 +20147,8 @@ sub EnOcean_Delete($$) {
          <li><a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a></li>
          <li><a href="#EnOcean-attr-signOfLifeLostMax">signOfLifeLostMax</a></li>
          <li><a href="#EnOcean-attr-summerMode">summerMode</a></li>
+         <li><a href="#EnOcean-attr-summerModeTempRefDev">summerModeTempRefDev</a></li>         
+         <li><a href="#EnOcean-attr-summerModeTempTreshold">summerModeTempTreshold</a></li>
          <li><a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a></li>
        </ul>
     The actual temperature will be reported by the Heating Radiator Actuating Drive or by the
@@ -20148,6 +20220,8 @@ sub EnOcean_Delete($$) {
          <li><a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a></li>
          <li><a href="#EnOcean-attr-signOfLifeLostMax">signOfLifeLostMax</a></li>
          <li><a href="#EnOcean-attr-summerMode">summerMode</a></li>
+         <li><a href="#EnOcean-attr-summerModeTempRefDev">summerModeTempRefDev</a></li>         
+         <li><a href="#EnOcean-attr-summerModeTempTreshold">summerModeTempTreshold</a></li>
          <li><a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a></li>
          <li><a href="#EnOcean-attr-wakeUpCycle">wakeUpCycle</a></li>
        </ul>
@@ -20216,6 +20290,8 @@ sub EnOcean_Delete($$) {
          <li><a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a></li>
          <li><a href="#EnOcean-attr-signOfLifeLostMax">signOfLifeLostMax</a></li>
          <li><a href="#EnOcean-attr-summerMode">summerMode</a></li>
+         <li><a href="#EnOcean-attr-summerModeTempRefDev">summerModeTempRefDev</a></li>         
+         <li><a href="#EnOcean-attr-summerModeTempTreshold">summerModeTempTreshold</a></li>
          <li><a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a></li>
          <li><a href="#EnOcean-attr-wakeUpCycle">wakeUpCycle</a></li>
          <li><a href="#EnOcean-attr-windowOpenCtrl">windowOpenCtrl</a></li>
@@ -22039,10 +22115,20 @@ sub EnOcean_Delete($$) {
       Type of device (EEP Profile) used for sending commands. Set the Attribute manually.
       The profile has to fit their basic profile. More information can be found in the basic profiles.
     </li>
-    <li><a id="EnOcean-attr-summerMode">summerMode</a> off|on,
+    <li><a id="EnOcean-attr-summerMode">summerMode</a> auto|off|on,
       [summerMode] = off is default.<br>
       Put Battery Powered Actuator (hvac.01/hvac.06) or Heating Radiator Actuating Drive (hvac.04) in summer operation
-      to reduce energy consumption. If [summerMode] = on, the set commands are not executed.
+      to reduce energy consumption. If summerMode is active, the set commands are not executed.<br>
+      If the value is set to auto, summer mode is activated as soon as the <a href="#EnOcean-attr-summerModeTempTreshold">summerModeTempTreshold</a>
+      of the <a href="#EnOcean-attr-summerModeTempRefDev">summerModeTempRefDev</a> is exceeded. If the temperature drops,
+      summer mode is automatically deactivated. The hysteresis is 1 K.
+    </li>
+    <li><a id="EnOcean-attr-summerModeTempRefDev">summerModeTempRefDev</a> &lt;name&gt;[:&lt;reading name&gt;]<br>
+      Reference device for the temperature value for automatic control of summer mode. If the reading name is not specified, the reading 'temperature' is used.
+    </li>
+    <li><a id="EnOcean-attr-summerModeTempTreshold">summerModeTempTreshold</a> 5...30,
+      [summerModeTempTreshold] = 16 is default.<br>
+      Temperature threshold at which summer mode is enabled or disabled. The hysteresis is 1 K.
     </li>
     <li><a id="EnOcean-attr-switchHysteresis">switchHysteresis</a> &lt;value&gt;,
       [switchHysteresis] = 1 is default.<br>
