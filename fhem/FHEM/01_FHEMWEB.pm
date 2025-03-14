@@ -361,7 +361,7 @@ FW_Read($$)
     my $buf;
     my $ret = sysread($c, $buf, 1024);
     $buf = Encode::decode($hash->{encoding}, $buf)
-                if($unicodeEncoding && $hash->{encoding} && !$hash->{websocket});
+               if($unicodeEncoding && $hash->{encoding} && !$hash->{websocket});
 
     if(!defined($ret) && $! == EWOULDBLOCK ){
       $hash->{wantWrite} = 1
@@ -398,7 +398,7 @@ FW_Read($$)
     if($op == 8) {
       # Close, Normal, empty mask. #104718
       TcpServer_WriteBlocking($hash, pack("CCn",0x88,0x2,1000));
-      TcpServer_Close($hash, 1, !$hash->{inform});
+      CommandDelete(undef, $name); // Want to call FW_Undef
       return;
 
     } elsif($op == 9) { # Ping
