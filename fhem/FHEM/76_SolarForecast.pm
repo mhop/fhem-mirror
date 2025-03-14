@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.48.0" => "14.03.2025  edit commandref, add graphicBeam layer 5 and 6, attr ctrlAIdataStorageDuration, ctrlAIshiftTrainStart removed ",
   "1.47.3" => "11.03.2025  adjust weather_ids and management of significant weather, _calcDataEveryFullHour: change attrInvChangedTs Management ".
                            "split __batteryOnBeam into _beamFillupBatValues and itself, expand bat key 'show' by top, bottom ".
                            "__getDWDSolarData: use always diffuse radiation as part of global radiation ",
@@ -460,6 +461,10 @@ use constant {
   B3FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 3
   B4COLDEF        => 'DBDBD0',                                                      # default Farbe Beam 4
   B4FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 4
+  B5COLDEF        => 'A3C8FF',                                                      # default Farbe Beam 5
+  B5FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 5
+  B6COLDEF        => 'ABABAB',                                                      # default Farbe Beam 6
+  B6FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 6
   FGCDDEF         => 130,                                                           # Abstand Verbrauchericons zueinander
 
   FGSCALEDEF      => 0.10,                                                          # Flußgrafik: Scale Normativ Icons
@@ -568,9 +573,9 @@ my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    disable
                    flowGraphicControl graphicBeamWidth
                    graphicBeamHeightLevel1 graphicBeamHeightLevel2
-                   graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content
-                   graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color
-                   graphicBeam1FontColor graphicBeam2FontColor graphicBeam3FontColor graphicBeam4FontColor
+                   graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content graphicBeam5Content graphicBeam6Content
+                   graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color graphicBeam5Color graphicBeam6Color
+                   graphicBeam1FontColor graphicBeam2FontColor graphicBeam3FontColor graphicBeam4FontColor graphicBeam5FontColor graphicBeam6FontColor
                    graphicEnergyUnit graphicHeaderOwnspec graphicHeaderOwnspecValForm
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
@@ -1467,11 +1472,18 @@ sub Initialize {
   my $hod = join ",", map { sprintf "%02d", $_} (1..24);
   my $srd = join ",", sort keys (%hcsr);
 
-  my ($consumer, $setupbat, $ctrlbatsm, $setupprod, $setupinv, @allc);
+  my ($consumer, $setupbat, $ctrlbatsm, $setupprod, $setupinv, $beamcont, $beamcol, $beamfontcol, @allc);
+  
   for my $c (1..MAXCONSUMER) {
       $c         = sprintf "%02d", $c;
       $consumer .= "consumer${c}:textField-long ";
       push @allc, $c;
+  }
+  
+  for my $n (1..6) {
+      $beamcont    .= "graphicBeam${n}Content ";
+      $beamcol     .= "graphicBeam${n}Color:colorpicker,RGB ";
+      $beamfontcol .= "graphicBeam${n}FontColor:colorpicker,RGB ";
   }
 
   for my $bn (1..MAXBATTERIES) {
@@ -1533,18 +1545,6 @@ sub Initialize {
                                 "graphicBeamHeightLevel1 ".
                                 "graphicBeamHeightLevel2 ".
                                 "graphicBeamWidth:slider,20,5,100 ".
-                                "graphicBeam1Content ".
-                                "graphicBeam2Content ".
-                                "graphicBeam3Content ".
-                                "graphicBeam4Content ".
-                                "graphicBeam1Color:colorpicker,RGB ".
-                                "graphicBeam2Color:colorpicker,RGB ".
-                                "graphicBeam3Color:colorpicker,RGB ".
-                                "graphicBeam4Color:colorpicker,RGB ".
-                                "graphicBeam1FontColor:colorpicker,RGB ".
-                                "graphicBeam2FontColor:colorpicker,RGB ".
-                                "graphicBeam3FontColor:colorpicker,RGB ".
-                                "graphicBeam4FontColor:colorpicker,RGB ".
                                 "graphicEnergyUnit:Wh,kWh ".
                                 "graphicHeaderOwnspec:textField-long ".
                                 "graphicHeaderOwnspecValForm:textField-long ".
@@ -1569,6 +1569,9 @@ sub Initialize {
                                 "setupRoofTops ".
                                 "setupRadiationAPI ".
                                 "setupStringPeak ".
+                                $beamcont.
+                                $beamcol.
+                                $beamfontcol.
                                 $setupbat.
                                 $setupinv.
                                 $setupprod.
@@ -1580,8 +1583,8 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';                          # 07.03.2025
-  $hash->{AttrList} .= " ctrlAIdataStorageDuration:$av ctrlAIshiftTrainStart:$av ";
+  # my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';                          # 07.03.2025
+  # $hash->{AttrList} .= " ctrlAIdataStorageDuration:$av ctrlAIshiftTrainStart:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -4451,7 +4454,7 @@ sub __openMeteoDWD_ApiResponse {
 
       return;
   }
-  elsif ($myjson ne "") {                                                                                                     # Evaluiere ob Daten im JSON-Format empfangen wurden
+  elsif ($myjson ne "") {                                                                                              # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson ($hash, $myjson);
 
       if (!$success) {
@@ -4574,13 +4577,13 @@ sub __openMeteoDWD_ApiResponse {
           }
 
           if ($requestmode eq 'MODEL') {
-              $data{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;                  # Startstunde verschieben
+              $data{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;                     # Startstunde verschieben
 
               if ($paref->{begin}) {                                                                # im ersten Call den DS löschen -> dann Aufsummierung
                   delete $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h};
               }
 
-              $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} += $rad;                         # Startstunde verschieben, Rad Werte aller Strings addieren
+              $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} += $rad;                            # Startstunde verschieben, Rad Werte aller Strings addieren
           }
 
           ## Wetterdaten
@@ -5624,17 +5627,17 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^ctrlAIdataStorageDuration|ctrlAIshiftTrainStart$/) {
-      #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
-      my $msg = "The attribute $aName is replaced by 'aiControl'. Please press 'save config' when restart is finished.";
-      if (!$init_done) {
-          Log3 ($name, 1, "$name - $msg");
-          #return qq{Device "$name" -> $msg};
-      }
-      else {
-          return $msg;
-      }
-  }
+  #if ($cmd eq 'set' && $aName =~ /^ctrlAIdataStorageDuration|ctrlAIshiftTrainStart$/) {
+  #    #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
+  #    my $msg = "The attribute $aName is replaced by 'aiControl'. Please press 'save config' when restart is finished.";
+  #    if (!$init_done) {
+  #        Log3 ($name, 1, "$name - $msg");
+  #        #return qq{Device "$name" -> $msg};
+  #    }
+  #    else {
+  #        return $msg;
+  #    }
+  #}
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -7172,6 +7175,8 @@ sub readCacheFile {
           
           push @{$data{$name}{aidectree}{aitrained}}, @{$objref};
           
+          undef @{$objref};
+          
           $data{$name}{current}{aitrainstate} = 'ok';
 
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
@@ -7644,10 +7649,9 @@ sub _addDynAttr {
 
   $gbc .= 'consumption,consumptionForecast,energycosts,feedincome,gridconsumption,gridfeedin,pvForecast,pvReal';
 
-  push @deva, "graphicBeam1Content:$gbc";
-  push @deva, "graphicBeam2Content:$gbc";
-  push @deva, "graphicBeam3Content:$gbc";
-  push @deva, "graphicBeam4Content:$gbc";
+  for my $n (1..6) {
+      push @deva, "graphicBeam${n}Content:$gbc";
+  }
 
   $hash->{".AttrList"} = join " ", @deva;
 
@@ -7746,18 +7750,6 @@ sub centralTask {
       Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
   }
   
-  my $fg1 = AttrVal ($name, 'ctrlAIdataStorageDuration', undef);                     # 07.03.2025
-  my $fg2 = AttrVal ($name, 'ctrlAIshiftTrainStart',     undef);
-  
-  my $newval;
-  $newval .= "aiStorageDuration=$fg1 "    if(defined $fg1);
-  $newval .= "aiTrainStart=$fg2 "         if(defined $fg2);
-
-  if ($newval) {
-      CommandAttr (undef, "$name aiControl $newval");
-      ::CommandDeleteAttr (undef, "$name ctrlAIdataStorageDuration|ctrlAIshiftTrainStart");
-  }
-
   ##########################################################################################################################
 
   if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -13379,6 +13371,8 @@ sub entryGraphic {
       beam2cont      => AttrVal    ($name, 'graphicBeam2Content',     'pvForecast'),
       beam3cont      => AttrVal    ($name, 'graphicBeam3Content',               ''),
       beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
+      beam5cont      => AttrVal    ($name, 'graphicBeam5Content',               ''),
+      beam6cont      => AttrVal    ($name, 'graphicBeam6Content',               ''),
       caicon         => AttrVal    ($name, 'consumerAdviceIcon',         CAICONDEF),                # Consumer AdviceIcon
       clegendpos     => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => AttrVal    ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
@@ -13510,7 +13504,7 @@ sub entryGraphic {
       if ($paref->{beam3cont} || $paref->{beam4cont}) {                                                    # Balkengrafik Ebene 2
           my %hfcg2;
 
-          $paref->{chartlvl}  = 2;                                                                         # Balkengrafik Ebene 2
+          $paref->{chartlvl}  = 2;                                                                       
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
           $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',               B3COLDEF);
@@ -13520,6 +13514,49 @@ sub entryGraphic {
           $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height});
           $paref->{weather}   = 0;
           $paref->{hfcg}      = \%hfcg2;
+          
+          # Werte aktuelle Stunde
+          ##########################
+          $paref->{thishour} = _beamGraphicFirstHour ($paref);
+
+          # Werte restliche Stunden
+          ###########################
+          my $back         = _beamGraphicRemainingHours ($paref);
+          $paref->{maxVal} = $back->{maxVal};                                                             # Startwert wenn kein Wert bereits via attr vorgegeben ist
+          $paref->{maxCon} = $back->{maxCon};
+          $paref->{maxDif} = $back->{maxDif};                                                             # für Typ diff
+          $paref->{minDif} = $back->{minDif};                                                             # für Typ diff
+          
+          ## Batteriewerte füllen
+          #########################
+          _beamFillupBatValues ($paref);
+
+          # Balkengrafik Ausgabe
+          ########################
+          $ret .= _beamGraphic    ($paref);
+          $ret .= _levelSeparator ($paref);
+
+          delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
+          delete $paref->{maxCon};
+          delete $paref->{maxDif};
+          delete $paref->{minDif};
+      }
+      
+      ## Balkengrafik Ebene 3
+      #########################
+      if ($paref->{beam5cont} || $paref->{beam6cont}) {                                                    # Balkengrafik Ebene 3
+          my %hfcg3;
+
+          $paref->{chartlvl}  = 3;                                                                       
+          $paref->{beam1cont} = $paref->{beam5cont};
+          $paref->{beam2cont} = $paref->{beam6cont};
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam5Color',               B5COLDEF);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam6Color',               B6COLDEF);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam5FontColor',       B5FONTCOLDEF);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam6FontColor',       B6FONTCOLDEF);
+          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height});
+          $paref->{weather}   = 0;
+          $paref->{hfcg}      = \%hfcg3;
           
           # Werte aktuelle Stunde
           ##########################
@@ -24238,58 +24275,17 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeam1Color"></a>
-       <li><b>graphicBeam1Color </b><br>
-         Color selection of the primary bar of the first level. <br>
-         (default: FFAC63)
+       <a id="SolarForecast-attr-graphicBeamXColor" data-pattern="graphicBeam.*Color"></a>
+       <li><b>graphicBeamXColor </b><br>
+         Color selection for the bar of the selected layer. <br>
+         Odd bar numbers indicate the primary bar, even bar numbers indicate the secondary bar. <br>
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
-       <li><b>graphicBeam1FontColor </b><br>
-         Selection of the font color of the primary bar of the first level. <br>
-         (default: 0D0D0D)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam2Color"></a>
-       <li><b>graphicBeam2Color </b><br>
-         Color selection of the secondary bars of the first level. <br>
-         (default: C4C4A7)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
-       <li><b>graphicBeam2FontColor </b><br>
-         Selection of the font color of the secondary bars of the first level. <br>
-         (default: 000000)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam3Color"></a>
-       <li><b>graphicBeam3Color </b><br>
-         Color selection of the primary bars of the second level. <br>
-         (default: BED6C0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam3FontColor"></a>
-       <li><b>graphicBeam3FontColor </b><br>
-         Selection of the font color of the primary bars of the second level. <br>
-         (default: 000000)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam4Color"></a>
-       <li><b>graphicBeam4Color </b><br>
-         Color selection of the secondary bars of the second level. <br>
-         (default: DBDBD0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam4FontColor"></a>
-       <li><b>graphicBeam4FontColor </b><br>
-         Selection of the font color of the secondary bars of the second level. <br>
+       <a id="SolarForecast-attr-graphicBeamXFontColor" data-pattern="graphicBeam.*FontColor"></a>
+       <li><b>graphicBeamXFontColor </b><br>
+         Selection of the font color of the bar of the selected layer. <br>
+         Odd bar numbers indicate the primary bar, even bar numbers indicate the secondary bar. <br>
          (default: 000000)
        </li>
        <br>
@@ -24427,6 +24423,10 @@ to ensure that the system configuration is correct.
          other Perl operations.  <br>
          There are two basic notation options that cannot be combined with each other. <br>
          The notations are always specified within two curly brackets {...}.
+         <br><br>
+         <b>Note:</b> Values with the units 'Wh' or 'kWh' are automatically converted and displayed according to the setting
+         automatically converted and displayed according to the setting of attribute 
+         <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a>.
          <br><br>
 
          <b>Notation 1: </b> <br>
@@ -26762,58 +26762,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeam1Color"></a>
-       <li><b>graphicBeam1Color </b><br>
-         Farbauswahl des primären Balkens der ersten Ebene. <br>
-         (default: FFAC63)
+       <a id="SolarForecast-attr-graphicBeamXColor" data-pattern="graphicBeam.*Color"></a>
+       <li><b>graphicBeamXColor </b><br>
+         Farbauswahl für den Balken der ausgewählten Ebene. <br>
+         Ungerade Balkennummern kennzeichnen den primären, gerade Balkennummern den sekundären Balken. <br>
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
-       <li><b>graphicBeam1FontColor </b><br>
-         Auswahl der Schriftfarbe des primären Balkens der ersten Ebene. <br>
-         (default: 0D0D0D)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam2Color"></a>
-       <li><b>graphicBeam2Color </b><br>
-         Farbauswahl der sekundären Balken der ersten Ebene. <br>
-         (default: C4C4A7)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
-       <li><b>graphicBeam2FontColor </b><br>
-         Auswahl der Schriftfarbe der sekundären Balken der ersten Ebene. <br>
-         (default: 000000)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam3Color"></a>
-       <li><b>graphicBeam3Color </b><br>
-         Farbauswahl für die primären Balken der zweiten Ebene. <br>
-         (default: BED6C0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam3FontColor"></a>
-       <li><b>graphicBeam3FontColor </b><br>
-         Auswahl der Schriftfarbe der primären Balken der zweiten Ebene. <br>
-         (default: 000000)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam4Color"></a>
-       <li><b>graphicBeam4Color </b><br>
-         Farbauswahl für die sekundären Balken der zweiten Ebene. <br>
-         (default: DBDBD0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam4FontColor"></a>
-       <li><b>graphicBeam4FontColor </b><br>
-         Auswahl der Schriftfarbe der sekundären Balken der zweiten Ebene. <br>
+       <a id="SolarForecast-attr-graphicBeamXFontColor" data-pattern="graphicBeam.*FontColor"></a>
+       <li><b>graphicBeamXFontColor </b><br>
+         Auswahl der Schriftfarbe des Balkens der ausgewählten Ebene. <br>
+         Ungerade Balkennummern kennzeichnen den primären, gerade Balkennummern den sekundären Balken. <br>
          (default: 000000)
        </li>
        <br>
@@ -26949,6 +26908,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Readings können mit sprintf und anderen Perl Operationen manipuliert werden. <br>
          Es stehen zwei grundsätzliche, miteinander nicht kombinierbare Möglichkeiten der Notation zur Verfügung. <br>
          Die Angabe der Notationen erfolgt grundsätzlich innerhalb von zwei geschweiften Klammern {...}.
+         <br><br>
+         <b>Hinweis:</b> Werte mit den Einheiten 'Wh' oder 'kWh' werden entsprechend der Einstellung
+         des Attributs <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a> automatisch umgerechnet und dargestellt.
          <br><br>
 
          <b>Notation 1: </b> <br>

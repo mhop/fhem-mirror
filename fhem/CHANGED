@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 76_SolarForecast: add Beam graphic layer 3
  - change:  74_AutomowerConnect: Perl module Readonly is mandatory, respect
                                  some perlcritic
  - feature: 76_SolarForecast: version 1.47.3, bat key 'show' use top / bottom
