@@ -398,7 +398,7 @@ FW_Read($$)
     if($op == 8) {
       # Close, Normal, empty mask. #104718
       TcpServer_WriteBlocking($hash, pack("CCn",0x88,0x2,1000));
-      CommandDelete(undef, $name); // Want to call FW_Undef
+      CommandDelete(undef, $name); # Want to call FW_Undef
       return;
 
     } elsif($op == 9) { # Ping
