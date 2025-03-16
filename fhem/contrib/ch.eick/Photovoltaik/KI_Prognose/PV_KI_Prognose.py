@@ -237,6 +237,9 @@ while loop_date <= end_date:
         Prognose     = int(round((Prognose_pre + predict[loop_hour]*Prognose_faktor)/2))
         Prognose_pre = int(round(predict[loop_hour]*Prognose_faktor))
 
+        if (verbose >= 4):
+            print("loop_hour " + str(loop_hour) + " " + str(Prognose))
+
         # Zu kleine Werte werden verworfen
         if (Prognose < 20):
             if (verbose >= 4):
@@ -245,9 +248,15 @@ while loop_date <= end_date:
 
         # Zu große Werte werden limitiert
         # Achtung, die yield Prognose Werte sind Angaben zum Ende der Stunde
-        if (Prognose > 0):
+        if (Prognose > 0 and loop_hour > 0):
           timestamp = date+" %02d:00:00" % (dfhour_start['VALUE'].values[0]+loop_hour-1)
+
+          if (verbose >= 4):
+              print("TIMESTAMP " + str(timestamp))
+
           Limit = int(round(dfask.loc[dfask['TIMESTAMP'] == timestamp].yield_max.values[0],0))
+#          Limit = 50000
+
           if (verbose >= 4):
             # Hier wird beim Anzeigen der Wert um eine Stunde vorher angezeigt
             print(dfhour_start['VALUE'].values[0]+loop_hour-1,Prognose,Limit)
@@ -353,6 +362,9 @@ while loop_date <= end_date:
                 print("%s  %02d %d" % (reading,dfhour_start['VALUE'].values[0]+loop_hour-1,Prognose))
 
         # Zum Ende der Prognose alle Werte in die readings schreiben
+        if (verbose >= 4):
+            print("loop_hour " + str(loop_hour))
+
         if (loop_hour == dfhours-1):
             if (loop_date.day == start_date.day):
                 # Für den aktuellen Tag diese Werte schreiben 
@@ -399,8 +411,7 @@ while loop_date <= end_date:
     loop_count += 1
 
 
-if (verbose >= 3):
-    print("PV_KI_Prognose  done")
+print("PV_KI_Prognose  done")
 
 # Zum Schluss noch einen Trigger ins FHEM schreiben
 fh.send_cmd("setreading "+DbRep+" PV_KI_Prognose done")
