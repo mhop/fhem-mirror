@@ -598,7 +598,7 @@ __END__
     <li>mower_commandStatus - Status of the last sent command cleared each status update</li>
     <li>mower_currentZone - Zone name with activity MOWING in the last status time stamp interval and number of way points in parenthesis.</li>
     <li>mower_inactiveReason - They are NONE, PLANNING, SEARCHING_FOR_SATELLITES.</li>
-    <li>mower_wsEvent - websocket connection events (battery-event-v2, calendar-event-v2, cuttingHeight-event-v2, headLights-event-v2, messages-event-v2, mower-event-v2, planner-event-v2 and position-event-v2)</li>
+    <li>mower_wsEvent - websocket connection events (battery-event-v2, calendar-event-v2, cuttingHeight-event-v2, headlights-event-v2, messages-event-v2, mower-event-v2, planner-event-v2 and position-event-v2)</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>
@@ -1124,7 +1124,7 @@ __END__
     <li>mower_commandStatus - Status des letzten uebermittelten Kommandos wird duch Statusupdate zurückgesetzt.</li>
     <li>mower_currentZone - Name der Zone im aktuell abgefragten Intervall der Statuszeitstempel , in der der Mäher gemäht hat und Anzahl der Wegpunkte in der Zone in Klammern.</li>
     <li>mower_inactiveReason - Gründe für Inaktivität: NONE, PLANNING, SEARCHING_FOR_SATELLITES.</li>
-    <li>mower_wsEvent - Events der Websocketverbindung (battery-event-v2, calendar-event-v2, cuttingHeight-event-v2, headLights-event-v2, messages-event-v2, mower-event-v2, planner-event-v2 and position-event-v2)</li>
+    <li>mower_wsEvent - Events der Websocketverbindung (battery-event-v2, calendar-event-v2, cuttingHeight-event-v2, headights-event-v2, messages-event-v2, mower-event-v2, planner-event-v2 and position-event-v2)</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
     <li>mower_errorDescription - error description</li>

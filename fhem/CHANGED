@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  74_AutomowerConnect: add new error codes, implement new spelling of
+                         headlight-event-v2, named space and named empty string
  - feature: 76_SolarForecast: add Beam graphic layer 3
  - change:  74_AutomowerConnect: Perl module Readonly is mandatory, respect
                                  some perlcritic

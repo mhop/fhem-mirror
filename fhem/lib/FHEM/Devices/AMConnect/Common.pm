@@ -35,14 +35,16 @@ use Time::Local;
 use DevIo;
 use Storable qw(dclone retrieve store);
 use DateTime;
-my $missingModul = '';
+my $EMPTY = q{};
+my $missingModul = $EMPTY;
 ## no critic (ProhibitConditionalUseStatements)
 eval { use Readonly; 1 } or $missingModul .= 'Readonly ';
 
 Readonly my $AUTHURL       => 'https://api.authentication.husqvarnagroup.dev/v1';
 Readonly my $APIURL        => 'https://api.amc.husqvarna.dev/v1';
 Readonly my $WSDEVICENAME  => 'wss:ws.openapi.husqvarna.dev:443/v1';
-
+Readonly my $SPACE         => q{ };
+Readonly    $EMPTY         => q{};
 eval { use JSON; 1 } or $missingModul .= 'JSON ';
 ## use critic
 
@@ -102,7 +104,7 @@ require HttpUtils;
 
 my $cvsid = '$Id$';
 
-my $errorjson = '{"23":"Wheel drive problem, left","24":"Cutting system blocked","123":"Destination not reachable","710":"SIM card locked","50":"Guide 1 not found","717":"SMS could not be sent","108":"Folding cutting deck sensor defect","4":"Loop sensor problem - front","15":"Lifted","29":"Slope too steep","1":"Outside working area","45":"Cutting height problem - dir","52":"Guide 3 not found","28":"Memory circuit problem","95":"Folding sensor activated","9":"Trapped","114":"Too high discharge current","103":"Cutting drive motor 2 defect","65":"Temporary battery problem","119":"Zone generator problem","6":"Loop sensor problem - left","82":"Wheel motor blocked - rear right","714":"Geofence problem","703":"Connectivity problem","708":"SIM card locked","75":"Connection changed","7":"Loop sensor problem - right","35":"Wheel motor overloaded - right","3":"Wrong loop signal","117":"High internal power loss","0":"Unexpected error","80":"Cutting system imbalance - Warning","110":"Collision sensor error","100":"Ultrasonic Sensor 3 defect","79":"Invalid battery combination - Invalid combination of different battery types.","724":"Communication circuit board SW must be updated","86":"Wheel motor overloaded - rear right","81":"Safety function faulty","78":"Slipped - Mower has Slipped. Situation not solved with moving pattern","107":"Docking sensor defect","33":"Mower tilted","69":"Alarm! Mower switched off","68":"Temporary battery problem","34":"Cutting stopped - slope too steep","127":"Battery problem","73":"Alarm! Mower in motion","74":"Alarm! Outside geofence","713":"Geofence problem","87":"Wheel motor overloaded - rear left","120":"Internal voltage error","39":"Cutting motor problem","704":"Connectivity problem","63":"Temporary battery problem","109":"Loop sensor defect","38":"Electronic problem","64":"Temporary battery problem","113":"Complex working area","93":"No accurate position from satellites","104":"Cutting drive motor 3 defect","709":"SIM card not found","94":"Reference station communication problem","43":"Cutting height problem - drive","13":"No drive","44":"Cutting height problem - curr","118":"Charging system problem","14":"Mower lifted","57":"Guide calibration failed","707":"SIM card requires PIN","99":"Ultrasonic Sensor 2 defect","98":"Ultrasonic Sensor 1 defect","51":"Guide 2 not found","56":"Guide calibration accomplished","49":"Ultrasonic problem","2":"No loop signal","124":"Destination blocked","25":"Cutting system blocked","19":"Collision sensor problem, front","18":"Collision sensor problem - rear","48":"No response from charger","105":"Lift Sensor defect","111":"No confirmed position","10":"Upside down","40":"Limited cutting height range","716":"Connectivity problem","27":"Settings restored","90":"No power in charging station","21":"Wheel motor blocked - left","26":"Invalid sub-device combination","92":"Work area not valid","702":"Connectivity settings restored","125":"Battery needs replacement","5":"Loop sensor problem - rear","12":"Empty battery","55":"Difficult finding home","42":"Limited cutting height range","30":"Charging system problem","72":"Alarm! Mower tilted","85":"Wheel drive problem - rear left","8":"Wrong PIN code","62":"Temporary battery problem","102":"Cutting drive motor 1 defect","116":"High charging power loss","122":"CAN error","60":"Temporary battery problem","705":"Connectivity problem","711":"SIM card locked","70":"Alarm! Mower stopped","32":"Tilt sensor problem","37":"Charging current too high","89":"Invalid system configuration","76":"Connection NOT changed","71":"Alarm! Mower lifted","88":"Angular sensor problem","701":"Connectivity problem","715":"Connectivity problem","61":"Temporary battery problem","66":"Battery problem","106":"Collision sensor defect","67":"Battery problem","112":"Cutting system major imbalance","83":"Wheel motor blocked - rear left","84":"Wheel drive problem - rear right","126":"Battery near end of life","77":"Com board not available","36":"Wheel motor overloaded - left","31":"STOP button problem","17":"Charging station blocked","54":"Weak GPS signal","47":"Cutting height problem","53":"GPS navigation problem","121":"High internal temerature","97":"Left brush motor overloaded","712":"SIM card locked","20":"Wheel motor blocked - right","91":"Switch cord problem","96":"Right brush motor overloaded","58":"Temporary battery problem","59":"Temporary battery problem","22":"Wheel drive problem - right","706":"Poor signal quality","41":"Unexpected cutting height adj","46":"Cutting height blocked","11":"Low battery","16":"Stuck in charging station","101":"Ultrasonic Sensor 4 defect","115":"Too high internal current"}';
+my $errorjson = '{"1":"Outside working area","":"No loop signal","3":"Wrong loop signal","4":"Loop sensor problem front","5 ":"Loop sensor problem rear","6":"Loop sensor problem left","7":"Loop sensor problem right","8":"Wrong PIN code","9":"Trapped","10":"Upside down","11":"Low battery","12":"Empty battery","13":"No drive","14":"Mower lifted","15":"Lifted","16":"Stuck in charging station","17":"Charging station blocked","18":"Collision sensor problem rear","19":"Collision sensor problem front","20":"Wheel motor blocked right","21":"Wheel motor blocked left","22":"Wheel drive problem right","23":"Wheel drive problem left","24":"Cutting system blocked","25":"Cutting system blocked","26":"Invalid sub-device combination","27":"Settings restored","28":"Memory circuit problem","29":"Slope too steep","30":"Charging system problem","31":"STOP button problem","32":"Tilt sensor problem","33":"Mower tilted","34":"Cutting stopped - slope too steep","35":"Wheel motor overloaded right","36":"Wheel motor overloaded left","37":"Charging current too high","38":"Electronic problem","39":"Cutting motor problem","40":"Limited cutting height range","41":"Unexpected cutting height adj","42":"Limited cutting height range","43":"Cutting height problem drive","44":"Cutting height problem curr","45":"Cutting height problem dir","46":"Cutting height blocked","47":"Cutting height problem","48":"No response from charger","49":"Ultrasonic problem","50":"Guide 1 not found","51":"Guide 2 not found","52":"Guide 3 not found","53":"GPS navigation problem","54":"Weak GPS signal","55":"Difficult finding home","56":"Guide calibration accomplished","57":"Guide calibration failed","58":"Temporary battery problem","59":"Temporary battery problem","60":"Temporary battery problem","61":"Temporary battery problem","62":"Temporary battery problem","63":"Temporary battery problem","64":"Temporary battery problem","65":"Temporary battery problem","66":"Battery problem","67":"Battery problem","68":"Temporary battery problem","69":"Alarm! Mower switched off","70":"Alarm! Mower stopped","71":"Alarm! Mower lifted","72":"Alarm! Mower tilted","73":"Alarm! Mower in motion","74":"Alarm! Outside geofence","75":"Connection changed","76":"Connection NOT changed","77":"Com board not available","78":"Slipped - Mower has Slipped.Situation not solved with moving pattern","79":"Invalid battery combination - Invalid combination of different battery types.","80":"Cutting system imbalance Warning","81":"Safety function faulty","82":"Wheel motor blocked rear right","83":"Wheel motor blocked rear left","84":"Wheel drive problem rear right","85":"Wheel drive problem rear left","86":"Wheel motor overloaded rear right","87":"Wheel motor overloaded rear left","88":"Angular sensor problem","89":"Invalid system configuration","90":"No power in charging station","91":"Switch cord problem","92":"Work area not valid","93":"No accurate position from satellites","94":"Reference station communication problem","95":"Folding sensor activated","96":"Right brush motor overloaded","97":"Left brush motor overloaded","98":"Ultrasonic Sensor 1 defect","99":"Ultrasonic Sensor 2 defect","100":"Ultrasonic Sensor 3 defect","101":"Ultrasonic Sensor 4 defect","102":"Cutting drive motor 1 defect","103":"Cutting drive motor 2 defect","104":"Cutting drive motor 3 defect","105":"Lift Sensor defect","106":"Collision sensor defect","107":"Docking sensor defect","108":"Folding cutting deck sensor defect","109":"Loop sensor defect","110":"Collision sensor error","111":"No confirmed position","112":"Cutting system major imbalance","113":"Complex working area","114":"Too high discharge current","115":"Too high internal current","116":"High charging power loss","117":"High internal power loss","118":"Charging system problem","119":"Zone generator problem","120":"Internal voltage error","121":"High internal temerature","122":"CAN error","123":"Destination not reachable","124":"Destination blocked","125":"Battery needs replacement","126":"Battery near end of life","127":"Battery problem","128":"Multiple reference stations detected","129":"Auxiliary cutting means blocked","130":"Imbalanced auxiliary cutting disc detected","131":"Lifted in link arm","132":"EPOS accessory missing","133":"Bluetooth com with CS failed","134":"Invalid SW configuration","135":"Radar problem","136":"Work area tampered","137":"High temperature in cutting motor right","138":"High temperature in cutting motor center","139":"High temperature in cutting motor left","141":"Wheel brush motor problem","143":"Accessory power problem","144":"Boundary wire problem","145":"No correction data available","147":"Cutting disc lost","148":"Chassis collision","701":"Connectivity problem","702":"Connectivity settings restored","703":"Connectivity problem","704":"Connectivity problem","705":"Connectivity problem","706":"Poor signal quality","707":"SIM card requires PIN","708":"SIM card locked","709":"SIM card not found","710":"SIM card locked","711":"SIM card locked","712":"SIM card locked","713":"Geofence problem","714":"Geofence problem","715":"Connectivity problem","716":"Connectivity problem","717":"SMS could not be sent","724":"Communication circuit board SW must be updated"}';
 
 our $errortable = eval { JSON::XS->new->decode ( $errorjson ) }; ## no critic (ProhibitPackageVars)
 
@@ -123,7 +125,7 @@ sub Define{
   my $name = $val[0];
   my $type = $val[1];
   my $iam = "$type $name Define:";
-  my $client_id = '';
+  my $client_id = $EMPTY;
   my $mowerNumber = 0;
 
   return "$iam install missing modul $missingModul" if( $missingModul );
@@ -254,72 +256,63 @@ EOF
         positions               => [],
         timestamp               => 0,
         errordesc               => '-',
-        errordate               => '',
-        errorstate              => ''
+        errordate               => $EMPTY,
+        errorstate              => $EMPTY
       },
       UNKNOWN                   => {
         short                   => 'U',
-        arrayName               => '',
+        arrayName               => $EMPTY,
         maxLength               => 100,
-        cnt                     => 0,
-        callFn                  => ''
+        cnt                     => 0
       },
       NOT_APPLICABLE            => {
         short                   => 'N',
-        arrayName               => '',
+        arrayName               => $EMPTY,
         maxLength               => 50,
-        cnt                     => 0,
-        callFn                  => ''
+        cnt                     => 0
       },
       NONE                      => {
         short                   => 'N',
-        arrayName               => '',
+        arrayName               => $EMPTY,
         maxLength               => 50,
-        cnt                     => 0,
-        callFn                  => ''
+        cnt                     => 0
       },
       MOWING                    => {
         short                   => 'M',
         arrayName               => 'areapos',
         maxLength               => 5000,
         maxLengthDefault        => 5000,
-        cnt                     => 0,
-        callFn                  => ''
+        cnt                     => 0
       },
       GOING_HOME                => {
         short                   => 'G',
-        arrayName               => '',
+        arrayName               => $EMPTY,
         maxLength               => 50,
-        cnt                     => 0,
-        callFn                  => ''
+        cnt                     => 0
       },
       CHARGING                  => {
         short                   => 'C',
         arrayName               => 'cspos',
         maxLength               => 100,
-        cnt                     => 0,
-        callFn                  => ''
+        cnt                     => 0
       },
       LEAVING                   => {
         short                   => 'L',
-        arrayName               => '',
+        arrayName               => $EMPTY,
         maxLength               => 50,
-        cnt                     => 0,
-        callFn                  => ''
+        cnt                     => 0
       },
       PARKED_IN_CS              => {
         short                   => 'P',
         arrayName               => 'cspos',
         maxLength               => 100,
-        cnt                     => 0,
-        callFn                  => ''
+        cnt                     => 0
       },
       STOPPED_IN_GARDEN         => {
         short                   => 'S',
-        arrayName               => '',
+        arrayName               => $EMPTY,
         maxLength               => 50,
-        cnt                     => 0,
-        callFn                  => ''
+        cnt                     => 0
       },
       statistics                => {
         currentSpeed            => 0,
@@ -344,14 +337,14 @@ EOF
       wsbuf                     => {
         events_changed          => 0,
         event_duplicates        => 0,
-        'position-event-v2'     => '',
-        'mower-event-v2'        => '',
-        'battery-event-v2'      => '',
-        'planner-event-v2'      => '',
-        'cuttingHeight-event-v2'=> '',
-        'headLights-event-v2'   => '',
-        'calendar-event-v2'     => '',
-        'message-event-v2'      => ''
+        'position-event-v2'     => $EMPTY,
+        'mower-event-v2'        => $EMPTY,
+        'battery-event-v2'      => $EMPTY,
+        'planner-event-v2'      => $EMPTY,
+        'cuttingHeight-event-v2'=> $EMPTY,
+        'headLights-event-v2'   => $EMPTY,
+        'calendar-event-v2'     => $EMPTY,
+        'message-event-v2'      => $EMPTY
       }
     }
   );
@@ -470,8 +463,8 @@ sub FW_summaryFn {
   my ($FW_wname, $name, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$name};
   my $type = $hash->{TYPE};
-  my $content = AttrVal($name, 'mowerPanel', '');
-  return '' if( AttrVal($name, 'disable', 0) || !$content || !$init_done);
+  my $content = AttrVal($name, 'mowerPanel', $EMPTY);
+  return $EMPTY if( AttrVal($name, 'disable', 0) || !$content || !$init_done);
   $content =~ s/command=['"](.*?)['"]/onclick="AutomowerConnectPanelCmd('set $name $1')"/g;
   return $content if ( $content =~ /IN_STATE/ );
   return;
@@ -483,7 +476,7 @@ sub FW_detailFn { ## no critic (ProhibitExcessComplexity [complexity core mainte
   my $hash = $defs{$name};
   my $type = $hash->{TYPE};
   my $iam = "$type $name FW_detailFn:";
-  return '' if( AttrVal($name, 'disable', 0) || !$init_done || !$FW_ME );
+  return $EMPTY if( AttrVal($name, 'disable', 0) || !$init_done || !$FW_ME );
 
   my $mapDesign = getDesignAttr( $hash );
   my $reta = "<div id='amc_${name}_schedule_buttons' name='fhem_amc_mower_schedule_buttons' ><button id='amc_${name}_schedule_button' onclick='AutomowerConnectSchedule( \"$name\" )' style='font-size:16px; ' >Mower Schedule</button>";
@@ -496,8 +489,8 @@ sub FW_detailFn { ## no critic (ProhibitExcessComplexity [complexity core mainte
   my $img = "$FW_ME/$type/$name/map";
 
   my $zoom=AttrVal( $name,'mapImageZoom', 0.7 );
-  my $backgroundcolor = AttrVal($name, 'mapBackgroundColor','');
-  my $bgstyle = $backgroundcolor ? " background-color:$backgroundcolor;" : '';
+  my $backgroundcolor = AttrVal($name, 'mapBackgroundColor',$EMPTY);
+  my $bgstyle = $backgroundcolor ? " background-color:$backgroundcolor;" : $EMPTY;
 
   my ($picx,$picy) = AttrVal( $name, 'mapImageWidthHeight', $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
   $picx=int($picx*$zoom);
@@ -522,8 +515,8 @@ sub FW_detailFn { ## no critic (ProhibitExcessComplexity [complexity core mainte
   my $csdata = 'data-csimgpos="'.$csimgpos.'" data-cslon="'.$cslon.'" data-cslat="'.$cslat.'"';
 
   # AREA LIMITS
-  my $arealimits = AttrVal($name,'mowingAreaLimits','');
-  my $limi = '';
+  my $arealimits = AttrVal( $name, 'mowingAreaLimits', $EMPTY );
+  my $limi = $EMPTY;
   if ($arealimits) {
     my @lixy = (split(/\s|,|\R$/,$arealimits));
     my @liar = ();
@@ -543,8 +536,8 @@ sub FW_detailFn { ## no critic (ProhibitExcessComplexity [complexity core mainte
   $limi = 'data-areaLimitsPath="'.$limi.'"';
 
   # PROPERTY LIMITS
-  my $propertylimits = AttrVal($name,'propertyLimits','');
-  my $propli = '';
+  my $propertylimits = AttrVal( $name, 'propertyLimits', $EMPTY );
+  my $propli = $EMPTY;
   if ($propertylimits) {
     my @propxy = (split(/\s|,|\R$/,$propertylimits));
     my @liar = ();
@@ -574,7 +567,7 @@ sub FW_detailFn { ## no critic (ProhibitExcessComplexity [complexity core mainte
   $hash->{helper}{statistics}{hullArea} = int( polygonArea( $hull, $scalx/$picx, $scaly/$picy ) );
   $hash->{helper}{mapupdate}{hullxy} = $hull;
 
-  my $ret = '';
+  my $ret = $EMPTY;
   $ret .= '<style>'
   .".${type}_${name}_div{padding:0px !important;"
   ."  $bgstyle background-image: url('$img');"
@@ -587,7 +580,7 @@ sub FW_detailFn { ## no critic (ProhibitExcessComplexity [complexity core mainte
   .". ${type}_${name}_canvas_1{"
   .'  position: absolute; left: 0; top: 0; z-index: 1;}'
   .'</style>';
-  my $content = AttrVal($name, 'mowerPanel', '');
+  my $content = AttrVal($name, 'mowerPanel', $EMPTY);
   my $contentflg = $content =~ /ON_TOP/;
   $content =~ s/command=['"](.*?)['"]/onclick="AutomowerConnectPanelCmd('set $name $1')"/g;
   $ret .= $content if ( $contentflg );
@@ -601,9 +594,9 @@ sub FW_detailFn { ## no critic (ProhibitExcessComplexity [complexity core mainte
 
   $ret .= "<div class='fhem_amc_hull_buttons' >";
   $ret .= "<button class='fhem_amc_hull_button' title='Sends the hull polygon points to attribute mowingAreaHull.' onclick='AutomowerConnectGetHull( \"$FW_ME/$type/$name/json\" )' style='font-size:12pt; ' >mowingAreaHullToAttribute</button>"
-          if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && !AttrVal( $name,'mowingAreaHull','' ) && ${ $mapDesign } =~ m/hullCalculate="1"/g );
+          if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && !AttrVal( $name, 'mowingAreaHull', $EMPTY ) && ${ $mapDesign } =~ m/hullCalculate="1"/g );
   $ret .= "<button class='fhem_amc_hull_button' title='Subtracts hull polygon points from way points. To hide button set hullSubtract=\"\".' onclick='AutomowerConnectSubtractHull( \"$FW_ME/$type/$name/json\" )' style='font-size:12pt; ' >Subtract Hull</button>"
-          if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && AttrVal( $name,'mowingAreaHull','' ) && ${ $mapDesign } =~ m/hullSubtract="\d+"/g );
+          if ( -e "$FW_dir/$hash->{helper}{FWEXTA}{path}/$hash->{helper}{FWEXTA}{file}" && AttrVal( $name, 'mowingAreaHull', $EMPTY ) && ${ $mapDesign } =~ m/hullSubtract="\d+"/g );
   $ret .= "</div>";
   $ret .= $content  if ( !$contentflg );
 
@@ -631,7 +624,7 @@ sub FW_detailFn_Update {
   
   my ($picx,$picy) = AttrVal( $name,'mapImageWidthHeight', $hash->{helper}{imageWidthHeight} ) =~ /(\d+)\s(\d+)/;
 
-  my ( $scaleToMeterX, $scaleToMeterY ) = AttrVal( $name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude} ) =~ /(-?\d+)\s+(-?\d+)/;
+  my ( $scaleToMeterX, $scaleToMeterY ) = AttrVal( $name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . $SPACE .$hash->{helper}{scaleToMeterLatitude} ) =~ /(-?\d+)\s+(-?\d+)/;
   my $scalx = ( $lonru - $lonlo ) * $scaleToMeterX;
   my $scaly = ( $latlo - $latru ) * $scaleToMeterY;
 
@@ -690,8 +683,8 @@ sub FW_detailFn_Update {
   $hash->{helper}{mapupdate}{posxy} = \@posxy;
   $hash->{helper}{mapupdate}{poserrxy} = \@poserrxy;
 
-  for ( devspec2array('TYPE=FHEMWEB') ) { 
-    ::FW_directNotify("#FHEMWEB:$_", "AutomowerConnectUpdateJson ( '$FW_ME/$type/$name/json' )","") if ( $FW_ME );
+  for ( devspec2array( 'TYPE=FHEMWEB' ) ) { 
+    ::FW_directNotify( "#FHEMWEB:$_", "AutomowerConnectUpdateJson ( '$FW_ME/$type/$name/json' )", $EMPTY ) if ( $FW_ME );
   }
 
   $hash->{helper}{detailFnFirst} = 0;
@@ -713,11 +706,11 @@ sub APIAuth {
 
   if ( IsDisabled( $name ) ) {
 
-    if ( IsDisabled( $name ) == 1 and ReadingsVal( $name, 'device_state', '' ) ne 'disabled' ) {
+    if ( IsDisabled( $name ) == 1 and ReadingsVal( $name, 'device_state', $EMPTY ) ne 'disabled' ) {
 
       readingsSingleUpdate( $hash, 'device_state', 'disabled', 1 );
 
-    } elsif ( IsDisabled( $name ) == 2 and ReadingsVal( $name, 'device_state', '' ) ne 'temporarily disabled' ) {
+    } elsif ( IsDisabled( $name ) == 2 and ReadingsVal( $name, 'device_state', $EMPTY ) ne 'temporarily disabled' ) {
 
       readingsSingleUpdate( $hash, 'device_state', 'temporarily disabled', 1 );
 
@@ -731,9 +724,9 @@ sub APIAuth {
 
   if ( !$update && $init_done ) {
 
-    if ( ReadingsVal( $name,'.access_token','' ) and gettimeofday() < (ReadingsVal( $name, '.expires', 0 ) - 45 ) ) {
+    if ( ReadingsVal( $name,'.access_token',$EMPTY ) and gettimeofday() < (ReadingsVal( $name, '.expires', 0 ) - 45 ) ) {
 
-      $hash->{header} = { "Authorization", "Bearer ". ReadingsVal( $name,'.access_token','' ) };
+      $hash->{header} = { "Authorization", "Bearer ". ReadingsVal( $name,'.access_token',$EMPTY ) };
       readingsSingleUpdate( $hash, 'device_state', 'update', 1 );
       getMower( $hash );
 
@@ -778,7 +771,7 @@ sub APIAuthResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $statuscode = $param->{code} // '';
+  my $statuscode = $param->{code} // $EMPTY;
   my $iam = "$type $name APIAuthResponse:";
 
   Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
@@ -858,8 +851,8 @@ sub getMower {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $iam = "$type $name getMower:";
-  my $access_token = ReadingsVal($name,".access_token","");
-  my $provider = ReadingsVal($name,'.provider','');
+  my $access_token = ReadingsVal($name,".access_token",$EMPTY);
+  my $provider = ReadingsVal($name,'.provider',$EMPTY);
   my $client_id = $hash->{helper}->{client_id};
   my $timeout = AttrVal( $name, 'timeoutGetMower', $hash->{helper}->{timeout_getmower} );
 
@@ -887,7 +880,7 @@ sub getMowerResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $statuscode = $param->{code} // '';
+  my $statuscode = $param->{code} // $EMPTY;
   my $iam = "$type $name getMowerResponse:";
   my $mowerNumber = $hash->{helper}{mowerNumber};
   
@@ -922,10 +915,10 @@ sub getMowerResponse {
 
         }
 
-        my $foundMower = '0 => ' . $hash->{helper}{mowers}[0]{attributes}{system}{name} . ' ' . $hash->{helper}{mowers}[0]{id};
+        my $foundMower = '0 => ' . $hash->{helper}{mowers}[0]{attributes}{system}{name} . $SPACE . $hash->{helper}{mowers}[0]{id};
         for (my $i = 1; $i < $maxMower; $i++) {
 
-          $foundMower .= "\n" . $i .' => '. $hash->{helper}{mowers}[$i]{attributes}{system}{name} . ' ' . $hash->{helper}{mowers}[$i]{id};
+          $foundMower .= "\n" . $i .' => '. $hash->{helper}{mowers}[$i]{attributes}{system}{name} . $SPACE . $hash->{helper}{mowers}[$i]{id};
 
         }
 
@@ -992,7 +985,7 @@ sub processingMowerResponse {
 
       $hash->{helper}{searchpos} = [ dclone $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions}[0] ];
 
-      if ( AttrVal( $name, 'mapImageCoordinatesToRegister', '' ) eq '' ) {
+      if ( AttrVal( $name, 'mapImageCoordinatesToRegister', $EMPTY ) eq $EMPTY ) {
         posMinMax( $hash, $hash->{helper}{mowers}[$mowerNumber]{attributes}{positions} );
       }
 
@@ -1029,12 +1022,12 @@ sub processingMowerResponse {
 #########################
 sub getMowerWs {
   my $hash = shift;
-  my $endpoint = shift // '';
+  my $endpoint = shift // $EMPTY;
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $iam = "$type $name getMowerWs:";
-  my $access_token = ReadingsVal($name,'.access_token','');
-  my $provider = ReadingsVal($name,'.provider','');
+  my $access_token = ReadingsVal( $name, '.access_token', $EMPTY );
+  my $provider = ReadingsVal( $name, '.provider', $EMPTY );
   my $client_id = $hash->{helper}->{client_id};
   my $timeout = AttrVal( $name, 'timeoutGetMower', $hash->{helper}->{timeout_getmower} );
   my $callback = \&getMowerResponseWs;
@@ -1046,7 +1039,7 @@ sub getMowerWs {
   if ( $endpoint eq 'messages') { $callback = \&getEndpointResponse }
 
   ::HttpUtils_NonblockingGet( {
-    url        => $APIURL . '/mowers/' . $hash->{helper}{mower}{id} . ($endpoint ? '/' . $endpoint : ''),
+    url        => $APIURL . '/mowers/' . $hash->{helper}{mower}{id} . ($endpoint ? '/' . $endpoint : $EMPTY),
     timeout    => $timeout,
     hash       => $hash,
     method     => "GET",
@@ -1066,8 +1059,8 @@ sub getEndpointResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $statuscode = $param->{code} // '';
-  my $endpoint = $param->{endpoint} // '';
+  my $statuscode = $param->{code} // $EMPTY;
+  my $endpoint = $param->{endpoint} // $EMPTY;
   my $iam = "$type $name getEndpointResponse:";
 
   Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
@@ -1075,7 +1068,7 @@ sub getEndpointResponse {
 
   if ( !$err && $statuscode == 200 && $data) {
 
-    if ( $data eq '' ) {
+    if ( $data eq $EMPTY ) {
 
       Log3 $name, 2, "$iam no mower data present";
 
@@ -1138,7 +1131,7 @@ sub getMowerResponseWs {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $statuscode = $param->{code} // '';
+  my $statuscode = $param->{code} // $EMPTY;
   my $iam = "$type $name getMowerResponseWs:";
 
   Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
@@ -1146,7 +1139,7 @@ sub getMowerResponseWs {
    ## no critic (ProhibitDeepNests [complexity core maintenance])
   if( !$err && $statuscode == 200 && $data) {
 
-    if ( $data eq '' ) {
+    if ( $data eq $EMPTY ) {
 
       Log3 $name, 2, "$iam no mower data present";
 
@@ -1160,7 +1153,7 @@ sub getMowerResponseWs {
 
       } else {
 
-        $hash->{helper}{wsResult}{mower} = dclone( $result->{data} ) if ( AttrVal($name, 'debug', '') );
+        $hash->{helper}{wsResult}{mower} = dclone( $result->{data} ) if ( AttrVal($name, 'debug', $EMPTY) );
         $hash->{helper}{mower}{attributes} = dclone( $result->{data}{attributes} );
 
         if ( $hash->{helper}{use_position_polling} && $hash->{helper}{mower}{attributes}{capabilities}{position} ) {
@@ -1274,7 +1267,7 @@ sub Get {
 
   my ($pname,$setName,$setVal,$setVal2,$setVal3) = @val;
 
-  Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : "");
+  Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : $EMPTY);
 
   if ( $setName eq 'html' ) { ## no critic (ProhibitCascadingIfElse [complexity core maintenance pbp])
     
@@ -1326,7 +1319,7 @@ sub Set { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
 
   my ($pname,$setName,$setVal,$setVal2,$setVal3) = @val;
 
-  Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : '') if ( $setName !~ /^(?:\?|client_secret)$/ );
+  Log3 $name, 4, "$iam called with $setName " . ($setVal ? $setVal : $EMPTY) if ( $setName !~ /^(?:\?|client_secret)$/ );
 
   ########## Device Setter ##########
   if ( !$hash->{helper}{midnightCycle} && $setName eq 'getUpdate' ) { ## no critic (ProhibitCascadingIfElse [complexity core maintenance pbp])
@@ -1398,7 +1391,7 @@ sub Set { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
       return "$iam $passErr" if( $passErr );
 
       readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
+        readingsBulkUpdateIfChanged( $hash, '.access_token', $EMPTY, 0 );
         readingsBulkUpdateIfChanged( $hash, 'device_state', 'initialized');
         readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
       readingsEndUpdate($hash, 1);
@@ -1412,7 +1405,7 @@ sub Set { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
   } elsif ( $setName eq 'getNewAccessToken' ) {
 
     readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, '.access_token', '', 0 );
+      readingsBulkUpdateIfChanged( $hash, '.access_token', $EMPTY, 0 );
       readingsBulkUpdateIfChanged( $hash, 'device_state', 'initialized');
       readingsBulkUpdateIfChanged( $hash, 'mower_commandStatus', 'cleared');
     readingsEndUpdate($hash, 1);
@@ -1434,7 +1427,7 @@ sub Set { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
   ##########
   } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /$cmd_blocking/ && $setName eq 'headlight' 
     && $hash->{helper}{mower}{attributes}{capabilities}{headlights}) {
-    if ( $setVal =~ /^(ALWAYS_OFF|ALWAYS_ON|EVENING_ONLY|EVENING_AND_NIGHT)$/) {
+    if ( $setVal =~ /ALWAYS_OFF|ALWAYS_ON|EVENING_ONLY|EVENING_AND_NIGHT/) {
 
       CMD($hash ,$setName, $setVal);
 
@@ -1456,7 +1449,7 @@ sub Set { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
 
   ##########
   } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /$cmd_blocking/ && $setName =~ /confirmError/
-    && $hash->{helper}{mower}{attributes}{capabilities}{canConfirmError} && AttrVal( $name, 'testing', '' ) ) {
+    && $hash->{helper}{mower}{attributes}{capabilities}{canConfirmError} && AttrVal( $name, 'testing', $EMPTY ) ) {
 
     CMD($hash,$setName);
     return;
@@ -1476,7 +1469,7 @@ sub Set { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
 
   ##########
   } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /$cmd_blocking/ && $setName =~ /^(StartInWorkArea|cuttingHeightInWorkArea)$/
-    && $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && AttrVal( $name, 'testing', '' ) ) {
+    && $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && AttrVal( $name, 'testing', $EMPTY ) ) {
 
     ( $setVal, $setVal2 ) = $setVal =~ /(.*),(\d+)/ if ( $setVal =~/,/ && !defined( $setVal2 ) );
     my $id = undef;
@@ -1493,7 +1486,7 @@ sub Set { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
 
   ##########
   } elsif ( ReadingsVal( $name, 'device_state', 'defined' ) !~ /$cmd_blocking/ && $setName =~ /^stayOutZone$/
-    && $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && AttrVal( $name, 'testing', '' ) ) {
+    && $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && AttrVal( $name, 'testing', $EMPTY ) ) {
 
     ( $setVal, $setVal2 ) = $setVal =~ /(.*),(enable|disable)/ if ( $setVal =~/,/ && ! defined( $setVal2 ) );
     my $id = undef;
@@ -1512,32 +1505,32 @@ sub Set { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
   }
   ##########
   my $ret = ' getNewAccessToken:noArg ParkUntilFurtherNotice:noArg ParkUntilNextSchedule:noArg Pause:noArg Start:selectnumbers,30,30,600,0,lin Park:selectnumbers,30,30,600,0,lin ResumeSchedule:noArg getUpdate:noArg client_secret getMessages:noArg ';
-  $ret .= AttrVal( $name, 'mowerAutoSyncTime', 0 ) ? '' : 'dateTime:noArg ';
+  $ret .= AttrVal( $name, 'mowerAutoSyncTime', 0 ) ? $EMPTY : 'dateTime:noArg ';
   $ret .= 'mowerScheduleToAttribute:noArg sendScheduleFromAttributeToMower:noArg ';
   $ret .= 'cuttingHeight:1,2,3,4,5,6,7,8,9 ' if ( defined $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} );
   $ret .= 'defaultDesignAttributesToAttribute:noArg mapZonesTemplateToAttribute:noArg chargingStationPositionToAttribute:noArg ' if ( $hash->{helper}{mower}{attributes}{capabilities}{position} );
   $ret .= 'headlight:ALWAYS_OFF,ALWAYS_ON,EVENING_ONLY,EVENING_AND_NIGHT ' if ( $hash->{helper}{mower}{attributes}{capabilities}{headlights} );
 
   ##########
-  if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && defined ( $hash->{helper}{mower}{attributes}{workAreas} ) && AttrVal( $name, 'testing', '' ) ) {
+  if ( $hash->{helper}{mower}{attributes}{capabilities}{workAreas} && defined ( $hash->{helper}{mower}{attributes}{workAreas} ) && AttrVal( $name, 'testing', $EMPTY ) ) {
 
     my @ar = @{ $hash->{helper}{mower}{attributes}{workAreas} };
     my @anlist = map { ','.$_->{name} } @ar;
-    $ret .= 'cuttingHeightInWorkArea:widgetList,'.(scalar @anlist + 1).',select'.join('',@anlist).',6,selectnumbers,0,10,100,0,lin ';
-    $ret .= 'StartInWorkArea:widgetList,'.(scalar @anlist + 1).',select'.join('',@anlist).',6,selectnumbers,0,30,600,0,lin ';
+    $ret .= 'cuttingHeightInWorkArea:widgetList,'.(scalar @anlist + 1).',select'.join( $EMPTY, @anlist).',6,selectnumbers,0,10,100,0,lin ';
+    $ret .= 'StartInWorkArea:widgetList,'.(scalar @anlist + 1).',select'.join($EMPTY,@anlist).',6,selectnumbers,0,30,600,0,lin ';
 
   }
 
   ##########
-  if ( $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && defined ( $hash->{helper}{mower}{attributes}{stayOutZones}{zones} ) && AttrVal( $name, 'testing', '' ) ) {
+  if ( $hash->{helper}{mower}{attributes}{capabilities}{stayOutZones} && defined ( $hash->{helper}{mower}{attributes}{stayOutZones}{zones} ) && AttrVal( $name, 'testing', $EMPTY ) ) {
 
     my @so = @{ $hash->{helper}{mower}{attributes}{stayOutZones}{zones} };
     my @solist = map { ','.$_->{name} } @so;
-    $ret .= 'stayOutZone:widgetList,'.(scalar @solist + 1).',select'.join('',@solist).',3,select,enable,disable ';
+    $ret .= 'stayOutZone:widgetList,'.(scalar @solist + 1).',select'.join($EMPTY,@solist).',3,select,enable,disable ';
 
   }
 
-  $ret .= 'confirmError:noArg ' if ( $hash->{helper}{mower}{attributes}{capabilities}{canConfirmError} && AttrVal( $name, 'testing', '' ) );
+  $ret .= 'confirmError:noArg ' if ( $hash->{helper}{mower}{attributes}{capabilities}{canConfirmError} && AttrVal( $name, 'testing', $EMPTY ) );
   $ret .= 'resetCuttingBladeUsageTime ' if ( defined( $hash->{helper}{mower}{attributes}{statistics}{cuttingBladeUsageTime} ) );
   return "Unknown argument $setName, choose one of".$ret;
   
@@ -1558,7 +1551,7 @@ sub CMD { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
   my $method = 'POST';
   my $ts = time();
   my $tz_name = AttrVal( $name, 'mowerTimeZone', $hash->{helper}{timeZoneName} );
-  $hash->{helper}{mower_commandSend} = $cmd[ 0 ] . ( $cmd[ 1 ] ? ' '.$cmd[ 1 ] : '' ) . ( $cmd[ 2 ] ? ' '.$cmd[ 2 ] : '' );
+  $hash->{helper}{mower_commandSend} = $cmd[ 0 ] . ( $cmd[ 1 ] ? $SPACE.$cmd[ 1 ] : $EMPTY ) . ( $cmd[ 2 ] ? $SPACE.$cmd[ 2 ] : $EMPTY );
 
   if ( IsDisabled( $name ) ) {
 
@@ -1568,12 +1561,12 @@ sub CMD { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
   }
 
   my $client_id = $hash->{helper}->{client_id};
-  my $token = ReadingsVal($name,'.access_token','');
-  my $provider = ReadingsVal($name,'.provider','');
+  my $token = ReadingsVal($name,'.access_token',$EMPTY);
+  my $provider = ReadingsVal($name,'.provider',$EMPTY);
   my $mower_id = $hash->{helper}{mower}{id};
 
-  my $json = '';
-  my $post = '';
+  my $json = $EMPTY;
+  my $post = $EMPTY;
 
 my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nAuthorization: Bearer " . $token . "\r\nAuthorization-Provider: " . $provider . "\r\nContent-Type: application/vnd.api+json";
 
@@ -1595,15 +1588,15 @@ my $header = "Accept: application/vnd.api+json\r\nX-Api-Key: ".$client_id."\r\nA
   elsif ($cmd[0] eq 'stayOutZone')     { $json = '{"data": {"type":"stayOutZone","id":"'.$cmd[1].'","attributes":{"enable": '.$cmd[2].'}}}'; $post = 'stayOutZones/' . $cmd[1]; $method = 'PATCH' }
   elsif ($cmd[0] eq 'confirmError')    { $json = '{}'; $post = 'errors/confirm' }
   elsif ($cmd[0] eq 'resetCuttingBladeUsageTime') { $json = '{}'; $post = 'statistics/resetCuttingBladeUsageTime' }
-  elsif ($cmd[0] eq 'sendScheduleFromAttributeToMower' && AttrVal( $name, 'mowerSchedule', '')) {
+  elsif ($cmd[0] eq 'sendScheduleFromAttributeToMower' && AttrVal( $name, 'mowerSchedule', $EMPTY)) {
 
-    my $perl = eval { JSON::XS->new->decode (AttrVal( $name, 'mowerSchedule', '')) };
+    my $perl = eval { JSON::XS->new->decode (AttrVal( $name, 'mowerSchedule', $EMPTY)) };
     return "$iam decode error: $@ \n $perl" if ($@);
     
     my $jsonSchedule = eval { JSON::XS->new->utf8( not $unicodeEncoding )->encode ($perl) };
     return "$iam encode error: $@ \n $jsonSchedule" if ($@);
     
-    $hash->{helper}{mower_commandSend} .= ' '. $jsonSchedule;
+    $hash->{helper}{mower_commandSend} .= $SPACE. $jsonSchedule;
     $json = '{"data":{"type": "calendar","attributes":{"tasks":'.$jsonSchedule.'}}}'; 
     $post = 'calendar';
   }
@@ -1642,7 +1635,7 @@ sub CMDResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $statuscode = $param->{code} // '';
+  my $statuscode = $param->{code} // $EMPTY;
   my $iam = "$type $name CMDResponse:";
 
   Log3 $name, 1, "$iam response time ". sprintf( "%.2f", ( gettimeofday() - $param->{t_begin} ) ) . ' s' if ( $param->{timeout} == 60 );
@@ -1752,9 +1745,9 @@ sub Attr { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
 
     } elsif( $cmd eq 'del' ) {
 
-      $hash->{helper}{MAP_PATH} = '';
-      $hash->{helper}{MAP_CACHE} = '';
-      $hash->{helper}{MAP_MIME} = '';
+      $hash->{helper}{MAP_PATH} = $EMPTY;
+      $hash->{helper}{MAP_CACHE} = $EMPTY;
+      $hash->{helper}{MAP_MIME} = $EMPTY;
       Log3 $name, 3, "$iam $cmd $attrName";
 
     }
@@ -1883,13 +1876,13 @@ sub Attr { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
 
     if( $cmd eq 'set' ) {
 
-      if ( AttrVal( $name,'mapImageCoordinatesToRegister', '' ) && $attrVal =~ /(?<x1>-?\d*\.?\d+)\s(?<y1>-?\d*\.?\d+) #upper left coordinates
+      if ( AttrVal( $name,'mapImageCoordinatesToRegister', $EMPTY ) && $attrVal =~ /(?<x1>-?\d*\.?\d+)\s(?<y1>-?\d*\.?\d+) #upper left coordinates
                                                                                 (?:\R|\s)
                                                                                 (?<x2>-?\d*\.?\d+)\s(?<y2>-?\d*\.?\d+) #lower right coordinates
                                                                                /x ) {
 
         my ( $x1, $y1, $x2, $y2 ) = ( $+{x1}, $+{y1}, $+{x2}, $+{y2} );
-        AttrVal( $name,'mapImageCoordinatesToRegister', '' ) =~ /(?<lo1>-?\d*\.?\d+)\s(?<la1>-?\d*\.?\d+) #upper left coordinates
+        AttrVal( $name,'mapImageCoordinatesToRegister', $EMPTY ) =~ /(?<lo1>-?\d*\.?\d+)\s(?<la1>-?\d*\.?\d+) #upper left coordinates
                                                                  (?:\R|\s)
                                                                  (?<lo2>-?\d*\.?\d+)\s(?<la2>-?\d*\.?\d+) #lower right coordinates
                                                                 /x;
@@ -1986,7 +1979,7 @@ sub Attr { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
         my %ORDER=(start=>1,duration=>2,monday=>3,tuesday=>4,wednesday=>5,thursday=>6,friday=>7,saturday=>8,sunday=>9,workAreaId=>10);
         JSON::PP->new->sort_by(
           sub {($ORDER{$JSON::PP::a} // 999) <=> ($ORDER{$JSON::PP::b} // 999) or $JSON::PP::a cmp $JSON::PP::b}) ## no critic (ProhibitPackageVars)
-          ->pretty(1)->encode( $perl ) ## no critic (ProhibitPackageVars)
+          ->pretty(1)->encode( $perl )
       };
       return "$iam $cmd $attrName encode error: $@ \n $attrVal" if ($@);
 
@@ -2208,8 +2201,8 @@ sub resetLastErrorIfCorrected {
     $hash->{helper}{lasterror}{positions} = [];
     $hash->{helper}{lasterror}{timestamp} = 0;
     $hash->{helper}{lasterror}{errordesc} = '-';
-    $hash->{helper}{lasterror}{errordate} = '';
-    $hash->{helper}{lasterror}{errorstate} = '';
+    $hash->{helper}{lasterror}{errordate} = $EMPTY;
+    $hash->{helper}{lasterror}{errorstate} = $EMPTY;
     FW_detailFn_Update ($hash);
 
   }
@@ -2221,8 +2214,8 @@ sub resetLastErrorIfCorrected {
 sub ZoneHandling {
   my ( $hash, $poshash, $cnt ) = @_;
   my $name = $hash->{NAME};
-  my $zone = '';
-  my $nextzone = '';
+  my $zone = $EMPTY;
+  my $nextzone = $EMPTY;
   my @pos = @{$poshash};
   my $longitude = 0;
   my $latitude = 0;
@@ -2338,7 +2331,7 @@ sub calcPathLength {
   my $k = 0;
   my @xyarr  = @{$hash->{helper}{areapos}};# areapos
   my $n = scalar @xyarr;
-  my ($sclon, $sclat) = AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . ' ' .$hash->{helper}{scaleToMeterLatitude}) =~ /(-?\d+)\s+(-?\d+)/;
+  my ($sclon, $sclat) = AttrVal($name,'scaleToMeterXY', $hash->{helper}{scaleToMeterLongitude} . $SPACE .$hash->{helper}{scaleToMeterLatitude}) =~ /(-?\d+)\s+(-?\d+)/;
   my $lsum = 0;
 
   for ( $k = $istart; $k < $i; $k++) {
@@ -2473,7 +2466,7 @@ sub readMap {
     if ( open my $fh, '<:raw', $filename ) { ## no critic (RequireBriefOpen [core maintenance pbp])
 
 
-      my $content = '';
+      my $content = $EMPTY;
 
       while (1) {
 
@@ -2546,7 +2539,7 @@ sub posMinMax {
   $hash->{helper}{minLat} = $minLat;
   $hash->{helper}{maxLat} = $maxLat;
   $hash->{helper}{posMinMax} = "$minLon $maxLat\n$maxLon $minLat";
-  $hash->{helper}{imageWidthHeight} = int($hash->{helper}{imageHeight} * ($maxLon-$minLon) / ($maxLat-$minLat)) . ' ' . $hash->{helper}{imageHeight} if ($maxLat-$minLat);
+  $hash->{helper}{imageWidthHeight} = int($hash->{helper}{imageHeight} * ($maxLon-$minLon) / ($maxLat-$minLat)) . $SPACE . $hash->{helper}{imageHeight} if ($maxLat-$minLat);
 
   return;
 }
@@ -2561,7 +2554,7 @@ sub fillReadings {
   $model =~ s/AUTOMOWER./AM/;
   readingsBulkUpdateIfChanged( $hash, 'model', $model );
   my $pref = 'mower';
-  my $rval = ReadingsVal( $name, $pref.'_inactiveReason', '' );
+  my $rval = ReadingsVal( $name, $pref.'_inactiveReason', $EMPTY );
 
   if ( !$rval && $hash->{helper}{mower}{attributes}{$pref}{inactiveReason} !~ /NONE/ ) {
     readingsBulkUpdateIfChanged( $hash, $pref.'_inactiveReason', $hash->{helper}{mower}{attributes}{$pref}{inactiveReason} );
@@ -2670,11 +2663,11 @@ sub calculateStatistics { ## no critic (ProhibitExcessComplexity [complexity cor
 
         for (@zonekeys){ 
       $hash->{helper}{mapZones}{$_}{lastDayCntPct} = $hash->{helper}{mapZones}{$_}{currentDayCntPct};
-      $hash->{helper}{mapZones}{$_}{currentWeekCntPct} = ( $sumCurrentWeekCnt ? sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekCnt} / $sumCurrentWeekCnt * 100 ) : '' );
+      $hash->{helper}{mapZones}{$_}{currentWeekCntPct} = ( $sumCurrentWeekCnt ? sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekCnt} / $sumCurrentWeekCnt * 100 ) : $EMPTY );
       $hash->{helper}{mapZones}{$_}{lastDayAreaPct} = $hash->{helper}{mapZones}{$_}{currentDayAreaPct};
-      $hash->{helper}{mapZones}{$_}{currentWeekAreaPct} = ( $sumCurrentWeekArea ? sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekArea} / $sumCurrentWeekArea * 100 ) : '' );
-      $hash->{helper}{mapZones}{$_}{currentDayCntPct} = '';
-      $hash->{helper}{mapZones}{$_}{currentDayAreaPct} = '';
+      $hash->{helper}{mapZones}{$_}{currentWeekAreaPct} = ( $sumCurrentWeekArea ? sprintf( "%.0f", $hash->{helper}{mapZones}{$_}{currentWeekArea} / $sumCurrentWeekArea * 100 ) : $EMPTY );
+      $hash->{helper}{mapZones}{$_}{currentDayCntPct} = $EMPTY;
+      $hash->{helper}{mapZones}{$_}{currentDayAreaPct} = $EMPTY;
       if ( $hash->{helper}{additional_polling} ) {
         $hash->{helper}{mapZones}{$_}{lastDayCollisions} = ( $hash->{helper}{mapZones}{$_}{currentDayCollisions} ? $hash->{helper}{mapZones}{$_}{currentDayCollisions} : 0 );
         $hash->{helper}{mapZones}{$_}{currentWeekCollisions} += ( $hash->{helper}{mapZones}{$_}{currentDayCollisions} ? $hash->{helper}{mapZones}{$_}{currentDayCollisions} : 0 );
@@ -2704,8 +2697,8 @@ sub calculateStatistics { ## no critic (ProhibitExcessComplexity [complexity cor
         $hash->{helper}{mapZones}{$_}{lastWeekAreaPct} = $hash->{helper}{mapZones}{$_}{currentWeekAreaPct};
         $hash->{helper}{mapZones}{$_}{lastWeekTrack} = $hash->{helper}{mapZones}{$_}{currentWeekTrack};
         $hash->{helper}{mapZones}{$_}{lastWeekTime} = $hash->{helper}{mapZones}{$_}{currentWeekTime};
-        $hash->{helper}{mapZones}{$_}{currentWeekCntPct} = '';
-        $hash->{helper}{mapZones}{$_}{currentWeekAreaPct} = '';
+        $hash->{helper}{mapZones}{$_}{currentWeekCntPct} = $EMPTY;
+        $hash->{helper}{mapZones}{$_}{currentWeekAreaPct} = $EMPTY;
         $hash->{helper}{mapZones}{$_}{currentWeekTrack} = 0;
         $hash->{helper}{mapZones}{$_}{currentWeekTime} = 0;
         if ( $hash->{helper}{additional_polling} ) {
@@ -2739,7 +2732,7 @@ sub listStatisticsData { ## no critic (ProhibitExcessComplexity [complexity core
       Track      => 'm',
       Area       => 'qm',
       Time       => 's',
-      Collisions => ' ',
+      Collisions => $SPACE,
       CntPct     => '%',
       AreaPct    => '%'
     );
@@ -2748,7 +2741,7 @@ sub listStatisticsData { ## no critic (ProhibitExcessComplexity [complexity core
     my $additional_polling = $hash->{helper}{additional_polling};
     my $name = $hash->{NAME};
     my $cnt = 0;
-    my $ret = '';
+    my $ret = $EMPTY;
     $ret .= '<html><table class="block wide">';
     $ret .= '<caption><b>Statistics Data</b></caption><tbody>'; 
 
@@ -2795,7 +2788,7 @@ sub listStatisticsData { ## no critic (ProhibitExcessComplexity [complexity core
 
             } else {
 
-              $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>'. $item . $prop . '</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{$item.$prop} ? $hash->{helper}{mapZones}{$_}{$item.$prop} : '' ) . ' </td><td> ' . $unit{$prop} . ' </td></tr>';
+              $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ) . '"><td> $hash->{helper}{mapZones}{' . $_ . '}{<b>'. $item . $prop . '</b>} &emsp;</td><td> ' . ( $hash->{helper}{mapZones}{$_}{$item.$prop} ? $hash->{helper}{mapZones}{$_}{$item.$prop} : $EMPTY ) . ' </td><td> ' . $unit{$prop} . ' </td></tr>';
 
             }
 
@@ -2834,7 +2827,7 @@ sub listMowerData {  ## no critic (ProhibitExcessComplexity [complexity core mai
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
   my $cnt = 0;
-  my $ret = '';
+  my $ret = $EMPTY;
   if ( $init_done && defined( $hash->{helper}{mower}{type} ) ) {
 
     $ret .= '<html><table class="block wide">';
@@ -3162,9 +3155,9 @@ sub getDesignAttr {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};             
   my @designDefault = split( /\R/,$hash->{helper}{mapdesign} );
-  my @designAttr = split( /\R/, AttrVal( $name, 'mapDesignAttributes', '' ) );
-  my $hsh = '';
-  my $val = '';
+  my @designAttr = split( /\R/, AttrVal( $name, 'mapDesignAttributes', $EMPTY ) );
+  my $hsh = $EMPTY;
+  my $val = $EMPTY;
   ## no critic (ProhibitComplexMappings [complexity core maintenance pbp])
   my %desDef = map { ( $hsh, $val ) = $_ =~ /(.*)=(.*)/; $hsh => $val } @designDefault;
   %desDef = ( %desDef, map { ( $hsh, $val ) = $_ =~ /(.*)=(.*)/; $hsh => $val } @designAttr );
@@ -3302,7 +3295,7 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
 
     for my $buf (@bufj) { # process each buffer part
 
-      if ( $buf =~ /((position|mower|battery|planner|cuttingHeight|headLights|calendar|message)-event-v2)/ ) { # pass only correct event types and count dubletts
+      if ( $buf =~ /((position|mower|battery|planner|cuttingHeight|headlights|calendar|message)-event-v2)/ ) { # pass only correct event types and count dubletts
 
         my $evt = $1;
         my $evn = $2;
@@ -3419,10 +3412,10 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
 
               }
 
-# headLights-event-v2
-              elsif ( $result->{type} =~ /^hea/ ) { #no headLight event 430x
+# headlights-event-v2
+              elsif ( $result->{type} =~ /^hea/ ) { #no headlight event 430x
 
-                $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} = $result->{attributes}{headLight}{mode};
+                $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} = $result->{attributes}{headlight}{mode};
 
               }
 
