@@ -154,6 +154,7 @@
 # 6.02.4    fix: checking os regarding command hostname
 # 6.03      new: commands script_start, script_stop
 #           fix: recognition of ShellyI4Gen3
+# 6.03.1    change of some log levels
 
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
@@ -177,7 +178,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.03 24.02.2025";
+my $version = "6.03.1 18.03.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -962,28 +963,6 @@ sub Shelly_Define($$) {   # use Socket;
           Log 1,"[Shelly_define] \'$portnumber' is not a valid port number";
           return "port number \'$portnumber' is not valid";
       }
-      #******
-if(0){
-      use IO::Socket::INET;
-      # Connect to TCP socket
-  my $socket = new IO::Socket::INET(
-    PeerHost => $definit,
-    PeerPort => $portnumber,
-    Proto => 'tcp',
-    Timeout => 3);
-  if ($socket){
-    # We are connected...
-    my $buffer = "";
-    my $length = 1024;
-    $socket->recv($buffer, $length);    
-    $socket->close();
-    Log 0,"OK - got message '$buffer'";
-  }else{
-    # Connection failed
-    Log 0,"Connection to $definit\:$portnumber failed";
-  }
-}
-      #******
     }else{
       Log 4,"[Shelly_define] no port number given";
     }
@@ -1891,7 +1870,7 @@ sub Shelly_Attr(@) {
           Log3 $name,1,"[Shelly_Attr] $name\: $error ";
           return $error;
     }
-    if(1&& $init_done && $hash->{INTERVAL} != 0 ){
+    if( $init_done && $hash->{INTERVAL} != 0 ){
       RemoveInternalTimer($hash,"Shelly_getEMvalues");
       InternalTimer(time()+$attrVal, "Shelly_getEMvalues", $hash);
     }
@@ -4403,7 +4382,7 @@ sub Shelly_status2G {
   my $timer = $hash->{INTERVAL};  # timer in seconds for next update of status via Shelly_status()
   if( $hash->{helper}{timer}>0 ){
      $timer=$hash->{helper}{timer}; 
-     Log3 $name,2,"$name have set timer=$timer to helper";
+     Log3 $name,5,"$name have set timer=$timer to helper";
   }
 
   readingsBeginUpdate($hash);
@@ -4731,7 +4710,7 @@ sub Shelly_status2G {
           Shelly_readingsBulkUpdate($hash,"energy".$subs,$energy,"energy/Wh");
           # Energy consumption by minute (in Milliwatt-hours) for the last minute, is cumulated while minute restarts
          ## $minutes = shelly_energy_fmt($hash,$jhash->{$CC}{aenergy}{by_minute}[0],"mWh"); # 
-          Shelly_readingsBulkUpdate($hash,"energy_lastMinute".$subs,$jhash->{$CC}{aenergy}{by_minute}[0],"energy/mWh") if(1); 
+          Shelly_readingsBulkUpdate($hash,"energy_lastMinute".$subs,$jhash->{$CC}{aenergy}{by_minute}[0],"energy/mWh"); 
           # Returned Energy available with suitable devices/mode only, eg. ShellyPro1PM
           $ret_energy= $jhash->{$CC}{ret_aenergy}{total};
           if( defined($ret_energy) ){
@@ -4771,7 +4750,7 @@ sub Shelly_status2G {
             $tmrDur =  round($tmrDur,1);
             Log3 $name,4,"[Shelly_status2G:tmr] $name calculated timer$subs from start and duration is $tmrDur"; #5
          }
-Log3 $name,6,"[Shelly_status2G:timex] $name calculated update timer is $timer vs duration=$tmrDur"; #5
+Log3 $name,6,"[Shelly_status2G:timer] $name calculated update timer is $timer vs duration=$tmrDur"; #5
 #         $timer = minNum( $timer, $tmrDur ); 
          $timer = $hash->{INTERVAL}>0 ? minNum( $hash->{INTERVAL},$tmrDur ) : $tmrDur;# 
          Log3 $name,6,"[Shelly_status2G:timer] $name calculated update timer is $timer"; #5
@@ -6365,9 +6344,9 @@ sub Shelly_webhook_create {
   #return "Error"  unless( $cmd =~ /info|all/ || $cmd =~ /\d/ );
 
   if( $cmd eq "info"){
-      Log3 $name,2,"[Shelly_webhook_create] generating list of possible webhook(s) for device $name";
+      Log3 $name,4,"[Shelly_webhook_create] generating list of possible webhook(s) for device $name";
   }elsif($cmd eq "all" ){
-      Log3 $name,2,"[Shelly_webhook_create] creating all webhooks for device $name";
+      Log3 $name,4,"[Shelly_webhook_create] creating all webhooks for device $name";
         delete $hash->{helper}{actionCreate};
   }elsif( $cmd =~ /\d/ ){
       $number = $cmd;
