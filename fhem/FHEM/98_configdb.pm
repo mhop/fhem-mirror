@@ -248,6 +248,8 @@ sub _cfgDB_readConfig() {
 			$cfgDB_dbtype ="POSTGRESQL";
 		} elsif ($cfgDB_dbconn =~ m/mysql:/i) {
 			$cfgDB_dbtype = "MYSQL";
+		} elsif ($cfgDB_dbconn =~ m/mariadb:/i) {
+			$cfgDB_dbtype = "MARIADB";
 		} elsif ($cfgDB_dbconn =~ m/sqlite:/i) {
 			$cfgDB_dbtype = "SQLITE";
 		} else {

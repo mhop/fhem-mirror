@@ -245,6 +245,7 @@ sub _cfgDB_dump;
 sub _cfgDB_knownAttr;
 sub _cfgDB_deleteRF;
 sub _cfgDB_deleteStatefiles;
+sub _cfgDB_isMysqlType;
 
 ##################################################
 # Read configuration file for DB connection
@@ -297,6 +298,8 @@ if($cfgDB_dbconn =~ m/pg:/i) {
       $cfgDB_dbtype ="POSTGRESQL";
    } elsif ($cfgDB_dbconn =~ m/mysql:/i) {
       $cfgDB_dbtype = "MYSQL";
+   } elsif ($cfgDB_dbconn =~ m/mariadb:/i) {
+      $cfgDB_dbtype = "MARIADB";
    } elsif ($cfgDB_dbconn =~ m/sqlite:/i) {
       $cfgDB_dbtype = "SQLITE";
       (undef,$cfgDB_filename) = split(/=/,$cfgDB_dbconn);
@@ -364,7 +367,8 @@ sub cfgDB_Init {
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
 
 #	create TABLE fhemb64filesave if nonexistent
-	if($cfgDB_dbtype eq "MYSQL") {
+#	if($cfgDB_dbtype eq "MYSQL") {
+	if(_cfgDB_isMysqlType($cfgDB_dbtype)) {
 		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemb64filesave(filename TEXT, content MEDIUMBLOB)");
 	} elsif ($cfgDB_dbtype eq "POSTGRESQL") {
 		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemb64filesave(filename TEXT, content bytea)");
@@ -1231,7 +1235,8 @@ sub _cfgDB_dump {
       $ret        = qx($dumpcmd);
       return $ret if $ret; # return error message if available
 
-   } elsif ($dbtype eq 'MYSQL') {
+#   } elsif ($dbtype eq 'MYSQL') {
+   } elsif (_cfgDB_isMysqlType($dbtype)) {
       ($dbname,$dbhostname,$dbport) = split (/;/,$dbconn);
       $dbport //= '=3306';
       (undef,$dbname)     = split (/=/,$dbname);
@@ -1334,6 +1339,10 @@ sub _cfgDB_deleteStatefiles {
    $fhem_dbh->disconnect();
 }
 
+sub _cfgDB_isMysqlType {
+   my $type = shift();
+   return ($type eq 'MYSQL' || $type eq 'MARIADB');
+}
 ##################################################
 # functions used for file handling
 # called by 98_configdb.pm
