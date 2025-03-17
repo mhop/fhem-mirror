@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: configDB: add support for mariadb connections
  - change:  74_AutomowerConnect: add new error codes, implement new spelling of
                          headlight-event-v2, named space and named empty string
  - feature: 76_SolarForecast: add Beam graphic layer 3
