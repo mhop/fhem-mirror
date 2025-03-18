@@ -316,7 +316,7 @@ sub _cfgDB_readConfig() {
 		<b>Prerequisits / Installation</b><br/>
 		<ul><br/>
 		<li>Please install perl package Text::Diff if not already installed on your system.</li><br/>
-		<li>You must have access to a SQL database. Supported database types are SQLITE, MYSQL and POSTGRESQL.</li><br/>
+		<li>You must have access to a SQL database. Supported database types are SQLITE, MYSQL/MARIADB and POSTGRESQL.</li><br/>
 		<li>The corresponding DBD module must be available in your perl environment,<br/>
 				e.g. sqlite3 running on a Debian systems requires package libdbd-sqlite3-perl</li><br/>
 		<li>Create an empty database, e.g. with sqlite3:<br/>
@@ -341,6 +341,15 @@ sub _cfgDB_readConfig() {
 			</ul>
 			<br/>
 			<pre>
+## for MariaDB
+################################################################
+#%dbconfig= (
+#	connection => "MariaDB:database=configdb;host=127.0.0.1;port=3306",
+#	user => "fhemuser",
+#	password => "fhempassword",
+#);
+################################################################
+#
 ## for MySQL
 ################################################################
 #%dbconfig= (
