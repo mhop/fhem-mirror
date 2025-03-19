@@ -160,7 +160,17 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.47.2" => "07.03.2025  __getDWDSolarData: change calc when af == 0",
+  "1.49.0" => "19.03.2025  _listDataPoolApiData: fix warning item1, new option OpenMeteoDWD_D2-API with preparation for satellite support ".
+                           "add Attr graphicBeamHeightLevel3, Compatibility of Rad1h data between DWD and OpenMeteo established ".
+                           "set reset aiData deletes raw data also, _transferAPIRadiationValues: AI PV estimate limited to inverter capacity summary ".
+                           "__calcPVestimates: pv power summary of all strings connected to inverter limited to inverter capacity summary ".
+						   "_batChargeRecmd: fix calc if more than one batteries are installed ",
+  "1.48.0" => "14.03.2025  edit commandref, add graphicBeam layer 5 and 6, attr ctrlAIdataStorageDuration, ctrlAIshiftTrainStart removed ",
+  "1.47.3" => "11.03.2025  adjust weather_ids and management of significant weather, _calcDataEveryFullHour: change attrInvChangedTs Management ".
+                           "split __batteryOnBeam into _beamFillupBatValues and itself, expand bat key 'show' by top, bottom ".
+                           "__getDWDSolarData: use always diffuse radiation as part of global radiation ",
+  "1.47.2" => "09.03.2025  __getDWDSolarData: change calc when af == 0, aiAddInstance: add weatherid property ".
+                           "overwrite wcc = 0 if wid = 0 -> give wid priority over wcc ",
   "1.47.1" => "07.03.2025  __substituteIcon: consider Tooltip content if ctrlBatSocManagementXX is set ",
   "1.47.0" => "05.03.2025  aiInit: change AI init sequence, use Random Forest with Ensemble algorithm, use Scalar::Util ".
                            "_beamGraphic.*: change decimal places für battery SoC, set aiDecTree: change addInstances to addInstAndTrain ".
@@ -426,7 +436,7 @@ use constant {
   OMETEOREPDEF   => 900,                                                            # default Abrufintervall Open-Meteo API (s)
   VRMAPIREPDEF   => 300,                                                            # default Abrufintervall Victron VRM API Forecast
   SOLCMAXREQDEF  => 50,                                                             # max. täglich mögliche Requests SolCast API
-  OMETMAXREQ     => 9700,                                                           # Beschränkung auf max. mögliche Requests Open-Meteo API
+  OMETMAXREQ     => 8000,                                                           # Beschränkung auf max. mögliche Requests Open-Meteo API
   LEADTIME       => 3600,                                                           # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
   LAGTIME        => 1800,                                                           # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
 
@@ -456,6 +466,10 @@ use constant {
   B3FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 3
   B4COLDEF        => 'DBDBD0',                                                      # default Farbe Beam 4
   B4FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 4
+  B5COLDEF        => 'A3C8FF',                                                      # default Farbe Beam 5
+  B5FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 5
+  B6COLDEF        => 'ABABAB',                                                      # default Farbe Beam 6
+  B6FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 6
   FGCDDEF         => 130,                                                           # Abstand Verbrauchericons zueinander
 
   FGSCALEDEF      => 0.10,                                                          # Flußgrafik: Scale Normativ Icons
@@ -563,10 +577,10 @@ my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    disable
                    flowGraphicControl graphicBeamWidth
-                   graphicBeamHeightLevel1 graphicBeamHeightLevel2
-                   graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content
-                   graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color
-                   graphicBeam1FontColor graphicBeam2FontColor graphicBeam3FontColor graphicBeam4FontColor
+                   graphicBeamHeightLevel1 graphicBeamHeightLevel2 graphicBeamHeightLevel3
+                   graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content graphicBeam5Content graphicBeam6Content
+                   graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color graphicBeam5Color graphicBeam6Color
+                   graphicBeam1FontColor graphicBeam2FontColor graphicBeam3FontColor graphicBeam4FontColor graphicBeam5FontColor graphicBeam6FontColor
                    graphicEnergyUnit graphicHeaderOwnspec graphicHeaderOwnspecValForm
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
@@ -1050,13 +1064,29 @@ my %htitles = (                                                                 
                 DE => qq{Die Wetterdaten sind veraltet.\nPr&uuml;fen sie die Anlage mit 'set <NAME> plantConfiguration check'.}                                                         },
 );
 
+# Wetterintertretation
+# https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/01_num_vorhersagemodelle/01c_wetterinterpretation/wetter_interpretation.pdf?__blob=publicationFile&v=7
+#
+# Falls keiner ww-Schlüssel >= 45 eintritt, wird das Wetter als nicht signifikant eingestuft. An
+# Gitterpunkten ohne signifikantes Wetter wird der Gesamtbedeckungsgrad, verschlüsselt
+#
+# Wenn ferner keine der zuvor genannten Nebelbedingungen erfüllt ist, wird lediglich der
+# Gesamtbedeckungsgrad verschlüsselt.
+#  0.00 % -   6.25 % dann ww=0,
+#  6.25 % -  43.75 % dann ww=1,
+# 43.75 % -  81.25 % dann ww=2,
+# 81.25 % - 100.00 % dann ww=3,
+#
+# ww = 00 wolkenlos
+# ww = 01 leicht bewölkt
+# ww = 02 wolkig
+# ww = 03 stark bewölkt bis bedeckt
+#################################################
 my %weather_ids = (
-  # s =>  0 , 0 - 3   DWD -> kein signifikantes Wetter
-  # s =>  1 , 45 - 99 DWD -> signifikantes Wetter
   '0'   => { s => '0', icon => 'weather_sun',                       txtd => 'wolkenloser Himmel',                                                       txte => 'cloudless sky'                                                              },
-  '1'   => { s => '0', icon => 'weather_cloudy_light',              txtd => 'Bewölkung abnehmend',                                                      txte => 'Cloudiness decreasing'                                                      },
-  '2'   => { s => '0', icon => 'weather_cloudy',                    txtd => 'Bewölkung unverändert',                                                    txte => 'Cloudiness unchanged'                                                       },
-  '3'   => { s => '0', icon => 'weather_cloudy_heavy',              txtd => 'Bewölkung zunehmend',                                                      txte => 'Cloudiness increasing'                                                      },
+  '1'   => { s => '0', icon => 'weather_cloudy_light',              txtd => 'leicht bewölkt',                                                           txte => 'slightly cloudy'                                                            },
+  '2'   => { s => '0', icon => 'weather_cloudy',                    txtd => 'wolkig',                                                                   txte => 'cloudy'                                                                     },
+  '3'   => { s => '0', icon => 'weather_cloudy_heavy',              txtd => 'stark bewölkt bis bedeckt',                                                txte => 'very cloudy to overcast'                                                    },
   '4'   => { s => '0', icon => 'unknown',                           txtd => 'Sicht durch Rauch oder Asche vermindert',                                  txte => 'Visibility reduced by smoke or ash'                                         },
   '5'   => { s => '0', icon => 'unknown',                           txtd => 'trockener Dunst (relative Feuchte < 80 %)',                                txte => 'dry haze (relative humidity < 80 %)'                                        },
   '6'   => { s => '0', icon => 'unknown',                           txtd => 'verbreiteter Schwebstaub, nicht vom Wind herangeführt',                    txte => 'widespread airborne dust, not brought in by the wind'                       },
@@ -1164,9 +1194,9 @@ my %weather_ids = (
   '99'  => { s => '1', icon => 'weather_thunderstorm',              txtd => 'Gewitter mit Graupel oder Hagel',                                          txte => 'Thunderstorm with sleet or hail'                                            },
 
   '100' => { s => '0', icon => 'weather_night_starry',              txtd => 'sternenklarer Himmel',                                                     txte => 'starry sky'                                                                 },
-  '101' => { s => '0', icon => 'weather_night_cloudy_light',        txtd => 'Bewölkung abnehmend',                                                      txte => 'Cloudiness decreasing'                                                      },
-  '102' => { s => '0', icon => 'weather_night_cloudy',              txtd => 'Bewölkung unverändert',                                                    txte => 'Cloudiness unchanged'                                                       },
-  '103' => { s => '0', icon => 'weather_night_cloudy_heavy',        txtd => 'Bewölkung zunehmend',                                                      txte => 'Cloudiness increasing'                                                      },
+  '101' => { s => '0', icon => 'weather_night_cloudy_light',        txtd => 'leicht bewölkt',                                                           txte => 'slightly cloudy'                                                            },
+  '102' => { s => '0', icon => 'weather_night_cloudy',              txtd => 'wolkig',                                                                   txte => 'cloudy'                                                                     },
+  '103' => { s => '0', icon => 'weather_night_cloudy_heavy',        txtd => 'stark bewölkt bis bedeckt',                                                txte => 'very cloudy to overcast'                                                    },
   '110' => { s => '0', icon => 'weather_night_fog',                 txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
   '111' => { s => '0', icon => 'weather_night_rain_fog',            txtd => 'Nebel mit Regen',                                                          txte => 'Fog with rain'                                                              },
   '112' => { s => '0', icon => 'weather_night_fog',                 txtd => 'durchgehender Bodennebel',                                                 txte => 'continuous ground fog'                                                      },
@@ -1447,11 +1477,18 @@ sub Initialize {
   my $hod = join ",", map { sprintf "%02d", $_} (1..24);
   my $srd = join ",", sort keys (%hcsr);
 
-  my ($consumer, $setupbat, $ctrlbatsm, $setupprod, $setupinv, @allc);
+  my ($consumer, $setupbat, $ctrlbatsm, $setupprod, $setupinv, $beamcont, $beamcol, $beamfontcol, @allc);
+
   for my $c (1..MAXCONSUMER) {
       $c         = sprintf "%02d", $c;
       $consumer .= "consumer${c}:textField-long ";
       push @allc, $c;
+  }
+
+  for my $n (1..6) {
+      $beamcont    .= "graphicBeam${n}Content ";
+      $beamcol     .= "graphicBeam${n}Color:colorpicker,RGB ";
+      $beamfontcol .= "graphicBeam${n}FontColor:colorpicker,RGB ";
   }
 
   for my $bn (1..MAXBATTERIES) {
@@ -1512,19 +1549,8 @@ sub Initialize {
                                 "flowGraphicControl:textField-long ".
                                 "graphicBeamHeightLevel1 ".
                                 "graphicBeamHeightLevel2 ".
+                                "graphicBeamHeightLevel3 ".
                                 "graphicBeamWidth:slider,20,5,100 ".
-                                "graphicBeam1Content ".
-                                "graphicBeam2Content ".
-                                "graphicBeam3Content ".
-                                "graphicBeam4Content ".
-                                "graphicBeam1Color:colorpicker,RGB ".
-                                "graphicBeam2Color:colorpicker,RGB ".
-                                "graphicBeam3Color:colorpicker,RGB ".
-                                "graphicBeam4Color:colorpicker,RGB ".
-                                "graphicBeam1FontColor:colorpicker,RGB ".
-                                "graphicBeam2FontColor:colorpicker,RGB ".
-                                "graphicBeam3FontColor:colorpicker,RGB ".
-                                "graphicBeam4FontColor:colorpicker,RGB ".
                                 "graphicEnergyUnit:Wh,kWh ".
                                 "graphicHeaderOwnspec:textField-long ".
                                 "graphicHeaderOwnspecValForm:textField-long ".
@@ -1549,6 +1575,9 @@ sub Initialize {
                                 "setupRoofTops ".
                                 "setupRadiationAPI ".
                                 "setupStringPeak ".
+                                $beamcont.
+                                $beamcol.
+                                $beamfontcol.
                                 $setupbat.
                                 $setupinv.
                                 $setupprod.
@@ -1560,8 +1589,8 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';                          # 07.03.2025
-  $hash->{AttrList} .= " ctrlAIdataStorageDuration:$av ctrlAIshiftTrainStart:$av ";
+  # my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';                          # 07.03.2025
+  # $hash->{AttrList} .= " ctrlAIdataStorageDuration:$av ctrlAIshiftTrainStart:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -1649,18 +1678,6 @@ sub Set {
                pvHistory
              );
   my $resets = join ",",@re;
-
-  my @fcdevs = qw( OpenMeteoDWD-API
-                   OpenMeteoDWDEnsemble-API
-                   OpenMeteoWorld-API
-                   SolCast-API
-                   ForecastSolar-API
-                   VictronKI-API
-                 );
-
-  push @fcdevs, devspec2array ("TYPE=DWD_OpenData");
-
-  my $rdd = join ",", @fcdevs;
 
   for my $h (@chours) {
       push @cfs, 'pvCorrectionFactor_'. sprintf("%02d",$h);
@@ -1847,7 +1864,6 @@ return;
 sub _setroofIdentPair {                 ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
@@ -2351,6 +2367,8 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$name}{current}{aitrainstate};
       delete $data{$name}{current}{aiaddistate};
       delete $data{$name}{current}{aigetresult};
+      
+      delete $data{$name}{aidectree}{airaw};
 
       my @ftd = ( $airaw.$name,
                   $aitrained.$name
@@ -3572,7 +3590,7 @@ sub __getDWDSolarData {
   $data{$name}{statusapi}{DWD}{'?All'}{lastretrieval_timestamp} = $t;
   $data{$name}{statusapi}{DWD}{'?All'}{todayDoneAPIrequests}   += 1;
 
-  my $fctime                                  = ReadingsVal ($raname, 'fc_time', '-');
+  my $fctime                           = ReadingsVal ($raname, 'fc_time', '-');
   $data{$name}{current}{dwdRad1hDev}   = $raname;
   $data{$name}{current}{dwdRad1hAge}   = $fctime;
   $data{$name}{current}{dwdRad1hAgeTS} = timestringToTimestamp ($fctime);
@@ -3615,7 +3633,7 @@ sub __getDWDSolarData {
 
           my ($af, $pv, $sdr, $wcc);
 
-          if ($cafd =~ /track/xs) {                                                            # Flächenfaktor Sonnenstand geführt
+          if ($cafd eq 'trackFlex') {                                                          # Flächenfaktor Sonnenstand geführt
               ($af, $sdr, $wcc) = ___areaFactorTrack ( { name   => $name,
                                                          day    => $day,
                                                          dday   => $dday,
@@ -3635,20 +3653,23 @@ sub __getDWDSolarData {
               $af  = 1.00 if(!isNumeric($af));
               $sdr = 0.75 if(!isNumeric($sdr));
 
-              if ( $wcc >= 80 || !(1 * $af) ) {                                                     # V 1.47.2 Direktstrahlung + Diffusstrahlung
+              #if ($wcc >= 80 || !$af) {                                                            # V 1.47.3
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
-                  $pv = sprintf "%.1f", ((($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF);     # Rad wird in kW/m2 erwartet
-              }
-              else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
-                  $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);
-              }
+                  $pv = (($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF;                       # Rad wird in kW/m2 erwartet
+              #}
+              #else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
+              #    $pv = $rad * $af * KJ2KWH * $peak * PRDEF;
+              #}
           }
           else {                                                                                    # Flächenfaktor Fix
               $af = ___areaFactorFix ($ti, $az);                                                    # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
-              $pv = sprintf "%.1f", ($rad * $af * KJ2KWH * $peak * PRDEF);                          # Rad wird in kW/m2 erwartet
+              $pv = $rad * $af * KJ2KWH * $peak * PRDEF;                                            # Rad wird in kW/m2 erwartet
           }
+
+          $af = sprintf "%.2f", $af;
+          $pv = sprintf "%.1f", $pv;
 
           $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                        # Startzeit wird verwendet, nicht laufende Stunde
 
@@ -3683,7 +3704,7 @@ sub ___areaFactorFix {
   $af    = $af * $y - 0.00785953342909065    + 1.1197340251684106E-6  * $x2 - 8.99915952119488E-11  * $x4;
   $af    = $af * $y - 0.8432627150525525     + 0.00010392051567819936 * $x2 - 3.979206287671085E-9  * $x4;
   $af    = $af * $y + 99.49627151067648      - 0.006340200119196879   * $x2 + 2.052575360270524E-7  * $x4;
-  $af    = sprintf "%.2f", ($af / 100);                                                                       # Prozenz in Faktor
+  $af    = $af / 100;                                                                                        # Prozenz in Faktor
 
 return $af;
 }
@@ -3753,7 +3774,6 @@ sub ___areaFactorTrack {
   my $daf = $nx * $sx + $ny * $sy + $nz * $sz;
   $daf    = max ($daf, 0);
   $daf   += 1 if($daf);
-  $daf    = sprintf "%.2f", $daf;
 
   ## Schätzung Anteil Direktstrahlung an Globalstrahlung
   ########################################################
@@ -4237,20 +4257,19 @@ sub __getopenMeteoData {
       }
   }
 
-  debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - the daily API requests -> limited to: OMETMAXREQ, done: $donearq});
+  debugLog ($paref, 'apiCall', "Open-Meteo API Call - the daily API requests -> limited to: ".OMETMAXREQ.", done: $donearq");
 
-  my $submodel         = InternalVal ($hash->{NAME}, $reqm, '');
-
-  $paref->{allstrings} = AttrVal ($name, 'setupInverterStrings', '');
-  $paref->{submodel}   = $submodel eq 'OpenMeteoDWDAPI'         ? 'DWD ICON Seamless'          :
-                         $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 'DWD ICON Seamless Ensemble' :
-                         $submodel eq 'OpenMeteoWorldAPI'       ? 'World Best Match'           :
-                         'unknown';
-
-  return "The Weather Model '$submodel' is not a valid Open-Meteo Weather Model" if($paref->{submodel} eq 'unknown');
+  my $submodel   = InternalVal ($name, $reqm, 'unknown');
+  my $allstrings = AttrVal     ($name, 'setupInverterStrings', '');
+  
+  if ($reqm eq 'MODEL' && $submodel eq 'OpenMeteoDWDD2API') {                      # Satellietenunterstützung dazuladen
+      $allstrings .= ',OpenMeteoSatellite,'.$allstrings;
+  }
 
   $paref->{callequivalent} = $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 20 : 1;
+  $paref->{allstrings}     = $allstrings;
   $paref->{begin}          = 1;
+  $paref->{submodel}       = $submodel;
   $paref->{requestmode}    = $reqm;
 
   __openMeteoDWD_ApiRequest ($paref);
@@ -4259,7 +4278,7 @@ return;
 }
 
 ########################################################################################################################
-#                Open-Meteo DWD ICON API Request
+#                Open-Meteo API Request
 #  Open data weather forecasts from the German weather service DWD
 #  Quelle Seite: https://open-meteo.com/
 #
@@ -4282,17 +4301,16 @@ return;
 #
 ########################################################################################################################
 sub __openMeteoDWD_ApiRequest {
-  my $paref      = shift;
-  my $name       = $paref->{name};
-  my $type       = $paref->{type};
-  my $allstrings = $paref->{allstrings};                                     # alle Strings
-  my $debug      = $paref->{debug};
-  my $lang       = $paref->{lang};
-  my $t          = $paref->{t}       // int time;
-  my $submodel   = $paref->{submodel};                                       # abzufragendes Datenmodell
+  my $paref       = shift;
+  my $name        = $paref->{name};
+  my $allstrings  = $paref->{allstrings};                                     # alle Strings
+  my $debug       = $paref->{debug};
+  my $lang        = $paref->{lang};
+  my $t           = $paref->{t}       // int time;
+  my $submodel    = $paref->{submodel};                                       # abzufragendes Datenmodell
   my $requestmode = $paref->{requestmode};
 
-  my $hash       = $defs{$name};
+  my $hash        = $defs{$name};
 
   if (!$allstrings) {                                                        # alle Strings wurden abgerufen
       my $apiitv = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF);
@@ -4304,51 +4322,36 @@ sub __openMeteoDWD_ApiRequest {
   }
 
   my ($string, $err);
-  ($string, $allstrings)       = split ",", $allstrings, 2;
-  my ($set, $lat, $lon, $elev) = locCoordinates();
+  ($string, $allstrings) = split ",", $allstrings, 2;
+  
+  if ($string eq 'OpenMeteoSatellite') {                                      # Trenner-String: ab jetzt Satelliten Abfrage
+      $submodel              = 'OpenMeteoSatellite';
+      $paref->{submodel}     = $submodel;
+      ($string, $allstrings) = split ",", $allstrings, 2;
+  }
 
-  if (!$set) {
-      $err = qq{ERROR - the attribute 'latitude' and/or 'longitude' in global device is not set};
+  $paref->{string} = $string;
+  my $url = ___createOpenMeteoURL ($paref);
+  delete $paref->{string};
+
+  if (!$url) {
+      $err = qq{ERROR OpenMeteo API Call - no URL could be created for submodel: $submodel};
       Log3 ($name, 1, "$name - $err");
       return;
   }
 
-  my $tilt = StringVal ($hash, $string, 'tilt',   '<unknown>');
-  my $az   = StringVal ($hash, $string, 'azimut', '<unknown>');
+  my $deburl = $url;
+  $deburl    =~ s/&/&amp;/g;
 
-  if ($requestmode eq 'WEATHERMODEL' && $string eq 'KI-based') {$tilt = 0; $az = 0;}            # Dummy Settings
-
-  if ($tilt eq '<unknown>' || $az eq '<unknown>') {
-      $err = qq{ERROR OpenMeteo API Call - the reading 'setupStringAzimuth' and/or 'setupStringDeclination' is not set};
-      Log3 ($name, 1, "$name - $err");
-      return;
-  }
-
-  my $url = "https://api.open-meteo.com/v1/forecast?";
-  $url    = "https://ensemble-api.open-meteo.com/v1/ensemble?" if($submodel =~ /Ensemble/xs);                    # Ensemble Modell gewählt
-  $url   .= "models=icon_seamless"                             if($submodel =~ /DWD\sICON\sSeamless/xs);
-  $url   .= "models=best_match"                                if($submodel eq 'World Best Match');
-  $url   .= "&latitude=".$lat;
-  $url   .= "&longitude=".$lon;
-  $url   .= "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance";
-  $url   .= "&current=temperature_2m,weather_code,cloud_cover" if($submodel !~ /Ensemble/xs);
-  $url   .= "&minutely_15=global_tilted_irradiance"            if($submodel !~ /Ensemble/xs);
-  $url   .= "&daily=sunrise,sunset"                            if($submodel !~ /Ensemble/xs);
-  $url   .= "&forecast_hours=48";
-  $url   .= "&forecast_days=2";
-  $url   .= "&tilt=".$tilt;
-  $url   .= "&azimuth=".$az;
-
-  debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - Request for PV-String "$string" with Data Model >$submodel<:\n$url});
+  debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - Request for PV-String "$string" with Data Model >$submodel<:\n$deburl});
   debugLog ($paref, 'apiCall|apiProcess', qq{Open-Meteo API Call - Request Mode: $requestmode});
 
-  my $caller = (caller(0))[3];                                                                        # Rücksprungmarke
+  my $caller = (caller(0))[3];                                                                                  # Rücksprungmarke
 
   my $param = {
       url            => $url,
       timeout        => 30,
       name           => $name,
-      type           => $paref->{type},
       debug          => $debug,
       header         => 'Accept: application/json',
       submodel       => $submodel,
@@ -4374,7 +4377,7 @@ return;
 }
 
 ################################################################################################
-#             Open-Meteo DWD ICON API Response
+#                               Open-Meteo API Response
 #
 #  Rad1h vom DWD  - Globalstrahlung in kJ/m2
 #
@@ -4399,7 +4402,6 @@ sub __openMeteoDWD_ApiResponse {
   my $myjson     = shift;
 
   my $name        = $paref->{name};
-  my $type        = $paref->{type};
   my $caller      = $paref->{caller};
   my $string      = $paref->{string};
   my $allstrings  = $paref->{allstrings};
@@ -4417,7 +4419,7 @@ sub __openMeteoDWD_ApiResponse {
   my $msg;
 
   if ($err ne "") {
-      $msg = 'Open-Meteo DWD ICON API server response: '.$err;
+      $msg = 'Open-Meteo API server response: '.$err;
 
       Log3 ($name, 1, "$name - $msg");
 
@@ -4429,11 +4431,11 @@ sub __openMeteoDWD_ApiResponse {
 
       return;
   }
-  elsif ($myjson ne "") {                                                                                                     # Evaluiere ob Daten im JSON-Format empfangen wurden
+  elsif ($myjson ne "") {                                                                                              # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson ($hash, $myjson);
 
       if (!$success) {
-          $msg = 'ERROR - invalid Open-Meteo DWD ICON API server response';
+          $msg = 'ERROR - invalid Open-Meteo API server response';
 
           Log3 ($name, 1, "$name - $msg");
 
@@ -4456,7 +4458,7 @@ sub __openMeteoDWD_ApiResponse {
       # reason: <Grund>
 
       if ($jdata->{'error'}) {
-          $msg = "Open-Meteo DWD ICON API server ERROR response: ".$jdata->{'reason'};
+          $msg = "Open-Meteo API server ERROR response: ".$jdata->{'reason'};
 
           Log3 ($name, 3, "$name - $msg");
 
@@ -4482,11 +4484,11 @@ sub __openMeteoDWD_ApiResponse {
       my $peak  = StringVal ($hash, $string, 'peak', 0);                                          # String Peak (kWp)
       $peak    *= 1000;                                                                           # kWp in Wp
 
-      ## Akt. Werte
-      #################
-      my ($curwid, $curwcc, $curtmp, $curstr);
+      ## aktuelle Wetterdaten
+      #########################
+      my ($curwid, $currain, $curwcc, $curtmp, $curstr);
 
-      if (defined $jdata->{current}{time}) {
+      if (defined $jdata->{current}{time} && $submodel ne 'OpenMeteoSatellite') {
           ($err, $curstr) = timestringUTCtoLocal ($name, $jdata->{current}{time}, '%Y-%m-%dT%H:%M');
 
           if ($err) {
@@ -4496,9 +4498,10 @@ sub __openMeteoDWD_ApiResponse {
               return;
           }
 
-          $curwid = $jdata->{current}{weather_code};
-          $curwcc = $jdata->{current}{cloud_cover};
-          $curtmp = $jdata->{current}{temperature_2m};
+          $curwid  = $jdata->{current}{weather_code};
+          $curwcc  = $jdata->{current}{cloud_cover};
+          $currain = $jdata->{current}{rain};
+          $curtmp  = $jdata->{current}{temperature_2m};
       }
 
       ## Stundenwerte
@@ -4516,124 +4519,156 @@ sub __openMeteoDWD_ApiResponse {
           }
 
           my $ots     = timestringToTimestamp  ($otmstr);
-          my $pvtmstr = (timestampToTimestring ($ots-3600))[0];                                 # Strahlung wird als Durchschnitt der !vorangegangenen! Stunde geliefert!
+          my $pvtmstr = (timestampToTimestring ($ots - 3600))[0];                                   # Strahlung wird als Durchschnitt der !vorangegangenen! Stunde geliefert!
 
-          if (timestringToTimestamp($pvtmstr) < $refts) {
+          if (timestringToTimestamp ($pvtmstr) < $refts) {
               $k++;
-              next;                                                                             # Daten älter als akt. Tag 00:00:00 verwerfen
+              next;                                                                                 # Daten älter als akt. Tag 00:00:00 verwerfen
           }
 
-          my $rad1wh = $jdata->{hourly}{global_tilted_irradiance}[$k];                          # Wh/m2
-          my $rad    = 10 * (sprintf "%.0f", ($rad1wh * WH2KJ) / 10);                           # Umrechnung Wh/m2 in kJ/m2 ->
-          my $pv     = sprintf "%.2f", int ($rad1wh / 1000 * $peak * PRDEF);                    # Rad wird in kWh/m2 erwartet
-
-          my $don    = $jdata->{hourly}{is_day}[$k];
-          my $temp   = $jdata->{hourly}{temperature_2m}[$k];
-          my $rain   = $jdata->{hourly}{rain}[$k];                                              # Regen in Millimeter = kg/m2
-          my $wid    = $jdata->{hourly}{weather_code}[$k];
-          my $wcc    = $jdata->{hourly}{cloud_cover}[$k];
-
-          if ($debug =~ /apiProcess/xs) {
-              if ($requestmode eq 'MODEL') {
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - Rad1Wh: $rad1wh, Rad1kJ: $rad, PV est: $pv Wh");
-              }
-
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $pvtmstr - RR1c: $rain");
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - DoN: $don");
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Temp: $temp");
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Weather Code: $wid");
-              Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - Cloud Cover: $wcc");
-
-              if ($k == 0) {
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $otmstr - current Temp: $curtmp")         if(defined $curtmp);
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Weather Code: $curwid") if(defined $curwid);
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API $curstr - current Cloud Cover: $curwcc")  if(defined $curwcc);
-              }
-          }
-
+          ## Strahlungsdaten
+          ####################
           if ($requestmode eq 'MODEL') {
-              $data{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;                  # Startstunde verschieben
-
-              if ($paref->{begin}) {                                                                # im ersten Call den DS löschen -> dann Aufsummierung
-                  delete $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h};
+              my $gtiwh = $jdata->{hourly}{global_tilted_irradiance}[$k];                           # GTI in Wh/m2
+              my $radwh = $jdata->{hourly}{shortwave_radiation}[$k];                                # Solarstrahlung -> Rad1h
+              
+              if (defined $radwh) {                                                                 # Globalstrahlung für KI 
+                  my $radkJ = 10 * (sprintf "%.0f", ($radwh * WH2KJ) / 10);                         # Umrechnung Wh/m2 in kJ/m2
+                  $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} = $radkJ;                       # Startstunde verschieben
+                  
+                  debugLog ($paref, 'apiProcess', "Open-Meteo API $pvtmstr - Global Radiation Rad1h: $radkJ");                  
               }
+              
+              if (defined $gtiwh) {                                                                 # Global Tilted Radiation - zur PV Berechnung jedes Strings
+                  my $pv = sprintf "%.2f", int ($gtiwh / 1000 * $peak * PRDEF);                     # GTI wird in kWh/m2 genutzt
 
-              $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} += $rad;                         # Startstunde verschieben, Rad Werte aller Strings addieren
+                  $data{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;                 # Startstunde verschieben
+                  $data{$name}{solcastapi}{$string}{$pvtmstr}{GTIWh}         = $gtiwh;              # Startstunde verschieben, GTI wird für jeden String separat geliefert
+             
+                  debugLog ($paref, 'apiProcess', "Open-Meteo API $pvtmstr - GTIWh: $gtiwh, PV estimate: $pv Wh");
+              }
           }
 
           ## Wetterdaten
           ################
-          my $fwtg = formatWeatherTimestrg ($pvtmstr);                                              # Zeit gemäß DWD_OpenData-Format
+          if ($submodel ne 'OpenMeteoSatellite') {
+              my $don  = $jdata->{hourly}{is_day}[$k];
+              my $temp = $jdata->{hourly}{temperature_2m}[$k];
+              my $rain = $jdata->{hourly}{rain}[$k];                                                    # Regen in Millimeter = kg/m2
+              my $wid  = $jdata->{hourly}{weather_code}[$k];
+              my $wcc  = $jdata->{hourly}{cloud_cover}[$k];
 
-          $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{rr1c}       = $rain;
-          $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{StartTime}  = $pvtmstr;
+              my $fwtg = formatWeatherTimestrg ($pvtmstr);                                              # Zeit gemäß DWD_OpenData-Format
 
-          $fwtg = formatWeatherTimestrg ($otmstr);                                                  # Zeit gemäß DWD_OpenData-Format
+              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{rr1c}       = $rain if(defined $rain);
+              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{StartTime}  = $pvtmstr;
 
-          $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{don}        = $don;
-          $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{neff}       = $wcc;
-          $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{ww}         = $wid;
-          $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{ttt}        = $temp;
-          $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{UpdateTime} = $rt;
-          $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{StartTime}  = $otmstr;
+              $fwtg = formatWeatherTimestrg ($otmstr);                                                  # Zeit gemäß DWD_OpenData-Format
 
-          if ($k == 0) {
-              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{neff} = $curwcc if(defined $curwcc);
-              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{ww}   = $curwid if(defined $curwid);
-              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{ttt}  = $curtmp if(defined $curtmp);
-          }
+              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{don}        = $don  if(defined $don);
+              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{neff}       = $wcc  if(defined $wcc);
+              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{ww}         = $wid  if(defined $wid);
+              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{ttt}        = $temp if(defined $temp);
+              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{UpdateTime} = $rt;
+              $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{StartTime}  = $otmstr;
 
-          $k++;
-      }
-
-      ## Tageswerte
-      ###############
-      $k = 0;
-
-      while ($jdata->{daily}{time}[$k]) {
-          my $oday = $jdata->{daily}{time}[$k];
-
-          ($err, my $sunrise) = timestringUTCtoLocal ($name, $jdata->{daily}{sunrise}[$k], '%Y-%m-%dT%H:%M');
-          ($err, my $sunset)  = timestringUTCtoLocal ($name, $jdata->{daily}{sunset}[$k],  '%Y-%m-%dT%H:%M');
-
-          if ($err) {
-              $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
-              Log3 ($name, 1, "$name - $msg");
-              singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
-              return;
-          }
-
-          if ($k == 0) {
-              $data{$name}{weatherapi}{OpenMeteo}{sunrise}{today} = $sunrise;
-              $data{$name}{weatherapi}{OpenMeteo}{sunset}{today}  = $sunset;
-
-              if ($debug =~ /apiProcess/xs) {
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - Sunrise Today: $sunrise");
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - SunSet Today: $sunset");
+              if ($k == 0) {
+                  $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{neff} = $curwcc  if(defined $curwcc);
+                  $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{ww}   = $curwid  if(defined $curwid);
+                  $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{ttt}  = $curtmp  if(defined $curtmp);
+                  $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{rr1c} = $currain if(defined $currain);
               }
-          }
-
-          if ($k == 1) {
-              $data{$name}{weatherapi}{OpenMeteo}{sunrise}{tomorrow} = $sunrise;
-              $data{$name}{weatherapi}{OpenMeteo}{sunset}{tomorrow}  = $sunset;
 
               if ($debug =~ /apiProcess/xs) {
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - Sunrise Tomorrow: $sunrise");
-                  Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - SunSet Tomorrow: $sunset");
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo API $pvtmstr - RR1c: ".       (defined $rain ? $rain : '-'));
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo API $otmstr - DoN: ".         (defined $don  ? $don  : '-'));
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo API $otmstr - Temp: ".        (defined $temp ? $temp : '-'));
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo API $otmstr - Weather Code: ".(defined $wid  ? $wid  : '-'));
+                  Log3 ($name, 1, "$name DEBUG> Open-Meteo API $otmstr - Cloud Cover: ". (defined $wcc  ? $wcc  : '-'));
+
+                  if ($curstr && $k == 0) {
+                      Log3 ($name, 1, "$name DEBUG> Open-Meteo API $curstr - current Temp: ".        (defined $curtmp  ? $curtmp   : '-'));
+                      Log3 ($name, 1, "$name DEBUG> Open-Meteo API $curstr - current Weather Code: ".(defined $curwid  ? $curwid   : '-'));
+                      Log3 ($name, 1, "$name DEBUG> Open-Meteo API $curstr - current Cloud Cover: ". (defined $curwcc  ? $curwcc   : '-'));
+                      Log3 ($name, 1, "$name DEBUG> Open-Meteo API $curstr - current Rain: ".        (defined $currain ? $currain  : '-'));
+                  }
               }
           }
 
           $k++;
       }
+
+      ## Tageswerte (Sonnenauf- und untergang)
+      ##########################################
+      if ($submodel ne 'OpenMeteoSatellite') {
+          $k = 0;
+
+          while ($jdata->{daily}{time}[$k]) {
+              my $oday = $jdata->{daily}{time}[$k];
+
+              ($err, my $sunrise) = timestringUTCtoLocal ($name, $jdata->{daily}{sunrise}[$k], '%Y-%m-%dT%H:%M');
+              ($err, my $sunset)  = timestringUTCtoLocal ($name, $jdata->{daily}{sunset}[$k],  '%Y-%m-%dT%H:%M');
+
+              if ($err) {
+                  $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
+                  Log3 ($name, 1, "$name - $msg");
+                  singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
+                  return;
+              }
+
+              if ($k == 0) {
+                  $data{$name}{weatherapi}{OpenMeteo}{sunrise}{today} = $sunrise;
+                  $data{$name}{weatherapi}{OpenMeteo}{sunset}{today}  = $sunset;
+
+                  if ($debug =~ /apiProcess/xs) {
+                      Log3 ($name, 1, "$name DEBUG> Open-Meteo API - Sunrise Today: $sunrise");
+                      Log3 ($name, 1, "$name DEBUG> Open-Meteo API - SunSet Today: $sunset");
+                  }
+              }
+
+              if ($k == 1) {
+                  $data{$name}{weatherapi}{OpenMeteo}{sunrise}{tomorrow} = $sunrise;
+                  $data{$name}{weatherapi}{OpenMeteo}{sunset}{tomorrow}  = $sunset;
+
+                  if ($debug =~ /apiProcess/xs) {
+                      Log3 ($name, 1, "$name DEBUG> Open-Meteo API - Sunrise Tomorrow: $sunrise");
+                      Log3 ($name, 1, "$name DEBUG> Open-Meteo API - SunSet Tomorrow: $sunset");
+                  }
+              }
+
+              $k++;
+          }
+      }
+      
+      ## 15 Minuten Werte 
+      #####################
+      $paref->{jdata}     = $jdata;
+      $paref->{indicator} = 'global_tilted_irradiance';
+      
+      my $haggr = ___15Minutes2HourAggregator ($paref);                                        # 15 Minuten zu 1h Aggregation
+      
+      if ($requestmode eq 'MODEL' && $haggr) {   
+          for my $tmstr (sort keys %{$haggr->{hourly}}) {
+              my $gtiwh = $haggr->{hourly}{$tmstr}{$paref->{indicator}};                      
+              my $pv    = sprintf "%.2f", int ($gtiwh / 1000 * $peak * PRDEF);          
+              
+              #$data{$name}{solcastapi}{$string}{$tmstr}{GTIWh}         = $gtiwh;
+              #$data{$name}{solcastapi}{$string}{$tmstr}{pv_estimate50} = $pv;
+              
+              # debugLog ($paref, 'apiProcess', "Open-Meteo API - do 15 min Aggr $tmstr - GTIWh: $gtiwh, PV estimate: $pv Wh");
+          }
+      }
+      
+      delete $paref->{indicator};
+      delete $paref->{jdata};
   }
 
   ___setOpenMeteoAPIcallKeyData ($paref);
 
-  Log3 ($name, 4, qq{$name - Open-Meteo DWD ICON API answer received for string "$string"});
+  Log3 ($name, 4, qq{$name - Open-Meteo API answer received for string "$string"});
 
   my $param = {
       name           => $name,
-      type           => $type,
       debug          => $debug,
       allstrings     => $allstrings,
       submodel       => $submodel,
@@ -4646,6 +4681,139 @@ sub __openMeteoDWD_ApiResponse {
   $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
 return &$caller($param);
+}
+
+################################################################
+#            OpenMeteo URL zusammenstellen
+################################################################
+sub ___createOpenMeteoURL {
+  my $paref       = shift;
+  my $name        = $paref->{name};
+  my $submodel    = $paref->{submodel};                                       # abzufragendes Datenmodell
+  my $requestmode = $paref->{requestmode};
+  my $string      = $paref->{string};
+
+  my $err;
+  my ($set, $lat, $lon, $elev) = locCoordinates();
+
+  if (!$set) {
+      $err = qq{ERROR - the attribute 'latitude' and/or 'longitude' in global device is not set};
+      Log3 ($name, 1, "$name - $err");
+      return;
+  }
+
+  my $tilt = StringVal ($name, $string, 'tilt',   '<unknown>');
+  my $az   = StringVal ($name, $string, 'azimut', '<unknown>');
+
+  if ($requestmode eq 'WEATHERMODEL' && $string eq 'KI-based') {$tilt = 0; $az = 0;}                              # Dummy Settings
+
+  if ($tilt eq '<unknown>' || $az eq '<unknown>') {
+      $err = qq{ERROR OpenMeteo API Call - the reading 'setupStringAzimuth' and/or 'setupStringDeclination' is not set};
+      Log3 ($name, 1, "$name - $err");
+      return;
+  }
+
+  my $url;
+
+  if ($submodel eq 'OpenMeteoDWDEnsembleAPI') {                                                                   # Ensemble Modell gewählt
+      $url  = "https://ensemble-api.open-meteo.com/v1/ensemble?";
+      $url .= "&latitude=".$lat;
+      $url .= "&longitude=".$lon;
+      $url .= "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance,shortwave_radiation";
+      $url .= "&forecast_hours=48";
+      $url .= "&forecast_days=2";
+      $url .= "&tilt=".$tilt;
+      $url .= "&azimuth=".$az;
+  }
+
+  if ($submodel eq 'OpenMeteoDWDAPI' || $submodel eq 'OpenMeteoDWDD2API' || $submodel eq 'OpenMeteoWorldAPI') {
+      $url  = "https://api.open-meteo.com/v1/forecast?";
+      $url .= "models=icon_seamless"                            if($submodel eq 'OpenMeteoDWDAPI');
+      $url .= "models=icon_d2"                                  if($submodel eq 'OpenMeteoDWDD2API');
+      $url .= "models=best_match"                               if($submodel eq 'OpenMeteoWorldAPI');
+      $url .= "&latitude=".$lat;
+      $url .= "&longitude=".$lon;
+      $url .= "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance,shortwave_radiation";
+      $url .= "&current=temperature_2m,weather_code,rain,cloud_cover";
+      $url .= "&minutely_15=global_tilted_irradiance,shortwave_radiation";
+      $url .= "&daily=sunrise,sunset";
+      $url .= "&forecast_hours=48";
+      $url .= "&forecast_days=2";
+      $url .= "&tilt=".$tilt;
+      $url .= "&azimuth=".$az;
+  }
+
+  if ($submodel eq 'OpenMeteoSatellite') {
+      $url  = "https://satellite-api.open-meteo.com/v1/archive?";
+      $url .= "models=satellite_radiation_seamless";
+      $url .= "&latitude=".$lat;
+      $url .= "&longitude=".$lon;
+      $url .= "&hourly=global_tilted_irradiance";
+      $url .= "&forecast_hours=24";
+      $url .= "&utm_source=substack";
+      $url .= "&utm_medium=email";
+      $url .= "&tilt=".$tilt;
+      $url .= "&azimuth=".$az;
+  }
+
+return $url;
+}
+
+################################################################
+#        15-Minuten Werte auf eine Stunde aggregieren
+#   Return: Referenz auf Ergebnishash
+################################################################
+sub ___15Minutes2HourAggregator {
+  my $paref     = shift;
+  my $name      = $paref->{name};
+  my $jdata     = $paref->{jdata};
+  my $indicator = $paref->{indicator};              # der zu bearbeitende Indikator
+  
+  return if(!$jdata || !$indicator);
+
+  my ($haggr, $nct, $lzstr);
+  my $k = 0;
+  
+  while ($jdata->{minutely_15}{time}[$k]) {
+      my $tstr = $jdata->{minutely_15}{time}[$k];
+      
+      $lzstr = $jdata->{minutely_15}{time}[$k] if($tstr =~ /T..:00/xs);
+      
+      if (!$lzstr) {
+          $k++;
+          next;
+      }
+      
+      if ($tstr =~ /T..:15/xs) {
+          $nct = $lzstr;
+      }
+      
+      if (!$nct) {
+          $k++;
+          next;
+      }
+      
+      $haggr->{hourly}{$nct}{$indicator} = $jdata->{minutely_15}{$indicator}[$k];
+      
+      $k++;
+  }
+  
+  if ($haggr) {
+      for my $key (sort keys %{$haggr->{hourly}}) {
+          my ($err, $otmstr) = timestringUTCtoLocal ($name, $key, '%Y-%m-%dT%H:%M');
+
+          if ($err) {
+              Log3 ($name, 1, "$name - ERROR - Open-Meteo invalid time conversion in Aggregator: $err");
+              delete $haggr->{hourly}{$key}{$indicator};
+              next;
+          }
+          
+          $haggr->{hourly}{$otmstr}{$indicator} = sprintf "%.0f", $haggr->{hourly}{$key}{$indicator};
+          delete $haggr->{hourly}{$key};
+      }
+  }
+
+return $haggr;
 }
 
 ################################################################
@@ -5338,21 +5506,21 @@ sub __getaiRuleStrings {                 ## no critic "not used"
   my $rs = 'no rules delivered';
   my (@rsl, %entities);
   my $tn = 0;
-  
+
   for my $dtree (@{$objref}) {
       eval { my @rules = $dtree->rule_statements();                      # Returns a list of strings that describe the tree in rule-form
              $tn++;
-             
+
              if ($tn == 1) {                                             # nur den ersten Tree ausgeben
                  push @rsl, '&nbsp;';
                  push @rsl, 'Tree: '.$tn;
                  push @rsl, '&nbsp;';
-                 push @rsl, @rules;                             
+                 push @rsl, @rules;
              }
-             
+
              $entities{$tn}{rules} = scalar @rules;                      # Anzahl der Regeln
              $entities{$tn}{nodes} = $dtree->nodes();                    # Returns the number of nodes in the trained decision tree
-             $entities{$tn}{depth} = $dtree->depth();                    # Returns the depth of the tree. This is the maximum number of decisions that would need to be made to classify an unseen instance, i.e. the length of the longest path from the tree's root to a leaf.             
+             $entities{$tn}{depth} = $dtree->depth();                    # Returns the depth of the tree. This is the maximum number of decisions that would need to be made to classify an unseen instance, i.e. the length of the longest path from the tree's root to a leaf.
              1;
            }
            or do { return $@;
@@ -5362,18 +5530,18 @@ sub __getaiRuleStrings {                 ## no critic "not used"
   my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
   $atf    = '<b>'.$hqtxt{ailatr}{$lang}.' </b>'.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
   my $art = $hqtxt{aitris}{$lang}.' '.CircularVal ($hash, 99, 'runTimeTrainAI', '-');
-  
+
   my $agt = CurrentVal  ($hash, 'aiLastGetResultTime', '');
   $agt    = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
 
   if (@rsl) {
       my $l = scalar @rsl;
       $rs   = "<b>Trained AI Object contains an Ensemble of $tn trees (only the first Tree is printed out)</b>\n\n";
-      
+
       for my $tree (1..$tn) {
           $rs .= "<b>Tree: $tree</b> -> Number of Rules: $entities{$tree}{rules} / Number of Nodes: $entities{$tree}{nodes} / Depth: $entities{$tree}{depth} \n";
       }
-      
+
       $rs  .= "\n\n";
       $rs  .= "Rules: ".$hqtxt{airule}{$lang}."\n";
       $rs  .= "Nodes: ".$hqtxt{ainode}{$lang}."\n";
@@ -5602,17 +5770,17 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^ctrlAIdataStorageDuration|ctrlAIshiftTrainStart$/) {
-      #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
-      my $msg = "The attribute $aName is replaced by 'aiControl'. Please press 'save config' when restart is finished.";
-      if (!$init_done) {
-          Log3 ($name, 1, "$name - $msg");
-          #return qq{Device "$name" -> $msg};
-      }
-      else {
-          return $msg;
-      }
-  }
+  #if ($cmd eq 'set' && $aName =~ /^ctrlAIdataStorageDuration|ctrlAIshiftTrainStart$/) {
+  #    #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
+  #    my $msg = "The attribute $aName is replaced by 'aiControl'. Please press 'save config' when restart is finished.";
+  #    if (!$init_done) {
+  #        Log3 ($name, 1, "$name - $msg");
+  #        #return qq{Device "$name" -> $msg};
+  #    }
+  #    else {
+  #        return $msg;
+  #    }
+  #}
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -5847,9 +6015,9 @@ sub _attrconsumer {                      ## no critic "not used"
           return "swstate off-Regex: $err" if($err);
       }
 
-      if (exists $h->{mintime}) {                                                                  
+      if (exists $h->{mintime}) {
           my $mintime = $h->{mintime};
-          
+
           if ($mintime !~ /^SunPath/xsi && $mintime =~ /.*:.*/xs) {
               my ($dv, $rd) = split ':', $mintime;
               ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
@@ -6034,8 +6202,8 @@ sub _attraiControl {                     ## no critic "not used"
 
   my $hash  = $defs{$name};
 
-  for my $av ( qw( aiStorageDuration 
-                   aiTrainStart 
+  for my $av ( qw( aiStorageDuration
+                   aiTrainStart
                    aiTreesPV
                  ) ) {
 
@@ -6398,6 +6566,15 @@ sub _attrBatteryDev {                    ## no critic "not used"
           return qq{One or more of the keys 'pin, pout, cap' are missing. Please note the command reference.};
       }
 
+      if ($h->{show} && $h->{show} =~ /:/xs) {
+          my ($show, $pos) = split ':', $h->{show};
+          $pos //= 'xx';
+
+          if ($pos !~ /^top|bottom$/xs) {
+              return qq{The key 'show' is not set correctly. Please note the command reference.};
+          }
+      }
+
       if (($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
          ($h->{pout} !~ /-/xs && $h->{pout} !~ /:/xs)) {
           return qq{The keys 'pin' and/or 'pout' are not set correctly. Please note the command reference.};
@@ -6410,6 +6587,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{batteries}{$bn}{basynchron};
       delete $data{$name}{batteries}{$bn}{bicon};
       delete $data{$name}{batteries}{$bn}{bshowingraph};
+      delete $data{$name}{batteries}{$bn}{bposingraph};
   }
   elsif ($paref->{cmd} eq 'del') {
       readingsDelete    ($hash, 'Current_PowerBatIn_'.$bn);
@@ -6502,15 +6680,6 @@ sub _attrRadiationAPI {                  ## no critic "not used"
       if ($aVal !~ /-API$/x && (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData")) {
           return qq{The device "$aVal" doesn't exist or has no TYPE "DWD_OpenData"};
       }
-
-      #my $awdev1 = AttrVal ($name, 'setupWeatherDev1', '');
-
-      #if (($awdev1 eq 'OpenMeteoDWD-API'         && $aVal ne 'OpenMeteoDWD-API')         ||
-      #    ($awdev1 eq 'OpenMeteoDWDEnsemble-API' && $aVal ne 'OpenMeteoDWDEnsemble-API') ||
-      #    ($awdev1 eq 'OpenMeteoWorld-API'       && $aVal ne 'OpenMeteoWorld-API')) {
-      #    return "The attribute 'setupWeatherDev1' is set to '$awdev1'. \n".
-      #           "Change that attribute to another weather device first if you want use an other API.";
-      #}
 
       if ($aVal =~ /(SolCast|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
           return "The library FHEM::Utility::CTZ is missing. Please update FHEM completely." if($ctzAbsent);
@@ -7128,18 +7297,20 @@ sub readCacheFile {
           if (ref $objref ne 'ARRAY') {
               return "The file $file was restored but the content is not an ARRAY";
           }
-          
+
           for my $obj (@{$objref}) {
               my $class = blessed ($obj);
               my $valid = $obj->isa('AI::DecisionTree');
               return 'The trained object is not AI::DecisionTree' if(!$valid);
           }
-          
+
           undef @{$data{$name}{aidectree}{aitrained}};
           delete $data{$name}{aidectree}{aitrained};
-          
+
           push @{$data{$name}{aidectree}{aitrained}}, @{$objref};
-          
+
+          undef @{$objref};
+
           $data{$name}{current}{aitrainstate} = 'ok';
 
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
@@ -7256,7 +7427,7 @@ sub writeCacheToFile {
   if ($cachename eq 'aitrained') {
       my $objref = AiDetreeVal ($hash, 'aitrained', '');
       return 'trained object is not an ARRAY' if(ref $objref ne 'ARRAY');
-      
+
       for my $obj (@{$objref}) {
           return 'wrong trained object' if(ref $obj ne 'AI::DecisionTree');
       }
@@ -7566,6 +7737,7 @@ sub _addDynAttr {
   $adwds     = join ",", @alldwd if(@alldwd);
 
   my @fcdevs = qw( OpenMeteoDWD-API
+                   OpenMeteoDWD_D2-API
                    OpenMeteoDWDEnsemble-API
                    OpenMeteoWorld-API
                    SolCast-API
@@ -7586,8 +7758,8 @@ sub _addDynAttr {
   ######################################################################
   for my $step (1..MAXWEATHERDEV) {
       if ($step == 1) {
-          push @deva, ($adwds ? "setupWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" :
-                       "setupWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
+          push @deva, ($adwds ? "setupWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWD_D2-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" :
+                       "setupWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWD_D2-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
           next;
       }
 
@@ -7612,10 +7784,9 @@ sub _addDynAttr {
 
   $gbc .= 'consumption,consumptionForecast,energycosts,feedincome,gridconsumption,gridfeedin,pvForecast,pvReal';
 
-  push @deva, "graphicBeam1Content:$gbc";
-  push @deva, "graphicBeam2Content:$gbc";
-  push @deva, "graphicBeam3Content:$gbc";
-  push @deva, "graphicBeam4Content:$gbc";
+  for my $n (1..6) {
+      push @deva, "graphicBeam${n}Content:$gbc";
+  }
 
   $hash->{".AttrList"} = join " ", @deva;
 
@@ -7712,18 +7883,6 @@ sub centralTask {
 
   if ($n) {
       Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
-  }
-  
-  my $fg1 = AttrVal ($name, 'ctrlAIdataStorageDuration', undef);                     # 07.03.2025
-  my $fg2 = AttrVal ($name, 'ctrlAIshiftTrainStart',     undef);
-  
-  my $newval;
-  $newval .= "aiStorageDuration=$fg1 "    if(defined $fg1);
-  $newval .= "aiTrainStart=$fg2 "         if(defined $fg2);
-
-  if ($newval) {
-      CommandAttr (undef, "$name aiControl $newval");
-      ::CommandDeleteAttr (undef, "$name ctrlAIdataStorageDuration|ctrlAIshiftTrainStart");
   }
 
   ##########################################################################################################################
@@ -8195,7 +8354,7 @@ sub _specialActivities {
   ## bestimmte einmalige Aktionen
   ##################################
   $chour    = int $chour;
-  $minute   = int $minute;                         
+  $minute   = int $minute;
   my $aitrh = CurrentVal ($name, 'aiTrainStart', AITRSTARTDEF);                                   # Stunde f. Start AI-Training
 
   ## Task 1
@@ -8541,6 +8700,11 @@ sub _transferWeatherValues {
       my $rr1c  = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{rr1c};                  # Gesamtniederschlag (1-stündig) letzte 1 Stunde
       my $temp  = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ttt};                   # Außentemperatur
       my $don   = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{don};                   # Tag/Nacht-Grenze
+
+      if (defined $wid && (!$wid || $wid == 100)) {
+          $wcc = 0;                                                                         # V 1.47.2
+          debugLog ($paref, 'collectData', "Adjust cloud cover ratio (wcc) due to significant weather (ww) - ww: $wid -> wcc: $wcc");
+      }
 
       my $nhtstr                                  = "NextHour".sprintf "%02d", $num;
       $data{$name}{nexthours}{$nhtstr}{weatherid} = $wid;
@@ -8951,8 +9115,8 @@ return;
 sub _transferAPIRadiationValues {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $t     = $paref->{t};                                                                     # Epoche Zeit
+  my $lang  = $paref->{lang};
   my $chour = $paref->{chour};
   my $date  = $paref->{date};
   my $hash  = $defs{$name};
@@ -8962,7 +9126,10 @@ sub _transferAPIRadiationValues {
   my @strings = sort keys %{$data{$name}{strings}};
   return if(!@strings);
 
-  my $lang = $paref->{lang};
+  my $invcapsum = 0;
+  for my $in (keys %{$data{$name}{inverters}}) {
+      $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                            # Limit Leistungssumme aller Inverters
+  }
 
   for my $num (0..47) {
       my ($fd,$fh) = calcDayHourMove ($chour, $num);
@@ -9018,10 +9185,10 @@ sub _transferAPIRadiationValues {
       }
 
       $paref->{sabin}    = sunalt2bin ($sunalt);
-      my $est            = __calcPVestimates ($paref);
+      my $pvest          = __calcPVestimates ($paref);
       my ($msg, $pvaifc) = aiGetResult ($paref);                                              # KI Entscheidungen abfragen
-
-      $data{$name}{nexthours}{$nhtstr}{pvapifc} = $est;                                       # durch API gelieferte PV Forecast
+      
+      $data{$name}{nexthours}{$nhtstr}{pvapifc} = $pvest;                                     # durch API gelieferte PV Forecast
 
       delete $paref->{fd};
       delete $paref->{fh1};
@@ -9037,11 +9204,17 @@ sub _transferAPIRadiationValues {
       my $pvfc;
 
       if ($msg eq 'accurate' || $msg eq 'spreaded') {
+          if ($invcapsum && $pvaifc > $invcapsum) {
+              $pvaifc = $invcapsum;                                                                     # PV AI Vorhersage auf Summe aller WR Kapazität begrenzen
+
+              debugLog ($paref, "radiationProcess", "PV AI forecast start time $wantdt limited to $invcapsum Wh due to inverter capacity summary");
+          }
+          
           my $airn  = CircularVal ($hash, 99, 'aiRulesNumber', 0);
           my $aivar = 100;
-          $aivar    = sprintf "%.0f", (100 * $pvaifc / $est) if($est);                        # Übereinstimmungsgrad KI Forecast zu API Forecast in %
+          $aivar    = sprintf "%.0f", (100 * $pvaifc / $pvest) if($pvest);                              # Übereinstimmungsgrad KI Forecast zu API Forecast in %
 
-          if ($msg eq 'accurate') {                                                           # KI liefert 'accurate' Treffer -> verwenden
+          if ($msg eq 'accurate') {                                                                     # KI liefert 'accurate' Treffer -> verwenden
               if ($airn >= AIACCTRNMIN || ($aivar >= AIACCLOWLIM && $aivar <= AIACCUPLIM)) {
                   $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
                   $pvfc  = $pvaifc;
@@ -9050,7 +9223,7 @@ sub _transferAPIRadiationValues {
                   debugLog ($paref, 'aiData', qq{AI Hit - accurate result used -> aiRulesNum: $airn, variance: $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
               }
           }
-          elsif ($msg eq 'spreaded') {                                                        # Abweichung AI von Standardvorhersage begrenzen
+          elsif ($msg eq 'spreaded') {                                                                  # Abweichung AI von Standardvorhersage begrenzen
               if ($airn >= AISPREADTRNMIN || ($aivar >= AISPREADLOWLIM && $aivar <= AISPREADUPLIM)) {
                   $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
                   $pvfc  = $pvaifc;
@@ -9065,17 +9238,17 @@ sub _transferAPIRadiationValues {
       }
 
       if ($useai) {
-          $data{$name}{nexthours}{$nhtstr}{pvaifc} = $pvaifc;                               # durch AI gelieferte PV Forecast
+          $data{$name}{nexthours}{$nhtstr}{pvaifc} = $pvaifc;                                  # durch AI gelieferte PV Forecast
       }
       else {
           delete $data{$name}{nexthours}{$nhtstr}{pvaifc};
           $data{$name}{nexthours}{$nhtstr}{aihit} = 0;
-          $pvfc = $est;
+          $pvfc = $pvest;
 
           debugLog ($paref, 'aiData', "use PV from API (no AI or AI result tolerance overflow) -> hod: $hod, Rad1h: ".(defined $rad1h ? $rad1h : '-').", pvfc: $pvfc Wh");
       }
 
-      $data{$name}{nexthours}{$nhtstr}{pvfc} = $pvfc;                                       # resultierende PV Forecast zuweisen
+      $data{$name}{nexthours}{$nhtstr}{pvfc} = $pvfc;                                          # resultierende PV Forecast zuweisen
 
       if ($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
           $data{$name}{circular}{sprintf "%02d",$fh1}{pvapifc} = NexthoursVal ($hash, $nhtstr, 'pvapifc', undef);
@@ -9155,7 +9328,6 @@ return;
 sub __calcPVestimates {
   my $paref   = shift;
   my $name    = $paref->{name};
-  my $type    = $paref->{type};
   my $wantdt  = $paref->{wantdt};
   my $hod     = $paref->{hod};
   my $fd      = $paref->{fd};
@@ -9166,7 +9338,7 @@ sub __calcPVestimates {
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   my $rr1c        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",            0);   # Gesamtniederschlag während der letzten Stunde kg/m2
   my $wcc         = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "wcc",             0);   # effektive Wolkendecke nächste Stunde X
-  my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", TEMPBASEDEF);   # vorhergesagte Temperatur Stunde X
+  my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", TEMPBASEDEF);    # vorhergesagte Temperatur Stunde X
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   $paref->{wcc}  = $wcc;
@@ -9174,8 +9346,9 @@ sub __calcPVestimates {
   delete $paref->{wcc};
 
   my ($lh,$sq,$peakloss, $modtemp);
-  my $pvsum   = 0;
-  my $peaksum = 0;
+  my $pvsum     = 0;
+  my $peaksum   = 0;
+  my $invcapsum = 0;
 
   for my $string (sort keys %{$data{$name}{strings}}) {
       my $peak = StringVal ($hash, $string, 'peak', 0);                                               # String Peak (kWp)
@@ -9193,31 +9366,21 @@ sub __calcPVestimates {
           delete $paref->{temp};
       }
 
-      $peak  *= 1000;
-      my $est = RadiationAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0);
-      my $pv  = sprintf "%.1f", ($est * $hc);                                                         # Korrekturfaktor anwenden
-
-      my $invcap = 0;
+      $peak    *= 1000;
+      my $pvest = RadiationAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0);
+      my $pv    = sprintf "%.1f", ($pvest * $hc);                                                     # Korrekturfaktor anwenden
 
       for my $in (keys %{$data{$name}{inverters}}) {
           my $istrings = InverterVal ($hash, $in, 'istrings', '');                                    # dem Inverter zugeordnete Strings
           next if(!grep /^$string$/, (split ',', $istrings));
 
-          $invcap = InverterVal ($hash, $in, 'invertercap', 0);                                       # Max. Leistung des Inverters
-
-          last;
-      }
-
-      if ($invcap && $pv > $invcap) {
-          $pv = $invcap;                                                                              # PV Vorhersage auf WR Kapazität begrenzen
-
-          debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $pv Wh due to inverter capacity");
+          $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                      # Max. Leistung des Inverters
       }
 
       if ($debug =~ /radiationProcess/xs) {
           $lh = {                                                                                     # Log-Hash zur Ausgabe
               "String Peak"                    => $peak. " W",
-              "Estimated PV generation (raw)"  => $est.  " Wh",
+              "Estimated PV generation (raw)"  => $pvest." Wh",
               "Estimated PV generation (calc)" => $pv.   " Wh",
               "PV correction factor"           => $hc,
               "PV correction quality"          => $hq,
@@ -9240,9 +9403,16 @@ sub __calcPVestimates {
       $peaksum += $peak;
   }
 
-  $data{$name}{current}{allstringspeak} = $peaksum;                                           # temperaturbedingte Korrektur der installierten Peakleistung in W
-  $pvsum                                       = $peaksum if($peaksum && $pvsum > $peaksum);         # Vorhersage nicht größer als die Summe aller PV-Strings Peak
-  $pvsum                                       = sprintf "%.0f", $pvsum;
+  $data{$name}{current}{allstringspeak} = $peaksum;                                                 # temperaturbedingte Korrektur der installierten Peakleistung in W
+  $pvsum                                = $peaksum if($peaksum && $pvsum > $peaksum);               # Vorhersage nicht größer als die Summe aller PV-Strings Peak
+  
+  if ($invcapsum && $pvsum > $invcapsum) {
+      $pvsum = $invcapsum;                                                                          # PV Vorhersage auf WR Kapazität begrenzen
+
+      debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $invcapsum Wh due to inverter capacity summary");
+  }
+  
+  $pvsum = sprintf "%.0f", $pvsum;
 
   if ($debug =~ /radiationProcess/xs) {
       $lh = {                                                                                        # Log-Hash zur Ausgabe
@@ -9713,7 +9883,7 @@ sub _transferBatteryValues {
 
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
-      
+
       my $warnin  = '';
       my $warnout = '';
       my ($pin,$piunit)    = split ":", $h->{pin};                                                # Readingname/Unit für aktuelle Batterieladung
@@ -9740,6 +9910,13 @@ sub _transferBatteryValues {
       my $btotout = ReadingsNum ($badev, $bout,     0) * $boutuf;                                # totale Batterieentladung (Wh)
       my $btotin  = ReadingsNum ($badev, $bin,      0) * $binuf;                                 # totale Batterieladung (Wh)
       my $soc     = ReadingsNum ($badev, $batchr,   0);
+
+      my $show    = $h->{show} // 0;                                                             # Batterie in Balkengrafik anzeigen
+      my $pos     = 'top';
+
+      if ($show =~ /:/xs) {
+          ($show, $pos) = split ':', $show;
+      }
 
       if ($instcap) {
           if (!isNumeric ($instcap)) {                                                           # wenn $instcap Reading Wert abfragen
@@ -9786,7 +9963,7 @@ sub _transferBatteryValues {
           };
 
           ($pbi,$pbo) = substSpecialCases ($params);
-          
+
           if ($debug =~ /collectData/x) {
               Log3 ($name, 1, "$name DEBUG> Battery Power data after resolving the special case 'pou eq -pin' =>");
               Log3 ($name, 1, "$name DEBUG> pin: $pbi W, pout: $pbo W");
@@ -9834,7 +10011,7 @@ sub _transferBatteryValues {
           Log3 ($name, $vl, "$name $pre The BatIn Energy of Battery '$badev' is lower than the value saved before. This situation is unexpected and the Energy generated of current hour of this Battery is set to '0'.");
           $warnin = ' (WARNING invalid BatIn Energy occured - see Logfile)';
       }
-      
+
       $data{$name}{circular}{sprintf("%02d",$nhour)}{'batin'.$bn} = $batinthishour;                            # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
       writeToHistory ( { paref => $paref, key => 'batinthishour'.$bn, val => $batinthishour, hour => $nhour } );
@@ -9865,7 +10042,7 @@ sub _transferBatteryValues {
           Log3 ($name, $vl, "$name $pre The BatOut Energy of Battery '$badev' is lower than the value saved before. This situation is unexpected and the Energy generated of current hour of this Battery is set to '0'.");
           $warnout = ' (WARNING invalid BatOut Energy occured - see Logfile)';
       }
-      
+
       $data{$name}{circular}{sprintf("%02d",$nhour)}{'batout'.$bn} = $batoutthishour;                          # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
       writeToHistory ( { paref => $paref, key => 'batoutthishour'.$bn, val => $batoutthishour, hour => $nhour } );
@@ -9893,7 +10070,8 @@ sub _transferBatteryValues {
       $data{$name}{batteries}{$bn}{bcharge}      = $soc;                                                 # Batterie SoC (%)
       $data{$name}{batteries}{$bn}{basynchron}   = $h->{asynchron} // 0;                                 # asynchroner Modus = X
       $data{$name}{batteries}{$bn}{bicon}        = $h->{icon} if($h->{icon});                            # Batterie Icon
-      $data{$name}{batteries}{$bn}{bshowingraph} = $h->{show} // 0;                                      # Batterie in Balkengrafik anzeigen
+      $data{$name}{batteries}{$bn}{bshowingraph} = $show;                                                # Batterie in Balkengrafik anzeigen
+      $data{$name}{batteries}{$bn}{bposingraph}  = $pos;                                                 # Anzeigeposition in Balkengrafik
       $data{$name}{batteries}{$bn}{bchargewh}    = BatteryVal ($name, $bn, 'binstcap', 0) * $soc / 100;  # Batterie SoC (Wh)
 
       writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, hour => $nhour } );
@@ -10166,10 +10344,6 @@ sub _batChargeRecmd {
   return if(!isBatteryUsed ($name));
 
   my $hash     = $defs{$name};
-  my $rodpvfc  = ReadingsNum ($name, 'RestOfDayPVforecast',          0);                         # PV Prognose Rest des Tages
-  my $tompvfc  = ReadingsNum ($name, 'Tomorrow_PVforecast',          0);                         # PV Prognose nächster Tag
-  my $confcss  = CurrentVal  ($hash, 'tdConFcTillSunset',            0);                         # Verbrauchsprognose bis Sonnenuntergang
-  my $tomconfc = ReadingsNum ($name, 'Tomorrow_ConsumptionForecast', 0);                         # Verbrauchsprognose nächster Tag
   my $pvCu     = ReadingsNum ($name, 'Current_PV',                   0);                         # aktuelle PV Erzeugung
   my $curcon   = ReadingsNum ($name, 'Current_Consumption',          0);                         # aktueller Verbrauch
   my $inplim   = 0;
@@ -10209,11 +10383,16 @@ sub _batChargeRecmd {
           return;
       }
 
-      my $csoc       = BatteryVal  ($hash, $bn, 'bcharge',  0);                                  # aktuelle Ladung in %
-      my $batoptsoc  = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                  # aktueller optimierter SoC
-      my $cgbt       = AttrVal     ($name, 'ctrlBatSocManagement'.$bn, undef);
-      my $sf         = __batCapShareFactor ($hash, $bn);                                         # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
-      my $lowSoc     = 0;
+      my $maxfctim  = timestringToTimestamp (ReadingsVal ($name, 'Today_MaxPVforecastTime', '')) // $t;
+	  my $rodpvfc   = ReadingsNum ($name, 'RestOfDayPVforecast',           0);                   # PV Prognose Rest des Tages
+	  my $tompvfc   = ReadingsNum ($name, 'Tomorrow_PVforecast',           0);                   # PV Prognose nächster Tag
+	  my $confcss   = CurrentVal  ($hash, 'tdConFcTillSunset',             0);                   # Verbrauchsprognose bis Sonnenuntergang
+	  my $tomconfc  = ReadingsNum ($name, 'Tomorrow_ConsumptionForecast',  0);                   # Verbrauchsprognose nächster Tag
+      my $csoc      = BatteryVal  ($hash, $bn, 'bcharge',  0);                                   # aktuelle Ladung in %
+      my $batoptsoc = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                   # aktueller optimierter SoC
+      my $cgbt      = AttrVal     ($name, 'ctrlBatSocManagement'.$bn, undef);
+      my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
+      my $lowSoc    = 0;
 
       if ($cgbt) {
           ($lowSoc) = __parseAttrBatSoc ($name, $cgbt);
@@ -10225,7 +10404,9 @@ sub _batChargeRecmd {
       debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
       debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - The PV generation, consumption and surplus listed below are based on the battery's share of the total capacity!");
 
-      my $socwh = sprintf "%.0f", ($batinstcap * $csoc / 100);                                   # aktueller SoC in Wh
+      my $socwh    = sprintf "%.0f", ($batinstcap * $csoc / 100);                                # aktueller SoC in Wh
+	  my $whneed   = $batinstcap - $socwh;
+      my $sfmargin = $whneed * 0.25;                                                             # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
 
       ## Auswertung für jede kommende Stunde
       ########################################
@@ -10238,6 +10419,7 @@ sub _batChargeRecmd {
           my $confc = NexthoursVal ($hash, 'NextHour'.$nhr, 'confc',      0);
           my $pvfc  = NexthoursVal ($hash, 'NextHour'.$nhr, 'pvfc',       0);
           my $stt   = NexthoursVal ($hash, 'NextHour'.$nhr, 'starttime', '');
+		  my $nhts  = timestringToTimestamp ($stt) // $t;                                        # Unix Timestamp von NextHours Starttime
           $stt      = (split /[-:]/, $stt)[2] if($stt);
 
           my $crel  = 0;                                                                         # Ladefreigabe 0 per Default
@@ -10245,12 +10427,12 @@ sub _batChargeRecmd {
 
           ## Aufteilung Energie auf Batterie XX im Verhältnis aller Bat
           ###############################################################
-          $pvfc     = sprintf "%.0f", $sf * $pvfc;
-          $confcss  = sprintf "%.0f", $sf * $confcss;
-          $confc    = sprintf "%.0f", $sf * $confc;
-          $rodpvfc  = sprintf "%.0f", $sf * $rodpvfc;
-          $tomconfc = sprintf "%.0f", $sf * $tomconfc;
-          $tompvfc  = sprintf "%.0f", $sf * $tompvfc;
+          $pvfc     = sprintf "%.0f", ($sf * $pvfc);
+          $confcss  = sprintf "%.0f", ($sf * $confcss);
+          $confc    = sprintf "%.0f", ($sf * $confc);
+          $rodpvfc  = sprintf "%.0f", ($sf * $rodpvfc);
+          $tomconfc = sprintf "%.0f", ($sf * $tomconfc);
+          $tompvfc  = sprintf "%.0f", ($sf * $tompvfc);
 
           ## (Rest) PV-Überschuß für den Tag
           ####################################
@@ -10259,6 +10441,7 @@ sub _batChargeRecmd {
                   $confcss  -= $confc;                                                           # Verbrauch bis Sonnenuntergang - Verbrauch Fc aktuelle Stunde
                   $confcss   = 0 if($confcss < 0);
                   $rodpvfc  -= $pvfc;
+				  $rodpvfc   = 0 if($rodpvfc < 0);
                   $spday     = $rodpvfc - $confcss;                                              # PV-Überschußprognose (Rest) heutiger Tag
               }
               else {                                                                             # nächster Tag
@@ -10273,27 +10456,25 @@ sub _batChargeRecmd {
 
           ## Ladefreigabe
           #################
-          my $whneed   = $batinstcap - $socwh;
-          my $maxfctim = timestringToTimestamp (ReadingsVal ($name, 'Today_MaxPVforecastTime', '')) // $t;
-
-          my $sfmargin = $whneed * 0.25;                                                         # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
-
-          if ( $whneed + $sfmargin >= $spday || ($today && $t > $maxfctim)) {$crel = 1}          # change V 1.47.0: Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-          if ( !$num && ($pvCu - $curcon) >= $inplim )                      {$crel = 1}          # Ladefreigabe wenn akt. PV Leistung >= WR-Leistungsbegrenzung
-          if ( !$cgbt )                                                     {$crel = 1}          # immer Ladefreigabe wenn kein BatSoc-Management
+          if ( $whneed + $sfmargin >= $spday )           {$crel = 1}                             # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+		  if ( $today && $t >= $maxfctim)                {$crel = 1}                             # change V 1.49.0: Ladefreigabe wenn akt. Zeit >= Zeit bei max. Tagesertragsertwartung
+          if ( $today && $nhts >= $maxfctim)             {$crel = 1}                             # change V 1.49.0: Ladefreigabe bei Prognosezeit >= Zeit bei max. Tagesertragsertwartung
+		  if ( !$num && ($pvCu - $curcon) >= $inplim )   {$crel = 1}                             # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
+          if ( !$cgbt )                                  {$crel = 1}                             # immer Ladefreigabe wenn kein BatSoc-Management
 
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
           my $fceff = $pvfc - $confc;                                                            # effektiver PV Überschuß (effektiver Verbrauch wenn < 0)
-          $socwh   += $crel ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) : 
+          $socwh   += $crel ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) :
                       ($fceff > 0 ? 0 : $fceff / STOREFFDEF);                                    # PV Prognose nur einbeziehen wenn Ladefreigabe
-          
+
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
                     $socwh > $batinstcap  ? $batinstcap  :
                     $socwh;
 
           $socwh      = sprintf "%.0f", $socwh;
+		  $whneed     = $batinstcap - $socwh;
           my $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                            # Prognose SoC in %
 
           __createNextHoursSFCReadings ( {name    => $name,
@@ -10303,10 +10484,14 @@ sub _batChargeRecmd {
                                          }
                                        );                                                        # Readings NextHourXX_Bat_XX_ChargeForecast erstellen
 
-          my $msg = "(currsoc: $csoc %, SoCfc: $progsoc %, soc: $socwh Wh, pvfc: $pvfc, confc: $confc, Surp Day: $spday Wh, Curr PV: $pvCu W, Curr Consumption: $curcon W, Limit: $inplim W)";
-
+          my $msg = "(CurrSoc: $csoc %, soc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W)";
+                    
           if ($num) {
-              $msg = "(SoCfc: $progsoc %, soc: $socwh Wh, pvfc: $pvfc, confc: $confc, Surp Day: $spday Wh)";
+              $msg = "(SoCfc: $progsoc %, soc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh)";
+              
+              if (!$today) {
+                  $msg = "(SoCfc: $progsoc %, soc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh)";
+              }
           }
           else {
               storeReading ('Battery_ChargeRecommended_'.$bn, $crel);                            # Reading nur für aktuelle Stunde
@@ -10371,8 +10556,8 @@ sub _createSummaries {
   my $tdConFcTillSunset = 0;
   my $remainminutes     = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
 
-  my $restofhourpvfc   = (NexthoursVal($hash, "NextHour00", 'pvfc',  0)) / 60 * $remainminutes;
-  my $restofhourconfc  = (NexthoursVal($hash, "NextHour00", 'confc', 0)) / 60 * $remainminutes;
+  my $restofhourpvfc  = (NexthoursVal($hash, "NextHour00", 'pvfc',  0)) / 60 * $remainminutes;
+  my $restofhourconfc = (NexthoursVal($hash, "NextHour00", 'confc', 0)) / 60 * $remainminutes;
 
   $next1HoursSum->{PV}          = $restofhourpvfc;
   $next2HoursSum->{PV}          = $restofhourpvfc;
@@ -10760,7 +10945,7 @@ sub __calcEnergyPieces {
                                                debug   => $paref->{debug}
                                              }
                                            );
-                                           
+
   if ($err) {
       Log3 ($name, 1, "$name - ERROR in consumer $c config: $err");
       return;
@@ -11120,7 +11305,7 @@ sub ___doPlanning {
   if ($err) {
       Log3 ($name, 1, "$name - ERROR in consumer $c config: $err");
       return;
-  } 
+  }
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
 
@@ -11836,7 +12021,7 @@ sub ___setConsumerSwitchingState {
                                                    debug   => $paref->{debug}
                                                  }
                                                );
-                                               
+
       if ($err) {
           $state = qq{Consumer '$calias' ERROR in config: $err};
           Log3 ($name, 1, "$name - $state");
@@ -12356,7 +12541,7 @@ sub _calcConsForecast_circular {
       my $nhhr  = sprintf "%02d", int (strftime "%H", localtime($utime)) + 1;                          # Stunde des Tages vom NextHours Key (01,02,...24)
 
       next if(!defined $usage{$nhhr}{con});                                                            # V 1.47.0
-      
+
       $data{$name}{nexthours}{$k}{confcEx} = $usage{$nhhr}{conex};
       $data{$name}{nexthours}{$k}{confc}   = $usage{$nhhr}{con};                                       # prognostizierter Verbrauch (Median)
 
@@ -12543,15 +12728,18 @@ sub _calcDataEveryFullHour {
   my $chour = $paref->{chour};
   my $t     = $paref->{t};                                                            # aktuelle Unix-Zeit
 
-  my $hash = $defs{$name};
-  my $idts = CircularVal ($hash, 99, "attrInvChangedTs", '');                         # Definitionstimestamp des Attr setupInverterDev01
-
-  return if(!$idts);
-
+  my $hash        = $defs{$name};
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   if ($acu) {
       readingsSingleUpdate ($hash, '.pvCorrectionFactor_Auto_Soll', ($aln ? $acu : $acu.' noLearning'), 0) if($acu =~ /on/xs);
+
+      my $idts = CircularVal ($hash, 99, "attrInvChangedTs", '');                         # Definitionstimestamp des Attr setupInverterDev01
+
+      if (!$idts) {                                                                       # V 1.47.3
+          $data{$name}{circular}{99}{attrInvChangedTs} = int $t;
+          return;
+      }
 
       if ($t - $idts < 7200) {
           my $rmh = sprintf "%.2f", ((7200 - ($t - $idts)) / 3600);
@@ -13002,7 +13190,7 @@ sub _genSpecialReadings {
       }
       elsif ($hcsr{$kpi}{fnr} == 4) {
           storeReading ($prpo.'_'.$kpi, &{$hcsr{$kpi}{fn}} ($hash, $day, $hcsr{$kpi}{par}, $hcsr{$kpi}{par1}, $def).$hcsr{$kpi}{unit});
-      } 
+      }
       elsif ($hcsr{$kpi}{fnr} == 5) {
           if ($kpi eq 'SunHours_Remain') {
               my $ss  = &{$hcsr{$kpi}{fn}} ($hash, 'sunsetTodayTs',  $def);
@@ -13151,7 +13339,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, $radc.$hcsr{$kpi}{unit});
           }
-          
+
           if ($kpi eq 'todayConsumptionForecast') {
              for my $hod (sort keys %{$data{$name}{pvhist}{$day}}) {
                  next if(!$hod || $hod == 99);
@@ -13172,7 +13360,7 @@ sub _genSpecialReadings {
 
                  storeReading ($prpo.'_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
              }
-          }             
+          }
 
           if ($kpi eq 'conForecastTillNextSunrise') {
              my $confc = 0;
@@ -13331,8 +13519,10 @@ sub entryGraphic {
       beam2cont      => AttrVal    ($name, 'graphicBeam2Content',     'pvForecast'),
       beam3cont      => AttrVal    ($name, 'graphicBeam3Content',               ''),
       beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
+      beam5cont      => AttrVal    ($name, 'graphicBeam5Content',               ''),
+      beam6cont      => AttrVal    ($name, 'graphicBeam6Content',               ''),
       caicon         => AttrVal    ($name, 'consumerAdviceIcon',         CAICONDEF),                # Consumer AdviceIcon
-      clegend        => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
+      clegendpos     => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => AttrVal    ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
       lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
       kw             => AttrVal    ($name, 'graphicEnergyUnit',               'Wh'),
@@ -13363,7 +13553,8 @@ sub entryGraphic {
       debug          => getDebug   ($hash),                                                         # Debug Module
   };
 
-  my $ret = q{};
+  my $colspan = $maxhours + 2;
+  my $ret     = q{};
 
   $ret .= "<span>$dlink </span><br>"  if(AttrVal($name, 'ctrlShowLink', 0));
 
@@ -13378,7 +13569,7 @@ sub entryGraphic {
 
   # Verbraucherlegende und Steuerung
   ###################################
-  my $legendtxt = _graphicConsumerLegend ($paref);
+  my $cnmlegend = _graphicConsumerLegend ($paref);
 
   # Headerzeile und/oder Verbraucherlegende ausblenden
   ######################################################
@@ -13387,7 +13578,7 @@ sub entryGraphic {
   }
 
   if ($gsel =~ /_noCons/xs) {
-      $legendtxt = q{};
+      $cnmlegend = q{};
   }
 
   $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
@@ -13395,19 +13586,19 @@ sub entryGraphic {
 
   if ($header) {                                                                                            # Header ausgeben
       $ret .= "<tr class='$htr{$m}{cl}'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td>";
+      $ret .= "<td colspan='$colspan' align='center' style='word-break: normal'>$header</td>";
       $ret .= "</tr>";
 
       $paref->{modulo}++;
   }
 
-  my $clegend = $paref->{clegend};
-  $m          = $paref->{modulo} % 2;
+  my $clegendpos = $paref->{clegendpos};
+  $m             = $paref->{modulo} % 2;
 
-  if ($legendtxt && $clegend eq 'top') {
+  if ($cnmlegend && $clegendpos eq 'top') {
       $ret .= "<tr class='$htr{$m}{cl}'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
-      $ret .= $legendtxt;
+      $ret .= "<td colspan='$colspan' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
+      $ret .= $cnmlegend;
       $ret .= "</td>";
       $ret .= "</tr>";
 
@@ -13424,15 +13615,15 @@ sub entryGraphic {
   if ($gsel =~ /both/xs || $gsel =~ /forecast/xs) {
       my %hfcg1;
       $paref->{chartlvl} = 1;                                                                              # Balkengrafik Ebene 1
+      $paref->{hfcg}     = \%hfcg1;                                                                        # hfcg = hash forecast graphic
 
       ## Werte aktuelle Stunde
       ##########################
-      $paref->{hfcg}     = \%hfcg1;                                                                        # hfcg = hash forecast graphic
       $paref->{thishour} = _beamGraphicFirstHour ($paref);
 
       ## get consumer list and display it in Graphics
       #################################################
-      #_showConsumerInGraphicBeam ($paref);                                                               # keine Verwendung zur Zeit
+      #_showConsumerInGraphicBeam ($paref);                                                                # keine Verwendung zur Zeit
 
       ## Werte restliche Stunden
       ############################
@@ -13442,7 +13633,14 @@ sub entryGraphic {
       $paref->{maxDif} = $back->{maxDif};                                                                  # für Typ diff
       $paref->{minDif} = $back->{minDif};                                                                  # für Typ diff
 
-      $ret .= _beamGraphic ($paref);
+      ## Batteriewerte füllen
+      #########################
+      _beamFillupBatValues ($paref);
+
+      # Balkengrafik Ausgabe
+      ########################
+      $ret .= _beamGraphic    ($paref);
+      $ret .= _levelSeparator ($paref);
 
       delete $paref->{maxVal};                                                                             # bereinigen vor nächster Ebene
       delete $paref->{maxCon};
@@ -13454,7 +13652,7 @@ sub entryGraphic {
       if ($paref->{beam3cont} || $paref->{beam4cont}) {                                                    # Balkengrafik Ebene 2
           my %hfcg2;
 
-          $paref->{chartlvl}  = 2;                                                                         # Balkengrafik Ebene 2
+          $paref->{chartlvl}  = 2;
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
           $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',               B3COLDEF);
@@ -13463,10 +13661,10 @@ sub entryGraphic {
           $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',       B4FONTCOLDEF);
           $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height});
           $paref->{weather}   = 0;
+          $paref->{hfcg}      = \%hfcg2;
 
           # Werte aktuelle Stunde
           ##########################
-          $paref->{hfcg}     = \%hfcg2;
           $paref->{thishour} = _beamGraphicFirstHour ($paref);
 
           # Werte restliche Stunden
@@ -13477,9 +13675,57 @@ sub entryGraphic {
           $paref->{maxDif} = $back->{maxDif};                                                             # für Typ diff
           $paref->{minDif} = $back->{minDif};                                                             # für Typ diff
 
+          ## Batteriewerte füllen
+          #########################
+          _beamFillupBatValues ($paref);
+
           # Balkengrafik Ausgabe
           ########################
-          $ret .= _beamGraphic ($paref);
+          $ret .= _beamGraphic    ($paref);
+          $ret .= _levelSeparator ($paref);
+
+          delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
+          delete $paref->{maxCon};
+          delete $paref->{maxDif};
+          delete $paref->{minDif};
+      }
+
+      ## Balkengrafik Ebene 3
+      #########################
+      if ($paref->{beam5cont} || $paref->{beam6cont}) {                                                    # Balkengrafik Ebene 3
+          my %hfcg3;
+
+          $paref->{chartlvl}  = 3;
+          $paref->{beam1cont} = $paref->{beam5cont};
+          $paref->{beam2cont} = $paref->{beam6cont};
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam5Color',               B5COLDEF);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam6Color',               B6COLDEF);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam5FontColor',       B5FONTCOLDEF);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam6FontColor',       B6FONTCOLDEF);
+          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel3', $paref->{height});
+          $paref->{weather}   = 0;
+          $paref->{hfcg}      = \%hfcg3;
+
+          # Werte aktuelle Stunde
+          ##########################
+          $paref->{thishour} = _beamGraphicFirstHour ($paref);
+
+          # Werte restliche Stunden
+          ###########################
+          my $back         = _beamGraphicRemainingHours ($paref);
+          $paref->{maxVal} = $back->{maxVal};                                                             # Startwert wenn kein Wert bereits via attr vorgegeben ist
+          $paref->{maxCon} = $back->{maxCon};
+          $paref->{maxDif} = $back->{maxDif};                                                             # für Typ diff
+          $paref->{minDif} = $back->{minDif};                                                             # für Typ diff
+
+          ## Batteriewerte füllen
+          #########################
+          _beamFillupBatValues ($paref);
+
+          # Balkengrafik Ausgabe
+          ########################
+          $ret .= _beamGraphic    ($paref);
+          $ret .= _levelSeparator ($paref);
 
           delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
           delete $paref->{maxCon};
@@ -13497,7 +13743,7 @@ sub entryGraphic {
   if ($gsel =~ /both/xs || $gsel =~ /flow/xs) {
       $ret  .= "<tr class='$htr{$m}{cl}'>";
       my $fg = _flowGraphic ($paref);
-      $ret  .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
+      $ret  .= "<td colspan='$colspan' align='center' style='word-break: normal'>";
       $ret  .= "$fg</td>";
       $ret  .= "</tr>";
 
@@ -13508,11 +13754,11 @@ sub entryGraphic {
 
   # Legende unten
   #################
-  if ($legendtxt && ($clegend eq 'bottom')) {
+  if ($cnmlegend && ($clegendpos eq 'bottom')) {
       $ret .= "<tr class='$htr{$m}{cl}'>";
-      #$ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
-      $ret .= "$legendtxt</td>";
+      #$ret .= "<td colspan='$colspan' align='center' style='word-break: normal'>";
+      $ret .= "<td colspan='$colspan' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
+      $ret .= "$cnmlegend</td>";
       $ret .= "</tr>";
   }
 
@@ -14513,6 +14759,23 @@ return ($val, $unit);
 }
 
 ################################################################
+#            Erstellung des Ebenentrenners
+################################################################
+sub _levelSeparator {
+  my $paref    = shift;
+  my $dstyle   = $paref->{dstyle};                        # TD-Style
+  my $maxhours = $paref->{maxhours};
+
+  my $colspan  = $maxhours + 2;
+
+  my $ret = "<tr>";
+  $ret   .= "<td colspan='$colspan' align='center' $dstyle><hr></td>";
+  $ret   .= "</tr>";
+
+return $ret;
+}
+
+################################################################
 #    Consumer in forecastGraphic (Balken) anzeigen
 #    (Hat zur Zeit keine Wirkung !)
 ################################################################
@@ -14586,12 +14849,12 @@ return;
 sub _graphicConsumerLegend {
   my $paref                    = shift;
   my $name                     = $paref->{name};
-  my ($clegendstyle, $clegend) = split '_', $paref->{clegend};
+  my ($clegendstyle, $clegend) = split '_', $paref->{clegendpos};
   my $clink                    = $paref->{clink};
 
   my @consumers                = sort{$a<=>$b} keys %{$data{$name}{consumers}};              # definierte Verbraucher ermitteln
   $clegend                     = '' if($clegendstyle eq 'none' || !int @consumers);
-  $paref->{clegend}            = $clegend;
+  $paref->{clegendpos}         = $clegend;
 
   return if(!$clegend );
 
@@ -15044,7 +15307,7 @@ sub _beamGraphicRemainingHours {
                               $beam1cont eq 'energycosts'         ? $val6 :
                               $beam1cont eq 'gridfeedin'          ? $val7 :
                               $beam1cont eq 'feedincome'          ? $val8 :
-                              $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam1cont)[1]} : 
+                              $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam1cont)[1]} :
                               undef;
 
       $hfcg->{$i}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
@@ -15079,6 +15342,67 @@ sub _beamGraphicRemainingHours {
   };
 
 return $back;
+}
+
+################################################################
+#   Batteriewerte zur Anzeige in Balkengrafik vorbereiten
+#   Anzeigehash mit Werten auffüllen
+################################################################
+sub _beamFillupBatValues {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hfcg  = $paref->{hfcg};
+
+  my $hash = $defs{$name};
+  my $hh;
+
+  for my $idx (sort keys %{$data{$name}{nexthours}}) {
+      for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
+          $bn      = sprintf "%02d", $bn;
+          my $rcdc = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, undef);
+          my $stt  = NexthoursVal ($name, $idx, 'starttime',        undef);
+          next if(!defined $stt || !defined $rcdc);
+
+          my (undef,undef,$day_str,$time_str) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
+
+          $hh->{$day_str}{$time_str}{'rcdchargebat'.$bn} = $rcdc;
+          $hh->{$day_str}{$time_str}{'soc'.$bn}          = NexthoursVal ($name, $idx, 'soc'.$bn, undef);
+      }
+  }
+
+  for my $kdx (sort keys %{$hfcg}) {
+      next if(!isNumeric ($kdx));
+
+      my $ds = $hfcg->{$kdx}{day_str};
+      my $ts = $hfcg->{$kdx}{time_str};
+
+      next if(!defined $ds || !defined $ts);
+
+      $ts = (split ":", $ts)[0];                                           # Forum: https://forum.fhem.de/index.php?msg=1332721
+
+      for my $bn (1..MAXBATTERIES) {
+          $bn = sprintf "%02d", $bn;
+          $ds = sprintf "%02d", $ds;
+
+          ## Einfügen prepared NextHour Werte
+          #####################################
+          $hfcg->{$kdx}{'rcdchargebat'.$bn} = $hh->{$ds}{$ts}{'rcdchargebat'.$bn} if(defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn});
+          $hfcg->{$kdx}{'soc'.$bn}          = $hh->{$ds}{$ts}{'soc'.$bn}          if(defined $hh->{$ds}{$ts}{'soc'.$bn});
+
+          ## Auffüllen mit History Werten (Achtung: Stundenverschieber relativ zu Nexthours)
+          ####################################################################################
+          if (!defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn}) {
+              my $histsoc = HistoryVal ($hash, $ds, (sprintf "%02d", $ts+1), 'batsoc'.$bn, undef);
+
+              if (defined $histsoc) {
+                  $hfcg->{$kdx}{'soc'.$bn}          = $histsoc;
+                  $hfcg->{$kdx}{'rcdchargebat'.$bn} = 'hist';
+              }
+          }
+      }
+  }
+
+return;
 }
 
 ################################################################
@@ -15118,10 +15442,18 @@ sub _beamGraphic {
 
   my ($val, $z2, $z3, $z4, $he, $titz2, $titz3);
 
-  my $ret      = q{};
-  $ret        .= __weatherOnBeam ($paref) if($weather);
-  $ret        .= __batteryOnBeam ($paref);
-  my $m        = $paref->{modulo} % 2;
+  $paref->{beampos} = 'top';                                                                                    # Lagedefinition "über den Balken"
+  my $ret           = q{};
+
+  ## Wetteranzeige über den Balken
+  ##################################
+  $ret .= __weatherOnBeam ($paref) if($weather);
+
+  ## Batterieanzeige über den Balken
+  ####################################
+  $ret .= __batteryOnBeam ($paref);
+
+  my $m = $paref->{modulo} % 2;
 
   if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
@@ -15213,7 +15545,7 @@ sub _beamGraphic {
           my $maxValBeam = 0;                                                                                   # ToDo:  maxValBeam noch aus maxVal ableiten
 
           if ($maxValBeam) {                                                                                    # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
-              $px_pos = int($height/2);
+              $px_pos = int ($height/2);
               $px_neg = $height - $px_pos;                                                                      # Rundungsfehler vermeiden
           }
           else {                                                                                                # Dynamische hoch/runter Verschiebung der Null-Linie
@@ -15223,7 +15555,7 @@ sub _beamGraphic {
               }
               else {
                   if ($maxDif > 0) {
-                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));                         # Wieviel % entfallen auf unten ?
+                      $px_neg = int ($height * abs($minDif) / ($maxDif + abs($minDif)));                        # Wieviel % entfallen auf unten ?
                       $px_pos = $height - $px_neg;                                                              # der Rest ist oben
                   }
                   else {                                                                                        # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
@@ -15235,11 +15567,11 @@ sub _beamGraphic {
 
           if ($hfcg->{$i}{diff} >= 0) {                                                                         # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
               $z2 = $hfcg->{$i}{diff};
-              $z3 = abs($minDif);
+              $z3 = abs ($minDif);
           }
           else {
               $z2 = $maxDif;
-              $z3 = abs($hfcg->{$i}{diff});                                                                     # Nur Betrag ohne Vorzeichen
+              $z3 = abs ($hfcg->{$i}{diff});                                                                    # Nur Betrag ohne Vorzeichen
           }
 
           $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
@@ -15257,7 +15589,6 @@ sub _beamGraphic {
 
       ## Erstellung der Balken
       ##########################
-
       # das style des nächsten TD bestimmt ganz wesentlich das gesammte Design
       # das \n erleichtert das lesen des Seitenquelltext beim debugging
       # vertical-align:bottom damit alle Balken und Ausgaben wirklich auf der gleichen Grundlinie sitzen
@@ -15395,6 +15726,8 @@ sub _beamGraphic {
           $ret .= "</td></tr>";
       }
 
+      ## die Zeitleiste
+      ###################
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
       $ret .= $hfcg->{$i}{time} == $thishour ?                                                                                           # wenn Hervorhebung nur bei gesetztem Attr 'graphicHistoryHour' ? dann hinzufügen: "&& $offset < 0"
                                    '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' :
@@ -15409,6 +15742,14 @@ sub _beamGraphic {
 
   $ret .= "<td class='solarfc'></td>";
   $ret .= "</tr>";
+
+  $paref->{beampos} = 'bottom';                                                                         # Lagedefinition "unter den Balken"
+
+  ## Batterieanzeige unterhalb der Balken
+  #########################################
+  $ret .= __batteryOnBeam ($paref);
+
+  delete $paref->{beampos};
 
 return $ret;
 }
@@ -15520,82 +15861,32 @@ return $ret;
 }
 
 ################################################################
-#         Batterieladeempfehlung in Balkengrafik
+#         Batterieanzeige in Balkengrafik
+# vorbereitete Werte (_beamFillupBatValues) in Anzeige einfügen
 ################################################################
 sub __batteryOnBeam {
-  my $paref      = shift;
-  my $name       = $paref->{name};
-  my $maxhours   = $paref->{maxhours};
-  my $show_night = $paref->{show_night};                                         # alle Balken (Spalten) anzeigen?
-  my $width      = $paref->{width};
-  my $lang       = $paref->{lang};
-  my $hfcg       = $paref->{hfcg};
-  my $t          = $paref->{t};
-  my $barcount   = $paref->{barcount} // 9999;                                   # Sync Anzahl Balken dieser Ebene mit voriger Ebene
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $maxhours = $paref->{maxhours};
+  my $width    = $paref->{width};
+  my $lang     = $paref->{lang};
+  my $hfcg     = $paref->{hfcg};
+  my $t        = $paref->{t};
+  my $barcount = $paref->{barcount} // 9999;                                                          # Sync Anzahl Balken dieser Ebene mit voriger Ebene
 
-  my $hash = $defs{$name};
-  my $hh;
-
-  for my $idx (sort keys %{$data{$name}{nexthours}}) {
-      for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
-          $bn      = sprintf "%02d", $bn;
-          my $rcdc = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, undef);
-          my $stt  = NexthoursVal ($name, $idx, 'starttime',        undef);
-          next if(!defined $stt || !defined $rcdc);
-
-          my (undef,undef,$day_str,$time_str) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
-
-          $hh->{$day_str}{$time_str}{'rcdchargebat'.$bn} = $rcdc;
-          $hh->{$day_str}{$time_str}{'soc'.$bn}          = NexthoursVal ($name, $idx, 'soc'.$bn, undef);
-      }
-  }
-
-  for my $kdx (sort keys %{$hfcg}) {
-      next if(!isNumeric ($kdx));
-
-      my $ds = $hfcg->{$kdx}{day_str};
-      my $ts = $hfcg->{$kdx}{time_str};
-
-      next if(!defined $ds || !defined $ts);
-
-      $ts = (split ":", $ts)[0];                                           # Forum: https://forum.fhem.de/index.php?msg=1332721
-
-      for my $bn (1..MAXBATTERIES) {
-          $bn = sprintf "%02d", $bn;
-          $ds = sprintf "%02d", $ds;
-
-          ## Einfügen prepared NextHour Werte
-          #####################################
-          $hfcg->{$kdx}{'rcdchargebat'.$bn} = $hh->{$ds}{$ts}{'rcdchargebat'.$bn} if(defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn});
-          $hfcg->{$kdx}{'soc'.$bn}          = $hh->{$ds}{$ts}{'soc'.$bn}          if(defined $hh->{$ds}{$ts}{'soc'.$bn});
-
-          ## Auffüllen mit History Werten (Achtung: Stundenverschieber relativ zu Nexthours)
-          ####################################################################################
-          if (!defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn}) {
-              my $histsoc = HistoryVal ($hash, $ds, (sprintf "%02d", $ts+1), 'batsoc'.$bn, undef);
-
-              if (defined $histsoc) {
-                  $hfcg->{$kdx}{'soc'.$bn}          = $histsoc;
-                  $hfcg->{$kdx}{'rcdchargebat'.$bn} = 'hist';
-              }
-          }
-      }
-  }
-
-  ## Werte in Anzeigehash einfügen
-  ##################################
   my $m     = $paref->{modulo} % 2;
   my $day   = strftime "%d", localtime($t);                                                           # aktueller Tag (range 01 .. 31)
   my $chour = strftime "%H", localtime($t);                                                           # aktuelle Stunde in 24h format (00-23)
   my $ret   = q{};
 
-  for my $bn (1..MAXBATTERIES) {                                                                     # für jede definierte Batterie
+  for my $bn (1..MAXBATTERIES) {                                                                      # für jede definierte Batterie
       $bn = sprintf "%02d", $bn;
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
-      my $bshow = BatteryVal ($name, $bn, 'bshowingraph', 0);
-      next if($bshow != $paref->{chartlvl});                                                          # Anzeige nur auf Grafikebene "chartlvl"
+      my $bshow = BatteryVal ($name, $bn, 'bshowingraph',     0);
+      my $bpos  = BatteryVal ($name, $bn, 'bposingraph', 'totp');
+      next if($bshow != $paref->{chartlvl} || $bpos ne $paref->{beampos});                            # Anzeige nur auf Grafikebene "chartlvl" bzw. oberhalb/unterhalb der Balken
 
       $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                            # freier Platz am Anfang
       my $ii       = 0;
@@ -15729,7 +16020,7 @@ sub _flowGraphic {
       $bat2home = 0;
       $soc      = 0;
   }
-  
+
   debugLog ($paref, 'graphic', "Battery initial summary - batin: $batin, bat2home: $bat2home");
 
   ## Resultierende von Laden und Entladen berechnen
@@ -15741,7 +16032,7 @@ sub _flowGraphic {
   if ($x > 0) { $batin = $x; } else { $bat2home = abs $x; }                    # es darf nur $batin ODER $bat2home mit einem Wert > 0 geben
 
   debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, bat2home: $bat2home");
-  
+
   my $bat_color = $soc < 26 ? "$stna bat25" :
                   $soc < 76 ? "$stna bat50" :
                   "$stna bat75";
@@ -16422,7 +16713,7 @@ sub __substituteIcon {
       $inorcmd  = $inorcmd  ? $inorcmd  : '';
       $icharge  = $icharge  ? $icharge  : '';
       $idischrg = $idischrg ? $idischrg : '';
-      
+
       my $cgbt = AttrVal ($name, 'ctrlBatSocManagement'.$pn, '');
 
       if (defined $flag) {                                                               # Empfehlungszeitraum
@@ -16448,7 +16739,7 @@ sub __substituteIcon {
                                 BICONDEF;                                                # nur Farbe angegeben
 
               $color  //= BICCOLNRCDDEF;
-              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1\n".($cgbt ? "\n".$htitles{bncharel}{$lang} : '');
+              $pretxt   = $htitles{onlybatw}{$lang}." $pn: $msg1".($cgbt ? "\n".$htitles{bncharel}{$lang} : '');
           }
       }
 
@@ -17098,7 +17389,7 @@ sub aiManageInstance {
   my $paref = shift;
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
-  
+
   return if(!isPrepared4AI ($hash));
 
   delete $hash->{HELPER}{AIBLOCKRUNNING} if(defined $hash->{HELPER}{AIBLOCKRUNNING}{pid} && $hash->{HELPER}{AIBLOCKRUNNING}{pid} =~ /DEAD/xs);
@@ -17147,11 +17438,11 @@ sub aiAddInstance {
 
       return $serial;
   }
-  
+
   my $cst = [gettimeofday];                                                  # Train Startzeit
-  
+
   my @pvhdata;
-  
+
   for my $idx (sort keys %{$data{$name}{aidectree}{airaw}}) {
       next if(!$idx);
 
@@ -17164,18 +17455,19 @@ sub aiAddInstance {
       my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
       next if($rad1h <= 0);
 
-      my $temp   = AiRawdataVal ($hash, $idx, 'temp', undef);
-      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',  undef);
-      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c', undef);
-      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',   0);
+      my $temp   = AiRawdataVal ($hash, $idx, 'temp',      undef);
+      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',       undef);
+      my $wid    = AiRawdataVal ($name, $idx, 'weatherid', undef);
+      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c',      undef);
+      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',        0);
 
       my $tbin   = temp2bin   ($temp)    if(defined $temp);
       my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
       my $sabin  = sunalt2bin ($sunalt);
 
-      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, rr1c => $rr1c, sunalt => $sunalt, hod => $hod, pvrl => $pvrl };
+      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, wid => $wid, rr1c => $rr1c, sunalt => $sunalt, hod => $hod, pvrl => $pvrl };
   }
-  
+
   if (!scalar @pvhdata) {
       $serial = encode_base64 (Serialize ( { name         => $name,
                                              aitrainstate => "aiAddInstance not performed due to no Raw data",
@@ -17185,13 +17477,13 @@ sub aiAddInstance {
 
       return $serial;
   }
-  
+
   my $numtrees = CurrentVal ($name, 'aiTreesPV', AINUMTREES);
-  
+
   for my $tn (1 .. $numtrees) {                                                 # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
       my @sampled       = sample_data (\@pvhdata);
       my ($err, $dtree) = aiInit ($paref);
-      
+
       if ($err) {
           Log3 ($name, 2, "$name - ERROR - AI::DecisionTree init error: $err");
           $serial = encode_base64 (Serialize ( { name         => $name,
@@ -17202,15 +17494,16 @@ sub aiAddInstance {
 
           return $serial;
       }
-      
+
       Log3 ($name, 3, "$name - AI::DecisionTree initialized") if($tn == 1);
-      
+
       my $aiAddedToTrain = 0;
 
       for my $instance (@sampled) {
           eval { $dtree->add_instance (attributes => { rad1h  => $instance->{rad1h},
                                                        temp   => $instance->{temp},
                                                        wcc    => $instance->{wcc},
+                                                       wid    => $instance->{wid},
                                                        rr1c   => $instance->{rr1c},
                                                        sunalt => $instance->{sunalt},
                                                        hod    => $instance->{hod}
@@ -17227,21 +17520,22 @@ sub aiAddInstance {
 
                        return $serial;
                      };
-                     
+
           $aiAddedToTrain++;
-          
+
           debugLog ($paref, 'aiProcess', "AI Instance added Tree $tn - ".
                                          "hod: $instance->{hod}, ".
                                          "sunalt: $instance->{sunalt}, ".
                                          "rad1h: $instance->{rad1h}, pvrl: instance->{pvrl}, ".
                                          "wcc: ".(defined $instance->{wcc}   ? $instance->{wcc}  : '-').", ".
+                                         "wid: ".(defined $instance->{wid}   ? $instance->{wid}  : '-').", ".
                                          "rr1c: ".(defined $instance->{rr1c} ? $instance->{rr1c} : '-').", ".
-                                         "temp: ".(defined $instance->{temp} ? $instance->{temp} : '-'), 
+                                         "temp: ".(defined $instance->{temp} ? $instance->{temp} : '-'),
                                          4);
       }
-      
+
       debugLog ($paref, 'aiProcess', "AI Instance add - Tree: $tn -> ".$aiAddedToTrain." entities added for training ".(AttrVal ($name, 'verbose', 3) < 4 ? '(set verbose 4 for output more detail)' : ''));
-      
+
       $data{$name}{aidectree}{object}{$tn}{dtree} = $dtree;
       $data{$name}{aidectree}{object}{$tn}{enum}  = $aiAddedToTrain;
   }
@@ -17256,14 +17550,14 @@ return $serial;
 ################################################################
 #     KI trainieren
 ################################################################
-sub aiTrain {          
+sub aiTrain {
   my $paref = shift;
   my $name  = $paref->{name};
   my $cst   = $paref->{cst};                                  # Train Startzeit
 
   my $hash = $defs{$name};
   my ($serial, $err);
-                                              
+
   my $object = AiDetreeVal ($hash, 'object', undef);
 
   if (!$object) {
@@ -17274,10 +17568,10 @@ sub aiTrain {
                                             aicanuse     => 'ok'
                                            }
                                          ), "");
-                                         
+
       return $serial;
   }
-  
+
   my @ensemble;                                                                 # Erstelle das Ensemble
   my %entities;
   my $numtrees = CurrentVal ($name, 'aiTreesPV', AINUMTREES);
@@ -17285,7 +17579,7 @@ sub aiTrain {
   for my $tn (1 .. $numtrees) {                                                 # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
       my $dtree = $object->{$tn}{dtree};                                        # dtree Objekt
       my $enum  = $object->{$tn}{enum};                                         # Anazhl Elemente im Tree
-      
+
       eval { $dtree->train();
              1;
            }
@@ -17299,16 +17593,16 @@ sub aiTrain {
 
                    return $serial;
                  };
-                 
+
       push @ensemble, $dtree;
-      
+
       $entities{$tn}  = $enum;
       $entities{rn}  += scalar $dtree->rule_statements();
   }
-  
+
   undef @{$data{$name}{aidectree}{aitrained}};
   delete $data{$name}{aidectree}{aitrained};
-  
+
   push @{$data{$name}{aidectree}{aitrained}}, @ensemble;
 
   $err = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
@@ -17316,11 +17610,11 @@ sub aiTrain {
 
   if (!$err) {
       $rn = delete $entities{rn};
-      
+
       while (my ($tree, $ent) = each %entities) {
           debugLog ($paref, 'aiProcess', "AI trained Tree: $tree, number of entities: $ent");
       }
-      
+
       debugLog ($paref, 'aiProcess', qq{Training instances and their associated information where purged from the AI object});
       debugLog ($paref, 'aiProcess', qq{AI trained and saved data into file: }.$aitrained.$name);
   }
@@ -17330,7 +17624,7 @@ sub aiTrain {
                                             aicanuse     => 'ok'
                                            }
                                          ), "");
-                                         
+
       return $serial;
   }
 
@@ -17437,40 +17731,42 @@ sub aiGetResult {
 
   my $rad1h = NexthoursVal ($hash, $nhtstr, 'rad1h', 0);
   return "no rad1h for hod: $hod" if($rad1h <= 0);
-  
+
   my $cst = [gettimeofday];                                                         # aiGetResult Startzeit
 
   debugLog ($paref, 'aiData', "Start AI result check for hod: $hod");
-  
-  my $wcc    = NexthoursVal ($hash, $nhtstr, 'wcc',     0);
-  my $rr1c   = NexthoursVal ($hash, $nhtstr, 'rr1c',    0);
-  my $temp   = NexthoursVal ($hash, $nhtstr, 'temp',   20);
-  my $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt',  0);
-  my $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',   0);
+
+  my $wcc    = NexthoursVal ($hash, $nhtstr, 'wcc',       0);
+  my $wid    = NexthoursVal ($name, $nhtstr, 'weatherid', 0);
+  my $rr1c   = NexthoursVal ($hash, $nhtstr, 'rr1c',      0);
+  my $temp   = NexthoursVal ($hash, $nhtstr, 'temp',     20);
+  my $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt',    0);
+  my $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',     0);
 
   my $tbin  = temp2bin   ($temp);
   my $cbin  = cloud2bin  ($wcc);
   my $sabin = sunalt2bin ($sunalt);
-  
+
   my $new_data = {                                                                 # Prognose für neue Daten
       rad1h  => $rad1h,
       temp   => $tbin,
       wcc    => $cbin,
+      wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sabin,
       sunaz  => $sunaz,
       hod    => $hod
   };
-    
+
   ## Accurate Decision
   ######################
   my @total_prediction;
   my $tn = 0;
-  
+
   for my $dtree (@{$objref}) {
       $tn++;
       my $res;
-      
+
       eval { $res = $dtree->get_result (attributes => $new_data);
              push @total_prediction, $res if(defined $res);
              1;
@@ -17478,36 +17774,37 @@ sub aiGetResult {
            or do { Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
                    return $@;
                  };
-                 
+
       debugLog ($paref, 'aiData', "got AI result from Tree number $tn: $res") if(defined $res);
   }
-  
+
   my $tprnum = scalar @total_prediction;
 
   if ($tprnum) {
       my $avg_prediction = sprintf '%.0f', avgArray (\@total_prediction, $tprnum);
       # my $avg_prediction = sprintf '%.0f', medianArray (\@total_prediction);
-      
+
       debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $avg_prediction (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)});
       return ('accurate', $avg_prediction);
   }
-  
+
   ## Spread Decision
   ####################
 #  undef @total_prediction;
 #  $tn = 0;
-  
+
 #  debugLog ($paref, 'aiData', qq{AI no accurate result found with initial value "Rad1h: $rad1h" (hod: $hod)});
-  
+
 #  for my $dtree (@{$objref}) {
 #      $tn++;
-      
+
 #      debugLog ($paref, 'aiData', "Start get AI spreaded result from Tree number $tn");
-      
+
 #      my ($msg, $res) = _aiGetSpread ( { name   => $name,
 #                                         rad1h  => $rad1h,
 #                                         temp   => $tbin,
 #                                         wcc    => $cbin,
+#                                         wid    => $wid,
 #                                         rr1c   => $rr1c,
 #                                         sunalt => $sabin,
 #                                         sunaz  => $sunaz,
@@ -17516,8 +17813,8 @@ sub aiGetResult {
 #                                         debug  => $paref->{debug}
 #                                       }
 #                                     );
-     
-#      push @total_prediction, $res if($msg eq 'spreaded');                                            
+
+#      push @total_prediction, $res if($msg eq 'spreaded');
 #  }
 
 #  my $sprnum = scalar @total_prediction;
@@ -17526,13 +17823,13 @@ sub aiGetResult {
 #  if ($sprnum) {
 #      my $avg_prediction = sprintf '%.0f', avgArray (\@total_prediction, $sprnum);
 #      # my $avg_prediction = sprintf '%.0f', medianArray (\@total_prediction);
-      
+
 #      debugLog ($paref, 'aiData', qq{AI spreaded result found: pvaifc: $avg_prediction (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)});
 #      return ('spreaded', $avg_prediction);
 #  }
 
   setTimeTracking ($hash, $cst, 'aiLastGetResultTime');                      # aiGetResult-Laufzeit ermitteln
-  
+
 return 'No AI decision delivered';
 }
 
@@ -17545,6 +17842,7 @@ sub _aiGetSpread {
   my $rad1h  = $paref->{rad1h};
   my $temp   = $paref->{temp};
   my $wcc    = $paref->{wcc};
+  my $wid    = $paref->{wid};
   my $rr1c   = $paref->{rr1c};
   my $sunalt = $paref->{sunalt};
   my $sunaz  = $paref->{sunaz};
@@ -17559,6 +17857,7 @@ sub _aiGetSpread {
   my $gra = {
       temp   => $temp,
       wcc    => $wcc,
+      wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sunalt,
       sunaz  => $sunaz,
@@ -17670,28 +17969,34 @@ sub aiAddRawData {
 
       last if(int $pvd > int $day);
 
+      if (!$ood) {                                                           # V 1.47.2 -> für manuelles Auffüllen mit Setter
+          $dayname = HistoryVal ($hash, $pvd, 99, 'dayname', undef);
+      }
+
       for my $hod (sort keys %{$data{$name}{pvhist}{$pvd}}) {
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
 
           my $ridx   = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
 
-          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',  undef);
-          my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt',    0);
-          my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',     0);
-          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',   undef);
-          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',   undef);
-          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',  undef);
-          my $rad1h  = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
+          my $temp   = HistoryVal ($hash, $pvd, $hod, 'temp',      undef);
+          my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt',        0);
+          my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',         0);
+          my $con    = HistoryVal ($hash, $pvd, $hod, 'con',       undef);
+          my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',       undef);
+          my $wid    = HistoryVal ($hash, $pvd, $hod, 'weatherid', undef);            # Wetter ID
+          my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',      undef);
+          my $rad1h  = HistoryVal ($hash, $pvd, $hod, 'rad1h',     undef);
 
-          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}  = $sunalt;
-          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}   = $sunaz;
-          $data{$name}{aidectree}{airaw}{$ridx}{dayname} = $dayname;
-          $data{$name}{aidectree}{airaw}{$ridx}{hod}     = $hod;
-          $data{$name}{aidectree}{airaw}{$ridx}{temp}    = sprintf "%.0f", $temp  if(defined $temp);
-          $data{$name}{aidectree}{airaw}{$ridx}{con}     = $con                   if(defined $con && $con >= 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{wcc}     = $wcc                   if(defined $wcc);
-          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}    = $rr1c                  if(defined $rr1c);
-          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}   = $rad1h                 if(defined $rad1h && $rad1h > 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}    = $sunalt;
+          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}     = $sunaz;
+          $data{$name}{aidectree}{airaw}{$ridx}{dayname}   = $dayname;
+          $data{$name}{aidectree}{airaw}{$ridx}{hod}       = $hod;
+          $data{$name}{aidectree}{airaw}{$ridx}{temp}      = sprintf "%.0f", $temp            if(defined $temp);
+          $data{$name}{aidectree}{airaw}{$ridx}{con}       = $con                             if(defined $con && $con >= 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{wcc}       = $wcc                             if(defined $wcc);
+          $data{$name}{aidectree}{airaw}{$ridx}{weatherid} = $wid >= 100 ? $wid - 100 : $wid  if(defined $wid);
+          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}      = $rr1c                            if(defined $rr1c);
+          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}     = $rad1h                           if(defined $rad1h && $rad1h > 0);
 
           $dosave++;
 
@@ -17786,11 +18091,11 @@ return $ridx;
 ################################################################
 #     Hilfsfunktion zum Erstellen einer Stichprobe
 ################################################################
-sub sample_data {                                                             
+sub sample_data {
   my $data        = shift;
   my @shuffled    = shuffle @$data;
   my $sample_size = int (scalar (@$data) * 0.8);
-  
+
 return @shuffled[0 .. $sample_size - 1];                                  # Teilmenge zurückgeben
 }
 
@@ -18063,19 +18368,20 @@ sub listDataPool {
       $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
 
       for my $idx (sort keys %{$h}) {
-          my $hod    = AiRawdataVal ($name, $idx, 'hod',     '-');
-          my $sunalt = AiRawdataVal ($name, $idx, 'sunalt',  '-');
-          my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',   '-');
-          my $rad1h  = AiRawdataVal ($name, $idx, 'rad1h',   '-');
-          my $wcc    = AiRawdataVal ($name, $idx, 'wcc',     '-');
-          my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',    '-');
-          my $pvrl   = AiRawdataVal ($name, $idx, 'pvrl',    '-');
-          my $temp   = AiRawdataVal ($name, $idx, 'temp',    '-');
-          my $nod    = AiRawdataVal ($name, $idx, 'dayname', '-');
-          my $con    = AiRawdataVal ($name, $idx, 'con',     '-');
+          my $hod    = AiRawdataVal ($name, $idx, 'hod',       '-');
+          my $sunalt = AiRawdataVal ($name, $idx, 'sunalt',    '-');
+          my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',     '-');
+          my $rad1h  = AiRawdataVal ($name, $idx, 'rad1h',     '-');
+          my $wcc    = AiRawdataVal ($name, $idx, 'wcc',       '-');
+          my $wid    = AiRawdataVal ($name, $idx, 'weatherid', '-');
+          my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',      '-');
+          my $pvrl   = AiRawdataVal ($name, $idx, 'pvrl',      '-');
+          my $temp   = AiRawdataVal ($name, $idx, 'temp',      '-');
+          my $nod    = AiRawdataVal ($name, $idx, 'dayname',   '-');
+          my $con    = AiRawdataVal ($name, $idx, 'con',       '-');
 
           $sq       .= "\n";
-          $sq       .= "$idx => hod: $hod, nod: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, pvrl: $pvrl, con: $con, temp: $temp";
+          $sq       .= "$idx => hod: $hod, nod: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, wid: $wid, rr1c: $rr1c, pvrl: $pvrl, con: $con, temp: $temp";
       }
   }
 
@@ -18798,6 +19104,7 @@ sub _listDataPoolApiData {
               my $sp2 = _ldpspaces ($tag, $sp1);
 
               while (my ($tag1, $item1) = each %{$git->($itref->{$idx}{$tag})}) {
+                  $item1 //= '-';
                   $sq .= ($s2 ? $sp2 : "")."$tag1: ".$item1."\n";
                   $s2  = 1;
                   delete $itref->{$idx}{$tag}{$tag1};
@@ -20215,7 +20522,7 @@ sub getConsumerMintime {
 
       my $tdiff                  = (CurrentVal ($hash, 'sunsetTodayTs',  0) + $setshift) -
                                    (defined $startts ? $startts : $sunrisestartts);
-      
+
       $mintime                   = sprintf '%.1f', ($tdiff / 60);
 
       if ($debug =~ /consumerPlanning/x && !$nolog) {
@@ -20239,17 +20546,17 @@ sub getConsumerMintime {
       if ($debug =~ /consumerPlanning/x && !$nolog) {
           Log3 ($name, 1, "$name DEBUG> consumer '$c' - use Device:Reading -> '$mintime' for getting mintime");
       }
-      
+
       my ($dv, $rd) = split ':', $mintime;
       ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
-      
+
       if (!$err) {
           $mintime = ReadingsVal ($dv, $rd, '');
-          
+
           if (!isNumeric ($mintime)) {
               $err = "The reading '$rd' of device '$dv' is invalid or doesn't contain a numeric value";
           }
-      }      
+      }
   }
 
 return ($err, $mintime);
@@ -20310,13 +20617,15 @@ sub setModel {
   elsif ($radapi =~ /VictronKI-/xs)            { $hash->{MODEL} = 'VictronKiAPI';            }
   elsif ($radapi =~ /OpenMeteoDWDEnsemble-/xs) { $hash->{MODEL} = 'OpenMeteoDWDEnsembleAPI'; }
   elsif ($radapi =~ /OpenMeteoDWD-/xs)         { $hash->{MODEL} = 'OpenMeteoDWDAPI';         }
+  elsif ($radapi =~ /OpenMeteoDWD_D2-/xs)      { $hash->{MODEL} = 'OpenMeteoDWDD2API';       }
   elsif ($radapi =~ /OpenMeteoWorld-/xs)       { $hash->{MODEL} = 'OpenMeteoWorldAPI';       }
   else                                         { $hash->{MODEL} = 'DWD';                     }
 
   if    ($wthapi =~ /OpenMeteoDWDEnsemble-/xs) { $hash->{WEATHERMODEL} = 'OpenMeteoDWDEnsembleAPI'; }
   elsif ($wthapi =~ /OpenMeteoDWD-/xs)         { $hash->{WEATHERMODEL} = 'OpenMeteoDWDAPI';         }
+  elsif ($wthapi =~ /OpenMeteoDWD_D2-/xs)      { $hash->{WEATHERMODEL} = 'OpenMeteoDWDD2API';       }
   elsif ($wthapi =~ /OpenMeteoWorld-/xs)       { $hash->{WEATHERMODEL} = 'OpenMeteoWorldAPI';       }
-  else                                         { $hash->{WEATHERMODEL} = 'DWD';       }
+  else                                         { $hash->{WEATHERMODEL} = 'DWD';                     }
 
 return;
 }
@@ -22890,7 +23199,7 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>deletes an existing AI instance including all training data and reinitialises it                                                      </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>deletes an existing AI instance including all training and raw data and reinitializes it                                              </td></tr>
             <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                                     </td></tr>
             <tr><td> <b>consumerPlanning</b>   </td><td>deletes the planning data of all registered consumers                                                                                 </td></tr>
             <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                                </td></tr>
@@ -23284,10 +23593,11 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>Rad1h</b>          </td><td>if available, expected global irradiation (GI) or global tilt irradiation (GTI) in kJ/m2 </td></tr>
-            <tr><td> <b>pv_estimateXX</b>  </td><td>Expected PV generation (Wh)                                                              </td></tr>
-            <tr><td> <b>KI-based</b>       </td><td>expected PV generation (Wh) of the VictronKI-API                                         </td></tr>
-            <tr><td> <b>KI-based_co</b>    </td><td>expected energy consumption (Wh) of the VictronKI-API                                    </td></tr>
+            <tr><td> <b>Rad1h</b>          </td><td>expected global irradiation (GI) in kJ/m2                       </td></tr>
+            <tr><td> <b>GTIWh</b>          </td><td>expected Global Tilted Radiation  (GTI) in Wh/m2                </td></tr>
+            <tr><td> <b>pv_estimateXX</b>  </td><td>Expected PV generation (Wh)                                     </td></tr>
+            <tr><td> <b>KI-based</b>       </td><td>expected PV generation (Wh) of the VictronKI-API                </td></tr>
+            <tr><td> <b>KI-based_co</b>    </td><td>expected energy consumption (Wh) of the VictronKI-API           </td></tr>
          </table>
       </ul>
       </li>
@@ -23509,12 +23819,12 @@ to ensure that the system configuration is correct.
          (default: 50)
        </li>
        <br>
-       
+
        <a id="SolarForecast-attr-aiControl"></a>
        <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
          By optionally specifying the following key=value pairs, various properties of the AI support can be
          properties of the AI support can be influenced. <br>
-		 AI support for PV forecast autocorrection is activated with the set command 
+		 AI support for PV forecast autocorrection is activated with the set command
 		 <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> switched on. <br>
          The entry can be made in several lines.
          <br><br>
@@ -23541,12 +23851,12 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 
+         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3
        </ul>
 
        </li>
        <br>
-       
+
        <a id="SolarForecast-attr-alias"></a>
        <li><b>alias </b> <br>
          In connection with "ctrlShowLink" any display name.
@@ -23660,7 +23970,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                            </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The load is started even if there is insufficient PV surplus, provided that
                                                     a set "swoncond" condition is met and "swoffcond" is not met.                                                                                     </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination to be able to change the planning mode dynamically. 
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination to be able to change the planning mode dynamically.
                                                     The reading must return 'can' or 'must'.                                                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon and, if applicable, its color for displaying the consumer in the overview graphic (optional)                                                 </td></tr>
@@ -23724,7 +24034,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>default</b> - the PV surplus is read directly from the 'Current_Surplus' reading. (default)                                                    </td></tr>
             <tr><td>                       </td><td><b>median</b> - the median of the last PV surplus measurements (max. 20) is used.                                                                 </td></tr>
             <tr><td>                       </td><td><b>2 .. 20</b> - the PV surplus used is calculated from the average of the specified number of measured values.                                   </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination that provides a numerical PV surplus value in Watt 
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination that provides a numerical PV surplus value in Watt
                                                     determined or calculated by the user.                                                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                          </td></tr>
@@ -24008,7 +24318,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>the remaining minutes until sunset of the current day                                                                </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>the remaining hours until sunset of the current day                                                                  </td></tr>
             <tr><td> <b>todayConsumption</b>           </td><td>the energy consumption of the house on the current day                                                               </td></tr>
-            <tr><td> <b>todayConsumptionForecastDay</b></td><td>Consumption forecast for the current day                                                                             </td></tr>  
+            <tr><td> <b>todayConsumptionForecastDay</b></td><td>Consumption forecast for the current day                                                                             </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Consumption forecast per hour of the current day (01-24)                                                             </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Consumption forecast from current hour to hour before sunset                                                         </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>          </td><td>the number of radiation data API calls executed on the current day                                                   </td></tr>
@@ -24117,58 +24427,17 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeam1Color"></a>
-       <li><b>graphicBeam1Color </b><br>
-         Color selection of the primary bar of the first level. <br>
-         (default: FFAC63)
+       <a id="SolarForecast-attr-graphicBeamXColor" data-pattern="graphicBeam.*Color"></a>
+       <li><b>graphicBeamXColor </b><br>
+         Color selection for the bar of the selected layer. <br>
+         Odd bar numbers indicate the primary bar, even bar numbers indicate the secondary bar. <br>
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
-       <li><b>graphicBeam1FontColor </b><br>
-         Selection of the font color of the primary bar of the first level. <br>
-         (default: 0D0D0D)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam2Color"></a>
-       <li><b>graphicBeam2Color </b><br>
-         Color selection of the secondary bars of the first level. <br>
-         (default: C4C4A7)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
-       <li><b>graphicBeam2FontColor </b><br>
-         Selection of the font color of the secondary bars of the first level. <br>
-         (default: 000000)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam3Color"></a>
-       <li><b>graphicBeam3Color </b><br>
-         Color selection of the primary bars of the second level. <br>
-         (default: BED6C0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam3FontColor"></a>
-       <li><b>graphicBeam3FontColor </b><br>
-         Selection of the font color of the primary bars of the second level. <br>
-         (default: 000000)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam4Color"></a>
-       <li><b>graphicBeam4Color </b><br>
-         Color selection of the secondary bars of the second level. <br>
-         (default: DBDBD0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam4FontColor"></a>
-       <li><b>graphicBeam4FontColor </b><br>
-         Selection of the font color of the secondary bars of the second level. <br>
+       <a id="SolarForecast-attr-graphicBeamXFontColor" data-pattern="graphicBeam.*FontColor"></a>
+       <li><b>graphicBeamXFontColor </b><br>
+         Selection of the font color of the bar of the selected layer. <br>
+         Odd bar numbers indicate the primary bar, even bar numbers indicate the secondary bar. <br>
          (default: 000000)
        </li>
        <br>
@@ -24306,6 +24575,10 @@ to ensure that the system configuration is correct.
          other Perl operations.  <br>
          There are two basic notation options that cannot be combined with each other. <br>
          The notations are always specified within two curly brackets {...}.
+         <br><br>
+         <b>Note:</b> Values with the units 'Wh' or 'kWh' are automatically converted and displayed according to the setting
+         automatically converted and displayed according to the setting of attribute
+         <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a>.
          <br><br>
 
          <b>Notation 1: </b> <br>
@@ -24495,23 +24768,23 @@ to ensure that the system configuration is correct.
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
            <tr><td> <b>pin</b>       </td><td>Reading which provides the current battery charging power                                                     </td></tr>
-           <tr><td>                  </td><td>                                                                                                              </td></tr> 
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                                     </td></tr>
-           <tr><td>                  </td><td>                                                                                                              </td></tr> 
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>intotal</b>   </td><td>Reading which provides the total battery charge as a continuous counter (optional)                            </td></tr>
            <tr><td>                  </td><td>If the reading violates the specification of a continuously rising counter, SolarForecast handles             </td></tr>
-           <tr><td>                  </td><td>this error and reports the situation that has occurred with a log entry with verbose 2.                       </td></tr>          
-           <tr><td>                  </td><td>                                                                                                              </td></tr>              
+           <tr><td>                  </td><td>this error and reports the situation that has occurred with a log entry with verbose 2.                       </td></tr>
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>outtotal</b>  </td><td>Reading which provides the total battery discharge as a continuous counter (optional)                         </td></tr>
            <tr><td>                  </td><td>If the reading violates the specification of a continuously rising counter, SolarForecast handles             </td></tr>
-           <tr><td>                  </td><td>this error and reports the situation that has occurred with a log entry with verbose 2.                       </td></tr>          
-           <tr><td>                  </td><td>                                                                                                              </td></tr>          
+           <tr><td>                  </td><td>this error and reports the situation that has occurred with a log entry with verbose 2.                       </td></tr>
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>cap</b>       </td><td>installed battery capacity. Option can be:                                                                    </td></tr>
            <tr><td>                  </td><td><b>numerical value</b> - direct specification of the battery capacity in Wh without specifying the unit!      </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)              </td></tr>
-           <tr><td>                  </td><td>                                                                                                              </td></tr> 
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                                </td></tr>
-           <tr><td>                  </td><td>                                                                                                              </td></tr> 
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                             </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>icon</b>      </td><td>Icon and/or (only) colour for displaying the battery in the bar chart (optional)                              </td></tr>
@@ -24523,8 +24796,7 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>show</b>      </td><td>Control of the battery display in the bar graph (optional)                                                    </td></tr>
            <tr><td>                  </td><td><b>0</b> - no display of the device (default)                                                                 </td></tr>
-           <tr><td>                  </td><td><b>1</b> - Display of the device in the bar chart level 1                                                     </td></tr>
-           <tr><td>                  </td><td><b>2</b> - Display of the device in the bar chart level 2                                                     </td></tr>
+           <tr><td>                  </td><td><b>1..3[:top|bottom]</b> - display of the device in level 1,2 or 3 (above|below) the bar                      </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>asynchron</b> </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                   </td></tr>
            <tr><td>                  </td><td>event processing (asynchronous).                                                                              </td></tr>
@@ -24546,7 +24818,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh show=2:bottom icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
        </ul>
        <br>
 
@@ -24753,6 +25025,13 @@ to ensure that the system configuration is correct.
        the service's website.
        <br><br>
 
+       <b>OpenMeteoDWD_D2-API</b> <br>
+
+       Like OpenMeteoDWD-API. However, only the ICON D2 model is used for Central Europe
+       (Germany, Switzerland, Austria, France, Belgium, Netherlands, Denmark, Czech Republic, Slovenia) is used.
+       The spatial resolution of this model is 0.02° (approx. 2 km) and a temporal resolution of 15 minutes.
+       <br><br>
+
        <b>OpenMeteoDWDEnsemble-API</b> <br>
 
        This Open-Meteo API variant provides access to the DWD's global
@@ -24888,6 +25167,13 @@ to ensure that the system configuration is correct.
       The comprehensive and clearly laid out
       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
       the service's website.
+      <br><br>
+
+      <b>OpenMeteoDWD_D2-API</b> <br>
+
+      Like OpenMeteoDWD-API. However, only the ICON D2 model is used for Central Europe
+      (Germany, Switzerland, Austria, France, Belgium, Netherlands, Denmark, Czech Republic, Slovenia) is used.
+      The spatial resolution of this model is 0.02° (approx. 2 km) and a temporal resolution of 15 minutes.
       <br><br>
 
       <b>OpenMeteoDWDEnsemble-API</b> <br>
@@ -25414,7 +25700,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainingsdaten und initialisiert sie neu                                            </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainings- und Rohdaten und initialisiert sie neu                                   </td></tr>
             <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                                        </td></tr>
             <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                              </td></tr>
             <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                                 </td></tr>
@@ -25809,10 +26095,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>Rad1h</b>          </td><td>wenn vorhanden, erwartete Globalstrahlung (GI) bzw. globale Schräglagenstrahlung (GTI) in kJ/m2 </td></tr>
-            <tr><td> <b>pv_estimateXX</b>  </td><td>erwartete PV Erzeugung (Wh)                                                                     </td></tr>
-            <tr><td> <b>KI-based</b>       </td><td>erwartete PV Erzeugung (Wh) der VictronKI-API                                                   </td></tr>
-            <tr><td> <b>KI-based_co</b>    </td><td>erwarteter Energieverbrauch (Wh) der VictronKI-API                                              </td></tr>
+            <tr><td> <b>Rad1h</b>          </td><td>erwartete Globalstrahlung (GI) in kJ/m2                                     </td></tr>
+            <tr><td> <b>GTIWh</b>          </td><td>erwartete globale Strahlung auf die geneigte Fläche (GTI) in Wh/m2          </td></tr>
+            <tr><td> <b>pv_estimateXX</b>  </td><td>erwartete PV Erzeugung (Wh)                                                 </td></tr>
+            <tr><td> <b>KI-based</b>       </td><td>erwartete PV Erzeugung (Wh) der VictronKI-API                               </td></tr>
+            <tr><td> <b>KI-based_co</b>    </td><td>erwarteter Energieverbrauch (Wh) der VictronKI-API                          </td></tr>
          </table>
       </ul>
       </li>
@@ -26033,12 +26320,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          (default: 50)
        </li>
        <br>
-       
+
        <a id="SolarForecast-attr-aiControl"></a>
        <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene
          Eigenschaften der KI Unterstützung beeinflusst werden. <br>
-		 Die KI Unterstützung der PV Prognose Autokorrektur wird mit dem Set-Befehl 
+		 Die KI Unterstützung der PV Prognose Autokorrektur wird mit dem Set-Befehl
 		 <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> eingeschaltet. <br>
          Die Eingabe kann mehrzeilig erfolgen.
          <br><br>
@@ -26065,7 +26352,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 
+         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3
        </ul>
 
        </li>
@@ -26183,7 +26470,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                   </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß sofern eine
                                                     gesetzte "swoncond" Bedingung erfüllt und "swoffcond" nicht erfüllt ist.                                                                           </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading Kombination um den Planungsmodus dynamisch ändern zu können. 
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading Kombination um den Planungsmodus dynamisch ändern zu können.
                                                     Das Reading muß 'can' oder 'must' zurückgeben.                                                                                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon und ggf. dessen Farbe zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                     </td></tr>
@@ -26247,7 +26534,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>default</b> - der PV-Überschuß wird aus dem Reading 'Current_Surplus' direkt ausgelesen. (default)                                              </td></tr>
             <tr><td>                       </td><td><b>median</b> - es wird der Median der letzten PV-Überschuß Messungen (max. 20) verwendet.                                                         </td></tr>
             <tr><td>                       </td><td><b>2 .. 20</b> - der verwendete PV-Überschuß wird als Durchschnitt der angegebenen Anzahl Meßwerte gebildet.                                       </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination die einen vom Nutzer bestimmten bzw. berechneten 
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination die einen vom Nutzer bestimmten bzw. berechneten
                                                     numerischen PV-Überschuß in Watt liefert.                                                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen fehlenden PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend                      </td></tr>
@@ -26532,7 +26819,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>todayConsumption</b>           </td><td>der Energieverbrauch des Hauses am aktuellen Tag                                                                </td></tr>
-            <tr><td> <b>todayConsumptionForecastDay</b></td><td>Verbrauchsprognose für den aktuellen Tag                                                                        </td></tr>  
+            <tr><td> <b>todayConsumptionForecastDay</b></td><td>Verbrauchsprognose für den aktuellen Tag                                                                        </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Verbrauchsprognose pro Stunde des aktuellen Tages (01-24)                                                       </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Verbrauchsprognose von aktueller Stunde bis Stunde vor Sonnenuntergang                                          </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>          </td><td>die Anzahl der am aktuellen Tag ausgeführten Strahlungsdaten-API Calls                                          </td></tr>
@@ -26641,58 +26928,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeam1Color"></a>
-       <li><b>graphicBeam1Color </b><br>
-         Farbauswahl des primären Balkens der ersten Ebene. <br>
-         (default: FFAC63)
+       <a id="SolarForecast-attr-graphicBeamXColor" data-pattern="graphicBeam.*Color"></a>
+       <li><b>graphicBeamXColor </b><br>
+         Farbauswahl für den Balken der ausgewählten Ebene. <br>
+         Ungerade Balkennummern kennzeichnen den primären, gerade Balkennummern den sekundären Balken. <br>
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
-       <li><b>graphicBeam1FontColor </b><br>
-         Auswahl der Schriftfarbe des primären Balkens der ersten Ebene. <br>
-         (default: 0D0D0D)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam2Color"></a>
-       <li><b>graphicBeam2Color </b><br>
-         Farbauswahl der sekundären Balken der ersten Ebene. <br>
-         (default: C4C4A7)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
-       <li><b>graphicBeam2FontColor </b><br>
-         Auswahl der Schriftfarbe der sekundären Balken der ersten Ebene. <br>
-         (default: 000000)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam3Color"></a>
-       <li><b>graphicBeam3Color </b><br>
-         Farbauswahl für die primären Balken der zweiten Ebene. <br>
-         (default: BED6C0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam3FontColor"></a>
-       <li><b>graphicBeam3FontColor </b><br>
-         Auswahl der Schriftfarbe der primären Balken der zweiten Ebene. <br>
-         (default: 000000)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam4Color"></a>
-       <li><b>graphicBeam4Color </b><br>
-         Farbauswahl für die sekundären Balken der zweiten Ebene. <br>
-         (default: DBDBD0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam4FontColor"></a>
-       <li><b>graphicBeam4FontColor </b><br>
-         Auswahl der Schriftfarbe der sekundären Balken der zweiten Ebene. <br>
+       <a id="SolarForecast-attr-graphicBeamXFontColor" data-pattern="graphicBeam.*FontColor"></a>
+       <li><b>graphicBeamXFontColor </b><br>
+         Auswahl der Schriftfarbe des Balkens der ausgewählten Ebene. <br>
+         Ungerade Balkennummern kennzeichnen den primären, gerade Balkennummern den sekundären Balken. <br>
          (default: 000000)
        </li>
        <br>
@@ -26828,6 +27074,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Readings können mit sprintf und anderen Perl Operationen manipuliert werden. <br>
          Es stehen zwei grundsätzliche, miteinander nicht kombinierbare Möglichkeiten der Notation zur Verfügung. <br>
          Die Angabe der Notationen erfolgt grundsätzlich innerhalb von zwei geschweiften Klammern {...}.
+         <br><br>
+         <b>Hinweis:</b> Werte mit den Einheiten 'Wh' oder 'kWh' werden entsprechend der Einstellung
+         des Attributs <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a> automatisch umgerechnet und dargestellt.
          <br><br>
 
          <b>Notation 1: </b> <br>
@@ -27022,12 +27271,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)                    </td></tr>
            <tr><td>                  </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                   </td></tr>
-           <tr><td>                  </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag mit verbose 2.  </td></tr>          
+           <tr><td>                  </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag mit verbose 2.  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung als fortlaufenden Zähler liefert (optional)                 </td></tr>
            <tr><td>                  </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                   </td></tr>
-           <tr><td>                  </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag mit verbose 2.  </td></tr> 
-           <tr><td>                  </td><td>                                                                                                         </td></tr>           
+           <tr><td>                  </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag mit verbose 2.  </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität. Option kann sein:                                                        </td></tr>
            <tr><td>                  </td><td><b>numerischer Wert</b> - direkte Angabe der Batteriekapazität in Wh ohne die Einheit anzugeben!         </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
@@ -27044,8 +27293,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>show</b>      </td><td>Steuerung der Anzeige der Batterie in der Balkengrafik (optional)                                        </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Anzeige des Gerätes (default)                                                           </td></tr>
-           <tr><td>                  </td><td><b>1</b> - Anzeige des Gerätes in der Balkengrafik Ebene 1                                               </td></tr>
-           <tr><td>                  </td><td><b>2</b> - Anzeige des Gerätes in der Balkengrafik Ebene 2                                               </td></tr>
+           <tr><td>                  </td><td><b>1..3[:top|bottom]</b> - Anzeige des Gerätes in der Ebene 1,2 oder 3 (über|unter) den Balken           </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>asynchron</b> </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch           </td></tr>
            <tr><td>                  </td><td>Eventverarbeitung (asynchron).                                                                           </td></tr>
@@ -27067,7 +27315,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh show=2:bottom icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
        </ul>
        <br>
 
@@ -27275,6 +27523,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
       <br><br>
 
+      <b>OpenMeteoDWD_D2-API</b> <br>
+
+      Wie OpenMeteoDWD-API. Es wird jedoch nur das Modell ICON D2 für Mitteleuropa
+      (Deutschland, Schweiz, Österreich, Frankreich, Belgien, Niederlande, Dänemark, Tschechien, Slowenien) verwendet.
+      Die Raumauflösung dieses Modells beträgt 0,02° (ca. 2 km) und eine zeitliche Auflösung von 15 Minuten.
+      <br><br>
+
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
       Diese Open-Meteo API Variante bietet Zugang zum globalen
@@ -27412,6 +27667,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
       Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
+      <br><br>
+
+      <b>OpenMeteoDWD_D2-API</b> <br>
+
+      Wie OpenMeteoDWD-API. Es wird jedoch nur das Modell ICON D2 für Mitteleuropa
+      (Deutschland, Schweiz, Österreich, Frankreich, Belgien, Niederlande, Dänemark, Tschechien, Slowenien) verwendet.
+      Die Raumauflösung dieses Modells beträgt 0,02° (ca. 2 km) und eine zeitliche Auflösung von 15 Minuten.
       <br><br>
 
       <b>OpenMeteoDWDEnsemble-API</b> <br>
