@@ -164,7 +164,7 @@ my %vNotesIntern = (
                            "add Attr graphicBeamHeightLevel3, Compatibility of Rad1h data between DWD and OpenMeteo established ".
                            "set reset aiData deletes raw data also, _transferAPIRadiationValues: AI PV estimate limited to inverter capacity summary ".
                            "__calcPVestimates: pv power summary of all strings connected to inverter limited to inverter capacity summary ".
-						   "_batChargeRecmd: fix calc if more than one batteries are installed ",
+						   "_batChargeRecmd: fix calc if more than one batteries are installed, set aiDecTree: new option rawDataGHIreplace ",
   "1.48.0" => "14.03.2025  edit commandref, add graphicBeam layer 5 and 6, attr ctrlAIdataStorageDuration, ctrlAIshiftTrainStart removed ",
   "1.47.3" => "11.03.2025  adjust weather_ids and management of significant weather, _calcDataEveryFullHour: change attrInvChangedTs Management ".
                            "split __batteryOnBeam into _beamFillupBatValues and itself, expand bat key 'show' by top, bottom ".
@@ -1734,7 +1734,7 @@ sub Set {
   ## KI spezifische Setter
   ##########################
   if ($ipai) {
-      $setlist .= "aiDecTree:addInstAndTrain,addRawData ";
+      $setlist .= "aiDecTree:addInstAndTrain,addRawData,rawDataGHIreplace ";
   }
 
   ## Batterie spezifische Setter
@@ -2575,6 +2575,9 @@ sub _setaiDecTree {                   ## no critic "not used"
   }
   elsif ($prop eq 'addRawData') {
       aiAddRawData ($paref);
+  }
+  elsif ($prop eq 'rawDataGHIreplace') {
+      __getopenMeteoGHIreplace ($paref);
   }
 
 return;
@@ -4262,15 +4265,65 @@ sub __getopenMeteoData {
   my $submodel   = InternalVal ($name, $reqm, 'unknown');
   my $allstrings = AttrVal     ($name, 'setupInverterStrings', '');
   
-  if ($reqm eq 'MODEL' && $submodel eq 'OpenMeteoDWDD2API') {                      # Satellietenunterstützung dazuladen
-      $allstrings .= ',OpenMeteoSatellite,'.$allstrings;
-  }
+  #if ($reqm eq 'MODEL' && $submodel eq 'OpenMeteoDWDD2API') {                      # Satellitenunterstützung dazuladen
+  #    $allstrings .= ',Special_SatelliteRadiation,'.$allstrings;
+  #}
 
   $paref->{callequivalent} = $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 20 : 1;
   $paref->{allstrings}     = $allstrings;
   $paref->{begin}          = 1;
   $paref->{submodel}       = $submodel;
   $paref->{requestmode}    = $reqm;
+
+  __openMeteoDWD_ApiRequest ($paref);
+
+return;
+}
+
+################################################################################################
+#       historische GHI Daten von OpenMeteo abrufen und in aiRawData ersetzen
+################################################################################################
+sub __getopenMeteoGHIreplace {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $lang  = $paref->{lang};
+  my $debug = $paref->{debug};
+
+  my $hash    = $defs{$name};
+  my $donearq = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
+
+  if ($donearq >= OMETMAXREQ) {
+      my $msg = "The limit of maximum OMETMAXREQ daily API requests is reached or already exceeded. Process is exited.";
+      Log3 ($name, 1, "$name - ERROR - $msg");
+      return $msg;
+  }
+  
+  my $nk = scalar keys %{$data{$name}{aidectree}{airaw}};
+  return if(!$nk);
+  
+  my @ha = sort keys %{$data{$name}{aidectree}{airaw}};
+  my $fstidx = $ha[0];
+  my $lstidx = $ha[$nk-1];
+  
+  my $fsty = substr $fstidx, 0, 4;
+  my $fstm = substr $fstidx, 4, 2;
+  my $fstd = substr $fstidx, 6, 2;
+  
+  my $lsty = substr $lstidx, 0, 4;
+  my $lstm = substr $lstidx, 4, 2;
+  my $lstd = substr $lstidx, 6, 2;
+  
+  debugLog ($paref, 'apiCall', "Open-Meteo API Call - the daily API requests -> limited to: ".OMETMAXREQ.", done: $donearq");
+  debugLog ($paref, 'apiCall', "Open-Meteo API Call - Refill Global Horizontal Irradiance (GHI) - Start: $fsty-$fstm-$fstd, End: $lsty-$lstm-$lstd");
+
+  $paref->{callequivalent} = 1;
+  $paref->{allstrings}     = 'Dummy';
+  $paref->{begin}          = 1;
+  $paref->{submodel}       = 'HistoricalData';
+  $paref->{requestmode}    = 'GHIREFILL';
+  $paref->{t}              = int time;
+  $paref->{startdate}      = "$fsty-$fstm-$fstd";
+  $paref->{enddate}        = "$lsty-$lstm-$lstd";
 
   __openMeteoDWD_ApiRequest ($paref);
 
@@ -4324,8 +4377,8 @@ sub __openMeteoDWD_ApiRequest {
   my ($string, $err);
   ($string, $allstrings) = split ",", $allstrings, 2;
   
-  if ($string eq 'OpenMeteoSatellite') {                                      # Trenner-String: ab jetzt Satelliten Abfrage
-      $submodel              = 'OpenMeteoSatellite';
+  if ($string eq 'Special_SatelliteRadiation') {                                      # Trenner-String: ab jetzt Satelliten Abfrage
+      $submodel              = 'Special_SatelliteRadiation';
       $paref->{submodel}     = $submodel;
       ($string, $allstrings) = split ",", $allstrings, 2;
   }
@@ -4405,8 +4458,8 @@ sub __openMeteoDWD_ApiResponse {
   my $caller      = $paref->{caller};
   my $string      = $paref->{string};
   my $allstrings  = $paref->{allstrings};
-  my $requestmode = $paref->{requestmode};                # MODEL oder WEATHERMODEL
-  my $stc         = $paref->{stc};                                                                                             # Startzeit API Abruf
+  my $requestmode = $paref->{requestmode};                # MODEL / WEATHERMODEL / GHIREFILL
+  my $stc         = $paref->{stc};                        # Startzeit API Abruf
   my $lang        = $paref->{lang};
   my $debug       = $paref->{debug};
   my $submodel    = $paref->{submodel};
@@ -4414,6 +4467,7 @@ sub __openMeteoDWD_ApiResponse {
   my $hash    = $defs{$name};
   my $t       = int time;
   my $sta     = [gettimeofday];                           # Start Response Verarbeitung
+  my $nghi    = 0;
   $paref->{t} = $t;
 
   my $msg;
@@ -4488,21 +4542,23 @@ sub __openMeteoDWD_ApiResponse {
       #########################
       my ($curwid, $currain, $curwcc, $curtmp, $curstr);
 
-      if (defined $jdata->{current}{time} && $submodel ne 'OpenMeteoSatellite') {
-          ($err, $curstr) = timestringUTCtoLocal ($name, $jdata->{current}{time}, '%Y-%m-%dT%H:%M');
+      if ($submodel ne 'Special_SatelliteRadiation') {
+		  if (defined $jdata->{current}{time}) {
+			  ($err, $curstr) = timestringUTCtoLocal ($name, $jdata->{current}{time}, '%Y-%m-%dT%H:%M');
 
-          if ($err) {
-              $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
-              Log3 ($name, 1, "$name - $msg");
-              singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
-              return;
-          }
+			  if ($err) {
+				  $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
+				  Log3 ($name, 1, "$name - $msg");
+				  singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
+				  return;
+			  }
 
-          $curwid  = $jdata->{current}{weather_code};
-          $curwcc  = $jdata->{current}{cloud_cover};
-          $currain = $jdata->{current}{rain};
-          $curtmp  = $jdata->{current}{temperature_2m};
-      }
+			  $curwid  = $jdata->{current}{weather_code};
+			  $curwcc  = $jdata->{current}{cloud_cover};
+			  $currain = $jdata->{current}{rain};
+			  $curtmp  = $jdata->{current}{temperature_2m};
+		  }
+	  }
 
       ## Stundenwerte
       #################
@@ -4521,37 +4577,60 @@ sub __openMeteoDWD_ApiResponse {
           my $ots     = timestringToTimestamp  ($otmstr);
           my $pvtmstr = (timestampToTimestring ($ots - 3600))[0];                                   # Strahlung wird als Durchschnitt der !vorangegangenen! Stunde geliefert!
 
-          if (timestringToTimestamp ($pvtmstr) < $refts) {
+          if (timestringToTimestamp ($pvtmstr) < $refts && $submodel ne 'HistoricalData') {
               $k++;
               next;                                                                                 # Daten älter als akt. Tag 00:00:00 verwerfen
           }
 
           ## Strahlungsdaten
           ####################
-          if ($requestmode eq 'MODEL') {
-              my $gtiwh = $jdata->{hourly}{global_tilted_irradiance}[$k];                           # GTI in Wh/m2
-              my $radwh = $jdata->{hourly}{shortwave_radiation}[$k];                                # Solarstrahlung -> Rad1h
-              
-              if (defined $radwh) {                                                                 # Globalstrahlung für KI 
-                  my $radkJ = 10 * (sprintf "%.0f", ($radwh * WH2KJ) / 10);                         # Umrechnung Wh/m2 in kJ/m2
-                  $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} = $radkJ;                       # Startstunde verschieben
+          if ($submodel ne 'HistoricalData') {
+              if ($requestmode eq 'MODEL') {
+                  my $gtiwh = $jdata->{hourly}{global_tilted_irradiance}[$k];                           # GTI in Wh/m2
+                  my $radwh = $jdata->{hourly}{shortwave_radiation}[$k];                                # Solarstrahlung GHI
                   
-                  debugLog ($paref, 'apiProcess', "Open-Meteo API $pvtmstr - Global Radiation Rad1h: $radkJ");                  
-              }
-              
-              if (defined $gtiwh) {                                                                 # Global Tilted Radiation - zur PV Berechnung jedes Strings
-                  my $pv = sprintf "%.2f", int ($gtiwh / 1000 * $peak * PRDEF);                     # GTI wird in kWh/m2 genutzt
+                  if (defined $radwh) {                                                                 # Globalstrahlung für KI 
+                      my $radkJ = 10 * (sprintf "%.0f", ($radwh * WH2KJ) / 10);                         # Umrechnung Wh/m2 in kJ/m2
+                      $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} = $radkJ;                       # Startstunde verschieben
+                      
+                      debugLog ($paref, 'apiProcess', "Open-Meteo API $pvtmstr - Global Radiation Rad1h: $radkJ");                  
+                  }
+                  
+                  if (defined $gtiwh) {                                                                 # Global Tilted Radiation - zur PV Berechnung jedes Strings
+                      my $pv = sprintf "%.2f", int ($gtiwh / 1000 * $peak * PRDEF);                     # GTI wird in kWh/m2 genutzt
 
-                  $data{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;                 # Startstunde verschieben
-                  $data{$name}{solcastapi}{$string}{$pvtmstr}{GTIWh}         = $gtiwh;              # Startstunde verschieben, GTI wird für jeden String separat geliefert
-             
-                  debugLog ($paref, 'apiProcess', "Open-Meteo API $pvtmstr - GTIWh: $gtiwh, PV estimate: $pv Wh");
+                      $data{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;                 # Startstunde verschieben
+                      $data{$name}{solcastapi}{$string}{$pvtmstr}{GTIWh}         = $gtiwh;              # Startstunde verschieben, GTI wird für jeden String separat geliefert
+                 
+                      debugLog ($paref, 'apiProcess', "Open-Meteo API $pvtmstr - GTIWh: $gtiwh, PV estimate: $pv Wh");
+                  }
+              }
+          }
+          
+          ## Refill GHI Strahlungsdaten
+          ###############################        
+          if ($submodel eq 'HistoricalData') {
+              if ($requestmode eq 'GHIREFILL') {
+                  my $srwh = $jdata->{hourly}{shortwave_radiation}[$k];                                 # Solarstrahlung GHI
+                  
+                  if ($srwh) {                                                                          # Globalstrahlung für KI 
+                      my $ghikj = 10 * (sprintf "%.0f", ($srwh * WH2KJ) / 10);                          # Umrechnung Wh/m2 in kJ/m2
+                      
+                      $pvtmstr =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
+                      my $tidx = $1.$2.$3.(sprintf "%02d", ($4 + 1));
+                      
+                      if (AiRawdataVal ($name, $tidx, 'rad1h', 0)) {
+                          $data{$name}{aidectree}{airaw}{$tidx}{rad1h} = $ghikj;
+                          $nghi++;                          
+                          debugLog ($paref, 'apiProcess', "Open-Meteo API Index $tidx - Global Radiation GHI replaced: $ghikj");                          
+                      }                      
+                  }                  
               }
           }
 
           ## Wetterdaten
           ################
-          if ($submodel ne 'OpenMeteoSatellite') {
+          if ($submodel ne 'Special_SatelliteRadiation' && $submodel ne 'HistoricalData') {
               my $don  = $jdata->{hourly}{is_day}[$k];
               my $temp = $jdata->{hourly}{temperature_2m}[$k];
               my $rain = $jdata->{hourly}{rain}[$k];                                                    # Regen in Millimeter = kg/m2
@@ -4600,7 +4679,7 @@ sub __openMeteoDWD_ApiResponse {
 
       ## Tageswerte (Sonnenauf- und untergang)
       ##########################################
-      if ($submodel ne 'OpenMeteoSatellite') {
+      if ($submodel ne 'Special_SatelliteRadiation') {
           $k = 0;
 
           while ($jdata->{daily}{time}[$k]) {
@@ -4642,29 +4721,41 @@ sub __openMeteoDWD_ApiResponse {
       
       ## 15 Minuten Werte 
       #####################
-      $paref->{jdata}     = $jdata;
-      $paref->{indicator} = 'global_tilted_irradiance';
-      
-      my $haggr = ___15Minutes2HourAggregator ($paref);                                        # 15 Minuten zu 1h Aggregation
-      
-      if ($requestmode eq 'MODEL' && $haggr) {   
-          for my $tmstr (sort keys %{$haggr->{hourly}}) {
-              my $gtiwh = $haggr->{hourly}{$tmstr}{$paref->{indicator}};                      
-              my $pv    = sprintf "%.2f", int ($gtiwh / 1000 * $peak * PRDEF);          
-              
-              #$data{$name}{solcastapi}{$string}{$tmstr}{GTIWh}         = $gtiwh;
-              #$data{$name}{solcastapi}{$string}{$tmstr}{pv_estimate50} = $pv;
-              
-              # debugLog ($paref, 'apiProcess', "Open-Meteo API - do 15 min Aggr $tmstr - GTIWh: $gtiwh, PV estimate: $pv Wh");
-          }
-      }
-      
-      delete $paref->{indicator};
-      delete $paref->{jdata};
+	  if ($submodel ne 'Special_SatelliteRadiation') {
+		  $paref->{jdata}     = $jdata;
+		  $paref->{indicator} = 'global_tilted_irradiance';
+		  
+		  my $haggr = ___15Minutes2HourAggregator ($paref);                                        # 15 Minuten zu 1h Aggregation
+		  
+		  if ($requestmode eq 'MODEL' && $haggr) {   
+			  for my $tmstr (sort keys %{$haggr->{hourly}}) {
+				  my $gtiwh = $haggr->{hourly}{$tmstr}{$paref->{indicator}};                      
+				  my $pv    = sprintf "%.2f", int ($gtiwh / 1000 * $peak * PRDEF);          
+				  
+				  #$data{$name}{solcastapi}{$string}{$tmstr}{GTIWh}         = $gtiwh;
+				  #$data{$name}{solcastapi}{$string}{$tmstr}{pv_estimate50} = $pv;
+				  
+				  # debugLog ($paref, 'apiProcess', "Open-Meteo API - do 15 min Aggr $tmstr - GTIWh: $gtiwh, PV estimate: $pv Wh");
+			  }
+		  }
+		  
+		  delete $paref->{indicator};
+		  delete $paref->{jdata};
+	  }
   }
 
   ___setOpenMeteoAPIcallKeyData ($paref);
 
+  if ($nghi) {
+      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+
+      if (!$err) {
+          $data{$name}{current}{aitrawstate} = 'ok';
+          Log3 ($name, 3, qq{$name - aiRawData -> number of datasets replaced rad1h: $nghi});
+          debugLog ($paref, 'aiProcess', "AI raw data saved into file: ".$airaw.$name);
+      }
+  }
+  
   Log3 ($name, 4, qq{$name - Open-Meteo API answer received for string "$string"});
 
   my $param = {
@@ -4706,6 +4797,7 @@ sub ___createOpenMeteoURL {
   my $az   = StringVal ($name, $string, 'azimut', '<unknown>');
 
   if ($requestmode eq 'WEATHERMODEL' && $string eq 'KI-based') {$tilt = 0; $az = 0;}                              # Dummy Settings
+  if ($requestmode eq 'GHIREFILL'    && $string eq 'Dummy')    {$tilt = 0; $az = 0;}                              # Dummy Settings
 
   if ($tilt eq '<unknown>' || $az eq '<unknown>') {
       $err = qq{ERROR OpenMeteo API Call - the reading 'setupStringAzimuth' and/or 'setupStringDeclination' is not set};
@@ -4743,7 +4835,7 @@ sub ___createOpenMeteoURL {
       $url .= "&azimuth=".$az;
   }
 
-  if ($submodel eq 'OpenMeteoSatellite') {
+  if ($submodel eq 'Special_SatelliteRadiation') {
       $url  = "https://satellite-api.open-meteo.com/v1/archive?";
       $url .= "models=satellite_radiation_seamless";
       $url .= "&latitude=".$lat;
@@ -4754,6 +4846,15 @@ sub ___createOpenMeteoURL {
       $url .= "&utm_medium=email";
       $url .= "&tilt=".$tilt;
       $url .= "&azimuth=".$az;
+  }
+  
+  if ($submodel eq 'HistoricalData') {
+      $url  = "https://archive-api.open-meteo.com/v1/archive?";
+      $url .= "latitude=".$lat;
+      $url .= "&longitude=".$lon;
+      $url .= "&hourly=shortwave_radiation";
+      $url .= "&start_date=".$paref->{startdate};
+      $url .= "&end_date=".$paref->{enddate};
   }
 
 return $url;
@@ -7982,6 +8083,8 @@ sub centralTask {
       $centpars->{evt} = 1;
       singleUpdateState ( {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}} );
   }
+  
+  undef %{$centpars};
 
 return;
 }
@@ -9210,7 +9313,7 @@ sub _transferAPIRadiationValues {
               debugLog ($paref, "radiationProcess", "PV AI forecast start time $wantdt limited to $invcapsum Wh due to inverter capacity summary");
           }
           
-          my $airn  = CircularVal ($hash, 99, 'aiRulesNumber', 0);
+          my $airn  = CircularVal ($hash, 99, 'aiRulesNumber', 0) / CurrentVal ($name, 'aiTreesPV', AINUMTREES);
           my $aivar = 100;
           $aivar    = sprintf "%.0f", (100 * $pvaifc / $pvest) if($pvest);                              # Übereinstimmungsgrad KI Forecast zu API Forecast in %
 
@@ -10474,7 +10577,6 @@ sub _batChargeRecmd {
                     $socwh;
 
           $socwh      = sprintf "%.0f", $socwh;
-		  $whneed     = $batinstcap - $socwh;
           my $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                            # Prognose SoC in %
 
           __createNextHoursSFCReadings ( {name    => $name,
@@ -10484,18 +10586,20 @@ sub _batChargeRecmd {
                                          }
                                        );                                                        # Readings NextHourXX_Bat_XX_ChargeForecast erstellen
 
-          my $msg = "(CurrSoc: $csoc %, soc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W)";
+          my $msg = "(CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W)";
                     
           if ($num) {
-              $msg = "(SoCfc: $progsoc %, soc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh)";
+              $msg = "(SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh)";
               
               if (!$today) {
-                  $msg = "(SoCfc: $progsoc %, soc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh)";
+                  $msg = "(SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh)";
               }
           }
           else {
               storeReading ('Battery_ChargeRecommended_'.$bn, $crel);                            # Reading nur für aktuelle Stunde
           }
+		  
+		  $whneed = $batinstcap - $socwh;
 
           $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
@@ -22871,11 +22975,16 @@ to ensure that the system configuration is correct.
       <ul>
        <table>
        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-          <tr><td> <b>addInstAndTrain</b>  </td><td>The AI is enriched with the currently available PV, radiation and environmental data.                </td></tr>
-          <tr><td>                         </td><td>The AI is then trained using the historical data.                                                    </td></tr>
-          <tr><td>                         </td><td>Successfully generated decision trees are saved in the file system.                                  </td></tr>
-          <tr><td> <b>addRawData</b>       </td><td>Relevant PV, radiation and environmental data are extracted and stored for later use.                </td></tr>
-         </table>
+          <tr><td> <b>addInstAndTrain</b>  </td><td>The AI is enriched with the currently available PV, radiation and environmental data.                                       </td></tr>
+          <tr><td>                         </td><td>The AI is then trained using the historical data.                                                                           </td></tr>
+          <tr><td>                         </td><td>Successfully generated decision trees are saved in the file system.                                                         </td></tr>
+          <tr><td>                         </td><td>                                                                                                                            </td></tr>
+		  <tr><td> <b>addRawData</b>       </td><td>Relevant PV, radiation and environmental data are extracted and stored for later use.                                       </td></tr>
+          <tr><td>                         </td><td>                                                                                                                            </td></tr>
+		  <tr><td><b>rawDataGHIreplace</b> </td><td>Historical GHI (Global Horizontal Irradiance) values are retrieved from the Open-Meteo service and the values in aiRawData  </td></tr>
+		  <tr><td>                         </td><td>(see  <a href="#SolarForecast-get-valDecTree">get ... valDecTree aiRawData</a>) replaces existing values ‘rad1h’ 
+		                                             or adds them if they are not available.                                                                                    </td></tr>		 
+		 </table>
       </ul>
     </li>
     </ul>
@@ -25363,11 +25472,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>addInstAndTrain</b>  </td><td>Die KI wird mit den aktuell vorhandenen PV-, Strahlungs- und Umweltdaten angereichert.                                  </td></tr>
+          <tr><td><b>addInstAndTrain</b>   </td><td>Die KI wird mit den aktuell vorhandenen PV-, Strahlungs- und Umweltdaten angereichert.                                  </td></tr>
           <tr><td>                         </td><td>Anschließend wird die KI mit den historischen Daten trainiert.                                                          </td></tr>
           <tr><td>                         </td><td>Erfolgreich generierte Entscheidungsbäume werden im Filesystem gespeichert.                                             </td></tr>
-          <tr><td> <b>addRawData</b>       </td><td>Relevante PV-, Strahlungs- und Umweltdaten werden extrahiert und für die spätere Verwendung gespeichert.                </td></tr>
-        </table>
+          <tr><td>                         </td><td>                                                                                                                        </td></tr>
+		  <tr><td><b>addRawData</b>        </td><td>Relevante PV-, Strahlungs- und Umweltdaten werden extrahiert und für die spätere Verwendung gespeichert.                </td></tr>
+          <tr><td>                         </td><td>                                                                                                                        </td></tr>
+		  <tr><td><b>rawDataGHIreplace</b> </td><td>Es werden historische GHI (Global Horizontal Irradiance) Werte vom Open-Meteo Dienst abgerufen und die in aiRawData     </td></tr>
+		  <tr><td>                         </td><td>(siehe <a href="#SolarForecast-get-valDecTree">get ... valDecTree aiRawData</a>) vorhanden Werte 'rad1h' ersetzt bzw. 
+		                                             ergänzt wenn sie nicht vorhanden sind.                                                                                 </td></tr>
+		</table>
       </ul>
     </li>
     </ul>
