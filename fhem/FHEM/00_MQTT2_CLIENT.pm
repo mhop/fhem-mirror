@@ -1048,7 +1048,12 @@ MQTT2_CLIENT_feedTheList($$$;$)
     <a id="MQTT2_CLIENT-attr-sslargs"></a>
     <li>sslargs<br>
       a list of space separated tuples of key:value, where key is one of the
-      possible options documented in perldoc IO::Socket::SSL
+      possible options documented in perldoc IO::Socket::SSL<br>
+      e.g.:
+      <pre>
+        attr m2c sslargs SSL_cert_file:client.crt SSL_key_file:client.key
+      </pre>
+
       </li><br>
 
     <a id="MQTT2_CLIENT-attr-topicConversion"></a>
