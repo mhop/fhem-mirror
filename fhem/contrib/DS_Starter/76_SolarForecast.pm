@@ -165,7 +165,7 @@ my %vNotesIntern = (
                            "set reset aiData deletes raw data also, _transferAPIRadiationValues: AI PV estimate limited to inverter capacity summary ".
                            "__calcPVestimates: pv power summary of all strings connected to inverter limited to inverter capacity summary ".
 						   "_batChargeRecmd: fix calc if more than one batteries are installed, set aiDecTree: new option rawDataGHIreplace ".
-                           "new Attr plantControl with key feedinPowerLimit ",
+                           "new Attr plantControl with key feedinPowerLimit, batteryPreferredCharge , Attr affectBatteryPreferredCharge is obsolete ",
   "1.48.0" => "14.03.2025  edit commandref, add graphicBeam layer 5 and 6, attr ctrlAIdataStorageDuration, ctrlAIshiftTrainStart removed ",
   "1.47.3" => "11.03.2025  adjust weather_ids and management of significant weather, _calcDataEveryFullHour: change attrInvChangedTs Management ".
                            "split __batteryOnBeam into _beamFillupBatValues and itself, expand bat key 'show' by top, bottom ".
@@ -567,7 +567,7 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                    energyH4Trigger
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
-my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
+my @aconfigs = qw( affectConsForecastIdentWeekdays
                    affectConsForecastInPlanning affectSolCastPercentile
                    aiControl 
                    consumerLegend consumerAdviceIcon consumerLink
@@ -1527,8 +1527,7 @@ sub Initialize {
   $hash->{AttrFn}             = \&Attr;
   $hash->{NotifyFn}           = \&Notify;
   $hash->{ReadyFn}            = \&runTask;
-  $hash->{AttrList}           = "affectBatteryPreferredCharge:slider,0,1,100 ".
-                                "affectConsForecastIdentWeekdays:1,0 ".
+  $hash->{AttrList}           = "affectConsForecastIdentWeekdays:1,0 ".
                                 "affectConsForecastInPlanning:1,0 ".
                                 "affectConsForecastLastDays:selectnumbers,1,1,180,0,lin ".
                                 "affectSolCastPercentile:select,10,50,90 ".
@@ -1594,8 +1593,8 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  # my $av = 'obsolete#-#use#attr#flowGraphicControl#instead';                          # 07.03.2025
-  # $hash->{AttrList} .= " ctrlAIdataStorageDuration:$av ctrlAIshiftTrainStart:$av ";
+  my $av = 'obsolete#-#use#attr#plantControl#instead';                          
+  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av ";           # 21.03.2025
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -5875,17 +5874,16 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  #if ($cmd eq 'set' && $aName =~ /^ctrlAIdataStorageDuration|ctrlAIshiftTrainStart$/) {
-  #    #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please save your Configuration.";
-  #    my $msg = "The attribute $aName is replaced by 'aiControl'. Please press 'save config' when restart is finished.";
-  #    if (!$init_done) {
-  #        Log3 ($name, 1, "$name - $msg");
-  #        #return qq{Device "$name" -> $msg};
-  #    }
-  #    else {
-  #        return $msg;
-  #    }
-  #}
+  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge$/) {                  # 21.03.2025
+      #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
+      my $msg = "The attribute $aName is replaced by 'plantControl'.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg");
+      }
+      else {
+          return $msg;
+      }
+  }
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -6352,6 +6350,7 @@ sub _attrplantControl {                  ## no critic "not used"
   my $hash  = $defs{$name};
 
   for my $av ( qw( feedinPowerLimit
+                   batteryPreferredCharge
                  ) ) {
 
       delete $data{$name}{current}{$av};
@@ -6359,7 +6358,8 @@ sub _attrplantControl {                  ## no critic "not used"
 
   if ($cmd eq 'set') {
       my $valid = {
-          feedinPowerLimit => '\d+',
+          feedinPowerLimit       => '\d+',
+          batteryPreferredCharge => '([0-9]|[1-9][0-9]|100)',
       };
 
       my ($a, $h) = parseParams ($aVal);
@@ -7979,7 +7979,17 @@ sub centralTask {
   ##########################################################################################################################
   #delete $data{$name}{circular}{'00'};                                          # 04.02.2025
   readingsDelete    ($hash, '.migrated');                                       # 01.02.25
+  
+  my $pcb = AttrVal ($name, 'affectBatteryPreferredCharge', undef);               # 22.03.2025
+  ::CommandDeleteAttr (undef, "$name affectBatteryPreferredCharge") if(defined $pcb);  
+  my $apc = AttrVal ($name, 'plantControl', '');
 
+  if (defined $pcb) {
+      my $newval = $apc." batteryPreferredCharge=$pcb"      if(defined $pcb);
+      CommandAttr (undef, "$name plantControl $newval");
+  }  
+  ######
+  
   my $n = 0;                                                       # 01.02.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_*
   for my $hh (1..24) {
       $hh = sprintf "%02d", $hh;
@@ -10475,9 +10485,9 @@ sub _batChargeRecmd {
   return if(!isBatteryUsed ($name));
 
   my $hash      = $defs{$name};
-  my $pvCu      = ReadingsNum ($name, 'Current_PV',          0);                                 # aktuelle PV Erzeugung
-  my $curcon    = ReadingsNum ($name, 'Current_Consumption', 0);                                 # aktueller Verbrauch
-  my $feedinlim = CurrentVal  ($name, 'feedinPowerLimit',      INFINIITY);                       # Einspeiselimit in W
+  my $pvCu      = ReadingsNum ($name, 'Current_PV',               0);                            # aktuelle PV Erzeugung
+  my $curcon    = ReadingsNum ($name, 'Current_Consumption',      0);                            # aktueller Verbrauch
+  my $feedinlim = CurrentVal  ($name, 'feedinPowerLimit', INFINIITY);                            # Einspeiselimit in W
   my $inplim    = 0;
 
   ## Inverter Limits ermitteln
@@ -12412,14 +12422,13 @@ sub ___enableSwitchByBatPrioCharge {
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
 
-  my $hash    = $defs{$name};
   my $ena     = 1;
-  my $pcb     = AttrVal ($name, 'affectBatteryPreferredCharge', 0);          # Vorrangladung Batterie zu X%
+  my $pcb     = CurrentVal ($name, 'affectBatteryPreferredCharge', 0);       # Vorrangladung Batterie zu X%
   my ($badev) = isBatteryUsed ($name);
 
   return $ena if(!$pcb || !$badev);                                          # Freigabe Schalten Consumer wenn kein Prefered Battery/Soll-Ladung 0 oder keine Batterie installiert
 
-  my $bcharge = BatteryVal  ($hash, '01', 'bcharge', 0);                     # aktuelle Ladung in %
+  my $bcharge = BatteryVal ($name, '01', 'bcharge', 0);                      # aktuelle Ladung in %
   $ena        = 0 if($bcharge < $pcb);                                       # keine Freigabe wenn Batterieladung kleiner Soll-Ladung
 
 return $ena;
@@ -23905,15 +23914,6 @@ to ensure that the system configuration is correct.
   <br><br>
   <ul>
      <ul>
-       <a id="SolarForecast-attr-affectBatteryPreferredCharge"></a>
-       <li><b>affectBatteryPreferredCharge </b><br>
-         Consumers with the <b>can</b> mode are only switched on when the specified battery charge (%)
-         is reached. <br>
-         Consumers with the <b>must</b> mode do not observe the priority charging of the battery. <br>
-         (default: 0)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-affectConsForecastInPlanning"></a>
        <li><b>affectConsForecastInPlanning </b><br>
          If set, the consumption forecast is also taken into account in addition to the PV forecast when scheduling the
@@ -24901,12 +24901,16 @@ to ensure that the system configuration is correct.
 
          <ul>
          <table>
-         <colgroup> <col width="35%"> <col width="65%"> </colgroup>
-			<tr><td> <b>feedinPowerLimit</b> </td><td>Feed-in limit of the entire system into the public grid in watts.                 </td></tr>
-            <tr><td>                         </td><td>SolarForecast does not limit the feed-in, but uses this information               </td></tr>
-            <tr><td>                         </td><td>within the battery charge management to avoid system curtailment.                 </td></tr>
-			<tr><td>                         </td><td>Value: <b>Integer</b>, default: unlimited                                         </td></tr>
-			<tr><td>                         </td><td>                                                                                  </td></tr>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+			<tr><td> <b>batteryPreferredCharge</b> </td><td>Consumers with the <b>can</b> mode are only switched on when the specified battery charge (%) is reached.      </td></tr>
+			<tr><td>                               </td><td>Consumers with the <b>must</b> mode do not observe the priority charging of the battery.                       </td></tr>
+			<tr><td>                               </td><td>Wert: <b>Integer 0..100</b>, default: 0                                                                        </td></tr>
+			<tr><td>                               </td><td>                                                                                                               </td></tr>
+			<tr><td> <b>feedinPowerLimit</b>       </td><td>Feed-in limit of the entire system into the public grid in watts.                                              </td></tr>
+            <tr><td>                               </td><td>SolarForecast does not limit the feed-in, but uses this information                                            </td></tr>
+            <tr><td>                               </td><td>within the battery charge management to avoid system curtailment.                                              </td></tr>
+			<tr><td>                               </td><td>Value: <b>Integer</b>, default: unlimited                                                                      </td></tr>
+			<tr><td>                               </td><td>                                                                                                               </td></tr>
         </table>
          </ul>
 
@@ -26436,15 +26440,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
   <br><br>
   <ul>
      <ul>
-       <a id="SolarForecast-attr-affectBatteryPreferredCharge"></a>
-       <li><b>affectBatteryPreferredCharge </b><br>
-         Es werden Verbraucher mit dem Mode <b>can</b> erst dann eingeschaltet, wenn die angegebene Batterieladung (%)
-         erreicht ist. <br>
-         Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht. <br>
-         (default: 0)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-affectConsForecastInPlanning"></a>
        <li><b>affectConsForecastInPlanning </b><br>
          Wenn gesetzt, wird bei der Einplanung der Consumer zusätzlich zur PV Prognose ebenfalls die Prognose
@@ -27430,12 +27425,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
          <table>
-         <colgroup> <col width="35%"> <col width="65%"> </colgroup>
-			<tr><td> <b>feedinPowerLimit</b> </td><td>Einspeiselimit der Gesamtanlage in das öffentliche Netz in Watt.                 </td></tr>
-            <tr><td>                         </td><td>SolarForecast limitiert die Einspeisung nicht, verwendet diese Angabe jedoch     </td></tr>
-            <tr><td>                         </td><td>innerhalb des Batterie-Lademanagements zur Vermeidung einer Anlagenabregelung.   </td></tr>
-			<tr><td>                         </td><td>Wert: <b>Ganzzahl</b>, default: unbegrent                                        </td></tr>
-			<tr><td>                         </td><td>                                                                                 </td></tr>
+         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+			<tr><td> <b>batteryPreferredCharge</b> </td><td>Verbraucher mit dem Mode <b>can</b> werden erst dann eingeschaltet, wenn die angegebene Batterieladung (%) erreicht ist.   </td></tr>
+			<tr><td>                               </td><td>Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht.                                        </td></tr>
+			<tr><td>                               </td><td>Wert: <b>Ganzzahl 0..100</b>, default: 0                                                                                   </td></tr>
+			<tr><td>                               </td><td>                                                                                                                           </td></tr>
+            <tr><td> <b>feedinPowerLimit</b>       </td><td>Einspeiselimit der Gesamtanlage in das öffentliche Netz in Watt.                                                           </td></tr>
+            <tr><td>                               </td><td>SolarForecast limitiert die Einspeisung nicht, verwendet diese Angabe jedoch                                               </td></tr>
+            <tr><td>                               </td><td>innerhalb des Batterie-Lademanagements zur Vermeidung einer Anlagenabregelung.                                             </td></tr>
+			<tr><td>                               </td><td>Wert: <b>Ganzzahl</b>, default: unbegrent                                                                                  </td></tr>
+			<tr><td>                               </td><td>                                                                                                                           </td></tr>
         </table>
          </ul>
 
