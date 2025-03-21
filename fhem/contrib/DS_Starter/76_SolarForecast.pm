@@ -160,11 +160,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.49.0" => "19.03.2025  _listDataPoolApiData: fix warning item1, new option OpenMeteoDWD_D2-API with preparation for satellite support ".
+  "1.49.0" => "22.03.2025  _listDataPoolApiData: fix warning item1, new option OpenMeteoDWD_D2-API with preparation for satellite support ".
                            "add Attr graphicBeamHeightLevel3, Compatibility of Rad1h data between DWD and OpenMeteo established ".
                            "set reset aiData deletes raw data also, _transferAPIRadiationValues: AI PV estimate limited to inverter capacity summary ".
                            "__calcPVestimates: pv power summary of all strings connected to inverter limited to inverter capacity summary ".
-						   "_batChargeRecmd: fix calc if more than one batteries are installed, set aiDecTree: new option rawDataGHIreplace ",
+						   "_batChargeRecmd: fix calc if more than one batteries are installed, set aiDecTree: new option rawDataGHIreplace ".
+                           "new Attr plantControl with key feedinPowerLimit ",
   "1.48.0" => "14.03.2025  edit commandref, add graphicBeam layer 5 and 6, attr ctrlAIdataStorageDuration, ctrlAIshiftTrainStart removed ",
   "1.47.3" => "11.03.2025  adjust weather_ids and management of significant weather, _calcDataEveryFullHour: change attrInvChangedTs Management ".
                            "split __batteryOnBeam into _beamFillupBatValues and itself, expand bat key 'show' by top, bottom ".
@@ -391,6 +392,7 @@ my %vNotesIntern = (
 ## Konstanten
 ######################
 use constant {
+  INFINIITY      => ~0 >> 1,                                                        # "Unendlich"
   LPOOLLENLIM    => 140,                                                            # Breitenbegrenzung der Ausgabe von List Pooldaten
   KJ2KWH         => 0.0002777777778,                                                # Umrechnungsfaktor kJ in kWh
   KJ2WH          => 0.2777777778,                                                   # Umrechnungsfaktor kJ in Wh
@@ -567,14 +569,13 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    affectConsForecastInPlanning affectSolCastPercentile
-                   aiControl
+                   aiControl 
                    consumerLegend consumerAdviceIcon consumerLink
                    ctrlBackupFilesKeep
                    ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
                    ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings
                    ctrlShowLink ctrlSolCastAPImaxReq
                    ctrlSolCastAPIoptimizeReq ctrlSpecialReadings ctrlUserExitFn
-                   setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    disable
                    flowGraphicControl graphicBeamWidth
                    graphicBeamHeightLevel1 graphicBeamHeightLevel2 graphicBeamHeightLevel3
@@ -585,7 +586,9 @@ my @aconfigs = qw( affectBatteryPreferredCharge affectConsForecastIdentWeekdays
                    graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicWeatherColor graphicWeatherColorNight
+                   plantControl
                    setupMeterDev setupInverterStrings setupRadiationAPI setupStringPeak
+                   setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    setupRoofTops
                  );
 
@@ -699,6 +702,7 @@ my %hattr = (                                                                # H
   setupRoofTops             => { fn => \&_attrRoofTops            },
   flowGraphicControl        => { fn => \&_attrflowGraphicControl  },
   aiControl                 => { fn => \&_attraiControl           },
+  plantControl              => { fn => \&_attrplantControl        },
 );
 
   for my $bn (1..MAXBATTERIES) {
@@ -1567,6 +1571,7 @@ sub Initialize {
                                 "graphicSpaceSize ".
                                 "graphicWeatherColor:colorpicker,RGB ".
                                 "graphicWeatherColorNight:colorpicker,RGB ".
+                                "plantControl:textField-long ".
                                 "setupInverterStrings ".
                                 "setupMeterDev:textField-long ".
                                 "setupWeatherDev1 ".
@@ -1598,9 +1603,8 @@ sub Initialize {
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
-   $hash->{AttrRenameMap} = { "ctrlBatSocManagement"  => "ctrlBatSocManagement01",     # 01.01.25
-                              "ctrlStatisticReadings" => "ctrlSpecialReadings",        # 02.01.25
-                            };
+  # $hash->{AttrRenameMap} = { "ctrlStatisticReadings" => "ctrlSpecialReadings",
+  #                          };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
 
@@ -4266,7 +4270,7 @@ sub __getopenMeteoData {
   my $allstrings = AttrVal     ($name, 'setupInverterStrings', '');
   
   #if ($reqm eq 'MODEL' && $submodel eq 'OpenMeteoDWDD2API') {                      # Satellitenunterstützung dazuladen
-  #    $allstrings .= ',Special_SatelliteRadiation,'.$allstrings;
+  #    $allstrings .= ',SatelliteRadiation,'.$allstrings;
   #}
 
   $paref->{callequivalent} = $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 20 : 1;
@@ -4365,7 +4369,7 @@ sub __openMeteoDWD_ApiRequest {
 
   my $hash        = $defs{$name};
 
-  if (!$allstrings) {                                                        # alle Strings wurden abgerufen
+  if (!$allstrings) {                                                         # alle Strings wurden abgerufen
       my $apiitv = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF);
       readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
 
@@ -4377,8 +4381,8 @@ sub __openMeteoDWD_ApiRequest {
   my ($string, $err);
   ($string, $allstrings) = split ",", $allstrings, 2;
   
-  if ($string eq 'Special_SatelliteRadiation') {                                      # Trenner-String: ab jetzt Satelliten Abfrage
-      $submodel              = 'Special_SatelliteRadiation';
+  if ($string eq 'SatelliteRadiation') {                                      # Trenner-String: ab jetzt Satelliten Abfrage
+      $submodel              = 'SatelliteRadiation';
       $paref->{submodel}     = $submodel;
       ($string, $allstrings) = split ",", $allstrings, 2;
   }
@@ -4542,7 +4546,7 @@ sub __openMeteoDWD_ApiResponse {
       #########################
       my ($curwid, $currain, $curwcc, $curtmp, $curstr);
 
-      if ($submodel ne 'Special_SatelliteRadiation') {
+      if ($submodel ne 'SatelliteRadiation') {
 		  if (defined $jdata->{current}{time}) {
 			  ($err, $curstr) = timestringUTCtoLocal ($name, $jdata->{current}{time}, '%Y-%m-%dT%H:%M');
 
@@ -4630,7 +4634,7 @@ sub __openMeteoDWD_ApiResponse {
 
           ## Wetterdaten
           ################
-          if ($submodel ne 'Special_SatelliteRadiation' && $submodel ne 'HistoricalData') {
+          if ($submodel ne 'SatelliteRadiation' && $submodel ne 'HistoricalData') {
               my $don  = $jdata->{hourly}{is_day}[$k];
               my $temp = $jdata->{hourly}{temperature_2m}[$k];
               my $rain = $jdata->{hourly}{rain}[$k];                                                    # Regen in Millimeter = kg/m2
@@ -4679,7 +4683,7 @@ sub __openMeteoDWD_ApiResponse {
 
       ## Tageswerte (Sonnenauf- und untergang)
       ##########################################
-      if ($submodel ne 'Special_SatelliteRadiation') {
+      if ($submodel ne 'SatelliteRadiation') {
           $k = 0;
 
           while ($jdata->{daily}{time}[$k]) {
@@ -4721,13 +4725,13 @@ sub __openMeteoDWD_ApiResponse {
       
       ## 15 Minuten Werte 
       #####################
-	  if ($submodel ne 'Special_SatelliteRadiation') {
+	  if ($requestmode eq 'MODEL' && $submodel ne 'SatelliteRadiation') {
 		  $paref->{jdata}     = $jdata;
 		  $paref->{indicator} = 'global_tilted_irradiance';
 		  
 		  my $haggr = ___15Minutes2HourAggregator ($paref);                                        # 15 Minuten zu 1h Aggregation
 		  
-		  if ($requestmode eq 'MODEL' && $haggr) {   
+		  if ($haggr) {   
 			  for my $tmstr (sort keys %{$haggr->{hourly}}) {
 				  my $gtiwh = $haggr->{hourly}{$tmstr}{$paref->{indicator}};                      
 				  my $pv    = sprintf "%.2f", int ($gtiwh / 1000 * $peak * PRDEF);          
@@ -4735,7 +4739,7 @@ sub __openMeteoDWD_ApiResponse {
 				  #$data{$name}{solcastapi}{$string}{$tmstr}{GTIWh}         = $gtiwh;
 				  #$data{$name}{solcastapi}{$string}{$tmstr}{pv_estimate50} = $pv;
 				  
-				  # debugLog ($paref, 'apiProcess', "Open-Meteo API - do 15 min Aggr $tmstr - GTIWh: $gtiwh, PV estimate: $pv Wh");
+				  #debugLog ($paref, 'apiProcess', "Open-Meteo API - do 15 min Aggr $tmstr - GTIWh: $gtiwh, PV estimate: $pv Wh");
 			  }
 		  }
 		  
@@ -4827,7 +4831,7 @@ sub ___createOpenMeteoURL {
       $url .= "&longitude=".$lon;
       $url .= "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance,shortwave_radiation";
       $url .= "&current=temperature_2m,weather_code,rain,cloud_cover";
-      $url .= "&minutely_15=global_tilted_irradiance,shortwave_radiation";
+      $url .= "&minutely_15=rain,global_tilted_irradiance,shortwave_radiation";
       $url .= "&daily=sunrise,sunset";
       $url .= "&forecast_hours=48";
       $url .= "&forecast_days=2";
@@ -4835,7 +4839,7 @@ sub ___createOpenMeteoURL {
       $url .= "&azimuth=".$az;
   }
 
-  if ($submodel eq 'Special_SatelliteRadiation') {
+  if ($submodel eq 'SatelliteRadiation') {
       $url  = "https://satellite-api.open-meteo.com/v1/archive?";
       $url .= "models=satellite_radiation_seamless";
       $url .= "&latitude=".$lat;
@@ -6316,6 +6320,46 @@ sub _attraiControl {                     ## no critic "not used"
           aiStorageDuration => '\d+',
           aiTrainStart      => '(1?[1-9]|10|2[0-3])',
           aiTreesPV         => '(1?[1-9]|10|[2-4][0-9]|50)',
+      };
+
+      my ($a, $h) = parseParams ($aVal);
+
+      for my $key (keys %{$h}) {
+          my $comp = $valid->{$key};
+          next if(!$comp);
+
+          if ($h->{$key} =~ /^$comp$/xs) {
+              $data{$name}{current}{$key} = $h->{$key};
+          }
+          else {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
+          }
+      }
+  }
+
+return;
+}
+
+################################################################
+#                  Attr plantControl
+################################################################
+sub _attrplantControl {                  ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $cmd   = $paref->{cmd};
+
+  my $hash  = $defs{$name};
+
+  for my $av ( qw( feedinPowerLimit
+                 ) ) {
+
+      delete $data{$name}{current}{$av};
+  }
+
+  if ($cmd eq 'set') {
+      my $valid = {
+          feedinPowerLimit => '\d+',
       };
 
       my ($a, $h) = parseParams ($aVal);
@@ -7933,24 +7977,8 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  delete $data{$name}{circular}{'00'};                                          # 04.02.2025
+  #delete $data{$name}{circular}{'00'};                                          # 04.02.2025
   readingsDelete    ($hash, '.migrated');                                       # 01.02.25
-
-  for my $ck (keys %{$data{$name}{circular}}) {                                 # 30.12.2024
-      $data{$name}{circular}{$ck}{batin01}  = delete $data{$name}{circular}{$ck}{batin}  if(defined $data{$name}{circular}{$ck}{batin});
-      $data{$name}{circular}{$ck}{batout01} = delete $data{$name}{circular}{$ck}{batout} if(defined $data{$name}{circular}{$ck}{batout});
-  }
-
-  for my $dy (sort keys %{$data{$name}{pvhist}}) {                              # 01.01.2025
-      for my $hr (sort keys %{$data{$name}{pvhist}{$dy}}) {
-          $data{$name}{pvhist}{$dy}{$hr}{batintotal01}  = delete $data{$name}{pvhist}{$dy}{$hr}{batintotal}  if(defined $data{$name}{pvhist}{$dy}{$hr}{batintotal});
-          $data{$name}{pvhist}{$dy}{$hr}{batouttotal01} = delete $data{$name}{pvhist}{$dy}{$hr}{batouttotal} if(defined $data{$name}{pvhist}{$dy}{$hr}{batouttotal});
-          $data{$name}{pvhist}{$dy}{$hr}{batin01}       = delete $data{$name}{pvhist}{$dy}{$hr}{batin}       if(defined $data{$name}{pvhist}{$dy}{$hr}{batin});
-          $data{$name}{pvhist}{$dy}{$hr}{batout01}      = delete $data{$name}{pvhist}{$dy}{$hr}{batout}      if(defined $data{$name}{pvhist}{$dy}{$hr}{batout});
-          $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batmaxsoc});
-          $data{$name}{pvhist}{$dy}{$hr}{batsetsoc01}   = delete $data{$name}{pvhist}{$dy}{$hr}{batsetsoc}   if(defined $data{$name}{pvhist}{$dy}{$hr}{batsetsoc});
-      }
-  }
 
   my $n = 0;                                                       # 01.02.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_*
   for my $hh (1..24) {
@@ -10446,10 +10474,11 @@ sub _batChargeRecmd {
 
   return if(!isBatteryUsed ($name));
 
-  my $hash     = $defs{$name};
-  my $pvCu     = ReadingsNum ($name, 'Current_PV',                   0);                         # aktuelle PV Erzeugung
-  my $curcon   = ReadingsNum ($name, 'Current_Consumption',          0);                         # aktueller Verbrauch
-  my $inplim   = 0;
+  my $hash      = $defs{$name};
+  my $pvCu      = ReadingsNum ($name, 'Current_PV',          0);                                 # aktuelle PV Erzeugung
+  my $curcon    = ReadingsNum ($name, 'Current_Consumption', 0);                                 # aktueller Verbrauch
+  my $feedinlim = CurrentVal  ($name, 'feedinPowerLimit',      INFINIITY);                       # Einspeiselimit in W
+  my $inplim    = 0;
 
   ## Inverter Limits ermitteln
   ##############################
@@ -10489,10 +10518,10 @@ sub _batChargeRecmd {
       my $maxfctim  = timestringToTimestamp (ReadingsVal ($name, 'Today_MaxPVforecastTime', '')) // $t;
 	  my $rodpvfc   = ReadingsNum ($name, 'RestOfDayPVforecast',           0);                   # PV Prognose Rest des Tages
 	  my $tompvfc   = ReadingsNum ($name, 'Tomorrow_PVforecast',           0);                   # PV Prognose nächster Tag
-	  my $confcss   = CurrentVal  ($hash, 'tdConFcTillSunset',             0);                   # Verbrauchsprognose bis Sonnenuntergang
 	  my $tomconfc  = ReadingsNum ($name, 'Tomorrow_ConsumptionForecast',  0);                   # Verbrauchsprognose nächster Tag
-      my $csoc      = BatteryVal  ($hash, $bn, 'bcharge',  0);                                   # aktuelle Ladung in %
       my $batoptsoc = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                   # aktueller optimierter SoC
+      my $confcss   = CurrentVal  ($name, 'tdConFcTillSunset',             0);                   # Verbrauchsprognose bis Sonnenuntergang     
+      my $csoc      = BatteryVal  ($hash, $bn, 'bcharge',  0);                                   # aktuelle Ladung in %
       my $cgbt      = AttrVal     ($name, 'ctrlBatSocManagement'.$bn, undef);
       my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $lowSoc    = 0;
@@ -10558,12 +10587,13 @@ sub _batChargeRecmd {
           $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
 
           ## Ladefreigabe
-          #################
-          if ( $whneed + $sfmargin >= $spday )           {$crel = 1}                             # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-		  if ( $today && $t >= $maxfctim)                {$crel = 1}                             # change V 1.49.0: Ladefreigabe wenn akt. Zeit >= Zeit bei max. Tagesertragsertwartung
-          if ( $today && $nhts >= $maxfctim)             {$crel = 1}                             # change V 1.49.0: Ladefreigabe bei Prognosezeit >= Zeit bei max. Tagesertragsertwartung
-		  if ( !$num && ($pvCu - $curcon) >= $inplim )   {$crel = 1}                             # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
-          if ( !$cgbt )                                  {$crel = 1}                             # immer Ladefreigabe wenn kein BatSoc-Management
+          #################		  
+          if ( $whneed + $sfmargin >= $spday )            {$crel = 1}                            # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+		  if ( $today && $t >= $maxfctim)                 {$crel = 1}                            # change V 1.49.0: Ladefreigabe wenn akt. Zeit >= Zeit bei max. Tagesertragsertwartung
+          if ( $today && $nhts >= $maxfctim)              {$crel = 1}                            # change V 1.49.0: Ladefreigabe bei Prognosezeit >= Zeit bei max. Tagesertragsertwartung
+		  if ( !$num && ($pvCu - $curcon) >= $inplim )    {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
+		  if ( !$num && ($pvCu - $curcon) >= $feedinlim ) {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= Einspeiselimit der Anlage
+          if ( !$cgbt )                                   {$crel = 1}                            # immer Ladefreigabe wenn kein BatSoc-Management
 
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
@@ -24861,6 +24891,32 @@ to ensure that the system configuration is correct.
          Color of the weather icons for the night hours.
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-plantControl"></a>
+       <li><b>plantControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+         By optionally specifying the 'Key=Value' pairs listed below, various properties of the overall
+         properties of the overall system can be set. <br>
+         The entry can be made in several lines.
+         <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="35%"> <col width="65%"> </colgroup>
+			<tr><td> <b>feedinPowerLimit</b> </td><td>Feed-in limit of the entire system into the public grid in watts.                 </td></tr>
+            <tr><td>                         </td><td>SolarForecast does not limit the feed-in, but uses this information               </td></tr>
+            <tr><td>                         </td><td>within the battery charge management to avoid system curtailment.                 </td></tr>
+			<tr><td>                         </td><td>Value: <b>Integer</b>, default: unlimited                                         </td></tr>
+			<tr><td>                         </td><td>                                                                                  </td></tr>
+        </table>
+         </ul>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 
+       </ul>
+
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
        <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
@@ -27362,6 +27418,32 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-graphicWeatherColorNight"></a>
        <li><b>graphicWeatherColorNight </b><br>
          Farbe der Wetter-Icons für die Nachtstunden.
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-plantControl"></a>
+       <li><b>plantControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+         Durch die optionale Angabe der nachfolgend aufgeführten 'Schlüssel=Wert' Paare können verschiedene
+         Eigenschaften der Gesamtanlage eingestellt werden. <br>
+         Die Eingabe kann mehrzeilig erfolgen.
+         <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="35%"> <col width="65%"> </colgroup>
+			<tr><td> <b>feedinPowerLimit</b> </td><td>Einspeiselimit der Gesamtanlage in das öffentliche Netz in Watt.                 </td></tr>
+            <tr><td>                         </td><td>SolarForecast limitiert die Einspeisung nicht, verwendet diese Angabe jedoch     </td></tr>
+            <tr><td>                         </td><td>innerhalb des Batterie-Lademanagements zur Vermeidung einer Anlagenabregelung.   </td></tr>
+			<tr><td>                         </td><td>Wert: <b>Ganzzahl</b>, default: unbegrent                                        </td></tr>
+			<tr><td>                         </td><td>                                                                                 </td></tr>
+        </table>
+         </ul>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 
+       </ul>
+
        </li>
        <br>
 
