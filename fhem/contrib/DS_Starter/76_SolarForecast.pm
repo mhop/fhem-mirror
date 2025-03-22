@@ -165,7 +165,8 @@ my %vNotesIntern = (
                            "set reset aiData deletes raw data also, _transferAPIRadiationValues: AI PV estimate limited to inverter capacity summary ".
                            "__calcPVestimates: pv power summary of all strings connected to inverter limited to inverter capacity summary ".
 						   "_batChargeRecmd: fix calc if more than one batteries are installed, set aiDecTree: new option rawDataGHIreplace ".
-                           "new Attr plantControl with key feedinPowerLimit, batteryPreferredCharge , Attr affectBatteryPreferredCharge is obsolete ",
+                           "new Attr plantControl with keys feedinPowerLimit, batteryPreferredCharge, consForecastInPlanning ".
+                           "Attr affectBatteryPreferredCharge, affectConsForecastInPlanning are obsolete ",
   "1.48.0" => "14.03.2025  edit commandref, add graphicBeam layer 5 and 6, attr ctrlAIdataStorageDuration, ctrlAIshiftTrainStart removed ",
   "1.47.3" => "11.03.2025  adjust weather_ids and management of significant weather, _calcDataEveryFullHour: change attrInvChangedTs Management ".
                            "split __batteryOnBeam into _beamFillupBatValues and itself, expand bat key 'show' by top, bottom ".
@@ -568,7 +569,7 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( affectConsForecastIdentWeekdays
-                   affectConsForecastInPlanning affectSolCastPercentile
+                   affectSolCastPercentile
                    aiControl 
                    consumerLegend consumerAdviceIcon consumerLink
                    ctrlBackupFilesKeep
@@ -1528,7 +1529,6 @@ sub Initialize {
   $hash->{NotifyFn}           = \&Notify;
   $hash->{ReadyFn}            = \&runTask;
   $hash->{AttrList}           = "affectConsForecastIdentWeekdays:1,0 ".
-                                "affectConsForecastInPlanning:1,0 ".
                                 "affectConsForecastLastDays:selectnumbers,1,1,180,0,lin ".
                                 "affectSolCastPercentile:select,10,50,90 ".
                                 "aiControl:textField-long ".
@@ -1594,7 +1594,7 @@ sub Initialize {
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
   my $av = 'obsolete#-#use#attr#plantControl#instead';                          
-  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av ";           # 21.03.2025
+  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av";           # 22.03.2025
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -5874,7 +5874,7 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge$/) {                  # 21.03.2025
+  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning$/) {      # 22.03.2025
       #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
       my $msg = "The attribute $aName is replaced by 'plantControl'.";
       if (!$init_done) {
@@ -6349,8 +6349,9 @@ sub _attrplantControl {                  ## no critic "not used"
 
   my $hash  = $defs{$name};
 
-  for my $av ( qw( feedinPowerLimit
-                   batteryPreferredCharge
+  for my $av ( qw( batteryPreferredCharge
+                   consForecastInPlanning
+                   feedinPowerLimit
                  ) ) {
 
       delete $data{$name}{current}{$av};
@@ -6358,8 +6359,9 @@ sub _attrplantControl {                  ## no critic "not used"
 
   if ($cmd eq 'set') {
       my $valid = {
-          feedinPowerLimit       => '\d+',
           batteryPreferredCharge => '([0-9]|[1-9][0-9]|100)',
+          consForecastInPlanning => '0|1',
+          feedinPowerLimit       => '\d+',
       };
 
       my ($a, $h) = parseParams ($aVal);
@@ -7978,15 +7980,25 @@ sub centralTask {
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
   #delete $data{$name}{circular}{'00'};                                          # 04.02.2025
-  readingsDelete    ($hash, '.migrated');                                       # 01.02.25
+  readingsDelete    ($hash, '.migrated');                                         # 01.02.25
   
-  my $pcb = AttrVal ($name, 'affectBatteryPreferredCharge', undef);               # 22.03.2025
-  ::CommandDeleteAttr (undef, "$name affectBatteryPreferredCharge") if(defined $pcb);  
+  my $pcb = AttrVal ($name, 'affectBatteryPreferredCharge', undef);               # 22.03.2025 
   my $apc = AttrVal ($name, 'plantControl', '');
 
   if (defined $pcb) {
-      my $newval = $apc." batteryPreferredCharge=$pcb"      if(defined $pcb);
+      my $newval = $apc." batteryPreferredCharge=$pcb";
       CommandAttr (undef, "$name plantControl $newval");
+      ::CommandDeleteAttr (undef, "$name affectBatteryPreferredCharge"); 
+  }  
+  ######
+  
+  my $afp = AttrVal ($name, 'affectConsForecastInPlanning', undef);               # 22.03.2025 
+  my $pc1 = AttrVal ($name, 'plantControl', '');
+
+  if (defined $afp) {
+      my $newval = $apc." consForecastInPlanning=$afp";
+      CommandAttr (undef, "$name plantControl $newval");
+      ::CommandDeleteAttr (undef, "$name affectConsForecastInPlanning"); 
   }  
   ######
   
@@ -11380,17 +11392,17 @@ sub ___doPlanning {
   my $debug  = $paref->{debug};
   my $lang   = $paref->{lang};
   my $nh     = $data{$name}{nexthours};
-  my $cicfip = AttrVal ($name, 'affectConsForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
+  my $cicfip = CurrentVal ($name, 'consForecastInPlanning', 0);                            # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
 
   my $hash   = $defs{$name};
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'affectConsForecastInPlanning'): }.($cicfip ? 'yes' : 'no'));
+  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
 
   my %max;
   my %mtimes;
 
-  ## max. PV-Forecast bzw. Überschuß (bei gesetzen affectConsForecastInPlanning) ermitteln
-  ##########################################################################################
+  ## max. PV-Forecast bzw. Überschuß (bei gesetzen consForecastInPlanning) ermitteln
+  ####################################################################################
   for my $idx (sort keys %{$nh}) {
       my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',    0);
       my $confcex = NexthoursVal ($hash, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
@@ -23914,15 +23926,6 @@ to ensure that the system configuration is correct.
   <br><br>
   <ul>
      <ul>
-       <a id="SolarForecast-attr-affectConsForecastInPlanning"></a>
-       <li><b>affectConsForecastInPlanning </b><br>
-         If set, the consumption forecast is also taken into account in addition to the PV forecast when scheduling the
-         consumer. <br>
-         Standard consumer planning is based on the PV forecast only. <br>
-         (default: 0)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-affectConsForecastIdentWeekdays"></a>
        <li><b>affectConsForecastIdentWeekdays </b><br>
          If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast. <br>
@@ -24911,12 +24914,16 @@ to ensure that the system configuration is correct.
             <tr><td>                               </td><td>within the battery charge management to avoid system curtailment.                                              </td></tr>
 			<tr><td>                               </td><td>Value: <b>Integer</b>, default: unlimited                                                                      </td></tr>
 			<tr><td>                               </td><td>                                                                                                               </td></tr>
+            <tr><td> <b>consForecastInPlanning</b> </td><td>The key determines the procedure for scheduling registered consumers.                                          </td></tr>
+			<tr><td>                               </td><td><b>0</b> - the consumers are scheduled on the basis of the PV forecast (default)                               </td></tr>
+			<tr><td>                               </td><td><b>1</b> - consumers are scheduled on the basis of the PV forecast and the consumption forecast                </td></tr>
+			<tr><td>                               </td><td>                                                                                                               </td></tr>       
         </table>
          </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1
        </ul>
 
        </li>
@@ -26440,15 +26447,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
   <br><br>
   <ul>
      <ul>
-       <a id="SolarForecast-attr-affectConsForecastInPlanning"></a>
-       <li><b>affectConsForecastInPlanning </b><br>
-         Wenn gesetzt, wird bei der Einplanung der Consumer zusätzlich zur PV Prognose ebenfalls die Prognose
-         des Verbrauchs berücksichtigt. <br>
-         Die Standardplanung der Consumer erfolgt lediglich auf Grundlage der PV Prognose. <br>
-         (default: 0)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-affectConsForecastIdentWeekdays"></a>
        <li><b>affectConsForecastIdentWeekdays </b><br>
          Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
@@ -27435,12 +27433,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                               </td><td>innerhalb des Batterie-Lademanagements zur Vermeidung einer Anlagenabregelung.                                             </td></tr>
 			<tr><td>                               </td><td>Wert: <b>Ganzzahl</b>, default: unbegrent                                                                                  </td></tr>
 			<tr><td>                               </td><td>                                                                                                                           </td></tr>
+            <tr><td> <b>consForecastInPlanning</b> </td><td>Der Schlüssel bestimmt die Vorgehensweise bei der Einplanung der registrierten Verbraucher.                                </td></tr>
+			<tr><td>                               </td><td><b>0</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose (default)                                  </td></tr>
+			<tr><td>                               </td><td><b>1</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose und der Prognose des Verbrauchs            </td></tr>
+			<tr><td>                               </td><td>                                                                                                                           </td></tr>       
         </table>
          </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1
        </ul>
 
        </li>
