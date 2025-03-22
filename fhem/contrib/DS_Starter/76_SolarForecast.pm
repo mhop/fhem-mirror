@@ -568,7 +568,7 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                    energyH4Trigger
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
-my @aconfigs = qw( affectConsForecastIdentWeekdays
+my @aconfigs = qw( affectConsForecastIdentWeekdays affectConsForecastLastDays
                    affectSolCastPercentile
                    aiControl 
                    consumerLegend consumerAdviceIcon consumerLink
