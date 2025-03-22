@@ -166,7 +166,7 @@ my %vNotesIntern = (
                            "__calcPVestimates: pv power summary of all strings connected to inverter limited to inverter capacity summary ".
 						   "_batChargeRecmd: fix calc if more than one batteries are installed, set aiDecTree: new option rawDataGHIreplace ".
                            "new Attr plantControl with keys feedinPowerLimit, batteryPreferredCharge, consForecastInPlanning ".
-                           "Attr affectBatteryPreferredCharge, affectConsForecastInPlanning are obsolete ",
+                           "Attr affectBatteryPreferredCharge, affectConsForecastInPlanning, ctrlShowLink are obsolete ",
   "1.48.0" => "14.03.2025  edit commandref, add graphicBeam layer 5 and 6, attr ctrlAIdataStorageDuration, ctrlAIshiftTrainStart removed ",
   "1.47.3" => "11.03.2025  adjust weather_ids and management of significant weather, _calcDataEveryFullHour: change attrInvChangedTs Management ".
                            "split __batteryOnBeam into _beamFillupBatValues and itself, expand bat key 'show' by top, bottom ".
@@ -575,7 +575,7 @@ my @aconfigs = qw( affectConsForecastIdentWeekdays
                    ctrlBackupFilesKeep
                    ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
                    ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings
-                   ctrlShowLink ctrlSolCastAPImaxReq
+                   ctrlSolCastAPImaxReq
                    ctrlSolCastAPIoptimizeReq ctrlSpecialReadings ctrlUserExitFn
                    disable
                    flowGraphicControl graphicBeamWidth
@@ -1543,7 +1543,6 @@ sub Initialize {
                                 "ctrlLanguage:DE,EN ".
                                 "ctrlNextDayForecastReadings:multiple-strict,$hod ".
                                 "ctrlNextHoursSoCForecastReadings ".
-                                "ctrlShowLink:1,0 ".
                                 "ctrlSolCastAPImaxReq:selectnumbers,5,5,60,0,lin ".
                                 "ctrlSolCastAPIoptimizeReq:1,0 ".
                                 "ctrlSpecialReadings:multiple-strict,$srd ".
@@ -1594,7 +1593,7 @@ sub Initialize {
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
   my $av = 'obsolete#-#use#attr#plantControl#instead';                          
-  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av";           # 22.03.2025
+  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av";     # 22.03.2025
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -5874,7 +5873,7 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning$/) {      # 22.03.2025
+  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning|ctrlShowLink$/) {      # 22.03.2025
       #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
       my $msg = "The attribute $aName is replaced by 'plantControl'.";
       if (!$init_done) {
@@ -6352,6 +6351,7 @@ sub _attrplantControl {                  ## no critic "not used"
   for my $av ( qw( batteryPreferredCharge
                    consForecastInPlanning
                    feedinPowerLimit
+                   showLink
                  ) ) {
 
       delete $data{$name}{current}{$av};
@@ -6362,6 +6362,7 @@ sub _attrplantControl {                  ## no critic "not used"
           batteryPreferredCharge => '([0-9]|[1-9][0-9]|100)',
           consForecastInPlanning => '0|1',
           feedinPowerLimit       => '\d+',
+          showLink               => '0|1',
       };
 
       my ($a, $h) = parseParams ($aVal);
@@ -7996,9 +7997,19 @@ sub centralTask {
   my $pc1 = AttrVal ($name, 'plantControl', '');
 
   if (defined $afp) {
-      my $newval = $apc." consForecastInPlanning=$afp";
+      my $newval = $pc1." consForecastInPlanning=$afp";
       CommandAttr (undef, "$name plantControl $newval");
       ::CommandDeleteAttr (undef, "$name affectConsForecastInPlanning"); 
+  }  
+  ######
+  
+  my $csl = AttrVal ($name, 'ctrlShowLink', undef);                               # 22.03.2025 
+  my $pc2 = AttrVal ($name, 'plantControl', '');
+
+  if (defined $csl) {
+      my $newval = $pc2." showLink=$csl";
+      CommandAttr (undef, "$name plantControl $newval");
+      ::CommandDeleteAttr (undef, "$name ctrlShowLink"); 
   }  
   ######
   
@@ -13711,7 +13722,7 @@ sub entryGraphic {
   my $colspan = $maxhours + 2;
   my $ret     = q{};
 
-  $ret .= "<span>$dlink </span><br>"  if(AttrVal($name, 'ctrlShowLink', 0));
+  $ret .= "<span>$dlink </span><br>"  if(CurrentVal ($name, 'showLink', 0));
 
   #$ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
   $ret .= "<style>TD.solarfc {text-align: center; padding-left:5px; padding-right:5px; margin:0px;}</style>";
@@ -23999,12 +24010,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-alias"></a>
-       <li><b>alias </b> <br>
-         In connection with "ctrlShowLink" any display name.
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-consumerAdviceIcon"></a>
        <li><b>consumerAdviceIcon </b><br>
          Defines the type of information about the planned switching times of a consumer in the consumer legend.
@@ -24401,13 +24406,6 @@ to ensure that the system configuration is correct.
          # creates readings for the current hour (00) and the following hours +03, +12 and +18.
        </ul>
 
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlShowLink"></a>
-       <li><b>ctrlShowLink </b><br>
-         Display of the link to the detailed view of the device above the graphic area. <br>
-         (default: 1)
        </li>
        <br>
 
@@ -24918,12 +24916,15 @@ to ensure that the system configuration is correct.
 			<tr><td>                               </td><td><b>0</b> - the consumers are scheduled on the basis of the PV forecast (default)                               </td></tr>
 			<tr><td>                               </td><td><b>1</b> - consumers are scheduled on the basis of the PV forecast and the consumption forecast                </td></tr>
 			<tr><td>                               </td><td>                                                                                                               </td></tr>       
+			<tr><td> <b>showLink</b>               </td><td>Display of a link to the detailed view of the device above the graphics area                                   </td></tr>
+			<tr><td>                               </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                      </td></tr>
+		    <tr><td>                               </td><td>                                                                                                               </td></tr>
         </table>
          </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1
        </ul>
 
        </li>
@@ -26521,12 +26522,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-alias"></a>
-       <li><b>alias </b> <br>
-         In Verbindung mit "ctrlShowLink" ein beliebiger Anzeigename.
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-consumerAdviceIcon"></a>
        <li><b>consumerAdviceIcon </b><br>
          Definiert die Art der Information über die geplanten Schaltzeiten eines Verbrauchers in der Verbraucherlegende.
@@ -26923,13 +26918,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          # erstellt Readings für die aktuelle Stunde (00) sowie die nachfolgenden Stunden +03, +12 und +18.
        </ul>
 
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-ctrlShowLink"></a>
-       <li><b>ctrlShowLink </b><br>
-         Anzeige des Links zur Detailansicht des Device über dem Grafikbereich <br>
-         (default: 1)
        </li>
        <br>
 
@@ -27437,12 +27425,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                               </td><td><b>0</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose (default)                                  </td></tr>
 			<tr><td>                               </td><td><b>1</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose und der Prognose des Verbrauchs            </td></tr>
 			<tr><td>                               </td><td>                                                                                                                           </td></tr>       
+			<tr><td> <b>showLink</b>               </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                    </td></tr>
+			<tr><td>                               </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                  </td></tr>
+		    <tr><td>                               </td><td>                                                                                                                           </td></tr>
         </table>
          </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1
        </ul>
 
        </li>
