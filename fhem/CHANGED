@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 76_SolarForecast: Major Release 1.49.0
+                              (see https://forum.fhem.de/index.php?msg=1337341)
  - change:  36_Shelly: some log-levels 
  - feature: configDB: add support for mariadb connections
  - change:  74_AutomowerConnect: add new error codes, implement new spelling of
