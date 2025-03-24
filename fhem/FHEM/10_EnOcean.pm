@@ -6105,7 +6105,7 @@ sub EnOcean_Set($@) {
       # Multisensor Lockable Windows Handle
       # (D2-06-40)
       $rorg = "D2";
-      $updateState = 0;
+      $updateState = 3;
       if ($cmd eq "block") {
         # set unlock allowance info
         if (defined $a[1]) {
@@ -7989,6 +7989,9 @@ sub EnOcean_Parse($$) {
       }
     } elsif ($rorg eq "35") {
       # pass second teach-in telegram
+
+    } elsif ($rorg eq "D0") {
+      # pass signal telegram
 
     } else {
       Log3 $name, 2, "EnOcean $name unsecure telegram locked";
@@ -16886,14 +16889,14 @@ sub EnOcean_CreateSVG($$$) {
         $autocreateWeblinkRoom = 'EnOcean' if ($autocreateWeblinkRoom eq '%TYPE');
         $autocreateWeblinkRoom = $name if ($autocreateWeblinkRoom eq '%NAME');
         $autocreateWeblinkRoom = $attr{$name}{room} if (exists $attr{$name}{room});
-        my $wnr = 1;
+        my $wnr = 0;
         #create SVG devices
         foreach my $wdef (split(/,/, $EnO_eepConfig{$eep}{GPLOT})) {
           next if(!$wdef);
           my ($gplotfile, $stuff) = split(/:/, $wdef);
           next if(!$gplotfile);
           $weblinkName = "SVG_$name";
-          $weblinkName .= "_$wnr" if($wnr > 1);
+          $weblinkName .= "_$wnr" if($wnr > 0);
           $wnr++;
           next if (exists $defs{$weblinkName});
           $cmd = "$weblinkName SVG $filelogName:$gplotfile:CURRENT";
@@ -17160,13 +17163,15 @@ sub EnOcean_SndCdm($$$$$$$$) {
   }
   if ($packetType == 1 && $len > $dataPartLen) {
     # first CDM telegram
+    #my $rorgCdm = $rorg =~ /^3[15]$/ ? 33 : 40;
+    my $rorgCdm = 40;
     $dataPartMask = $dataPartLen - 8;
     $data =~ m/^(.{$dataPartMask})(.*)$/;
     $dataPart = (sprintf "%02X", $seq << 6 | $idx) . (sprintf "%04X", $len / 2) . $rorg . $1;
     $data = $2;
     $idx ++;
     $len -= $dataPartMask;
-    EnOcean_SndRadio($ctrl, $hash, $packetType, "40", $dataPart, $senderID, $status, $destinationID);
+    EnOcean_SndRadio($ctrl, $hash, $packetType, $rorgCdm, $dataPart, $senderID, $status, $destinationID);
     $dataPartMask = $dataPartLen - 2;
     while ($len > 0) {
       if ($len > $dataPartLen - 2) {
@@ -17179,7 +17184,9 @@ sub EnOcean_SndCdm($$$$$$$$) {
         $dataPart = (sprintf "%02X", $seq << 6 | $idx) . $data;
         $len = 0;
       }
-      EnOcean_SndRadio($ctrl, $hash, $packetType, "40", $dataPart, $senderID, $status, $destinationID);
+      EnOcean_SndRadio($ctrl, $hash, $packetType, $rorgCdm, $dataPart, $senderID, $status, $destinationID);
+      # next part will be sent with 5 ms delay
+      usleep(10000);      
     }
   } else {
     # not necessary to split
@@ -18948,7 +18955,7 @@ sub EnOcean_sec_convertToSecure($$$$) {
   # no encryption with different set profile, required for the LED control of the model Eltako_F4CT55
   my $subTypeSet = AttrVal($name, "subTypeSet", "");
   # encryption needed?
-  return ($err, $rorg, $data, $response, 5) if ($rorg =~ m/^F6|35|D0$/ || $secLevel !~ m/^encapsulation|encryption$/ || $subType eq "STE" || $subTypeSet eq "switch");
+  return ($err, $rorg, $data, $response, 5) if ($rorg =~ /^F6|33|35|40|D0$/ || $secLevel !~ /^encapsulation|encryption$/ || $subTypeSet eq "switch");
   return ("Cryptographic functions are not available", undef, undef, $response, 2) if ($cryptFunc == 0);
   my $dataEnc = AttrVal($name, "dataEnc", undef);
   Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToSecure RORG: $rorg DATA: $data";
