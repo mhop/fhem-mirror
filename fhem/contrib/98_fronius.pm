@@ -2,6 +2,10 @@
 #
 ##############################################
 #
+# 2025.03.24 - fichtennadel v0.4
+# - CHANGE: 
+#          - change in Fronius API, make https configurable (https://forum.fhem.de/index.php?topic=138356.msg1337761#msg1337761)
+#
 # 2025.01.16 - DS_Starter / fichtennadel v0.3
 # - CHANGE: 
 #          - check for init_done in fronius_StartUp loop instead of define (https://forum.fhem.de/index.php?topic=139206.msg1330774#msg1330774)
@@ -120,7 +124,7 @@ use Date::Parse;
 use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 
-my $ModulVersion        = "0.3";
+my $ModulVersion        = "0.4";
 
 ##############################################################################
 sub fronius_Initialize($) {
@@ -142,6 +146,8 @@ sub fronius_Initialize($) {
                           "IntervalStorageRealtimeData ".
                           "IntervalMeterRealtimeData ".
                           "IntervalInverterRealtimeData ".
+                          "useHTTPS:0,1 ".
+                          "sslargs ".
                           "SaveDataHead:0,1 ".
                           $readingFnAttributes;
 }
@@ -378,6 +384,8 @@ sub fronius_Attr($$$) {
   
   if ( $attrName eq "SaveDataHead" ) {
     fronius_clearHeadData($hash);
+  } elsif ($attrName eq 'useHTTPS') {
+    fronius_StartUp($hash);
   }
   
   return;  
@@ -593,41 +601,48 @@ sub fronius_SendCommand($$$) {
   
   Log3 $name, 4, "[$name] [fronius_SendCommand] [$type] START"; 
   
-  my $SendUrl;
+  # http or https  
+  my $proto = AttrVal( $name, "useHTTPS", "0") eq "0" ? "http://" : "https://";
   
+  # sslargs
+  my %sslargs = eval AttrVal( $name, "sslargs", "");
+  Log3 $name, 5, "[$name] [fronius_SendCommand] [$type] sslargs " . Dumper(\%sslargs); 
+
+  # build URL  
+  my $SendUrl;
   # JSON Auswertung
   if ($type eq "GetAPIVersionInfo") {
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . "/solar_api/GetAPIVersion.cgi";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . "/solar_api/GetAPIVersion.cgi";
   }
   elsif ($type eq "GetPowerFlowRealtimeData") {
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetPowerFlowRealtimeData.fcgi";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetPowerFlowRealtimeData.fcgi";
   }
   elsif ($type eq "GetStorageRealtimeData") {
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetStorageRealtimeData.cgi?Scope=System&DeviceId=$SendData";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetStorageRealtimeData.cgi?Scope=System&DeviceId=$SendData";
   }
   elsif ($type eq "GetMeterRealtimeData") {
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetMeterRealtimeData.cgi?Scope=System&DeviceId=$SendData";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetMeterRealtimeData.cgi?Scope=System&DeviceId=$SendData";
   }
   elsif ($type eq "GetActiveDeviceInfo") {
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetActiveDeviceInfo.cgi?DeviceClass=System";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetActiveDeviceInfo.cgi?DeviceClass=System";
   }
   elsif ($type eq "GetInverterRealtimeData_System") {
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetInverterRealtimeData.cgi?Scope=System";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetInverterRealtimeData.cgi?Scope=System";
   }
   elsif ($type eq "GetInverterRealtimeData_Cumulation") {
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetInverterRealtimeData.cgi?Scope=Device&DeviceId=$SendData&DataCollection=CumulationInverterData";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetInverterRealtimeData.cgi?Scope=Device&DeviceId=$SendData&DataCollection=CumulationInverterData";
   }
   elsif ($type eq "GetInverterRealtimeData_Common") {
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetInverterRealtimeData.cgi?Scope=Device&DeviceId=$SendData&DataCollection=CommonInverterData";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetInverterRealtimeData.cgi?Scope=Device&DeviceId=$SendData&DataCollection=CommonInverterData";
   }
   elsif ($type eq "GetInverterRealtimeData_3P") {
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetInverterRealtimeData.cgi?Scope=Device&DeviceId=$SendData&DataCollection=3PInverterData";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetInverterRealtimeData.cgi?Scope=Device&DeviceId=$SendData&DataCollection=3PInverterData";
   }
   elsif ($type eq "GetArchiveData") {
     my $today = time;
     my $StartDate = strftime "%Y-%m-%dT%H:%M:00Z", gmtime($today - 300); # Fronius Solar API V1 Doku - "...intervals which can be set between 5 and 30 minutes..."
     my $EndDate = strftime "%Y-%m-%dT%H:%M:00Z", gmtime($today);
-    $SendUrl   = "http://" . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetArchiveData.cgi?Scope=System&StartDate=$StartDate&EndDate=$EndDate&Channel=Current_DC_String_1&Channel=Current_DC_String_2&Channel=Voltage_DC_String_1&Channel=Voltage_DC_String_2&Channel=EnergyReal_WAC_Sum_Produced&Channel=EnergyReal_WAC_Minus_Absolute&Channel=EnergyReal_WAC_Plus_Absolute&Channel=PowerReal_PAC_Sum";
+    $SendUrl   = $proto . $hash->{helper}{VARS}{FroniusIP} . $hash->{helper}{VARS}{FroniusBaseURL} . "GetArchiveData.cgi?Scope=System&StartDate=$StartDate&EndDate=$EndDate&Channel=Current_DC_String_1&Channel=Current_DC_String_2&Channel=Voltage_DC_String_1&Channel=Voltage_DC_String_2&Channel=EnergyReal_WAC_Sum_Produced&Channel=EnergyReal_WAC_Minus_Absolute&Channel=EnergyReal_WAC_Plus_Absolute&Channel=PowerReal_PAC_Sum";
   }
   else {
     Log3 $name, 3, "[$name] [fronius_SendCommand] [$type] ERROR=Type is unkown!!";
@@ -653,7 +668,8 @@ sub fronius_SendCommand($$$) {
       hash            => $hash,
       CL              => $hash->{CL},
       httpversion     => "1.1",
-      type            => $type
+      type            => $type,
+      sslargs         => \%sslargs
     };
   
     Log3 $name, 4, "[$name] [fronius_SendCommand] [$type] PushToCmdQueue SendURL=" . $SendUrl;
@@ -671,8 +687,7 @@ sub fronius_HandleCmdQueue($) {
   return undef if(!defined($hash->{helper}{CMD_QUEUE})); 
   $hash->{helper}{RUNNING_REQUEST} = 0 if(!defined($hash->{helper}{RUNNING_REQUEST})); 
     
-    if(not($hash->{helper}{RUNNING_REQUEST}) and @{$hash->{helper}{CMD_QUEUE}})
-    {
+  if(not($hash->{helper}{RUNNING_REQUEST}) and @{$hash->{helper}{CMD_QUEUE}}) {
   
     my $params =  {
                        url             => $param->{url},
@@ -684,21 +699,22 @@ sub fronius_HandleCmdQueue($) {
                        hash            => $hash,
                        type            => $param->{type},
                        httpversion     => $param->{httpversion},
+                       sslargs         => $param->{sslargs},
                        callback        => \&fronius_Parse
                       };
-  
-        my $request = pop @{$hash->{helper}{CMD_QUEUE}};
-
-        map {$hash->{helper}{".HTTP_CONNECTION"}{$_} = $params->{$_}} keys %{$params};
-        map {$hash->{helper}{".HTTP_CONNECTION"}{$_} = $request->{$_}} keys %{$request};
+    
+    my $request = pop @{$hash->{helper}{CMD_QUEUE}};
+    
+    map {$hash->{helper}{".HTTP_CONNECTION"}{$_} = $params->{$_}} keys %{$params};
+    map {$hash->{helper}{".HTTP_CONNECTION"}{$_} = $request->{$_}} keys %{$request};
     
     my $type = $hash->{helper}{".HTTP_CONNECTION"}{type};
         
-        $hash->{helper}{RUNNING_REQUEST} = 1;
-        Log3 $name, 4, "[$name] [fronius_HandleCmdQueue] [$type] send command=" . $hash->{helper}{".HTTP_CONNECTION"}{url};
-        HttpUtils_NonblockingGet($hash->{helper}{".HTTP_CONNECTION"});
+    $hash->{helper}{RUNNING_REQUEST} = 1;
+    Log3 $name, 4, "[$name] [fronius_HandleCmdQueue] [$type] send command=" . $hash->{helper}{".HTTP_CONNECTION"}{url};
+    HttpUtils_NonblockingGet($hash->{helper}{".HTTP_CONNECTION"});
     
-    }
+  }
 }
 
 sub fronius_Parse($$$) {
@@ -957,6 +973,14 @@ sub fronius_setState($$) {
 
       <li><a id="fronius-IntervalInverterRealtimeData">IntervalInverterRealtimeData</a><br>
       Interval in seconds for requesting GetInverterRealtimeData data from inverter, default IntervalRealtimeData, 0 to disable requests.
+      </li>
+
+      <li><a id="fronius-useHTTPS">useHTTPS</a><br>
+      1 to use https to access Fronius Solar API, 0 to use http (default)
+      </li>
+
+      <li><a id="fronius-sslargs">sslargs</a><br>
+      sslargs to pass to HttpUtils_BlockingGet, see <a href="https://wiki.fhem.de/wiki/HttpUtils">https://wiki.fhem.de/wiki/HttpUtils</a> / <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods">http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods</a>
       </li>
 
     </ul>
