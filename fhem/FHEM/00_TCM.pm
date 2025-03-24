@@ -60,7 +60,7 @@ sub TCM_Initialize($) {
   $hash->{UndefFn} = "TCM_Undef";
   $hash->{AttrList} = "assignIODev:select,no,yes baseID .baseIDSaved blockSenderID:own,no .chipIDSaved comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
                       "dummy:1,0 fingerprint:off,on learningDev:all,teachMsg learningMode:always,demand,nearfield " .
-                      "msgCounter:select,off,on rcvIDShift sendInterval:0,10,15,20,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
+                      "msgCounter:select,off,on rcvIDShift sendInterval:0,5,10,15,20,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
                       "smartAckLearnMode:simple,advance,advanceSelectRep";
   return undef;
 }
@@ -129,11 +129,11 @@ sub TCM_InitSerialCom($) {
   # default attributes
   my %setAttrInit;
   if ($comType eq "RS485" || $hash->{DeviceName} eq "none") {
-    %setAttrInit = (sendInterval => {ESP2 => 100, ESP3 => 15},
+    %setAttrInit = (sendInterval => {ESP2 => 100, ESP3 => 0},
                     learningMode => {ESP2 => "always", ESP3 => "always"}
                    );
   }else {
-    %setAttrInit = ("sendInterval" => {ESP2 => 100, ESP3 => 15});
+    %setAttrInit = ("sendInterval" => {ESP2 => 100, ESP3 => 0});
   }
   foreach(keys %setAttrInit) {
     $attrVal = AttrVal($name, $_, undef);
@@ -1925,7 +1925,7 @@ sub TCM_Shutdown($) {
     </li>
     <li><a id="TCM-attr-sendInterval">sendInterval</a> &lt;0 ... 250&gt;<br>
       ESP2: [sendInterval] = 100 ms is default.<br>
-      ESP3: [sendInterval] = 15 ms is default.<br>
+      ESP3: [sendInterval] = 0 ms is default.<br>
       Smallest interval between two sending telegrams
     </li>
     <li><a id="TCM-attr-smartAckLearnMode">smartAckLearnMode</a> &lt;simple|advance|advanceSelectRep&gt;<br>
