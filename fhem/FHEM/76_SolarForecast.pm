@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.49.1" => "25.03.2025  fix batteryPreferredCharge: https://forum.fhem.de/index.php?msg=1337802 ",
   "1.49.0" => "23.03.2025  _listDataPoolApiData: fix warning item1, new option OpenMeteoDWD_D2-API with preparation for satellite support ".
                            "add Attr graphicBeamHeightLevel3, Compatibility of Rad1h data between DWD and OpenMeteo established ".
                            "set reset aiData deletes raw data also, _transferAPIRadiationValues: AI PV estimate limited to inverter capacity summary ".
@@ -12446,7 +12447,7 @@ sub ___enableSwitchByBatPrioCharge {
   my $c     = $paref->{consumer};
 
   my $ena     = 1;
-  my $pcb     = CurrentVal ($name, 'affectBatteryPreferredCharge', 0);       # Vorrangladung Batterie zu X%
+  my $pcb     = CurrentVal ($name, 'batteryPreferredCharge', 0);             # Vorrangladung Batterie zu X%
   my ($badev) = isBatteryUsed ($name);
 
   return $ena if(!$pcb || !$badev);                                          # Freigabe Schalten Consumer wenn kein Prefered Battery/Soll-Ladung 0 oder keine Batterie installiert

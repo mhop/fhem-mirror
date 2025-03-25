@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  76_SolarForecast: fix batteryPreferredCharge consideration
  - feature: 76_SolarForecast: Major Release 1.49.0
                               (see https://forum.fhem.de/index.php?msg=1337341)
  - change:  36_Shelly: some log-levels 
