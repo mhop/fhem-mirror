@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.49.1" => "25.03.2025  fix batteryPreferredCharge: https://forum.fhem.de/index.php?msg=1337802 ",
+  "1.49.1" => "25.03.2025  fix batteryPreferredCharge: https://forum.fhem.de/index.php?msg=1337802, Attr ctrlBackupFilesKeep is ".
+                           "obsolete and replaced by plantControl->backupFilesKeep ",
   "1.49.0" => "23.03.2025  _listDataPoolApiData: fix warning item1, new option OpenMeteoDWD_D2-API with preparation for satellite support ".
                            "add Attr graphicBeamHeightLevel3, Compatibility of Rad1h data between DWD and OpenMeteo established ".
                            "set reset aiData deletes raw data also, _transferAPIRadiationValues: AI PV estimate limited to inverter capacity summary ".
@@ -573,7 +574,6 @@ my @aconfigs = qw( affectConsForecastIdentWeekdays affectConsForecastLastDays
                    affectSolCastPercentile
                    aiControl 
                    consumerLegend consumerAdviceIcon consumerLink
-                   ctrlBackupFilesKeep
                    ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
                    ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings
                    ctrlSolCastAPImaxReq
@@ -1536,7 +1536,6 @@ sub Initialize {
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
                                 "consumerLink:0,1 ".
-                                "ctrlBackupFilesKeep ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#10 ".
                                 "ctrlGenPVdeviation:daily,continuously ".
@@ -1594,7 +1593,7 @@ sub Initialize {
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
   my $av = 'obsolete#-#use#attr#plantControl#instead';                          
-  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av";     # 22.03.2025
+  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av ctrlBackupFilesKeep:$av";     # 22.03.2025
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -5874,7 +5873,7 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning|ctrlShowLink$/) {      # 22.03.2025
+  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning|ctrlShowLink|ctrlBackupFilesKeep$/) {      # 22.03.2025
       #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
       my $msg = "The attribute $aName is replaced by 'plantControl'.";
       if (!$init_done) {
@@ -5937,7 +5936,7 @@ sub Attr {
   }
 
   if ($cmd eq 'set') {
-      if ($aName eq 'ctrlInterval' || $aName eq 'ctrlBackupFilesKeep') {
+      if ($aName eq 'ctrlInterval') {
           unless ($aVal =~ /^[0-9]+$/x) {
               return qq{Invalid value for $aName. Use only figures 0-9!};
           }
@@ -7270,7 +7269,7 @@ sub deleteOldBckpFiles {
   my $name = shift;
   my $file = shift;
 
-  my $dfk    = AttrVal ($name, 'ctrlBackupFilesKeep', 3);
+  my $dfk    = CurrentVal ($name, 'backupFilesKeep', 3); 
   my $bfform = $file.'_.*';
 
   if (!opendir (DH, $cachedir)) {
@@ -8014,6 +8013,16 @@ sub centralTask {
   }  
   ######
   
+  my $cbk = AttrVal ($name, 'ctrlBackupFilesKeep', undef);                        # 25.03.2025 
+  my $pc3 = AttrVal ($name, 'plantControl', '');
+
+  if (defined $cbk) {
+      my $newval = $pc3." backupFilesKeep=$cbk";
+      CommandAttr (undef, "$name plantControl $newval");
+      ::CommandDeleteAttr (undef, "$name ctrlBackupFilesKeep"); 
+  }  
+  ######
+  
   my $n = 0;                                                       # 01.02.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_*
   for my $hh (1..24) {
       $hh = sprintf "%02d", $hh;
@@ -8655,8 +8664,8 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 5 started");
 
-          if (AttrVal ($name, 'ctrlBackupFilesKeep', 3)) {
-              periodicWriteMemcache ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen (unterbleibt bei ctrlBackupFilesKeep == 0)
+          if (CurrentVal ($name, 'backupFilesKeep', 3)) {
+              periodicWriteMemcache ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen (unterbleibt bei 'backupFilesKeep' == 0)
           }
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 5 finished");
@@ -23191,16 +23200,16 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="17%"> <col width="83%"> </colgroup>
-            <tr><td> <b>backup</b>               </td><td>Saves the active in-memory structures with the current timestamp.                                                                          </td></tr>
-            <tr><td>                             </td><td><a href="#SolarForecast-attr-ctrlBackupFilesKeep">ctrlBackupFilesKeep</a> generations of the files are saved. Older versions are deleted.  </td></tr>
-            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;                                  </td></tr>
-            <tr><td>                             </td><td>                                                                                                                                           </td></tr>
-            <tr><td> <b>save</b>                 </td><td>The active in-memory structures are saved.                                                                                                 </td></tr>
-            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                      </td></tr>
-            <tr><td>                             </td><td>                                                                                                                                           </td></tr>
-            <tr><td> <b>recover-&lt;File&gt;</b> </td><td>Restores the data of the selected backup file as an active in-memory structure.                                                            </td></tr>
-            <tr><td>                             </td><td>To avoid inconsistencies, the PVH.* and PVC.* files should be restored in pairs                                                            </td></tr>
-            <tr><td>                             </td><td>with the same time stamp.                                                                                                                  </td></tr>
+            <tr><td> <b>backup</b>               </td><td>Saves the active in-memory structures with the current timestamp.                                                                             </td></tr>
+            <tr><td>                             </td><td><a href="#SolarForecast-attr-plantControl">plantControl->backupFilesKeep</a> generations of the files are saved. Older versions are deleted.  </td></tr>
+            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;                                     </td></tr>
+            <tr><td>                             </td><td>                                                                                                                                              </td></tr>
+            <tr><td> <b>save</b>                 </td><td>The active in-memory structures are saved.                                                                                                    </td></tr>
+            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                         </td></tr>
+            <tr><td>                             </td><td>                                                                                                                                              </td></tr>
+            <tr><td> <b>recover-&lt;File&gt;</b> </td><td>Restores the data of the selected backup file as an active in-memory structure.                                                               </td></tr>
+            <tr><td>                             </td><td>To avoid inconsistencies, the PVH.* and PVC.* files should be restored in pairs                                                               </td></tr>
+            <tr><td>                             </td><td>with the same time stamp.                                                                                                                     </td></tr>
          </table>
       </ul>
       <br>
@@ -24239,16 +24248,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlBackupFilesKeep"></a>
-       <li><b>ctrlBackupFilesKeep &lt;Integer&gt; </b><br>
-         Defines the number of generations of backup files
-         (see also <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>). <br>
-         If ctrlBackupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place. <br>
-         Manual execution with the aforementioned set command is still possible. <br>
-         (default: 3)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
        <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] </b> <br><br>
          If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC management for this
@@ -24920,12 +24919,18 @@ to ensure that the system configuration is correct.
 			<tr><td> <b>showLink</b>               </td><td>Display of a link to the detailed view of the device above the graphics area                                   </td></tr>
 			<tr><td>                               </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                      </td></tr>
 		    <tr><td>                               </td><td>                                                                                                               </td></tr>
+			<tr><td> <b>backupFilesKeep</b>        </td><td>Defines the number of generations of backup files.                                                             </td></tr>
+			<tr><td>                               </td><td>(see <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                 </td></tr>
+		    <tr><td>                               </td><td>If ctrlBackupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place.  </td></tr>
+		    <tr><td>                               </td><td>Manual execution with the aforementioned set command is still possible.                                        </td></tr>
+		    <tr><td>                               </td><td>Wert: <b>Integer</b>, default: 3                                                                               </td></tr>
+			<tr><td>                               </td><td>                                                                                                               </td></tr>
         </table>
          </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2
        </ul>
 
        </li>
@@ -25695,16 +25700,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="17%"> <col width="83%"> </colgroup>
-            <tr><td> <b>backup</b>                </td><td>Sichert die aktiven In-Memory Strukturen mit dem aktuellen Zeitstempel.                                                                                      </td></tr>
-            <tr><td>                              </td><td>Es werden <a href="#SolarForecast-attr-ctrlBackupFilesKeep">ctrlBackupFilesKeep</a> Generationen der Dateien gespeichert. Ältere Versionen werden gelöscht.  </td></tr>
-            <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;                                              </td></tr>
-            <tr><td>                              </td><td>                                                                                                                                                             </td></tr>
-            <tr><td> <b>save</b>                  </td><td>Die aktiven In-Memory Strukturen werden gespeichert.                                                                                                         </td></tr>
-            <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                                      </td></tr>
-            <tr><td>                              </td><td>                                                                                                                                                             </td></tr>
-            <tr><td> <b>recover-&lt;Datei&gt;</b> </td><td>Stellt die Daten der ausgewählten Sicherungsdatei als aktive In-Memory Struktur wieder her.                                                                  </td></tr>
-            <tr><td>                              </td><td>Um Inkonsistenzen zu vermeiden, sollten die Dateien PVH.* und PVC.* mit dem gleichen                                                                         </td></tr>
-            <tr><td>                              </td><td>Zeitstempel paarweise recovert werden.                                                                                                                       </td></tr>
+            <tr><td> <b>backup</b>                </td><td>Sichert die aktiven In-Memory Strukturen mit dem aktuellen Zeitstempel.                                                                                            </td></tr>
+            <tr><td>                              </td><td>Es werden <a href="#SolarForecast-attr-backupFilesKeep">plantControl->backupFilesKeep</a> Generationen der Dateien gespeichert. Ältere Versionen werden gelöscht.  </td></tr>
+            <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;                                                    </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                                   </td></tr>
+            <tr><td> <b>save</b>                  </td><td>Die aktiven In-Memory Strukturen werden gespeichert.                                                                                                               </td></tr>
+            <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                                            </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                                   </td></tr>
+            <tr><td> <b>recover-&lt;Datei&gt;</b> </td><td>Stellt die Daten der ausgewählten Sicherungsdatei als aktive In-Memory Struktur wieder her.                                                                        </td></tr>
+            <tr><td>                              </td><td>Um Inkonsistenzen zu vermeiden, sollten die Dateien PVH.* und PVC.* mit dem gleichen                                                                               </td></tr>
+            <tr><td>                              </td><td>Zeitstempel paarweise recovert werden.                                                                                                                             </td></tr>
          </table>
       </ul>
       <br>
@@ -26750,16 +26755,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlBackupFilesKeep"></a>
-       <li><b>ctrlBackupFilesKeep &lt;Ganzzahl&gt;</b><br>
-         Legt die Anzahl der Generationen von Sicherungsdateien
-         (siehe <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>) fest. <br>
-         Ist ctrlBackupFilesKeep explit auf '0' gesetzt, erfolgt keine automatische Generierung und Bereinigung von Sicherungsdateien. <br>
-         Eine manuelle Ausführung mit dem genannten Set-Kommando ist weiterhin möglich. <br>
-         (default: 3)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
        <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] </b> <br><br>
          Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
@@ -27413,28 +27408,34 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-			<tr><td> <b>batteryPreferredCharge</b> </td><td>Verbraucher mit dem Mode <b>can</b> werden erst dann eingeschaltet, wenn die angegebene Batterieladung (%) erreicht ist.   </td></tr>
-			<tr><td>                               </td><td>Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht.                                        </td></tr>
-			<tr><td>                               </td><td>Wert: <b>Ganzzahl 0..100</b>, default: 0                                                                                   </td></tr>
-			<tr><td>                               </td><td>                                                                                                                           </td></tr>
-            <tr><td> <b>feedinPowerLimit</b>       </td><td>Einspeiselimit der Gesamtanlage in das öffentliche Netz in Watt.                                                           </td></tr>
-            <tr><td>                               </td><td>SolarForecast limitiert die Einspeisung nicht, verwendet diese Angabe jedoch                                               </td></tr>
-            <tr><td>                               </td><td>innerhalb des Batterie-Lademanagements zur Vermeidung einer Anlagenabregelung.                                             </td></tr>
-			<tr><td>                               </td><td>Wert: <b>Ganzzahl</b>, default: unbegrent                                                                                  </td></tr>
-			<tr><td>                               </td><td>                                                                                                                           </td></tr>
-            <tr><td> <b>consForecastInPlanning</b> </td><td>Der Schlüssel bestimmt die Vorgehensweise bei der Einplanung der registrierten Verbraucher.                                </td></tr>
-			<tr><td>                               </td><td><b>0</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose (default)                                  </td></tr>
-			<tr><td>                               </td><td><b>1</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose und der Prognose des Verbrauchs            </td></tr>
-			<tr><td>                               </td><td>                                                                                                                           </td></tr>       
-			<tr><td> <b>showLink</b>               </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                    </td></tr>
-			<tr><td>                               </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                  </td></tr>
-		    <tr><td>                               </td><td>                                                                                                                           </td></tr>
+			<tr><td> <b>batteryPreferredCharge</b> </td><td>Verbraucher mit dem Mode <b>can</b> werden erst dann eingeschaltet, wenn die angegebene Batterieladung (%) erreicht ist.        </td></tr>
+			<tr><td>                               </td><td>Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht.                                             </td></tr>
+			<tr><td>                               </td><td>Wert: <b>Ganzzahl 0..100</b>, default: 0                                                                                        </td></tr>
+			<tr><td>                               </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>feedinPowerLimit</b>       </td><td>Einspeiselimit der Gesamtanlage in das öffentliche Netz in Watt.                                                                </td></tr>
+            <tr><td>                               </td><td>SolarForecast limitiert die Einspeisung nicht, verwendet diese Angabe jedoch                                                    </td></tr>
+            <tr><td>                               </td><td>innerhalb des Batterie-Lademanagements zur Vermeidung einer Anlagenabregelung.                                                  </td></tr>
+			<tr><td>                               </td><td>Wert: <b>Ganzzahl</b>, default: unbegrent                                                                                       </td></tr>
+			<tr><td>                               </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>consForecastInPlanning</b> </td><td>Der Schlüssel bestimmt die Vorgehensweise bei der Einplanung der registrierten Verbraucher.                                     </td></tr>
+			<tr><td>                               </td><td><b>0</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose (default)                                       </td></tr>
+			<tr><td>                               </td><td><b>1</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose und der Prognose des Verbrauchs                 </td></tr>
+			<tr><td>                               </td><td>                                                                                                                                </td></tr>       
+			<tr><td> <b>showLink</b>               </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                         </td></tr>
+			<tr><td>                               </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                       </td></tr>
+		    <tr><td>                               </td><td>                                                                                                                                </td></tr>
+			<tr><td> <b>backupFilesKeep</b>        </td><td>Legt die Anzahl der Generationen von Sicherungsdateien fest.                                                                    </td></tr>
+			<tr><td>                               </td><td>(siehe <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                </td></tr>
+		    <tr><td>                               </td><td>Ist ctrlBackupFilesKeep explit auf '0' gesetzt, erfolgt keine automatische Generierung und Bereinigung von Sicherungsdateien.   </td></tr>
+		    <tr><td>                               </td><td>Eine manuelle Ausführung mit dem genannten Set-Kommando ist weiterhin möglich.                                                  </td></tr>
+		    <tr><td>                               </td><td>Wert: <b>Ganzzahl</b>, default: 3                                                                                               </td></tr>
+			<tr><td>                               </td><td>                                                                                                                                </td></tr>
         </table>
          </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2
        </ul>
 
        </li>
