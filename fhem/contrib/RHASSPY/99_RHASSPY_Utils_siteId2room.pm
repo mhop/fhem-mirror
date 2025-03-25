@@ -49,8 +49,8 @@ sub siteId2room {
         Log3($hash->{NAME}, 1, "JSON decoding error, $rawd seems not to be valid JSON data:  $@");
         return "Error! $rawd seems not to be valid JSON data!";
     }
-    my $site = encode('UTF-8',$data->{siteId});
-    my $room = encode('UTF-8',$data->{Room});
+    my $site = $data->{siteId};
+    my $room = $data->{Room};
     my $rreading = makeReadingName("siteId2room_$site");
     
     readingsSingleUpdate($hash, $rreading, $room, 1);
@@ -77,7 +77,7 @@ __END__
 <ul>
   <li>siteId2room</li>
   Routine to change the default room a siteId is assigned to. Might be usefull if you use e.g. your mobile phone as satellite.<br> 
-  Example: <code>attr &lt;rhasspyDevice&gt; rhasspyIntents siteId2room=RHASSPY::siteId2room::siteId2room(NAME,DATA)</code></p>
+  Example: <code>attr &lt;rhasspyDevice&gt; rhasspyIntents siteId2room=RHASSPY::siteId2room::siteId2room(NAME,DATA)</code><br>
 </ul>
 =end html
 =cut
