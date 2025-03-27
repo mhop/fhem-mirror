@@ -1,4 +1,4 @@
-REV 29788
+REV 29791
 DIR unused
 UPD 2025-03-26_07:45:04 442446 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -767,8 +767,8 @@ UPD 2025-03-26_07:45:11 5276176 docs/commandref.html
 UPD 2025-03-26_07:45:15 3304610 docs/commandref_DE.html
 UPD 2024-10-27_07:45:03 86474 docs/commandref_frame.html
 UPD 2024-10-27_07:45:03 97208 docs/commandref_frame_DE.html
-UPD 2025-03-26_07:45:16 320110 docs/commandref_modular.html
-UPD 2025-03-26_07:45:17 332022 docs/commandref_modular_DE.html
+UPD 2025-03-27_07:45:16 320110 docs/commandref_modular.html
+UPD 2025-03-27_07:45:17 332022 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1543,6 +1543,7 @@ UPD 2022-11-24_07:45:03 1143 www/images/fhemSVG/hue2019_devicesOutdoorMotionSens
 UPD 2022-02-12_07:45:05 1230 www/images/fhemSVG/hue2019_roomDining.svg
 UPD 2023-11-29_07:45:02 1977 www/images/fhemSVG/hue2023_string_light.svg
 UPD 2017-11-14_07:45:02 10070 www/images/fhemSVG/hue_bridge.svg
+UPD 2025-03-27_07:45:04 682 www/images/fhemSVG/hue_filled_appear.svg
 UPD 2016-04-27_07:45:12 1413 www/images/fhemSVG/hue_filled_aura.svg
 UPD 2017-11-14_07:45:02 542 www/images/fhemSVG/hue_filled_beyond_ceiling_pendant_table.svg
 UPD 2017-11-14_07:45:02 1114 www/images/fhemSVG/hue_filled_bloom.svg
