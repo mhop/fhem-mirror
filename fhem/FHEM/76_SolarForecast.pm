@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.49.3" => "27.03.2025  flowGraphicControl: new key homenodedyncol ",
+  "1.49.2" => "26.03.2025  ___enableSwitchByBatPrioCharge: fix usage of rusulting SOC of all batteries ",
   "1.49.1" => "25.03.2025  fix batteryPreferredCharge: https://forum.fhem.de/index.php?msg=1337802, Attr ctrlBackupFilesKeep is ".
                            "obsolete and replaced by plantControl->backupFilesKeep ",
   "1.49.0" => "23.03.2025  _listDataPoolApiData: fix warning item1, new option OpenMeteoDWD_D2-API with preparation for satellite support ".
@@ -6241,6 +6243,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
   for my $av ( qw( animate
                    consumerdist
                    h2consumerdist
+                   homenodedyncol
                    shiftx
                    shifty
                    showconsumer
@@ -6259,16 +6262,17 @@ sub _attrflowGraphicControl {            ## no critic "not used"
 
   if ($cmd eq 'set') {
       my $valid = {
-          animate                => '0|1',
+          animate                => '(0|1)',
           consumerdist           => '[89]\d{1}|[1234]\d{2}|500',
           h2consumerdist         => '\d{1,3}',
+          homenodedyncol         => '(0|1)',
           shiftx                 => '-?[0-7]\d{0,1}|-?80',
           shifty                 => '\d+',
           size                   => '\d+',
-          showconsumer           => '0|1',
-          showconsumerdummy      => '0|1',
-          showconsumerremaintime => '0|1',
-          showconsumerpower      => '0|1',
+          showconsumer           => '(0|1)',
+          showconsumerdummy      => '(0|1)',
+          showconsumerremaintime => '(0|1)',
+          showconsumerpower      => '(0|1)',
           strokecolstd           => '.*',
           strokecolsig           => '.*',
           strokecolina           => '.*',
@@ -9958,7 +9962,7 @@ sub _transferMeterValues {
 
   if (!$gctotal) {
       $data{$name}{circular}{99}{initdaygcon} = 0;
-      Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy drawn from grid was reset and is registered with >0<.");
+      Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy drawn from grid was reset and is registered with >0<. Check Reading '$gt'");
   }
   elsif ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
       if (defined $idgcon) {
@@ -10259,8 +10263,12 @@ sub _transferBatteryValues {
   }
 
   if ($num) {
-      my $soctotal = sprintf "%.0f", ($socwhsum / $bcapsum * 100) if($bcapsum);            # resultierender SoC (%) aller Batterien als "eine"
-      push @{$data{$name}{current}{batsocslidereg}}, $soctotal;                            # Schieberegister average SOC aller Batterien
+      if ($bcapsum) {
+          my $soctotal = sprintf "%.0f", ($socwhsum / $bcapsum * 100);                     # resultierender SoC (%) aller Batterien als "eine"
+          $data{$name}{current}{batsoctotal} = $soctotal;                                  
+          push @{$data{$name}{current}{batsocslidereg}}, $soctotal;                        # Schieberegister average SOC aller Batterien
+      }
+      
       limitArray ($data{$name}{current}{batsocslidereg}, SLIDENUMMAX);
 
       $data{$name}{current}{batpowerinsum}  = $pbisum;                                     # summarische laufende Batterieladung
@@ -12461,7 +12469,7 @@ sub ___enableSwitchByBatPrioCharge {
 
   return $ena if(!$pcb || !$badev);                                          # Freigabe Schalten Consumer wenn kein Prefered Battery/Soll-Ladung 0 oder keine Batterie installiert
 
-  my $bcharge = BatteryVal ($name, '01', 'bcharge', 0);                      # aktuelle Ladung in %
+  my $bcharge = CurrentVal ($name, 'batsoctotal', 0);                        # resultierender SoC (%) aller Batterien als Cluster 
   $ena        = 0 if($bcharge < $pcb);                                       # keine Freigabe wenn Batterieladung kleiner Soll-Ladung
 
 return $ena;
@@ -16171,10 +16179,8 @@ sub _flowGraphic {
   ## definierte Batterien ermitteln und zusammenfassen
   ######################################################
   my ($batin, $bat2home);
-  my $socwhsum = 0;
-  my $soc      = 0;
 
-  for my $bn (1..MAXBATTERIES) {                                                   # für jede definierte Batterie
+  for my $bn (1..MAXBATTERIES) {                                                       # für jede definierte Batterie
       $bn                   = sprintf "%02d", $bn;
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
@@ -16183,12 +16189,9 @@ sub _flowGraphic {
       my $bat2homepow = ReadingsNum ($name, 'Current_PowerBatOut_'.$bn, undef);
       $batin         += $batinpow    if(defined $batinpow);
       $bat2home      += $bat2homepow if(defined $bat2homepow);
-
-      $socwhsum      += BatteryVal ($name, $bn, 'bchargewh', 0);                    # Batterie SoC in Wh
   }
-
-  my $batcapsum = CurrentVal ($hash, 'batcapsum', 0);                               # Summe installierte Batterie Kapazität
-  $soc          = sprintf "%.0f", ($socwhsum / $batcapsum * 100) if($batcapsum);    # resultierender SoC (%) aller Batterien als Cluster
+  
+  my $soc = CurrentVal ($hash, 'batsoctotal', 0);                                      # resultierender SoC (%) aller Batterien als Cluster 
 
   if (!defined $batin && !defined $bat2home) {
       $hasbat   = 0;
@@ -16196,7 +16199,7 @@ sub _flowGraphic {
       $bat2home = 0;
       $soc      = 0;
   }
-
+  
   debugLog ($paref, 'graphic', "Battery initial summary - batin: $batin, bat2home: $bat2home");
 
   ## Resultierende von Laden und Entladen berechnen
@@ -16465,7 +16468,18 @@ END1
 
   ## Home Icon
   ##############
-  my $hicon        = FW_makeImage    (HOMEICONDEF, '');
+  my $car   = CurrentVal  ($name, 'autarkyrate', undef);
+  my $hicon = HOMEICONDEF;  
+
+  if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {
+      $car              = 100 - $car;
+      my $pahcol        = '#'.substr(Color::pahColor(0,50,100,$car,[102,205,0, 050,205,050, 247,203,159, 247,148,111, 255,51,15]),0,6);
+      ($hicon, my $col) = split '@', $hicon;
+      $hicon            = $hicon.'@'.$pahcol;
+  }
+  
+  $hicon = FW_makeImage ($hicon, '');
+  
   ($scale, $hicon) = __normIconScale ($name, $hicon);
 
   $ret .= qq{<g id="home_$stna" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung
@@ -24523,6 +24537,9 @@ to ensure that the system configuration is correct.
             <tr><td> <b>h2consumerdist</b>          </td><td>Extension of the vertical distance between the house and the consumer icons.                                            </td></tr>
             <tr><td>                                </td><td>Value: <b>0 ... 999</b>, default: 0                                                                                     </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>homenodedyncol</b>          </td><td>The house node icon can be colored dynamically depending on the current self-sufficiency.                               </td></tr>
+            <tr><td>                                </td><td><b>0</b> - no dynamic coloring,  <b>1</b> - dynamic coloring, default: 0                                                </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shiftx</b>                  </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
 			<tr><td>                                </td><td>Value: <b>-80 ... 80</b>, default: 0                                                                                    </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
@@ -27030,6 +27047,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>h2consumerdist</b>          </td><td>Erweiterung des vertikalen Abstandes zwischen dem Haus und den Verbraucher-Icons.                                       </td></tr>
             <tr><td>                                </td><td>Wert: <b>0 ... 999</b>, default: 0                                                                                      </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>homenodedyncol</b>          </td><td>Das Hausknoten-Icon kann dynamisch in Abhängigkeit der aktuellen Autarkie eingefärbt werden.                            </td></tr>
+            <tr><td>                                </td><td><b>0</b> - keine dynamische Färbung,  <b>1</b> - dynamische Färbung, default: 0                                         </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shiftx</b>                  </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
 			<tr><td>                                </td><td>Wert: <b>-80 ... 80</b>, default: 0                                                                                     </td></tr>
