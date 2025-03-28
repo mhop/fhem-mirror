@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.49.4" => "28.03.2025  _batChargeRecmd: revert Loading release changes of V 1.49.0, _transferAPIRadiationValues: fix sunalt for tomorrow ",
+  "1.49.3" => "27.03.2025  flowGraphicControl: new key homenodedyncol ",
   "1.49.2" => "26.03.2025  ___enableSwitchByBatPrioCharge: fix usage of rusulting SOC of all batteries ",
   "1.49.1" => "25.03.2025  fix batteryPreferredCharge: https://forum.fhem.de/index.php?msg=1337802, Attr ctrlBackupFilesKeep is ".
                            "obsolete and replaced by plantControl->backupFilesKeep ",
@@ -6242,6 +6244,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
   for my $av ( qw( animate
                    consumerdist
                    h2consumerdist
+                   homenodedyncol
                    shiftx
                    shifty
                    showconsumer
@@ -6260,16 +6263,17 @@ sub _attrflowGraphicControl {            ## no critic "not used"
 
   if ($cmd eq 'set') {
       my $valid = {
-          animate                => '0|1',
+          animate                => '(0|1)',
           consumerdist           => '[89]\d{1}|[1234]\d{2}|500',
           h2consumerdist         => '\d{1,3}',
+          homenodedyncol         => '(0|1)',
           shiftx                 => '-?[0-7]\d{0,1}|-?80',
           shifty                 => '\d+',
           size                   => '\d+',
-          showconsumer           => '0|1',
-          showconsumerdummy      => '0|1',
-          showconsumerremaintime => '0|1',
-          showconsumerpower      => '0|1',
+          showconsumer           => '(0|1)',
+          showconsumerdummy      => '(0|1)',
+          showconsumerremaintime => '(0|1)',
+          showconsumerpower      => '(0|1)',
           strokecolstd           => '.*',
           strokecolsig           => '.*',
           strokecolina           => '.*',
@@ -9336,27 +9340,27 @@ sub _transferAPIRadiationValues {
       $data{$name}{nexthours}{$nhtstr}{today}     = $fd == 0 ? 1 : 0;
       $data{$name}{nexthours}{$nhtstr}{rad1h}     = $rad1h;
 
-      my $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
-      my $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
-
-      if (!defined $sunalt || !defined $sunaz) {
-          __calcSunPosition ($paref);
-          $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
-          $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
-      }
-
-      if (defined $sunaz) {
-          $data{$name}{nexthours}{$nhtstr}{sunaz} = $sunaz;
-      }
-      else {
-          $sunaz = NexthoursVal ($hash, $nhtstr, 'sunaz', 0);
-      }
-
-      if (defined $sunalt) {
-          $data{$name}{nexthours}{$nhtstr}{sunalt} = $sunalt;
+      my ($sunalt, $sunaz);
+	  
+	  if ($fd == 0) {                                                                                      # V 1.49.4 für den aktuellen Tag
+		  $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
+		  $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
+		  
+		  if (!defined $sunalt || !defined $sunaz) {
+			  __calcSunPosition ($paref);
+			  $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
+			  $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
+		  }
+	  }
+		  
+      if (defined $sunalt && defined $sunaz) {
+		  $data{$name}{nexthours}{$nhtstr}{sunalt} = $sunalt;
+          $data{$name}{nexthours}{$nhtstr}{sunaz}  = $sunaz;
       }
       else {
-          $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt', 0);
+		  __calcSunPosition ($paref);
+		  $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt', 0);
+          $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',  0);
       }
 
       $paref->{sabin}    = sunalt2bin ($sunalt);
@@ -9489,7 +9493,7 @@ sub __calcSunPosition {
 
   debugLog ($paref, 'collectData', "Sun position: day: $wtday, hod: $hodn, $tstr, azimuth: $az, altitude: $alt");
 
-  if ($fd == 0 && $hodn) {                                                                            # Sun Position in pvHistory speichern
+  if ($fd == 0 && $hodn) {                                                                            # Sun Position für aktuellen Tag in pvHistory speichern
       writeToHistory ( { paref => $paref, key => 'sunaz',  val => $az,  hour => $hodn } );
       writeToHistory ( { paref => $paref, key => 'sunalt', val => $alt, hour => $hodn } );
   }
@@ -9959,7 +9963,7 @@ sub _transferMeterValues {
 
   if (!$gctotal) {
       $data{$name}{circular}{99}{initdaygcon} = 0;
-      Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy drawn from grid was reset and is registered with >0<.");
+      Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy drawn from grid was reset and is registered with >0<. Check Reading '$gt'");
   }
   elsif ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
       if (defined $idgcon) {
@@ -10599,7 +10603,7 @@ sub _batChargeRecmd {
           my $confc = NexthoursVal ($hash, 'NextHour'.$nhr, 'confc',      0);
           my $pvfc  = NexthoursVal ($hash, 'NextHour'.$nhr, 'pvfc',       0);
           my $stt   = NexthoursVal ($hash, 'NextHour'.$nhr, 'starttime', '');
-		  my $nhts  = timestringToTimestamp ($stt) // $t;                                        # Unix Timestamp von NextHours Starttime
+		  #my $nhts  = timestringToTimestamp ($stt) // $t;                                        # Unix Timestamp von NextHours Starttime
           $stt      = (split /[-:]/, $stt)[2] if($stt);
 
           my $crel  = 0;                                                                         # Ladefreigabe 0 per Default
@@ -10637,8 +10641,8 @@ sub _batChargeRecmd {
           ## Ladefreigabe
           #################		  
           if ( $whneed + $sfmargin >= $spday )            {$crel = 1}                            # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-		  if ( $today && $t >= $maxfctim)                 {$crel = 1}                            # change V 1.49.0: Ladefreigabe wenn akt. Zeit >= Zeit bei max. Tagesertragsertwartung
-          if ( $today && $nhts >= $maxfctim)              {$crel = 1}                            # change V 1.49.0: Ladefreigabe bei Prognosezeit >= Zeit bei max. Tagesertragsertwartung
+		  #if ( $today && $t >= $maxfctim)                 {$crel = 1}                            # change V 1.49.0: Ladefreigabe wenn akt. Zeit >= Zeit bei max. Tagesertragsertwartung
+          #if ( $today && $nhts >= $maxfctim)              {$crel = 1}                            # change V 1.49.0: Ladefreigabe bei Prognosezeit >= Zeit bei max. Tagesertragsertwartung
 		  if ( !$num && ($pvCu - $curcon) >= $inplim )    {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
 		  if ( !$num && ($pvCu - $curcon) >= $feedinlim ) {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= Einspeiselimit der Anlage
           if ( !$cgbt )                                   {$crel = 1}                            # immer Ladefreigabe wenn kein BatSoc-Management
@@ -15459,8 +15463,8 @@ sub _beamGraphicRemainingHours {
           $hfcg->{$i}{don}     = NexthoursVal ($hash, 'NextHour'.$nh, 'DoN',         0);
           my $stt              = NexthoursVal ($hash, 'NextHour'.$nh, 'starttime',  '');
 
-          $val1 = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',        0);
-          $val4 = NexthoursVal ($hash, 'NextHour'.$nh, 'confc',       0);
+          $val1 = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',  0);
+          $val4 = NexthoursVal ($hash, 'NextHour'.$nh, 'confc', 0);
 
           ## Batterien Selektionshash anreichern
           ########################################
@@ -16465,7 +16469,18 @@ END1
 
   ## Home Icon
   ##############
-  my $hicon        = FW_makeImage    (HOMEICONDEF, '');
+  my $car   = CurrentVal  ($name, 'autarkyrate', undef);
+  my $hicon = HOMEICONDEF;  
+
+  if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {
+      $car              = 100 - $car;
+      my $pahcol        = '#'.substr(Color::pahColor(0,50,100,$car,[102,205,0, 050,205,050, 247,203,159, 247,148,111, 255,51,15]),0,6);
+      ($hicon, my $col) = split '@', $hicon;
+      $hicon            = $hicon.'@'.$pahcol;
+  }
+  
+  $hicon = FW_makeImage ($hicon, '');
+  
   ($scale, $hicon) = __normIconScale ($name, $hicon);
 
   $ret .= qq{<g id="home_$stna" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung
@@ -24523,6 +24538,9 @@ to ensure that the system configuration is correct.
             <tr><td> <b>h2consumerdist</b>          </td><td>Extension of the vertical distance between the house and the consumer icons.                                            </td></tr>
             <tr><td>                                </td><td>Value: <b>0 ... 999</b>, default: 0                                                                                     </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>homenodedyncol</b>          </td><td>The house node icon can be colored dynamically depending on the current self-sufficiency.                               </td></tr>
+            <tr><td>                                </td><td><b>0</b> - no dynamic coloring,  <b>1</b> - dynamic coloring, default: 0                                                </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shiftx</b>                  </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
 			<tr><td>                                </td><td>Value: <b>-80 ... 80</b>, default: 0                                                                                    </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
@@ -27030,6 +27048,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>h2consumerdist</b>          </td><td>Erweiterung des vertikalen Abstandes zwischen dem Haus und den Verbraucher-Icons.                                       </td></tr>
             <tr><td>                                </td><td>Wert: <b>0 ... 999</b>, default: 0                                                                                      </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>homenodedyncol</b>          </td><td>Das Hausknoten-Icon kann dynamisch in Abhängigkeit der aktuellen Autarkie eingefärbt werden.                            </td></tr>
+            <tr><td>                                </td><td><b>0</b> - keine dynamische Färbung,  <b>1</b> - dynamische Färbung, default: 0                                         </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shiftx</b>                  </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
 			<tr><td>                                </td><td>Wert: <b>-80 ... 80</b>, default: 0                                                                                     </td></tr>
