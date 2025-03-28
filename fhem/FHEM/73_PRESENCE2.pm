@@ -33,7 +33,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "01.03c";
+my $ModulVersion = "01.03d";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -314,6 +314,29 @@ sub PRESENCE2_Define($$) {
             }
 
         }
+        elsif   ($a[2] eq "netcat") {
+            delete $attr{$name}{nonblockingTimeOut};
+            my ($Address, $Port) = split(/:/, $hash->{ADDRESS});
+
+            return "$Address is not a valid IP address" if ($Address !~ m/^\s*([0-9]{1,3}\.){3}[0-9]{1,3}\s*$/);
+
+            $hash->{helper}{os}{Cmd} = "nc -vz $Address $Port 2>&1";
+
+            $hash->{helper}{os}{search} = 'succeeded';
+
+            if ($^O !~ m/solaris/ && $^O !~ m/(Win|cygwin)/) {
+              my $pingAttr = "disable:0,1 "
+                        . "thresholdAbsence "
+                        . "intervalNormal "
+                        . "intervalPresent "
+                        . "prGroup:multiple,static,dynamic "
+                        . "prGroupDisp:condense,verbose "
+                        . "FhemLog3Std:0,1 "
+                        . $readingFnAttributes;
+              setDevAttrList($hash->{NAME}, $pingAttr);
+            }
+
+        }
         elsif($a[2] eq "lan-bluetooth") {
             delete $attr{$name}{nonblockingTimeOut};
             DevIo_CloseDev($hash);# {DevIo_CloseDev($dev{prBtTest })}
@@ -321,7 +344,7 @@ sub PRESENCE2_Define($$) {
             $attr{$name}{intervalNormal}   = 30;
             $attr{$name}{intervalPresent}  = 30;
             my ($dev,$port) = split(":",$a[4].":5222");
-            return "$dev not a valid IP address" if ($dev !~ m/^\s*([0-9]{1,3}\.){3}[0-9]{1,3}\s*$/);
+            return "$dev is not a valid IP address" if ($dev !~ m/^\s*([0-9]{1,3}\.){3}[0-9]{1,3}\s*$/);
             $hash->{DeviceName} = "$dev:$port";
         }
         elsif($a[2] eq "bluetooth") {
@@ -423,7 +446,7 @@ sub PRESENCE2_Define($$) {
             setDevAttrList($hash->{NAME}, $daemonAttr);
         }
         else {
-            my $msg = "unknown mode \"".$a[2]."\" in define statement: Please use lan-ping, daemon, shellscript, function, bluetooth, lan-bluetooth";
+            my $msg = "unknown mode \"".$a[2]."\" in define statement: Please use lan-ping, netcat, daemon, shellscript, function, bluetooth, lan-bluetooth";
             Log 2, "PRESENCE2 ($name) - ".$msg;
             return $msg
         }
@@ -565,7 +588,7 @@ sub PRESENCE2_Set($@) {
     my $powerCmd = AttrVal($name, "powerCmd", undef);
 
     if   ($cmd eq "statusRequest"){
-        if($hash->{MODE} =~ m/(lan-ping|shellscript|function|bluetooth)/) {
+        if($hash->{MODE} =~ m/(lan-ping|netcat|shellscript|function|bluetooth)/) {
             PRESENCE2_Log $name, 5, "PRESENCE2 ($name) - starting local scan";
             my $daemon = PRESENCE2_getDaemonName();
             return PRESENCE2_daemonScanScheduler($defs{$daemon}, $name);
@@ -1505,6 +1528,7 @@ sub PRESENCE2_doEvtCheckReply($){
   This module provides several operational modes to serve your needs. These are:<br><br>
   <ul>
       <li><b>lan-ping</b> - device PRESENCE2 check utilizing network ping.</li>
+      <li><b>netcat</b> - device PRESENCE2 check utilizing network netcat.</li>
       <li><b>function</b> - executing user defined FHEM command.</li>
       <li><b>shellscript</b> - executing user defined OS command.</li>
       <li><b>bluetooth</b> - bluetooth device scan from FHEM server .</li>
@@ -1879,6 +1903,7 @@ Options:
   Dieses Modul bietet verschiedene Betriebsmodi, um Euren Anforderungen gerecht zu werden. Dies sind:<br><br>
   <ul>
       <li><b>lan-ping</b> – Geräte-PRÄSENCE2-Prüfung mithilfe von Netzwerk-Ping.</li>
+      <li><b>netcat</b> – Geräte-PRÄSENCE2-Prüfung mithilfe von Netzwerk-netcat.</li>
       <li><b>function</b> – Ausführen eines benutzerdefinierten FHEM-Befehls.</li>
       <li><b>shellscript</b> – Ausführen eines benutzerdefinierten Betriebssystembefehls.</li>
       <li><b>bluetooth</b> – Bluetooth-Gerätescan vom FHEM-Server .</li>
