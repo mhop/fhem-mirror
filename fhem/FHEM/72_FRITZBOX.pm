@@ -14761,10 +14761,12 @@ sub FRITZBOX_Helper_Url_Regex {
       <li><b>box_moh</b> - music-on-hold setting</li>
       <li><b>box_model</b> - FRITZ!BOX model</li>
       <li><b>box_notify_</b><i>...</i> - the two readings are created when the FritzBox activates the red info LED and a corresponding note</li>
-      <li><b>box_notify_</b><i>...</i><b>_info</b> - placed on the website. The readings contain a link for further information and <br>
-                                                     a link to acknowledge the information. This link confirms the information in the FritzBox<br>
-                                                     and the two readings will be deleted. If the information is withdrawn from the FritzBox, then the <br>
-                                                     Readings the addition solved and the link to acknowledge only deletes the readings</li>
+      <li><b>box_notify_</b><i>...</i><b>_info</b> - placed on the website. The readings contain a button for further information and a button<br>
+                                                   to acknowledge the information. This link acknowledges the information in the FritzBox and sets<br>
+                                                   both readings to "solved by click". If the information is withdrawn from the FritzBox, the readings receive the <br>
+                                                   suffix "solved by FB". The button is set to "delete readings" (solved by FB). Using this button, both readings<br>
+                                                   box_notify_<notify_ID> and box_notify_<notify_ID>_info can now be deleted.<br>
+                                                   The readings must be activated using the attribute: enableBoxReadings.</li>
       <li><b>box_connect</b> - connection state: Unconfigured, Connecting, Authenticating, Connected, PendingDisconnect, Disconnecting, Disconnected</li>
       <li><b>box_last_connect_err</b> - last connection error</li>
       <li><b>box_upnp</b> - application interface UPNP (needed by this modul)</li>
@@ -15774,10 +15776,12 @@ sub FRITZBOX_Helper_Url_Regex {
       <li><b>box_model</b> - FRITZ!BOX-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
       <li><b>box_notify_</b><i>...</i> - die beiden Readings werden erstellt, wenn die FritzBox die Info LED rot aktiviert und einen entsprechenden Hinweis</li>
-      <li><b>box_notify_</b><i>...</i><b>_info</b> - auf der Webseite plaziert. In den Readings befinden sich ein Link für weitere Informationen und<br>
-                                                     ein Link um die Information zu quittieren. Durch diesen Link wird die Info in der FritzBox quittiert<br>
-                                                     und es werden die beiden Readings gelöscht. Wird die Info von der FritzBox zurückgezogen, dann erhalten die <br>
-                                                     Readings die Ergänzung solved und der Link zum Quittieren löscht nur noch die Readings</li>
+      <li><b>box_notify_</b><i>...</i><b>_info</b> - auf der Webseite platziert. In den Readings befinden sich ein Button für weitere Informationen und ein Button<br>
+                                                     um die Information zu quittieren. Durch diesen Link wird die Info in der FritzBox quittiert und es werden die beiden<br>
+                                                     Readings auf -solved by click- gesetzt. Wird die Info von der FritzBox zurückgezogen, dann erhalten die Readings die<br>
+                                                     Ergänzung -solved by FB-. Der Button wird auf '-solved by FB- Readings löschen' gesetzt. Über diesen Button können die<br>
+                                                     beiden Readings box_notify_<notify_ID> und box_notify_<notify_ID>_info nun gelöscht werden.<br>
+                                                     Die Readings müssen über das Attribut: enableBoxReadings aktiviert werden.</li>
       <li><b>box_connect</b> - Verbindungsstatus: Unconfigured, Connecting, Authenticating, Connected, PendingDisconnect, Disconnecting, Disconnected</li>
       <li><b>box_last_connect_err</b> - letzter Verbindungsfehler</li>
       <li><b>box_upnp</b> - Status der Anwendungsschnittstelle UPNP (wird auch von diesem Modul ben&ouml;tigt)</li>
