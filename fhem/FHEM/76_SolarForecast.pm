@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.49.4" => "28.03.2025  _batChargeRecmd: revert Loading release changes of V 1.49.0, _transferAPIRadiationValues: fix sunalt for next day ".
+                           "Home Node: Mouse over show Autarky Rate, flowGraphicControl: new key strokeconsumerdyncol ",
   "1.49.3" => "27.03.2025  flowGraphicControl: new key homenodedyncol ",
   "1.49.2" => "26.03.2025  ___enableSwitchByBatPrioCharge: fix usage of rusulting SOC of all batteries ",
   "1.49.1" => "25.03.2025  fix batteryPreferredCharge: https://forum.fhem.de/index.php?msg=1337802, Attr ctrlBackupFilesKeep is ".
@@ -974,6 +976,8 @@ my %htitles = (                                                                 
                 DE => qq{wird entladen mit}                                                                        },
   dela     => { EN => qq{delayed},
                 DE => qq{verzoegert}                                                                               },
+  autarky  => { EN => qq{Autarky rate},
+                DE => qq{Autarkierate}                                                                             },
   azimuth  => { EN => qq{Azimuth},
                 DE => qq{Azimut}                                                                                   },
   elevatio => { EN => qq{Elevation},
@@ -6251,6 +6255,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
                    size
                    showconsumerdummy
                    showconsumerpower
+                   strokeconsumerdyncol
                    strokecolstd
                    strokecolsig
                    strokecolina
@@ -6273,6 +6278,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
           showconsumerdummy      => '(0|1)',
           showconsumerremaintime => '(0|1)',
           showconsumerpower      => '(0|1)',
+          strokeconsumerdyncol   => '(0|1)',
           strokecolstd           => '.*',
           strokecolsig           => '.*',
           strokecolina           => '.*',
@@ -9339,27 +9345,27 @@ sub _transferAPIRadiationValues {
       $data{$name}{nexthours}{$nhtstr}{today}     = $fd == 0 ? 1 : 0;
       $data{$name}{nexthours}{$nhtstr}{rad1h}     = $rad1h;
 
-      my $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
-      my $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
-
-      if (!defined $sunalt || !defined $sunaz) {
-          __calcSunPosition ($paref);
-          $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
-          $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
-      }
-
-      if (defined $sunaz) {
-          $data{$name}{nexthours}{$nhtstr}{sunaz} = $sunaz;
-      }
-      else {
-          $sunaz = NexthoursVal ($hash, $nhtstr, 'sunaz', 0);
-      }
-
-      if (defined $sunalt) {
-          $data{$name}{nexthours}{$nhtstr}{sunalt} = $sunalt;
+      my ($sunalt, $sunaz);
+	  
+	  if ($fd == 0) {                                                                                      # V 1.49.4 für den aktuellen Tag
+		  $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
+		  $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
+		  
+		  if (!defined $sunalt || !defined $sunaz) {
+			  __calcSunPosition ($paref);
+			  $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
+			  $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
+		  }
+	  }
+		  
+      if (defined $sunalt && defined $sunaz) {
+		  $data{$name}{nexthours}{$nhtstr}{sunalt} = $sunalt;
+          $data{$name}{nexthours}{$nhtstr}{sunaz}  = $sunaz;
       }
       else {
-          $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt', 0);
+		  __calcSunPosition ($paref);
+		  $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt', 0);
+          $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',  0);
       }
 
       $paref->{sabin}    = sunalt2bin ($sunalt);
@@ -9492,7 +9498,7 @@ sub __calcSunPosition {
 
   debugLog ($paref, 'collectData', "Sun position: day: $wtday, hod: $hodn, $tstr, azimuth: $az, altitude: $alt");
 
-  if ($fd == 0 && $hodn) {                                                                            # Sun Position in pvHistory speichern
+  if ($fd == 0 && $hodn) {                                                                            # Sun Position für aktuellen Tag in pvHistory speichern
       writeToHistory ( { paref => $paref, key => 'sunaz',  val => $az,  hour => $hodn } );
       writeToHistory ( { paref => $paref, key => 'sunalt', val => $alt, hour => $hodn } );
   }
@@ -10602,7 +10608,7 @@ sub _batChargeRecmd {
           my $confc = NexthoursVal ($hash, 'NextHour'.$nhr, 'confc',      0);
           my $pvfc  = NexthoursVal ($hash, 'NextHour'.$nhr, 'pvfc',       0);
           my $stt   = NexthoursVal ($hash, 'NextHour'.$nhr, 'starttime', '');
-		  my $nhts  = timestringToTimestamp ($stt) // $t;                                        # Unix Timestamp von NextHours Starttime
+		  #my $nhts  = timestringToTimestamp ($stt) // $t;                                        # Unix Timestamp von NextHours Starttime
           $stt      = (split /[-:]/, $stt)[2] if($stt);
 
           my $crel  = 0;                                                                         # Ladefreigabe 0 per Default
@@ -10640,8 +10646,8 @@ sub _batChargeRecmd {
           ## Ladefreigabe
           #################		  
           if ( $whneed + $sfmargin >= $spday )            {$crel = 1}                            # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-		  if ( $today && $t >= $maxfctim)                 {$crel = 1}                            # change V 1.49.0: Ladefreigabe wenn akt. Zeit >= Zeit bei max. Tagesertragsertwartung
-          if ( $today && $nhts >= $maxfctim)              {$crel = 1}                            # change V 1.49.0: Ladefreigabe bei Prognosezeit >= Zeit bei max. Tagesertragsertwartung
+		  #if ( $today && $t >= $maxfctim)                 {$crel = 1}                            # change V 1.49.0: Ladefreigabe wenn akt. Zeit >= Zeit bei max. Tagesertragsertwartung
+          #if ( $today && $nhts >= $maxfctim)              {$crel = 1}                            # change V 1.49.0: Ladefreigabe bei Prognosezeit >= Zeit bei max. Tagesertragsertwartung
 		  if ( !$num && ($pvCu - $curcon) >= $inplim )    {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
 		  if ( !$num && ($pvCu - $curcon) >= $feedinlim ) {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= Einspeiselimit der Anlage
           if ( !$cgbt )                                   {$crel = 1}                            # immer Ladefreigabe wenn kein BatSoc-Management
@@ -15462,8 +15468,8 @@ sub _beamGraphicRemainingHours {
           $hfcg->{$i}{don}     = NexthoursVal ($hash, 'NextHour'.$nh, 'DoN',         0);
           my $stt              = NexthoursVal ($hash, 'NextHour'.$nh, 'starttime',  '');
 
-          $val1 = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',        0);
-          $val4 = NexthoursVal ($hash, 'NextHour'.$nh, 'confc',       0);
+          $val1 = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',  0);
+          $val4 = NexthoursVal ($hash, 'NextHour'.$nh, 'confc', 0);
 
           ## Batterien Selektionshash anreichern
           ########################################
@@ -16263,7 +16269,7 @@ sub _flowGraphic {
 
   ## Batterie Werte verarbeiten
   ###############################
-  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";            # cgc current GridConsumption
+  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";            # cgc = current GridConsumption
   my $bat2home_style  = $bat2home  ? "$stna active_normal" : "$stna inactive";
   my $cgc_direction   = "M250,515 L670,590";
 
@@ -16469,11 +16475,12 @@ END1
   ## Home Icon
   ##############
   my $car   = CurrentVal  ($name, 'autarkyrate', undef);
+  my $hmtxt = $htitles{autarky}{$lang}.': '.$car.' %';            
   my $hicon = HOMEICONDEF;  
 
-  if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {
+  if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {               
       $car              = 100 - $car;
-      my $pahcol        = '#'.substr(Color::pahColor(0,50,100,$car,[102,205,0, 050,205,050, 247,203,159, 247,148,111, 255,51,15]),0,6);
+      my $pahcol        = '#'.substr (Color::pahColor (0, 50, 100, $car, [102,205,0, 050,205,050, 247,203,159, 247,148,111, 255,51,15]), 0, 6);
       ($hicon, my $col) = split '@', $hicon;
       $hicon            = $hicon.'@'.$pahcol;
   }
@@ -16483,7 +16490,7 @@ END1
   ($scale, $hicon) = __normIconScale ($name, $hicon);
 
   $ret .= qq{<g id="home_$stna" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung
-  $ret .= "<title>Home</title>".$hicon;
+  $ret .= "<title>$hmtxt</title>".$hicon;
   $ret .= '</g> ';
 
   ## Dummy Consumer Icon
@@ -16528,12 +16535,11 @@ END3
   ##############################
    if ($flowgconX) {
       my $consumer_style = "$stna inactive";
-      $consumer_style    = "$stna active_sig" if($cc_dummy > 1);
+      $consumer_style    = "$stna active_normal" if($cc_dummy > 1);                           # current consumption Dummy
       my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
-      if ($cc_dummy > 0.5) {
-          $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
-          #$chain_color  = 'style="stroke: #DF0101;"';
+      if ($cc_dummy > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
+          $chain_color = 'style="stroke: #'.__dynColor ($cc_dummy).';"';
       }
 
       $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};
@@ -16608,8 +16614,8 @@ END3
           $consumer_style    = $p > DEFPOPERCENT ? "$stna active_normal" : "$stna inactive";
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
-          if ($p > 0.5) {
-              $chain_color = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+          if ($p > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
+              $chain_color = 'style="stroke: #'.__dynColor ($p).';"';
           }
 
           $ret             .= qq{<path id="home2consumer_${c}_$stna" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,$y_pos" />};
@@ -17013,6 +17019,18 @@ sub __substituteIcon {
   $icon .= '@'.$color if($color);
 
 return ($icon, $txt);
+}
+
+################################################################
+#  liefert eine dynamische Farbe abhängig von "$val" zurück
+#  https://www.w3schools.com/colors/colors_picker.asp
+################################################################
+sub __dynColor {          
+  my $val = shift;
+
+  my $color = substr (Color::pahColor (0, 200, 400, $val, [102,205,0, 127,255,0, 251,158,4, 255,127,0, 255,0,0]), 0, 6);
+
+return $color;
 }
 
 ################################################################
@@ -24562,6 +24580,9 @@ to ensure that the system configuration is correct.
 			<tr><td> <b>size </b>                   </td><td>Size of the energy flow graphic in pixels if displayed. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>) </td></tr>
 			<tr><td>                                </td><td>Value: <b>Integer</b>, default: 400                                                                                     </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>strokeconsumerdyncol</b>    </td><td>The lines from the house node to the consumers can be colored dynamically depending on the consumption value.           </td></tr>
+            <tr><td>                                </td><td><b>0</b> - no dynamic coloring,  <b>1</b> - dynamic coloring, default: 0                                                </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>strokecolina </b>           </td><td>Color of an inactive line                                                                                               </td></tr>
 			<tr><td>                                </td><td>Value: <b>Hex (e.g. #cc3300) or designation (e.g. red, blue)</b>, default: gray                                         </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
@@ -27072,6 +27093,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>size </b>                   </td><td>Größe der Energieflußgrafik in Pixel sofern angezeigt. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)  </td></tr>
 			<tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 400                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>strokeconsumerdyncol</b>    </td><td>Die Linien vom Hausknoten zu den Verbrauchern können abhängig vom Verbrauchswert dynamisch eingefärbt werden.           </td></tr>
+            <tr><td>                                </td><td><b>0</b> - keine dynamische Färbung,  <b>1</b> - dynamische Färbung, default: 0                                         </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>strokecolina </b>           </td><td>Farbe einer inaktiven Linie                                                                                             </td></tr>
 			<tr><td>                                </td><td>Wert: <b>Hex (z.B. #cc3300) oder Bezeichnung (z.B. red, blue)</b>, default: gray                                        </td></tr>

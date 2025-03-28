@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  76_SolarForecast: fix sunalt for next day,
+                              flowGraphicControl: new key strokeconsumerdyncol
  - bufgix: 72_FRITZBOX: set <name> lockLandevice <number|mac> <on|off|rt|rtoff>
  - feature: 72_FRITZBOX: https://forum.fhem.de/index.php?msg=1338100
  - feature: 73_PRESENCE2: check über netcat, Attribut pingParam
