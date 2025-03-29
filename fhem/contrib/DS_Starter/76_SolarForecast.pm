@@ -160,7 +160,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.49.4" => "28.03.2025  _batChargeRecmd: revert Loading release changes of V 1.49.0, _transferAPIRadiationValues: fix sunalt for tomorrow ",
+  "1.49.5" => "29.03.2025  some code changes, Attr affectSolCastPercentile, ctrlSolCastAPIoptimizeReq are obsolete -> SolCast optimze requests is default now ".
+                           "attr affectConsForecastIdentWeekdays replaced by plantControl->consForecastIdentWeekdays ".
+                           "attr affectConsForecastLastDays replaced by plantControl->consForecastLastDays ".
+                           "setupBatteryDevXX: new keys pinmax, poutmax ",
+  "1.49.4" => "28.03.2025  _batChargeRecmd: revert Loading release changes of V 1.49.0, _transferAPIRadiationValues: fix sunalt for next day ".
+                           "Home Node: Mouse over show Autarky Rate, flowGraphicControl: new key strokeconsumerdyncol ",
   "1.49.3" => "27.03.2025  flowGraphicControl: new key homenodedyncol ",
   "1.49.2" => "26.03.2025  ___enableSwitchByBatPrioCharge: fix usage of rusulting SOC of all batteries ",
   "1.49.1" => "25.03.2025  fix batteryPreferredCharge: https://forum.fhem.de/index.php?msg=1337802, Attr ctrlBackupFilesKeep is ".
@@ -370,28 +375,6 @@ my %vNotesIntern = (
   "1.17.9" => "17.04.2024  _batSocTarget: fix Illegal division by zero, Forum: https://forum.fhem.de/index.php?msg=1310930 ",
   "1.17.8" => "16.04.2024  _calcTodayPVdeviation: change of calculation ",
   "1.17.7" => "09.04.2024  export pvHistory to CSV, making attr affectMaxDayVariance obsolete ",
-  "1.17.6" => "07.04.2024  new sub writeToHistory with many internal changes in pvHistory write process ".
-                           "_transferInverterValues: react on inverter etotal behavior ",
-  "1.17.5" => "04.04.2024  currentInverterDev: check syntax of key capacity if set, change defmaxvar back from 0.8 to 0.5 ".
-                           "currentMeterDev: [conprice=<Devicename>:<Readingname>:<Einheit>] [feedprice=<Devicename>:<Readingname>:<Einheit>] ".
-                           "___setOpenMeteoAPIcallKeyData: new sub to calculate the minimum Open-Meteo request intervalls ",
-  "1.17.4" => "01.04.2024  fix ctrlWeatherDev1 Drop-Down list if no DWD Device exists, edit commandref ",
-  "1.17.3" => "31.03.2024  edit commandref, valDecTree: more infos in aiRuleStrings output, integrate OpenMeteoDWDEnsemble-API ".
-                           "change Call interval Open-Meteo API to 900s, OpenMeteo-API: fix todayDoneAPIcalls, implement callequivalent".
-                           "aiTrain: change default start to hour 2, change AI acceptable result limits ",
-  "1.17.2" => "29.03.2024  aiTrain: better status info, limit ctrlWeatherDev2/3 to can only use DWD Devices ".
-                           "integrate OpenMeteoWorld-API with the 'Best match' Weather model ",
-  "1.17.1" => "27.03.2024  add AI to OpenMeteoDWD-API, changed AI train debuglog, new attr ctrlAIshiftTrainStart ".
-                           "_specialActivities: split tasks to several time slots, bugfixes ".
-                           "AI: modify aiAddInstance, Customize pattern training data ".
-                           "add batteryTrigger to save plantconfig, valDecTree: more infos in get aiRuleStrings ",
-  "1.17.0" => "24.03.2024  new DWD ICON API, change defmaxvar from 0.5 to 0.8, attr ctrlWeatherDev1 can select OpenMeteoDWD-API ",
-  "1.16.8" => "16.03.2024  plantConfigCheck: adjust pvCorrectionFactor_Auto check, settings of forecastRefresh ".
-                           "rename reading nextSolCastCall to nextRadiationAPICall ".
-                           "currentMeterDev: new optional keys conprice, feedprice ".
-                           "destroy runtime data when delete device ",
-  "1.16.7" => "12.03.2024  prevent duplicates in NOTIFYDEV, Forum: https://forum.fhem.de/index.php?msg=1306875 ",
-  "1.16.6" => "11.03.2024  plantConfigCheck: join forecastProperties with ',' ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -507,6 +490,8 @@ use constant {
   CFILE           => 'controls_solarforecast.txt',                                                         # Controlfile Update FTUI-Files
   BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',   # Basispfad GitHub SolarForecast Files
   PGHPATH         => '',                                                                                   # GitHub Post Pfad
+  MSGFILETEST     => 'controls_solarforecast_messages_test.txt',                                           # TEST Input-File Notification System
+  MSGFILEPROD     => 'controls_solarforecast_messages_prod.txt',                                           # PRODUKTIVES Input-File Notification System
 };
 
 ## Standardvariablen
@@ -535,10 +520,7 @@ my @draattrmust    = qw(Rad1h);                                                 
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
                         noSchedule);                                                # erlaubte Consumer Typen
 
-my $msgfiletest    = 'controls_solarforecast_messages_test.txt';                    # TEST Input-File Notification System
-my $msgfileprod    = 'controls_solarforecast_messages_prod.txt';                    # PRODUKTIVES Input-File Notification System
-
-my $messagefile = $msgfileprod;
+my $messagefile = MSGFILEPROD;
                                                                                     # mögliche Debug-Module
 my @dd = qw( aiProcess
              aiData
@@ -573,14 +555,12 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                    energyH4Trigger
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
-my @aconfigs = qw( affectConsForecastIdentWeekdays affectConsForecastLastDays
-                   affectSolCastPercentile
-                   aiControl 
+my @aconfigs = qw( aiControl 
                    consumerLegend consumerAdviceIcon consumerLink
                    ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
                    ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings
                    ctrlSolCastAPImaxReq
-                   ctrlSolCastAPIoptimizeReq ctrlSpecialReadings ctrlUserExitFn
+                   ctrlSpecialReadings ctrlUserExitFn
                    disable
                    flowGraphicControl graphicBeamWidth
                    graphicBeamHeightLevel1 graphicBeamHeightLevel2 graphicBeamHeightLevel3
@@ -975,6 +955,8 @@ my %htitles = (                                                                 
                 DE => qq{wird entladen mit}                                                                        },
   dela     => { EN => qq{delayed},
                 DE => qq{verzoegert}                                                                               },
+  autarky  => { EN => qq{Autarky rate},
+                DE => qq{Autarkierate}                                                                             },
   azimuth  => { EN => qq{Azimuth},
                 DE => qq{Azimut}                                                                                   },
   elevatio => { EN => qq{Elevation},
@@ -1532,10 +1514,7 @@ sub Initialize {
   $hash->{AttrFn}             = \&Attr;
   $hash->{NotifyFn}           = \&Notify;
   $hash->{ReadyFn}            = \&runTask;
-  $hash->{AttrList}           = "affectConsForecastIdentWeekdays:1,0 ".
-                                "affectConsForecastLastDays:selectnumbers,1,1,180,0,lin ".
-                                "affectSolCastPercentile:select,10,50,90 ".
-                                "aiControl:textField-long ".
+  $hash->{AttrList}           = "aiControl:textField-long ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
                                 "consumerLink:0,1 ".
@@ -1547,7 +1526,6 @@ sub Initialize {
                                 "ctrlNextDayForecastReadings:multiple-strict,$hod ".
                                 "ctrlNextHoursSoCForecastReadings ".
                                 "ctrlSolCastAPImaxReq:selectnumbers,5,5,60,0,lin ".
-                                "ctrlSolCastAPIoptimizeReq:1,0 ".
                                 "ctrlSpecialReadings:multiple-strict,$srd ".
                                 "ctrlUserExitFn:textField-long ".
                                 "disable:1,0 ".
@@ -1595,8 +1573,10 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $av = 'obsolete#-#use#attr#plantControl#instead';                          
-  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av ctrlBackupFilesKeep:$av";     # 22.03.2025
+  my $av = 'obsolete#-#use#attr#plantControl#instead';
+  my $av1 = 'obsolete#-#will#be#deleted#soon';
+  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av ctrlBackupFilesKeep:$av affectConsForecastIdentWeekdays:$av affectConsForecastLastDays:$av";     # 29.03.2025
+  $hash->{AttrList} .= " affectSolCastPercentile:$av1 ctrlSolCastAPIoptimizeReq:$av1";           # 29.03.2025
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -3008,12 +2988,6 @@ sub __solCast_ApiResponse {
       }
 
       my ($period,$starttmstr);
-
-      my $perc = AttrVal ($name, 'affectSolCastPercentile', 50);                                         # das gewählte zu nutzende Percentil
-
-      debugLog ($paref, "apiProcess", qq{SolCast API used percentile: }. $perc);
-
-      $perc = q{} if($perc == 50);
       my $k = 0;
 
       while ($jdata->{'forecasts'}[$k]) {                                                                # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
@@ -3046,7 +3020,7 @@ sub __solCast_ApiResponse {
       $k = 0;
 
       while ($jdata->{'forecasts'}[$k]) {
-          if (!$jdata->{'forecasts'}[$k]{'pv_estimate'.$perc}) {                                             # keine PV Prognose -> Datensatz überspringen -> Verarbeitungszeit sparen
+          if (!$jdata->{'forecasts'}[$k]{'pv_estimate'}) {                                              # keine PV Prognose -> Datensatz überspringen -> Verarbeitungszeit sparen
               $k++;
               next;
           }
@@ -3054,7 +3028,7 @@ sub __solCast_ApiResponse {
           my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
           ($err, $starttmstr) = ___convPendToPstart ($name, $lang, $petstr);
 
-          my $pvest50         = $jdata->{'forecasts'}[$k]{'pv_estimate'.$perc};
+          my $pvest50         = $jdata->{'forecasts'}[$k]{'pv_estimate'};
 
           $period             = $jdata->{'forecasts'}[$k]{'period'};
           $period             =~ s/.*(\d\d).*/$1/;
@@ -3177,24 +3151,17 @@ sub ___setSolCastAPIcallKeyData {
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
-  if (AttrVal($name, 'ctrlSolCastAPIoptimizeReq', 0)) {
-      my $date   = strftime "%Y-%m-%d", localtime($t);
-      my $sunset = $date.' '.ReadingsVal ($name, "Today_SunSet", '00:00').':00';
-      my $sstime = timestringToTimestamp ($sunset);
-      my $dart   = $sstime - $t;                                                                                      # verbleibende Sekunden bis Sonnenuntergang
-      $dart      = 0 if($dart < 0);
-      $drc      += 1;
+  my $date   = strftime "%Y-%m-%d", localtime($t);
+  my $sunset = $date.' '.ReadingsVal ($name, "Today_SunSet", '00:00').':00';
+  my $sstime = timestringToTimestamp ($sunset);
+  my $dart   = $sstime - $t;                                                                                          # verbleibende Sekunden bis Sonnenuntergang
+  $dart      = 0 if($dart < 0);
+  $drc      += 1;
 
-      $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = SOLAPIREPDEF;
-      $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
+  $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = SOLAPIREPDEF;
+  $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
 
-      debugLog ($paref, "apiProcess|apiCall", "SolCast API Call - Sunset: $sunset, remain Sec to Sunset: $dart, new interval: ".StatusAPIVal ($hash, 'SolCast', '?All', 'currentAPIinterval', SOLAPIREPDEF));
-  }
-  else {
-      $data{$name}{statusapi}{SolCast}{'?All'}{currentAPIinterval} = SOLAPIREPDEF;
-  }
-
-  ####
+  debugLog ($paref, "apiProcess|apiCall", "SolCast API Call - Sunset: $sunset, remain Sec to Sunset: $dart, new interval: ".StatusAPIVal ($hash, 'SolCast', '?All', 'currentAPIinterval', SOLAPIREPDEF));
 
   my $apiitv = StatusAPIVal ($hash, 'SolCast', '?All', 'currentAPIinterval', SOLAPIREPDEF);
 
@@ -5876,9 +5843,8 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning|ctrlShowLink|ctrlBackupFilesKeep$/) {      # 22.03.2025
-      #my $msg = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
-      my $msg = "The attribute $aName is replaced by 'plantControl'.";
+  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning|ctrlShowLink|ctrlBackupFilesKeep|affectConsForecastIdentWeekdays|affectConsForecastLastDays$/) {      # 29.03.2025
+      my $msg  = "The attribute $aName is replaced by 'plantControl'.";
       if (!$init_done) {
           Log3 ($name, 1, "$name - $msg");
       }
@@ -5886,12 +5852,25 @@ sub Attr {
           return $msg;
       }
   }
+  
+  if ($cmd eq 'set' && $aName =~ /^affectSolCastPercentile|ctrlSolCastAPIoptimizeReq$/) {      # 29.03.2025
+      my $msg1 = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
+      my $msg2 = "The attribute $aName is obsolete and will be deleted soon.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg1");
+          return $msg1;
+      }
+      else {
+          return $msg2;
+      }
+  }   
   ######################################################################################################################
 
   if ($aName eq 'disable') {
       if($cmd eq 'set') {
           $do = $aVal ? 1 : 0;
       }
+      
       $do  = 0 if($cmd eq 'del');
       $val = ($do == 1 ? 'disabled' : 'initialized');
       singleUpdateState ( {hash => $hash, state => $val, evt => 1} );
@@ -5942,12 +5921,6 @@ sub Attr {
       if ($aName eq 'ctrlInterval') {
           unless ($aVal =~ /^[0-9]+$/x) {
               return qq{Invalid value for $aName. Use only figures 0-9!};
-          }
-      }
-
-      if ($init_done && $aName eq 'ctrlSolCastAPIoptimizeReq') {
-          if (!isSolCastUsed ($hash)) {
-              return qq{The attribute $aName is only valid for device model "SolCastAPI".};
           }
       }
 
@@ -6252,6 +6225,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
                    size
                    showconsumerdummy
                    showconsumerpower
+                   strokeconsumerdyncol
                    strokecolstd
                    strokecolsig
                    strokecolina
@@ -6274,6 +6248,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
           showconsumerdummy      => '(0|1)',
           showconsumerremaintime => '(0|1)',
           showconsumerpower      => '(0|1)',
+          strokeconsumerdyncol   => '(0|1)',
           strokecolstd           => '.*',
           strokecolsig           => '.*',
           strokecolina           => '.*',
@@ -6353,7 +6328,10 @@ sub _attrplantControl {                  ## no critic "not used"
 
   my $hash  = $defs{$name};
 
-  for my $av ( qw( batteryPreferredCharge
+  for my $av ( qw( backupFilesKeep
+                   batteryPreferredCharge
+                   consForecastIdentWeekdays
+                   consForecastLastDays
                    consForecastInPlanning
                    feedinPowerLimit
                    showLink
@@ -6364,10 +6342,13 @@ sub _attrplantControl {                  ## no critic "not used"
 
   if ($cmd eq 'set') {
       my $valid = {
-          batteryPreferredCharge => '([0-9]|[1-9][0-9]|100)',
-          consForecastInPlanning => '0|1',
-          feedinPowerLimit       => '\d+',
-          showLink               => '0|1',
+          backupFilesKeep           => '\d+',
+          batteryPreferredCharge    => '([0-9]|[1-9][0-9]|100)',
+          consForecastIdentWeekdays => '(0|1)',
+          consForecastLastDays      => '([1-9]|[1-9][0-9]|1[0-7][0-9]|180)',
+          consForecastInPlanning    => '(0|1)',
+          feedinPowerLimit          => '\d+',
+          showLink                  => '(0|1)',
       };
 
       my ($a, $h) = parseParams ($aVal);
@@ -6717,6 +6698,14 @@ sub _attrBatteryDev {                    ## no critic "not used"
 
       if (!$h->{pin} || !$h->{pout} || !$h->{cap}) {
           return qq{One or more of the keys 'pin, pout, cap' are missing. Please note the command reference.};
+      }
+      
+      if ($h->{pinmax} && $h->{pinmax} !~ /^\d+$/xs) {
+          return qq{The key “pinmax” may only be specified by whole numbers};
+      }
+      
+      if ($h->{poutmax} && $h->{poutmax} !~ /^\d+$/xs) {
+          return qq{The key “poutmax” may only be specified by whole numbers};
       }
 
       if ($h->{show} && $h->{show} =~ /:/xs) {
@@ -8025,6 +8014,26 @@ sub centralTask {
       my $newval = $pc3." backupFilesKeep=$cbk";
       CommandAttr (undef, "$name plantControl $newval");
       ::CommandDeleteAttr (undef, "$name ctrlBackupFilesKeep"); 
+  }  
+  ######
+  
+  my $fiw = AttrVal ($name, 'affectConsForecastIdentWeekdays', undef);                        # 29.03.2025 
+  my $pc4 = AttrVal ($name, 'plantControl', '');
+
+  if (defined $fiw) {
+      my $newval = $pc4." consForecastIdentWeekdays=$fiw";
+      CommandAttr (undef, "$name plantControl $newval");
+      ::CommandDeleteAttr (undef, "$name affectConsForecastIdentWeekdays"); 
+  }  
+  ######
+  
+  my $cfl = AttrVal ($name, 'affectConsForecastLastDays', undef);                        # 29.03.2025 
+  my $pc5 = AttrVal ($name, 'plantControl', '');
+
+  if (defined $cfl) {
+      my $newval = $pc5." consForecastLastDays=$cfl";
+      CommandAttr (undef, "$name plantControl $newval");
+      ::CommandDeleteAttr (undef, "$name affectConsForecastLastDays"); 
   }  
   ######
   
@@ -10069,9 +10078,11 @@ sub _transferBatteryValues {
       my ($pou,$pounit)    = split ":", $h->{pout};                                               # Readingname/Unit für aktuelle Batterieentladung
       my ($bin,$binunit)   = split ":", $h->{intotal}  // "-:-";                                  # Readingname/Unit der total in die Batterie eingespeisten Energie (Zähler)
       my ($bout,$boutunit) = split ":", $h->{outtotal} // "-:-";                                  # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
-      my $batchr           = $h->{charge} // "";                                                  # Readingname Ladezustand Batterie
+      my $batchr           = $h->{charge} // '';                                                  # Readingname Ladezustand Batterie
       my $instcap          = $h->{cap};                                                           # numerischer Wert (Wh) oder Readingname installierte Batteriekapazität
-
+      my $pinmax           = $h->{pinmax}  // INFINIITY;                                          # max. mögliche Ladeleistung
+      my $poutmax          = $h->{poutmax} // INFINIITY;                                          # max. mögliche Entladeleistung 
+      
       return if(!$pin || !$pou);
 
       $pounit   //= $piunit;
@@ -10246,6 +10257,8 @@ sub _transferBatteryValues {
       $data{$name}{batteries}{$bn}{balias}       = AttrVal ($badev, 'alias', $badev);                    # Alias Batterie Device
       $data{$name}{batteries}{$bn}{bpowerin}     = $pbi;                                                 # momentane Batterieladung
       $data{$name}{batteries}{$bn}{bpowerout}    = $pbo;                                                 # momentane Batterieentladung
+      $data{$name}{batteries}{$bn}{bpinmax}      = $pinmax;                                              # max. mögliche Ladeleistung
+      $data{$name}{batteries}{$bn}{bpoutmax}     = $poutmax;                                             # max. mögliche Entladeleistung
       $data{$name}{batteries}{$bn}{bcharge}      = $soc;                                                 # Batterie SoC (%)
       $data{$name}{batteries}{$bn}{basynchron}   = $h->{asynchron} // 0;                                 # asynchroner Modus = X
       $data{$name}{batteries}{$bn}{bicon}        = $h->{icon} if($h->{icon});                            # Batterie Icon
@@ -10573,8 +10586,10 @@ sub _batChargeRecmd {
 	  my $tomconfc  = ReadingsNum ($name, 'Tomorrow_ConsumptionForecast',  0);                   # Verbrauchsprognose nächster Tag
       my $batoptsoc = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                   # aktueller optimierter SoC
       my $confcss   = CurrentVal  ($name, 'tdConFcTillSunset',             0);                   # Verbrauchsprognose bis Sonnenuntergang     
-      my $csoc      = BatteryVal  ($hash, $bn, 'bcharge',  0);                                   # aktuelle Ladung in %
-      my $cgbt      = AttrVal     ($name, 'ctrlBatSocManagement'.$bn, undef);
+      my $csoc      = BatteryVal  ($hash, $bn, 'bcharge',                  0);                   # aktuelle Ladung in %
+      my $bpinmax   = BatteryVal  ($hash, $bn, 'bpinmax',          INFINIITY);                   # max. mögliche Ladeleistung W
+      my $bpoutmax  = BatteryVal  ($hash, $bn, 'bpoutmax',         INFINIITY);                   # max. mögliche Entladeleistung W
+      my $cgbt      = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
       my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $lowSoc    = 0;
 
@@ -10649,9 +10664,16 @@ sub _batChargeRecmd {
 
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
-          my $fceff = $pvfc - $confc;                                                            # effektiver PV Überschuß (effektiver Verbrauch wenn < 0)
-          $socwh   += $crel ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) :
-                      ($fceff > 0 ? 0 : $fceff / STOREFFDEF);                                    # PV Prognose nur einbeziehen wenn Ladefreigabe
+          my $fceff = $pvfc - $confc;                                                            # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0
+          $fceff    = $fceff > 0 ? ($fceff >= $bpinmax       ? $bpinmax       : $fceff) : 
+                      $fceff < 0 ? ($fceff <= $bpoutmax * -1 ? $bpoutmax * -1 : $fceff) : 
+                      $fceff;
+                      
+          # debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - max. possible Charging(+) / Discharging(-) Energy: $fceff Wh");
+          
+          $socwh   += $crel       ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) :
+                      ($fceff > 0 ? 0                                                        : 
+                      $fceff / STOREFFDEF);                                                      # PV Überschuß (d.h. Aufladung) nur einbeziehen wenn Ladefreigabe
 
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -10668,13 +10690,13 @@ sub _batChargeRecmd {
                                          }
                                        );                                                        # Readings NextHourXX_Bat_XX_ChargeForecast erstellen
 
-          my $msg = "(CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W)";
+          my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W";
                     
           if ($num) {
-              $msg = "(SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh)";
+              $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh";
               
               if (!$today) {
-                  $msg = "(SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh)";
+                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh";
               }
           }
           else {
@@ -10686,7 +10708,7 @@ sub _batChargeRecmd {
           $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
 
-          debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $crel $msg");
+          debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $crel ($msg)");
       }
   }
 
@@ -12513,8 +12535,8 @@ sub _calcConsForecast_circular {
 
   my $hash    = $defs{$name};
   my $acref   = $data{$name}{consumers};
-  my $swdfcfc = AttrVal ($name, 'affectConsForecastIdentWeekdays',      0);                             # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
-  my $acld    = AttrVal ($name, 'affectConsForecastLastDays', CONSFCLDAYS);                             # Beachtung Stundenwerte der letzten X Tage falls gesetzt
+  my $swdfcfc = CurrentVal ($name, 'consForecastIdentWeekdays',         0);                             # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
+  my $acld    = CurrentVal ($name, 'consForecastLastDays',    CONSFCLDAYS);                             # Beachtung Stundenwerte der letzten X Tage falls gesetzt
 
   my $dt         = timestringsFromOffset ($t, 86400);
   my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname kommender Tag
@@ -12795,8 +12817,7 @@ sub __evaluateArray {
   my $tname  = $paref->{tname};          # Thresholdname, z.B. powerTrigger
   my $tholds = $paref->{tholds};         # Triggervorgaben, z.B. aus Reading powerTrigger
 
-  my $hash  = $defs{$name};
-  my $aaref = CurrentVal ($hash, $cobj, '');
+  my $aaref = CurrentVal ($name, $cobj, '');
   my @aa    = ();
   @aa       = @{$aaref} if (ref $aaref eq 'ARRAY');
 
@@ -13723,16 +13744,16 @@ sub entryGraphic {
       wlalias        => AttrVal    ($name, 'alias',                          $name),
       sheader        => AttrNum    ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
       hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-      flowgsize      => CurrentVal ($hash, 'size',                    FLOWGSIZEDEF),                # Größe Energieflußgrafik
-      flowgani       => CurrentVal ($hash, 'animate',                            1),                # Animation Energieflußgrafik
-      flowgxshift    => CurrentVal ($hash, 'shiftx',                             0),                # X-Verschiebung der Flußgrafikbox (muß negiert werden)
-      flowgyshift    => CurrentVal ($hash, 'shifty',                             0),                # Y-Verschiebung der Flußgrafikbox (muß negiert werden)
-      flowgcons      => CurrentVal ($hash, 'showconsumer',                       1),                # Verbraucher in der Energieflußgrafik anzeigen
-      flowgconX      => CurrentVal ($hash, 'showconsumerdummy',                  1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
-      flowgconsPower => CurrentVal ($hash, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
-      flowgconsTime  => CurrentVal ($hash, 'showconsumerremaintime',             1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
-      flowgconsDist  => CurrentVal ($hash, 'consumerdist',                 FGCDDEF),                # Abstand Verbrauchericons zueinander
-      flowgh2cDist   => CurrentVal ($hash, 'h2consumerdist',                     0),                # Erweiterung des vertikalen Abstandes Haus -> Consumer
+      flowgsize      => CurrentVal ($name, 'size',                    FLOWGSIZEDEF),                # Größe Energieflußgrafik
+      flowgani       => CurrentVal ($name, 'animate',                            1),                # Animation Energieflußgrafik
+      flowgxshift    => CurrentVal ($name, 'shiftx',                             0),                # X-Verschiebung der Flußgrafikbox (muß negiert werden)
+      flowgyshift    => CurrentVal ($name, 'shifty',                             0),                # Y-Verschiebung der Flußgrafikbox (muß negiert werden)
+      flowgcons      => CurrentVal ($name, 'showconsumer',                       1),                # Verbraucher in der Energieflußgrafik anzeigen
+      flowgconX      => CurrentVal ($name, 'showconsumerdummy',                  1),                # Dummyverbraucher in der Energieflußgrafik anzeigen
+      flowgconsPower => CurrentVal ($name, 'showconsumerpower',                  1),                # Verbraucher Leistung in der Energieflußgrafik anzeigen
+      flowgconsTime  => CurrentVal ($name, 'showconsumerremaintime',             1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
+      flowgconsDist  => CurrentVal ($name, 'consumerdist',                 FGCDDEF),                # Abstand Verbrauchericons zueinander
+      flowgh2cDist   => CurrentVal ($name, 'h2consumerdist',                     0),                # Erweiterung des vertikalen Abstandes Haus -> Consumer
       genpvdva       => AttrVal    ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
       lang           => getLang    ($hash),
       debug          => getDebug   ($hash),                                                         # Debug Module
@@ -16264,7 +16285,7 @@ sub _flowGraphic {
 
   ## Batterie Werte verarbeiten
   ###############################
-  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";            # cgc current GridConsumption
+  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";            # cgc = current GridConsumption
   my $bat2home_style  = $bat2home  ? "$stna active_normal" : "$stna inactive";
   my $cgc_direction   = "M250,515 L670,590";
 
@@ -16470,11 +16491,13 @@ END1
   ## Home Icon
   ##############
   my $car   = CurrentVal  ($name, 'autarkyrate', undef);
+  my $hmtxt = $htitles{autarky}{$lang}.': '.$car.' %';            
   my $hicon = HOMEICONDEF;  
 
-  if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {
+  if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {               
       $car              = 100 - $car;
-      my $pahcol        = '#'.substr(Color::pahColor(0,50,100,$car,[102,205,0, 050,205,050, 247,203,159, 247,148,111, 255,51,15]),0,6);
+      #my $pahcol        = '#'.substr (Color::pahColor (0, 50, 100, $car, [102,205,0, 050,205,050, 247,203,159, 247,148,111, 255,51,15]), 0, 6);
+      my $pahcol        = '#'.__dynColor ($car, 0, 50, 100);                                      # V 1.49.5
       ($hicon, my $col) = split '@', $hicon;
       $hicon            = $hicon.'@'.$pahcol;
   }
@@ -16484,7 +16507,7 @@ END1
   ($scale, $hicon) = __normIconScale ($name, $hicon);
 
   $ret .= qq{<g id="home_$stna" transform="translate(368,360),scale($scale)">};                   # translate(X-Koordinate,Y-Koordinate), scale(<Größe>)-> Koordinaten ändern sich bei Größenänderung
-  $ret .= "<title>Home</title>".$hicon;
+  $ret .= "<title>$hmtxt</title>".$hicon;
   $ret .= '</g> ';
 
   ## Dummy Consumer Icon
@@ -16529,12 +16552,11 @@ END3
   ##############################
    if ($flowgconX) {
       my $consumer_style = "$stna inactive";
-      $consumer_style    = "$stna active_sig" if($cc_dummy > 1);
+      $consumer_style    = "$stna active_normal" if($cc_dummy > 1);                           # current consumption Dummy
       my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
-      if ($cc_dummy > 0.5) {
-          $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
-          #$chain_color  = 'style="stroke: #DF0101;"';
+      if ($cc_dummy > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
+          $chain_color = 'style="stroke: #'.__dynColor ($cc_dummy).';"';
       }
 
       $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};
@@ -16609,8 +16631,8 @@ END3
           $consumer_style    = $p > DEFPOPERCENT ? "$stna active_normal" : "$stna inactive";
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
-          if ($p > 0.5) {
-              $chain_color = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+          if ($p > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
+              $chain_color = 'style="stroke: #'.__dynColor ($p).';"';
           }
 
           $ret             .= qq{<path id="home2consumer_${c}_$stna" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,$y_pos" />};
@@ -17014,6 +17036,22 @@ sub __substituteIcon {
   $icon .= '@'.$color if($color);
 
 return ($icon, $txt);
+}
+
+###################################################################
+#  liefert eine dynamische Farbe abhängig von "$val" zurück
+#  https://www.w3schools.com/colors/colors_picker.asp
+#  https://wiki.fhem.de/wiki/Color#Skalenfarbe_mit_Color::pahColor
+###################################################################   
+sub __dynColor {          
+  my $val = shift;
+  my $beg = shift // 0;
+  my $mid = shift // 200;
+  my $end = shift // 400;
+
+  my $color = substr (Color::pahColor ($beg, $mid, $end, $val, [40,198,45, 127,255,0, 251,158,4, 255,127,0, 255,0,0]), 0, 6);
+
+return $color;
 }
 
 ################################################################
@@ -19835,8 +19873,7 @@ sub checkPlantConfig {
   }
 
   if (isSolCastUsed ($hash)) {                                                               # allg. Settings bei Nutzung SolCast API
-      my $gdn = AttrVal ('global', 'dnsServer',                '');
-      my $osi = AttrVal ($name,    'ctrlSolCastAPIoptimizeReq', 0);
+      my $gdn = AttrVal ('global', 'dnsServer', '');
 
       my $lam = StatusAPIVal ($hash, 'SolCast', '?All', 'response_message', 'success');
 
@@ -19844,13 +19881,6 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on_complex" is recommended if the SolCast efficiency factor is already adjusted.<br>};
-      }
-
-      if (!$osi) {
-          $result->{'Common Settings'}{state}   = $warn;
-          $result->{'Common Settings'}{result} .= qq{Attribute ctrlSolCastAPIoptimizeReq is set to "$osi" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set ctrlSolCastAPIoptimizeReq to "1" is recommended.<br>};
-          $result->{'Common Settings'}{warn}    = 1;
       }
 
       if ($lam =~ /You have exceeded your free daily limit/i) {
@@ -19876,7 +19906,7 @@ sub checkPlantConfig {
       if (!$result->{'Common Settings'}{fault}) {
           $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
           $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, ctrlSolCastAPIoptimizeReq, global dnsServer <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, global->dnsServer <br>};
       }
   }
 
@@ -19942,12 +19972,12 @@ sub checkPlantConfig {
       if (!$result->{'Common Settings'}{fault}) {
           $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
           $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, global dnsServer, vrmCredentials <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, global->dnsServer, vrmCredentials <br>};
       }
   }
 
   if (!$result->{'Common Settings'}{fault}) {
-      $result->{'Common Settings'}{note}   .= qq{global latitude, global longitude, global altitude, global language <br>};
+      $result->{'Common Settings'}{note}   .= qq{global->latitude, global->longitude, global->altitude, global->language <br>};
       $result->{'Common Settings'}{note}   .= qq{event-on-change-reading, ctrlLanguage <br>};
   }
 
@@ -20852,7 +20882,7 @@ sub isPrepared4AI {
   my $err;
 
   if (!isDWDUsed($hash) && !isOpenMeteoUsed($hash)) {
-      $err = qq(The selected SolarForecast Model cannot use AI support);
+      $err = qq(Unfortunately, AI support is not possible with the selected radiation API MODEL.);
   }
   elsif ($aidtabs) {
       $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
@@ -23840,7 +23870,9 @@ to ensure that the system configuration is correct.
             <tr><td> <b>bchargewh </b>      </td><td>current SoC (State of Charge) of the battery (Wh)      </td></tr>
             <tr><td> <b>binstcap </b>       </td><td>installed battery capacity (Wh)                        </td></tr>
             <tr><td> <b>bpowerin </b>       </td><td>current charging power (W)                             </td></tr>
+            <tr><td> <b>bpinmax </b>        </td><td>maximum possible charging power (W)                    </td></tr>
             <tr><td> <b>bpowerout </b>      </td><td>current discharge power (W)                            </td></tr>
+            <tr><td> <b>bpoutmax </b>       </td><td>maximum possible discharging power (W)                 </td></tr>
 		 </table>
       </ul>
 
@@ -23962,42 +23994,6 @@ to ensure that the system configuration is correct.
   <br><br>
   <ul>
      <ul>
-       <a id="SolarForecast-attr-affectConsForecastIdentWeekdays"></a>
-       <li><b>affectConsForecastIdentWeekdays </b><br>
-         If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast. <br>
-         Otherwise, all weekdays are used equally for the calculation. <br>
-         The number of weekdays included is determined by the attribute
-		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>. <br>
-         (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectConsForecastLastDays"></a>
-       <li><b>affectConsForecastLastDays </b><br>
-         The specified number of historical daily values is included in the calculation of the consumption forecast. <br>
-         For example, with the attribute value “1” only the previous day is taken into account, with the value “14” the previous 14 days. <br>
-         The days actually taken into account may be less than specified if there are not enough values in the internal memory
-         are available. <br>
-         (default: 60) <br><br>
-
-         <b>Note:</b> With an additionally set attribute
-		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
-		 the specified number of past weekdays of the same type (Mon .. Sun) is taken into account. <br>
-         In this case, if a value of “8” is set, the same weekdays of the past 8 weeks are taken into account.
-         are taken into account. <br>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectSolCastPercentile"></a>
-       <li><b>affectSolCastPercentile &lt;10 | 50 | 90&gt; </b><br>
-         (only when using Model SolCastAPI) <br><br>
-
-         Selection of the probability range of the delivered SolCast data.
-         SolCast provides the 10 and 90 percent probability around the forecast mean (50). <br>
-         (default: 50)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-aiControl"></a>
        <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
          By optionally specifying the following key=value pairs, various properties of the AI support can be
@@ -24435,17 +24431,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlSolCastAPIoptimizeReq"></a>
-       <li><b>ctrlSolCastAPIoptimizeReq </b><br>
-         (only when using Model SolCastAPI) <br><br>
-
-         The default retrieval interval of the SolCast API is 1 hour. If this attribute is set, the interval is dynamically
-         adjustment of the interval with the goal to use the maximum possible fetches within
-         sunrise and sunset. <br>
-         (default: 0)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-ctrlSpecialReadings"></a>
        <li><b>ctrlSpecialReadings </b><br>
          Readings are created for the selected key figures and indicators with the
@@ -24562,6 +24547,9 @@ to ensure that the system configuration is correct.
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>size </b>                   </td><td>Size of the energy flow graphic in pixels if displayed. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>) </td></tr>
 			<tr><td>                                </td><td>Value: <b>Integer</b>, default: 400                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>strokeconsumerdyncol</b>    </td><td>The lines from the house node to the consumers can be colored dynamically depending on the consumption value.           </td></tr>
+            <tr><td>                                </td><td><b>0</b> - no dynamic coloring,  <b>1</b> - dynamic coloring, default: 0                                                </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>strokecolina </b>           </td><td>Color of an inactive line                                                                                               </td></tr>
 			<tr><td>                                </td><td>Value: <b>Hex (e.g. #cc3300) or designation (e.g. red, blue)</b>, default: gray                                         </td></tr>
@@ -24914,41 +24902,53 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-plantControl"></a>
        <li><b>plantControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
          By optionally specifying the 'Key=Value' pairs listed below, various properties of the overall
-         properties of the overall system can be set. <br>
+         properties of the overall system can be set.
          The entry can be made in several lines.
          <br><br>
 
          <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-			<tr><td> <b>batteryPreferredCharge</b> </td><td>Consumers with the <b>can</b> mode are only switched on when the specified battery charge (%) is reached.      </td></tr>
-			<tr><td>                               </td><td>Consumers with the <b>must</b> mode do not observe the priority charging of the battery.                       </td></tr>
-			<tr><td>                               </td><td>Wert: <b>Integer 0..100</b>, default: 0                                                                        </td></tr>
-			<tr><td>                               </td><td>                                                                                                               </td></tr>
-			<tr><td> <b>feedinPowerLimit</b>       </td><td>Feed-in limit of the entire system into the public grid in watts.                                              </td></tr>
-            <tr><td>                               </td><td>SolarForecast does not limit the feed-in, but uses this information                                            </td></tr>
-            <tr><td>                               </td><td>within the battery charge management to avoid system curtailment.                                              </td></tr>
-			<tr><td>                               </td><td>Value: <b>Integer</b>, default: unlimited                                                                      </td></tr>
-			<tr><td>                               </td><td>                                                                                                               </td></tr>
-            <tr><td> <b>consForecastInPlanning</b> </td><td>The key determines the procedure for scheduling registered consumers.                                          </td></tr>
-			<tr><td>                               </td><td><b>0</b> - the consumers are scheduled on the basis of the PV forecast (default)                               </td></tr>
-			<tr><td>                               </td><td><b>1</b> - consumers are scheduled on the basis of the PV forecast and the consumption forecast                </td></tr>
-			<tr><td>                               </td><td>                                                                                                               </td></tr>       
-			<tr><td> <b>showLink</b>               </td><td>Display of a link to the detailed view of the device above the graphics area                                   </td></tr>
-			<tr><td>                               </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                      </td></tr>
-		    <tr><td>                               </td><td>                                                                                                               </td></tr>
-			<tr><td> <b>backupFilesKeep</b>        </td><td>Defines the number of generations of backup files.                                                             </td></tr>
-			<tr><td>                               </td><td>(see <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                 </td></tr>
-		    <tr><td>                               </td><td>If ctrlBackupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place.  </td></tr>
-		    <tr><td>                               </td><td>Manual execution with the aforementioned set command is still possible.                                        </td></tr>
-		    <tr><td>                               </td><td>Wert: <b>Integer</b>, default: 3                                                                               </td></tr>
-			<tr><td>                               </td><td>                                                                                                               </td></tr>
-        </table>
+         <colgroup> <col width="23%"> <col width="77%"> </colgroup>
+			<tr><td> <b>backupFilesKeep</b>           </td><td>Defines the number of generations of backup files.                                                                                   </td></tr>
+			<tr><td>                                  </td><td>(see <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                       </td></tr>
+		    <tr><td>                                  </td><td>If ctrlBackupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place.                        </td></tr>
+		    <tr><td>                                  </td><td>Manual execution with the aforementioned set command is still possible.                                                              </td></tr>
+		    <tr><td>                                  </td><td>Value: <b>Integer</b>, default: 3                                                                                                    </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
+			<tr><td> <b>batteryPreferredCharge</b>    </td><td>Consumers with the <b>can</b> mode are only switched on when the specified battery charge (%) is reached.                            </td></tr>
+			<tr><td>                                  </td><td>Consumers with the <b>must</b> mode do not observe the priority charging of the battery.                                             </td></tr>
+			<tr><td>                                  </td><td>Value: <b>Integer 0..100</b>, default: 0                                                                                             </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
+            <tr><td> <b>consForecastIdentWeekdays</b> </td><td>If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast.                               </td></tr>
+			<tr><td>                                  </td><td>Otherwise, all weekdays are used equally for the calculation.                                                                        </td></tr>       
+			<tr><td>                                  </td><td>Value: <b>0|1</b>, default: 0                                                                                                        </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>       
+            <tr><td> <b>consForecastInPlanning</b>    </td><td>The key determines the procedure for scheduling registered consumers.                                                                </td></tr>
+			<tr><td>                                  </td><td><b>0</b> - the consumers are scheduled on the basis of the PV forecast (default)                                                     </td></tr>
+			<tr><td>                                  </td><td><b>1</b> - consumers are scheduled on the basis of the PV forecast and the consumption forecast                                      </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>       
+            <tr><td> <b>consForecastLastDays</b>      </td><td>The specified number of historical days is included in the calculation of the consumption forecast.                                  </td></tr>
+			<tr><td>                                  </td><td>For example, with the attribute value “1” only the previous day is taken into account, with the value “14” the previous 14 days.     </td></tr>
+			<tr><td>                                  </td><td>The days taken into account may be fewer if there are not enough values in the internal memory.                                      </td></tr>
+			<tr><td>                                  </td><td>If the key ‘consForecastIdentWeekdays’ is also set, the specified number of past weekdays                                            </td></tr>  
+            <tr><td>                                  </td><td>of the <b>same</b> day (Mon .. Sun) is taken into account.                                                                           </td></tr>
+            <tr><td>                                  </td><td>For example, if the value is set to ‘8’, the same weekdays of the past 8 weeks are taken into account.                               </td></tr>
+            <tr><td>                                  </td><td>Value: <b>Integer 0..180</b>, default: 60                                                                                            </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
+			<tr><td> <b>feedinPowerLimit</b>          </td><td>Feed-in limit of the entire system into the public grid in watts.                                                                    </td></tr>
+            <tr><td>                                  </td><td>SolarForecast does not limit the feed-in, but uses this information                                                                  </td></tr>
+            <tr><td>                                  </td><td>within the battery charge management to avoid system curtailment.                                                                    </td></tr>
+			<tr><td>                                  </td><td>Value: <b>Integer</b>, default: unlimited                                                                                            </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
+			<tr><td> <b>showLink</b>                  </td><td>Display of a link to the detailed view of the device above the graphics area                                                         </td></tr>
+			<tr><td>                                  </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                                            </td></tr>
+		    <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
+         </table>
          </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8
        </ul>
 
        </li>
@@ -24956,7 +24956,8 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
        <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
-                                cap=&lt;Option&gt; [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
+                                cap=&lt;Option&gt; [pinmax=&lt;Integer&gt] [poutmax=&lt;Integer&gt]
+                                [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
                                 [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]         <br>
                                 [[icon=&lt;recomm&gt;@&lt;Color&gt;]:[&lt;charge&gt;@&lt;Color&gt;]:[&lt;discharge&gt;@&lt;Color&gt;]:[&lt;omit&gt;@&lt;Color&gt;]]  </b> <br><br>
 
@@ -24971,6 +24972,10 @@ to ensure that the system configuration is correct.
            <tr><td> <b>pin</b>       </td><td>Reading which provides the current battery charging power                                                     </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                                     </td></tr>
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
+           <tr><td> <b>pinmax</b>    </td><td>the maximum possible charging power in watts (optional)                                                       </td></tr>
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
+           <tr><td> <b>poutmax</b>   </td><td>the maximum possible discharge power in watts (optional)                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>intotal</b>   </td><td>Reading which provides the total battery charge as a continuous counter (optional)                            </td></tr>
            <tr><td>                  </td><td>If the reading violates the specification of a continuously rising counter, SolarForecast handles             </td></tr>
@@ -25262,8 +25267,7 @@ to ensure that the system configuration is correct.
        A rooftop is equivalent to one <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a>
        in the SolarForecast context. <br>
        Free API usage is limited to one daily rate API requests. The number of defined strings (rooftops)
-       increases the number of API requests required. The module optimizes the query cycles with the attribute
-       <a href="#SolarForecast-attr-ctrlSolCastAPIoptimizeReq ">ctrlSolCastAPIoptimizeReq </a>.
+       increases the number of API requests required. The module optimizes the query cycles automatically.
        <br><br>
 
        <b>ForecastSolar-API</b> <br>
@@ -26352,7 +26356,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>bchargewh </b>      </td><td>aktueller SoC (State of Charge) der Batterie (Wh)      </td></tr>
             <tr><td> <b>binstcap </b>       </td><td>installierte Batteriekapazität (Wh)                    </td></tr>
             <tr><td> <b>bpowerin </b>       </td><td>momentane Ladeleistung (W)                             </td></tr>
+            <tr><td> <b>bpinmax </b>        </td><td>maximal mögliche Ladeleistung (W)                      </td></tr>
             <tr><td> <b>bpowerout </b>      </td><td>momentane Entladeleistung (W)                          </td></tr>
+            <tr><td> <b>bpoutmax </b>       </td><td>maximal mögliche Entladeleistung (W)                   </td></tr>
 		 </table>
       </ul>
 
@@ -26472,43 +26478,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
   <br><br>
   <ul>
      <ul>
-       <a id="SolarForecast-attr-affectConsForecastIdentWeekdays"></a>
-       <li><b>affectConsForecastIdentWeekdays </b><br>
-         Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
-         Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet. <br>
-         Die Anzahl der einbezogenen Wochentage wird durch das Attribut
-		 <a href="#SolarForecast-attr-affectConsForecastLastDays">affectConsForecastLastDays</a>
-		 bestimmt. <br>
-         (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectConsForecastLastDays"></a>
-       <li><b>affectConsForecastLastDays </b><br>
-         Es wird die angegebene Anzahl historischer Tageswerte bei der Berechnung der Verbrauchsprognose einbezogen. <br>
-         So wird z.B. mit dem Attributwert "1" nur der vorangegangene Tag berücksichtigt, mit dem Wert "14" die vergangenen 14 Tage. <br>
-         Die tatsächlich berücksichtigten Tage können geringer als angegeben sein wenn noch nicht genügend Werte im internen Speicher
-         vorhanden sind. <br>
-         (default: 60) <br><br>
-
-         <b>Hinweis:</b> Bei einem zusätzlich gesetzten Attribut
-		 <a href="#SolarForecast-attr-affectConsForecastIdentWeekdays">affectConsForecastIdentWeekdays</a>
-		 wird die angegebene Anzahl vergangener gleicher Wochentage (Mo .. So) berücksichtigt. <br>
-         In diesem Fall werden bei einem gesetzten Wert von "8" die gleichen Wochentage der vergangenen 8 Wochen
-         berücksichtigt. <br>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-affectSolCastPercentile"></a>
-       <li><b>affectSolCastPercentile &lt;10 | 50 | 90&gt; </b><br>
-         (nur bei Verwendung Model SolCastAPI) <br><br>
-
-         Auswahl des Wahrscheinlichkeitsbereiches der gelieferten SolCast-Daten.
-         SolCast liefert die 10- und 90-prozentige Wahrscheinlichkeit um den Prognosemittelwert (50) herum. <br>
-         (default: 50)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-aiControl"></a>
        <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene
@@ -26946,17 +26915,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlSolCastAPIoptimizeReq"></a>
-       <li><b>ctrlSolCastAPIoptimizeReq </b><br>
-         (nur bei Verwendung Model SolCastAPI) <br><br>
-
-         Das default Abrufintervall der SolCast API beträgt 1 Stunde. Ist dieses Attribut gesetzt erfolgt ein dynamische
-         Anpassung des Intervalls mit dem Ziel die maximal möglichen Abrufe innerhalb von Sonnenauf- und untergang
-         auszunutzen. <br>
-         (default: 0)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-ctrlSpecialReadings"></a>
        <li><b>ctrlSpecialReadings </b><br>
          Für die ausgewählten Kennzahlen und Indikatoren werden Readings mit dem
@@ -27073,6 +27031,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>size </b>                   </td><td>Größe der Energieflußgrafik in Pixel sofern angezeigt. (<a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>)  </td></tr>
 			<tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 400                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>strokeconsumerdyncol</b>    </td><td>Die Linien vom Hausknoten zu den Verbrauchern können abhängig vom Verbrauchswert dynamisch eingefärbt werden.           </td></tr>
+            <tr><td>                                </td><td><b>0</b> - keine dynamische Färbung,  <b>1</b> - dynamische Färbung, default: 0                                         </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>strokecolina </b>           </td><td>Farbe einer inaktiven Linie                                                                                             </td></tr>
 			<tr><td>                                </td><td>Wert: <b>Hex (z.B. #cc3300) oder Bezeichnung (z.B. red, blue)</b>, default: gray                                        </td></tr>
@@ -27422,41 +27383,53 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-plantControl"></a>
        <li><b>plantControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten 'Schlüssel=Wert' Paare können verschiedene
-         Eigenschaften der Gesamtanlage eingestellt werden. <br>
+         Eigenschaften der Gesamtanlage eingestellt werden.
          Die Eingabe kann mehrzeilig erfolgen.
          <br><br>
 
          <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-			<tr><td> <b>batteryPreferredCharge</b> </td><td>Verbraucher mit dem Mode <b>can</b> werden erst dann eingeschaltet, wenn die angegebene Batterieladung (%) erreicht ist.        </td></tr>
-			<tr><td>                               </td><td>Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht.                                             </td></tr>
-			<tr><td>                               </td><td>Wert: <b>Ganzzahl 0..100</b>, default: 0                                                                                        </td></tr>
-			<tr><td>                               </td><td>                                                                                                                                </td></tr>
-            <tr><td> <b>feedinPowerLimit</b>       </td><td>Einspeiselimit der Gesamtanlage in das öffentliche Netz in Watt.                                                                </td></tr>
-            <tr><td>                               </td><td>SolarForecast limitiert die Einspeisung nicht, verwendet diese Angabe jedoch                                                    </td></tr>
-            <tr><td>                               </td><td>innerhalb des Batterie-Lademanagements zur Vermeidung einer Anlagenabregelung.                                                  </td></tr>
-			<tr><td>                               </td><td>Wert: <b>Ganzzahl</b>, default: unbegrent                                                                                       </td></tr>
-			<tr><td>                               </td><td>                                                                                                                                </td></tr>
-            <tr><td> <b>consForecastInPlanning</b> </td><td>Der Schlüssel bestimmt die Vorgehensweise bei der Einplanung der registrierten Verbraucher.                                     </td></tr>
-			<tr><td>                               </td><td><b>0</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose (default)                                       </td></tr>
-			<tr><td>                               </td><td><b>1</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose und der Prognose des Verbrauchs                 </td></tr>
-			<tr><td>                               </td><td>                                                                                                                                </td></tr>       
-			<tr><td> <b>showLink</b>               </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                         </td></tr>
-			<tr><td>                               </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                       </td></tr>
-		    <tr><td>                               </td><td>                                                                                                                                </td></tr>
-			<tr><td> <b>backupFilesKeep</b>        </td><td>Legt die Anzahl der Generationen von Sicherungsdateien fest.                                                                    </td></tr>
-			<tr><td>                               </td><td>(siehe <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                </td></tr>
-		    <tr><td>                               </td><td>Ist ctrlBackupFilesKeep explit auf '0' gesetzt, erfolgt keine automatische Generierung und Bereinigung von Sicherungsdateien.   </td></tr>
-		    <tr><td>                               </td><td>Eine manuelle Ausführung mit dem genannten Set-Kommando ist weiterhin möglich.                                                  </td></tr>
-		    <tr><td>                               </td><td>Wert: <b>Ganzzahl</b>, default: 3                                                                                               </td></tr>
-			<tr><td>                               </td><td>                                                                                                                                </td></tr>
-        </table>
+         <colgroup> <col width="23%"> <col width="77%"> </colgroup>
+			<tr><td> <b>backupFilesKeep</b>           </td><td>Legt die Anzahl der Generationen von Sicherungsdateien fest.                                                                    </td></tr>
+			<tr><td>                                  </td><td>(siehe <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                </td></tr>
+		    <tr><td>                                  </td><td>Ist ctrlBackupFilesKeep explit auf '0' gesetzt, erfolgt keine automatische Generierung und Bereinigung von Sicherungsdateien.   </td></tr>
+		    <tr><td>                                  </td><td>Eine manuelle Ausführung mit dem genannten Set-Kommando ist weiterhin möglich.                                                  </td></tr>
+		    <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 3                                                                                               </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
+ 			<tr><td> <b>batteryPreferredCharge</b>    </td><td>Verbraucher mit dem Mode <b>can</b> werden erst dann eingeschaltet, wenn die angegebene Batterieladung (%) erreicht ist.        </td></tr>
+			<tr><td>                                  </td><td>Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht.                                             </td></tr>
+			<tr><td>                                  </td><td>Wert: <b>Ganzzahl 0..100</b>, default: 0                                                                                        </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>consForecastIdentWeekdays</b> </td><td>Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen.                          </td></tr>
+			<tr><td>                                  </td><td>Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet.                                                 </td></tr>       
+			<tr><td>                                  </td><td>Wert: <b>0|1</b>, default: 0                                                                                                    </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                </td></tr>       
+            <tr><td> <b>consForecastInPlanning</b>    </td><td>Der Schlüssel bestimmt die Vorgehensweise bei der Einplanung der registrierten Verbraucher.                                     </td></tr>
+			<tr><td>                                  </td><td><b>0</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose (default)                                       </td></tr>
+			<tr><td>                                  </td><td><b>1</b> - die Einplanung der Verbraucher erfolgt auf Grundlage der PV Prognose und der Prognose des Verbrauchs                 </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                </td></tr>       
+            <tr><td> <b>consForecastLastDays</b>      </td><td>Es wird die angegebene Anzahl historischer Tage bei der Berechnung der Verbrauchsprognose einbezogen.                           </td></tr>
+			<tr><td>                                  </td><td>So wird z.B. mit dem Attributwert "1" nur der vorangegangene Tag berücksichtigt, mit dem Wert '14' die vergangenen 14 Tage.     </td></tr>
+			<tr><td>                                  </td><td>Die berücksichtigten Tage können geringer ausfallen, wenn noch nicht genügend Werte im internen Speicher vorhanden sind.        </td></tr>
+			<tr><td>                                  </td><td>Bei einem zusätzlich gesetzten Schlüssel 'consForecastIdentWeekdays' wird die angegebene Anzahl vergangener                     </td></tr>  
+            <tr><td>                                  </td><td><b>gleicher</b> Wochentage (Mo .. So) berücksichtigt.                                                                           </td></tr>
+            <tr><td>                                  </td><td>Zum Beispiel werden dann bei einem gesetzten Wert von '8' die gleichen Wochentage der vergangenen 8 Wochen berücksichtigt.      </td></tr>
+            <tr><td>                                  </td><td>Wert: <b>Ganzzahl 0..180</b>, default: 60                                                                                       </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>feedinPowerLimit</b>          </td><td>Einspeiselimit der Gesamtanlage in das öffentliche Netz in Watt.                                                                </td></tr>
+            <tr><td>                                  </td><td>SolarForecast limitiert die Einspeisung nicht, verwendet diese Angabe jedoch                                                    </td></tr>
+            <tr><td>                                  </td><td>innerhalb des Batterie-Lademanagements zur Vermeidung einer Anlagenabregelung.                                                  </td></tr>
+			<tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: unbegrent                                                                                       </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
+			<tr><td> <b>showLink</b>                  </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                         </td></tr>
+			<tr><td>                                  </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                       </td></tr>
+		    <tr><td>                                  </td><td>                                                                                                                                </td></tr>
+         </table>
          </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8
        </ul>
 
        </li>
@@ -27464,7 +27437,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
        <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;
-                                cap=&lt;Option&gt; [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
+                                cap=&lt;Option&gt; [pinmax=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt]
+                                [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
                                 [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]     <br>
                                 [[icon=&lt;empfohlen&gt;@&lt;Farbe&gt;]:[&lt;aufladen&gt;@&lt;Farbe&gt;]:[&lt;entladen&gt;@&lt;Farbe&gt;]:[icon=&lt;unterlassen&gt;@&lt;Farbe&gt;]]  </b> <br><br>
 
@@ -27479,6 +27453,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladeleistung liefert                                                </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                                             </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
+           <tr><td> <b>pinmax</b>    </td><td>die maximal mögliche Ladeleistung in Watt (optional)                                                     </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
+           <tr><td> <b>poutmax</b>   </td><td>die maximal mögliche Entladeleistung in Watt (optional)                                                  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung als fortlaufenden Zähler liefert (optional)                    </td></tr>
            <tr><td>                  </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                   </td></tr>
@@ -27772,8 +27750,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Ein Rooftop ist im SolarForecast-Kontext mit einem <a href="#SolarForecast-attr-setupInverterStrings">setupInverterString</a>
       gleichzusetzen. <br>
       Die kostenfreie API-Nutzung ist auf eine Tagesrate API-Anfragen begrenzt. Die Anzahl definierter Strings (Rooftops)
-      erhöht die Anzahl erforderlicher API-Anfragen. Das Modul optimiert die Abfragezyklen mit dem Attribut
-      <a href="#SolarForecast-attr-ctrlSolCastAPIoptimizeReq ">ctrlSolCastAPIoptimizeReq </a>.
+      erhöht die Anzahl erforderlicher API-Anfragen. Das Modul optimiert die Abfragezyklen automatisch.
       <br><br>
 
       <b>ForecastSolar-API</b> <br>
