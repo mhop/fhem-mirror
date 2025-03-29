@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 6.4 released
+
+- 2025-03-29 (6.3)
  - bugfix:  76_SolarForecast: fix sunalt for next day,
                               flowGraphicControl: new key strokeconsumerdyncol
  - bufgix: 72_FRITZBOX: set <name> lockLandevice <number|mac> <on|off|rt|rtoff>
