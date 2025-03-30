@@ -6281,28 +6281,22 @@ sub _attraiControl {                     ## no critic "not used"
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
+  
+  my $valid = {
+      aiStorageDuration => { comp => '\d+',                        act => 0 },
+      aiTrainStart      => { comp => '(1?[1-9]|10|2[0-3])',        act => 0 },
+      aiTreesPV         => { comp => '(1?[1-9]|10|[2-4][0-9]|50)', act => 0 },
+  };
 
-  my $hash  = $defs{$name};
-
-  for my $av ( qw( aiStorageDuration
-                   aiTrainStart
-                   aiTreesPV
-                 ) ) {
-
+  for my $av (keys %{$valid}) {
       delete $data{$name}{current}{$av};
   }
+  
+  my ($a, $h) = parseParams ($aVal);
 
   if ($cmd eq 'set') {
-      my $valid = {
-          aiStorageDuration => '\d+',
-          aiTrainStart      => '(1?[1-9]|10|2[0-3])',
-          aiTreesPV         => '(1?[1-9]|10|[2-4][0-9]|50)',
-      };
-
-      my ($a, $h) = parseParams ($aVal);
-
       for my $key (keys %{$h}) {
-          my $comp = $valid->{$key};
+          my $comp = $valid->{$key}{comp};
           next if(!$comp);
 
           if ($h->{$key} =~ /^$comp$/xs) {
@@ -6312,6 +6306,18 @@ sub _attraiControl {                     ## no critic "not used"
               return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
       }
+  }
+  
+  for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
+      next if(!$valid->{$akey}{act});
+      
+      $paref->{akey}   = $akey;
+      $paref->{keyval} = $h->{$akey};
+      
+      __attrKeyAction ($paref);
+      
+      delete $paref->{keyval};
+      delete $paref->{akey};
   }
 
 return;
@@ -6325,36 +6331,27 @@ sub _attrplantControl {                  ## no critic "not used"
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
-
-  my $hash  = $defs{$name};
-
-  for my $av ( qw( backupFilesKeep
-                   batteryPreferredCharge
-                   consForecastIdentWeekdays
-                   consForecastLastDays
-                   consForecastInPlanning
-                   feedinPowerLimit
-                   showLink
-                 ) ) {
-
+  
+  my $valid = {
+      backupFilesKeep           => { comp => '\d+',                                act => 0 },
+      batteryPreferredCharge    => { comp => '([0-9]|[1-9][0-9]|100)',             act => 0 },
+      consForecastIdentWeekdays => { comp => '(0|1)',                              act => 0 },
+      consForecastLastDays      => { comp => '([1-9]|[1-9][0-9]|1[0-7][0-9]|180)', act => 0 },
+      consForecastInPlanning    => { comp => '(0|1)',                              act => 0 },
+      feedinPowerLimit          => { comp => '\d+',                                act => 0 },
+      interval                  => { comp => '\d+',                                act => 1 },
+      showLink                  => { comp => '(0|1)',                              act => 0 },
+  };
+  
+  for my $av (keys %{$valid}) {
       delete $data{$name}{current}{$av};
   }
+  
+  my ($a, $h) = parseParams ($aVal);
 
   if ($cmd eq 'set') {
-      my $valid = {
-          backupFilesKeep           => '\d+',
-          batteryPreferredCharge    => '([0-9]|[1-9][0-9]|100)',
-          consForecastIdentWeekdays => '(0|1)',
-          consForecastLastDays      => '([1-9]|[1-9][0-9]|1[0-7][0-9]|180)',
-          consForecastInPlanning    => '(0|1)',
-          feedinPowerLimit          => '\d+',
-          showLink                  => '(0|1)',
-      };
-
-      my ($a, $h) = parseParams ($aVal);
-
       for my $key (keys %{$h}) {
-          my $comp = $valid->{$key};
+          my $comp = $valid->{$key}{comp};
           next if(!$comp);
 
           if ($h->{$key} =~ /^$comp$/xs) {
@@ -6364,6 +6361,18 @@ sub _attrplantControl {                  ## no critic "not used"
               return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
       }
+  }
+  
+  for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
+      next if(!$valid->{$akey}{act});
+      
+      $paref->{akey}   = $akey;
+      $paref->{keyval} = $h->{$akey};
+      
+      __attrKeyAction ($paref);
+      
+      delete $paref->{keyval};
+      delete $paref->{akey};
   }
 
 return;
@@ -6816,7 +6825,7 @@ sub _attrRadiationAPI {                  ## no critic "not used"
 
   return if(!$init_done);
 
-  my $hash  = $defs{$name};
+  my $hash = $defs{$name};
 
   if ($paref->{cmd} eq 'set') {
       if ($aVal !~ /-API$/x && (!$defs{$aVal} || $defs{$aVal}{TYPE} ne "DWD_OpenData")) {
@@ -6880,6 +6889,29 @@ sub _attrgraphicBeamXContent {           ## no critic "not used"
       }
   }
 
+return;
+}
+
+################################################################
+#  von bestimmten Schlüsseln abhängige Aktionen ausführen
+################################################################
+sub __attrKeyAction {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $akey   = $paref->{akey};
+  my $keyval = $paref->{keyval};
+  my $cmd    = $paref->{cmd};
+  
+  my $hash = $defs{$name};
+  
+  if ($cmd eq 'set') {
+      if ($init_done && $akey eq 'interval') {
+          _newCycTime ($hash, time, $keyval);
+          my $nct = CurrentVal ($name, 'nextCycleTime', 0);                                                         # gespeicherte nächste CyleTime
+          readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
+      }
+  }
+  
 return;
 }
 
