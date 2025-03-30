@@ -6339,7 +6339,7 @@ sub _attrplantControl {                  ## no critic "not used"
       consForecastLastDays      => { comp => '([1-9]|[1-9][0-9]|1[0-7][0-9]|180)', act => 0 },
       consForecastInPlanning    => { comp => '(0|1)',                              act => 0 },
       feedinPowerLimit          => { comp => '\d+',                                act => 0 },
-      interval                  => { comp => '\d+',                                act => 1 },
+      cycleInterval             => { comp => '\d+',                                act => 1 },
       showLink                  => { comp => '(0|1)',                              act => 0 },
   };
   
@@ -6905,7 +6905,7 @@ sub __attrKeyAction {
   my $hash = $defs{$name};
   
   if ($cmd eq 'set') {
-      if ($init_done && $akey eq 'interval') {
+      if ($init_done && $akey eq 'cycleInterval') {
           _newCycTime ($hash, time, $keyval);
           my $nct = CurrentVal ($name, 'nextCycleTime', 0);                                                         # gespeicherte nächste CyleTime
           readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
