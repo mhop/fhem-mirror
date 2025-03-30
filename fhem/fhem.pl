@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2023
+#  (c) 2005-2025
 #  Copyright: Rudolf Koenig (rudolf dot koenig at fhem dot de)
 #  All rights reserved
 #
