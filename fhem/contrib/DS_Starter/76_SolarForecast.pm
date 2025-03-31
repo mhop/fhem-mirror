@@ -163,6 +163,8 @@ my %vNotesIntern = (
   "1.49.5" => "29.03.2025  some code changes, Attr affectSolCastPercentile, ctrlSolCastAPIoptimizeReq are obsolete -> SolCast optimze requests is default now ".
                            "attr affectConsForecastIdentWeekdays replaced by plantControl->consForecastIdentWeekdays ".
                            "attr affectConsForecastLastDays replaced by plantControl->consForecastLastDays ".
+                           "attr ctrlInterval replaced by plantControl->cycleInterval".
+                           "attr ctrlGenPVdeviation replaced by plantControl->genPVdeviation ".
                            "setupBatteryDevXX: new keys pinmax, poutmax ",
   "1.49.4" => "28.03.2025  _batChargeRecmd: revert Loading release changes of V 1.49.0, _transferAPIRadiationValues: fix sunalt for next day ".
                            "Home Node: Mouse over show Autarky Rate, flowGraphicControl: new key strokeconsumerdyncol ",
@@ -557,7 +559,7 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( aiControl 
                    consumerLegend consumerAdviceIcon consumerLink
-                   ctrlConsRecommendReadings ctrlGenPVdeviation ctrlInterval
+                   ctrlConsRecommendReadings 
                    ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings
                    ctrlSolCastAPImaxReq
                    ctrlSpecialReadings ctrlUserExitFn
@@ -1520,8 +1522,6 @@ sub Initialize {
                                 "consumerLink:0,1 ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#10 ".
-                                "ctrlGenPVdeviation:daily,continuously ".
-                                "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
                                 "ctrlNextDayForecastReadings:multiple-strict,$hod ".
                                 "ctrlNextHoursSoCForecastReadings ".
@@ -1575,7 +1575,7 @@ sub Initialize {
   ##########################################################################################################################
   my $av = 'obsolete#-#use#attr#plantControl#instead';
   my $av1 = 'obsolete#-#will#be#deleted#soon';
-  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av ctrlBackupFilesKeep:$av affectConsForecastIdentWeekdays:$av affectConsForecastLastDays:$av";     # 29.03.2025
+  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av ctrlBackupFilesKeep:$av affectConsForecastIdentWeekdays:$av affectConsForecastLastDays:$av ctrlInterval:$av ctrlGenPVdeviation:$av";     # 31.03.2025
   $hash->{AttrList} .= " affectSolCastPercentile:$av1 ctrlSolCastAPIoptimizeReq:$av1";           # 29.03.2025
   ##########################################################################################################################
 
@@ -5843,7 +5843,7 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning|ctrlShowLink|ctrlBackupFilesKeep|affectConsForecastIdentWeekdays|affectConsForecastLastDays$/) {      # 29.03.2025
+  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning|ctrlShowLink|ctrlBackupFilesKeep|affectConsForecastIdentWeekdays|affectConsForecastLastDays|ctrlInterval|ctrlGenPVdeviation$/) {      # 31.03.2025
       my $msg  = "The attribute $aName is replaced by 'plantControl'.";
       if (!$init_done) {
           Log3 ($name, 1, "$name - $msg");
@@ -5907,33 +5907,15 @@ sub Attr {
       delete $data{$name}{circular}{99}{'nextTsMaxSocChge'.$bn};
   }
 
-  if ($aName eq 'ctrlGenPVdeviation' && $aVal eq 'daily') {
-      readingsDelete ($hash, 'Today_PVdeviation');
-      delete $data{$name}{circular}{99}{tdayDvtn};
-  }
-
   if ($aName eq 'graphicHeaderOwnspecValForm') {
       $err = isGhoValFormValid ($name, $aVal);
       return $err if($err);
   }
 
   if ($cmd eq 'set') {
-      if ($aName eq 'ctrlInterval') {
-          unless ($aVal =~ /^[0-9]+$/x) {
-              return qq{Invalid value for $aName. Use only figures 0-9!};
-          }
-      }
-
       if ($init_done && $aName eq 'ctrlUserExitFn') {
           ($err) = checkCode ($name, $aVal, 'cc1');
           return $err if($err);
-      }
-
-      if ($init_done && $aName eq 'ctrlInterval') {
-          _newCycTime ($hash, time, $aVal);
-          my $nct = CurrentVal ($hash, 'nextCycleTime', 0);                                     # gespeicherte nächste CyleTime
-          readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
-          return;
       }
   }
 
@@ -6338,8 +6320,9 @@ sub _attrplantControl {                  ## no critic "not used"
       consForecastIdentWeekdays => { comp => '(0|1)',                              act => 0 },
       consForecastLastDays      => { comp => '([1-9]|[1-9][0-9]|1[0-7][0-9]|180)', act => 0 },
       consForecastInPlanning    => { comp => '(0|1)',                              act => 0 },
-      feedinPowerLimit          => { comp => '\d+',                                act => 0 },
       cycleInterval             => { comp => '\d+',                                act => 1 },
+      feedinPowerLimit          => { comp => '\d+',                                act => 0 },    
+      genPVdeviation            => { comp => '(daily|continuously)',               act => 1 },
       showLink                  => { comp => '(0|1)',                              act => 0 },
   };
   
@@ -6910,6 +6893,11 @@ sub __attrKeyAction {
           my $nct = CurrentVal ($name, 'nextCycleTime', 0);                                                         # gespeicherte nächste CyleTime
           readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
       }
+  }
+  
+  if ($akey eq 'genPVdeviation' && $keyval eq 'daily') {
+      readingsDelete ($hash, 'Today_PVdeviation');
+      delete $data{$name}{circular}{99}{tdayDvtn};
   }
   
 return;
@@ -8066,6 +8054,26 @@ sub centralTask {
       my $newval = $pc5." consForecastLastDays=$cfl";
       CommandAttr (undef, "$name plantControl $newval");
       ::CommandDeleteAttr (undef, "$name affectConsForecastLastDays"); 
+  }  
+  ######
+  
+  my $civ = AttrVal ($name, 'ctrlInterval', undef);                        # 31.03.2025 
+  my $pc6 = AttrVal ($name, 'plantControl', '');
+
+  if (defined $civ) {
+      my $newval = $pc6." cycleInterval=$civ";
+      CommandAttr (undef, "$name plantControl $newval");
+      ::CommandDeleteAttr (undef, "$name ctrlInterval"); 
+  }  
+  ######
+  
+  my $cgd = AttrVal ($name, 'ctrlGenPVdeviation', undef);                        # 31.03.2025 
+  my $pc7 = AttrVal ($name, 'plantControl', '');
+
+  if (defined $cgd) {
+      my $newval = $pc7." genPVdeviation=$cgd";
+      CommandAttr (undef, "$name plantControl $newval");
+      ::CommandDeleteAttr (undef, "$name ctrlGenPVdeviation"); 
   }  
   ######
   
@@ -12933,7 +12941,7 @@ sub _calcTodayPVdeviation {
 
   my $dp;
 
-  if (AttrVal ($name, 'ctrlGenPVdeviation', 'daily') eq 'daily') {
+  if (CurrentVal ($name, 'genPVdeviation', 'daily') eq 'daily') {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
       return if($t < $sstime);
 
@@ -12943,7 +12951,7 @@ sub _calcTodayPVdeviation {
       my $pvfcd = ReadingsNum ($name, 'RestOfDayPVforecast', 0) - $pvfc;      # PV Prognose bis jetzt
       return if(!$pvfcd);                                                     # Illegal division by zero verhindern
 
-      $dp       = sprintf "%.2f", (100 - (100 * $pvre / abs $pvfcd));         # V 1.25.0
+      $dp = sprintf "%.2f", (100 - (100 * $pvre / abs $pvfcd));               # V 1.25.0
   }
 
   $data{$name}{circular}{99}{tdayDvtn} = $dp;
@@ -13786,7 +13794,7 @@ sub entryGraphic {
       flowgconsTime  => CurrentVal ($name, 'showconsumerremaintime',             1),                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
       flowgconsDist  => CurrentVal ($name, 'consumerdist',                 FGCDDEF),                # Abstand Verbrauchericons zueinander
       flowgh2cDist   => CurrentVal ($name, 'h2consumerdist',                     0),                # Erweiterung des vertikalen Abstandes Haus -> Consumer
-      genpvdva       => AttrVal    ($name, 'ctrlGenPVdeviation',           'daily'),                # Methode der Abweichungsberechnung
+      genpvdva       => CurrentVal ($name, 'genPVdeviation',               'daily'),                # Methode der Abweichungsberechnung
       lang           => getLang    ($hash),
       debug          => getDebug   ($hash),                                                         # Debug Module
   };
@@ -20847,7 +20855,7 @@ return;
 sub controller {
   my $name = shift;
 
-  my $interval = AttrVal    ($name, 'ctrlInterval', DEFINTERVAL);            # 0 wenn manuell gesteuert
+  my $interval = CurrentVal ($name, 'cycleInterval', DEFINTERVAL);            # 0 wenn manuell gesteuert
   my $idval    = IsDisabled ($name);
   my $disabled = $idval == 1 ? 1 : 0;
   my $inactive = $idval == 3 ? 1 : 0;
@@ -24383,34 +24391,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlGenPVdeviation"></a>
-       <li><b>ctrlGenPVdeviation </b><br>
-         Specifies the method for calculating the deviation between predicted and real PV generation.
-         The Reading <b>Today_PVdeviation</b> is created depending on this setting. <br><br>
-
-         <ul>
-         <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>daily</b>         </td><td>Calculation and creation of Today_PVdeviation is done after sunset (default) </td></tr>
-            <tr><td> <b>continuously</b>  </td><td>Calculation and creation of Today_PVdeviation is done continuously           </td></tr>
-         </table>
-         </ul>
-       </li><br>
-
-       <a id="SolarForecast-attr-ctrlInterval"></a>
-       <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
-         Repetition interval of the data collection. <br>
-         If ctrlInterval is explicitly set to “0”, no regular data collection takes place and must be started externally
-         with “get &lt;name&gt; data”. <br>
-         (default: 70)
-         <br><br>
-
-         <b>Note:</b> Regardless of the set interval (even with “0”), data is collected automatically a few seconds
-                      before the end and after the start of a full hour. <br>
-                      Furthermore, data is collected automatically when an event from a device defined as “asynchron”
-                      device (consumer, meter, etc.) is received and processed.
-       </li><br>
-
        <a id="SolarForecast-attr-ctrlLanguage"></a>
        <li><b>ctrlLanguage &lt;DE | EN&gt; </b><br>
          Defines the used language of the device. The language definition has an effect on the module graphics and various
@@ -24513,8 +24493,8 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlUserExitFn"></a>
        <li><b>ctrlUserExitFn {&lt;Code&gt;} </b><br>
-         After each cycle (see the <a href="#SolarForecast-attr-ctrlInterval">ctrlInterval </a> attribute), the code given
-         in this attribute is executed. The code is to be enclosed in curly brackets {...}. <br>
+         After each cycle (see the <a href="#SolarForecast-attr-plantControl">plantControl->cycleInterval </a> attribute), 
+         the code given in this attribute is executed. The code is to be enclosed in curly brackets {...}. <br>
          The code is passed the variables <b>$name</b> and <b>$hash</b>, which contain the name of the SolarForecast
          device and its hash. <br>
          In the SolarForecast Device, readings can be created and modified using the <b>storeReading</b> function.
@@ -24967,10 +24947,23 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>For example, if the value is set to ‘8’, the same weekdays of the past 8 weeks are taken into account.                               </td></tr>
             <tr><td>                                  </td><td>Value: <b>Integer 0..180</b>, default: 60                                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
+            <tr><td> <b>cycleInterval</b>             </td><td>Repetition interval of the data collection in seconds.                                                                               </td></tr>
+			<tr><td>                                  </td><td>If cycleInterval is explicitly set to ‘0’, there is no regular data collection and must be started externally                        </td></tr>
+			<tr><td>                                  </td><td>with ‘get &lt;name&gt; data’.                                                                                                        </td></tr>
+			<tr><td>                                  </td><td>Value: <b>Integer</b>, default: 70                                                                                                   </td></tr>       
+			<tr><td>                                  </td><td><b>Note:</b> Regardless of the interval set (even with ‘0’), data is collected automatically a few seconds before the end            </td></tr>
+			<tr><td>                                  </td><td>and after the start of a full hour. Data is also collected automatically when an event from a device defined                         </td></tr>
+			<tr><td>                                  </td><td>as “asynchronous” (consumer, meter, etc.) is received and processed.                                                                 </td></tr>       
+			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>       
 			<tr><td> <b>feedinPowerLimit</b>          </td><td>Feed-in limit of the entire system into the public grid in watts.                                                                    </td></tr>
             <tr><td>                                  </td><td>SolarForecast does not limit the feed-in, but uses this information                                                                  </td></tr>
             <tr><td>                                  </td><td>within the battery charge management to avoid system curtailment.                                                                    </td></tr>
 			<tr><td>                                  </td><td>Value: <b>Integer</b>, default: unlimited                                                                                            </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
+            <tr><td> <b>genPVdeviation</b>            </td><td>Defines the method for calculating the deviation between forecast and actual PV generation.                                          </td></tr>
+            <tr><td>                                  </td><td>The reading <b>Today_PVdeviation</b> is created depending on this setting.                                                           </td></tr>
+            <tr><td>                                  </td><td><b>daily</b>        - Calculation and creation of Today_PVdeviation takes place after sunset (default)                               </td></tr>
+			<tr><td>                                  </td><td><b>continuously</b> - Calculation and creation of Today_PVdeviation is continuous                                                    </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
 			<tr><td> <b>showLink</b>                  </td><td>Display of a link to the detailed view of the device above the graphics area                                                         </td></tr>
 			<tr><td>                                  </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                                            </td></tr>
@@ -24980,7 +24973,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously
        </ul>
 
        </li>
@@ -25036,7 +25029,7 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td><b>0</b> - no display of the device (default)                                                                 </td></tr>
            <tr><td>                  </td><td><b>1..3[:top|bottom]</b> - display of the device in level 1,2 or 3 (above|below) the bar                      </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
-           <tr><td> <b>asynchron</b> </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                   </td></tr>
+           <tr><td> <b>asynchron</b> </td><td>Data collection mode according to the plantControl->cycleInterval setting (synchronous) or additionally by    </td></tr>
            <tr><td>                  </td><td>event processing (asynchronous).                                                                              </td></tr>
            <tr><td>                  </td><td><b>0</b> - no data collection after receiving an event from the device (default)                              </td></tr>
            <tr><td>                  </td><td><b>1</b> - trigger a data collection when an event is received from the device                                </td></tr>
@@ -25108,7 +25101,7 @@ to ensure that the system configuration is correct.
            <tr><td>                   </td><td><b>&lt;Day&gt;</b> - Icon and optional color for activity after sunrise                                     </td></tr>
            <tr><td>                   </td><td><b>&lt;Night&gt;</b> - Icon and optional color after sunset, otherwise the moon phase is displayed          </td></tr>
            <tr><td>                   </td><td>                                                                                                            </td></tr>
-           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                 </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the plantControl->cycleInterval setting (synchronous) or additionally by  </td></tr>
            <tr><td>                   </td><td>event processing (asynchronous). (optional)                                                                 </td></tr>
            <tr><td>                   </td><td><b>0</b> - no data collection after receiving an event from the device (default)                            </td></tr>
            <tr><td>                   </td><td><b>1</b> - trigger a data collection when an event is received from the device                              </td></tr>
@@ -25179,7 +25172,7 @@ to ensure that the system configuration is correct.
            <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Currency&gt; - Reading of the <b>meter device</b> that contains the remuneration : Currency           </td></tr>
            <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Currency&gt; - any device and reading containing the remuneration : Currency           </td></tr>
            <tr><td>                   </td><td>                                                                                                                          </td></tr>
-           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the ctrlInterval setting (synchronous) or additionally by                               </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the plantControl->cycleInterval setting (synchronous) or additionally by                </td></tr>
            <tr><td>                   </td><td>event processing (asynchronous).                                                                                          </td></tr>
            <tr><td>                   </td><td><b>0</b> - no data collection after receiving an event from the device (default)                                          </td></tr>
            <tr><td>                   </td><td><b>1</b> - trigger a data collection when an event is received from the device                                            </td></tr>
@@ -26867,34 +26860,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-ctrlGenPVdeviation"></a>
-       <li><b>ctrlGenPVdeviation </b><br>
-         Legt die Methode zur Berechnung der Abweichung von prognostizierter und realer PV Erzeugung fest.
-         Das Reading <b>Today_PVdeviation</b> wird in Abhängigkeit dieser Einstellung erstellt. <br><br>
-
-         <ul>
-         <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>daily</b>         </td><td>Berechnung und Erstellung von Today_PVdeviation erfolgt nach Sonnenuntergang (default) </td></tr>
-            <tr><td> <b>continuously</b>  </td><td>Berechnung und Erstellung von Today_PVdeviation erfolgt fortlaufend                    </td></tr>
-         </table>
-         </ul>
-       </li><br>
-
-       <a id="SolarForecast-attr-ctrlInterval"></a>
-       <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
-         Wiederholungsintervall der Datensammlung. <br>
-         Ist ctrlInterval explizit auf "0" gesetzt, erfolgt keine regelmäßige Datensammlung und muss mit
-         "get &lt;name&gt; data" extern gestartet werden. <br>
-         (default: 70)
-         <br><br>
-
-         <b>Hinweis:</b> Unabhängig vom eingestellten Intervall (auch bei "0") erfolgt einige Sekunden vor dem Ende
-                         sowie nach dem Beginn einer vollen Stunde eine automatische Datensammlung. <br>
-                         Weiterhin erfolgt eine automatische Datensammlung wenn ein Event eines als "asynchron"
-                         definierten Gerätes (Consumer, Meter, etc.) empfangen und verarbeitet wird.
-       </li><br>
-
        <a id="SolarForecast-attr-ctrlLanguage"></a>
        <li><b>ctrlLanguage &lt;DE | EN&gt; </b><br>
          Legt die benutzte Sprache des Devices fest. Die Sprachendefinition hat Auswirkungen auf die Modulgrafik und
@@ -26997,8 +26962,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-ctrlUserExitFn"></a>
        <li><b>ctrlUserExitFn {&lt;Code&gt;} </b><br>
-         Nach jedem Zyklus (siehe Attribut <a href="#SolarForecast-attr-ctrlInterval ">ctrlInterval </a>) wird der in diesem
-         Attribut abgegebene Code ausgeführt. Der Code ist in geschweifte Klammern {...} einzuschließen. <br>
+         Nach jedem Zyklus (siehe Attribut <a href="#SolarForecast-attr-plantControl">plantControl->cycleInterval</a>) wird der in 
+         diesem Attribut abgegebene Code ausgeführt. Der Code ist in geschweifte Klammern {...} einzuschließen. <br>
          Dem Code werden die Variablen <b>$name</b> und <b>$hash</b> übergeben, die den Namen des SolarForecast Device und
          dessen Hash enthalten. <br>
          Im SolarForecast Device können Readings über die Funktion <b>storeReading</b> erzeugt und geändert werden.
@@ -27448,10 +27413,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>Zum Beispiel werden dann bei einem gesetzten Wert von '8' die gleichen Wochentage der vergangenen 8 Wochen berücksichtigt.      </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl 0..180</b>, default: 60                                                                                       </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>cycleInterval</b>             </td><td>Wiederholungsintervall der Datensammlung in Sekunden.                                                                           </td></tr>
+			<tr><td>                                  </td><td>Ist cycleInterval explizit auf '0' gesetzt, erfolgt keine regelmäßige Datensammlung und muss mit 'get &lt;name&gt; data'        </td></tr>
+			<tr><td>                                  </td><td>extern gestartet werden.                                                                                                        </td></tr>
+			<tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 70                                                                                              </td></tr>       
+			<tr><td>                                  </td><td><b>Hinweis:</b> Unabhängig vom eingestellten Intervall (auch bei '0') erfolgt einige Sekunden vor dem Ende                      </td></tr>
+			<tr><td>                                  </td><td>sowie nach dem Beginn einer vollen Stunde eine automatische Datensammlung. Weiterhin erfolgt eine automatische Datensammlung    </td></tr>
+			<tr><td>                                  </td><td>wenn ein Event eines als "asynchron" definierten Gerätes (Consumer, Meter, etc.) empfangen und verarbeitet wird.                </td></tr>       
+			<tr><td>                                  </td><td>                                                                                                                                </td></tr>       
             <tr><td> <b>feedinPowerLimit</b>          </td><td>Einspeiselimit der Gesamtanlage in das öffentliche Netz in Watt.                                                                </td></tr>
             <tr><td>                                  </td><td>SolarForecast limitiert die Einspeisung nicht, verwendet diese Angabe jedoch                                                    </td></tr>
             <tr><td>                                  </td><td>innerhalb des Batterie-Lademanagements zur Vermeidung einer Anlagenabregelung.                                                  </td></tr>
 			<tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: unbegrent                                                                                       </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>genPVdeviation</b>            </td><td>Legt die Methode zur Berechnung der Abweichung von prognostizierter und realer PV Erzeugung fest.                               </td></tr>
+            <tr><td>                                  </td><td>Das Reading <b>Today_PVdeviation</b> wird in Abhängigkeit dieser Einstellung erstellt.                                          </td></tr>
+            <tr><td>                                  </td><td><b>daily</b>        - Berechnung und Erstellung von Today_PVdeviation erfolgt nach Sonnenuntergang (default)                    </td></tr>
+			<tr><td>                                  </td><td><b>continuously</b> - Berechnung und Erstellung von Today_PVdeviation erfolgt fortlaufend                                       </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
 			<tr><td> <b>showLink</b>                  </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                         </td></tr>
 			<tr><td>                                  </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                       </td></tr>
@@ -27461,7 +27439,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously
        </ul>
 
        </li>
@@ -27516,8 +27494,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td><b>0</b> - keine Anzeige des Gerätes (default)                                                           </td></tr>
            <tr><td>                  </td><td><b>1..3[:top|bottom]</b> - Anzeige des Gerätes in der Ebene 1,2 oder 3 (über|unter) den Balken           </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
-           <tr><td> <b>asynchron</b> </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch           </td></tr>
-           <tr><td>                  </td><td>Eventverarbeitung (asynchron).                                                                           </td></tr>
+           <tr><td> <b>asynchron</b> </td><td>Modus der Datensammlung entsprechend Einstellung plantControl->cycleInterval (synchron) oder             </td></tr>
+           <tr><td>                  </td><td>zusätzlich durch Eventverarbeitung (asynchron).                                                          </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                           </td></tr>
            <tr><td>                  </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                             </td></tr>
          </table>
@@ -27589,8 +27567,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                   </td><td><b>&lt;Tag&gt;</b> - Icon und ggf. Farbe bei Aktivität nach Sonnenaufgang                                   </td></tr>
            <tr><td>                   </td><td><b>&lt;Nacht&gt;</b> - Icon und ggf. Farbe nach Sonnenuntergang, sonst wird die Mondphase angezeigt         </td></tr>
            <tr><td>                   </td><td>                                                                                                            </td></tr>
-           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch              </td></tr>
-           <tr><td>                   </td><td>Eventverarbeitung (asynchron). (optional)                                                                   </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung plantControl->cycleInterval (synchron) oder                </td></tr>
+           <tr><td>                   </td><td> zusätzlich durch Eventverarbeitung (asynchron). (optional)                                                 </td></tr>
            <tr><td>                   </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                              </td></tr>
            <tr><td>                   </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                                </td></tr>
          </table>
@@ -27661,7 +27639,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                   </td><td>&lt;Reading&gt;:&lt;Währung&gt; - Reading des <b>Meter Device</b> das die Vergütung enthält : Währung                      </td></tr>
            <tr><td>                   </td><td>&lt;Device&gt;:&lt;Reading&gt;:&lt;Währung&gt; - beliebiges Device und Reading welches die Vergütung enthält : Währung     </td></tr>
            <tr><td>                   </td><td>                                                                                                                           </td></tr>
-           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung ctrlInterval (synchron) oder zusätzlich durch                             </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung plantControl->cycleInterval (synchron) oder zusätzlich durch              </td></tr>
            <tr><td>                   </td><td>Eventverarbeitung (asynchron).                                                                                             </td></tr>
            <tr><td>                   </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                                             </td></tr>
            <tr><td>                   </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                                               </td></tr>
