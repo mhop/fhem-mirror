@@ -49,8 +49,8 @@ use Encode;
 use Color;
 use utf8;
 use HttpUtils;
-eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # Debian: sudo apt-get install libjson-perl
-eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval' # Debian: sudo apt-get install libai-decisiontree-perl
+eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # cpan install JSON
+eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval' # cpan install AI::DecisionTree
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                            # Error Code Modul
 use FHEM::SynoModules::SMUtils qw (checkModVer
@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.49.6" => "02.04.2025  some code changes, _flowGraphic: position of home text element, new attr consumerControl->dummyIcon ", 
   "1.49.5" => "29.03.2025  some code changes, Attr affectSolCastPercentile, ctrlSolCastAPIoptimizeReq are obsolete -> SolCast optimze requests is default now ".
                            "attr affectConsForecastIdentWeekdays replaced by plantControl->consForecastIdentWeekdays ".
                            "attr affectConsForecastLastDays replaced by plantControl->consForecastLastDays ".
@@ -472,7 +473,8 @@ use constant {
   STROKWIDTHDEF   => 25,                                                            # Flußgrafik: Standard Breite der Kette
   PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
   CICONDEF        => 'light_light_dim_100',                                         # default Consumer-Icon
-  CICONCOLDEF     => 'darkorange',                                                  # default Consumer-Icon Färbung
+  CICONCOLACT     => 'darkorange',                                                  # default Consumer-Icon aktiv Färbung
+  CICONCOLINACT   => 'grey',                                                        # default Consumer-Icon inaktiv Färbung
   BICONDEF        => 'measure_battery_75',                                          # default Batterie-Icon
   BICCOLRCDDEF    => 'grey',                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
   BICCOLNRCDDEF   => '#cccccc',                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
@@ -558,13 +560,20 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( aiControl 
-                   consumerLegend consumerAdviceIcon consumerLink
+                   consumerControl 
+                   consumerLegend 
+                   consumerAdviceIcon 
+                   consumerLink
                    ctrlConsRecommendReadings 
-                   ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings
+                   ctrlLanguage 
+                   ctrlNextDayForecastReadings 
+                   ctrlNextHoursSoCForecastReadings
                    ctrlSolCastAPImaxReq
-                   ctrlSpecialReadings ctrlUserExitFn
+                   ctrlSpecialReadings 
+                   ctrlUserExitFn
                    disable
-                   flowGraphicControl graphicBeamWidth
+                   flowGraphicControl 
+                   graphicBeamWidth
                    graphicBeamHeightLevel1 graphicBeamHeightLevel2 graphicBeamHeightLevel3
                    graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content graphicBeam5Content graphicBeam6Content
                    graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color graphicBeam5Color graphicBeam6Color
@@ -676,6 +685,7 @@ my %hget = (                                                                # Ha
 
 my %hattr = (                                                                # Hash für Attr-Funktion
   consumer                  => { fn => \&_attrconsumer            },
+  consumerControl           => { fn => \&_attrconsumerControl     },
   ctrlConsRecommendReadings => { fn => \&_attrcreateConsRecRdgs   },
   ctrlSpecialReadings       => { fn => \&_attrcreateSpecialRdgs   },
   ctrlDebug                 => { fn => \&_attrctrlDebug           },
@@ -1519,6 +1529,7 @@ sub Initialize {
   $hash->{AttrList}           = "aiControl:textField-long ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
+                                "consumerControl:textField-long ".
                                 "consumerLink:0,1 ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#10 ".
@@ -6114,6 +6125,54 @@ return;
 }
 
 ################################################################
+#                  Attr consumerControl
+################################################################
+sub _attrconsumerControl {               ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $cmd   = $paref->{cmd};
+  
+  my $valid = {
+      dummyIcon => { comp => '.*', act => 0 },
+  };
+  
+  for my $av (keys %{$valid}) {
+      delete $data{$name}{current}{$av};
+  }
+  
+  my ($a, $h) = parseParams ($aVal);
+
+  if ($cmd eq 'set') {
+      for my $key (keys %{$h}) {
+          my $comp = $valid->{$key}{comp};
+          next if(!$comp);
+
+          if ($h->{$key} =~ /^$comp$/xs) {
+              $data{$name}{current}{$key} = $h->{$key};
+          }
+          else {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
+          }
+      }
+  }
+  
+  for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
+      next if(!$valid->{$akey}{act});
+      
+      $paref->{akey}   = $akey;
+      $paref->{keyval} = $h->{$akey};
+      
+      __attrKeyAction ($paref);
+      
+      delete $paref->{keyval};
+      delete $paref->{akey};
+  }
+
+return;
+}
+
+################################################################
 #               Attr ctrlConsRecommendReadings
 ################################################################
 sub _attrcreateConsRecRdgs {             ## no critic "not used"
@@ -8851,6 +8910,11 @@ sub __delObsoleteAPIData {
       my $refts = timestringToTimestamp ($date.' 00:00:00');                               # Referenztimestring
 
       for my $idx (sort keys %{$data{$name}{solcastapi}}) {                                # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
+          if (!keys %{$data{$name}{solcastapi}{$idx}}) {                                   # leeren Schlüssel löschen
+              delete $data{$name}{solcastapi}{$idx};
+              next;
+          }
+          
           for my $scd (sort keys %{$data{$name}{solcastapi}{$idx}}) {
               my $ds = timestringToTimestamp ($scd);
               delete $data{$name}{solcastapi}{$idx}{$scd} if($ds && $ds < $refts);
@@ -16536,7 +16600,6 @@ END1
 
   if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {               
       $car              = 100 - $car;
-      #my $pahcol        = '#'.substr (Color::pahColor (0, 50, 100, $car, [102,205,0, 050,205,050, 247,203,159, 247,148,111, 255,51,15]), 0, 6);
       my $pahcol        = '#'.__dynColor ($car, 0, 50, 100);                                      # V 1.49.5
       ($hicon, my $col) = split '@', $hicon;
       $hicon            = $hicon.'@'.$pahcol;
@@ -16553,9 +16616,19 @@ END1
   ## Dummy Consumer Icon
   ########################
   if ($flowgconX) {
-      my $dumtxt       = $htitles{dumtxt}{$lang};
-      my $dumcol       = $cc_dummy <= 0 ? '@grey' : q{};                                          # Einfärbung Consumer Dummy
-      my $dicon        = FW_makeImage    (CICONDEF.$dumcol, '');
+      my $dumtxt  = $htitles{dumtxt}{$lang};
+      
+      my ($dicon) = __substituteIcon ( { hash => $hash,                                           # Icon des Consumerdevices
+                                         name => $name,
+                                         pn    => '',
+                                         ptyp  => 'consumerdummy',
+                                         pcurr => $cc_dummy,
+                                         lang  => $lang
+                                       }
+                                     );  
+      
+      
+      $dicon           = FW_makeImage    ($dicon, '');
       ($scale, $dicon) = __normIconScale ($name, $dicon);
 
       $ret .= qq{<g id="dummy_$stna" transform="translate(660,360),scale($scale)">};
@@ -16683,7 +16756,7 @@ END3
 
   ## Textangaben an Grafikelementen
   ###################################
-  $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
+  $cc_dummy = sprintf "%.0f", $cc_dummy;                                                           # Verbrauch Dummy-Consumer
   $bat2home = __normDecPlaces ($bat2home);
   $node2bat = __normDecPlaces ($node2bat);
 
@@ -16694,7 +16767,7 @@ END3
   $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="420"  y="610" style="text-anchor: end;">$cgc</text>}           if ($cgc);
   $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}    if ($bat2home && $hasbat);
   $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="1000" y="420" style="text-anchor: start;">$node2bat</text>}    if ($node2bat && $hasbat);
-  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="750" style="text-anchor: end;">$cc</text>};                                                 # Current_Consumption Anlage
+  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                                 # Current_Consumption Anlage
   $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1380" y="710" style="text-anchor: start;">$cc_dummy</text>}    if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
 
   ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
@@ -16939,14 +17012,19 @@ sub __substituteIcon {
   my $txt = '';
 
   if ($ptyp eq 'consumer') {                                                             # Icon Consumer
-      ($icon, $color) = split '@', ConsumerVal ($hash, $pn, 'icon', CICONDEF);
+      ($icon, $color) = split '@', ConsumerVal ($name, $pn, 'icon', CICONDEF);
 
       if (!$color) {
-          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? CICONCOLDEF : '';
+          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? CICONCOLACT : CICONCOLINACT;
       }
   }
+  elsif ($ptyp eq 'consumerdummy') {                                                     # Icon Dummy Consumer
+      ($icon, $color) = split '@', CurrentVal ($name, 'dummyIcon', CICONDEF);
+      $icon           = CICONDEF if(!$icon);
+      $color          = $pcurr > 0 ? CICONCOLDEF : CICONCOLINACT if(!$color);
+  }
   elsif ($ptyp eq 'battery') {                                                           # Icon Batterie
-      my ($ircmd, $icharge, $idischrg, $inorcmd) = split ':', BatteryVal ($hash, $pn, 'bicon', '');
+      my ($ircmd, $icharge, $idischrg, $inorcmd) = split ':', BatteryVal ($name, $pn, 'bicon', '');
 
       my $soctxt = '';
       my $pretxt = '';
@@ -16996,7 +17074,7 @@ sub __substituteIcon {
           }
       }
 
-      if (defined $pcurr) {                                                              # aktueller Zusatnd
+      if (defined $pcurr) {                                                              # aktueller Zustand
            if ($pcurr > 0) {                                                             # Batterie wird aufgeladen
                ($icon, $color) = split '@', $icharge;
                $icon           = $icon    ? $icon    :
@@ -19340,7 +19418,7 @@ sub _listDataPoolApiData {
   my $h = $data{$name}{solcastapi};
   $h    = $data{$name}{weatherapi}  if($htol eq 'weatherApiData');
   $h    = $data{$name}{statusapi}   if($htol eq 'statusApiData');
-
+  
   if (!keys %{$h}) {
       return qq{The API values cache is empty.};
   }
@@ -19895,7 +19973,7 @@ sub checkPlantConfig {
       if ($aidtabs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
-          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
+          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree".<br>};
           $result->{'Common Settings'}{info}    = 1;
       }
 
@@ -19956,7 +20034,7 @@ sub checkPlantConfig {
       if ($aidtabs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
-          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
+          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree".<br>};
           $result->{'Common Settings'}{info}    = 1;
       }
 
@@ -20026,7 +20104,7 @@ sub checkPlantConfig {
   if ($aidtabs) {
       $result->{'Perl Modules'}{state}   = $info;
       $result->{'Perl Modules'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
-      $result->{'Perl Modules'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
+      $result->{'Perl Modules'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree".<br>};
       $result->{'Perl Modules'}{info}    = 1;
   }
 
@@ -20925,7 +21003,7 @@ sub isPrepared4AI {
       $err = qq(Unfortunately, AI support is not possible with the selected radiation API MODEL.);
   }
   elsif ($aidtabs) {
-      $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
+      $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "cpan install AI::DecisionTree" for AI support);
   }
   elsif ($full && $acu !~ /ai/xs) {
       $err = "Set pvCorrectionFactor_Auto to '<any>_ai' for switch on AI support";
@@ -24035,7 +24113,7 @@ to ensure that the system configuration is correct.
   <ul>
      <ul>
        <a id="SolarForecast-attr-aiControl"></a>
-       <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>aiControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
          By optionally specifying the following key=value pairs, various properties of the AI support can be
          properties of the AI support can be influenced. <br>
 		 AI support for PV forecast autocorrection is activated with the set command
@@ -24084,6 +24162,31 @@ to ensure that the system configuration is correct.
             <tr><td> <b>none</b>                      </td><td>no display of the planning data                                                                             </td></tr>
          </table>
          </ul>
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-consumerControl"></a>
+       <li><b>consumerControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
+         By specifying the 'Key=Value' pairs listed below, various overlapping properties of the consumer display can be set. <br>
+         The entry can be made in several lines.
+         <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+			<tr><td> <b>dummyIcon</b>           </td><td>Icon and, if applicable, its color for displaying the dummy consumer in the flow chart (optional).                      </td></tr>
+		    <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Color&gt;]</b>                                                                           </td></tr>
+			<tr><td>                            </td><td>If only the color of the standard dummy icon is to be changed, only ‘@&lt;color&gt;’ can be specified.                  </td></tr>
+            <tr><td>                            </td><td>The color can be specified as a hex value (e.g. #cc3300) or designation (e.g. red, blue).                               </td></tr>
+            <tr><td>                            </td><td>                                                                                                                        </td></tr>
+         </table>
+         </ul>
+
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; consumerControl dummyIcon=light_light_dim_100@#cc3300
+       </ul>
+
        </li>
        <br>
 
@@ -26504,7 +26607,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
   <ul>
      <ul>
        <a id="SolarForecast-attr-aiControl"></a>
-       <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>aiControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene
          Eigenschaften der KI Unterstützung beeinflusst werden. <br>
 		 Die KI Unterstützung der PV Prognose Autokorrektur wird mit dem Set-Befehl
@@ -26553,6 +26656,32 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>none</b>                      </td><td>keine Anzeige der Planungsdaten                                                                               </td></tr>
          </table>
          </ul>
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-consumerControl"></a>
+       <li><b>consumerControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
+         Durch die Angabe der nachfolgend aufgeführten 'Schlüssel=Wert' Paare können verschiedene
+         übergreifende Eigenschaften der Verbraucherdarstellung eingestellt werden. <br>
+         Die Eingabe kann mehrzeilig erfolgen.
+         <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+			<tr><td> <b>dummyIcon</b>           </td><td>Icon und ggf. dessen Farbe zur Darstellung des Dummy-Verbrauchers in der Flußgrafik (optional)                                  </td></tr>
+		    <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Farbe&gt;]</b>                                                                                   </td></tr>
+			<tr><td>                            </td><td>Soll nur die Farbe des Standard Dummy-Icon geändert werden, kann lediglich '@&lt;Farbe&gt;' angegeben werden.                   </td></tr>
+            <tr><td>                            </td><td>Die Farbe kann als Hex-Wert (z.B. #cc3300) oder Bezeichnung (z.B. red, blue) angegeben werden.                                  </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+         </table>
+         </ul>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; consumerControl dummyIcon=light_light_dim_100@#cc3300
+       </ul>
+
        </li>
        <br>
 
