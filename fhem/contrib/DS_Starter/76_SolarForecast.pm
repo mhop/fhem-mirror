@@ -16595,7 +16595,8 @@ END1
   ## Home Icon
   ##############
   my $car   = CurrentVal  ($name, 'autarkyrate', undef);
-  my $hmtxt = $htitles{autarky}{$lang}.': '.$car.' %';            
+  my $hmtxt = ''; 
+  $hmtxt    = $htitles{autarky}{$lang}.': '.$car.' %' if(defined $car);   
   my $hicon = HOMEICONDEF;  
 
   if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {               
