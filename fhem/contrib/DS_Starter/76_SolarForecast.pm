@@ -17021,7 +17021,7 @@ sub __substituteIcon {
   elsif ($ptyp eq 'consumerdummy') {                                                     # Icon Dummy Consumer
       ($icon, $color) = split '@', CurrentVal ($name, 'dummyIcon', CICONDEF);
       $icon           = CICONDEF if(!$icon);
-      $color          = $pcurr > 0 ? CICONCOLDEF : CICONCOLINACT if(!$color);
+      $color          = $pcurr > 0 ? CICONCOLACT : CICONCOLINACT if(!$color);
   }
   elsif ($ptyp eq 'battery') {                                                           # Icon Batterie
       my ($ircmd, $icharge, $idischrg, $inorcmd) = split ':', BatteryVal ($name, $pn, 'bicon', '');
