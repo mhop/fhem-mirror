@@ -502,6 +502,7 @@ my %EnO_models = (
   "Eltako_FHK14" => {attr => {manufID => "00D"}},
   "Eltako_FHK61" => {attr => {manufID => "00D"}},
   "Eltako_FJ62" => {attr => {manufID => "00D"}},
+  "Eltako_FL62" => {attr => {manufID => "00D"}},
   "Eltako_FRM60" => {attr => {manufID => "00D"}},
   "Eltako_FSA12" => {attr => {manufID => "00D"}},
   "Eltako_FSB14" => {attr => {manufID => "00D"}},
@@ -535,7 +536,7 @@ my %EnO_mscRefID = (
   "000004DD" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0303", attr => {eep => "J5.38.08"}},
   "0000045C" => {model => "Eltako_F4CT55", version => "0101", attr => {eep => "G6.02.01"}},
   "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0100", attr => {eep => "I5.3F.7F"}},
-  "00000484" => {model => "Eltako_FJ62", teachIn => "FFF80D80", version => "0104", attr => {eep => "K5.3F.7F"}},
+  "00000484" => {model => "Eltako_FL62", teachIn => "E0400D80", version => "0104", attr => {eep => "N5.3F.7F"}},
   "000004F8" => {model => "Eltako_FJ62", teachIn => "FFF80D80", version => "0105", attr => {eep => "K5.3F.7F"}}
 );
 
@@ -548,7 +549,7 @@ my %EnO_productID = (
             "000004DD" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0303", attr => {eep => "J5.38.08"}},
             "0000045C" => {model => "Eltako_F4CT55", version => "0101", attr => {eep => "G6.02.01"}},
             "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0100", attr => {eep => "I5.3F.7F"}}},
-            "00000484" => {model => "Eltako_FJ62", teachIn => "FFF80D80", version => "0104", attr => {eep => "K5.3F.7F"}},
+            "00000484" => {model => "Eltako_FL62", teachIn => "E0400D80", version => "0104", attr => {eep => "N5.3F.7F"}},
             "000004F8" => {model => "Eltako_FJ62", teachIn => "FFF80D80", version => "0105", attr => {eep => "K5.3F.7F"}},
   "05C" => {"0000000A" => {model => "Hoppe_eHandle", version => "00", attr => {eep => "D2.06.40", subType =>"multisensor.40"}}}
 );
@@ -19539,13 +19540,13 @@ sub EnOcean_Delete($$) {
      <li>I5-38-08 Gateway, Dimming [Eltako FUD14] secure and confirm teach-in supported<br></li>
      <li>J5-38-08 Gateway, Dimming [Eltako FUD61] secure, confirm and MSC teach-in supported<br></li>
      <li>M5-38-08 Gateway, Switching [Eltako FSR14] old version<br></li>
-     <li>N5-38-08 Gateway, Switching [Eltako TF61L, TF61R, TF100A, TF100L]<br></li>
+     <li>N5-38-08 Gateway, Switching [Eltako TF61L, TF61R, TF100A, TF100L, FL62]<br></li>
      <li>O5-38-08 Gateway, Switching [Eltako FSR14] secure and confirm teach-in supported<br></li>
      <li>P5-38-08 Gateway, Switching [Eltako FSR14M] secure and confirm teach-in supported<br>
      In the second step, the automated meter reading electricity function must be taught in via <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.<br></li>
      <li>K5-38-08 Gateway, Switching [Eltako FSR61] secure and confirm teach-in supported<br></li>
      <li>G5-3F-7F Shutter [Eltako FSB]<br></li>
-     <li>H5-3F-7F Shutter [Eltako TF61J]<br></li>
+     <li>H5-3F-7F Shutter [Eltako TF61J, FJ62]<br></li>
      <li>I5-3F-7F Shutter [Eltako FRM60] - MSC teach-in supported<br></li>
      <li>J5-3F-7F Wireless Analog Input Module [Thermokon SR65 3AI]<br></li>
      <li>K5-3F-7F Shutter [Eltako FJ62] - MSC teach-in supported<br></li>
