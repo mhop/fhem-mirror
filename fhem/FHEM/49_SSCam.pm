@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.8" => "04.04.2025  set verifiedversion to 9.2.3 ",
   "9.12.7" => "27.01.2025  _setsnapGallery: limit getClHash to the calling FHEMWEB Device ",
   "9.12.6" => "17.01.2025  __stopLiveview: fix Warning, set verifiedversion to 9.2.2 ",
   "9.12.5" => "30.12.2024  remove delHashRefDeep ",
@@ -722,7 +723,7 @@ my $defSlim           = 3;                                 # default Anzahl der 
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
 my $sgnum             = '1,2,3,4,5,6,7,8,9,10';            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $sgbdef            = 0;                                 # default value Attr snapGalleryBoost
-my $verifiedversion   = '9.2.2';                           # getestete SVS-Version
+my $verifiedversion   = '9.2.3';                           # getestete SVS-Version
 my $valZoom           = '.++,+,stop,-,--.';                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
 my $todef             = 20;                                # httptimeout default Wert
