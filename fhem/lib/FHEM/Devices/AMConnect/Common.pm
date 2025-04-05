@@ -35,6 +35,7 @@ use Time::Local;
 use DevIo;
 use Storable qw(dclone retrieve store);
 use DateTime;
+use List::Util qw( min );
 my $EMPTY = q{};
 my $missingModul = $EMPTY;
 ## no critic (ProhibitConditionalUseStatements)
@@ -335,16 +336,32 @@ EOF
         hullArea                => 0
       },
       wsbuf                     => {
-        events_changed          => 0,
-        event_duplicates        => 0,
+        sum_changed             => 0,
+        sum_duplicates          => 0,
         'position-event-v2'     => $EMPTY,
         'mower-event-v2'        => $EMPTY,
         'battery-event-v2'      => $EMPTY,
         'planner-event-v2'      => $EMPTY,
         'cuttingHeight-event-v2'=> $EMPTY,
-        'headLights-event-v2'   => $EMPTY,
+        'headlights-event-v2'    => $EMPTY,
         'calendar-event-v2'     => $EMPTY,
-        'message-event-v2'      => $EMPTY
+        'message-event-v2'      => $EMPTY,
+        position_changed        => 0,
+        mower_changed           => 0,
+        battery_changed         => 0,
+        planner_changed         => 0,
+        cuttingHeight_changed   => 0,
+        headlights_changed       => 0,
+        calendar_changed        => 0,
+        message_changed         => 0,
+        position_duplicates     => 0,
+        mower_duplicates        => 0,
+        battery_duplicates      => 0,
+        planner_duplicates      => 0,
+        cuttingHeight_duplicates=> 0,
+        headlights_duplicates    => 0,
+        calendar_duplicates     => 0,
+        message_duplicates      => 0
       }
     }
   );
@@ -2595,9 +2612,17 @@ sub fillReadings {
   readingsBulkUpdateIfChanged( $hash, $pref.'_restrictedReason', $hash->{helper}{mower}{attributes}{$pref}{restrictedReason} );
   readingsBulkUpdateIfChanged( $hash, $pref.'_overrideAction', $hash->{helper}{mower}{attributes}{$pref}{override}{action} ) if ( $hash->{helper}{mower}{attributes}{$pref}{override}{action} );
 
-  $tstamp = $hash->{helper}{mower}{attributes}{$pref}{nextStartTimestamp};
-  $timestamp = FmtDateTimeGMT( $tstamp/1000 );
-  readingsBulkUpdateIfChanged($hash, $pref.'_nextStart', $tstamp ? $timestamp : '-' );
+  if ( AttrVal( $name, 'calculateReadings', $EMPTY ) =~ /nextStart/ ) {
+
+  readingsBulkUpdateIfChanged( $hash, $pref.'_nextStart', calculateNextStart( $hash ) );
+
+  } else {
+
+    $tstamp = $hash->{helper}{mower}{attributes}{$pref}{nextStartTimestamp};
+    $timestamp = FmtDateTimeGMT( $tstamp/1000 );
+    readingsBulkUpdateIfChanged( $hash, $pref.'_nextStart', $tstamp ? $timestamp : '-' );
+
+  }
 
   $pref = 'statistics';
   my $noCol = $hash->{helper}{statistics}{currentDayCollisions};
@@ -2985,6 +3010,22 @@ sub listInternalData { ## no critic (ProhibitExcessComplexity [complexity core m
 
     $ret .= '</tbody></table>';
     $ret .= '<p><table class="block wide">';
+    $ret .= '<caption><b>Websocket Events</b></caption><tbody>';
+
+    $ret .= '<tr class="col_header"><td> Events&emsp;</td><td> Changed&emsp;</td><td> Unchanged&emsp;</td><td> Sum&emsp;</td></tr>';
+    my @evt = qw(battery calendar cuttingHeight headlights message mower planner position sum);
+
+    for my $key (@evt) {
+
+      my $hc = $hash->{helper}{wsbuf}{$key . '_changed'};
+      my $hd = $hash->{helper}{wsbuf}{$key . '_duplicates'};
+      $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> ' . $key . '&emsp;</td><td> ' . $hc . '&emsp;</td><td> ' . $hd . ' </td><td> ' . ( $hc + $hd ) . '&emsp;</td></tr>';
+
+    }
+
+    $ret .= '</tbody></table>';
+
+    $ret .= '<p><table class="block wide">';
     $ret .= '<caption><b>Rest API Data</b></caption><tbody>'; 
 
     $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Link to APIs</td><td><a target="_blank" href="https://developer.husqvarnagroup.cloud/">Husqvarna Developer</a></td></tr>';
@@ -3000,11 +3041,11 @@ sub listInternalData { ## no critic (ProhibitExcessComplexity [complexity core m
     $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Token Expires</td><td> ' . FmtDateTime( ReadingsVal($name, '.expires', '0') ) . '</td></tr>';
     $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td> Access Token</td><td style="word-wrap:break-word; max-width:40em">' . ReadingsVal($name, '.access_token', '0') . '</td></tr>';
 
-$ret .= '</tbody></table>';
+    $ret .= '</tbody></table>';
     $ret .= '<p><table class="block wide">';
     $ret .= '<caption><b>Default mapDesignAttributes</b></caption><tbody>'; 
 
-my $mapdesign = $hash->{helper}{mapdesign};
+    my $mapdesign = $hash->{helper}{mapdesign};
     $mapdesign =~ s/\n/<br>/g;
     $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td style="word-wrap:break-word; max-width:40em">' . $mapdesign . '</td></tr>';
 
@@ -3188,6 +3229,37 @@ sub makeStatusTimeStamp {
 
 }
 
+#########################
+sub calculateNextStart {
+  my ( $hash ) = @_;
+  return "-" if ( $hash->{helper}{mower}{attributes}{mower}{mode} !~ /MAIN_AREA/ ) || $hash->{helper}{mower}{attributes}{mower}{state} =~ /IN_OPERATION/;
+
+  my $nt = gettimeofday();
+  my @lt = gmtime( $nt );
+  my $wday = $lt[ 6 ];
+  my $mn = $nt - ( $lt[ 2 ] * 3600 + $lt[ 1 ] * 60 + $lt[ 0 ] ); # Midnight
+  my @days = qw( sunday monday tuesday wednesday thursday friday saturday sunday monday tuesday wednesday thursday friday saturday );
+  my @cal = @{ $hash->{helper}{mower}{attributes}{calendar}{tasks} };
+  my @times =();
+
+  for ( my $i = 0; $i < @cal; $i++ ) {
+
+    my $calt = $mn + $cal [ $i ]->{start} * 60;
+     
+    for ( my $wd = $lt [ 6 ]; $wd < $lt [ 6 ] + 7 ; $wd++ ) {
+
+      my $nx = $calt + 86400 * ( $wd - $lt [ 6 ] );
+      push @times, $nx if ( $cal [ $i ]->{$days [ $wd ]} && $nx > $nt );
+
+    }
+
+  }
+
+  # my $nextTime = POSIX::strftime( "%F %H:%M:00", localtime( min( @times ) ) );
+  my $nextTime = FmtDateTimeGMT( min( @times ) );
+  return $nextTime;
+}
+
 ##############################################################
 #
 # WEBSOCKET
@@ -3283,13 +3355,18 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
 
     my ( @bufj ) = split('\}\{', $buforig ); # split in case buffer contains more than one event string
 
-    if ( @bufj > 1 ) {
+    if ( @bufj > 1 ) { # complete JSON strings due to splitting
 
-      for ( my $i = 0; $i < @bufj; $i++ ) { # complete JSON strings due to splitting
+      my $i = 0;
+      $bufj[$i] = $bufj[$i].'}';
 
-        $bufj[$i] = $i % 2 ? '{'.$bufj[$i] : $bufj[$i].'}';
+      for ( my $i = 1; $i < @bufj - 1; $i++ ) {
+
+        $bufj[$i] = '{'.$bufj[$i].'}';
 
       }
+
+      $bufj[$i] = '{'.$bufj[$i];
 
     }
 
@@ -3303,7 +3380,7 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
         if ( $buf ne $hash->{helper}{wsbuf}{$evt} ) { # handle changed events
 
           $hash->{helper}{wsbuf}{$evt} = $buf;
-          $hash->{helper}{wsbuf}{events_changed}++ ;
+          $hash->{helper}{wsbuf}{sum_changed}++ ;
           $hash->{helper}{wsbuf}{$evn.'_changed'}++ ;
 
           my $result = eval { JSON::XS->new->decode( $buf ) };
@@ -3413,7 +3490,7 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
               }
 
 # headlights-event-v2
-              elsif ( $result->{type} =~ /^hea/ ) { #no headlight event 430x
+              elsif ( $result->{type} =~ /^hea/ ) { #no headlights event 430x
 
                 $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} = $result->{attributes}{headlight}{mode};
 
@@ -3449,7 +3526,7 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
 
         } else { # handle duplicates
 
-          $hash->{helper}{wsbuf}{event_duplicates}++;
+          $hash->{helper}{wsbuf}{sum_duplicates}++;
           $hash->{helper}{wsbuf}{$evn.'_duplicates'}++ ;
 
         } # end handle duplicates/changed

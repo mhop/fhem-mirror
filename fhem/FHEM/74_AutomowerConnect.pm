@@ -83,6 +83,7 @@ sub Initialize() {
                           'numberOfWayPointsToDisplay ' .
                           'addPollingMinInterval ' .
                           'addPositionPolling:1,0 ' .
+                          'calculateReadings:nextStart ' .
                           $::readingFnAttributes;
 
   $::data{FWEXT}{AutomowerConnect}{SCRIPT} = 'automowerconnect.js';
@@ -485,6 +486,10 @@ __END__
         &emsp;&emsp;}<br>
       }'<br>
       </code></li>
+
+    <li><a id='AutomowerConnect-attr-calculateReadings'>calculateReadings</a><br>
+      <code>attr &lt;name&gt; calculateReadings &lt;nextStart&gt;</code><br>
+      Calcutates nextStart if not provided by planner event.</li>
 
     <li><a id='AutomowerConnect-attr-addPollingMinInterval'>addPollingMinInterval</a><br>
       <code>attr &lt;name&gt; addPollingMinInterval &lt;interval in seconds&gt;</code><br>
@@ -1013,6 +1018,10 @@ __END__
         &emsp;&emsp;}<br>
       }'<br>
       </code></li>
+
+    <li><a id='AutomowerConnect-attr-calculateReadings'>calculateReadings</a><br>
+      <code>attr &lt;name&gt; calculateReadings &lt;nextStart&gt;</code><br>
+      Berechnet nextStart wenn der Wert nicht per Plannerevent geliefert wird.</li>
 
     <li><a id='AutomowerConnect-attr-addPollingMinInterval'>addPollingMinInterval</a><br>
       <code>attr &lt;name&gt; addPollingMinInterval &lt;interval in seconds&gt;</code><br>

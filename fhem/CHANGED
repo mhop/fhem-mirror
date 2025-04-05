@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change:  74_AutomowerConnect: fix ws buffer handling if multiple JSON
+            data sets received, calculate nextStarttime if no planner event
+            add websocket statistics
  - feature: 76_SolarForecast: Major release 1.50.0
  - change:  49_SSCam: set compatible version to 9.2.3
  - feature: 76_SolarForecast: version 1.47.5
