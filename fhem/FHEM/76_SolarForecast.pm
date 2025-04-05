@@ -49,8 +49,8 @@ use Encode;
 use Color;
 use utf8;
 use HttpUtils;
-eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # Debian: sudo apt-get install libjson-perl
-eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval' # Debian: sudo apt-get install libai-decisiontree-perl
+eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # cpan install JSON
+eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval' # cpan install AI::DecisionTree
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                            # Error Code Modul
 use FHEM::SynoModules::SMUtils qw (checkModVer
@@ -160,10 +160,15 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.50.0" => "05.04.2025  changes V 1.49.1 - 1.49.6 as new major release ",
+  "1.49.6" => "05.04.2025  some code changes, _flowGraphic: position of home text element, new attr consumerControl->dummyIcon, _batChargeRecmd: change loading release ".
+                           "attr consumerAdviceIcon replaced by consumerControl->adviceIcon ". 
+                           "attr consumerLegend replaced by consumerControl->showLegend ".                           
+                           "attr consumerLink replaced by consumerControl->detailLink ", 
   "1.49.5" => "29.03.2025  some code changes, Attr affectSolCastPercentile, ctrlSolCastAPIoptimizeReq are obsolete -> SolCast optimze requests is default now ".
                            "attr affectConsForecastIdentWeekdays replaced by plantControl->consForecastIdentWeekdays ".
                            "attr affectConsForecastLastDays replaced by plantControl->consForecastLastDays ".
-                           "attr ctrlInterval replaced by plantControl->cycleInterval".
+                           "attr ctrlInterval replaced by plantControl->cycleInterval ".
                            "attr ctrlGenPVdeviation replaced by plantControl->genPVdeviation ".
                            "setupBatteryDevXX: new keys pinmax, poutmax ",
   "1.49.4" => "28.03.2025  _batChargeRecmd: revert Loading release changes of V 1.49.0, _transferAPIRadiationValues: fix sunalt for next day ".
@@ -472,7 +477,8 @@ use constant {
   STROKWIDTHDEF   => 25,                                                            # Flußgrafik: Standard Breite der Kette
   PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
   CICONDEF        => 'light_light_dim_100',                                         # default Consumer-Icon
-  CICONCOLDEF     => 'darkorange',                                                  # default Consumer-Icon Färbung
+  CICONCOLACT     => 'darkorange',                                                  # default Consumer-Icon aktiv Färbung
+  CICONCOLINACT   => 'grey',                                                        # default Consumer-Icon inaktiv Färbung
   BICONDEF        => 'measure_battery_75',                                          # default Batterie-Icon
   BICCOLRCDDEF    => 'grey',                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
   BICCOLNRCDDEF   => '#cccccc',                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
@@ -558,13 +564,17 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( aiControl 
-                   consumerLegend consumerAdviceIcon consumerLink
+                   consumerControl
                    ctrlConsRecommendReadings 
-                   ctrlLanguage ctrlNextDayForecastReadings ctrlNextHoursSoCForecastReadings
+                   ctrlLanguage 
+                   ctrlNextDayForecastReadings 
+                   ctrlNextHoursSoCForecastReadings
                    ctrlSolCastAPImaxReq
-                   ctrlSpecialReadings ctrlUserExitFn
+                   ctrlSpecialReadings 
+                   ctrlUserExitFn
                    disable
-                   flowGraphicControl graphicBeamWidth
+                   flowGraphicControl 
+                   graphicBeamWidth
                    graphicBeamHeightLevel1 graphicBeamHeightLevel2 graphicBeamHeightLevel3
                    graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content graphicBeam5Content graphicBeam6Content
                    graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color graphicBeam5Color graphicBeam6Color
@@ -676,6 +686,7 @@ my %hget = (                                                                # Ha
 
 my %hattr = (                                                                # Hash für Attr-Funktion
   consumer                  => { fn => \&_attrconsumer            },
+  consumerControl           => { fn => \&_attrconsumerControl     },
   ctrlConsRecommendReadings => { fn => \&_attrcreateConsRecRdgs   },
   ctrlSpecialReadings       => { fn => \&_attrcreateSpecialRdgs   },
   ctrlDebug                 => { fn => \&_attrctrlDebug           },
@@ -1517,9 +1528,7 @@ sub Initialize {
   $hash->{NotifyFn}           = \&Notify;
   $hash->{ReadyFn}            = \&runTask;
   $hash->{AttrList}           = "aiControl:textField-long ".
-                                "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
-                                "consumerAdviceIcon ".
-                                "consumerLink:0,1 ".
+                                "consumerControl:textField-long ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#10 ".
                                 "ctrlLanguage:DE,EN ".
@@ -1575,8 +1584,10 @@ sub Initialize {
   ##########################################################################################################################
   my $av = 'obsolete#-#use#attr#plantControl#instead';
   my $av1 = 'obsolete#-#will#be#deleted#soon';
+  my $av2 = 'obsolete#-#use#attr#consumerControl#instead';
   $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av ctrlBackupFilesKeep:$av affectConsForecastIdentWeekdays:$av affectConsForecastLastDays:$av ctrlInterval:$av ctrlGenPVdeviation:$av";     # 31.03.2025
   $hash->{AttrList} .= " affectSolCastPercentile:$av1 ctrlSolCastAPIoptimizeReq:$av1";           # 29.03.2025
+  $hash->{AttrList} .= " consumerAdviceIcon:$av2 consumerLink:$av2 consumerLegend:$av2";           # 05.04.2025
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -5853,6 +5864,16 @@ sub Attr {
       }
   }
   
+  if ($cmd eq 'set' && $aName =~ /^consumerAdviceIcon|consumerLink|consumerLegend$/) {      # 04.04.2025
+      my $msg  = "The attribute $aName is replaced by 'consumerControl'.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg");
+      }
+      else {
+          return $msg;
+      }
+  }
+  
   if ($cmd eq 'set' && $aName =~ /^affectSolCastPercentile|ctrlSolCastAPIoptimizeReq$/) {      # 29.03.2025
       my $msg1 = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
       my $msg2 = "The attribute $aName is obsolete and will be deleted soon.";
@@ -6105,10 +6126,61 @@ sub _attrconsumer {                      ## no critic "not used"
 
   writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                          # Cache File Consumer schreiben
 
-  $data{$name}{current}{consumerCollected} = 0;                                             # Consumer neu sammeln
+  $data{$name}{current}{consumerCollected} = 0;                                                    # Consumer neu sammeln
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
+
+return;
+}
+
+################################################################
+#                  Attr consumerControl
+################################################################
+sub _attrconsumerControl {               ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+  my $cmd   = $paref->{cmd};
+  
+  my $valid = {
+      adviceIcon => { comp => '.*',                                               act => 0 },
+      detailLink => { comp => '(0|1)',                                            act => 0 },
+      dummyIcon  => { comp => '.*',                                               act => 0 },
+      showLegend => { comp => '(none|icon_top|icon_bottom|text_top|text_bottom)', act => 0 },
+  };
+  
+  for my $av (keys %{$valid}) {
+      delete $data{$name}{current}{$av};
+  }
+  
+  my ($a, $h) = parseParams ($aVal);
+
+  if ($cmd eq 'set') {
+      for my $key (keys %{$h}) {
+          my $comp = $valid->{$key}{comp};
+          next if(!$comp);
+
+          if ($h->{$key} =~ /^$comp$/xs) {
+              $data{$name}{current}{$key} = $h->{$key};
+          }
+          else {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
+          }
+      }
+  }
+  
+  for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
+      next if(!$valid->{$akey}{act});
+      
+      $paref->{akey}   = $akey;
+      $paref->{keyval} = $h->{$akey};
+      
+      __attrKeyAction ($paref);
+      
+      delete $paref->{keyval};
+      delete $paref->{akey};
+  }
 
 return;
 }
@@ -7994,7 +8066,6 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  #delete $data{$name}{circular}{'00'};                                          # 04.02.2025
   readingsDelete    ($hash, '.migrated');                                         # 01.02.25
   
   my $pcb = AttrVal ($name, 'affectBatteryPreferredCharge', undef);               # 22.03.2025 
@@ -8074,6 +8145,36 @@ sub centralTask {
       my $newval = $pc7." genPVdeviation=$cgd";
       CommandAttr (undef, "$name plantControl $newval");
       ::CommandDeleteAttr (undef, "$name ctrlGenPVdeviation"); 
+  }  
+  ######
+  
+  my $cai = AttrVal ($name, 'consumerAdviceIcon', undef);                        # 04.04.2025 
+  my $pc8 = AttrVal ($name, 'consumerControl', '');
+
+  if (defined $cai) {
+      my $newval = $pc8." adviceIcon=$cai";
+      CommandAttr (undef, "$name consumerControl $newval");
+      ::CommandDeleteAttr (undef, "$name consumerAdviceIcon"); 
+  }  
+  ######
+  
+  my $cli = AttrVal ($name, 'consumerLink', undef);                        # 04.04.2025 
+  my $pc9 = AttrVal ($name, 'consumerControl', '');
+
+  if (defined $cli) {
+      my $newval = $pc9." detailLink=$cli";
+      CommandAttr (undef, "$name consumerControl $newval");
+      ::CommandDeleteAttr (undef, "$name consumerLink"); 
+  }  
+  ######
+  
+  my $cle  = AttrVal ($name, 'consumerLegend', undef);                        # 05.04.2025 
+  my $pc10 = AttrVal ($name, 'consumerControl', '');
+
+  if (defined $cle) {
+      my $newval = $pc10." showLegend=$cle";
+      CommandAttr (undef, "$name consumerControl $newval");
+      ::CommandDeleteAttr (undef, "$name consumerLegend"); 
   }  
   ######
   
@@ -8851,6 +8952,11 @@ sub __delObsoleteAPIData {
       my $refts = timestringToTimestamp ($date.' 00:00:00');                               # Referenztimestring
 
       for my $idx (sort keys %{$data{$name}{solcastapi}}) {                                # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
+          if (!keys %{$data{$name}{solcastapi}{$idx}}) {                                   # leeren Schlüssel löschen
+              delete $data{$name}{solcastapi}{$idx};
+              next;
+          }
+          
           for my $scd (sort keys %{$data{$name}{solcastapi}{$idx}}) {
               my $ds = timestringToTimestamp ($scd);
               delete $data{$name}{solcastapi}{$idx}{$scd} if($ds && $ds < $refts);
@@ -9602,7 +9708,7 @@ sub __calcPVestimates {
           my $istrings = InverterVal ($hash, $in, 'istrings', '');                                    # dem Inverter zugeordnete Strings
           next if(!grep /^$string$/, (split ',', $istrings));
 
-          $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                      # Max. Leistung des Inverters
+          $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                   # Max. Leistung des Inverters
       }
 
       if ($debug =~ /radiationProcess/xs) {
@@ -10583,6 +10689,8 @@ sub _batChargeRecmd {
   my $pvCu      = ReadingsNum ($name, 'Current_PV',               0);                            # aktuelle PV Erzeugung
   my $curcon    = ReadingsNum ($name, 'Current_Consumption',      0);                            # aktueller Verbrauch
   my $feedinlim = CurrentVal  ($name, 'feedinPowerLimit', INFINIITY);                            # Einspeiselimit in W
+  my $bpin      = CurrentVal  ($name, 'batpowerinsum',            0);                            # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
+  my $gfeedin   = CurrentVal  ($name, 'gridfeedin',               0);                            # aktuelle Netzeinspeisung
   my $inplim    = 0;
 
   ## Inverter Limits ermitteln
@@ -10607,7 +10715,7 @@ sub _batChargeRecmd {
 
   ## Schleife über alle Batterien
   #################################
-  for my $bn (1..MAXBATTERIES) {                                                                # für jede Batterie
+  for my $bn (1..MAXBATTERIES) {                                                                 # für jede Batterie
       $bn = sprintf "%02d", $bn;
 
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
@@ -10658,7 +10766,6 @@ sub _batChargeRecmd {
           my $confc = NexthoursVal ($hash, 'NextHour'.$nhr, 'confc',      0);
           my $pvfc  = NexthoursVal ($hash, 'NextHour'.$nhr, 'pvfc',       0);
           my $stt   = NexthoursVal ($hash, 'NextHour'.$nhr, 'starttime', '');
-		  #my $nhts  = timestringToTimestamp ($stt) // $t;                                        # Unix Timestamp von NextHours Starttime
           $stt      = (split /[-:]/, $stt)[2] if($stt);
 
           my $crel  = 0;                                                                         # Ladefreigabe 0 per Default
@@ -10696,10 +10803,10 @@ sub _batChargeRecmd {
           ## Ladefreigabe
           #################		  
           if ( $whneed + $sfmargin >= $spday )            {$crel = 1}                            # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-		  #if ( $today && $t >= $maxfctim)                 {$crel = 1}                            # change V 1.49.0: Ladefreigabe wenn akt. Zeit >= Zeit bei max. Tagesertragsertwartung
-          #if ( $today && $nhts >= $maxfctim)              {$crel = 1}                            # change V 1.49.0: Ladefreigabe bei Prognosezeit >= Zeit bei max. Tagesertragsertwartung
 		  if ( !$num && ($pvCu - $curcon) >= $inplim )    {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
-		  if ( !$num && ($pvCu - $curcon) >= $feedinlim ) {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= Einspeiselimit der Anlage
+		  # if ( !$num && ($pvCu - $curcon) >= $feedinlim ) {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= Einspeiselimit der Anlage
+		  if ( !$bpin && $gfeedin > $feedinlim )          {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
+		  if ( $bpin && ($gfeedin - $bpin) > $feedinlim ) {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
           if ( !$cgbt )                                   {$crel = 1}                            # immer Ladefreigabe wenn kein BatSoc-Management
 
           ## SOC-Prognose
@@ -10864,8 +10971,8 @@ sub _createSummaries {
   }
 
   for my $th (1..24) {
-      $todaySumFc->{PV} += HistoryVal ($hash, $day, sprintf("%02d", $th), 'pvfc', 0);
-      $todaySumRe->{PV} += HistoryVal ($hash, $day, sprintf("%02d", $th), 'pvrl', 0);
+      $todaySumFc->{PV} += HistoryVal ($name, $day, sprintf("%02d", $th), 'pvfc', 0);
+      $todaySumRe->{PV} += HistoryVal ($name, $day, sprintf("%02d", $th), 'pvrl', 0);
   }
 
   my $pvre = int $todaySumRe->{PV};
@@ -10873,17 +10980,17 @@ sub _createSummaries {
   push @{$data{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                                # Schieberegister 4h Summe Forecast
   limitArray ($data{$name}{current}{h4fcslidereg}, SLIDENUMMAX);
 
-  my $gcon    = CurrentVal ($hash, 'gridconsumption',         0);                                       # aktueller Netzbezug
-  my $tconsum = CurrentVal ($hash, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
-  my $gfeedin = CurrentVal ($hash, 'gridfeedin',              0);
+  my $gcon    = CurrentVal ($name, 'gridconsumption',         0);                                       # aktueller Netzbezug
+  my $tconsum = CurrentVal ($name, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
+  my $gfeedin = CurrentVal ($name, 'gridfeedin',              0);
 
   my $batin  = 0;
   my $batout = 0;
 
   for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
-      $batin  += BatteryVal ($hash, $bn, 'bpowerin',  0);                                               # Summe momentane Batterieladung
-      $batout += BatteryVal ($hash, $bn, 'bpowerout', 0);                                               # Summe momentane Batterieentladung
+      $batin  += BatteryVal ($name, $bn, 'bpowerin',  0);                                               # Summe momentane Batterieladung
+      $batout += BatteryVal ($name, $bn, 'bpowerout', 0);                                               # Summe momentane Batterieentladung
   }
 
   my $pvgen   = 0;
@@ -10891,8 +10998,8 @@ sub _createSummaries {
 
   for my $in (1..MAXINVERTER) {                                                                         # Summe alle Inverter
       $in      = sprintf "%02d", $in;
-      my $pvi  = InverterVal ($hash, $in, 'igeneration', 0);
-      my $feed = InverterVal ($hash, $in, 'ifeed',      '');
+      my $pvi  = InverterVal ($name, $in, 'igeneration', 0);
+      my $feed = InverterVal ($name, $in, 'ifeed',      '');
       $pvgen   += $pvi;
       $pv2grid += $pvi if($feed eq 'grid');
   }
@@ -13767,9 +13874,6 @@ sub entryGraphic {
       beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
       beam5cont      => AttrVal    ($name, 'graphicBeam5Content',               ''),
       beam6cont      => AttrVal    ($name, 'graphicBeam6Content',               ''),
-      caicon         => AttrVal    ($name, 'consumerAdviceIcon',         CAICONDEF),                # Consumer AdviceIcon
-      clegendpos     => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
-      clink          => AttrVal    ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
       lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
       kw             => AttrVal    ($name, 'graphicEnergyUnit',               'Wh'),
       height         => AttrNum    ($name, 'graphicBeamHeightLevel1',          200),
@@ -13784,6 +13888,9 @@ sub entryGraphic {
       wlalias        => AttrVal    ($name, 'alias',                          $name),
       sheader        => AttrNum    ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
       hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+      clegendpos     => CurrentVal ($name, 'showLegend',                'icon_top'),                # Lage und Art Cunsumer Legende
+      clink          => CurrentVal ($name, 'detailLink',                         1),                # Link zur Detailansicht des Verbrauchers      
+      caicon         => CurrentVal ($name, 'adviceIcon',                 CAICONDEF),                # Consumer AdviceIcon      
       flowgsize      => CurrentVal ($name, 'size',                    FLOWGSIZEDEF),                # Größe Energieflußgrafik
       flowgani       => CurrentVal ($name, 'animate',                            1),                # Animation Energieflußgrafik
       flowgxshift    => CurrentVal ($name, 'shiftx',                             0),                # X-Verschiebung der Flußgrafikbox (muß negiert werden)
@@ -16531,12 +16638,12 @@ END1
   ## Home Icon
   ##############
   my $car   = CurrentVal  ($name, 'autarkyrate', undef);
-  my $hmtxt = $htitles{autarky}{$lang}.': '.$car.' %';            
+  my $hmtxt = ''; 
+  $hmtxt    = $htitles{autarky}{$lang}.': '.$car.' %' if(defined $car);   
   my $hicon = HOMEICONDEF;  
 
   if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {               
       $car              = 100 - $car;
-      #my $pahcol        = '#'.substr (Color::pahColor (0, 50, 100, $car, [102,205,0, 050,205,050, 247,203,159, 247,148,111, 255,51,15]), 0, 6);
       my $pahcol        = '#'.__dynColor ($car, 0, 50, 100);                                      # V 1.49.5
       ($hicon, my $col) = split '@', $hicon;
       $hicon            = $hicon.'@'.$pahcol;
@@ -16553,9 +16660,19 @@ END1
   ## Dummy Consumer Icon
   ########################
   if ($flowgconX) {
-      my $dumtxt       = $htitles{dumtxt}{$lang};
-      my $dumcol       = $cc_dummy <= 0 ? '@grey' : q{};                                          # Einfärbung Consumer Dummy
-      my $dicon        = FW_makeImage    (CICONDEF.$dumcol, '');
+      my $dumtxt  = $htitles{dumtxt}{$lang};
+      
+      my ($dicon) = __substituteIcon ( { hash => $hash,                                           # Icon des Consumerdevices
+                                         name => $name,
+                                         pn    => '',
+                                         ptyp  => 'consumerdummy',
+                                         pcurr => $cc_dummy,
+                                         lang  => $lang
+                                       }
+                                     );  
+      
+      
+      $dicon           = FW_makeImage    ($dicon, '');
       ($scale, $dicon) = __normIconScale ($name, $dicon);
 
       $ret .= qq{<g id="dummy_$stna" transform="translate(660,360),scale($scale)">};
@@ -16683,7 +16800,7 @@ END3
 
   ## Textangaben an Grafikelementen
   ###################################
-  $cc_dummy = sprintf("%.0f", $cc_dummy);                                                         # Verbrauch Dummy-Consumer
+  $cc_dummy = sprintf "%.0f", $cc_dummy;                                                           # Verbrauch Dummy-Consumer
   $bat2home = __normDecPlaces ($bat2home);
   $node2bat = __normDecPlaces ($node2bat);
 
@@ -16694,7 +16811,7 @@ END3
   $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="420"  y="610" style="text-anchor: end;">$cgc</text>}           if ($cgc);
   $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}    if ($bat2home && $hasbat);
   $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="1000" y="420" style="text-anchor: start;">$node2bat</text>}    if ($node2bat && $hasbat);
-  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="750" style="text-anchor: end;">$cc</text>};                                                 # Current_Consumption Anlage
+  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                                 # Current_Consumption Anlage
   $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1380" y="710" style="text-anchor: start;">$cc_dummy</text>}    if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
 
   ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
@@ -16939,14 +17056,19 @@ sub __substituteIcon {
   my $txt = '';
 
   if ($ptyp eq 'consumer') {                                                             # Icon Consumer
-      ($icon, $color) = split '@', ConsumerVal ($hash, $pn, 'icon', CICONDEF);
+      ($icon, $color) = split '@', ConsumerVal ($name, $pn, 'icon', CICONDEF);
 
       if (!$color) {
-          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? CICONCOLDEF : '';
+          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? CICONCOLACT : CICONCOLINACT;
       }
   }
+  elsif ($ptyp eq 'consumerdummy') {                                                     # Icon Dummy Consumer
+      ($icon, $color) = split '@', CurrentVal ($name, 'dummyIcon', CICONDEF);
+      $icon           = CICONDEF if(!$icon);
+      $color          = $pcurr > 0 ? CICONCOLACT : CICONCOLINACT if(!$color);
+  }
   elsif ($ptyp eq 'battery') {                                                           # Icon Batterie
-      my ($ircmd, $icharge, $idischrg, $inorcmd) = split ':', BatteryVal ($hash, $pn, 'bicon', '');
+      my ($ircmd, $icharge, $idischrg, $inorcmd) = split ':', BatteryVal ($name, $pn, 'bicon', '');
 
       my $soctxt = '';
       my $pretxt = '';
@@ -16996,7 +17118,7 @@ sub __substituteIcon {
           }
       }
 
-      if (defined $pcurr) {                                                              # aktueller Zusatnd
+      if (defined $pcurr) {                                                              # aktueller Zustand
            if ($pcurr > 0) {                                                             # Batterie wird aufgeladen
                ($icon, $color) = split '@', $icharge;
                $icon           = $icon    ? $icon    :
@@ -17715,26 +17837,27 @@ sub aiAddInstance {
   for my $idx (sort keys %{$data{$name}{aidectree}{airaw}}) {
       next if(!$idx);
 
-      my $pvrl = AiRawdataVal ($hash, $idx, 'pvrl', undef);
+      my $pvrl = AiRawdataVal ($name, $idx, 'pvrl', undef);
       next if(!defined $pvrl);
 
-      my $hod  = AiRawdataVal ($hash, $idx, 'hod', undef);
+      my $hod  = AiRawdataVal ($name, $idx, 'hod', undef);
       next if(!defined $hod);
 
-      my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
+      my $rad1h = AiRawdataVal ($name, $idx, 'rad1h', 0);
       next if($rad1h <= 0);
 
-      my $temp   = AiRawdataVal ($hash, $idx, 'temp',      undef);
-      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',       undef);
+      my $temp   = AiRawdataVal ($name, $idx, 'temp',      undef);
+      my $wcc    = AiRawdataVal ($name, $idx, 'wcc',       undef);
       my $wid    = AiRawdataVal ($name, $idx, 'weatherid', undef);
-      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c',      undef);
-      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',        0);
+      my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',      undef);
+      my $sunalt = AiRawdataVal ($name, $idx, 'sunalt',        0);
+      my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',         0);
 
       my $tbin   = temp2bin   ($temp)    if(defined $temp);
       my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
       my $sabin  = sunalt2bin ($sunalt);
 
-      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, wid => $wid, rr1c => $rr1c, sunalt => $sunalt, hod => $hod, pvrl => $pvrl };
+      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, wid => $wid, rr1c => $rr1c, sunalt => $sunalt, sunaz => $sunaz, hod => $hod, pvrl => $pvrl };
   }
 
   if (!scalar @pvhdata) {
@@ -17750,7 +17873,7 @@ sub aiAddInstance {
   my $numtrees = CurrentVal ($name, 'aiTreesPV', AINUMTREES);
 
   for my $tn (1 .. $numtrees) {                                                 # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
-      my @sampled       = sample_data (\@pvhdata);
+      my @sampled       = aiSampleData (\@pvhdata);
       my ($err, $dtree) = aiInit ($paref);
 
       if ($err) {
@@ -17775,6 +17898,7 @@ sub aiAddInstance {
                                                        wid    => $instance->{wid},
                                                        rr1c   => $instance->{rr1c},
                                                        sunalt => $instance->{sunalt},
+                                                       # sunaz  => $instance->{sunaz},
                                                        hod    => $instance->{hod}
                                                      },
                                                      result => $instance->{pvrl}
@@ -17795,6 +17919,7 @@ sub aiAddInstance {
           debugLog ($paref, 'aiProcess', "AI Instance added Tree $tn - ".
                                          "hod: $instance->{hod}, ".
                                          "sunalt: $instance->{sunalt}, ".
+                                         "sunaz: $instance->{sunaz}, ".
                                          "rad1h: $instance->{rad1h}, pvrl: instance->{pvrl}, ".
                                          "wcc: ".(defined $instance->{wcc}   ? $instance->{wcc}  : '-').", ".
                                          "wid: ".(defined $instance->{wid}   ? $instance->{wid}  : '-').", ".
@@ -18023,7 +18148,7 @@ sub aiGetResult {
       wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sabin,
-      sunaz  => $sunaz,
+      # sunaz  => $sunaz,
       hod    => $hod
   };
 
@@ -18129,7 +18254,7 @@ sub _aiGetSpread {
       wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sunalt,
-      sunaz  => $sunaz,
+      # sunaz  => $sunaz,
       hod    => $hod
   };
 
@@ -18360,7 +18485,7 @@ return $ridx;
 ################################################################
 #     Hilfsfunktion zum Erstellen einer Stichprobe
 ################################################################
-sub sample_data {
+sub aiSampleData {
   my $data        = shift;
   my @shuffled    = shuffle @$data;
   my $sample_size = int (scalar (@$data) * 0.8);
@@ -19340,7 +19465,7 @@ sub _listDataPoolApiData {
   my $h = $data{$name}{solcastapi};
   $h    = $data{$name}{weatherapi}  if($htol eq 'weatherApiData');
   $h    = $data{$name}{statusapi}   if($htol eq 'statusApiData');
-
+  
   if (!keys %{$h}) {
       return qq{The API values cache is empty.};
   }
@@ -19895,7 +20020,7 @@ sub checkPlantConfig {
       if ($aidtabs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
-          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
+          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree".<br>};
           $result->{'Common Settings'}{info}    = 1;
       }
 
@@ -19956,7 +20081,7 @@ sub checkPlantConfig {
       if ($aidtabs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
-          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
+          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree".<br>};
           $result->{'Common Settings'}{info}    = 1;
       }
 
@@ -20026,7 +20151,7 @@ sub checkPlantConfig {
   if ($aidtabs) {
       $result->{'Perl Modules'}{state}   = $info;
       $result->{'Perl Modules'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
-      $result->{'Perl Modules'}{note}   .= qq{If you want use AI support, please install it with e.g. "sudo apt-get install libai-decisiontree-perl".<br>};
+      $result->{'Perl Modules'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree".<br>};
       $result->{'Perl Modules'}{info}    = 1;
   }
 
@@ -20925,7 +21050,7 @@ sub isPrepared4AI {
       $err = qq(Unfortunately, AI support is not possible with the selected radiation API MODEL.);
   }
   elsif ($aidtabs) {
-      $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "sudo apt-get install libai-decisiontree-perl" for AI support);
+      $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "cpan install AI::DecisionTree" for AI support);
   }
   elsif ($full && $acu !~ /ai/xs) {
       $err = "Set pvCorrectionFactor_Auto to '<any>_ai' for switch on AI support";
@@ -24035,7 +24160,7 @@ to ensure that the system configuration is correct.
   <ul>
      <ul>
        <a id="SolarForecast-attr-aiControl"></a>
-       <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>aiControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
          By optionally specifying the following key=value pairs, various properties of the AI support can be
          properties of the AI support can be influenced. <br>
 		 AI support for PV forecast autocorrection is activated with the set command
@@ -24070,36 +24195,43 @@ to ensure that the system configuration is correct.
 
        </li>
        <br>
-
-       <a id="SolarForecast-attr-consumerAdviceIcon"></a>
-       <li><b>consumerAdviceIcon </b><br>
-         Defines the type of information about the planned switching times of a consumer in the consumer legend.
+       
+       <a id="SolarForecast-attr-consumerControl"></a>
+       <li><b>consumerControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
+         By specifying the 'Key=Value' pairs listed below, various overlapping properties of the consumer display can be set. <br>
+         The entry can be made in several lines.
          <br><br>
+
          <ul>
          <table>
-         <colgroup> <col width="18%"> <col width="82%"> </colgroup>
-            <tr><td> <b>&lt;Icon&gt@&lt;Colour&gt</b> </td><td>Activation recommendation is represented by icon and colour (optional) (default: clock@gold)                </td></tr>
-            <tr><td>                                  </td><td>(the planning data is displayed as mouse-over text)                                                         </td></tr>
-            <tr><td> <b>times</b>                     </td><td>the planning status and the planned switching times are displayed as text                                   </td></tr>
-            <tr><td> <b>none</b>                      </td><td>no display of the planning data                                                                             </td></tr>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+			<tr><td> <b>adviceIcon</b>          </td><td>Defines the type of information about the planned switching times of a consumer in the consumer legend.                 </td></tr>
+		    <tr><td>                            </td><td><b>&lt;Icon&gt[@&lt;Color]&gt</b> - Activation recommendation is displayed by icon and color (default: clock@gold)      </td></tr>
+			<tr><td>                            </td><td><b>times</b> - the planning status and the planned switching times are displayed as text                                </td></tr>
+			<tr><td>                            </td><td><b>none</b>  - no display of planning data                                                                              </td></tr>
+            <tr><td>                            </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>detailLink</b>          </td><td>If set, the devices can be clicked on in the consumer legend to open the detailed view of the device.                   </td></tr>
+		    <tr><td>                            </td><td>Value: <b>0|1</b>, default: 1                                                                                           </td></tr>
+            <tr><td>                            </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>dummyIcon</b>           </td><td>Icon and, if applicable, its color for displaying the dummy consumer in the flow chart (optional).                      </td></tr>
+		    <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Color&gt;]</b>                                                                           </td></tr>
+			<tr><td>                            </td><td>If only the color of the standard dummy icon is to be changed, only ‘@&lt;color&gt;’ can be specified.                  </td></tr>
+            <tr><td>                            </td><td>The color can be specified as a hex value (e.g. #cc3300) or designation (e.g. red, blue).                               </td></tr>
+            <tr><td>                            </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showLegend</b>          </td><td>Defines the position or display method of the consumer legend if consumers are registered.                              </td></tr>
+		    <tr><td>                            </td><td><b>none</b> - the legend is hidden                                                                                      </td></tr>
+			<tr><td>                            </td><td><b>icon_top</b> - the legend is displayed above the bar chart with consumer icons (default)                             </td></tr>
+			<tr><td>                            </td><td><b>icon_bottom</b> - the legend is displayed below the bar and flow chart with consumer icons                           </td></tr>
+			<tr><td>                            </td><td><b>text_top</b> - the legend is displayed above the bar chart without consumer icons                                    </td></tr>
+			<tr><td>                            </td><td><b>text_bottom</b> - the legend is displayed below the bar chart and flow chart without consumer icons                  </td></tr>
          </table>
          </ul>
-       </li>
-       <br>
 
-       <a id="SolarForecast-attr-consumerLegend"></a>
-       <li><b>consumerLegend </b><br>
-         Defines the position or display mode of the load legend if loads are registered in the SolarForecast Device.
-         <br>
-         (default: icon_top)
-       </li>
-       <br>
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; consumerControl dummyIcon=status_comfort@#ff8c00 adviceIcon=times showLegend=icon_bottom
+       </ul>
 
-       <a id="SolarForecast-attr-consumerLink"></a>
-       <li><b>consumerLink </b><br>
-         If set, you can click on the respective consumer in the consumer list (consumerLegend) and get
-         directly to the detailed view of the respective device on a new browser page. <br>
-         (default: 1)
        </li>
        <br>
 
@@ -26504,7 +26636,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
   <ul>
      <ul>
        <a id="SolarForecast-attr-aiControl"></a>
-       <li><b>aiControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>aiControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene
          Eigenschaften der KI Unterstützung beeinflusst werden. <br>
 		 Die KI Unterstützung der PV Prognose Autokorrektur wird mit dem Set-Befehl
@@ -26539,36 +26671,45 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        </li>
        <br>
-
-       <a id="SolarForecast-attr-consumerAdviceIcon"></a>
-       <li><b>consumerAdviceIcon </b><br>
-         Definiert die Art der Information über die geplanten Schaltzeiten eines Verbrauchers in der Verbraucherlegende.
+       
+       <a id="SolarForecast-attr-consumerControl"></a>
+       <li><b>consumerControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
+         Durch die Angabe der nachfolgend aufgeführten 'Schlüssel=Wert' Paare können verschiedene
+         übergreifende Eigenschaften der Verbraucherdarstellung eingestellt werden. <br>
+         Die Eingabe kann mehrzeilig erfolgen.
          <br><br>
+
          <ul>
          <table>
-         <colgroup> <col width="18%"> <col width="82%"> </colgroup>
-            <tr><td> <b>&lt;Icon&gt@&lt;Farbe&gt</b>  </td><td>Aktivierungsempfehlung wird durch Icon und Farbe (optional) dargestellt (default: clock@gold)                 </td></tr>
-            <tr><td>                                  </td><td>(die Planungsdaten werden als Mouse-Over Text angezeigt)                                                      </td></tr>
-            <tr><td> <b>times</b>                     </td><td>es werden der Planungsstatus und die geplanten Schaltzeiten als Text angezeigt                                </td></tr>
-            <tr><td> <b>none</b>                      </td><td>keine Anzeige der Planungsdaten                                                                               </td></tr>
-         </table>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+			<tr><td> <b>adviceIcon</b>          </td><td>Definiert die Art der Information über die geplanten Schaltzeiten eines Verbrauchers in der Verbraucherlegende.                 </td></tr>
+		    <tr><td>                            </td><td><b>&lt;Icon&gt[@&lt;Farbe]&gt</b> - Aktivierungsempfehlung wird durch Icon und Farbe dargestellt (default: clock@gold)          </td></tr>
+			<tr><td>                            </td><td><b>times</b> - der Planungsstatus und die geplanten Schaltzeiten werden als Text angezeigt                                      </td></tr>
+			<tr><td>                            </td><td><b>none</b>  - keine Anzeige der Planungsdaten                                                                                  </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+			<tr><td> <b>detailLink</b>          </td><td>Wenn gesetzt, sind die Geräte in der Verbraucher-Legende anklickbar um die Detailansicht des Gerätes zu öffnen.                 </td></tr>
+		    <tr><td>                            </td><td>Wert: <b>0|1</b>, default: 1                                                                                                    </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+			<tr><td> <b>dummyIcon</b>           </td><td>Icon und ggf. dessen Farbe zur Darstellung des Dummy-Verbrauchers in der Flußgrafik (optional)                                  </td></tr>
+		    <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Farbe&gt;]</b>                                                                                   </td></tr>
+			<tr><td>                            </td><td>Soll nur die Farbe des Standard Dummy-Icon geändert werden, kann lediglich '@&lt;Farbe&gt;' angegeben werden.                   </td></tr>
+            <tr><td>                            </td><td>Die Farbe kann als Hex-Wert (z.B. #cc3300) oder Bezeichnung (z.B. red, blue) angegeben werden.                                  </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+			<tr><td> <b>showLegend</b>          </td><td>Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher registriert sind.                           </td></tr>
+		    <tr><td>                            </td><td><b>none</b> - die Legende wird ausgeblendet                                                                                     </td></tr>
+			<tr><td>                            </td><td><b>icon_top</b> - die Legende wird oberhalb der Balkengrafik mit Verbrauchericons angezeigt (default)                           </td></tr>
+			<tr><td>                            </td><td><b>icon_bottom</b> - die Legende wird unterhalb der Balken- und Flußgrafik mit Verbrauchericons angezeigt                       </td></tr>
+			<tr><td>                            </td><td><b>text_top</b> - die Legende wird oberhalb der Balkengrafik ohne Verbrauchericons angezeigt                                    </td></tr>
+			<tr><td>                            </td><td><b>text_bottom</b> - die Legende wird unterhalb der Balken- und Flußgrafik ohne Verbrauchericons angezeigt                      </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+          </table>
          </ul>
-       </li>
-       <br>
 
-       <a id="SolarForecast-attr-consumerLegend"></a>
-       <li><b>consumerLegend </b><br>
-         Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher im SolarForecast Device
-         registriert sind. <br>
-         (default: icon_top)
-       </li>
-       <br>
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; consumerControl dummyIcon=status_comfort@#ff8c00 adviceIcon=times showLegend=icon_bottom
+       </ul>
 
-       <a id="SolarForecast-attr-consumerLink"></a>
-       <li><b>consumerLink </b><br>
-         Wenn gesetzt, kann man in der Verbraucher-Liste (consumerLegend) die jeweiligen Verbraucher anklicken und gelangt
-         direkt zur Detailansicht des jeweiligen Geräts auf einer neuen Browserseite. <br>
-         (default: 1)
        </li>
        <br>
 
