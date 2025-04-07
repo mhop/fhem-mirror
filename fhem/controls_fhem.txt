@@ -1,4 +1,4 @@
-REV 29826
+REV 29829
 DIR unused
 UPD 2025-04-06_07:45:03 443250 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -767,8 +767,8 @@ UPD 2025-04-06_07:45:09 5286593 docs/commandref.html
 UPD 2025-04-06_07:45:13 3315422 docs/commandref_DE.html
 UPD 2024-10-27_07:45:03 86474 docs/commandref_frame.html
 UPD 2024-10-27_07:45:03 97208 docs/commandref_frame_DE.html
-UPD 2025-04-06_07:45:14 319868 docs/commandref_modular.html
-UPD 2025-04-06_07:45:15 331780 docs/commandref_modular_DE.html
+UPD 2025-04-07_07:45:14 319868 docs/commandref_modular.html
+UPD 2025-04-07_07:45:16 331780 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1839,6 +1839,7 @@ UPD 2021-09-12_07:45:03 6428 www/images/fhemSVG/tablet_wifi.svg
 UPD 2019-02-14_07:45:03 1160 www/images/fhemSVG/tag_label.svg
 UPD 2015-07-28_14:05:32 1342 www/images/fhemSVG/taster.svg
 UPD 2015-07-28_14:05:32 2211 www/images/fhemSVG/taster_ch.svg
+UPD 2025-04-07_07:45:03 2557 www/images/fhemSVG/taster_ch6.svg
 UPD 2015-07-28_14:05:32 2828 www/images/fhemSVG/taster_ch6_1.svg
 UPD 2015-07-28_14:05:32 2828 www/images/fhemSVG/taster_ch6_2.svg
 UPD 2015-07-28_14:05:32 2819 www/images/fhemSVG/taster_ch6_3.svg
@@ -1846,7 +1847,7 @@ UPD 2015-07-28_14:05:32 2828 www/images/fhemSVG/taster_ch6_4.svg
 UPD 2015-07-28_14:05:32 2828 www/images/fhemSVG/taster_ch6_5.svg
 UPD 2015-07-28_14:05:32 2828 www/images/fhemSVG/taster_ch6_6.svg
 UPD 2015-07-28_14:05:32 4133 www/images/fhemSVG/taster_ch_1.svg
-UPD 2017-11-14_07:45:02 2877 www/images/fhemSVG/taster_ch_2.svg
+UPD 2025-04-07_07:45:03 2865 www/images/fhemSVG/taster_ch_2.svg
 UPD 2015-07-28_14:05:32 2693 www/images/fhemSVG/taster_ch_an_gruen.svg
 UPD 2015-07-28_14:05:32 4548 www/images/fhemSVG/taster_ch_aus_rot.svg
 UPD 2019-02-14_07:45:03 807 www/images/fhemSVG/telegram.svg
