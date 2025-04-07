@@ -160,11 +160,17 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.49.6" => "02.04.2025  some code changes, _flowGraphic: position of home text element, new attr consumerControl->dummyIcon ", 
+  "1.50.1" => "07.04.2025  new pvCorrectionFactor_Auto option 'on_complex_api_ai' to use average of AI + API forecast if AI Hit ".
+                           "some code changes ",
+  "1.50.0" => "05.04.2025  changes V 1.49.1 - 1.49.6 as new major release ",
+  "1.49.6" => "05.04.2025  some code changes, _flowGraphic: position of home text element, new attr consumerControl->dummyIcon, _batChargeRecmd: change loading release ".
+                           "attr consumerAdviceIcon replaced by consumerControl->adviceIcon ". 
+                           "attr consumerLegend replaced by consumerControl->showLegend ".                           
+                           "attr consumerLink replaced by consumerControl->detailLink ", 
   "1.49.5" => "29.03.2025  some code changes, Attr affectSolCastPercentile, ctrlSolCastAPIoptimizeReq are obsolete -> SolCast optimze requests is default now ".
                            "attr affectConsForecastIdentWeekdays replaced by plantControl->consForecastIdentWeekdays ".
                            "attr affectConsForecastLastDays replaced by plantControl->consForecastLastDays ".
-                           "attr ctrlInterval replaced by plantControl->cycleInterval".
+                           "attr ctrlInterval replaced by plantControl->cycleInterval ".
                            "attr ctrlGenPVdeviation replaced by plantControl->genPVdeviation ".
                            "setupBatteryDevXX: new keys pinmax, poutmax ",
   "1.49.4" => "28.03.2025  _batChargeRecmd: revert Loading release changes of V 1.49.0, _transferAPIRadiationValues: fix sunalt for next day ".
@@ -422,8 +428,8 @@ use constant {
   AISPREADLOWLIM => 80,                                                             # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
   AIACCUPLIM     => 150,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-  AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
-  AISPREADTRNMIN => 5500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
+  AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
+  AISPREADTRNMIN => 5500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Spreaded"
 
   SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
   FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
@@ -560,10 +566,7 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                  );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( aiControl 
-                   consumerControl 
-                   consumerLegend 
-                   consumerAdviceIcon 
-                   consumerLink
+                   consumerControl
                    ctrlConsRecommendReadings 
                    ctrlLanguage 
                    ctrlNextDayForecastReadings 
@@ -1527,10 +1530,7 @@ sub Initialize {
   $hash->{NotifyFn}           = \&Notify;
   $hash->{ReadyFn}            = \&runTask;
   $hash->{AttrList}           = "aiControl:textField-long ".
-                                "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
-                                "consumerAdviceIcon ".
                                 "consumerControl:textField-long ".
-                                "consumerLink:0,1 ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm,#10 ".
                                 "ctrlLanguage:DE,EN ".
@@ -1586,8 +1586,10 @@ sub Initialize {
   ##########################################################################################################################
   my $av = 'obsolete#-#use#attr#plantControl#instead';
   my $av1 = 'obsolete#-#will#be#deleted#soon';
+  my $av2 = 'obsolete#-#use#attr#consumerControl#instead';
   $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av ctrlBackupFilesKeep:$av affectConsForecastIdentWeekdays:$av affectConsForecastLastDays:$av ctrlInterval:$av ctrlGenPVdeviation:$av";     # 31.03.2025
   $hash->{AttrList} .= " affectSolCastPercentile:$av1 ctrlSolCastAPIoptimizeReq:$av1";           # 29.03.2025
+  $hash->{AttrList} .= " consumerAdviceIcon:$av2 consumerLink:$av2 consumerLegend:$av2";           # 05.04.2025
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -1673,11 +1675,13 @@ sub Set {
                roofIdentPair
                pvHistory
              );
-  my $resets = join ",",@re;
+             
+  my $resets = join ",", @re;
 
   for my $h (@chours) {
       push @cfs, 'pvCorrectionFactor_'. sprintf("%02d",$h);
   }
+  
   $cf = join " ", @cfs;
 
   for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {
@@ -1709,7 +1713,7 @@ sub Set {
              "operationMode:active,inactive ".
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
-             "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,' : ',')."off ".
+             "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,on_complex_api_ai,' : ',')."off ".
              "reset:$resets ".
              "setupStringAzimuth ".
              "setupStringDeclination ".
@@ -4225,22 +4229,21 @@ sub __getopenMeteoData {
   my $debug = $paref->{debug};
   my $reqm  = $paref->{reqm};
 
-  my $hash    = $defs{$name};
-  my $donearq = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
-
-  if ($donearq >= OMETMAXREQ) {
-      my $msg = "The limit of maximum OMETMAXREQ daily API requests is reached or already exceeded. Process is exited.";
-      Log3 ($name, 1, "$name - ERROR - $msg");
-      return $msg;
-  }
-
   if (!$force) {                                                                                      # regulärer API Abruf
-      my $lrt = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'lastretrieval_timestamp', 0);
+      my $lrt = StatusAPIVal ($name, 'OpenMeteo', '?All', 'lastretrieval_timestamp', 0);
 
       if ($lrt && $t < $lrt + OMETEOREPDEF) {
           my $rt = $lrt + OMETEOREPDEF - $t;
           return qq{The waiting time to the next Open-Meteo API call has not expired yet. The remaining waiting time is $rt seconds};
       }
+  }
+
+  my $donearq = StatusAPIVal ($name, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
+
+  if ($donearq >= OMETMAXREQ) {
+      my $msg = "The limit of maximum ".OMETMAXREQ." daily API requests is reached or already exceeded. Process is exited.";
+      Log3 ($name, 1, "$name - ERROR - $msg");
+      return $msg;
   }
 
   debugLog ($paref, 'apiCall', "Open-Meteo API Call - the daily API requests -> limited to: ".OMETMAXREQ.", done: $donearq");
@@ -4276,7 +4279,7 @@ sub __getopenMeteoGHIreplace {
   my $donearq = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
 
   if ($donearq >= OMETMAXREQ) {
-      my $msg = "The limit of maximum OMETMAXREQ daily API requests is reached or already exceeded. Process is exited.";
+      my $msg = "The limit of maximum ".OMETMAXREQ." daily API requests is reached or already exceeded. Process is exited.";
       Log3 ($name, 1, "$name - ERROR - $msg");
       return $msg;
   }
@@ -5864,6 +5867,16 @@ sub Attr {
       }
   }
   
+  if ($cmd eq 'set' && $aName =~ /^consumerAdviceIcon|consumerLink|consumerLegend$/) {      # 04.04.2025
+      my $msg  = "The attribute $aName is replaced by 'consumerControl'.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg");
+      }
+      else {
+          return $msg;
+      }
+  }
+  
   if ($cmd eq 'set' && $aName =~ /^affectSolCastPercentile|ctrlSolCastAPIoptimizeReq$/) {      # 29.03.2025
       my $msg1 = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
       my $msg2 = "The attribute $aName is obsolete and will be deleted soon.";
@@ -6116,7 +6129,7 @@ sub _attrconsumer {                      ## no critic "not used"
 
   writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                          # Cache File Consumer schreiben
 
-  $data{$name}{current}{consumerCollected} = 0;                                             # Consumer neu sammeln
+  $data{$name}{current}{consumerCollected} = 0;                                                    # Consumer neu sammeln
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
@@ -6134,7 +6147,10 @@ sub _attrconsumerControl {               ## no critic "not used"
   my $cmd   = $paref->{cmd};
   
   my $valid = {
-      dummyIcon => { comp => '.*', act => 0 },
+      adviceIcon => { comp => '.*',                                               act => 0 },
+      detailLink => { comp => '(0|1)',                                            act => 0 },
+      dummyIcon  => { comp => '.*',                                               act => 0 },
+      showLegend => { comp => '(none|icon_top|icon_bottom|text_top|text_bottom)', act => 0 },
   };
   
   for my $av (keys %{$valid}) {
@@ -8053,7 +8069,6 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  #delete $data{$name}{circular}{'00'};                                          # 04.02.2025
   readingsDelete    ($hash, '.migrated');                                         # 01.02.25
   
   my $pcb = AttrVal ($name, 'affectBatteryPreferredCharge', undef);               # 22.03.2025 
@@ -8133,6 +8148,36 @@ sub centralTask {
       my $newval = $pc7." genPVdeviation=$cgd";
       CommandAttr (undef, "$name plantControl $newval");
       ::CommandDeleteAttr (undef, "$name ctrlGenPVdeviation"); 
+  }  
+  ######
+  
+  my $cai = AttrVal ($name, 'consumerAdviceIcon', undef);                        # 04.04.2025 
+  my $pc8 = AttrVal ($name, 'consumerControl', '');
+
+  if (defined $cai) {
+      my $newval = $pc8." adviceIcon=$cai";
+      CommandAttr (undef, "$name consumerControl $newval");
+      ::CommandDeleteAttr (undef, "$name consumerAdviceIcon"); 
+  }  
+  ######
+  
+  my $cli = AttrVal ($name, 'consumerLink', undef);                        # 04.04.2025 
+  my $pc9 = AttrVal ($name, 'consumerControl', '');
+
+  if (defined $cli) {
+      my $newval = $pc9." detailLink=$cli";
+      CommandAttr (undef, "$name consumerControl $newval");
+      ::CommandDeleteAttr (undef, "$name consumerLink"); 
+  }  
+  ######
+  
+  my $cle  = AttrVal ($name, 'consumerLegend', undef);                        # 05.04.2025 
+  my $pc10 = AttrVal ($name, 'consumerControl', '');
+
+  if (defined $cle) {
+      my $newval = $pc10." showLegend=$cle";
+      CommandAttr (undef, "$name consumerControl $newval");
+      ::CommandDeleteAttr (undef, "$name consumerLegend"); 
   }  
   ######
   
@@ -9418,9 +9463,12 @@ sub _transferAPIRadiationValues {
   my @strings = sort keys %{$data{$name}{strings}};
   return if(!@strings);
 
-  my $invcapsum = 0;
+  my $invcapsum   = 0;
+  my ($acu, $aln) = isAutoCorrUsed ($name);
+  my $dbmsg       = '';
+  
   for my $in (keys %{$data{$name}{inverters}}) {
-      $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                            # Limit Leistungssumme aller Inverters
+      $invcapsum += InverterVal ($name, $in, 'invertercap', 0);                                            # Limit Leistungssumme aller Inverters
   }
 
   for my $num (0..47) {
@@ -9437,7 +9485,7 @@ sub _transferAPIRadiationValues {
       my $nhtstr           = 'NextHour'.sprintf "%02d", $num;
       my ($wtday, $wthour) = $wantdt =~ /(\d{2})\s(\d{2}):/xs;
       my $hod              = sprintf "%02d", int $wthour + 1;                                              # Stunde des Tages
-      my $rad1h            = RadiationAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
+      my $rad1h            = RadiationAPIVal ($name, '?All', $wantdt, 'Rad1h', undef);
 
       $paref->{wantdt} = $wantdt;
       $paref->{wantts} = $wantts;
@@ -9456,13 +9504,13 @@ sub _transferAPIRadiationValues {
       my ($sunalt, $sunaz);
 	  
 	  if ($fd == 0) {                                                                                      # V 1.49.4 für den aktuellen Tag
-		  $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
-		  $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
+		  $sunalt = HistoryVal ($name, $wtday, $hod, 'sunalt', undef);
+		  $sunaz  = HistoryVal ($name, $wtday, $hod, 'sunaz',  undef);
 		  
 		  if (!defined $sunalt || !defined $sunaz) {
 			  __calcSunPosition ($paref);
-			  $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
-			  $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
+			  $sunalt = HistoryVal ($name, $wtday, $hod, 'sunalt', undef);
+			  $sunaz  = HistoryVal ($name, $wtday, $hod, 'sunaz',  undef);
 		  }
 	  }
 		  
@@ -9472,16 +9520,14 @@ sub _transferAPIRadiationValues {
       }
       else {
 		  __calcSunPosition ($paref);
-		  $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt', 0);
-          $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',  0);
+		  $sunalt = NexthoursVal ($name, $nhtstr, 'sunalt', 0);
+          $sunaz  = NexthoursVal ($name, $nhtstr, 'sunaz',  0);
       }
 
       $paref->{sabin}    = sunalt2bin ($sunalt);
-      my $pvest          = __calcPVestimates ($paref);
-      my ($msg, $pvaifc) = aiGetResult ($paref);                                              # KI Entscheidungen abfragen
+      my $pvapifc        = __calcPVestimates ($paref);
+      my ($msg, $pvaifc) = aiGetResult ($paref);                                                        # KI Entscheidungen abfragen
       
-      $data{$name}{nexthours}{$nhtstr}{pvapifc} = $pvest;                                     # durch API gelieferte PV Forecast
-
       delete $paref->{fd};
       delete $paref->{fh1};
       delete $paref->{num};
@@ -9502,26 +9548,42 @@ sub _transferAPIRadiationValues {
               debugLog ($paref, "radiationProcess", "PV AI forecast start time $wantdt limited to $invcapsum Wh due to inverter capacity summary");
           }
           
-          my $airn  = CircularVal ($hash, 99, 'aiRulesNumber', 0) / CurrentVal ($name, 'aiTreesPV', AINUMTREES);
-          my $aivar = 100;
-          $aivar    = sprintf "%.0f", (100 * $pvaifc / $pvest) if($pvest);                              # Übereinstimmungsgrad KI Forecast zu API Forecast in %
+          my $airn  = CircularVal ($name, 99, 'aiRulesNumber', 0) / CurrentVal ($name, 'aiTreesPV', AINUMTREES);
+          my $aivar = 0;
+          $aivar    = sprintf "%.0f", (100 * $pvaifc / $pvapifc) if($pvapifc);                          # Übereinstimmungsgrad KI Forecast zu API Forecast in %
 
           if ($msg eq 'accurate') {                                                                     # KI liefert 'accurate' Treffer -> verwenden
               if ($airn >= AIACCTRNMIN || ($aivar >= AIACCLOWLIM && $aivar <= AIACCUPLIM)) {
                   $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
-                  $pvfc  = $pvaifc;
                   $useai = 1;
+                  
+                  if ($acu =~ /api_ai/xs) {
+                      $pvfc  = $pvapifc ? (sprintf "%.0f", ($pvaifc + $pvapifc) / 2) : $pvaifc;         # Durchschnitt AI und API verwenden
+                      $dbmsg = 'average of accurate AI & API result used';
+                  }
+                  else {
+                      $pvfc  = $pvaifc;
+                      $dbmsg = 'accurate result used';
+                  }
 
-                  debugLog ($paref, 'aiData', qq{AI Hit - accurate result used -> aiRulesNum: $airn, variance: $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
+                  debugLog ($paref, 'aiData', qq{AI Hit - $dbmsg -> aiRulesNum: $airn, variance: $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
               }
           }
           elsif ($msg eq 'spreaded') {                                                                  # Abweichung AI von Standardvorhersage begrenzen
               if ($airn >= AISPREADTRNMIN || ($aivar >= AISPREADLOWLIM && $aivar <= AISPREADUPLIM)) {
                   $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
-                  $pvfc  = $pvaifc;
                   $useai = 1;
+                  
+                  if ($acu =~ /api_ai/xs) {
+                      $pvfc  = $pvapifc ? (sprintf "%.0f", ($pvaifc + $pvapifc) / 2) : $pvaifc;         # Durchschnitt AI und API verwenden
+                      $dbmsg = 'average of spreaded AI & API result used';
+                  }
+                  else {
+                      $pvfc  = $pvaifc;
+                      $dbmsg = 'spreaded result used';
+                  }
 
-                  debugLog ($paref, 'aiData', qq{AI Hit - spreaded result used -> aiRulesNum: $airn, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
+                  debugLog ($paref, 'aiData', qq{AI Hit - $dbmsg -> aiRulesNum: $airn, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
               }
           }
       }
@@ -9535,18 +9597,19 @@ sub _transferAPIRadiationValues {
       else {
           delete $data{$name}{nexthours}{$nhtstr}{pvaifc};
           $data{$name}{nexthours}{$nhtstr}{aihit} = 0;
-          $pvfc = $pvest;
+          $pvfc = $pvapifc;
 
           debugLog ($paref, 'aiData', "use PV from API (no AI or AI result tolerance overflow) -> hod: $hod, Rad1h: ".(defined $rad1h ? $rad1h : '-').", pvfc: $pvfc Wh");
       }
 
-      $data{$name}{nexthours}{$nhtstr}{pvfc} = $pvfc;                                          # resultierende PV Forecast zuweisen
+      $data{$name}{nexthours}{$nhtstr}{pvapifc} = $pvapifc;                                    # durch API gelieferte PV Forecast
+      $data{$name}{nexthours}{$nhtstr}{pvfc}    = $pvfc;                                       # resultierende PV Forecast zuweisen
 
       if ($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-          $data{$name}{circular}{sprintf "%02d",$fh1}{pvapifc} = NexthoursVal ($hash, $nhtstr, 'pvapifc', undef);
+          $data{$name}{circular}{sprintf "%02d",$fh1}{pvapifc} = NexthoursVal ($name, $nhtstr, 'pvapifc', undef);
           $data{$name}{circular}{sprintf "%02d",$fh1}{pvfc}    = $pvfc;
-          $data{$name}{circular}{sprintf "%02d",$fh1}{pvaifc}  = NexthoursVal ($hash, $nhtstr, 'pvaifc',  undef);
-          $data{$name}{circular}{sprintf "%02d",$fh1}{aihit}   = NexthoursVal ($hash, $nhtstr, 'aihit',       0);
+          $data{$name}{circular}{sprintf "%02d",$fh1}{pvaifc}  = NexthoursVal ($name, $nhtstr, 'pvaifc',  undef);
+          $data{$name}{circular}{sprintf "%02d",$fh1}{aihit}   = NexthoursVal ($name, $nhtstr, 'aihit',       0);
       }
 
       if ($fd == 0 && int $pvfc > 0) {                                                         # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
@@ -9666,7 +9729,7 @@ sub __calcPVestimates {
           my $istrings = InverterVal ($hash, $in, 'istrings', '');                                    # dem Inverter zugeordnete Strings
           next if(!grep /^$string$/, (split ',', $istrings));
 
-          $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                      # Max. Leistung des Inverters
+          $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                   # Max. Leistung des Inverters
       }
 
       if ($debug =~ /radiationProcess/xs) {
@@ -10647,6 +10710,8 @@ sub _batChargeRecmd {
   my $pvCu      = ReadingsNum ($name, 'Current_PV',               0);                            # aktuelle PV Erzeugung
   my $curcon    = ReadingsNum ($name, 'Current_Consumption',      0);                            # aktueller Verbrauch
   my $feedinlim = CurrentVal  ($name, 'feedinPowerLimit', INFINIITY);                            # Einspeiselimit in W
+  my $bpin      = CurrentVal  ($name, 'batpowerinsum',            0);                            # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
+  my $gfeedin   = CurrentVal  ($name, 'gridfeedin',               0);                            # aktuelle Netzeinspeisung
   my $inplim    = 0;
 
   ## Inverter Limits ermitteln
@@ -10671,7 +10736,7 @@ sub _batChargeRecmd {
 
   ## Schleife über alle Batterien
   #################################
-  for my $bn (1..MAXBATTERIES) {                                                                # für jede Batterie
+  for my $bn (1..MAXBATTERIES) {                                                                 # für jede Batterie
       $bn = sprintf "%02d", $bn;
 
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
@@ -10722,7 +10787,6 @@ sub _batChargeRecmd {
           my $confc = NexthoursVal ($hash, 'NextHour'.$nhr, 'confc',      0);
           my $pvfc  = NexthoursVal ($hash, 'NextHour'.$nhr, 'pvfc',       0);
           my $stt   = NexthoursVal ($hash, 'NextHour'.$nhr, 'starttime', '');
-		  #my $nhts  = timestringToTimestamp ($stt) // $t;                                        # Unix Timestamp von NextHours Starttime
           $stt      = (split /[-:]/, $stt)[2] if($stt);
 
           my $crel  = 0;                                                                         # Ladefreigabe 0 per Default
@@ -10760,10 +10824,10 @@ sub _batChargeRecmd {
           ## Ladefreigabe
           #################		  
           if ( $whneed + $sfmargin >= $spday )            {$crel = 1}                            # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-		  #if ( $today && $t >= $maxfctim)                 {$crel = 1}                            # change V 1.49.0: Ladefreigabe wenn akt. Zeit >= Zeit bei max. Tagesertragsertwartung
-          #if ( $today && $nhts >= $maxfctim)              {$crel = 1}                            # change V 1.49.0: Ladefreigabe bei Prognosezeit >= Zeit bei max. Tagesertragsertwartung
 		  if ( !$num && ($pvCu - $curcon) >= $inplim )    {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
-		  if ( !$num && ($pvCu - $curcon) >= $feedinlim ) {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= Einspeiselimit der Anlage
+		  # if ( !$num && ($pvCu - $curcon) >= $feedinlim ) {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= Einspeiselimit der Anlage
+		  if ( !$bpin && $gfeedin > $feedinlim )          {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
+		  if ( $bpin && ($gfeedin - $bpin) > $feedinlim ) {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
           if ( !$cgbt )                                   {$crel = 1}                            # immer Ladefreigabe wenn kein BatSoc-Management
 
           ## SOC-Prognose
@@ -10928,8 +10992,8 @@ sub _createSummaries {
   }
 
   for my $th (1..24) {
-      $todaySumFc->{PV} += HistoryVal ($hash, $day, sprintf("%02d", $th), 'pvfc', 0);
-      $todaySumRe->{PV} += HistoryVal ($hash, $day, sprintf("%02d", $th), 'pvrl', 0);
+      $todaySumFc->{PV} += HistoryVal ($name, $day, sprintf("%02d", $th), 'pvfc', 0);
+      $todaySumRe->{PV} += HistoryVal ($name, $day, sprintf("%02d", $th), 'pvrl', 0);
   }
 
   my $pvre = int $todaySumRe->{PV};
@@ -10937,17 +11001,17 @@ sub _createSummaries {
   push @{$data{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                                # Schieberegister 4h Summe Forecast
   limitArray ($data{$name}{current}{h4fcslidereg}, SLIDENUMMAX);
 
-  my $gcon    = CurrentVal ($hash, 'gridconsumption',         0);                                       # aktueller Netzbezug
-  my $tconsum = CurrentVal ($hash, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
-  my $gfeedin = CurrentVal ($hash, 'gridfeedin',              0);
+  my $gcon    = CurrentVal ($name, 'gridconsumption',         0);                                       # aktueller Netzbezug
+  my $tconsum = CurrentVal ($name, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
+  my $gfeedin = CurrentVal ($name, 'gridfeedin',              0);
 
   my $batin  = 0;
   my $batout = 0;
 
   for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
-      $batin  += BatteryVal ($hash, $bn, 'bpowerin',  0);                                               # Summe momentane Batterieladung
-      $batout += BatteryVal ($hash, $bn, 'bpowerout', 0);                                               # Summe momentane Batterieentladung
+      $batin  += BatteryVal ($name, $bn, 'bpowerin',  0);                                               # Summe momentane Batterieladung
+      $batout += BatteryVal ($name, $bn, 'bpowerout', 0);                                               # Summe momentane Batterieentladung
   }
 
   my $pvgen   = 0;
@@ -10955,8 +11019,8 @@ sub _createSummaries {
 
   for my $in (1..MAXINVERTER) {                                                                         # Summe alle Inverter
       $in      = sprintf "%02d", $in;
-      my $pvi  = InverterVal ($hash, $in, 'igeneration', 0);
-      my $feed = InverterVal ($hash, $in, 'ifeed',      '');
+      my $pvi  = InverterVal ($name, $in, 'igeneration', 0);
+      my $feed = InverterVal ($name, $in, 'ifeed',      '');
       $pvgen   += $pvi;
       $pv2grid += $pvi if($feed eq 'grid');
   }
@@ -13831,9 +13895,6 @@ sub entryGraphic {
       beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
       beam5cont      => AttrVal    ($name, 'graphicBeam5Content',               ''),
       beam6cont      => AttrVal    ($name, 'graphicBeam6Content',               ''),
-      caicon         => AttrVal    ($name, 'consumerAdviceIcon',         CAICONDEF),                # Consumer AdviceIcon
-      clegendpos     => AttrVal    ($name, 'consumerLegend',            'icon_top'),                # Lage und Art Cunsumer Legende
-      clink          => AttrVal    ($name, 'consumerLink'  ,                     1),                # Detail-Link zum Verbraucher
       lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
       kw             => AttrVal    ($name, 'graphicEnergyUnit',               'Wh'),
       height         => AttrNum    ($name, 'graphicBeamHeightLevel1',          200),
@@ -13848,6 +13909,9 @@ sub entryGraphic {
       wlalias        => AttrVal    ($name, 'alias',                          $name),
       sheader        => AttrNum    ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
       hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+      clegendpos     => CurrentVal ($name, 'showLegend',                'icon_top'),                # Lage und Art Cunsumer Legende
+      clink          => CurrentVal ($name, 'detailLink',                         1),                # Link zur Detailansicht des Verbrauchers      
+      caicon         => CurrentVal ($name, 'adviceIcon',                 CAICONDEF),                # Consumer AdviceIcon      
       flowgsize      => CurrentVal ($name, 'size',                    FLOWGSIZEDEF),                # Größe Energieflußgrafik
       flowgani       => CurrentVal ($name, 'animate',                            1),                # Animation Energieflußgrafik
       flowgxshift    => CurrentVal ($name, 'shiftx',                             0),                # X-Verschiebung der Flußgrafikbox (muß negiert werden)
@@ -17794,26 +17858,27 @@ sub aiAddInstance {
   for my $idx (sort keys %{$data{$name}{aidectree}{airaw}}) {
       next if(!$idx);
 
-      my $pvrl = AiRawdataVal ($hash, $idx, 'pvrl', undef);
+      my $pvrl = AiRawdataVal ($name, $idx, 'pvrl', undef);
       next if(!defined $pvrl);
 
-      my $hod  = AiRawdataVal ($hash, $idx, 'hod', undef);
+      my $hod  = AiRawdataVal ($name, $idx, 'hod', undef);
       next if(!defined $hod);
 
-      my $rad1h = AiRawdataVal ($hash, $idx, 'rad1h', 0);
+      my $rad1h = AiRawdataVal ($name, $idx, 'rad1h', 0);
       next if($rad1h <= 0);
 
-      my $temp   = AiRawdataVal ($hash, $idx, 'temp',      undef);
-      my $wcc    = AiRawdataVal ($hash, $idx, 'wcc',       undef);
+      my $temp   = AiRawdataVal ($name, $idx, 'temp',      undef);
+      my $wcc    = AiRawdataVal ($name, $idx, 'wcc',       undef);
       my $wid    = AiRawdataVal ($name, $idx, 'weatherid', undef);
-      my $rr1c   = AiRawdataVal ($hash, $idx, 'rr1c',      undef);
-      my $sunalt = AiRawdataVal ($hash, $idx, 'sunalt',        0);
+      my $rr1c   = AiRawdataVal ($name, $idx, 'rr1c',      undef);
+      my $sunalt = AiRawdataVal ($name, $idx, 'sunalt',        0);
+      my $sunaz  = AiRawdataVal ($name, $idx, 'sunaz',         0);
 
       my $tbin   = temp2bin   ($temp)    if(defined $temp);
       my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
       my $sabin  = sunalt2bin ($sunalt);
 
-      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, wid => $wid, rr1c => $rr1c, sunalt => $sunalt, hod => $hod, pvrl => $pvrl };
+      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, wid => $wid, rr1c => $rr1c, sunalt => $sunalt, sunaz => $sunaz, hod => $hod, pvrl => $pvrl };
   }
 
   if (!scalar @pvhdata) {
@@ -17829,7 +17894,7 @@ sub aiAddInstance {
   my $numtrees = CurrentVal ($name, 'aiTreesPV', AINUMTREES);
 
   for my $tn (1 .. $numtrees) {                                                 # Trainiere mehrere Entscheidungsbäume auf unterschiedlichen Stichproben
-      my @sampled       = sample_data (\@pvhdata);
+      my @sampled       = aiSampleData (\@pvhdata);
       my ($err, $dtree) = aiInit ($paref);
 
       if ($err) {
@@ -17854,6 +17919,7 @@ sub aiAddInstance {
                                                        wid    => $instance->{wid},
                                                        rr1c   => $instance->{rr1c},
                                                        sunalt => $instance->{sunalt},
+                                                       # sunaz  => $instance->{sunaz},
                                                        hod    => $instance->{hod}
                                                      },
                                                      result => $instance->{pvrl}
@@ -17874,6 +17940,7 @@ sub aiAddInstance {
           debugLog ($paref, 'aiProcess', "AI Instance added Tree $tn - ".
                                          "hod: $instance->{hod}, ".
                                          "sunalt: $instance->{sunalt}, ".
+                                         "sunaz: $instance->{sunaz}, ".
                                          "rad1h: $instance->{rad1h}, pvrl: instance->{pvrl}, ".
                                          "wcc: ".(defined $instance->{wcc}   ? $instance->{wcc}  : '-').", ".
                                          "wid: ".(defined $instance->{wid}   ? $instance->{wid}  : '-').", ".
@@ -18102,7 +18169,7 @@ sub aiGetResult {
       wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sabin,
-      sunaz  => $sunaz,
+      # sunaz  => $sunaz,
       hod    => $hod
   };
 
@@ -18208,7 +18275,7 @@ sub _aiGetSpread {
       wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sunalt,
-      sunaz  => $sunaz,
+      # sunaz  => $sunaz,
       hod    => $hod
   };
 
@@ -18439,7 +18506,7 @@ return $ridx;
 ################################################################
 #     Hilfsfunktion zum Erstellen einer Stichprobe
 ################################################################
-sub sample_data {
+sub aiSampleData {
   my $data        = shift;
   my @shuffled    = shuffle @$data;
   my $sample_size = int (scalar (@$data) * 0.8);
@@ -21545,12 +21612,13 @@ sub isAutoCorrUsed {
 
   my $cauto = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
 
-  my $acu = $cauto =~ /on_simple_ai/xs  ? 'on_simple_ai'  :
-            $cauto =~ /on_simple/xs     ? 'on_simple'     :
-            $cauto =~ /on_complex_ai/xs ? 'on_complex_ai' :
-            $cauto =~ /on_complex/xs    ? 'on_complex'    :
-            $cauto =~ /standby/xs       ? 'standby'       :
-            $cauto =~ /on/xs            ? 'on_simple'     :
+  my $acu = $cauto =~ /on_simple_ai/xs      ? 'on_simple_ai'      :
+            $cauto =~ /on_simple/xs         ? 'on_simple'         :
+            $cauto =~ /on_complex_ai/xs     ? 'on_complex_ai'     :
+            $cauto =~ /on_complex_api_ai/xs ? 'on_complex_api_ai' :
+            $cauto =~ /on_complex/xs        ? 'on_complex'        :
+            $cauto =~ /standby/xs           ? 'standby'           :
+            $cauto =~ /on/xs                ? 'on_simple'         :
             q{};
 
   my $aln = $cauto =~ /noLearning/xs ? 0 : 1;
@@ -23460,6 +23528,11 @@ to ensure that the system configuration is correct.
       <b>Note:</b> The automatic prediction correction is learning and needs time to optimise the correction values.
       After activation, optimal predictions cannot be expected immediately!
       <br><br>
+      
+      <b>on_complex_api_ai:</b> <br>
+      The method works in the same way as 'on_complex_ai', but the PV forecast value used is calculated by averaging the supplied 
+      API value and the AI value.
+      <br><br>
 
       Below are some API-specific tips that are merely best practice recommendations.
       <br><br>
@@ -24149,22 +24222,6 @@ to ensure that the system configuration is correct.
 
        </li>
        <br>
-
-       <a id="SolarForecast-attr-consumerAdviceIcon"></a>
-       <li><b>consumerAdviceIcon </b><br>
-         Defines the type of information about the planned switching times of a consumer in the consumer legend.
-         <br><br>
-         <ul>
-         <table>
-         <colgroup> <col width="18%"> <col width="82%"> </colgroup>
-            <tr><td> <b>&lt;Icon&gt@&lt;Colour&gt</b> </td><td>Activation recommendation is represented by icon and colour (optional) (default: clock@gold)                </td></tr>
-            <tr><td>                                  </td><td>(the planning data is displayed as mouse-over text)                                                         </td></tr>
-            <tr><td> <b>times</b>                     </td><td>the planning status and the planned switching times are displayed as text                                   </td></tr>
-            <tr><td> <b>none</b>                      </td><td>no display of the planning data                                                                             </td></tr>
-         </table>
-         </ul>
-       </li>
-       <br>
        
        <a id="SolarForecast-attr-consumerControl"></a>
        <li><b>consumerControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
@@ -24175,35 +24232,33 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+			<tr><td> <b>adviceIcon</b>          </td><td>Defines the type of information about the planned switching times of a consumer in the consumer legend.                 </td></tr>
+		    <tr><td>                            </td><td><b>&lt;Icon&gt[@&lt;Color]&gt</b> - Activation recommendation is displayed by icon and color (default: clock@gold)      </td></tr>
+			<tr><td>                            </td><td><b>times</b> - the planning status and the planned switching times are displayed as text                                </td></tr>
+			<tr><td>                            </td><td><b>none</b>  - no display of planning data                                                                              </td></tr>
+            <tr><td>                            </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>detailLink</b>          </td><td>If set, the devices can be clicked on in the consumer legend to open the detailed view of the device.                   </td></tr>
+		    <tr><td>                            </td><td>Value: <b>0|1</b>, default: 1                                                                                           </td></tr>
+            <tr><td>                            </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>dummyIcon</b>           </td><td>Icon and, if applicable, its color for displaying the dummy consumer in the flow chart (optional).                      </td></tr>
 		    <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Color&gt;]</b>                                                                           </td></tr>
 			<tr><td>                            </td><td>If only the color of the standard dummy icon is to be changed, only ‘@&lt;color&gt;’ can be specified.                  </td></tr>
             <tr><td>                            </td><td>The color can be specified as a hex value (e.g. #cc3300) or designation (e.g. red, blue).                               </td></tr>
             <tr><td>                            </td><td>                                                                                                                        </td></tr>
+			<tr><td> <b>showLegend</b>          </td><td>Defines the position or display method of the consumer legend if consumers are registered.                              </td></tr>
+		    <tr><td>                            </td><td><b>none</b> - the legend is hidden                                                                                      </td></tr>
+			<tr><td>                            </td><td><b>icon_top</b> - the legend is displayed above the bar chart with consumer icons (default)                             </td></tr>
+			<tr><td>                            </td><td><b>icon_bottom</b> - the legend is displayed below the bar and flow chart with consumer icons                           </td></tr>
+			<tr><td>                            </td><td><b>text_top</b> - the legend is displayed above the bar chart without consumer icons                                    </td></tr>
+			<tr><td>                            </td><td><b>text_bottom</b> - the legend is displayed below the bar chart and flow chart without consumer icons                  </td></tr>
          </table>
          </ul>
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; consumerControl dummyIcon=light_light_dim_100@#cc3300
+         attr &lt;name&gt; consumerControl dummyIcon=status_comfort@#ff8c00 adviceIcon=times showLegend=icon_bottom
        </ul>
 
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-consumerLegend"></a>
-       <li><b>consumerLegend </b><br>
-         Defines the position or display mode of the load legend if loads are registered in the SolarForecast Device.
-         <br>
-         (default: icon_top)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-consumerLink"></a>
-       <li><b>consumerLink </b><br>
-         If set, you can click on the respective consumer in the consumer list (consumerLegend) and get
-         directly to the detailed view of the respective device on a new browser page. <br>
-         (default: 1)
        </li>
        <br>
 
@@ -25955,6 +26010,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <b>Hinweis:</b> Die automatische Vorhersagekorrektur ist lernend und benötigt Zeit um die Korrekturwerte zu optimieren.
       Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten!
       <br><br>
+      
+      <b>on_complex_api_ai:</b> <br>
+      Die Methode arbeitet wie 'on_complex_ai', jedoch wird der verwendete PV-Prognosewert durch eine Durchschnittsberechnung 
+	  von gelieferten API-Wert und KI-Wert gebildet.
+      <br><br>
 
       Nachfolgend einige API-spezifische Hinweise die lediglich Best Practice Empfehlungen darstellen.
       <br><br>
@@ -26643,22 +26703,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        </li>
        <br>
-
-       <a id="SolarForecast-attr-consumerAdviceIcon"></a>
-       <li><b>consumerAdviceIcon </b><br>
-         Definiert die Art der Information über die geplanten Schaltzeiten eines Verbrauchers in der Verbraucherlegende.
-         <br><br>
-         <ul>
-         <table>
-         <colgroup> <col width="18%"> <col width="82%"> </colgroup>
-            <tr><td> <b>&lt;Icon&gt@&lt;Farbe&gt</b>  </td><td>Aktivierungsempfehlung wird durch Icon und Farbe (optional) dargestellt (default: clock@gold)                 </td></tr>
-            <tr><td>                                  </td><td>(die Planungsdaten werden als Mouse-Over Text angezeigt)                                                      </td></tr>
-            <tr><td> <b>times</b>                     </td><td>es werden der Planungsstatus und die geplanten Schaltzeiten als Text angezeigt                                </td></tr>
-            <tr><td> <b>none</b>                      </td><td>keine Anzeige der Planungsdaten                                                                               </td></tr>
-         </table>
-         </ul>
-       </li>
-       <br>
        
        <a id="SolarForecast-attr-consumerControl"></a>
        <li><b>consumerControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
@@ -26670,35 +26714,34 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+			<tr><td> <b>adviceIcon</b>          </td><td>Definiert die Art der Information über die geplanten Schaltzeiten eines Verbrauchers in der Verbraucherlegende.                 </td></tr>
+		    <tr><td>                            </td><td><b>&lt;Icon&gt[@&lt;Farbe]&gt</b> - Aktivierungsempfehlung wird durch Icon und Farbe dargestellt (default: clock@gold)          </td></tr>
+			<tr><td>                            </td><td><b>times</b> - der Planungsstatus und die geplanten Schaltzeiten werden als Text angezeigt                                      </td></tr>
+			<tr><td>                            </td><td><b>none</b>  - keine Anzeige der Planungsdaten                                                                                  </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+			<tr><td> <b>detailLink</b>          </td><td>Wenn gesetzt, sind die Geräte in der Verbraucher-Legende anklickbar um die Detailansicht des Gerätes zu öffnen.                 </td></tr>
+		    <tr><td>                            </td><td>Wert: <b>0|1</b>, default: 1                                                                                                    </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
 			<tr><td> <b>dummyIcon</b>           </td><td>Icon und ggf. dessen Farbe zur Darstellung des Dummy-Verbrauchers in der Flußgrafik (optional)                                  </td></tr>
 		    <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Farbe&gt;]</b>                                                                                   </td></tr>
 			<tr><td>                            </td><td>Soll nur die Farbe des Standard Dummy-Icon geändert werden, kann lediglich '@&lt;Farbe&gt;' angegeben werden.                   </td></tr>
             <tr><td>                            </td><td>Die Farbe kann als Hex-Wert (z.B. #cc3300) oder Bezeichnung (z.B. red, blue) angegeben werden.                                  </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
-         </table>
+			<tr><td> <b>showLegend</b>          </td><td>Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher registriert sind.                           </td></tr>
+		    <tr><td>                            </td><td><b>none</b> - die Legende wird ausgeblendet                                                                                     </td></tr>
+			<tr><td>                            </td><td><b>icon_top</b> - die Legende wird oberhalb der Balkengrafik mit Verbrauchericons angezeigt (default)                           </td></tr>
+			<tr><td>                            </td><td><b>icon_bottom</b> - die Legende wird unterhalb der Balken- und Flußgrafik mit Verbrauchericons angezeigt                       </td></tr>
+			<tr><td>                            </td><td><b>text_top</b> - die Legende wird oberhalb der Balkengrafik ohne Verbrauchericons angezeigt                                    </td></tr>
+			<tr><td>                            </td><td><b>text_bottom</b> - die Legende wird unterhalb der Balken- und Flußgrafik ohne Verbrauchericons angezeigt                      </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+          </table>
          </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; consumerControl dummyIcon=light_light_dim_100@#cc3300
+         attr &lt;name&gt; consumerControl dummyIcon=status_comfort@#ff8c00 adviceIcon=times showLegend=icon_bottom
        </ul>
 
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-consumerLegend"></a>
-       <li><b>consumerLegend </b><br>
-         Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher im SolarForecast Device
-         registriert sind. <br>
-         (default: icon_top)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-consumerLink"></a>
-       <li><b>consumerLink </b><br>
-         Wenn gesetzt, kann man in der Verbraucher-Liste (consumerLegend) die jeweiligen Verbraucher anklicken und gelangt
-         direkt zur Detailansicht des jeweiligen Geräts auf einer neuen Browserseite. <br>
-         (default: 1)
        </li>
        <br>
 
