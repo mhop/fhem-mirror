@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bufgix: 72_FRITZBOX: set <name> smartHome <deviceID> <tempOffset:value>
+                        set <name> ring <intNumbers> [duration]
+                        STATE 'undefined situation'
  - change:  74_AutomowerConnect: fix ws buffer handling if multiple JSON
             data sets received, calculate nextStarttime if no planner event
             add websocket statistics
