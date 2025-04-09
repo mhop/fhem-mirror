@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.50.2" => "09.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ",
+  "1.50.2" => "09.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
+                           "plant check: pront out module version in header ",
   "1.50.1" => "07.04.2025  new pvCorrectionFactor_Auto option 'on_complex_api_ai' to use average of AI + API forecast if AI Hit ".
                            "some code changes ",
   "1.50.0" => "05.04.2025  changes V 1.49.1 - 1.49.6 as new major release ",
@@ -4925,8 +4926,9 @@ sub ___setOpenMeteoAPIcallKeyData {
   my $dac = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIcalls',    0);
   my $asc = CurrentVal   ($hash, 'allstringscount', 1);
 
-  my $drr = OMETMAXREQ - $dar;
+  my $drr = OMETMAXREQ - $dar;                                                         # verbleibende Requests
   $drr    = 0 if($drr < 0);
+  my $rac = $drr / ($cequ * $asc);                                                     # verbleibende Calls
 
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{todayRemainingAPIrequests} = $drr;
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval}        = OMETEOREPDEF;
@@ -4937,8 +4939,8 @@ sub ___setOpenMeteoAPIcallKeyData {
   my $ets   = timestringToTimestamp ($edate);
   my $rmdif = $ets - int $t;
 
-  if ($drr) {
-      my $optrep = $rmdif / ($drr / ($cequ * $asc));
+  if ($rac) {
+      my $optrep = sprintf "%.0f", ($rmdif / $rac);
       $optrep    = OMETEOREPDEF if($optrep < OMETEOREPDEF);
 
       $data{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval} = $optrep;
@@ -19697,6 +19699,9 @@ sub checkPlantConfig {
   my $lang        = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', DEFLANG));
   my $pcf         = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', 'off');
   my $raname      = AttrVal        ($name, 'setupRadiationAPI',          '');
+  my $version     = InternalVal    ($name, 'FVERSION',                   '');
+  $version        =~ /:v(.*)-s/xs;
+  $version        = $1 ? $1 : '-';
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   my $ok     = FW_makeImage ('10px-kreis-gruen.png',     '');
@@ -20264,7 +20269,7 @@ sub checkPlantConfig {
   ## Ausgabe
   ############
   my $out  = qq{<html>};
-  $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{ - Model: $hash->{MODEL} </b> <br><br>};
+  $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{ - Module Version: $version, Model: $hash->{MODEL} </b> <br><br>};
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
   $out    .= qq{<tr style="font-weight:bold;">};
