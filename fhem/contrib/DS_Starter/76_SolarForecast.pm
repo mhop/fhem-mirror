@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.50.2" => "09.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ",
   "1.50.1" => "07.04.2025  new pvCorrectionFactor_Auto option 'on_complex_api_ai' to use average of AI + API forecast if AI Hit ".
                            "some code changes ",
   "1.50.0" => "05.04.2025  changes V 1.49.1 - 1.49.6 as new major release ",
@@ -1314,6 +1315,7 @@ my %hcsr = (                                                                    
   todayGridFeedIn             => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => '',     def => 0           },
   todayGridConsumption        => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => '',     def => 0           },
   todayConsumptionForecast    => { fnr => 5, fn => \&HistoryVal,      par => '',                  par1 => 'confc', unit => ' Wh',  def => '-'         },
+  tomorrowConsumptionForecast => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',      unit => ' Wh',  def => '-'         },
   conForecastTillNextSunrise  => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',      unit => ' Wh',  def => 0           },
   todayBatInSum               => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
   todayBatOutSum              => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
@@ -9726,10 +9728,11 @@ sub __calcPVestimates {
       my $pv    = sprintf "%.1f", ($pvest * $hc);                                                     # Korrekturfaktor anwenden
 
       for my $in (keys %{$data{$name}{inverters}}) {
-          my $istrings = InverterVal ($hash, $in, 'istrings', '');                                    # dem Inverter zugeordnete Strings
-          next if(!grep /^$string$/, (split ',', $istrings));
-
-          $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                   # Max. Leistung des Inverters
+          my $istrings = InverterVal ($hash, $in, 'istrings', 'all');                                 # dem Inverter zugeordnete Strings
+		  
+		  if ($istrings eq 'all' || grep /^$string$/, (split ',', $istrings)) {
+			  $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                               # Max. Leistung des Inverters
+		  }                                   
       }
 
       if ($debug =~ /radiationProcess/xs) {
@@ -13530,7 +13533,8 @@ sub _genSpecialReadings {
   for my $item (@srd) {
       next if(grep /^$item$/, @csr);
       readingsDelete    ($hash, $prpo.'_'.$item);
-      deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'todayConsumptionForecast');
+      deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'todayConsumptionForecast');    
+	  deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'tomorrowConsumptionForecast');
   }
 
   return if(!@csr);
@@ -13724,10 +13728,10 @@ sub _genSpecialReadings {
              }
           }
 
-          if ($kpi eq 'todayConsumptionForecastNh') {
+          if ($kpi eq 'tomorrowConsumptionForecast') {
              for my $idx (sort keys %{$data{$name}{nexthours}}) {
                  my $istoday = NexthoursVal ($hash, $idx, 'today', 0);
-                 last if(!$istoday);
+                 next if($istoday);
 
                  my $hod   = NexthoursVal ($hash, $idx, 'hourofday', '01');
                  my $confc = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
@@ -24644,6 +24648,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>todayBatInSum</b>              </td><td>Total energy charged in all batteries on the current day                                                             </td></tr>
             <tr><td> <b>todayBatOut_XX</b>             </td><td>the energy taken from the battery XX on the current day                                                              </td></tr>
             <tr><td> <b>todayBatOutSum</b>             </td><td>Total energy drawn from all batteries on the current day                                                             </td></tr>
+			<tr><td> <b>tomorrowConsumptionForecast</b></td><td>Consumption forecast per hour of the coming day (01-24)                                                              </td></tr>
          </table>
          </ul>
        <br>
@@ -27127,6 +27132,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>todayBatInSum</b>              </td><td>Summe der am aktuellen Tag in alle Batterien geladene Energie                                                   </td></tr>
             <tr><td> <b>todayBatOut_XX</b>             </td><td>die am aktuellen Tag aus der Batterie XX entnommene Energie                                                     </td></tr>
             <tr><td> <b>todayBatOutSum</b>             </td><td>Summe der am aktuellen Tag aus allen Batterien entnommene Energie                                               </td></tr>
+			<tr><td> <b>tomorrowConsumptionForecast</b></td><td>Verbrauchsprognose pro Stunde des kommenden Tages (01-24)                                                       </td></tr>
          </table>
          </ul>
        <br>
