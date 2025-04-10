@@ -536,7 +536,8 @@ my %EnO_mscRefID = (
   "000004DD" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0303", attr => {eep => "J5.38.08"}},
   "0000045C" => {model => "Eltako_F4CT55", version => "0101", attr => {eep => "G6.02.01"}},
   "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0100", attr => {eep => "I5.3F.7F"}},
-  "00000484" => {model => "Eltako_FL62", teachIn => "E0400D80", version => "0104", attr => {eep => "N5.3F.7F"}},
+  "00000484" => {model => "Eltako_FL62", teachIn => "E0400D80", version => "0104", attr => {eep => "N5.38.08"}},
+  "00000488" => {model => "Eltako_FL62", teachIn => "E0400D80", version => "0106", attr => {eep => "N5.38.08"}},
   "000004F8" => {model => "Eltako_FJ62", teachIn => "FFF80D80", version => "0105", attr => {eep => "K5.3F.7F"}}
 );
 
@@ -549,7 +550,8 @@ my %EnO_productID = (
             "000004DD" => {model => "Eltako_FUD61", teachIn => "E0400D80", version => "0303", attr => {eep => "J5.38.08"}},
             "0000045C" => {model => "Eltako_F4CT55", version => "0101", attr => {eep => "G6.02.01"}},
             "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0100", attr => {eep => "I5.3F.7F"}}},
-            "00000484" => {model => "Eltako_FL62", teachIn => "E0400D80", version => "0104", attr => {eep => "N5.3F.7F"}},
+            "00000484" => {model => "Eltako_FL62", teachIn => "E0400D80", version => "0104", attr => {eep => "N5.38.08"}},
+            "00000488" => {model => "Eltako_FL62", teachIn => "E0400D80", version => "0106", attr => {eep => "N5.38.08"}},
             "000004F8" => {model => "Eltako_FJ62", teachIn => "FFF80D80", version => "0105", attr => {eep => "K5.3F.7F"}},
   "05C" => {"0000000A" => {model => "Hoppe_eHandle", version => "00", attr => {eep => "D2.06.40", subType =>"multisensor.40"}}}
 );
@@ -1146,7 +1148,7 @@ sub EnOcean_Define($$) {
                     $hash->{helper}{teachInWait} = "MSC" if (exists $EnO_mscRefID{$refID}{teachIn});
                     if (!exists $hash->{IODev}) {
                       (defined $ioDev) ? AssignIoPort($hash, $ioDev) : AssignIoPort($hash);
-	              $attr{$name}{IODev} = $hash->{IODev}{NAME};
+	                 $attr{$name}{IODev} = $hash->{IODev}{NAME};
                     }
                     $hash->{DEF} = $def;
                     $modules{EnOcean}{defptr}{$def} = $hash;
@@ -3595,7 +3597,7 @@ sub EnOcean_Set($@) {
         if($cmd eq "teach") {
           # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
           #$data = sprintf "%02X000000", $gwCmdID;
-          if ($model =~ m/FSR14|FSR14M|FSR61|TF$/) {
+          if ($model =~ m/FL62|FSR14|FSR14M|FSR61|TF$/) {
             $data = "E0400D80";
           } else {
             $data = "E047FF80";
