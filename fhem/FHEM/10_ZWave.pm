@@ -692,6 +692,7 @@ my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "0175-0004-000a" => "devolo_Siren",
                            "010f-0301-1001" => "Fibaro_FGRM222",
                            "010f-0302-1000" => "Fibaro_FGRM222", # FGR 222
+                           "010f-0304-1000" => "Fibaro_FGRM222", # FGR-224, #140970
                            "010f-0203-1000" => "Fibaro_FGS223",
                            "0108-0004-000a" => "Philio_PSE02", # DLink DCH-Z510
                            "013c-0004-000a" => "Philio_PSE02", # Zipato Siren
