@@ -160,8 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.50.2" => "09.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
-                           "plant check: pront out module version in header ",
+  "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
+                           "plant check: print out module version in header, decouple graphicBeamHeightLevelX from each other ",
   "1.50.1" => "07.04.2025  new pvCorrectionFactor_Auto option 'on_complex_api_ai' to use average of AI + API forecast if AI Hit ".
                            "some code changes ",
   "1.50.0" => "05.04.2025  changes V 1.49.1 - 1.49.6 as new major release ",
@@ -460,6 +460,7 @@ use constant {
   HISTHOURDEF     => 2,                                                             # default Anzeige vorangegangene Stunden
   WTHCOLDDEF      => 'C7C979',                                                      # Wetter Icon Tag default Farbe
   WTHCOLNDEF      => 'C7C7C7',                                                      # Wetter Icon Nacht default Farbe
+  BHEIGHTLEVEL    => 200,                                                           # default Multiplikator zur Festlegung der maximalen Balkenhöhe
   B1COLDEF        => 'FFAC63',                                                      # default Farbe Beam 1
   B1FONTCOLDEF    => '0D0D0D',                                                      # default Schriftfarbe Beam 1
   B2COLDEF        => 'C4C4A7',                                                      # default Farbe Beam 2
@@ -4946,7 +4947,7 @@ sub ___setOpenMeteoAPIcallKeyData {
       $data{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval} = $optrep;
   }
 
-  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF));
+  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Call equivalent: $cequ, new call interval: ".StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF));
 
 return;
 }
@@ -13903,7 +13904,7 @@ sub entryGraphic {
       beam6cont      => AttrVal    ($name, 'graphicBeam6Content',               ''),
       lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
       kw             => AttrVal    ($name, 'graphicEnergyUnit',               'Wh'),
-      height         => AttrNum    ($name, 'graphicBeamHeightLevel1',          200),
+      height         => AttrNum    ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL),
       width          => $width,
       fsize          => AttrNum    ($name, 'graphicSpaceSize',                  24),
       layersync      => $layersync,                                                                 # Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen
@@ -14035,11 +14036,11 @@ sub entryGraphic {
           $paref->{chartlvl}  = 2;
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
-          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',               B3COLDEF);
-          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',               B4COLDEF);
-          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',       B3FONTCOLDEF);
-          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',       B4FONTCOLDEF);
-          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height});
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',       B3COLDEF);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',       B4COLDEF);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',   B3FONTCOLDEF);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',   B4FONTCOLDEF);
+          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', BHEIGHTLEVEL);
           $paref->{weather}   = 0;
           $paref->{hfcg}      = \%hfcg2;
 
@@ -14078,11 +14079,11 @@ sub entryGraphic {
           $paref->{chartlvl}  = 3;
           $paref->{beam1cont} = $paref->{beam5cont};
           $paref->{beam2cont} = $paref->{beam6cont};
-          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam5Color',               B5COLDEF);
-          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam6Color',               B6COLDEF);
-          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam5FontColor',       B5FONTCOLDEF);
-          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam6FontColor',       B6FONTCOLDEF);
-          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel3', $paref->{height});
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam5Color',       B5COLDEF);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam6Color',       B6COLDEF);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam5FontColor',   B5FONTCOLDEF);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam6FontColor',   B6FONTCOLDEF);
+          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel3', BHEIGHTLEVEL);
           $paref->{weather}   = 0;
           $paref->{hfcg}      = \%hfcg3;
 
@@ -14179,7 +14180,7 @@ sub _checkSetupNotComplete {
   my $pv0   = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                            # der erste PV ForeCast Wert
 
   my $link   = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$name</a>};
-  my $height = AttrNum ($name, 'graphicBeamHeightLevel1', 200);
+  my $height = AttrNum ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL);
   my $lang   = getLang ($hash);
 
   my (undef, $disabled, $inactive) = controller ($name);
@@ -15872,9 +15873,9 @@ sub _beamGraphic {
 
       $paref->{barcount} = $ii;                                                                                 # Anzahl Balken zur Begrenzung der nächsten Ebene registrieren
 
-      $height = 200 if(!$height);                                                                               # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
-      $maxVal = 1   if(!int $maxVal);                                                                           # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen
-      $maxCon = 1   if(!$maxCon);
+      $height = BHEIGHTLEVEL if(!$height);                                                                      # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
+      $maxVal = 1            if(!int $maxVal);                                                                  # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen
+      $maxCon = 1            if(!$maxCon);
 
       # Berechnung der Zonen
       ########################
@@ -19699,9 +19700,7 @@ sub checkPlantConfig {
   my $lang        = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', DEFLANG));
   my $pcf         = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', 'off');
   my $raname      = AttrVal        ($name, 'setupRadiationAPI',          '');
-  my $version     = InternalVal    ($name, 'FVERSION',                   '');
-  $version        =~ /:v(.*)-s/xs;
-  $version        = $1 ? $1 : '-';
+  my $version     = $hash->{HELPER}{VERSION} // '-';
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   my $ok     = FW_makeImage ('10px-kreis-gruen.png',     '');
@@ -20269,7 +20268,7 @@ sub checkPlantConfig {
   ## Ausgabe
   ############
   my $out  = qq{<html>};
-  $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{ - Module Version: $version, Model: $hash->{MODEL} </b> <br><br>};
+  $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{ - Modul Version: $version, Model: $hash->{MODEL} </b> <br><br>};
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
   $out    .= qq{<tr style="font-weight:bold;">};
@@ -24772,13 +24771,13 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-graphicBeamXContent" data-pattern="graphicBeam.*Content"></a>
        <li><b>graphicBeamXContent </b><br>
          Defines the content of the bars to be displayed in the bar charts.
-         The bar charts are available in two levels. <br>
+         The bar charts are available in several levels. <br>
          Level 1 is preset by default.
          The content is determined by the attributes graphicBeam1Content and graphicBeam2Content. <br>
          Level 2 can be activated by setting the attributes graphicBeam3Content and graphicBeam4Content. <br>
-         The attributes graphicBeam1Content and graphicBeam3Content represent the primary beams, the attributes
-         graphicBeam2Content and graphicBeam4Content attributes represent the secondary beams of the
-         respective level.
+		 Level 3 can be activated by setting the attributes graphicBeam5Content and graphicBeam6Content. <br>
+         The attributes with odd numbers (1,3,5) represent the primary bars, the attributes with even numbers the secondary bars 
+         of the respective level.
          <br><br>
 
          <ul>
@@ -24994,8 +24993,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-graphicLayoutType"></a>
        <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
        Layout of the bar graph. <br>
-       The content of the bars to be displayed is determined by the <b>graphicBeam1Content</b> or
-       <b>graphicBeam2Content</b> attributes.
+       The content of the bars to be displayed is determined by the <b>graphicBeamXContent</b> attributes.
        <br><br>
 
        <ul>
@@ -27256,12 +27254,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-graphicBeamXContent" data-pattern="graphicBeam.*Content"></a>
        <li><b>graphicBeamXContent </b><br>
          Legt den darzustellenden Inhalt der Balken in den Balkendiagrammen fest.
-         Die Balkendiagramme sind in zwei Ebenen verfügbar. <br>
+         Die Balkendiagramme sind in mehreren Ebenen verfügbar. <br>
          Die Ebene 1 ist im Standard voreingestellt.
          Der Inhalt wird durch die Attribute graphicBeam1Content und graphicBeam2Content bestimmt. <br>
          Die Ebene 2 kann durch Setzen der Attribute graphicBeam3Content und graphicBeam4Content aktiviert werden. <br>
-         Die Attribute graphicBeam1Content und graphicBeam3Content stellen die primären Balken, die Attribute
-         graphicBeam2Content und graphicBeam4Content die sekundären Balken der jeweiligen Ebene dar.
+		 Die Ebene 3 kann durch Setzen der Attribute graphicBeam5Content und graphicBeam6Content aktiviert werden. <br>
+         Die Attribute mit ungeraden Ziffern (1,3,5) stellen die primären Balken, die Attribute mit geraden Ziffern die sekundären Balken 
+		 der jeweiligen Ebene dar.
          <br><br>
 
          <ul>
@@ -27475,8 +27474,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-graphicLayoutType"></a>
        <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
        Layout der Balkengrafik. <br>
-       Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeam1Content</b> bzw.
-       <b>graphicBeam2Content</b> bestimmt.
+       Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeamXContent</b> bestimmt.
        <br><br>
 
        <ul>
