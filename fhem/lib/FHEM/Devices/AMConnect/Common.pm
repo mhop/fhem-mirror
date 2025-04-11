@@ -2614,7 +2614,7 @@ sub fillReadings {
 
   if ( AttrVal( $name, 'calculateReadings', $EMPTY ) =~ /nextStart/ ) {
 
-  readingsBulkUpdateIfChanged( $hash, $pref.'_nextStart', calculateNextStart( $hash ) );
+    readingsBulkUpdateIfChanged( $hash, $pref.'_nextStart', calculateNextStart( $hash ) );
 
   } else {
 
@@ -3360,7 +3360,7 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
       my $i = 0;
       $bufj[$i] = $bufj[$i].'}';
 
-      for ( my $i = 1; $i < @bufj - 1; $i++ ) {
+      for ( $i = 1; $i < @bufj - 1; $i++ ) {
 
         $bufj[$i] = '{'.$bufj[$i].'}';
 
@@ -3435,15 +3435,13 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
               elsif ( $result->{type} =~ /^mow/ ) {
 
                 $hash->{helper}{mowerold}{attributes}{mower}{activity}  = $hash->{helper}{mower}{attributes}{mower}{activity};
-                $hash->{helper}{mower}{attributes}{mower}{mode} = $result->{attributes}{mower}{mode};
-                $hash->{helper}{mower}{attributes}{mower}{state} = $result->{attributes}{mower}{state};
+                $hash->{helper}{mower}{attributes}{mower}{mode} = $result->{attributes}{mower}{mode} if ( defined $result->{attributes}{mower}{mode} );
+                $hash->{helper}{mower}{attributes}{mower}{state} = $result->{attributes}{mower}{state} if ( defined $result->{attributes}{mower}{state} );
+                $hash->{helper}{mower}{attributes}{mower}{inactiveReason} = $result->{attributes}{mower}{inactiveReason} if ( defined $result->{attributes}{mower}{inactiveReason} );
+                $hash->{helper}{mower}{attributes}{mower}{activity} = $result->{attributes}{mower}{activity} if ( defined $result->{attributes}{mower}{activity} );
+                $hash->{helper}{mower}{attributes}{mower}{errorCode} = $result->{attributes}{mower}{errorCode} if ( defined $result->{attributes}{mower}{errorCode} );
 
-                $hash->{helper}{mower}{attributes}{mower}{inactiveReason} = $result->{attributes}{mower}{inactiveReason} if ( defined( $result->{attributes}{mower}{inactiveReason} ) );
-
-                $hash->{helper}{mower}{attributes}{mower}{activity} = $result->{attributes}{mower}{activity};
-                $hash->{helper}{mower}{attributes}{mower}{errorCode} = $result->{attributes}{mower}{errorCode};
-
-                if ( $hash->{helper}{mower}{attributes}{mower}{errorCode} && !$hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} ) { # no errorCodeTimestamp transmitted ws v2, 430x
+                if ( $hash->{helper}{mower}{attributes}{mower}{errorCode} && !$hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} ) { # no errorCodeTimestamp transmitted, 430x
 
                   $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} = int( $hash->{helper}{statusTime} * 1000 );
 
@@ -3453,9 +3451,8 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
 
                 }
 
-
-                $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} = $result->{attributes}{mower}{errorCodeTimestamp} if ( defined $result->{attributes}{mower}{errorCodeTimestamp} ); # not transmitted, 430x
-                $hash->{helper}{mower}{attributes}{mower}{isErrorConfirmable} = $result->{attributes}{mower}{isErrorConfirmable} if ( defined $result->{attributes}{mower}{isErrorConfirmable} ); # not transmitted, 430x
+                $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} = $result->{attributes}{mower}{errorCodeTimestamp} if ( defined $result->{attributes}{mower}{errorCodeTimestamp} );
+                $hash->{helper}{mower}{attributes}{mower}{isErrorConfirmable} = $result->{attributes}{mower}{isErrorConfirmable} if ( defined $result->{attributes}{mower}{isErrorConfirmable} );
 
                 if ( !$additional_polling ) {
 
@@ -3469,21 +3466,28 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
 # battery-event-v2
               elsif ( $result->{type} =~/^bat/ ) {
 
-                my $temp = $result->{attributes}{battery}{batteryPercent};
-                $hash->{helper}{mower}{attributes}{battery}{batteryPercent} = $temp if ( $temp ); # batteryPercent zero sometimes 430x
+                my $tmp = $result->{attributes}{battery}{batteryPercent};
+                $hash->{helper}{mower}{attributes}{battery}{batteryPercent} = $tmp if ( $tmp ); # batteryPercent zero sometimes 430x
 
               }
 
 # planner-event-v2
               elsif ( $result->{type} =~ /^pla/ ) { # no planner event 430x
 
-                $hash->{helper}{mower}{attributes}{planner}{restrictedReason} = $result->{attributes}{planner}{restrictedReason};
-                $hash->{helper}{mower}{attributes}{planner}{nextStartTimestamp} = $result->{attributes}{planner}{nextStartTimestamp} * 1000; # change to ms
+                $hash->{helper}{mower}{attributes}{planner}{restrictedReason} = $result->{attributes}{planner}{restrictedReason} if ( defined $result->{attributes}{planner}{restrictedReason} );
+
+                # Timestamp in s not in ms as described, 415x
+                if ( defined $result->{attributes}{planner}{nextStartTimestamp} ) {
+
+                  my $tmp = $result->{attributes}{planner}{nextStartTimestamp};
+                  $hash->{helper}{mower}{attributes}{planner}{nextStartTimestamp} = length( $tmp ) == 10 ? $tmp * 1000 : $tmp;
+
+                }
 
               }
 
 # cuttingHeight-event-v2
-              elsif ( $result->{type} =~ /^cut/ ) { # first event after setting transmits old value 430 x
+              elsif ( $result->{type} =~ /^cut/ ) { # first event after setting transmits old value 430x
 
                 $hash->{helper}{mower}{attributes}{settings}{cuttingHeight} = $result->{attributes}{cuttingHeight}{height};
 
