@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.50.3" => "11.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ",
   "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
                            "plant check: print out module version in header, decouple graphicBeamHeightLevelX from each other ",
   "1.50.1" => "07.04.2025  new pvCorrectionFactor_Auto option 'on_complex_api_ai' to use average of AI + API forecast if AI Hit ".
@@ -9530,7 +9531,7 @@ sub _transferAPIRadiationValues {
       }
 
       $paref->{sabin}    = sunalt2bin ($sunalt);
-      my $pvapifc        = __calcPVestimates ($paref);
+      my $pvapifc        = __calcPVestimates ($paref);                                                  # API Wert ermitteln
       my ($msg, $pvaifc) = aiGetResult ($paref);                                                        # KI Entscheidungen abfragen
       
       delete $paref->{fd};
@@ -9696,8 +9697,8 @@ sub __calcPVestimates {
 
   my $hash        = $defs{$name};
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
-  my $rr1c        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",            0);   # Gesamtniederschlag während der letzten Stunde kg/m2
-  my $wcc         = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "wcc",             0);   # effektive Wolkendecke nächste Stunde X
+  my $rr1c        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",           0);    # Gesamtniederschlag während der letzten Stunde kg/m2
+  my $wcc         = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "wcc",            0);    # effektive Wolkendecke nächste Stunde X
   my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", TEMPBASEDEF);    # vorhergesagte Temperatur Stunde X
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
@@ -9709,6 +9710,7 @@ sub __calcPVestimates {
   my $pvsum     = 0;
   my $peaksum   = 0;
   my $invcapsum = 0;
+  my %sum;
 
   for my $string (sort keys %{$data{$name}{strings}}) {
       my $peak = StringVal ($hash, $string, 'peak', 0);                                               # String Peak (kWp)
@@ -9734,7 +9736,7 @@ sub __calcPVestimates {
           my $istrings = InverterVal ($hash, $in, 'istrings', 'all');                                 # dem Inverter zugeordnete Strings
 		  
 		  if ($istrings eq 'all' || grep /^$string$/, (split ',', $istrings)) {
-			  $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                               # Max. Leistung des Inverters
+			  $sum{$in}{pvinvsum} += $pv;
 		  }                                   
       }
 
@@ -9760,20 +9762,25 @@ sub __calcPVestimates {
           Log3 ($name, 1, "$name DEBUG> PV API estimate for $reld Hour ".sprintf ("%02d", $hod)." string $string ->\n$sq");
       }
 
-      $pvsum   += $pv;
       $peaksum += $peak;
   }
-
-  $data{$name}{current}{allstringspeak} = $peaksum;                                                 # temperaturbedingte Korrektur der installierten Peakleistung in W
-  $pvsum                                = $peaksum if($peaksum && $pvsum > $peaksum);               # Vorhersage nicht größer als die Summe aller PV-Strings Peak
   
-  if ($invcapsum && $pvsum > $invcapsum) {
-      $pvsum = $invcapsum;                                                                          # PV Vorhersage auf WR Kapazität begrenzen
+  for my $ins (keys %sum) {
+      my $cap      = InverterVal ($hash, $ins, 'invertercap', 0);                                   # Max. Leistung des Inverters
+      my $pvinvsum = $sum{$ins}{pvinvsum};
+      
+      if ($pvinvsum > $cap) {
+          $pvinvsum = $cap;                                                                         # betreffende Strings auf WR Kapazität begrenzen
 
-      debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $invcapsum Wh due to inverter capacity summary");
+          debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $cap Wh due to inverter capacity summary");
+      }
+      
+      $pvsum += $pvinvsum;
   }
   
-  $pvsum = sprintf "%.0f", $pvsum;
+  $data{$name}{current}{allstringspeak} = $peaksum;                                                 # temperaturbedingte Korrektur der installierten Peakleistung in W
+  $pvsum                                = $peaksum if($peaksum && $pvsum > $peaksum);               # Vorhersage nicht größer als die Summe aller PV-Strings Peak  
+  $pvsum                                = sprintf "%.0f", $pvsum;
 
   if ($debug =~ /radiationProcess/xs) {
       $lh = {                                                                                        # Log-Hash zur Ausgabe
@@ -9786,6 +9793,7 @@ sub __calcPVestimates {
       };
 
       $sq = q{};
+      
       for my $idx (sort keys %{$lh}) {
           $sq .= $idx." => ".$lh->{$idx}."\n";
       }
@@ -10780,8 +10788,7 @@ sub _batChargeRecmd {
 
       my $socwh    = sprintf "%.0f", ($batinstcap * $csoc / 100);                                # aktueller SoC in Wh
 	  my $whneed   = $batinstcap - $socwh;
-      my $sfmargin = $whneed * 0.25;                                                             # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
-
+      
       ## Auswertung für jede kommende Stunde
       ########################################
       for my $num (0..47) {
@@ -10825,13 +10832,13 @@ sub _batChargeRecmd {
               }
           }
 
-          $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
+          $spday       = 0 if($spday < 0);                                                       # PV Überschuß Prognose bis Sonnenuntergang
+		  my $sfmargin = $whneed * 0.5;                                                          # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
 
           ## Ladefreigabe
           #################		  
           if ( $whneed + $sfmargin >= $spday )            {$crel = 1}                            # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
 		  if ( !$num && ($pvCu - $curcon) >= $inplim )    {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
-		  # if ( !$num && ($pvCu - $curcon) >= $feedinlim ) {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= Einspeiselimit der Anlage
 		  if ( !$bpin && $gfeedin > $feedinlim )          {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
 		  if ( $bpin && ($gfeedin - $bpin) > $feedinlim ) {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
           if ( !$cgbt )                                   {$crel = 1}                            # immer Ladefreigabe wenn kein BatSoc-Management
