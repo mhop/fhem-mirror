@@ -160,6 +160,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
+                           "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
+  "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
+                           "plant check: print out module version in header, decouple graphicBeamHeightLevelX from each other ",
+  "1.50.1" => "07.04.2025  new pvCorrectionFactor_Auto option 'on_complex_api_ai' to use average of AI + API forecast if AI Hit ".
+                           "some code changes ",
   "1.50.0" => "05.04.2025  changes V 1.49.1 - 1.49.6 as new major release ",
   "1.49.6" => "05.04.2025  some code changes, _flowGraphic: position of home text element, new attr consumerControl->dummyIcon, _batChargeRecmd: change loading release ".
                            "attr consumerAdviceIcon replaced by consumerControl->adviceIcon ". 
@@ -426,8 +432,8 @@ use constant {
   AISPREADLOWLIM => 80,                                                             # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
   AIACCUPLIM     => 150,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-  AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Accurate"
-  AISPREADTRNMIN => 5500,                                                           # Mindestanzahl KI Trainingssätze für Verwendung "KI Spreaded"
+  AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
+  AISPREADTRNMIN => 5500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Spreaded"
 
   SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
   FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
@@ -456,6 +462,7 @@ use constant {
   HISTHOURDEF     => 2,                                                             # default Anzeige vorangegangene Stunden
   WTHCOLDDEF      => 'C7C979',                                                      # Wetter Icon Tag default Farbe
   WTHCOLNDEF      => 'C7C7C7',                                                      # Wetter Icon Nacht default Farbe
+  BHEIGHTLEVEL    => 200,                                                           # default Multiplikator zur Festlegung der maximalen Balkenhöhe
   B1COLDEF        => 'FFAC63',                                                      # default Farbe Beam 1
   B1FONTCOLDEF    => '0D0D0D',                                                      # default Schriftfarbe Beam 1
   B2COLDEF        => 'C4C4A7',                                                      # default Farbe Beam 2
@@ -1312,6 +1319,7 @@ my %hcsr = (                                                                    
   todayGridFeedIn             => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => '',     def => 0           },
   todayGridConsumption        => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => '',     def => 0           },
   todayConsumptionForecast    => { fnr => 5, fn => \&HistoryVal,      par => '',                  par1 => 'confc', unit => ' Wh',  def => '-'         },
+  tomorrowConsumptionForecast => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',      unit => ' Wh',  def => '-'         },
   conForecastTillNextSunrise  => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',      unit => ' Wh',  def => 0           },
   todayBatInSum               => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
   todayBatOutSum              => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
@@ -1673,11 +1681,13 @@ sub Set {
                roofIdentPair
                pvHistory
              );
-  my $resets = join ",",@re;
+             
+  my $resets = join ",", @re;
 
   for my $h (@chours) {
       push @cfs, 'pvCorrectionFactor_'. sprintf("%02d",$h);
   }
+  
   $cf = join " ", @cfs;
 
   for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {
@@ -1709,7 +1719,7 @@ sub Set {
              "operationMode:active,inactive ".
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
-             "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,' : ',')."off ".
+             "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,on_complex_api_ai,' : ',')."off ".
              "reset:$resets ".
              "setupStringAzimuth ".
              "setupStringDeclination ".
@@ -4225,22 +4235,21 @@ sub __getopenMeteoData {
   my $debug = $paref->{debug};
   my $reqm  = $paref->{reqm};
 
-  my $hash    = $defs{$name};
-  my $donearq = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
-
-  if ($donearq >= OMETMAXREQ) {
-      my $msg = "The limit of maximum OMETMAXREQ daily API requests is reached or already exceeded. Process is exited.";
-      Log3 ($name, 1, "$name - ERROR - $msg");
-      return $msg;
-  }
-
   if (!$force) {                                                                                      # regulärer API Abruf
-      my $lrt = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'lastretrieval_timestamp', 0);
+      my $lrt = StatusAPIVal ($name, 'OpenMeteo', '?All', 'lastretrieval_timestamp', 0);
 
       if ($lrt && $t < $lrt + OMETEOREPDEF) {
           my $rt = $lrt + OMETEOREPDEF - $t;
           return qq{The waiting time to the next Open-Meteo API call has not expired yet. The remaining waiting time is $rt seconds};
       }
+  }
+
+  my $donearq = StatusAPIVal ($name, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
+
+  if ($donearq >= OMETMAXREQ) {
+      my $msg = "The limit of maximum ".OMETMAXREQ." daily API requests is reached or already exceeded. Process is exited.";
+      Log3 ($name, 1, "$name - ERROR - $msg");
+      return $msg;
   }
 
   debugLog ($paref, 'apiCall', "Open-Meteo API Call - the daily API requests -> limited to: ".OMETMAXREQ.", done: $donearq");
@@ -4276,7 +4285,7 @@ sub __getopenMeteoGHIreplace {
   my $donearq = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
 
   if ($donearq >= OMETMAXREQ) {
-      my $msg = "The limit of maximum OMETMAXREQ daily API requests is reached or already exceeded. Process is exited.";
+      my $msg = "The limit of maximum ".OMETMAXREQ." daily API requests is reached or already exceeded. Process is exited.";
       Log3 ($name, 1, "$name - ERROR - $msg");
       return $msg;
   }
@@ -4912,16 +4921,15 @@ sub ___setOpenMeteoAPIcallKeyData {
   my $cequ  = $paref->{callequivalent};
   my $t     = $paref->{t} // time;
 
-  my $hash  = $defs{$name};
-
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{todayDoneAPIrequests} += $cequ;
 
-  my $dar = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
-  my $dac = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIcalls',    0);
-  my $asc = CurrentVal   ($hash, 'allstringscount', 1);
+  my $dar = StatusAPIVal ($name, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
+  my $dac = StatusAPIVal ($name, 'OpenMeteo', '?All', 'todayDoneAPIcalls',    0);
+  my $asc = CurrentVal   ($name, 'allstringscount', 1);
 
-  my $drr = OMETMAXREQ - $dar;
+  my $drr = OMETMAXREQ - $dar;                                                         # verbleibende Requests
   $drr    = 0 if($drr < 0);
+  my $rac = $drr / ($cequ * $asc);                                                     # verbleibende Calls
 
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{todayRemainingAPIrequests} = $drr;
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval}        = OMETEOREPDEF;
@@ -4929,17 +4937,17 @@ sub ___setOpenMeteoAPIcallKeyData {
   ## Berechnung des optimalen Request Intervalls
   ################################################
   my $edate = strftime "%Y-%m-%d 23:58:00", localtime($t);
-  my $ets   = timestringToTimestamp ($edate);
+  my $ets   = 3600 + timestringToTimestamp ($edate);                                   # V 1.50.3 1h Sicherheitspuffer -> Intervall vergößern
   my $rmdif = $ets - int $t;
 
-  if ($drr) {
-      my $optrep = $rmdif / ($drr / ($cequ * $asc));
+  if ($rac) {
+      my $optrep = sprintf "%.0f", ($rmdif / $rac);
       $optrep    = OMETEOREPDEF if($optrep < OMETEOREPDEF);
 
       $data{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval} = $optrep;
   }
 
-  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF));
+  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining Requests: $drr, Call equivalent: $cequ, new call interval: ".StatusAPIVal ($name, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF));
 
 return;
 }
@@ -6640,9 +6648,12 @@ sub _attrInverterStrings {               ## no critic "not used"
           next if ($k =~ /\?/xs || grep /^$k$/, @istrings);
           delete $data{$name}{solcastapi}{$k};
       }
+      
+      $data{$name}{current}{allStringsFullfilled} = 0;                                             # Stringkonfiguration neu prüfen lassen
   }
 
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -6687,9 +6698,12 @@ sub _attrStringPeak {                    ## no critic "not used"
               return qq{The stringname '$strg' is not defined as valid string in attribute 'setupInverterStrings'};
           }
       }
+      
+      $data{$name}{current}{allStringsFullfilled} = 0;                                               # Stringkonfiguration neu prüfen lassen
   }
 
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -6907,13 +6921,13 @@ sub _attrRadiationAPI {                  ## no critic "not used"
           return qq{Please complete command "set $name setupStringAzimuth".} if(!$dir);
       }
 
-      $data{$name}{current}{allStringsFullfilled} = 0;                                      # Stringkonfiguration neu prüfen lassen
+      $data{$name}{current}{allStringsFullfilled} = 0;                                             # Stringkonfiguration neu prüfen lassen
   }
 
   readingsDelete ($hash, 'nextRadiationAPICall');
 
   InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::__harmonizeAPIdelayed', $hash, 0);
-  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::setModel',              $hash, 0);                                  # Model setzen
+  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::setModel',              $hash, 0);                                 # Model setzen
   InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::createAssociatedWith',  $hash, 0);
   InternalTimer (gettimeofday() + 4, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);    # Anlagenkonfiguration File schreiben
 
@@ -8323,11 +8337,11 @@ sub _createStringConfig {                 ## no critic "not used"
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  delete $data{$name}{strings};                                                                # Stringhash zurücksetzen
+  delete $data{$name}{strings};                                                                   # Stringhash zurücksetzen
   $data{$name}{current}{allStringsFullfilled} = 0;
 
   my @istrings = split ",", AttrVal ($name, 'setupInverterStrings', '');                          # Stringbezeichner
-  $data{$name}{current}{allstringscount} = scalar @istrings;                                   # Anzahl der Anlagenstrings
+  $data{$name}{current}{allstringscount} = scalar @istrings;                                      # Anzahl der Anlagenstrings
 
   if (!@istrings) {
       return qq{Define all used strings with command "attr $name setupInverterStrings" first.};
@@ -8342,7 +8356,7 @@ sub _createStringConfig {                 ## no critic "not used"
   while (my ($strg, $pp) = each %$ha) {
       if (grep /^$strg$/, @istrings) {
           $data{$name}{strings}{$strg}{peak}     = $pp;
-          $data{$name}{current}{allstringspeak} += $pp * 1000;                                 # insgesamt installierte Peakleistung in W
+          $data{$name}{current}{allstringspeak} += $pp * 1000;                                    # insgesamt installierte Peakleistung in W
       }
       else {
           return qq{Check 'setupStringPeak' -> the stringname '$strg' is not defined as valid string in attribute 'setupInverterStrings'};
@@ -9460,9 +9474,12 @@ sub _transferAPIRadiationValues {
   my @strings = sort keys %{$data{$name}{strings}};
   return if(!@strings);
 
-  my $invcapsum = 0;
+  my $invcapsum   = 0;
+  my ($acu, $aln) = isAutoCorrUsed ($name);
+  my $dbmsg       = '';
+  
   for my $in (keys %{$data{$name}{inverters}}) {
-      $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                            # Limit Leistungssumme aller Inverters
+      $invcapsum += InverterVal ($name, $in, 'invertercap', 0);                                            # Limit Leistungssumme aller Inverters
   }
 
   for my $num (0..47) {
@@ -9479,7 +9496,7 @@ sub _transferAPIRadiationValues {
       my $nhtstr           = 'NextHour'.sprintf "%02d", $num;
       my ($wtday, $wthour) = $wantdt =~ /(\d{2})\s(\d{2}):/xs;
       my $hod              = sprintf "%02d", int $wthour + 1;                                              # Stunde des Tages
-      my $rad1h            = RadiationAPIVal ($hash, '?All', $wantdt, 'Rad1h', undef);
+      my $rad1h            = RadiationAPIVal ($name, '?All', $wantdt, 'Rad1h', undef);
 
       $paref->{wantdt} = $wantdt;
       $paref->{wantts} = $wantts;
@@ -9498,13 +9515,13 @@ sub _transferAPIRadiationValues {
       my ($sunalt, $sunaz);
 	  
 	  if ($fd == 0) {                                                                                      # V 1.49.4 für den aktuellen Tag
-		  $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
-		  $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
+		  $sunalt = HistoryVal ($name, $wtday, $hod, 'sunalt', undef);
+		  $sunaz  = HistoryVal ($name, $wtday, $hod, 'sunaz',  undef);
 		  
 		  if (!defined $sunalt || !defined $sunaz) {
 			  __calcSunPosition ($paref);
-			  $sunalt = HistoryVal ($hash, $wtday, $hod, 'sunalt', undef);
-			  $sunaz  = HistoryVal ($hash, $wtday, $hod, 'sunaz',  undef);
+			  $sunalt = HistoryVal ($name, $wtday, $hod, 'sunalt', undef);
+			  $sunaz  = HistoryVal ($name, $wtday, $hod, 'sunaz',  undef);
 		  }
 	  }
 		  
@@ -9514,16 +9531,14 @@ sub _transferAPIRadiationValues {
       }
       else {
 		  __calcSunPosition ($paref);
-		  $sunalt = NexthoursVal ($hash, $nhtstr, 'sunalt', 0);
-          $sunaz  = NexthoursVal ($hash, $nhtstr, 'sunaz',  0);
+		  $sunalt = NexthoursVal ($name, $nhtstr, 'sunalt', 0);
+          $sunaz  = NexthoursVal ($name, $nhtstr, 'sunaz',  0);
       }
 
       $paref->{sabin}    = sunalt2bin ($sunalt);
-      my $pvest          = __calcPVestimates ($paref);
-      my ($msg, $pvaifc) = aiGetResult ($paref);                                              # KI Entscheidungen abfragen
+      my $pvapifc        = __calcPVestimates ($paref);                                                  # API Wert ermitteln
+      my ($msg, $pvaifc) = aiGetResult ($paref);                                                        # KI Entscheidungen abfragen
       
-      $data{$name}{nexthours}{$nhtstr}{pvapifc} = $pvest;                                     # durch API gelieferte PV Forecast
-
       delete $paref->{fd};
       delete $paref->{fh1};
       delete $paref->{num};
@@ -9544,26 +9559,42 @@ sub _transferAPIRadiationValues {
               debugLog ($paref, "radiationProcess", "PV AI forecast start time $wantdt limited to $invcapsum Wh due to inverter capacity summary");
           }
           
-          my $airn  = CircularVal ($hash, 99, 'aiRulesNumber', 0) / CurrentVal ($name, 'aiTreesPV', AINUMTREES);
-          my $aivar = 100;
-          $aivar    = sprintf "%.0f", (100 * $pvaifc / $pvest) if($pvest);                              # Übereinstimmungsgrad KI Forecast zu API Forecast in %
+          my $airn  = CircularVal ($name, 99, 'aiRulesNumber', 0) / CurrentVal ($name, 'aiTreesPV', AINUMTREES);
+          my $aivar = 0;
+          $aivar    = sprintf "%.0f", (100 * $pvaifc / $pvapifc) if($pvapifc);                          # Übereinstimmungsgrad KI Forecast zu API Forecast in %
 
           if ($msg eq 'accurate') {                                                                     # KI liefert 'accurate' Treffer -> verwenden
               if ($airn >= AIACCTRNMIN || ($aivar >= AIACCLOWLIM && $aivar <= AIACCUPLIM)) {
                   $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
-                  $pvfc  = $pvaifc;
                   $useai = 1;
+                  
+                  if ($acu =~ /api_ai/xs) {
+                      $pvfc  = $pvapifc ? (sprintf "%.0f", ($pvaifc + $pvapifc) / 2) : $pvaifc;         # Durchschnitt AI und API verwenden
+                      $dbmsg = 'average of accurate AI & API result used';
+                  }
+                  else {
+                      $pvfc  = $pvaifc;
+                      $dbmsg = 'accurate result used';
+                  }
 
-                  debugLog ($paref, 'aiData', qq{AI Hit - accurate result used -> aiRulesNum: $airn, variance: $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
+                  debugLog ($paref, 'aiData', qq{AI Hit - $dbmsg -> aiRulesNum: $airn, variance: $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
               }
           }
           elsif ($msg eq 'spreaded') {                                                                  # Abweichung AI von Standardvorhersage begrenzen
               if ($airn >= AISPREADTRNMIN || ($aivar >= AISPREADLOWLIM && $aivar <= AISPREADUPLIM)) {
                   $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
-                  $pvfc  = $pvaifc;
                   $useai = 1;
+                  
+                  if ($acu =~ /api_ai/xs) {
+                      $pvfc  = $pvapifc ? (sprintf "%.0f", ($pvaifc + $pvapifc) / 2) : $pvaifc;         # Durchschnitt AI und API verwenden
+                      $dbmsg = 'average of spreaded AI & API result used';
+                  }
+                  else {
+                      $pvfc  = $pvaifc;
+                      $dbmsg = 'spreaded result used';
+                  }
 
-                  debugLog ($paref, 'aiData', qq{AI Hit - spreaded result used -> aiRulesNum: $airn, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
+                  debugLog ($paref, 'aiData', qq{AI Hit - $dbmsg -> aiRulesNum: $airn, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
               }
           }
       }
@@ -9577,18 +9608,19 @@ sub _transferAPIRadiationValues {
       else {
           delete $data{$name}{nexthours}{$nhtstr}{pvaifc};
           $data{$name}{nexthours}{$nhtstr}{aihit} = 0;
-          $pvfc = $pvest;
+          $pvfc = $pvapifc;
 
           debugLog ($paref, 'aiData', "use PV from API (no AI or AI result tolerance overflow) -> hod: $hod, Rad1h: ".(defined $rad1h ? $rad1h : '-').", pvfc: $pvfc Wh");
       }
 
-      $data{$name}{nexthours}{$nhtstr}{pvfc} = $pvfc;                                          # resultierende PV Forecast zuweisen
+      $data{$name}{nexthours}{$nhtstr}{pvapifc} = $pvapifc;                                    # durch API gelieferte PV Forecast
+      $data{$name}{nexthours}{$nhtstr}{pvfc}    = $pvfc;                                       # resultierende PV Forecast zuweisen
 
       if ($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-          $data{$name}{circular}{sprintf "%02d",$fh1}{pvapifc} = NexthoursVal ($hash, $nhtstr, 'pvapifc', undef);
+          $data{$name}{circular}{sprintf "%02d",$fh1}{pvapifc} = NexthoursVal ($name, $nhtstr, 'pvapifc', undef);
           $data{$name}{circular}{sprintf "%02d",$fh1}{pvfc}    = $pvfc;
-          $data{$name}{circular}{sprintf "%02d",$fh1}{pvaifc}  = NexthoursVal ($hash, $nhtstr, 'pvaifc',  undef);
-          $data{$name}{circular}{sprintf "%02d",$fh1}{aihit}   = NexthoursVal ($hash, $nhtstr, 'aihit',       0);
+          $data{$name}{circular}{sprintf "%02d",$fh1}{pvaifc}  = NexthoursVal ($name, $nhtstr, 'pvaifc',  undef);
+          $data{$name}{circular}{sprintf "%02d",$fh1}{aihit}   = NexthoursVal ($name, $nhtstr, 'aihit',       0);
       }
 
       if ($fd == 0 && int $pvfc > 0) {                                                         # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
@@ -9668,11 +9700,10 @@ sub __calcPVestimates {
   my $num     = $paref->{num};
   my $debug   = $paref->{debug};
 
-  my $hash        = $defs{$name};
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
-  my $rr1c        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",            0);   # Gesamtniederschlag während der letzten Stunde kg/m2
-  my $wcc         = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "wcc",             0);   # effektive Wolkendecke nächste Stunde X
-  my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", TEMPBASEDEF);    # vorhergesagte Temperatur Stunde X
+  my $rr1c        = NexthoursVal   ($name, "NextHour".sprintf ("%02d",$num), "rr1c",           0);    # Gesamtniederschlag während der letzten Stunde kg/m2
+  my $wcc         = NexthoursVal   ($name, "NextHour".sprintf ("%02d",$num), "wcc",            0);    # effektive Wolkendecke nächste Stunde X
+  my $temp        = NexthoursVal   ($name, "NextHour".sprintf ("%02d",$num), "temp", TEMPBASEDEF);    # vorhergesagte Temperatur Stunde X
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   $paref->{wcc}  = $wcc;
@@ -9682,10 +9713,10 @@ sub __calcPVestimates {
   my ($lh,$sq,$peakloss, $modtemp);
   my $pvsum     = 0;
   my $peaksum   = 0;
-  my $invcapsum = 0;
+  my %sum;
 
   for my $string (sort keys %{$data{$name}{strings}}) {
-      my $peak = StringVal ($hash, $string, 'peak', 0);                                               # String Peak (kWp)
+      my $peak = StringVal ($name, $string, 'peak', 0);                                               # String Peak (kWp)
 
       if ($acu =~ /on_complex/xs) {
           $paref->{peak} = $peak;
@@ -9701,14 +9732,16 @@ sub __calcPVestimates {
       }
 
       $peak    *= 1000;
-      my $pvest = RadiationAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0);
+      my $pvest = RadiationAPIVal ($name, $string, $wantdt, 'pv_estimate50', 0);
       my $pv    = sprintf "%.1f", ($pvest * $hc);                                                     # Korrekturfaktor anwenden
 
       for my $in (keys %{$data{$name}{inverters}}) {
-          my $istrings = InverterVal ($hash, $in, 'istrings', '');                                    # dem Inverter zugeordnete Strings
-          next if(!grep /^$string$/, (split ',', $istrings));
-
-          $invcapsum += InverterVal ($hash, $in, 'invertercap', 0);                                   # Max. Leistung des Inverters
+          my $istrings = InverterVal ($name, $in, 'istrings', 'all');                                 # dem Inverter zugeordnete Strings
+		  
+		  if ($istrings eq 'all' || grep /^$string$/, (split ',', $istrings)) {
+			  $sum{$in}{pvinvsum} += $pv;
+              $sum{$in}{string}    = defined $sum{$in}{string} ? $sum{$in}{string}.','.$string : $string;
+		  }                                   
       }
 
       if ($debug =~ /radiationProcess/xs) {
@@ -9733,20 +9766,25 @@ sub __calcPVestimates {
           Log3 ($name, 1, "$name DEBUG> PV API estimate for $reld Hour ".sprintf ("%02d", $hod)." string $string ->\n$sq");
       }
 
-      $pvsum   += $pv;
       $peaksum += $peak;
   }
-
-  $data{$name}{current}{allstringspeak} = $peaksum;                                                 # temperaturbedingte Korrektur der installierten Peakleistung in W
-  $pvsum                                = $peaksum if($peaksum && $pvsum > $peaksum);               # Vorhersage nicht größer als die Summe aller PV-Strings Peak
   
-  if ($invcapsum && $pvsum > $invcapsum) {
-      $pvsum = $invcapsum;                                                                          # PV Vorhersage auf WR Kapazität begrenzen
+  for my $ins (keys %sum) {
+      my $cap      = InverterVal ($name, $ins, 'invertercap', 0);                                   # Max. Leistung des Inverters
+      my $pvinvsum = $sum{$ins}{pvinvsum};
+      
+      if ($pvinvsum > $cap) {
+          $pvinvsum = $cap;                                                                         # betreffende Strings auf WR Kapazität begrenzen
 
-      debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $invcapsum Wh due to inverter capacity summary");
+          debugLog ($paref, "radiationProcess", "String(s) ".$sum{$ins}{string}." in total limited to $cap Wh due to inverter $ins capacity");
+      }
+      
+      $pvsum += $pvinvsum;
   }
   
-  $pvsum = sprintf "%.0f", $pvsum;
+  $data{$name}{current}{allstringspeak} = $peaksum;                                                 # temperaturbedingte Korrektur der installierten Peakleistung in W
+  $pvsum                                = $peaksum if($peaksum && $pvsum > $peaksum);               # Vorhersage nicht größer als die Summe aller PV-Strings Peak  
+  $pvsum                                = sprintf "%.0f", $pvsum;
 
   if ($debug =~ /radiationProcess/xs) {
       $lh = {                                                                                        # Log-Hash zur Ausgabe
@@ -9759,6 +9797,7 @@ sub __calcPVestimates {
       };
 
       $sq = q{};
+      
       for my $idx (sort keys %{$lh}) {
           $sq .= $idx." => ".$lh->{$idx}."\n";
       }
@@ -10753,8 +10792,7 @@ sub _batChargeRecmd {
 
       my $socwh    = sprintf "%.0f", ($batinstcap * $csoc / 100);                                # aktueller SoC in Wh
 	  my $whneed   = $batinstcap - $socwh;
-      my $sfmargin = $whneed * 0.25;                                                             # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
-
+      
       ## Auswertung für jede kommende Stunde
       ########################################
       for my $num (0..47) {
@@ -10798,13 +10836,13 @@ sub _batChargeRecmd {
               }
           }
 
-          $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
+          $spday       = 0 if($spday < 0);                                                       # PV Überschuß Prognose bis Sonnenuntergang
+		  my $sfmargin = $whneed * 0.5;                                                          # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
 
           ## Ladefreigabe
           #################		  
           if ( $whneed + $sfmargin >= $spday )            {$crel = 1}                            # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
 		  if ( !$num && ($pvCu - $curcon) >= $inplim )    {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
-		  # if ( !$num && ($pvCu - $curcon) >= $feedinlim ) {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= Einspeiselimit der Anlage
 		  if ( !$bpin && $gfeedin > $feedinlim )          {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
 		  if ( $bpin && ($gfeedin - $bpin) > $feedinlim ) {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
           if ( !$cgbt )                                   {$crel = 1}                            # immer Ladefreigabe wenn kein BatSoc-Management
@@ -13509,7 +13547,8 @@ sub _genSpecialReadings {
   for my $item (@srd) {
       next if(grep /^$item$/, @csr);
       readingsDelete    ($hash, $prpo.'_'.$item);
-      deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'todayConsumptionForecast');
+      deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'todayConsumptionForecast');    
+	  deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'tomorrowConsumptionForecast');
   }
 
   return if(!@csr);
@@ -13703,10 +13742,10 @@ sub _genSpecialReadings {
              }
           }
 
-          if ($kpi eq 'todayConsumptionForecastNh') {
+          if ($kpi eq 'tomorrowConsumptionForecast') {
              for my $idx (sort keys %{$data{$name}{nexthours}}) {
                  my $istoday = NexthoursVal ($hash, $idx, 'today', 0);
-                 last if(!$istoday);
+                 next if($istoday);
 
                  my $hod   = NexthoursVal ($hash, $idx, 'hourofday', '01');
                  my $confc = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
@@ -13876,7 +13915,7 @@ sub entryGraphic {
       beam6cont      => AttrVal    ($name, 'graphicBeam6Content',               ''),
       lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
       kw             => AttrVal    ($name, 'graphicEnergyUnit',               'Wh'),
-      height         => AttrNum    ($name, 'graphicBeamHeightLevel1',          200),
+      height         => AttrNum    ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL),
       width          => $width,
       fsize          => AttrNum    ($name, 'graphicSpaceSize',                  24),
       layersync      => $layersync,                                                                 # Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen
@@ -14008,11 +14047,11 @@ sub entryGraphic {
           $paref->{chartlvl}  = 2;
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
-          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',               B3COLDEF);
-          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',               B4COLDEF);
-          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',       B3FONTCOLDEF);
-          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',       B4FONTCOLDEF);
-          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', $paref->{height});
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',       B3COLDEF);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',       B4COLDEF);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',   B3FONTCOLDEF);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',   B4FONTCOLDEF);
+          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', BHEIGHTLEVEL);
           $paref->{weather}   = 0;
           $paref->{hfcg}      = \%hfcg2;
 
@@ -14051,11 +14090,11 @@ sub entryGraphic {
           $paref->{chartlvl}  = 3;
           $paref->{beam1cont} = $paref->{beam5cont};
           $paref->{beam2cont} = $paref->{beam6cont};
-          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam5Color',               B5COLDEF);
-          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam6Color',               B6COLDEF);
-          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam5FontColor',       B5FONTCOLDEF);
-          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam6FontColor',       B6FONTCOLDEF);
-          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel3', $paref->{height});
+          $paref->{colorb1}   = AttrVal ($name, 'graphicBeam5Color',       B5COLDEF);
+          $paref->{colorb2}   = AttrVal ($name, 'graphicBeam6Color',       B6COLDEF);
+          $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam5FontColor',   B5FONTCOLDEF);
+          $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam6FontColor',   B6FONTCOLDEF);
+          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel3', BHEIGHTLEVEL);
           $paref->{weather}   = 0;
           $paref->{hfcg}      = \%hfcg3;
 
@@ -14152,7 +14191,7 @@ sub _checkSetupNotComplete {
   my $pv0   = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                            # der erste PV ForeCast Wert
 
   my $link   = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$name</a>};
-  my $height = AttrNum ($name, 'graphicBeamHeightLevel1', 200);
+  my $height = AttrNum ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL);
   my $lang   = getLang ($hash);
 
   my (undef, $disabled, $inactive) = controller ($name);
@@ -15845,9 +15884,9 @@ sub _beamGraphic {
 
       $paref->{barcount} = $ii;                                                                                 # Anzahl Balken zur Begrenzung der nächsten Ebene registrieren
 
-      $height = 200 if(!$height);                                                                               # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
-      $maxVal = 1   if(!int $maxVal);                                                                           # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen
-      $maxCon = 1   if(!$maxCon);
+      $height = BHEIGHTLEVEL if(!$height);                                                                      # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
+      $maxVal = 1            if(!int $maxVal);                                                                  # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen
+      $maxCon = 1            if(!$maxCon);
 
       # Berechnung der Zonen
       ########################
@@ -19672,6 +19711,7 @@ sub checkPlantConfig {
   my $lang        = AttrVal        ($name, 'ctrlLanguage', AttrVal ('global', 'language', DEFLANG));
   my $pcf         = ReadingsVal    ($name, 'pvCorrectionFactor_Auto', 'off');
   my $raname      = AttrVal        ($name, 'setupRadiationAPI',          '');
+  my $version     = $hash->{HELPER}{VERSION} // '-';
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   my $ok     = FW_makeImage ('10px-kreis-gruen.png',     '');
@@ -19717,32 +19757,37 @@ sub checkPlantConfig {
 
       if ($data{$name}{strings}{$sn}{peak} >= 500) {
           $result->{'String Configuration'}{result} .= qq{The peak value of string "$sn" is very high. };
-          $result->{'String Configuration'}{result} .= qq{It seems to be given in Wp instead of kWp. <br>};
+          $result->{'String Configuration'}{result} .= qq{Check if you entered peak power in Wp instead of kWp. Ignore the Warning if the entered value is correct. <br>};
           $result->{'String Configuration'}{state}   = $warn;
           $result->{'String Configuration'}{warn}    = 1;
       }
 
       if (!isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {
           if ($sp !~ /azimut.*?peak.*?tilt/x) {
-              $result->{'String Configuration'}{state}  = $nok;
-              $result->{'String Configuration'}{fault}  = 1;                                    # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
+              $result->{'String Configuration'}{result} .= qq{Any of the parameter 'azimut', 'peak' or 'tilt' is missing. <br>};
+              $result->{'String Configuration'}{state}   = $nok;
+              $result->{'String Configuration'}{fault}   = 1;                                   # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
           }
       }
       elsif (isVictronKiUsed ($hash)) {
           if($sp !~ /KI-based\s=>\speak/xs) {
-              $result->{'String Configuration'}{state}  = $nok;
-              $result->{'String Configuration'}{fault}  = 1;
+              $result->{'String Configuration'}{result} .= qq{The parameter 'peak' is missing. <br>};
+              $result->{'String Configuration'}{state}   = $nok;
+              $result->{'String Configuration'}{fault}   = 1;
           }
       }
       else {                                                                                    # Strahlungsdevice SolCast-API
           if($sp !~ /peak.*?pk/x) {
-              $result->{'String Configuration'}{state}  = $nok;
-              $result->{'String Configuration'}{fault}  = 1;                                    # Test Vollständigkeit
+              $result->{'String Configuration'}{result} .= qq{Any of the parameter 'peak' or 'pk' is missing. <br>};
+              $result->{'String Configuration'}{state}   = $nok;
+              $result->{'String Configuration'}{fault}   = 1;                                   # Test Vollständigkeit
           }
       }
   }
 
-  $result->{'String Configuration'}{result} = $hqtxt{fulfd}{$lang} if(!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn});
+  if (!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn}) {
+      $result->{'String Configuration'}{result} = $hqtxt{fulfd}{$lang};
+  }
 
   ## Check Attribute DWD Wetterdevice
   #####################################
@@ -20239,7 +20284,7 @@ sub checkPlantConfig {
   ## Ausgabe
   ############
   my $out  = qq{<html>};
-  $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{ - Model: $hash->{MODEL} </b> <br><br>};
+  $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{ - Modul Version: $version, Model: $hash->{MODEL} </b> <br><br>};
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
   $out    .= qq{<tr style="font-weight:bold;">};
@@ -21591,12 +21636,13 @@ sub isAutoCorrUsed {
 
   my $cauto = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
 
-  my $acu = $cauto =~ /on_simple_ai/xs  ? 'on_simple_ai'  :
-            $cauto =~ /on_simple/xs     ? 'on_simple'     :
-            $cauto =~ /on_complex_ai/xs ? 'on_complex_ai' :
-            $cauto =~ /on_complex/xs    ? 'on_complex'    :
-            $cauto =~ /standby/xs       ? 'standby'       :
-            $cauto =~ /on/xs            ? 'on_simple'     :
+  my $acu = $cauto =~ /on_simple_ai/xs      ? 'on_simple_ai'      :
+            $cauto =~ /on_simple/xs         ? 'on_simple'         :
+            $cauto =~ /on_complex_ai/xs     ? 'on_complex_ai'     :
+            $cauto =~ /on_complex_api_ai/xs ? 'on_complex_api_ai' :
+            $cauto =~ /on_complex/xs        ? 'on_complex'        :
+            $cauto =~ /standby/xs           ? 'standby'           :
+            $cauto =~ /on/xs                ? 'on_simple'         :
             q{};
 
   my $aln = $cauto =~ /noLearning/xs ? 0 : 1;
@@ -23506,6 +23552,11 @@ to ensure that the system configuration is correct.
       <b>Note:</b> The automatic prediction correction is learning and needs time to optimise the correction values.
       After activation, optimal predictions cannot be expected immediately!
       <br><br>
+      
+      <b>on_complex_api_ai:</b> <br>
+      The method works in the same way as 'on_complex_ai', but the PV forecast value used is calculated by averaging the supplied 
+      API value and the AI value.
+      <br><br>
 
       Below are some API-specific tips that are merely best practice recommendations.
       <br><br>
@@ -24617,6 +24668,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>todayBatInSum</b>              </td><td>Total energy charged in all batteries on the current day                                                             </td></tr>
             <tr><td> <b>todayBatOut_XX</b>             </td><td>the energy taken from the battery XX on the current day                                                              </td></tr>
             <tr><td> <b>todayBatOutSum</b>             </td><td>Total energy drawn from all batteries on the current day                                                             </td></tr>
+			<tr><td> <b>tomorrowConsumptionForecast</b></td><td>Consumption forecast per hour of the coming day (01-24)                                                              </td></tr>
          </table>
          </ul>
        <br>
@@ -24735,13 +24787,13 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-graphicBeamXContent" data-pattern="graphicBeam.*Content"></a>
        <li><b>graphicBeamXContent </b><br>
          Defines the content of the bars to be displayed in the bar charts.
-         The bar charts are available in two levels. <br>
+         The bar charts are available in several levels. <br>
          Level 1 is preset by default.
          The content is determined by the attributes graphicBeam1Content and graphicBeam2Content. <br>
          Level 2 can be activated by setting the attributes graphicBeam3Content and graphicBeam4Content. <br>
-         The attributes graphicBeam1Content and graphicBeam3Content represent the primary beams, the attributes
-         graphicBeam2Content and graphicBeam4Content attributes represent the secondary beams of the
-         respective level.
+		 Level 3 can be activated by setting the attributes graphicBeam5Content and graphicBeam6Content. <br>
+         The attributes with odd numbers (1,3,5) represent the primary bars, the attributes with even numbers the secondary bars 
+         of the respective level.
          <br><br>
 
          <ul>
@@ -24957,8 +25009,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-graphicLayoutType"></a>
        <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
        Layout of the bar graph. <br>
-       The content of the bars to be displayed is determined by the <b>graphicBeam1Content</b> or
-       <b>graphicBeam2Content</b> attributes.
+       The content of the bars to be displayed is determined by the <b>graphicBeamXContent</b> attributes.
        <br><br>
 
        <ul>
@@ -25982,6 +26033,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <b>Hinweis:</b> Die automatische Vorhersagekorrektur ist lernend und benötigt Zeit um die Korrekturwerte zu optimieren.
       Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten!
+      <br><br>
+      
+      <b>on_complex_api_ai:</b> <br>
+      Die Methode arbeitet wie 'on_complex_ai', jedoch wird der verwendete PV-Prognosewert durch eine Durchschnittsberechnung 
+	  von gelieferten API-Wert und KI-Wert gebildet.
       <br><br>
 
       Nachfolgend einige API-spezifische Hinweise die lediglich Best Practice Empfehlungen darstellen.
@@ -27095,6 +27151,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>todayBatInSum</b>              </td><td>Summe der am aktuellen Tag in alle Batterien geladene Energie                                                   </td></tr>
             <tr><td> <b>todayBatOut_XX</b>             </td><td>die am aktuellen Tag aus der Batterie XX entnommene Energie                                                     </td></tr>
             <tr><td> <b>todayBatOutSum</b>             </td><td>Summe der am aktuellen Tag aus allen Batterien entnommene Energie                                               </td></tr>
+			<tr><td> <b>tomorrowConsumptionForecast</b></td><td>Verbrauchsprognose pro Stunde des kommenden Tages (01-24)                                                       </td></tr>
          </table>
          </ul>
        <br>
@@ -27213,12 +27270,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-graphicBeamXContent" data-pattern="graphicBeam.*Content"></a>
        <li><b>graphicBeamXContent </b><br>
          Legt den darzustellenden Inhalt der Balken in den Balkendiagrammen fest.
-         Die Balkendiagramme sind in zwei Ebenen verfügbar. <br>
+         Die Balkendiagramme sind in mehreren Ebenen verfügbar. <br>
          Die Ebene 1 ist im Standard voreingestellt.
          Der Inhalt wird durch die Attribute graphicBeam1Content und graphicBeam2Content bestimmt. <br>
          Die Ebene 2 kann durch Setzen der Attribute graphicBeam3Content und graphicBeam4Content aktiviert werden. <br>
-         Die Attribute graphicBeam1Content und graphicBeam3Content stellen die primären Balken, die Attribute
-         graphicBeam2Content und graphicBeam4Content die sekundären Balken der jeweiligen Ebene dar.
+		 Die Ebene 3 kann durch Setzen der Attribute graphicBeam5Content und graphicBeam6Content aktiviert werden. <br>
+         Die Attribute mit ungeraden Ziffern (1,3,5) stellen die primären Balken, die Attribute mit geraden Ziffern die sekundären Balken 
+		 der jeweiligen Ebene dar.
          <br><br>
 
          <ul>
@@ -27432,8 +27490,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-graphicLayoutType"></a>
        <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
        Layout der Balkengrafik. <br>
-       Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeam1Content</b> bzw.
-       <b>graphicBeam2Content</b> bestimmt.
+       Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeamXContent</b> bestimmt.
        <br><br>
 
        <ul>
