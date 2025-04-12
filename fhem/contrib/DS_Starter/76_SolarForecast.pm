@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.50.3" => "11.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ",
+  "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
+                           "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
   "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
                            "plant check: print out module version in header, decouple graphicBeamHeightLevelX from each other ",
   "1.50.1" => "07.04.2025  new pvCorrectionFactor_Auto option 'on_complex_api_ai' to use average of AI + API forecast if AI Hit ".
@@ -4920,13 +4921,11 @@ sub ___setOpenMeteoAPIcallKeyData {
   my $cequ  = $paref->{callequivalent};
   my $t     = $paref->{t} // time;
 
-  my $hash  = $defs{$name};
-
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{todayDoneAPIrequests} += $cequ;
 
-  my $dar = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
-  my $dac = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'todayDoneAPIcalls',    0);
-  my $asc = CurrentVal   ($hash, 'allstringscount', 1);
+  my $dar = StatusAPIVal ($name, 'OpenMeteo', '?All', 'todayDoneAPIrequests', 0);
+  my $dac = StatusAPIVal ($name, 'OpenMeteo', '?All', 'todayDoneAPIcalls',    0);
+  my $asc = CurrentVal   ($name, 'allstringscount', 1);
 
   my $drr = OMETMAXREQ - $dar;                                                         # verbleibende Requests
   $drr    = 0 if($drr < 0);
@@ -4938,7 +4937,7 @@ sub ___setOpenMeteoAPIcallKeyData {
   ## Berechnung des optimalen Request Intervalls
   ################################################
   my $edate = strftime "%Y-%m-%d 23:58:00", localtime($t);
-  my $ets   = timestringToTimestamp ($edate);
+  my $ets   = 3600 + timestringToTimestamp ($edate);                                   # V 1.50.3 1h Sicherheitspuffer -> Intervall vergößern
   my $rmdif = $ets - int $t;
 
   if ($rac) {
@@ -4948,7 +4947,7 @@ sub ___setOpenMeteoAPIcallKeyData {
       $data{$name}{statusapi}{OpenMeteo}{'?All'}{currentAPIinterval} = $optrep;
   }
 
-  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Call equivalent: $cequ, new call interval: ".StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF));
+  debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining Requests: $drr, Call equivalent: $cequ, new call interval: ".StatusAPIVal ($name, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF));
 
 return;
 }
@@ -6649,9 +6648,12 @@ sub _attrInverterStrings {               ## no critic "not used"
           next if ($k =~ /\?/xs || grep /^$k$/, @istrings);
           delete $data{$name}{solcastapi}{$k};
       }
+      
+      $data{$name}{current}{allStringsFullfilled} = 0;                                             # Stringkonfiguration neu prüfen lassen
   }
 
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -6696,9 +6698,12 @@ sub _attrStringPeak {                    ## no critic "not used"
               return qq{The stringname '$strg' is not defined as valid string in attribute 'setupInverterStrings'};
           }
       }
+      
+      $data{$name}{current}{allStringsFullfilled} = 0;                                               # Stringkonfiguration neu prüfen lassen
   }
 
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -6916,13 +6921,13 @@ sub _attrRadiationAPI {                  ## no critic "not used"
           return qq{Please complete command "set $name setupStringAzimuth".} if(!$dir);
       }
 
-      $data{$name}{current}{allStringsFullfilled} = 0;                                      # Stringkonfiguration neu prüfen lassen
+      $data{$name}{current}{allStringsFullfilled} = 0;                                             # Stringkonfiguration neu prüfen lassen
   }
 
   readingsDelete ($hash, 'nextRadiationAPICall');
 
   InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::__harmonizeAPIdelayed', $hash, 0);
-  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::setModel',              $hash, 0);                                  # Model setzen
+  InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::setModel',              $hash, 0);                                 # Model setzen
   InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::createAssociatedWith',  $hash, 0);
   InternalTimer (gettimeofday() + 4, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);    # Anlagenkonfiguration File schreiben
 
@@ -8332,11 +8337,11 @@ sub _createStringConfig {                 ## no critic "not used"
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  delete $data{$name}{strings};                                                                # Stringhash zurücksetzen
+  delete $data{$name}{strings};                                                                   # Stringhash zurücksetzen
   $data{$name}{current}{allStringsFullfilled} = 0;
 
   my @istrings = split ",", AttrVal ($name, 'setupInverterStrings', '');                          # Stringbezeichner
-  $data{$name}{current}{allstringscount} = scalar @istrings;                                   # Anzahl der Anlagenstrings
+  $data{$name}{current}{allstringscount} = scalar @istrings;                                      # Anzahl der Anlagenstrings
 
   if (!@istrings) {
       return qq{Define all used strings with command "attr $name setupInverterStrings" first.};
@@ -8351,7 +8356,7 @@ sub _createStringConfig {                 ## no critic "not used"
   while (my ($strg, $pp) = each %$ha) {
       if (grep /^$strg$/, @istrings) {
           $data{$name}{strings}{$strg}{peak}     = $pp;
-          $data{$name}{current}{allstringspeak} += $pp * 1000;                                 # insgesamt installierte Peakleistung in W
+          $data{$name}{current}{allstringspeak} += $pp * 1000;                                    # insgesamt installierte Peakleistung in W
       }
       else {
           return qq{Check 'setupStringPeak' -> the stringname '$strg' is not defined as valid string in attribute 'setupInverterStrings'};
@@ -9695,11 +9700,10 @@ sub __calcPVestimates {
   my $num     = $paref->{num};
   my $debug   = $paref->{debug};
 
-  my $hash        = $defs{$name};
   my $reld        = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
-  my $rr1c        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "rr1c",           0);    # Gesamtniederschlag während der letzten Stunde kg/m2
-  my $wcc         = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "wcc",            0);    # effektive Wolkendecke nächste Stunde X
-  my $temp        = NexthoursVal   ($hash, "NextHour".sprintf ("%02d",$num), "temp", TEMPBASEDEF);    # vorhergesagte Temperatur Stunde X
+  my $rr1c        = NexthoursVal   ($name, "NextHour".sprintf ("%02d",$num), "rr1c",           0);    # Gesamtniederschlag während der letzten Stunde kg/m2
+  my $wcc         = NexthoursVal   ($name, "NextHour".sprintf ("%02d",$num), "wcc",            0);    # effektive Wolkendecke nächste Stunde X
+  my $temp        = NexthoursVal   ($name, "NextHour".sprintf ("%02d",$num), "temp", TEMPBASEDEF);    # vorhergesagte Temperatur Stunde X
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
   $paref->{wcc}  = $wcc;
@@ -9709,11 +9713,10 @@ sub __calcPVestimates {
   my ($lh,$sq,$peakloss, $modtemp);
   my $pvsum     = 0;
   my $peaksum   = 0;
-  my $invcapsum = 0;
   my %sum;
 
   for my $string (sort keys %{$data{$name}{strings}}) {
-      my $peak = StringVal ($hash, $string, 'peak', 0);                                               # String Peak (kWp)
+      my $peak = StringVal ($name, $string, 'peak', 0);                                               # String Peak (kWp)
 
       if ($acu =~ /on_complex/xs) {
           $paref->{peak} = $peak;
@@ -9729,14 +9732,15 @@ sub __calcPVestimates {
       }
 
       $peak    *= 1000;
-      my $pvest = RadiationAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0);
+      my $pvest = RadiationAPIVal ($name, $string, $wantdt, 'pv_estimate50', 0);
       my $pv    = sprintf "%.1f", ($pvest * $hc);                                                     # Korrekturfaktor anwenden
 
       for my $in (keys %{$data{$name}{inverters}}) {
-          my $istrings = InverterVal ($hash, $in, 'istrings', 'all');                                 # dem Inverter zugeordnete Strings
+          my $istrings = InverterVal ($name, $in, 'istrings', 'all');                                 # dem Inverter zugeordnete Strings
 		  
 		  if ($istrings eq 'all' || grep /^$string$/, (split ',', $istrings)) {
 			  $sum{$in}{pvinvsum} += $pv;
+              $sum{$in}{string}    = defined $sum{$in}{string} ? $sum{$in}{string}.','.$string : $string;
 		  }                                   
       }
 
@@ -9766,13 +9770,13 @@ sub __calcPVestimates {
   }
   
   for my $ins (keys %sum) {
-      my $cap      = InverterVal ($hash, $ins, 'invertercap', 0);                                   # Max. Leistung des Inverters
+      my $cap      = InverterVal ($name, $ins, 'invertercap', 0);                                   # Max. Leistung des Inverters
       my $pvinvsum = $sum{$ins}{pvinvsum};
       
       if ($pvinvsum > $cap) {
           $pvinvsum = $cap;                                                                         # betreffende Strings auf WR Kapazität begrenzen
 
-          debugLog ($paref, "radiationProcess", "PV forecast start time $wantdt limited to $cap Wh due to inverter capacity summary");
+          debugLog ($paref, "radiationProcess", "String(s) ".$sum{$ins}{string}." in total limited to $cap Wh due to inverter $ins capacity");
       }
       
       $pvsum += $pvinvsum;
@@ -19753,32 +19757,37 @@ sub checkPlantConfig {
 
       if ($data{$name}{strings}{$sn}{peak} >= 500) {
           $result->{'String Configuration'}{result} .= qq{The peak value of string "$sn" is very high. };
-          $result->{'String Configuration'}{result} .= qq{It seems to be given in Wp instead of kWp. <br>};
+          $result->{'String Configuration'}{result} .= qq{Check if you entered peak power in Wp instead of kWp. Ignore the Warning if the entered value is correct. <br>};
           $result->{'String Configuration'}{state}   = $warn;
           $result->{'String Configuration'}{warn}    = 1;
       }
 
       if (!isSolCastUsed ($hash) && !isVictronKiUsed ($hash)) {
           if ($sp !~ /azimut.*?peak.*?tilt/x) {
-              $result->{'String Configuration'}{state}  = $nok;
-              $result->{'String Configuration'}{fault}  = 1;                                    # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
+              $result->{'String Configuration'}{result} .= qq{Any of the parameter 'azimut', 'peak' or 'tilt' is missing. <br>};
+              $result->{'String Configuration'}{state}   = $nok;
+              $result->{'String Configuration'}{fault}   = 1;                                   # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
           }
       }
       elsif (isVictronKiUsed ($hash)) {
           if($sp !~ /KI-based\s=>\speak/xs) {
-              $result->{'String Configuration'}{state}  = $nok;
-              $result->{'String Configuration'}{fault}  = 1;
+              $result->{'String Configuration'}{result} .= qq{The parameter 'peak' is missing. <br>};
+              $result->{'String Configuration'}{state}   = $nok;
+              $result->{'String Configuration'}{fault}   = 1;
           }
       }
       else {                                                                                    # Strahlungsdevice SolCast-API
           if($sp !~ /peak.*?pk/x) {
-              $result->{'String Configuration'}{state}  = $nok;
-              $result->{'String Configuration'}{fault}  = 1;                                    # Test Vollständigkeit
+              $result->{'String Configuration'}{result} .= qq{Any of the parameter 'peak' or 'pk' is missing. <br>};
+              $result->{'String Configuration'}{state}   = $nok;
+              $result->{'String Configuration'}{fault}   = 1;                                   # Test Vollständigkeit
           }
       }
   }
 
-  $result->{'String Configuration'}{result} = $hqtxt{fulfd}{$lang} if(!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn});
+  if (!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn}) {
+      $result->{'String Configuration'}{result} = $hqtxt{fulfd}{$lang};
+  }
 
   ## Check Attribute DWD Wetterdevice
   #####################################
