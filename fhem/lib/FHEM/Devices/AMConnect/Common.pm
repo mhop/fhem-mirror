@@ -3496,7 +3496,8 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
 # headlights-event-v2
               elsif ( $result->{type} =~ /^hea/ ) { #no headlights event 430x
 
-                $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} = $result->{attributes}{headlight}{mode};
+                $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} = $result->{attributes}{headlights}{mode} if ( defined $result->{attributes}{headlights} );
+                $hash->{helper}{mower}{attributes}{settings}{headlight}{mode} = $result->{attributes}{headlight}{mode} if ( defined $result->{attributes}{headlight} );
 
               }
 
