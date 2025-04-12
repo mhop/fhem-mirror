@@ -25106,7 +25106,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
 			<tr><td> <b>backupFilesKeep</b>           </td><td>Defines the number of generations of backup files.                                                                                   </td></tr>
 			<tr><td>                                  </td><td>(see <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                       </td></tr>
-		    <tr><td>                                  </td><td>If ctrlBackupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place.                        </td></tr>
+		    <tr><td>                                  </td><td>If backupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place.                            </td></tr>
 		    <tr><td>                                  </td><td>Manual execution with the aforementioned set command is still possible.                                                              </td></tr>
 		    <tr><td>                                  </td><td>Value: <b>Integer</b>, default: 3                                                                                                    </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
@@ -27587,7 +27587,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
 			<tr><td> <b>backupFilesKeep</b>           </td><td>Legt die Anzahl der Generationen von Sicherungsdateien fest.                                                                    </td></tr>
 			<tr><td>                                  </td><td>(siehe <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                </td></tr>
-		    <tr><td>                                  </td><td>Ist ctrlBackupFilesKeep explit auf '0' gesetzt, erfolgt keine automatische Generierung und Bereinigung von Sicherungsdateien.   </td></tr>
+		    <tr><td>                                  </td><td>Ist backupFilesKeep explit auf '0' gesetzt, erfolgt keine automatische Generierung und Bereinigung von Sicherungsdateien.       </td></tr>
 		    <tr><td>                                  </td><td>Eine manuelle Ausführung mit dem genannten Set-Kommando ist weiterhin möglich.                                                  </td></tr>
 		    <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 3                                                                                               </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
