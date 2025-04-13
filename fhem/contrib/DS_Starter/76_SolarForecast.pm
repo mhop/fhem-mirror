@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.50.4" => "13.04.2025  Consumer Strokes: fix __dynColor, new key flowGraphicControl->strokeCmrRedColLimit ".
+                           "__getopenMeteoData: fix get calclated call interval ",
   "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
                            "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
   "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
@@ -482,6 +484,7 @@ use constant {
   STROKCOLSIGDEF  => 'red',                                                         # Flußgrafik: Standardfarbe aktive Signal-Kette
   STROKCOLINADEF  => 'gray',                                                        # Flußgrafik: Standardfarbe inaktive Kette
   STROKWIDTHDEF   => 25,                                                            # Flußgrafik: Standard Breite der Kette
+  STROKCMRREDLIM  => 400,                                                           # Flußgrafik: Consumerpower ab der dynamische Laufkette rot gefärbt wird
   PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
   CICONDEF        => 'light_light_dim_100',                                         # default Consumer-Icon
   CICONCOLACT     => 'darkorange',                                                  # default Consumer-Icon aktiv Färbung
@@ -2820,7 +2823,7 @@ sub __getSolCastData {
           return "The current time is not between sunrise minus ".(LEADTIME/60)." minutes and sunset";
       }
 
-      my $lrt    = StatusAPIVal ($hash, $rapi, '?All', 'lastretrieval_timestamp',            0);
+      my $lrt    = StatusAPIVal ($hash, $rapi, '?All', 'lastretrieval_timestamp',           0);
       my $apiitv = StatusAPIVal ($hash, $rapi, '?All', 'currentAPIinterval',     SOLAPIREPDEF);
 
       if ($lrt && $t < $lrt + $apiitv) {
@@ -4236,10 +4239,11 @@ sub __getopenMeteoData {
   my $reqm  = $paref->{reqm};
 
   if (!$force) {                                                                                      # regulärer API Abruf
-      my $lrt = StatusAPIVal ($name, 'OpenMeteo', '?All', 'lastretrieval_timestamp', 0);
+      my $lrt   = StatusAPIVal ($name, 'OpenMeteo', '?All', 'lastretrieval_timestamp',       0);
+      my $cival = StatusAPIVal ($name, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF);
 
-      if ($lrt && $t < $lrt + OMETEOREPDEF) {
-          my $rt = $lrt + OMETEOREPDEF - $t;
+      if ($lrt && $t < $lrt + $cival) {
+          my $rt = $lrt + $cival - $t;
           return qq{The waiting time to the next Open-Meteo API call has not expired yet. The remaining waiting time is $rt seconds};
       }
   }
@@ -6288,6 +6292,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
                    showconsumerdummy
                    showconsumerpower
                    strokeconsumerdyncol
+                   strokeCmrRedColLimit
                    strokecolstd
                    strokecolsig
                    strokecolina
@@ -6311,6 +6316,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
           showconsumerremaintime => '(0|1)',
           showconsumerpower      => '(0|1)',
           strokeconsumerdyncol   => '(0|1)',
+          strokeCmrRedColLimit   => '\d+',
           strokecolstd           => '.*',
           strokecolsig           => '.*',
           strokecolina           => '.*',
@@ -16369,7 +16375,7 @@ sub _flowGraphic {
   my $cgc            = ReadingsNum ($name, 'Current_GridConsumption', 0);
   my $node2grid      = ReadingsNum ($name, 'Current_GridFeedIn',      0);      # vom Knoten zum Grid
   my $cself          = ReadingsNum ($name, 'Current_SelfConsumption', 0);
-  my $cc             = CurrentVal  ($hash, 'consumption',             0);
+  my $cc             = CurrentVal  ($name, 'consumption',             0);
 
   my $cc_dummy  = $cc;
   my $scale     = FGSCALEDEF;
@@ -16399,7 +16405,7 @@ sub _flowGraphic {
       $bat2home      += $bat2homepow if(defined $bat2homepow);
   }
   
-  my $soc = CurrentVal ($hash, 'batsoctotal', 0);                                      # resultierender SoC (%) aller Batterien als Cluster 
+  my $soc = CurrentVal ($name, 'batsoctotal', 0);                                      # resultierender SoC (%) aller Batterien als Cluster 
 
   if (!defined $batin && !defined $bat2home) {
       $hasbat   = 0;
@@ -16559,10 +16565,11 @@ sub _flowGraphic {
                    !$node2grid && !$cgc && $bat2home ? "$stna grid_gray"  :
                    "$stna grid_red";
 
-  my $strokecolstd = CurrentVal ($hash, 'strokecolstd', STROKCOLSTDDEF);
-  my $strokecolsig = CurrentVal ($hash, 'strokecolsig', STROKCOLSIGDEF);
-  my $strokecolina = CurrentVal ($hash, 'strokecolina', STROKCOLINADEF);
-  my $strokewidth  = CurrentVal ($hash, 'strokewidth',   STROKWIDTHDEF);
+  my $strokecolstd = CurrentVal ($name, 'strokecolstd',         STROKCOLSTDDEF);
+  my $strokecolsig = CurrentVal ($name, 'strokecolsig',         STROKCOLSIGDEF);
+  my $strokecolina = CurrentVal ($name, 'strokecolina',         STROKCOLINADEF);
+  my $strokewidth  = CurrentVal ($name, 'strokewidth',           STROKWIDTHDEF);
+  my $strokeredlim = CurrentVal ($name, 'strokeCmrRedColLimit', STROKCMRREDLIM);
 
   my $ret = << "END0";
       <style>
@@ -16634,7 +16641,7 @@ END0
       $cons_left = $consumer_start + 15;
 
       for my $c (@consumers) {
-          my $calias     = ConsumerVal ($hash, $c, 'alias', '');                                           # Name des Consumerdevices
+          my $calias     = ConsumerVal ($name, $c, 'alias', '');                                           # Name des Consumerdevices
           $currentPower  = $cnsmr->{$c}{p};
 
           my ($cicon)    = __substituteIcon ( { hash => $hash,                                             # Icon des Consumerdevices
@@ -16683,7 +16690,7 @@ END1
 
   if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {               
       $car              = 100 - $car;
-      my $pahcol        = '#'.__dynColor ($car, 0, 50, 100);                                      # V 1.49.5
+      my $pahcol        = '#'.__dynColor ($car, 100);                                             # V 1.50.4
       ($hicon, my $col) = split '@', $hicon;
       $hicon            = $hicon.'@'.$pahcol;
   }
@@ -16752,7 +16759,7 @@ END3
       my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
       if ($cc_dummy > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
-          $chain_color = 'style="stroke: #'.__dynColor ($cc_dummy).';"';
+          $chain_color = 'style="stroke: #'.__dynColor ($cc_dummy, $strokeredlim).';"';
       }
 
       $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};
@@ -16814,8 +16821,8 @@ END3
       my $consumer_style;
 
       for my $c (@consumers) {
-          my $power     = ConsumerVal ($hash, $c, 'power',   0);
-          my $rpcurr    = ConsumerVal ($hash, $c, 'rpcurr', '');                                   # Reading für akt. Verbrauch angegeben ?
+          my $power     = ConsumerVal ($name, $c, 'power',   0);
+          my $rpcurr    = ConsumerVal ($name, $c, 'rpcurr', '');                                   # Reading für akt. Verbrauch angegeben ?
           $currentPower = $cnsmr->{$c}{p};
 
           if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
@@ -16828,7 +16835,7 @@ END3
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
           if ($p > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
-              $chain_color = 'style="stroke: #'.__dynColor ($p).';"';
+              $chain_color = 'style="stroke: #'.__dynColor ($currentPower, $strokeredlim).';"';
           }
 
           $ret             .= qq{<path id="home2consumer_${c}_$stna" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,$y_pos" />};
@@ -16899,8 +16906,8 @@ END3
       for my $c (@consumers) {
           $currentPower    = sprintf "%.1f", $cnsmr->{$c}{p};
           $currentPower    = sprintf "%.0f", $currentPower if($currentPower > 10);
-          my $consumerTime = ConsumerVal ($hash, $c, 'remainTime', '');                               # Restlaufzeit
-          my $rpcurr       = ConsumerVal ($hash, $c, 'rpcurr',     '');                               # Readingname f. current Power
+          my $consumerTime = ConsumerVal ($name, $c, 'remainTime', '');                               # Restlaufzeit
+          my $rpcurr       = ConsumerVal ($name, $c, 'rpcurr',     '');                               # Readingname f. current Power
 
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = isConsumerPhysOn($hash, $c) ? 'on' : 'off';
@@ -17246,9 +17253,10 @@ return ($icon, $txt);
 ###################################################################   
 sub __dynColor {          
   my $val = shift;
-  my $beg = shift // 0;
-  my $mid = shift // 200;
   my $end = shift // 400;
+  
+  my $beg = 0;
+  my $mid = $end / 2;
 
   my $color = substr (Color::pahColor ($beg, $mid, $end, $val, [40,198,45, 127,255,0, 251,158,4, 255,127,0, 255,0,0]), 0, 6);
 
@@ -24747,6 +24755,9 @@ to ensure that the system configuration is correct.
             <tr><td> <b>strokeconsumerdyncol</b>    </td><td>The lines from the house node to the consumers can be colored dynamically depending on the consumption value.           </td></tr>
             <tr><td>                                </td><td><b>0</b> - no dynamic coloring,  <b>1</b> - dynamic coloring, default: 0                                                </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>strokeCmrRedColLimit</b>    </td><td>Power consumption from which the house -> consumer line is displayed in red if strokeconsumerdyncol=1 is set.           </td></tr>
+            <tr><td>                                </td><td>Value: <b>Integer</b>, default: 400                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>strokecolina </b>           </td><td>Color of an inactive line                                                                                               </td></tr>
 			<tr><td>                                </td><td>Value: <b>Hex (e.g. #cc3300) or designation (e.g. red, blue)</b>, default: gray                                         </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
@@ -25106,7 +25117,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
 			<tr><td> <b>backupFilesKeep</b>           </td><td>Defines the number of generations of backup files.                                                                                   </td></tr>
 			<tr><td>                                  </td><td>(see <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                       </td></tr>
-		    <tr><td>                                  </td><td>If ctrlBackupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place.                        </td></tr>
+		    <tr><td>                                  </td><td>If backupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place.                            </td></tr>
 		    <tr><td>                                  </td><td>Manual execution with the aforementioned set command is still possible.                                                              </td></tr>
 		    <tr><td>                                  </td><td>Value: <b>Integer</b>, default: 3                                                                                                    </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
@@ -27230,7 +27241,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>strokeconsumerdyncol</b>    </td><td>Die Linien vom Hausknoten zu den Verbrauchern können abhängig vom Verbrauchswert dynamisch eingefärbt werden.           </td></tr>
             <tr><td>                                </td><td><b>0</b> - keine dynamische Färbung,  <b>1</b> - dynamische Färbung, default: 0                                         </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
-			<tr><td> <b>strokecolina </b>           </td><td>Farbe einer inaktiven Linie                                                                                             </td></tr>
+            <tr><td> <b>strokeCmrRedColLimit</b>    </td><td>Leistungsaufnahme ab der die Linie Haus -> Verbraucher rot dargestellt wird sofern strokeconsumerdyncol=1 gesetzt ist.  </td></tr>
+            <tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 400                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>strokecolina </b>           </td><td>Farbe einer inaktiven Linie                                                                                             </td></tr>
 			<tr><td>                                </td><td>Wert: <b>Hex (z.B. #cc3300) oder Bezeichnung (z.B. red, blue)</b>, default: gray                                        </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>strokecolsig </b>           </td><td>Farbe einer aktiven Signallinie                                                                                         </td></tr>
@@ -27587,7 +27601,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
 			<tr><td> <b>backupFilesKeep</b>           </td><td>Legt die Anzahl der Generationen von Sicherungsdateien fest.                                                                    </td></tr>
 			<tr><td>                                  </td><td>(siehe <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                </td></tr>
-		    <tr><td>                                  </td><td>Ist ctrlBackupFilesKeep explit auf '0' gesetzt, erfolgt keine automatische Generierung und Bereinigung von Sicherungsdateien.   </td></tr>
+		    <tr><td>                                  </td><td>Ist backupFilesKeep explit auf '0' gesetzt, erfolgt keine automatische Generierung und Bereinigung von Sicherungsdateien.       </td></tr>
 		    <tr><td>                                  </td><td>Eine manuelle Ausführung mit dem genannten Set-Kommando ist weiterhin möglich.                                                  </td></tr>
 		    <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 3                                                                                               </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
