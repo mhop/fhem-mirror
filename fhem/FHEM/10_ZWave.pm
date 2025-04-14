@@ -432,7 +432,11 @@ my %zwave_class = (
   NETWORK_MANAGEMENT_INSTALL=> { id => '67' },
   ZIP_NAMING               => { id => '68' },
   MAILBOX                  => { id => '69' },
-  WINDOW_COVERING          => { id => '6a' },
+  WINDOW_COVERING          => { id => '6a',
+    get   => { wincov_supported=> "01" },
+    parse => { "..6a(02|04)(.*)"  => 'ZWave_wincovParse($hash,$1,$2)' },
+    init  => { ORDER=>49,  CMD => '"get $NAME wincov_supported"' }
+  },
   IRRIGATION               => { id => '6b' },
   SUPERVISION              => { id => '6c' },
   HUMIDITY_CONTROL_MODE    => { id => '6d' },
@@ -691,8 +695,7 @@ use vars qw(%zwave_parseHook);
 my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "0175-0004-000a" => "devolo_Siren",
                            "010f-0301-1001" => "Fibaro_FGRM222",
-                           "010f-0302-1000" => "Fibaro_FGRM222", # FGR 222
-                           "010f-0304-1000" => "Fibaro_FGRM222", # FGR-224, #140970
+                           "010f-0302-1000" => "Fibaro_FGRM222", # FGR 223
                            "010f-0203-1000" => "Fibaro_FGS223",
                            "0108-0004-000a" => "Philio_PSE02", # DLink DCH-Z510
                            "013c-0004-000a" => "Philio_PSE02", # Zipato Siren
@@ -913,6 +916,8 @@ ZWave_setEndpoints($)
   my $tn = TimeNow();
   for my $k (sort keys %{$mp}) {
     my $h = $mp->{$k};
+    ZWave_wincovAddCmd($h) if(ReadingsVal($h->{NAME},"wincov_supported",undef));
+
     next if($h->{nodeIdHex} !~ m/(..)(..)/);
     my ($root, $lid) = ($1, $2);
     my $rd = $mp->{$h->{homeId}." ".$root};
@@ -6295,6 +6300,96 @@ ZWave_entryControlParse($$)
   $data = pack("H*", $data) if($dt eq "ASCII");
 
   return "entry_control:sequence $seq dataType $dt eventType $et data $data"
+} 
+
+my @wc_cmd = (
+  "out_left_mvt", #0
+  "out_left_pos",
+  "out_right_mvt",
+  "out_right_pos",
+  "in_left_mvt",
+  "in_left_pos",
+  "in_right_mvt",
+  "in_right_pos",
+  "in_right_left_mvt",
+  "in_right_left_pos",
+
+  "vert_slats_mvt", #10
+  "vert_slats_pos",
+
+  "out_bottom_mvt",
+  "out_bottom_pos",
+  "out_top_mvt",
+  "out_top_pos",
+  "in_bottom_mvt",
+  "in_bottom_pos",
+  "in_top_mvt",
+  "in_top_pos",
+  "in_top_bottom_mvt", #20
+  "in_top_bottom_pos",
+
+  "hor_slats_mvt",
+  "hor_slats_pos"
+);
+
+sub
+ZWave_wincovAddCmd($;$)
+{
+  my ($h,$v) = @_;
+  $v = ReadingsVal($h->{NAME},"wincov_supported",undef) if(!$v);
+  foreach my $cmd (split(" ", $v)) {
+    $zwave_class{WINDOW_COVERING}{get}{"wincov_".$cmd} = 
+          "ZWave_wincovGet(\$hash,'wincov_$cmd')"
+  }
+}
+
+sub
+ZWave_wincovParse($$$)
+{
+  my($hash,$type,$data) = @_;
+
+  if($type == 2) { # supported
+    my @sup;
+    my $idx = 0;
+    for(my $byte=2; $byte<length($data); $byte+=2) {
+      my $d = hex(substr($data,$byte,2));
+      for(my $bit=0; $bit<8; $bit++) {
+        if($d & (1<<$bit) && $idx < @wc_cmd) {
+          push(@sup, $wc_cmd[$idx]);
+          $zwave_class{WINDOW_COVERING}{get}{"wincov_".$wc_cmd[$idx]} = 
+                "ZWave_wincovGet(\$hash,$idx)"
+        }
+        $idx++;
+      }
+    }
+    ZWave_wincovAddCmd(undef, join(" ", @sup));
+    return "wincov_supported:".join(" ", @sup);
+  }
+
+  if($type == 4) { # report
+    my $idx    = hex(substr($data,0,2));
+    my $curval = hex(substr($data,2,2));
+    my $tgtval = hex(substr($data,4,2));
+    my $dur    = hex(substr($data,6,2));
+    return "wincov_$wc_cmd[$idx]: current:$curval target:$tgtval duration:$dur";
+  }
+
+}
+
+sub
+ZWave_wincovGet($$)
+{
+  my($hash,$cmd) = @_;
+   
+  my $lcmd = substr($cmd,7); # cut off wincov_
+  return "Unsupported command: $cmd"
+    if(ReadingsVal($hash->{NAME}, "wincov_supported", "") !~ m/\b$lcmd\b/);
+  my $idx = 0; 
+  while($idx<@wc_cmd) {
+    last if($lcmd == $wc_cmd[$idx]);
+    $idx++;
+  }
+  return (undef, "03$idx");
 }
 
 sub
