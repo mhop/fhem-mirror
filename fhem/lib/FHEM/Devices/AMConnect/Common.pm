@@ -2951,7 +2951,7 @@ sub listErrorStack {
 
     for ( my $i = 0; $i < @{ $hash->{helper}{endpoints}{messages}{attributes}{messages} }; $i++ ) {
 
-      $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> ' . FmtDateTime( $msg[$i]{time} ) . ' </td><td> ' . $msg[$i]{severity} . ' - ' . $errortable->{ $msg[$i]{code} } . ' </td><td> ' . ( defined $msg[$i]{longitude} ? $msg[$i]{longitude} : '-' ) . ' / ' . ( defined $msg[$i]{latitude} ? $msg[$i]{latitude} : '-' ) . ' </td></tr>';
+      $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> ' . FmtDateTimeGMT( $msg[$i]{time} ) . ' </td><td> ' . $msg[$i]{severity} . ' - ' . $errortable->{ $msg[$i]{code} } . ' </td><td> ' . ( defined $msg[$i]{longitude} ? $msg[$i]{longitude} : '-' ) . ' / ' . ( defined $msg[$i]{latitude} ? $msg[$i]{latitude} : '-' ) . ' </td></tr>';
 
     }
 
@@ -3451,7 +3451,13 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
 
                 }
 
-                $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} = $result->{attributes}{mower}{errorCodeTimestamp} if ( defined $result->{attributes}{mower}{errorCodeTimestamp} );
+                if ( defined $result->{attributes}{mower}{errorCodeTimestamp} ) {
+
+                  my $tmp = $result->{attributes}{mower}{errorCodeTimestamp};
+                  $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp} = length( $tmp ) == 10 ? $tmp * 1000 : $tmp;
+
+                }
+
                 $hash->{helper}{mower}{attributes}{mower}{isErrorConfirmable} = $result->{attributes}{mower}{isErrorConfirmable} if ( defined $result->{attributes}{mower}{isErrorConfirmable} );
 
                 if ( !$additional_polling ) {
