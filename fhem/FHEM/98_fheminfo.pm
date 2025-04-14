@@ -131,13 +131,12 @@ sub _fi2_Count {
 
 # 8. skip for some special cases found in database
       next if ( ($model =~ /^unkno.*/i) || 
-                ($model =~ /virtual.*/i) || 
+                ($model =~ /virtual.*|actiondetector/i) || 
                 ($model =~ m/\berror\b/i) ||
                 ($model =~ m/^<.*>$/) ||
                 ($model eq '?') || 
                 ($model eq '1') || 
-#                (length($model) > 80) ||
-                (defined($defs{$key}{'chanNo'})) ||
+                (defined($defs{$key}{'chanNo'}) && defined($defs{$key}{device})) ||
                 ($name =~ m/^unknown_/) );
 
 # 9. finally count it :)
@@ -235,7 +234,8 @@ sub _fi2_HtmlTable {
       next if ($type eq $c_system);
       $fhemInfo{$type}{$c_noModel} //= '';
       $result .= "<tr><td>$type</td><td> </td><td>$fhemInfo{$type}{$c_noModel}</td></tr>";
-      while ( my ($model, $count) = each(%{$fhemInfo{$type}}) )
+      #while ( my ($model, $count) = each(%{$fhemInfo{$type}}) )
+      for my $model (sort keys %{$fhemInfo{$type}})
       { $result .= "<tr><td> </td><td>$model</td><td>$fhemInfo{$type}{$model}</td></tr>" unless $model eq $c_noModel; }
    }  
 
