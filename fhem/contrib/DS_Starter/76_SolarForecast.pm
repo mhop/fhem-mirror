@@ -160,8 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.50.4" => "13.04.2025  Consumer Strokes: fix __dynColor, new key flowGraphicControl->strokeCmrRedColLimit ".
-                           "__getopenMeteoData: fix get calclated call interval ",
+  "1.50.4" => "14.04.2025  Consumer Strokes: fix __dynColor, new key flowGraphicControl->strokeCmrRedColLimit ".
+                           "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ",
   "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
                            "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
   "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
@@ -637,6 +637,7 @@ my %hset = (                                                                # Ha
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
   consumerNewPlanning       => { fn => \&_setconsumerNewPlanning       },
   clientAction              => { fn => \&_setclientAction              },
+  cycleInterval             => { fn => \&_setcycleInterval             },
   energyH4Trigger           => { fn => \&_setTrigger                   },
   plantConfiguration        => { fn => \&_setplantConfiguration        },
   batteryTrigger            => { fn => \&_setTrigger                   },
@@ -1717,6 +1718,7 @@ sub Set {
   $setlist = "Unknown argument $opt, choose one of ".
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
+             "cycleInterval ".
              "energyH4Trigger:textField-long ".
              "operatingMemory:backup,save".$rf." ".
              "operationMode:active,inactive ".
@@ -1786,8 +1788,6 @@ return "$setlist";
 sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $opt   = $paref->{opt};
   my $c     = $paref->{prop};
   my $evt   = $paref->{prop1} // 0;                                                          # geändert V 1.1.0 - 1 -> 0
   my $hash  = $defs{$name};
@@ -1863,6 +1863,42 @@ sub _setconsumerNewPlanning {            ## no critic "not used"
   }
 
   centralTask ($hash, $evt);
+
+return;
+}
+
+################################################################
+#                      Setter cycleInterval
+################################################################
+sub _setcycleInterval {                   ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop} // return;
+  
+  return if(!$init_done);
+
+  if ($prop !~ /^\d+$/xs) {
+      return "The $opt must be specified by an Integer.";
+  }
+
+  my $pc = AttrVal ($name, 'plantControl', undef);
+  my $new;
+  
+  if (!defined $pc) {
+      $new = "$name plantControl cycleInterval=$prop";
+  }
+  elsif ($pc =~ /cycleInterval=\d+/xs) {
+      $pc  =~ s/cycleInterval=\d+/cycleInterval=$prop/gs;
+      $new = "$name plantControl $pc";
+  }  
+  else {
+      my $npc = $pc." cycleInterval=$prop";
+      $new    = "$name plantControl $npc";
+  }
+  
+  my $ret = CommandAttr (undef, "$new");
+  ::CommandSave (1, undef) if(!$ret);
 
 return;
 }
@@ -4239,11 +4275,11 @@ sub __getopenMeteoData {
   my $reqm  = $paref->{reqm};
 
   if (!$force) {                                                                                      # regulärer API Abruf
-      my $lrt   = StatusAPIVal ($name, 'OpenMeteo', '?All', 'lastretrieval_timestamp',       0);
-      my $cival = StatusAPIVal ($name, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF);
+      my $lrt    = StatusAPIVal ($name, 'OpenMeteo', '?All', 'lastretrieval_timestamp',       0);
+      my $apiitv = StatusAPIVal ($name, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF);
 
-      if ($lrt && $t < $lrt + $cival) {
-          my $rt = $lrt + $cival - $t;
+      if ($lrt && $t < $lrt + $apiitv) {
+          my $rt = $lrt + $apiitv - $t;
           return qq{The waiting time to the next Open-Meteo API call has not expired yet. The remaining waiting time is $rt seconds};
       }
   }
@@ -23364,6 +23400,23 @@ to ensure that the system configuration is correct.
     </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-set-cycleInterval"></a>
+      <li><b>cycleInterval &lt;Integer&gt; </b> <br><br>
+
+      Repetition interval of the data collection in seconds. <br>
+	  The command is suitable for dynamically changing the ‘cycleInterval’ key in the ‘plantControl’ attribute. 
+	  The conditions of the ‘plantControl’ attribute apply to the entry.
+	  <br><br>
+
+      <ul>
+        <b>Example: </b> <br>
+        set &lt;name&gt; cycleInterval 120 <br>
+      </ul>
+    </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-set-consumerImmediatePlanning"></a>
@@ -23604,7 +23657,7 @@ to ensure that the system configuration is correct.
 
       <b>Model VictronKiAPI:</b> <br>
       This model is based on Victron Energy's AI-supported API.
-      The recommended autocorrect method is <b>on_complex</b>. <br><br>
+      The recommended autocorrect method is <b>off</b>. <br><br>
 
       <b>Model DWD:</b> <br>
       The recommended autocorrect method is <b>on_complex</b> or <b>on_complex_ai</b>. <br><br>
@@ -24709,7 +24762,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-flowGraphicControl"></a>
-       <li><b>flowGraphicControl &lt;Key1=Value1&gt; &lt;Key2=Value2&gt; ... </b><br>
+       <li><b>flowGraphicControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
          By optionally specifying the key=value pairs listed below, various display properties of the energy flow
          graph can be influenced. <br>
          The entry can be made in several lines.
@@ -25106,7 +25159,7 @@ to ensure that the system configuration is correct.
        <br>
        
        <a id="SolarForecast-attr-plantControl"></a>
-       <li><b>plantControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>plantControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
          By optionally specifying the 'Key=Value' pairs listed below, various properties of the overall
          properties of the overall system can be set.
          The entry can be made in several lines.
@@ -25840,6 +25893,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-set-cycleInterval"></a>
+      <li><b>cycleInterval &lt;Ganzzahl&gt; </b> <br><br>
+
+      Wiederholungsintervall der Datensammlung in Sekunden. <br>
+	  Der Befehl ist geeignet um den Schlüssel 'cycleInterval' im Attribut 'plantControl' dynamisch zu ändern. 
+	  Für die Eingabe gelten die Bedingungen des Attributes 'plantControl'.
+	  <br><br>
+
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; cycleInterval 120 <br>
+      </ul>
+    </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-set-consumerImmediatePlanning"></a>
@@ -26089,7 +26159,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <b>Model VictronKiAPI:</b> <br>
       Dieses Model basiert auf der KI gestützten API von Victron Energy.
-      Die empfohlene Autokorrekturmethode ist <b>on_complex</b>. <br><br>
+      Die empfohlene Autokorrekturmethode ist <b>off</b>. <br><br>
 
       <b>Model DWD:</b> <br>
       Die empfohlene Autokorrekturmethode ist <b>on_complex</b> bzw. <b>on_complex_ai</b>. <br><br>
@@ -27195,7 +27265,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-flowGraphicControl"></a>
-       <li><b>flowGraphicControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>flowGraphicControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene
          Anzeigeeigenschaften der Energieflußgrafik beeinflusst werden. <br>
          Die Eingabe kann mehrzeilig erfolgen.
@@ -27590,7 +27660,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
        
        <a id="SolarForecast-attr-plantControl"></a>
-       <li><b>plantControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>plantControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten 'Schlüssel=Wert' Paare können verschiedene
          Eigenschaften der Gesamtanlage eingestellt werden.
          Die Eingabe kann mehrzeilig erfolgen.
