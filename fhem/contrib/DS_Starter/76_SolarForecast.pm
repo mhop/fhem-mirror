@@ -1898,7 +1898,7 @@ sub _setcycleInterval {                   ## no critic "not used"
   }
   
   my $ret = CommandAttr (undef, "$new");
-  ::CommandSave (1, undef) if(!$ret);
+  ::CommandSave (undef, undef) if(!$ret);
 
 return;
 }
