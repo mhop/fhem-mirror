@@ -2951,7 +2951,7 @@ sub listErrorStack {
 
     for ( my $i = 0; $i < @{ $hash->{helper}{endpoints}{messages}{attributes}{messages} }; $i++ ) {
 
-      $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> ' . FmtDateTimeGMT( $msg[$i]{time} ) . ' </td><td> ' . $msg[$i]{severity} . ' - ' . $errortable->{ $msg[$i]{code} } . ' </td><td> ' . ( defined $msg[$i]{longitude} ? $msg[$i]{longitude} : '-' ) . ' / ' . ( defined $msg[$i]{latitude} ? $msg[$i]{latitude} : '-' ) . ' </td></tr>';
+      $ret .= '<tr class="column '.( $cnt++ % 2 ? 'odd' : 'even' ).'"><td> ' . FmtDateTime( $msg[$i]{time} ) . ' </td><td> ' . $msg[$i]{severity} . ' - ' . $errortable->{ $msg[$i]{code} } . ' </td><td> ' . ( defined $msg[$i]{longitude} ? $msg[$i]{longitude} : '-' ) . ' / ' . ( defined $msg[$i]{latitude} ? $msg[$i]{latitude} : '-' ) . ' </td></tr>';
 
     }
 
