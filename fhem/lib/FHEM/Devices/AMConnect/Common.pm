@@ -2190,7 +2190,7 @@ sub isErrorThanPrepare {
       my $ect = $hash->{helper}{mower}{attributes}{mower}{errorCodeTimestamp};
       $hash->{helper}{lasterror}{timestamp} = $ect;
       my $errc = $hash->{helper}{mower}{attributes}{mower}{errorCode};
-      $hash->{helper}{lasterror}{errordesc} = $errortable->{$errc};
+      $hash->{helper}{lasterror}{errordesc} = $errortable->{$errc} // 'No error description available for error code: ' . $errc;
       $hash->{helper}{lasterror}{errordate} = FmtDateTime( $ect / 1000 );
       $hash->{helper}{lasterror}{errorstate} = $hash->{helper}{mower}{attributes}{mower}{state};
       $hash->{helper}{lasterror}{errorzone} = $hash->{helper}{currentZone} if ( defined( $hash->{helper}{currentZone} ) );
@@ -2601,7 +2601,7 @@ sub fillReadings {
 
   if ( $errc =~ /\d+/ ) {;
 
-    my $errd = $errortable->{$errc};
+    my $errd = $errortable->{$errc} // 'No error description available for error code: ' . $errc;
     readingsBulkUpdateIfChanged( $hash, $pref.'_errorDescription', $tstamp ? $errd : '-');
 
   }
