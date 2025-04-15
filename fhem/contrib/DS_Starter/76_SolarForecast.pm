@@ -162,7 +162,7 @@ BEGIN {
 my %vNotesIntern = (
   "1.50.4" => "15.04.2025  Consumer Strokes: fix __dynColor, new key flowGraphicControl->strokeCmrRedColLimit ".
                            "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ".
-						   "normBeamWidth: decouple content batsocforecast_, energycosts feedincome from the conversion Wh -> kWh ",
+						   "normBeamWidth: decouple content batsocforecast_, energycosts, feedincome from the conversion Wh -> kWh ",
   "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
                            "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
   "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
@@ -17414,12 +17414,8 @@ sub normBeamWidth {
   my $doconvert = 0;
   
   if ($kw eq 'kWh') {
-	  if ($beam eq 'diff' || ( $paref->{$beam.'cont'} !~ /batsocforecast_/xs && 
-	                           $paref->{$beam.'cont'} !~ /energycosts/xs     &&
-                               $paref->{$beam.'cont'} !~ /feedincome/xs
-							 )
-	     ) {
-		  $doconvert = 1;
+	  if ($beam ne 'diff' && $paref->{$beam.'cont'} !~ /batsocforecast_|energycosts|feedincome/xs) {
+	      $doconvert = 1;
 	  }
   }
 
@@ -25083,17 +25079,17 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicLayoutType"></a>
        <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
-       Layout of the bar graph. <br>
-       The content of the bars to be displayed is determined by the <b>graphicBeamXContent</b> attributes.
+       Layout of the bar graph. The content of the bars to be displayed is determined by the <b>graphicBeamXContent</b> attributes.
        <br><br>
 
        <ul>
        <table>
        <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-          <tr><td> <b>double</b>  </td><td>displays the primary bar and the secondary bar (default)                                                       </td></tr>
-          <tr><td> <b>single</b>  </td><td>displays only the primary bar                                                                                  </td></tr>
-          <tr><td> <b>diff</b>    </td><td>difference display. It is valid: &lt;Difference&gt; = &lt;Value primary bar&gt; - &lt;Value secondary bar&gt;  </td></tr>
-       </table>
+          <tr><td> <b>double</b>  </td><td>displays the primary bar and the secondary bar (default)                                                                </td></tr>
+          <tr><td> <b>single</b>  </td><td>displays only the primary bar                                                                                           </td></tr>
+          <tr><td> <b>diff</b>    </td><td>difference display. It is valid: &lt;Difference&gt; = &lt;Value primary bar&gt; - &lt;Value secondary bar&gt;           </td></tr>
+          <tr><td>                </td><td>The current setting of <a href=“#SolarForecast-attr-graphicEnergyUnit”>graphicEnergyUnit</a> is not taken into account. </td></tr>
+	   </table>
        </ul>
        </li>
        <br>
@@ -27584,16 +27580,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicLayoutType"></a>
        <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
-       Layout der Balkengrafik. <br>
-       Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeamXContent</b> bestimmt.
+       Layout der Balkengrafik. Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeamXContent</b> bestimmt.
        <br><br>
 
        <ul>
        <table>
        <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-          <tr><td> <b>double</b>  </td><td>zeigt den primären Balken und den sekundären Balken an (default)                                               </td></tr>
-          <tr><td> <b>single</b>  </td><td>zeigt nur den primären Balken an                                                                               </td></tr>
-          <tr><td> <b>diff</b>    </td><td>Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;  </td></tr>
+          <tr><td> <b>double</b>  </td><td>zeigt den primären Balken und den sekundären Balken an (default)                                                               </td></tr>
+          <tr><td> <b>single</b>  </td><td>zeigt nur den primären Balken an                                                                                               </td></tr>
+          <tr><td> <b>diff</b>    </td><td>Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;                  </td></tr>
+		  <tr><td>                </td><td>Die aktuelle Einstellung von <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a> wird nicht berücksichtigt.  </td></tr>
        </table>
        </ul>
        </li>
