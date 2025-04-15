@@ -160,8 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.50.4" => "14.04.2025  Consumer Strokes: fix __dynColor, new key flowGraphicControl->strokeCmrRedColLimit ".
-                           "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ",
+  "1.50.4" => "15.04.2025  Consumer Strokes: fix __dynColor, new key flowGraphicControl->strokeCmrRedColLimit ".
+                           "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ".
+						   "normBeamWidth: decouple content batsocforecast_, energycosts feedincome from the conversion Wh -> kWh ",
   "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
                            "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
   "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
@@ -14073,9 +14074,9 @@ sub entryGraphic {
 
       # Balkengrafik Ausgabe
       ########################
-      $ret .= _beamGraphic    ($paref);
+	  $ret .= _beamGraphic    ($paref);
       $ret .= _levelSeparator ($paref);
-
+	  
       delete $paref->{maxVal};                                                                             # bereinigen vor nächster Ebene
       delete $paref->{maxCon};
       delete $paref->{maxDif};
@@ -14114,8 +14115,8 @@ sub entryGraphic {
           _beamFillupBatValues ($paref);
 
           # Balkengrafik Ausgabe
-          ########################
-          $ret .= _beamGraphic    ($paref);
+          ########################		  
+		  $ret .= _beamGraphic    ($paref);
           $ret .= _levelSeparator ($paref);
 
           delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
@@ -14157,10 +14158,10 @@ sub entryGraphic {
           _beamFillupBatValues ($paref);
 
           # Balkengrafik Ausgabe
-          ########################
-          $ret .= _beamGraphic    ($paref);
+          ########################		  
+		  $ret .= _beamGraphic    ($paref);
           $ret .= _levelSeparator ($paref);
-
+		  
           delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
           delete $paref->{maxCon};
           delete $paref->{maxDif};
@@ -15900,7 +15901,7 @@ sub _beamGraphic {
           $ii++;                                                                                                # wieviele Stunden haben wir bisher angezeigt ?
           last if($ii > $maxhours || $ii > $barcount);                                                          # vorzeitiger Abbruch
 
-          $val = normBeamWidth ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
+          $val = normBeamWidth ($paref, 'diff', $i);
 
           if ($val ne '&nbsp;') {                                                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
               $val = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
@@ -16033,7 +16034,7 @@ sub _beamGraphic {
       $he  = $he < 20 ? 20 : $he;
 
       if ($lotype eq 'single') {
-          $val = normBeamWidth ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
+          $val = normBeamWidth ($paref, 'beam1', $i);
 
           $ret .="<table width='100%' height='100%'>";                                                              # mit width=100% etwas bessere Füllung der Balken
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
@@ -16066,23 +16067,23 @@ sub _beamGraphic {
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if(defined $he);     # Freiraum über den Balken einfügen
 
           if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                                 # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
-              $val    = normBeamWidth ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
+              $val    = normBeamWidth ($paref, 'beam1', $i);
               $color1 = $colorb1;
               $style1 = $style." background-color:#$color1; color:#$fcolor1;'";
 
               if ($z3) {                                                                                                 # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
-                  $v      = normBeamWidth ($hfcg->{$i}{beam2}, $kw, $hfcg->{$i}{weather});
+                  $v      = normBeamWidth ($paref, 'beam2', $i);
                   $color2 = $colorb2;
                   $style2 = $style." background-color:#$color2; color:#$fcolor2;'";
               }
           }
           else {
-              $val    = normBeamWidth ($hfcg->{$i}{beam2}, $kw, $hfcg->{$i}{weather});
+              $val    = normBeamWidth ($paref, 'beam2', $i);
               $color1 = $colorb2;
               $style1 = $style." background-color:#$color1; color:#$fcolor2;'";
 
               if ($z3) {
-                  $v      = normBeamWidth ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
+                  $v      = normBeamWidth ($paref, 'beam1', $i);
                   $color2 = $colorb1;
                   $style2 = $style." background-color:#$color2; color:#$fcolor1;'";
               }
@@ -16108,7 +16109,7 @@ sub _beamGraphic {
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
           $ret     .= "<table width='100%' border='0'>\n";                                                      # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
 
-          $val = ($hfcg->{$i}{diff} > 0) ? normBeamWidth ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '';
+          $val = ($hfcg->{$i}{diff} > 0) ? normBeamWidth ($paref, 'diff', $i) : '';
           $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if($hfcg->{$i}{diff} == 0);                                  # Sonderfall , hier wird die 0 gebraucht !
 
           if ($val) {
@@ -16133,20 +16134,20 @@ sub _beamGraphic {
               }
           }
 
-          if ($hfcg->{$i}{diff} < 0) {                                                                           # Negativ Balken anzeigen ?
-              $style .= " background-color:#$colorb2'";                                                          # mit Farbe 2 colorb2 füllen
+          if ($hfcg->{$i}{diff} < 0) {                                                                                                   # Negativ Balken anzeigen ?
+              $style .= " background-color:#$colorb2'";                                                                                  # mit Farbe 2 colorb2 füllen
               $ret   .= "<tr class='odd' style='height:".$z3."px'>";
               $ret   .= "<td align='center' class='solarfc' $style $titz3>";
               $ret   .= "</td></tr>";
           }
-          elsif ($z3) {                                                                                          # ohne Farbe
+          elsif ($z3) {                                                                                                                  # ohne Farbe
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z3."px'>";
               $ret .= "<td class='solarfc'>";
               $ret .= "</td></tr>";
           }
 
-          if ($z4) {                                                                                             # kann entfallen wenn auch z3 0 ist
-              $val  = $hfcg->{$i}{diff} < 0 ? normBeamWidth ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '&nbsp;';
+          if ($z4) {                                                                                                                     # kann entfallen wenn auch z3 0 ist
+              $val  = $hfcg->{$i}{diff} < 0 ? normBeamWidth ($paref, 'diff', $i) : '&nbsp;';
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z4."px'>";
               $ret .= "<td class='solarfc' style='vertical-align:top'>".$val;
               $ret .= "</td></tr>";
@@ -16154,7 +16155,7 @@ sub _beamGraphic {
       }
 
       if ($show_diff eq 'bottom') {                                                                                                      # zusätzliche diff Anzeige
-          $val  = normBeamWidth ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
+          $val  = normBeamWidth ($paref, 'diff', $i);
           $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;');                    # negative Zahlen in Fettschrift, 0 aber ohne +
           $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val";
           $ret .= "</td></tr>";
@@ -16177,7 +16178,7 @@ sub _beamGraphic {
   $ret .= "<td class='solarfc'></td>";
   $ret .= "</tr>";
 
-  $paref->{beampos} = 'bottom';                                                                         # Lagedefinition "unter den Balken"
+  $paref->{beampos} = 'bottom';                                                                                                          # Lagedefinition "unter den Balken"
 
   ## Batterieanzeige unterhalb der Balken
   #########################################
@@ -17402,55 +17403,65 @@ return $ret;
 #
 ###############################################################################
 sub normBeamWidth {
-  my $v  = shift;
-  my $kw = shift;
-  my $w  = shift;
-
-  my $n = '&nbsp;';                                         # positive Zahl
-
-  if ($v < 0) {
-      $n = '-';                                             # negatives Vorzeichen merken
-      $v = abs($v);
+  my $paref   = shift;
+  my $beam    = shift;
+  my $i       = shift;
+  
+  my $val     = $paref->{hfcg}{$i}{$beam};
+  my $kw      = $paref->{kw};
+  my $weather = $paref->{hfcg}{$i}{weather};
+  
+  my $doconvert = 0;
+  
+  if ($kw eq 'kWh') {
+	  if ($beam eq 'diff' || ( $paref->{$beam.'cont'} !~ /batsocforecast_/xs && 
+	                           $paref->{$beam.'cont'} !~ /energycosts/xs     &&
+                               $paref->{$beam.'cont'} !~ /feedincome/xs
+							 )
+	     ) {
+		  $doconvert = 1;
+	  }
   }
 
-  if ($kw eq 'kWh') {                                       # bei Anzeige in kWh muss weniger aufgefüllt werden
-      $v  = sprintf "%.1f",($v / 1000);
-      $v  += 0;                                             # keine 0.0 oder 6.0 etc
+  my $n = '&nbsp;';                                                                         # positive Zahl
 
-      return ($n eq '-') ? ($v * -1) : $v if(defined $w);
+  if ($val < 0) {
+      $n = '-';                                                                             # negatives Vorzeichen merken
+      $val = abs($val);
+  }
 
-      my $t = $v - int($v);                                 # Nachkommstelle ?
+  if ($doconvert) {                                                                         # bei Anzeige in kWh muss weniger aufgefüllt werden
+      $val  = sprintf "%.1f",($val / 1000);
+      $val  += 0;                                                                           # keine 0.0 oder 6.0 etc
 
-      if (!$t) {                                            # glatte Zahl ohne Nachkommastelle
-          if (!$v) {
-              return '&nbsp;';                              # 0 nicht anzeigen, passt eigentlich immer bis auf einen Fall im Typ diff
-          }
-          elsif ($v < 10) {
-              return '&nbsp;&nbsp;'.$n.$v.'&nbsp;&nbsp;';
-          }
-          else {
-              return '&nbsp;&nbsp;'.$n.$v.'&nbsp;';
-          }
+      if (defined $weather) {
+          return $n eq '-' ? $val * -1 : $val;
       }
-      else {                                                # mit Nachkommastelle -> zwei Zeichen mehr .X
-          if ($v < 10) {
-              return '&nbsp;'.$n.$v.'&nbsp;';
-          }
-          else {
-              return $n.$v.'&nbsp;';
-          }
+	  
+      my $dp = $val - int($val);                                                            # Nachkommstelle ?
+
+      if (!$dp) {                                                                           # glatte Zahl ohne Nachkommastelle
+          if    (!$val)     {return '&nbsp;';}                                              # 0 nicht anzeigen, passt eigentlich immer bis auf einen Fall im Typ diff
+          elsif ($val < 10) {return '&nbsp;&nbsp;'.$n.$val.'&nbsp;&nbsp;';}
+          else              {return '&nbsp;&nbsp;'.$n.$val.'&nbsp;';}
+      }
+      else {                                                                                # mit Nachkommastelle -> zwei Zeichen mehr .X
+          if ($val < 10) {return '&nbsp;'.$n.$val.'&nbsp;';}
+          else           {return $n.$val.'&nbsp;';}
       }
   }
 
-  return ($n eq '-') ? ($v * -1) : $v if(defined $w);
+  if (defined $weather) {
+      return $n eq '-' ? $val * -1 : $val;
+  }
 
   # Werte bleiben in Watt
-  if    (!$v)         { return '&nbsp;'; }                            ## no critic "Cascading" # keine Anzeige bei Null
-  elsif ($v <    10)  { return '&nbsp;&nbsp;'.$n.$v.'&nbsp;&nbsp;'; } # z.B. 0
-  elsif ($v <   100)  { return '&nbsp;'.$n.$v.'&nbsp;&nbsp;'; }
-  elsif ($v <  1000)  { return '&nbsp;'.$n.$v.'&nbsp;'; }
-  elsif ($v < 10000)  { return  $n.$v.'&nbsp;'; }
-  else                { return  $n.$v; }                              # mehr als 10.000 W :)
+  if    (!$val)         { return '&nbsp;'; }                                                ## no critic "Cascading" # keine Anzeige bei Null
+  elsif ($val <    10)  { return '&nbsp;&nbsp;'.$n.$val.'&nbsp;&nbsp;'; }                   # z.B. 0
+  elsif ($val <   100)  { return '&nbsp;'.$n.$val.'&nbsp;&nbsp;'; }
+  elsif ($val <  1000)  { return '&nbsp;'.$n.$val.'&nbsp;'; }
+  elsif ($val < 10000)  { return  $n.$val.'&nbsp;'; }
+  else                  { return  $n.$val; }                                                # mehr als 10.000 W
 }
 
 ###############################################################################
