@@ -160,6 +160,13 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.51.0" => "16.04.2025  obsolete Attr deleted: affectBatteryPreferredCharge, affectConsForecastInPlanning, ctrlShowLink, ctrlBackupFilesKeep ".
+                           "affectConsForecastIdentWeekdays, affectConsForecastLastDays, ctrlInterval, ctrlGenPVdeviation ".
+                           "affectSolCastPercentile, ctrlSolCastAPIoptimizeReq, consumerAdviceIcon, consumerLink, consumerLegend ",
+  "1.50.4" => "16.04.2025  Consumer Strokes: fix __dynColor, new key flowGraphicControl->strokeCmrRedColLimit ".
+                           "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ".
+						   "normBeamWidth: decouple content batsocforecast_, energycosts, feedincome from the conversion Wh -> kWh ".
+                           "___getFWwidget: textField-long -> textFieldNL-long ",
   "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
                            "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
   "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
@@ -482,6 +489,7 @@ use constant {
   STROKCOLSIGDEF  => 'red',                                                         # Flußgrafik: Standardfarbe aktive Signal-Kette
   STROKCOLINADEF  => 'gray',                                                        # Flußgrafik: Standardfarbe inaktive Kette
   STROKWIDTHDEF   => 25,                                                            # Flußgrafik: Standard Breite der Kette
+  STROKCMRREDLIM  => 400,                                                           # Flußgrafik: Consumerpower ab der dynamische Laufkette rot gefärbt wird
   PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
   CICONDEF        => 'light_light_dim_100',                                         # default Consumer-Icon
   CICONCOLACT     => 'darkorange',                                                  # default Consumer-Icon aktiv Färbung
@@ -634,6 +642,7 @@ my %hset = (                                                                # Ha
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
   consumerNewPlanning       => { fn => \&_setconsumerNewPlanning       },
   clientAction              => { fn => \&_setclientAction              },
+  cycleInterval             => { fn => \&_setcycleInterval             },
   energyH4Trigger           => { fn => \&_setTrigger                   },
   plantConfiguration        => { fn => \&_setplantConfiguration        },
   batteryTrigger            => { fn => \&_setTrigger                   },
@@ -1590,12 +1599,10 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $av = 'obsolete#-#use#attr#plantControl#instead';
-  my $av1 = 'obsolete#-#will#be#deleted#soon';
-  my $av2 = 'obsolete#-#use#attr#consumerControl#instead';
-  $hash->{AttrList} .= " affectBatteryPreferredCharge:$av affectConsForecastInPlanning:$av ctrlShowLink:$av ctrlBackupFilesKeep:$av affectConsForecastIdentWeekdays:$av affectConsForecastLastDays:$av ctrlInterval:$av ctrlGenPVdeviation:$av";     # 31.03.2025
-  $hash->{AttrList} .= " affectSolCastPercentile:$av1 ctrlSolCastAPIoptimizeReq:$av1";           # 29.03.2025
-  $hash->{AttrList} .= " consumerAdviceIcon:$av2 consumerLink:$av2 consumerLegend:$av2";           # 05.04.2025
+  #my $av = 'obsolete#-#use#attr#plantControl#instead';
+  #my $av1 = 'obsolete#-#will#be#deleted#soon';
+  #my $av2 = 'obsolete#-#use#attr#consumerControl#instead';
+  #$hash->{AttrList} .= " affectBatteryPreferredCharge:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -1714,6 +1721,7 @@ sub Set {
   $setlist = "Unknown argument $opt, choose one of ".
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
+             "cycleInterval ".
              "energyH4Trigger:textField-long ".
              "operatingMemory:backup,save".$rf." ".
              "operationMode:active,inactive ".
@@ -1783,8 +1791,6 @@ return "$setlist";
 sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $opt   = $paref->{opt};
   my $c     = $paref->{prop};
   my $evt   = $paref->{prop1} // 0;                                                          # geändert V 1.1.0 - 1 -> 0
   my $hash  = $defs{$name};
@@ -1860,6 +1866,42 @@ sub _setconsumerNewPlanning {            ## no critic "not used"
   }
 
   centralTask ($hash, $evt);
+
+return;
+}
+
+################################################################
+#                      Setter cycleInterval
+################################################################
+sub _setcycleInterval {                   ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop} // return;
+  
+  return if(!$init_done);
+
+  if ($prop !~ /^\d+$/xs) {
+      return "The $opt must be specified by an Integer.";
+  }
+
+  my $pc = AttrVal ($name, 'plantControl', undef);
+  my $new;
+  
+  if (!defined $pc) {
+      $new = "$name plantControl cycleInterval=$prop";
+  }
+  elsif ($pc =~ /cycleInterval=\d+/xs) {
+      $pc  =~ s/cycleInterval=\d+/cycleInterval=$prop/gs;
+      $new = "$name plantControl $pc";
+  }  
+  else {
+      my $npc = $pc." cycleInterval=$prop";
+      $new    = "$name plantControl $npc";
+  }
+  
+  my $ret = CommandAttr (undef, "$new");
+  ::CommandSave (undef, undef) if(!$ret);
 
 return;
 }
@@ -2820,7 +2862,7 @@ sub __getSolCastData {
           return "The current time is not between sunrise minus ".(LEADTIME/60)." minutes and sunset";
       }
 
-      my $lrt    = StatusAPIVal ($hash, $rapi, '?All', 'lastretrieval_timestamp',            0);
+      my $lrt    = StatusAPIVal ($hash, $rapi, '?All', 'lastretrieval_timestamp',           0);
       my $apiitv = StatusAPIVal ($hash, $rapi, '?All', 'currentAPIinterval',     SOLAPIREPDEF);
 
       if ($lrt && $t < $lrt + $apiitv) {
@@ -4236,10 +4278,11 @@ sub __getopenMeteoData {
   my $reqm  = $paref->{reqm};
 
   if (!$force) {                                                                                      # regulärer API Abruf
-      my $lrt = StatusAPIVal ($name, 'OpenMeteo', '?All', 'lastretrieval_timestamp', 0);
+      my $lrt    = StatusAPIVal ($name, 'OpenMeteo', '?All', 'lastretrieval_timestamp',       0);
+      my $apiitv = StatusAPIVal ($name, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF);
 
-      if ($lrt && $t < $lrt + OMETEOREPDEF) {
-          my $rt = $lrt + OMETEOREPDEF - $t;
+      if ($lrt && $t < $lrt + $apiitv) {
+          my $rt = $lrt + $apiitv - $t;
           return qq{The waiting time to the next Open-Meteo API call has not expired yet. The remaining waiting time is $rt seconds};
       }
   }
@@ -5862,37 +5905,37 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge|affectConsForecastInPlanning|ctrlShowLink|ctrlBackupFilesKeep|affectConsForecastIdentWeekdays|affectConsForecastLastDays|ctrlInterval|ctrlGenPVdeviation$/) {      # 31.03.2025
-      my $msg  = "The attribute $aName is replaced by 'plantControl'.";
-      if (!$init_done) {
-          Log3 ($name, 1, "$name - $msg");
-      }
-      else {
-          return $msg;
-      }
-  }
+  #if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge$/) {
+  #    my $msg  = "The attribute $aName is replaced by 'plantControl'.";
+  #    if (!$init_done) {
+  #        Log3 ($name, 1, "$name - $msg");
+  #    }
+  #    else {
+  #        return $msg;
+  #    }
+  #}
   
-  if ($cmd eq 'set' && $aName =~ /^consumerAdviceIcon|consumerLink|consumerLegend$/) {      # 04.04.2025
-      my $msg  = "The attribute $aName is replaced by 'consumerControl'.";
-      if (!$init_done) {
-          Log3 ($name, 1, "$name - $msg");
-      }
-      else {
-          return $msg;
-      }
-  }
+  #if ($cmd eq 'set' && $aName =~ /^consumerAdviceIcon$/) {
+  #    my $msg  = "The attribute $aName is replaced by 'consumerControl'.";
+  #    if (!$init_done) {
+  #        Log3 ($name, 1, "$name - $msg");
+  #    }
+  #    else {
+  #        return $msg;
+  #    }
+  #}
   
-  if ($cmd eq 'set' && $aName =~ /^affectSolCastPercentile|ctrlSolCastAPIoptimizeReq$/) {      # 29.03.2025
-      my $msg1 = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
-      my $msg2 = "The attribute $aName is obsolete and will be deleted soon.";
-      if (!$init_done) {
-          Log3 ($name, 1, "$name - $msg1");
-          return $msg1;
-      }
-      else {
-          return $msg2;
-      }
-  }   
+  #if ($cmd eq 'set' && $aName =~ /^affectSolCastPercentile$/) {
+  #    my $msg1 = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
+  #    my $msg2 = "The attribute $aName is obsolete and will be deleted soon.";
+  #    if (!$init_done) {
+  #        Log3 ($name, 1, "$name - $msg1");
+  #        return $msg1;
+  #    }
+  #    else {
+  #        return $msg2;
+  #    }
+  #}   
   ######################################################################################################################
 
   if ($aName eq 'disable') {
@@ -6288,6 +6331,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
                    showconsumerdummy
                    showconsumerpower
                    strokeconsumerdyncol
+                   strokeCmrRedColLimit
                    strokecolstd
                    strokecolsig
                    strokecolina
@@ -6311,6 +6355,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
           showconsumerremaintime => '(0|1)',
           showconsumerpower      => '(0|1)',
           strokeconsumerdyncol   => '(0|1)',
+          strokeCmrRedColLimit   => '\d+',
           strokecolstd           => '.*',
           strokecolsig           => '.*',
           strokecolina           => '.*',
@@ -8080,151 +8125,15 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  readingsDelete    ($hash, '.migrated');                                         # 01.02.25
   
-  my $pcb = AttrVal ($name, 'affectBatteryPreferredCharge', undef);               # 22.03.2025 
-  my $apc = AttrVal ($name, 'plantControl', '');
+  #my $pcb = AttrVal ($name, 'affectBatteryPreferredCharge', undef);
+  #my $apc = AttrVal ($name, 'plantControl', '');
 
-  if (defined $pcb) {
-      my $newval = $apc." batteryPreferredCharge=$pcb";
-      CommandAttr (undef, "$name plantControl $newval");
-      ::CommandDeleteAttr (undef, "$name affectBatteryPreferredCharge"); 
-  }  
-  ######
-  
-  my $afp = AttrVal ($name, 'affectConsForecastInPlanning', undef);               # 22.03.2025 
-  my $pc1 = AttrVal ($name, 'plantControl', '');
-
-  if (defined $afp) {
-      my $newval = $pc1." consForecastInPlanning=$afp";
-      CommandAttr (undef, "$name plantControl $newval");
-      ::CommandDeleteAttr (undef, "$name affectConsForecastInPlanning"); 
-  }  
-  ######
-  
-  my $csl = AttrVal ($name, 'ctrlShowLink', undef);                               # 22.03.2025 
-  my $pc2 = AttrVal ($name, 'plantControl', '');
-
-  if (defined $csl) {
-      my $newval = $pc2." showLink=$csl";
-      CommandAttr (undef, "$name plantControl $newval");
-      ::CommandDeleteAttr (undef, "$name ctrlShowLink"); 
-  }  
-  ######
-  
-  my $cbk = AttrVal ($name, 'ctrlBackupFilesKeep', undef);                        # 25.03.2025 
-  my $pc3 = AttrVal ($name, 'plantControl', '');
-
-  if (defined $cbk) {
-      my $newval = $pc3." backupFilesKeep=$cbk";
-      CommandAttr (undef, "$name plantControl $newval");
-      ::CommandDeleteAttr (undef, "$name ctrlBackupFilesKeep"); 
-  }  
-  ######
-  
-  my $fiw = AttrVal ($name, 'affectConsForecastIdentWeekdays', undef);                        # 29.03.2025 
-  my $pc4 = AttrVal ($name, 'plantControl', '');
-
-  if (defined $fiw) {
-      my $newval = $pc4." consForecastIdentWeekdays=$fiw";
-      CommandAttr (undef, "$name plantControl $newval");
-      ::CommandDeleteAttr (undef, "$name affectConsForecastIdentWeekdays"); 
-  }  
-  ######
-  
-  my $cfl = AttrVal ($name, 'affectConsForecastLastDays', undef);                        # 29.03.2025 
-  my $pc5 = AttrVal ($name, 'plantControl', '');
-
-  if (defined $cfl) {
-      my $newval = $pc5." consForecastLastDays=$cfl";
-      CommandAttr (undef, "$name plantControl $newval");
-      ::CommandDeleteAttr (undef, "$name affectConsForecastLastDays"); 
-  }  
-  ######
-  
-  my $civ = AttrVal ($name, 'ctrlInterval', undef);                        # 31.03.2025 
-  my $pc6 = AttrVal ($name, 'plantControl', '');
-
-  if (defined $civ) {
-      my $newval = $pc6." cycleInterval=$civ";
-      CommandAttr (undef, "$name plantControl $newval");
-      ::CommandDeleteAttr (undef, "$name ctrlInterval"); 
-  }  
-  ######
-  
-  my $cgd = AttrVal ($name, 'ctrlGenPVdeviation', undef);                        # 31.03.2025 
-  my $pc7 = AttrVal ($name, 'plantControl', '');
-
-  if (defined $cgd) {
-      my $newval = $pc7." genPVdeviation=$cgd";
-      CommandAttr (undef, "$name plantControl $newval");
-      ::CommandDeleteAttr (undef, "$name ctrlGenPVdeviation"); 
-  }  
-  ######
-  
-  my $cai = AttrVal ($name, 'consumerAdviceIcon', undef);                        # 04.04.2025 
-  my $pc8 = AttrVal ($name, 'consumerControl', '');
-
-  if (defined $cai) {
-      my $newval = $pc8." adviceIcon=$cai";
-      CommandAttr (undef, "$name consumerControl $newval");
-      ::CommandDeleteAttr (undef, "$name consumerAdviceIcon"); 
-  }  
-  ######
-  
-  my $cli = AttrVal ($name, 'consumerLink', undef);                        # 04.04.2025 
-  my $pc9 = AttrVal ($name, 'consumerControl', '');
-
-  if (defined $cli) {
-      my $newval = $pc9." detailLink=$cli";
-      CommandAttr (undef, "$name consumerControl $newval");
-      ::CommandDeleteAttr (undef, "$name consumerLink"); 
-  }  
-  ######
-  
-  my $cle  = AttrVal ($name, 'consumerLegend', undef);                        # 05.04.2025 
-  my $pc10 = AttrVal ($name, 'consumerControl', '');
-
-  if (defined $cle) {
-      my $newval = $pc10." showLegend=$cle";
-      CommandAttr (undef, "$name consumerControl $newval");
-      ::CommandDeleteAttr (undef, "$name consumerLegend"); 
-  }  
-  ######
-  
-  my $n = 0;                                                       # 01.02.25 -> Datenmigration pvrlsum, pvfcsum, dnumsum in pvrl_*, pvfc_*
-  for my $hh (1..24) {
-      $hh = sprintf "%02d", $hh;
-
-      for my $cul (sort keys %{$data{$name}{circular}{$hh}}) {
-          next if($cul ne 'dnumsum');
-
-          for my $dns (sort keys %{$data{$name}{circular}{$hh}{$cul}}) {
-              next if($dns eq 'simple');
-
-              my ($sabin, $crang) = split /\./, $dns;
-              my ($pvsum, $fcsum, $dnum) = CircularSumVal ($hash, $hh, $sabin, $crang, undef);
-
-              delete $data{$name}{circular}{$hh}{pvrlsum}{$dns};
-              delete $data{$name}{circular}{$hh}{pvfcsum}{$dns};
-              delete $data{$name}{circular}{$hh}{dnumsum}{$dns};
-
-              next if(!defined $pvsum || !defined $fcsum || !$dnum);
-
-              my $pvavg = sprintf "%.0f", ($pvsum / $dnum);
-              my $fcavg = sprintf "%.0f", ($fcsum / $dnum);
-
-              push @{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}}, $pvavg;
-              push @{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}}, $fcavg;
-
-              $n++;
-          }
-      }
-  }
-
-  if ($n) {
-      Log3 ($name, 1, "$name - NOTE - the stored PV real and forecast datasets (quantity: $n) were migrated to the new module structure");
-  }
+  #if (defined $pcb) {
+  #    my $newval = $apc." batteryPreferredCharge=$pcb";
+  #    CommandAttr (undef, "$name plantControl $newval");
+  #    ::CommandDeleteAttr (undef, "$name affectBatteryPreferredCharge"); 
+  #}
 
   ##########################################################################################################################
 
@@ -8875,12 +8784,6 @@ sub __deleteEveryHourControls  {
 
   for my $n (0..24) {
       $n = sprintf "%02d", $n;
-
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################
-      readingsDelete ($hash, ".pvCorrectionFactor_${n}_cloudcover");                 # 01.02.2025
-      readingsDelete ($hash, ".pvCorrectionFactor_${n}_apipercentil");
-  ##########################################################################################################################
 
       readingsDelete ($hash, ".signaldone_${n}");
 
@@ -14031,9 +13934,9 @@ sub entryGraphic {
 
       # Balkengrafik Ausgabe
       ########################
-      $ret .= _beamGraphic    ($paref);
+	  $ret .= _beamGraphic    ($paref);
       $ret .= _levelSeparator ($paref);
-
+	  
       delete $paref->{maxVal};                                                                             # bereinigen vor nächster Ebene
       delete $paref->{maxCon};
       delete $paref->{maxDif};
@@ -14072,8 +13975,8 @@ sub entryGraphic {
           _beamFillupBatValues ($paref);
 
           # Balkengrafik Ausgabe
-          ########################
-          $ret .= _beamGraphic    ($paref);
+          ########################		  
+		  $ret .= _beamGraphic    ($paref);
           $ret .= _levelSeparator ($paref);
 
           delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
@@ -14115,10 +14018,10 @@ sub entryGraphic {
           _beamFillupBatValues ($paref);
 
           # Balkengrafik Ausgabe
-          ########################
-          $ret .= _beamGraphic    ($paref);
+          ########################		  
+		  $ret .= _beamGraphic    ($paref);
           $ret .= _levelSeparator ($paref);
-
+		  
           delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
           delete $paref->{maxCon};
           delete $paref->{maxDif};
@@ -14991,8 +14894,12 @@ sub ___getFWwidget {
   if ($allc =~ /\s$elm:?(.*?)\s/xs) {                                                    # Element in allen Sets oder Attr enthalten
       my $arg = $1;
 
-      if (!$arg || $arg eq 'textField' || $arg eq 'textField-long') {                    # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
+      if (!$arg || $arg eq 'textField') {                                                # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
           $arg = 'textFieldNL';
+      }
+
+      if ($arg eq 'textField-long') {                                                    # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
+          $arg = 'textFieldNL-long';
       }
 
       if ($arg !~ /^\#/xs && $arg !~ /^$allwidgets/xs) {
@@ -15057,7 +14964,7 @@ sub ___widgetFallback {
   my $current = ReadingsVal ($name, $reading, undef);
 
   if (!defined $current) {
-      $reading = 'state';
+      $reading = ' ';
       $current = ' ';
   }
 
@@ -15068,8 +14975,7 @@ sub ___widgetFallback {
   $current =~ s/$elm //;
   $current = ReplaceEventMap ($dev, $current, 1);
 
-  return "<div class='fhemWidget' cmd='$elm' reading='$reading' ".
-                "dev='$dev' arg='$arg' current='$current' type='$ctyp'></div>";
+  return "<div class='fhemWidget' cmd='$elm' reading='$reading' dev='$dev' arg='$arg' current='$current' type='$ctyp'></div>";
 }
 
 ################################################################
@@ -15858,7 +15764,7 @@ sub _beamGraphic {
           $ii++;                                                                                                # wieviele Stunden haben wir bisher angezeigt ?
           last if($ii > $maxhours || $ii > $barcount);                                                          # vorzeitiger Abbruch
 
-          $val = normBeamWidth ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
+          $val = normBeamWidth ($paref, 'diff', $i);
 
           if ($val ne '&nbsp;') {                                                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
               $val = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
@@ -15991,7 +15897,7 @@ sub _beamGraphic {
       $he  = $he < 20 ? 20 : $he;
 
       if ($lotype eq 'single') {
-          $val = normBeamWidth ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
+          $val = normBeamWidth ($paref, 'beam1', $i);
 
           $ret .="<table width='100%' height='100%'>";                                                              # mit width=100% etwas bessere Füllung der Balken
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
@@ -16024,23 +15930,23 @@ sub _beamGraphic {
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if(defined $he);     # Freiraum über den Balken einfügen
 
           if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                                 # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
-              $val    = normBeamWidth ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
+              $val    = normBeamWidth ($paref, 'beam1', $i);
               $color1 = $colorb1;
               $style1 = $style." background-color:#$color1; color:#$fcolor1;'";
 
               if ($z3) {                                                                                                 # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
-                  $v      = normBeamWidth ($hfcg->{$i}{beam2}, $kw, $hfcg->{$i}{weather});
+                  $v      = normBeamWidth ($paref, 'beam2', $i);
                   $color2 = $colorb2;
                   $style2 = $style." background-color:#$color2; color:#$fcolor2;'";
               }
           }
           else {
-              $val    = normBeamWidth ($hfcg->{$i}{beam2}, $kw, $hfcg->{$i}{weather});
+              $val    = normBeamWidth ($paref, 'beam2', $i);
               $color1 = $colorb2;
               $style1 = $style." background-color:#$color1; color:#$fcolor2;'";
 
               if ($z3) {
-                  $v      = normBeamWidth ($hfcg->{$i}{beam1}, $kw, $hfcg->{$i}{weather});
+                  $v      = normBeamWidth ($paref, 'beam1', $i);
                   $color2 = $colorb1;
                   $style2 = $style." background-color:#$color2; color:#$fcolor1;'";
               }
@@ -16066,7 +15972,7 @@ sub _beamGraphic {
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
           $ret     .= "<table width='100%' border='0'>\n";                                                      # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
 
-          $val = ($hfcg->{$i}{diff} > 0) ? normBeamWidth ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '';
+          $val = ($hfcg->{$i}{diff} > 0) ? normBeamWidth ($paref, 'diff', $i) : '';
           $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if($hfcg->{$i}{diff} == 0);                                  # Sonderfall , hier wird die 0 gebraucht !
 
           if ($val) {
@@ -16091,20 +15997,20 @@ sub _beamGraphic {
               }
           }
 
-          if ($hfcg->{$i}{diff} < 0) {                                                                           # Negativ Balken anzeigen ?
-              $style .= " background-color:#$colorb2'";                                                          # mit Farbe 2 colorb2 füllen
+          if ($hfcg->{$i}{diff} < 0) {                                                                                                   # Negativ Balken anzeigen ?
+              $style .= " background-color:#$colorb2'";                                                                                  # mit Farbe 2 colorb2 füllen
               $ret   .= "<tr class='odd' style='height:".$z3."px'>";
               $ret   .= "<td align='center' class='solarfc' $style $titz3>";
               $ret   .= "</td></tr>";
           }
-          elsif ($z3) {                                                                                          # ohne Farbe
+          elsif ($z3) {                                                                                                                  # ohne Farbe
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z3."px'>";
               $ret .= "<td class='solarfc'>";
               $ret .= "</td></tr>";
           }
 
-          if ($z4) {                                                                                             # kann entfallen wenn auch z3 0 ist
-              $val  = $hfcg->{$i}{diff} < 0 ? normBeamWidth ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather}) : '&nbsp;';
+          if ($z4) {                                                                                                                     # kann entfallen wenn auch z3 0 ist
+              $val  = $hfcg->{$i}{diff} < 0 ? normBeamWidth ($paref, 'diff', $i) : '&nbsp;';
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z4."px'>";
               $ret .= "<td class='solarfc' style='vertical-align:top'>".$val;
               $ret .= "</td></tr>";
@@ -16112,7 +16018,7 @@ sub _beamGraphic {
       }
 
       if ($show_diff eq 'bottom') {                                                                                                      # zusätzliche diff Anzeige
-          $val  = normBeamWidth ($hfcg->{$i}{diff}, $kw, $hfcg->{$i}{weather});
+          $val  = normBeamWidth ($paref, 'diff', $i);
           $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;');                    # negative Zahlen in Fettschrift, 0 aber ohne +
           $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val";
           $ret .= "</td></tr>";
@@ -16135,7 +16041,7 @@ sub _beamGraphic {
   $ret .= "<td class='solarfc'></td>";
   $ret .= "</tr>";
 
-  $paref->{beampos} = 'bottom';                                                                         # Lagedefinition "unter den Balken"
+  $paref->{beampos} = 'bottom';                                                                                                          # Lagedefinition "unter den Balken"
 
   ## Batterieanzeige unterhalb der Balken
   #########################################
@@ -16369,7 +16275,7 @@ sub _flowGraphic {
   my $cgc            = ReadingsNum ($name, 'Current_GridConsumption', 0);
   my $node2grid      = ReadingsNum ($name, 'Current_GridFeedIn',      0);      # vom Knoten zum Grid
   my $cself          = ReadingsNum ($name, 'Current_SelfConsumption', 0);
-  my $cc             = CurrentVal  ($hash, 'consumption',             0);
+  my $cc             = CurrentVal  ($name, 'consumption',             0);
 
   my $cc_dummy  = $cc;
   my $scale     = FGSCALEDEF;
@@ -16399,7 +16305,7 @@ sub _flowGraphic {
       $bat2home      += $bat2homepow if(defined $bat2homepow);
   }
   
-  my $soc = CurrentVal ($hash, 'batsoctotal', 0);                                      # resultierender SoC (%) aller Batterien als Cluster 
+  my $soc = CurrentVal ($name, 'batsoctotal', 0);                                      # resultierender SoC (%) aller Batterien als Cluster 
 
   if (!defined $batin && !defined $bat2home) {
       $hasbat   = 0;
@@ -16559,10 +16465,11 @@ sub _flowGraphic {
                    !$node2grid && !$cgc && $bat2home ? "$stna grid_gray"  :
                    "$stna grid_red";
 
-  my $strokecolstd = CurrentVal ($hash, 'strokecolstd', STROKCOLSTDDEF);
-  my $strokecolsig = CurrentVal ($hash, 'strokecolsig', STROKCOLSIGDEF);
-  my $strokecolina = CurrentVal ($hash, 'strokecolina', STROKCOLINADEF);
-  my $strokewidth  = CurrentVal ($hash, 'strokewidth',   STROKWIDTHDEF);
+  my $strokecolstd = CurrentVal ($name, 'strokecolstd',         STROKCOLSTDDEF);
+  my $strokecolsig = CurrentVal ($name, 'strokecolsig',         STROKCOLSIGDEF);
+  my $strokecolina = CurrentVal ($name, 'strokecolina',         STROKCOLINADEF);
+  my $strokewidth  = CurrentVal ($name, 'strokewidth',           STROKWIDTHDEF);
+  my $strokeredlim = CurrentVal ($name, 'strokeCmrRedColLimit', STROKCMRREDLIM);
 
   my $ret = << "END0";
       <style>
@@ -16634,7 +16541,7 @@ END0
       $cons_left = $consumer_start + 15;
 
       for my $c (@consumers) {
-          my $calias     = ConsumerVal ($hash, $c, 'alias', '');                                           # Name des Consumerdevices
+          my $calias     = ConsumerVal ($name, $c, 'alias', '');                                           # Name des Consumerdevices
           $currentPower  = $cnsmr->{$c}{p};
 
           my ($cicon)    = __substituteIcon ( { hash => $hash,                                             # Icon des Consumerdevices
@@ -16683,7 +16590,7 @@ END1
 
   if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {               
       $car              = 100 - $car;
-      my $pahcol        = '#'.__dynColor ($car, 0, 50, 100);                                      # V 1.49.5
+      my $pahcol        = '#'.__dynColor ($car, 100);                                             # V 1.50.4
       ($hicon, my $col) = split '@', $hicon;
       $hicon            = $hicon.'@'.$pahcol;
   }
@@ -16752,7 +16659,7 @@ END3
       my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
       if ($cc_dummy > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
-          $chain_color = 'style="stroke: #'.__dynColor ($cc_dummy).';"';
+          $chain_color = 'style="stroke: #'.__dynColor ($cc_dummy, $strokeredlim).';"';
       }
 
       $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};
@@ -16814,8 +16721,8 @@ END3
       my $consumer_style;
 
       for my $c (@consumers) {
-          my $power     = ConsumerVal ($hash, $c, 'power',   0);
-          my $rpcurr    = ConsumerVal ($hash, $c, 'rpcurr', '');                                   # Reading für akt. Verbrauch angegeben ?
+          my $power     = ConsumerVal ($name, $c, 'power',   0);
+          my $rpcurr    = ConsumerVal ($name, $c, 'rpcurr', '');                                   # Reading für akt. Verbrauch angegeben ?
           $currentPower = $cnsmr->{$c}{p};
 
           if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
@@ -16828,7 +16735,7 @@ END3
           my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
 
           if ($p > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
-              $chain_color = 'style="stroke: #'.__dynColor ($p).';"';
+              $chain_color = 'style="stroke: #'.__dynColor ($currentPower, $strokeredlim).';"';
           }
 
           $ret             .= qq{<path id="home2consumer_${c}_$stna" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,$y_pos" />};
@@ -16899,8 +16806,8 @@ END3
       for my $c (@consumers) {
           $currentPower    = sprintf "%.1f", $cnsmr->{$c}{p};
           $currentPower    = sprintf "%.0f", $currentPower if($currentPower > 10);
-          my $consumerTime = ConsumerVal ($hash, $c, 'remainTime', '');                               # Restlaufzeit
-          my $rpcurr       = ConsumerVal ($hash, $c, 'rpcurr',     '');                               # Readingname f. current Power
+          my $consumerTime = ConsumerVal ($name, $c, 'remainTime', '');                               # Restlaufzeit
+          my $rpcurr       = ConsumerVal ($name, $c, 'rpcurr',     '');                               # Readingname f. current Power
 
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = isConsumerPhysOn($hash, $c) ? 'on' : 'off';
@@ -17246,9 +17153,10 @@ return ($icon, $txt);
 ###################################################################   
 sub __dynColor {          
   my $val = shift;
-  my $beg = shift // 0;
-  my $mid = shift // 200;
   my $end = shift // 400;
+  
+  my $beg = 0;
+  my $mid = $end / 2;
 
   my $color = substr (Color::pahColor ($beg, $mid, $end, $val, [40,198,45, 127,255,0, 251,158,4, 255,127,0, 255,0,0]), 0, 6);
 
@@ -17358,55 +17266,61 @@ return $ret;
 #
 ###############################################################################
 sub normBeamWidth {
-  my $v  = shift;
-  my $kw = shift;
-  my $w  = shift;
-
-  my $n = '&nbsp;';                                         # positive Zahl
-
-  if ($v < 0) {
-      $n = '-';                                             # negatives Vorzeichen merken
-      $v = abs($v);
+  my $paref   = shift;
+  my $beam    = shift;
+  my $i       = shift;
+  
+  my $val     = $paref->{hfcg}{$i}{$beam};
+  my $kw      = $paref->{kw};
+  my $weather = $paref->{hfcg}{$i}{weather};
+  
+  my $doconvert = 0;
+  
+  if ($kw eq 'kWh') {
+	  if ($beam ne 'diff' && $paref->{$beam.'cont'} !~ /batsocforecast_|energycosts|feedincome/xs) {
+	      $doconvert = 1;
+	  }
   }
 
-  if ($kw eq 'kWh') {                                       # bei Anzeige in kWh muss weniger aufgefüllt werden
-      $v  = sprintf "%.1f",($v / 1000);
-      $v  += 0;                                             # keine 0.0 oder 6.0 etc
+  my $n = '&nbsp;';                                                                         # positive Zahl
 
-      return ($n eq '-') ? ($v * -1) : $v if(defined $w);
+  if ($val < 0) {
+      $n = '-';                                                                             # negatives Vorzeichen merken
+      $val = abs($val);
+  }
 
-      my $t = $v - int($v);                                 # Nachkommstelle ?
+  if ($doconvert) {                                                                         # bei Anzeige in kWh muss weniger aufgefüllt werden
+      $val  = sprintf "%.1f",($val / 1000);
+      $val  += 0;                                                                           # keine 0.0 oder 6.0 etc
 
-      if (!$t) {                                            # glatte Zahl ohne Nachkommastelle
-          if (!$v) {
-              return '&nbsp;';                              # 0 nicht anzeigen, passt eigentlich immer bis auf einen Fall im Typ diff
-          }
-          elsif ($v < 10) {
-              return '&nbsp;&nbsp;'.$n.$v.'&nbsp;&nbsp;';
-          }
-          else {
-              return '&nbsp;&nbsp;'.$n.$v.'&nbsp;';
-          }
+      if (defined $weather) {
+          return $n eq '-' ? $val * -1 : $val;
       }
-      else {                                                # mit Nachkommastelle -> zwei Zeichen mehr .X
-          if ($v < 10) {
-              return '&nbsp;'.$n.$v.'&nbsp;';
-          }
-          else {
-              return $n.$v.'&nbsp;';
-          }
+	  
+      my $dp = $val - int($val);                                                            # Nachkommstelle ?
+
+      if (!$dp) {                                                                           # glatte Zahl ohne Nachkommastelle
+          if    (!$val)     {return '&nbsp;';}                                              # 0 nicht anzeigen, passt eigentlich immer bis auf einen Fall im Typ diff
+          elsif ($val < 10) {return '&nbsp;&nbsp;'.$n.$val.'&nbsp;&nbsp;';}
+          else              {return '&nbsp;&nbsp;'.$n.$val.'&nbsp;';}
+      }
+      else {                                                                                # mit Nachkommastelle -> zwei Zeichen mehr .X
+          if ($val < 10) {return '&nbsp;'.$n.$val.'&nbsp;';}
+          else           {return $n.$val.'&nbsp;';}
       }
   }
 
-  return ($n eq '-') ? ($v * -1) : $v if(defined $w);
+  if (defined $weather) {
+      return $n eq '-' ? $val * -1 : $val;
+  }
 
   # Werte bleiben in Watt
-  if    (!$v)         { return '&nbsp;'; }                            ## no critic "Cascading" # keine Anzeige bei Null
-  elsif ($v <    10)  { return '&nbsp;&nbsp;'.$n.$v.'&nbsp;&nbsp;'; } # z.B. 0
-  elsif ($v <   100)  { return '&nbsp;'.$n.$v.'&nbsp;&nbsp;'; }
-  elsif ($v <  1000)  { return '&nbsp;'.$n.$v.'&nbsp;'; }
-  elsif ($v < 10000)  { return  $n.$v.'&nbsp;'; }
-  else                { return  $n.$v; }                              # mehr als 10.000 W :)
+  if    (!$val)         { return '&nbsp;'; }                                                ## no critic "Cascading" # keine Anzeige bei Null
+  elsif ($val <    10)  { return '&nbsp;&nbsp;'.$n.$val.'&nbsp;&nbsp;'; }                   # z.B. 0
+  elsif ($val <   100)  { return '&nbsp;'.$n.$val.'&nbsp;&nbsp;'; }
+  elsif ($val <  1000)  { return '&nbsp;'.$n.$val.'&nbsp;'; }
+  elsif ($val < 10000)  { return  $n.$val.'&nbsp;'; }
+  else                  { return  $n.$val; }                                                # mehr als 10.000 W
 }
 
 ###############################################################################
@@ -23356,6 +23270,23 @@ to ensure that the system configuration is correct.
     </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-set-cycleInterval"></a>
+      <li><b>cycleInterval &lt;Integer&gt; </b> <br><br>
+
+      Repetition interval of the data collection in seconds. <br>
+	  The command is suitable for dynamically changing the ‘cycleInterval’ key in the ‘plantControl’ attribute. 
+	  The conditions of the ‘plantControl’ attribute apply to the entry.
+	  <br><br>
+
+      <ul>
+        <b>Example: </b> <br>
+        set &lt;name&gt; cycleInterval 120 <br>
+      </ul>
+    </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-set-consumerImmediatePlanning"></a>
@@ -23596,7 +23527,7 @@ to ensure that the system configuration is correct.
 
       <b>Model VictronKiAPI:</b> <br>
       This model is based on Victron Energy's AI-supported API.
-      The recommended autocorrect method is <b>on_complex</b>. <br><br>
+      The recommended autocorrect method is <b>off</b>. <br><br>
 
       <b>Model DWD:</b> <br>
       The recommended autocorrect method is <b>on_complex</b> or <b>on_complex_ai</b>. <br><br>
@@ -24701,7 +24632,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-flowGraphicControl"></a>
-       <li><b>flowGraphicControl &lt;Key1=Value1&gt; &lt;Key2=Value2&gt; ... </b><br>
+       <li><b>flowGraphicControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
          By optionally specifying the key=value pairs listed below, various display properties of the energy flow
          graph can be influenced. <br>
          The entry can be made in several lines.
@@ -24746,6 +24677,9 @@ to ensure that the system configuration is correct.
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>strokeconsumerdyncol</b>    </td><td>The lines from the house node to the consumers can be colored dynamically depending on the consumption value.           </td></tr>
             <tr><td>                                </td><td><b>0</b> - no dynamic coloring,  <b>1</b> - dynamic coloring, default: 0                                                </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>strokeCmrRedColLimit</b>    </td><td>Power consumption from which the house -> consumer line is displayed in red if strokeconsumerdyncol=1 is set.           </td></tr>
+            <tr><td>                                </td><td>Value: <b>Integer</b>, default: 400                                                                                     </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>strokecolina </b>           </td><td>Color of an inactive line                                                                                               </td></tr>
 			<tr><td>                                </td><td>Value: <b>Hex (e.g. #cc3300) or designation (e.g. red, blue)</b>, default: gray                                         </td></tr>
@@ -25008,17 +24942,17 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-graphicLayoutType"></a>
        <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
-       Layout of the bar graph. <br>
-       The content of the bars to be displayed is determined by the <b>graphicBeamXContent</b> attributes.
+       Layout of the bar graph. The content of the bars to be displayed is determined by the <b>graphicBeamXContent</b> attributes.
        <br><br>
 
        <ul>
        <table>
        <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-          <tr><td> <b>double</b>  </td><td>displays the primary bar and the secondary bar (default)                                                       </td></tr>
-          <tr><td> <b>single</b>  </td><td>displays only the primary bar                                                                                  </td></tr>
-          <tr><td> <b>diff</b>    </td><td>difference display. It is valid: &lt;Difference&gt; = &lt;Value primary bar&gt; - &lt;Value secondary bar&gt;  </td></tr>
-       </table>
+          <tr><td> <b>double</b>  </td><td>displays the primary bar and the secondary bar (default)                                                                </td></tr>
+          <tr><td> <b>single</b>  </td><td>displays only the primary bar                                                                                           </td></tr>
+          <tr><td> <b>diff</b>    </td><td>difference display. It is valid: &lt;Difference&gt; = &lt;Value primary bar&gt; - &lt;Value secondary bar&gt;           </td></tr>
+          <tr><td>                </td><td>The current setting of <a href=“#SolarForecast-attr-graphicEnergyUnit”>graphicEnergyUnit</a> is not taken into account. </td></tr>
+	   </table>
        </ul>
        </li>
        <br>
@@ -25095,7 +25029,7 @@ to ensure that the system configuration is correct.
        <br>
        
        <a id="SolarForecast-attr-plantControl"></a>
-       <li><b>plantControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>plantControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
          By optionally specifying the 'Key=Value' pairs listed below, various properties of the overall
          properties of the overall system can be set.
          The entry can be made in several lines.
@@ -25155,7 +25089,7 @@ to ensure that the system configuration is correct.
          </ul>
 
        <ul>
-         <b>Beispiel: </b> <br>
+         <b>Example: </b> <br>
          attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously
        </ul>
 
@@ -25829,6 +25763,23 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-set-cycleInterval"></a>
+      <li><b>cycleInterval &lt;Ganzzahl&gt; </b> <br><br>
+
+      Wiederholungsintervall der Datensammlung in Sekunden. <br>
+	  Der Befehl ist geeignet um den Schlüssel 'cycleInterval' im Attribut 'plantControl' dynamisch zu ändern. 
+	  Für die Eingabe gelten die Bedingungen des Attributes 'plantControl'.
+	  <br><br>
+
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; cycleInterval 120 <br>
+      </ul>
+    </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-set-consumerImmediatePlanning"></a>
@@ -26078,7 +26029,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <b>Model VictronKiAPI:</b> <br>
       Dieses Model basiert auf der KI gestützten API von Victron Energy.
-      Die empfohlene Autokorrekturmethode ist <b>on_complex</b>. <br><br>
+      Die empfohlene Autokorrekturmethode ist <b>off</b>. <br><br>
 
       <b>Model DWD:</b> <br>
       Die empfohlene Autokorrekturmethode ist <b>on_complex</b> bzw. <b>on_complex_ai</b>. <br><br>
@@ -27184,7 +27135,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-flowGraphicControl"></a>
-       <li><b>flowGraphicControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>flowGraphicControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene
          Anzeigeeigenschaften der Energieflußgrafik beeinflusst werden. <br>
          Die Eingabe kann mehrzeilig erfolgen.
@@ -27230,7 +27181,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>strokeconsumerdyncol</b>    </td><td>Die Linien vom Hausknoten zu den Verbrauchern können abhängig vom Verbrauchswert dynamisch eingefärbt werden.           </td></tr>
             <tr><td>                                </td><td><b>0</b> - keine dynamische Färbung,  <b>1</b> - dynamische Färbung, default: 0                                         </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
-			<tr><td> <b>strokecolina </b>           </td><td>Farbe einer inaktiven Linie                                                                                             </td></tr>
+            <tr><td> <b>strokeCmrRedColLimit</b>    </td><td>Leistungsaufnahme ab der die Linie Haus -> Verbraucher rot dargestellt wird sofern strokeconsumerdyncol=1 gesetzt ist.  </td></tr>
+            <tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 400                                                                                     </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>strokecolina </b>           </td><td>Farbe einer inaktiven Linie                                                                                             </td></tr>
 			<tr><td>                                </td><td>Wert: <b>Hex (z.B. #cc3300) oder Bezeichnung (z.B. red, blue)</b>, default: gray                                        </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>strokecolsig </b>           </td><td>Farbe einer aktiven Signallinie                                                                                         </td></tr>
@@ -27489,16 +27443,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-graphicLayoutType"></a>
        <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
-       Layout der Balkengrafik. <br>
-       Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeamXContent</b> bestimmt.
+       Layout der Balkengrafik. Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeamXContent</b> bestimmt.
        <br><br>
 
        <ul>
        <table>
        <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-          <tr><td> <b>double</b>  </td><td>zeigt den primären Balken und den sekundären Balken an (default)                                               </td></tr>
-          <tr><td> <b>single</b>  </td><td>zeigt nur den primären Balken an                                                                               </td></tr>
-          <tr><td> <b>diff</b>    </td><td>Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;  </td></tr>
+          <tr><td> <b>double</b>  </td><td>zeigt den primären Balken und den sekundären Balken an (default)                                                               </td></tr>
+          <tr><td> <b>single</b>  </td><td>zeigt nur den primären Balken an                                                                                               </td></tr>
+          <tr><td> <b>diff</b>    </td><td>Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;                  </td></tr>
+		  <tr><td>                </td><td>Die aktuelle Einstellung von <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a> wird nicht berücksichtigt.  </td></tr>
        </table>
        </ul>
        </li>
@@ -27576,7 +27530,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
        
        <a id="SolarForecast-attr-plantControl"></a>
-       <li><b>plantControl &lt;Schlüssel1=Wert1&gt; &lt;Schlüssel2=Wert2&gt; ... </b><br>
+       <li><b>plantControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten 'Schlüssel=Wert' Paare können verschiedene
          Eigenschaften der Gesamtanlage eingestellt werden.
          Die Eingabe kann mehrzeilig erfolgen.
