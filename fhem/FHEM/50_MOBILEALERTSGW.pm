@@ -267,8 +267,8 @@ sub MOBILEALERTSGW_Set ($$@) {
         Log3 $MA_wname, 5,
           "$MA_wname MOBILEALERTSGW: Good Checksum got: 0x"
           . sprintf( "%02X", $sum );
-
-        Dispatch( $hash, $data, undef );
+        my %addvals = ( lastGateway => "Debuginsert");
+        Dispatch( $hash, $data, \%addvals );
         return undef;
     }
     else {
@@ -476,7 +476,7 @@ sub MOBILEALERTSGW_Read($$) {
         Log3 $MA_wname, 4,
           "$MA_wname MOBILEALERTSGW: $MA_cname: Data from $gwserial $gwmac";
         MOBILEALERTSGW_DefaultAnswer($hash);
-        MOBILEALERTSGW_DecodeData( $hash, $POSTdata );
+        MOBILEALERTSGW_DecodeData( $hash, $gwserial, $POSTdata);
     }
     else {
         TcpServer_WriteBlocking( $MA_chash,
@@ -572,8 +572,8 @@ sub MOBILEALERTSGW_DecodeInit($$) {
       "$MA_wname MOBILEALERTSGW: Uptime (s): " . $upTime . " ID: " . $ID;
 }
 
-sub MOBILEALERTSGW_DecodeData($$) {
-    my ( $hash, $POSTdata ) = @_;
+sub MOBILEALERTSGW_DecodeData($$$) {
+    my ( $hash, $gwserial, $POSTdata ) = @_;
     my $verbose = GetVerbose($MA_wname);
 
     for ( my $pos = 0 ; $pos < length($POSTdata) ; $pos += MA_PACKAGE_LENGTH ) {
@@ -605,7 +605,8 @@ sub MOBILEALERTSGW_DecodeData($$) {
               "$MA_wname MOBILEALERTSGW: Data for $deviceID: "
               . unpack( "H*", $data )
               if ( $verbose >= 5 );
-            my $found = Dispatch( $defs{$MA_wname}, $data, undef );
+            my %addvals = ( lastGateway => $gwserial);
+            my $found = Dispatch( $defs{$MA_wname}, $data, \%addvals );
         }
     }
 }
