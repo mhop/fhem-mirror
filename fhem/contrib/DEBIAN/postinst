@@ -13,7 +13,7 @@ chown -R fhem:dialout /opt/fhem
 # remove repository entry after first installation
 echo "removing repo from sources"
 sed -i /debian.fhem.de/d /etc/apt/sources.list
-if [ -f /etc/apt/sources.list.d/debianfhemde.list ] then
+if [ -f /etc/apt/sources.list.d/debianfhemde.list ]; then
   rm /etc/apt/sources.list.d/debianfhemde.list
 fi
 
