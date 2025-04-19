@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.51.1" => "19.04.2025  consumer: interruptable, swoncond, swoffcond can be perl code enclosed by {..} ".
+  "1.51.1" => "19.04.2025  consumer: interruptable, swoncond, swoffcond, spignorecond can be perl code enclosed by {..} ".
                            "check key is valid in plantControl, aiControl, flowGraphicControl, consumerControl, setupMeterDev ".
                            "setupOtherProducer, setupInverterDev, setupBatteryDev, consumer ".
                            "writeCacheToFile: bugfix - cache File on OS is deleted if cache is empty ",
@@ -6136,7 +6136,7 @@ sub _attrconsumer {                      ## no critic "not used"
           }
       }
 
-      if (exists $h->{interruptable}) {                                                            # Check Regex,Code/Hysterese
+      if (exists $h->{interruptable}) {                                                            
           if ($h->{interruptable} !~ /^[01]$/xs) {
               my ($dev, $rd, $code, $hyst);
               
@@ -6152,7 +6152,7 @@ sub _attrconsumer {                      ## no critic "not used"
               }
 
               if (!$dev || !$rd || !defined $code) {
-                  return qq{A Device, Reading and Regex/Code must be specified for the 'interruptable' key!};
+                  return qq{A Device, Reading and Regex/Code must be specified for the 'interruptable' key};
               }
               
               if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                  # interruptable prüft Perl-Code
@@ -6171,8 +6171,12 @@ sub _attrconsumer {                      ## no critic "not used"
           }
       }
 
-      if (exists $h->{swoncond}) {                                                                 # Check Regex
-          my (undef, undef, $code) = split ":", $h->{swoncond}, 3;
+      if (exists $h->{swoncond}) {                                                                 
+          my ($dev, $rd, $code) = split ":", $h->{swoncond}, 3;
+          
+          if (!$dev || !$rd || !defined $code) {
+              return qq{A Device, Reading and Regex/Code must be specified for the 'swoncond' key};
+          }
 
           if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoncond prüft Perl-Code
               $code  =~ s/\s//xg;
@@ -6185,8 +6189,12 @@ sub _attrconsumer {                      ## no critic "not used"
           }
       }
 
-      if (exists $h->{swoffcond}) {                                                                # Check Regex
-          my (undef, undef, $code) = split ":", $h->{swoffcond}, 3;
+      if (exists $h->{swoffcond}) {                                                                
+          my ($dev, $rd, $code) = split ":", $h->{swoffcond}, 3;
+          
+          if (!$dev || !$rd || !defined $code) {
+              return qq{A Device, Reading and Regex/Code must be specified for the 'swoffcond' key};
+          }
 
           if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoffcond prüft Perl-Code
               $code  =~ s/\s//xg;
@@ -6196,6 +6204,24 @@ sub _attrconsumer {                      ## no critic "not used"
           else {                                                                                   # swoffcond prüft Regex
               $err = checkRegex ($code);
               return "swoffcond: $err" if($err);
+          }
+      }
+      
+      if (exists $h->{spignorecond}) {                                                                
+          my ($dev, $rd, $code) = split ":", $h->{spignorecond}, 3;
+          
+          if (!$dev || !$rd || !defined $code) {
+              return qq{A Device, Reading and Regex/Code must be specified for the 'spignorecond' key};
+          }
+
+          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # spignorecond prüft Perl-Code
+              $code  =~ s/\s//xg;
+              ($err) = checkCode ($name, $code);
+              return "spignorecond: $err" if($err);                  
+          }
+          else {                                                                                   # spignorecond prüft Regex
+              $err = checkRegex ($code);
+              return "spignorecond: $err" if($err);
           }
       }
 
@@ -8277,8 +8303,9 @@ sub centralTask {
       for my $c (1..MAXCONSUMER) {                                # 19.04.2025
           $c = sprintf "%02d", $c;
           if (defined $data{$name}{consumers} && defined $data{$name}{consumers}{$c}) {
-              delete $data{$name}{consumers}{$c}{swoncondregex}  if(exists $data{$name}{consumers}{$c}{swoncondregex});
-              delete $data{$name}{consumers}{$c}{swoffcondregex} if(exists $data{$name}{consumers}{$c}{swoffcondregex});
+              delete $data{$name}{consumers}{$c}{swoncondregex}     if(exists $data{$name}{consumers}{$c}{swoncondregex});
+              delete $data{$name}{consumers}{$c}{swoffcondregex}    if(exists $data{$name}{consumers}{$c}{swoffcondregex});
+              delete $data{$name}{consumers}{$c}{spignorecondregex} if(exists $data{$name}{consumers}{$c}{spignorecondregex});
           }
       }
   }
@@ -8618,9 +8645,9 @@ sub _collectAllRegConsumers {
           ($dswoffcond, $rswoffcond, $swoffcondition) = split ":", $hc->{swoffcond}, 3;
       }
 
-      my ($dspignorecond, $rigncond, $spignorecondregex);
+      my ($dspignorecond, $rigncond, $spignorecondition);
       if (exists $hc->{spignorecond}) {                                                            # Bedingung um vorhandenen PV Überschuß zu ignorieren
-          ($dspignorecond, $rigncond, $spignorecondregex) = split ":", $hc->{spignorecond}, 3;
+          ($dspignorecond, $rigncond, $spignorecondition) = split ":", $hc->{spignorecond}, 3;
       }
 
       my $interruptable = 0;
@@ -8703,7 +8730,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{swoffcondition}    = $swoffcondition     // q{};               # Regex einer vorrangigen Ausschaltbedingung
       $data{$name}{consumers}{$c}{dspignorecond}     = $dspignorecond      // q{};               # Device liefert Ignore Bedingung
       $data{$name}{consumers}{$c}{rigncond}          = $rigncond           // q{};               # Reading liefert Ignore Bedingung
-      $data{$name}{consumers}{$c}{spignorecondregex} = $spignorecondregex  // q{};               # Regex der Ignore Bedingung
+      $data{$name}{consumers}{$c}{spignorecondition} = $spignorecondition  // q{};               # Code/Regex der Ignore Bedingung
       $data{$name}{consumers}{$c}{interruptable}     = $interruptable;                           # Ein-Zustand des Verbrauchers ist unterbrechbar
       $data{$name}{consumers}{$c}{hysteresis}        = $hyst;                                    # Hysterese
       $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift     if(defined $riseshift);    # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
@@ -12164,7 +12191,11 @@ sub __setConsRcmdState {
   }
 
   my ($spignore, $info, $err) = isSurplusIgnoCond ($hash, $c, $debug);                    # PV Überschuß ignorieren?
+  
   Log3 ($name, 1, "$name - $err") if($err);
+  if ($debug =~ /consumerSwitching${c}/x && $info) {
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - IgnoreCondition - $info});
+  }
 
   if (!defined $surplus) {                                                                # $surplus kann undef sein! -> dann bisherigen isConsumptionRecommended verwenden
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = ReadingsVal ($name, "consumer${c}_ConsumptionRecommended", 0);
@@ -21481,36 +21512,58 @@ sub isSurplusIgnoCond {
   my $c     = shift;
   my $debug = shift;
 
+  my $name = $hash->{NAME};
+  my $igno = 0;
   my $info = q{};
 
   my $digncond = ConsumerVal ($hash, $c, 'dspignorecond', '');                          # Device zur Lieferung einer "Überschuß Ignore-Bedingung"
-  my ($err)    = isDeviceValid ( { name   => $hash->{NAME},
+  my ($err)    = isDeviceValid ( { name   => $name,
                                    obj    => $digncond,
                                    method => 'string',
                                  }
                                );
   if ($digncond && $err) {
       $err = qq{ERROR - the device "$digncond" doesn't exist! Check the key "spignorecond" in attribute "consumer${c}"};
-      return (0, $info, $err);
+      return ($igno, $info, $err);
   }
 
-  $err                  = q{};
-  my $rigncond          = ConsumerVal ($hash, $c, 'rigncond',          '');             # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
-  my $spignorecondregex = ConsumerVal ($hash, $c, 'spignorecondregex', '');             # Regex einer zusätzliche Einschaltbedingung
-  my $condval           = ReadingsVal ($digncond, $rigncond,           '');             # Wert zum Vergleich mit Regex
+  $err           = q{};
+  my $rigncond   = ConsumerVal ($hash, $c, 'rigncond',          '');                   # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
+  my $ignorecode = ConsumerVal ($hash, $c, 'spignorecondition', '');                   # Code/Regex für PV Überschuß Ignore
+  my $condval    = ReadingsVal ($digncond, $rigncond,        undef);                   # Wert zum Vergleich mit Code/Regex
 
-  if ($condval && $debug =~ /consumerSwitching${c}/x) {
-      my $name = $hash->{NAME};
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - PV surplus ignore condition ist set - device: $digncond, reading: $rigncond, condition: $spignorecondregex});
+  if ($debug =~ /consumerSwitching${c}/x && defined $condval) {
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - PV surplus ignore condition - device: $digncond, reading: $rigncond, condition: $ignorecode});
+  }
+      
+  if (defined $condval) {
+      if ($ignorecode =~ m/^\{.*\}$/xs) {                                              # wertet Perl-Code aus
+          my $VALUE = $condval;
+          my $true  = eval $ignorecode;
+
+          if ($@) {
+              Log3 ($name, 1, "$name - ERROR in surplus ignore condition Code execution: ".$@);
+          }
+          
+          if ($true) {
+              $info   = qq{Value “$condval” resulted in 'true' after exec "$ignorecode" \n};
+              $info  .= "-> Check successful ";
+              $igno  = 1;              
+          }
+          else {
+              $info  = qq{Value “$condval” resulted in 'false' after exec "$ignorecode" \n};
+              $igno = 0;
+          }
+      }
+      elsif ($condval =~ m/^$ignorecode$/x) {                                          # wertet Regex aus
+          $igno = 1;
+      }
+      else {
+          $info = qq{Value "$condval" doesn't match the condition: "$ignorecode"};
+      }
   }
 
-  if ($condval && $condval =~ m/^$spignorecondregex$/x) {
-      return (1, $info, $err);
-  }
-
-  $info = qq{The device "$digncond", reading "$rigncond" doesn't match the Regex "$spignorecondregex"};
-
-return (0, $info, $err);
+return ($igno, $info, $err);
 }
 
 ################################################################
@@ -24416,13 +24469,13 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                              <br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;Option&gt;]                                                                                             <br>
-                         [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                       <br>
-                         [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                         <br>
-                         [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Unit&gt;[:&lt;Threshold&gt;]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Threshold&gt;]]                     <br>
-                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;]                                                     <br>
-                         [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt;] [surpmeth=&lt;Option&gt;] [interruptable=&lt;Option&gt;] [noshow=&lt;Option&gt;] [exconfc=&lt;Option&gt;] </b>   <br>
+       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                                  <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
+                         [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                           <br>
+                         [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                             <br>
+                         [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Unit&gt;[:&lt;Threshold&gt;]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Threshold&gt;]]                         <br>
+                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;]                                                         <br>
+                         [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;] [surpmeth=&lt;Option&gt;] [interruptable=&lt;Option&gt;] [noshow=&lt;Option&gt;] [exconfc=&lt;Option&gt;] </b>   <br>
                          <br>
 
         Registers a consumer &lt;Device&gt; with the SolarForecast Device. An optional alias can be specified. <br>
@@ -24567,7 +24620,10 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                     </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device to deliver the condition                                                                                                   </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading which contains the condition                                                                                             </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be satisfied for a 'true' condition to be true                                                        </td></tr>
+            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                         </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be fulfilled for a 'true' condition                                                                   </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must return 'true' to fulfill the condition. It must not contain spaces.                      </td></tr>
+            <tr><td>                       </td><td>The value of Device:Reading is transferred to the code with the variable $VALUE.                                                                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>defines the possible interruption options for the consumer after it has been started (optional). Options can be:                                  </td></tr>
             <tr><td>                       </td><td><b>0</b> - Load is not temporarily switched off even if the PV surplus falls below the required energy (default)                                  </td></tr>
@@ -24613,11 +24669,11 @@ to ensure that the system configuration is correct.
          <b>Examples: </b> <br>
          <b>attr &lt;name&gt; consumer01</b> wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
          <b>attr &lt;name&gt; consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
-         <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:{$VALUE==100?1:0} <br>
-         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@ed type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2                        <br>
-         <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                                     <br>
-         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:05 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                               <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                                      <br>
+         <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:{$VALUE==100?1:0}       <br>
+         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@ed type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2                              <br>
+         <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                                           <br>
+         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1 spignorecond=SolCast:Current_PV:{($VALUE)=split/\s/,$VALUE;$VALUE>10?1:0;}          <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                                            <br>
        </ul>
        </li>
        <br>
@@ -26930,13 +26986,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                              <br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;Option&gt;]                                                                                             <br>
-                         [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                     <br>
-                         [notbefore=&lt;Ausdruck&gt;] [notafter=&lt;Ausdruck&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                             <br>
-                         [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt;]]           <br>
-                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;]                                                     <br>
-                         [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt;] [surpmeth=&lt;Option&gt;] [interruptable=&lt;Option&gt;] [noshow=&lt;Option&gt;] [exconfc=&lt;Option&gt;]  </b>  <br>
+       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                                  <br>
+                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
+                         [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                         <br>
+                         [notbefore=&lt;Ausdruck&gt;] [notafter=&lt;Ausdruck&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                                 <br>
+                         [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt;]]               <br>
+                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;]                                                         <br>
+                         [spignorecond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;] [surpmeth=&lt;Option&gt;] [interruptable=&lt;Option&gt;] [noshow=&lt;Option&gt;] [exconfc=&lt;Option&gt;]  </b>  <br>
                          <br>
 
         Registriert einen Verbraucher &lt;Device&gt; beim SolarForecast Device. Ein optionaler Alias kann angegeben werden. <br>
@@ -27081,7 +27137,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>ACHTUNG:</b> Die Verwendung beider Schlüssel <I>spignorecond</I> und <I>interruptable</I> kann zu einem unerwünschten Verhalten führen!         </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der Bedingung                                                                                                 </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading welches die Bedingung enthält                                                                                             </td></tr>
+            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                                  </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code muß 'wahr' liefern um die Bedingung zu erfüllen. Er darf keine Leerzeichen enthalten.   </td></tr>
+            <tr><td>                       </td><td>Der Wert von  Device:Reading wird dem Code mit der Variable $VALUE übergeben.                                                                      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher nachdem er gestartet wurde (optional). Optionen können sein:                    </td></tr>
             <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär ausgeschaltet auch wenn der PV Überschuß die benötigte Energie unterschreitet (default)                 </td></tr>
@@ -27127,11 +27186,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>Beispiele: </b> <br>
          <b>attr &lt;name&gt; consumer01</b> wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
          <b>attr &lt;name&gt; consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
-         <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:{$VALUE==100?1:0} <br>
-         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@red type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
-         <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                       <br>
-         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1                                                                              <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                   <br>
+         <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:{$VALUE==100?1:0}       <br>
+         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@red type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2                             <br>
+         <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                                           <br>
+         <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1 spignorecond=SolCast:Current_PV:{($VALUE)=split/\s/,$VALUE;$VALUE>10?1:0;}          <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                                            <br>
        </ul>
        </li>
        <br>
