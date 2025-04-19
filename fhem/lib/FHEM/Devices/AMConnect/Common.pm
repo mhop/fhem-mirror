@@ -206,7 +206,7 @@ EOF
       FWEXTA                    => {
         path                    => 'automowerconnect/',
         file                    => 'hull.js',
-        url                     => 'https://raw.githubusercontent.com/AndriiHeonia/hull/master/dist/hull.js'
+        url                     => 'https://raw.githubusercontent.com/core3d-inc/hull/master/dist/hull.js'
       },
       interval                  => 840,
       isDst                     => -1,
