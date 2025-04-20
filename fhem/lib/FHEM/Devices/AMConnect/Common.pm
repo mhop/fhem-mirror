@@ -3053,7 +3053,8 @@ sub listInternalData { ## no critic (ProhibitExcessComplexity [complexity core m
     $ret .= '<p><table class="block wide">';
     $ret .= '<caption><b>Third Party Software</b></caption><tbody>'; 
 
-    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td>hull calculation (hull.js)</td><td style="word-wrap:break-word; max-width:40em"> Server: ' . $hash->{helper}{FWEXTA}{url} . '</td></tr>';
+    $ret .= '<tr class="column ' . ( $cnt++ % 2 ? "odd" : "even" ) . '"><td>hull calculation (hull.js)</td><td style="word-wrap:break-word; max-width:40em"> Server: ' . $hash->{helper}{FWEXTA}{url}
+    . ', filesize: ' . ( -s $FW_dir . '/' . $hash->{helper}{FWEXTA}{path} . '/' . $hash->{helper}{FWEXTA}{file} ) . ' kB, check content if not about 12kB.</td></tr>';
 
     $ret .= '</tbody></table>';
 
@@ -3166,8 +3167,9 @@ sub getTpFile {
 
       print $fh $msg;
       close( $fh );
-      readingsSingleUpdate( $hash, 'third_party_library', "$file downloaded to: $path", 1 );
-      Log3 $name, 1, "$name getTpFile: third party library downloaded from $url to $path";
+      my $fsz = -s "$path/$file";
+      readingsSingleUpdate( $hash, 'third_party_library', "${file}, (${fsz} Byte) downloaded to: $path", 1 );
+      Log3 $name, 1, "$name getTpFile: third party library downloaded from $url to $path/$file, filesize: $fsz. Check content if not about 12 kB.";
 
 
     }

@@ -826,19 +826,27 @@ function AutomowerConnectUpdateDetail (dev, type, detailfnfirst, picx, picy, sca
 
           loadScript('automowerconnect/hull.js', ()=> {
 
-            const pts = [];
+            if ( typeof hull === "function" ) {
 
-            for ( let i = 0; i < pos.length; i+=3 ){
+              const pts = [];
 
-              if ( pos[i+2] == "M") pts.push( [ pos[i], pos[i+1] ] );
+              for ( let i = 0; i < pos.length; i+=3 ){
 
-            }
+                if ( pos[i+2] == "M") pts.push( [ pos[i], pos[i+1] ] );
 
-            if ( pts.length > 50 ) {
+              }
 
-              const res = div.getAttribute( 'data-hullResolution' );
-              const hullpts = hull( pts, res );
-              AutomowerConnectHull( ctx0, div, hullpts, 'hull' );
+              if ( pts.length > 50 ) {
+
+                const res = div.getAttribute( 'data-hullResolution' );
+                const hullpts = hull( pts, res );
+                AutomowerConnectHull( ctx0, div, hullpts, 'hull' );
+
+              }
+
+            } else {
+
+              log( 'AutomowerConnectUpdateDetail: Loading automowerconnect/hull.js failed, no function named hull, check content of hull.js' );
 
             }
 

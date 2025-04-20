@@ -284,13 +284,13 @@ __END__
 
     <li><a id='AutomowerConnect-get-MowerData'>MowerData</a><br>
       <code>get &lt;name&gt; MowerData</code><br>
-      Lists all mower data with its hash path exept positon array. The hash path can be used for generating userReadings. The trigger is e.g. <i>device_state: connected</i> or <i>mower_wsEvent: &lt;status-event|positions-event|settings-event&gt;</i>.<br>
+      Lists all mower data with its hash path exept positon array. The hash path can be used for generating <a href="#userReadings">userReadings</a>. The trigger is e.g. <i>device_state:\sconnected</i> or <i>mower_wsEvent:\s&lt;event name&gt;</i>.<br>
       Example: created reading <code>serialnumber</code> with hash path <code>$hash->{helper}{mower}{attributes}{system}{serialNumber}</code><br><br>
-      <code>attr &lt;name&gt; userReadings serialnumber:connected {$defs{$name}->{helper}{mower}{attributes}{system}{serialNumber}}</code></li>
+      <code>attr &lt;name&gt; userReadings serialnumber:device_state:\sconnected {$defs{$name}->{helper}{mower}{attributes}{system}{serialNumber}}</code></li>
 
     <li><a id='AutomowerConnect-get-StatisticsData'>StatisticsData</a><br>
       <code>get &lt;name&gt; StatisticsData</code><br>
-      Lists statistics data with its hash path. The hash path can be used for generating userReadings. The trigger is e.g. <i>device_state: connected</i> or <i>mower_wsEvent: &lt;status-event|positions-event|settings-event&gt;</i>.</li>
+      Lists statistics data with its hash path. The hash path can be used for generating <a href="#userReadings">userReadings</a>. The trigger is e.g. <i>device_state:\sconnected</i> or <i>mower_wsEvent:\s&lt;status-event|positions-event|settings-event&gt;</i>, see .</li>
 
     <li><a id='AutomowerConnect-get-errorCodes'>errorCodes</a><br>
       <code>get &lt;name&gt; errorCodes</code><br>
@@ -816,13 +816,13 @@ __END__
 
     <li><a id='AutomowerConnect-get-MowerData'>MowerData</a><br>
       <code>get &lt;name&gt; MowerData</code><br>
-      Listet alle Daten des Mähers einschließlich Hashpfad auf, ausgenommen das Positonsarray. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird durch e.g. <i>device_state: connected</i> oder <i>mower_wsEvent: &lt;status-event|positions-event|settings-event&gt;</i>.<br>
+      Listet alle Daten des Mähers einschließlich Hashpfad auf, ausgenommen das Positonsarray. Der Hashpfad kann zur Erzeugung von <a href="#userReadings">userReadings</a> genutzt werden, getriggert wird durch z.B. <i>device_state:\sconnected</i> oder <i>mower_wsEvent:\s&lt;event name&gt;</i>.<br>
       Beispiel: erzeugen des Reading <code>serialnumber</code> mit dem Hashpfad <code>$hash->{helper}{mower}{attributes}{system}{serialNumber}</code><br><br>
-      <code>attr &lt;name&gt; userReadings serialnumber:connected {$defs{$name}->{helper}{mower}{attributes}{system}{serialNumber}}</code></li>
+      <code>attr &lt;name&gt; userReadings serialnumber:device_state:\sconnected {$defs{$name}->{helper}{mower}{attributes}{system}{serialNumber}}</code></li>
 
     <li><a id='AutomowerConnect-get-StatisticsData'>StatisticsData</a><br>
       <code>get &lt;name&gt; StatisticsData</code><br>
-      Listet statistische Daten mit ihrem Hashpfad auf. Der Hashpfad kann zur Erzeugung von userReadings genutzt werden, getriggert wird z.B. durch <i>device_state: connected</i> oder <i>mower_wsEvent: &lt;status-event|positions-event|settings-event&gt;</i></li>
+      Listet statistische Daten mit ihrem Hashpfad auf. Der Hashpfad kann zur Erzeugung von <a href="#userReadings">userReadings</a> genutzt werden, getriggert wird z.B. durch <i>device_state:\sconnected</i> oder <i>mower_wsEvent:\s&lt;event name&gt;</i></li>
 
     <li><a id='AutomowerConnect-get-errorStack'>errorStack</a><br>
       <code>get &lt;name&gt; errorStack</code><br>
