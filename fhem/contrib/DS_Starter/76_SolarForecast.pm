@@ -160,10 +160,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.51.1" => "19.04.2025  consumer: interruptable, swoncond, swoffcond, spignorecond can be perl code enclosed by {..} ".
+  "1.51.1" => "20.04.2025  consumer: interruptable, swoncond, swoffcond, spignorecond can be perl code enclosed by {..} ".
                            "check key is valid in plantControl, aiControl, flowGraphicControl, consumerControl, setupMeterDev ".
                            "setupOtherProducer, setupInverterDev, setupBatteryDev, consumer ".
-                           "writeCacheToFile: bugfix - cache File on OS is deleted if cache is empty ",
+                           "writeCacheToFile: bugfix - cache File on OS is deleted if cache is empty ".
+                           "new Setter attrKeyVal, graphicEnergyUnit: fix display of 'diff' ",
   "1.51.0" => "16.04.2025  obsolete Attr deleted: affectBatteryPreferredCharge, affectConsForecastInPlanning, ctrlShowLink, ctrlBackupFilesKeep ".
                            "affectConsForecastIdentWeekdays, affectConsForecastLastDays, ctrlInterval, ctrlGenPVdeviation ".
                            "affectSolCastPercentile, ctrlSolCastAPIoptimizeReq, consumerAdviceIcon, consumerLink, consumerLegend ",
@@ -643,6 +644,7 @@ my %hset = (                                                                # Ha
   consumerNewPlanning       => { fn => \&_setconsumerNewPlanning       },
   clientAction              => { fn => \&_setclientAction              },
   cycleInterval             => { fn => \&_setcycleInterval             },
+  attrKeyVal                => { fn => \&_setattrKeyVal                },
   energyH4Trigger           => { fn => \&_setTrigger                   },
   plantConfiguration        => { fn => \&_setplantConfiguration        },
   batteryTrigger            => { fn => \&_setTrigger                   },
@@ -1666,7 +1668,7 @@ sub Set {
   my $name  = shift @a;
   my $opt   = shift @a;
   my @args  = @a;
-  my $arg   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
+  my $arg   = join " ", map { my $p = $_; $p =~ s/\s+/ /xg; $p; } @a;     ## no critic 'Map blocks'
   my $prop  = shift @a;
   my $prop1 = shift @a;
   my $prop2 = shift @a;
@@ -1722,6 +1724,7 @@ sub Set {
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
              "cycleInterval ".
+             "attrKeyVal:textField-long ".
              "energyH4Trigger:textField-long ".
              "operatingMemory:backup,save".$rf." ".
              "operationMode:active,inactive ".
@@ -1900,6 +1903,104 @@ sub _setcycleInterval {                   ## no critic "not used"
   return $ret if($ret);
   
   ::CommandSave (undef, undef) if(!$ret);
+
+return;
+}
+
+####################################################################
+#                      Setter attrKeyVal
+#   set <name> attrKeyVal <Sammelattribut> [<Device>] <Key>=<Wert>
+####################################################################
+sub _setattrKeyVal {                         ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $arg   = $paref->{arg} // return;
+  
+  return if(!$init_done);
+  
+  my $valid = {
+      flowGraphicControl => '',
+      aiControl          => '',
+      consumerControl    => '',
+      plantControl       => '',
+      setupMeterDev      => '',
+  };
+  
+  for my $cn (1..MAXCONSUMER) {
+      $cn = sprintf "%02d", $cn;
+      $valid->{'consumer'.${cn}} = '';                                               
+  }
+
+  for my $bn (1..MAXBATTERIES) {
+      $bn = sprintf "%02d", $bn;
+      $valid->{'setupBatteryDev'.${bn}} = '';                    
+      $valid->{'ctrlBatSocManagement'.${bn}} = '';
+  }
+
+  for my $in (1..MAXINVERTER) {
+      $in = sprintf "%02d", $in;
+      $valid->{'setupInverterDev'.${in}} = '';                    
+  }
+
+  for my $pn (1..MAXPRODUCER) {
+      $pn = sprintf "%02d", $pn;
+      $valid->{'setupOtherProducer'.${pn}} = '';             
+  }
+
+  my ($a, $h)    = parseParams ($arg);
+  my $targetattr = $a->[0];
+  my $devn       = $a->[1] // '';
+  
+  return "The '$opt' command requires a valid attribute as a passed parameter." if(!$targetattr || !grep /^$targetattr$/, keys %{$valid});
+  
+  my $av = AttrVal ($name, $targetattr, undef);
+  
+  if (defined $av) {                                                                     # vohandenes Attribut ändern 
+      my ($ao, $ho) = parseParams ($av);
+      
+      while (my ($key, $value) = each %$h) {
+          return "The target attribut '$targetattr' requires '<key>=<value>' as a passed parameter." if(!$key || !defined $value);                                                               
+          $ho->{$key} = $value;
+      }
+      
+      my $repl = '';
+      
+      for my $k (sort keys %$ho) {
+          $repl .= "$k=$ho->{$k}\n";
+      }
+      
+      my $dev = $devn    ? $devn    : 
+                $ao->[0] ? $ao->[0] :
+                '';
+      $dev   .= "\n" if($dev);
+      
+      my $new = "$name $targetattr $dev".$repl;
+      
+      # Log3 ($name, 1, "$name - setze Attribut neu: $new");
+      
+      my $ret = CommandAttr (undef, "$new");
+      return $ret if($ret);
+  }
+  else {                                                                                # Attribut komplett neu setzen
+      my $nkv = '';
+      
+      while (my ($key, $value) = each %$h) {
+          return "The target attribut '$targetattr' requires '<key>=<value>' as a passed parameter." if(!$key || !defined $value);
+          $nkv .= "\n" if($nkv);
+          $nkv .= "$key=$value";
+      }
+          
+      $devn   .= "\n" if($devn);
+      my $new  = "$name $targetattr $devn".$nkv;  
+
+      # Log3 ($name, 1, "$name - setze Attribut neu: $new");
+      
+      my $ret = CommandAttr (undef, "$new");
+      return $ret if($ret);
+  }
+    
+  ::CommandSave (undef, undef);
 
 return;
 }
@@ -2637,7 +2738,7 @@ sub Get {
   return "\"get X\" needs at least an argument" if ( @a < 2 );
   my $name = shift @a;
   my $opt  = shift @a;
-  my $arg  = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
+  my $arg  = join " ", map { my $p = $_; $p =~ s/\s+/ /xg; $p; } @a;     ## no critic 'Map blocks'
 
   my $type = $hash->{TYPE};
 
@@ -6991,7 +7092,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
           my ($show, $pos) = split ':', $h->{show};
           $pos //= 'xx';
 
-          if ($pos !~ /^top|bottom$/xs) {
+          if ($pos !~ /^(top|bottom)$/xs) {
               return qq{The key 'show' is not set correctly. Please note the command reference.};
           }
       }
@@ -15951,7 +16052,7 @@ sub _beamGraphic {
           $ii++;                                                                                                # wieviele Stunden haben wir bisher angezeigt ?
           last if($ii > $maxhours || $ii > $barcount);                                                          # vorzeitiger Abbruch
 
-          $val = normBeamWidth ($paref, 'diff', $i);
+          $val = normBeamWidth ($paref, 'diff', $i, 'beam1');
 
           if ($val ne '&nbsp;') {                                                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
               $val = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' :
@@ -16084,7 +16185,7 @@ sub _beamGraphic {
       $he  = $he < 20 ? 20 : $he;
 
       if ($lotype eq 'single') {
-          $val = normBeamWidth ($paref, 'beam1', $i);
+          $val = normBeamWidth ($paref, 'beam1', $i, 'beam1');
 
           $ret .="<table width='100%' height='100%'>";                                                              # mit width=100% etwas bessere Füllung der Balken
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
@@ -16117,23 +16218,23 @@ sub _beamGraphic {
           $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if(defined $he);     # Freiraum über den Balken einfügen
 
           if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                                 # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
-              $val    = normBeamWidth ($paref, 'beam1', $i);
+              $val    = normBeamWidth ($paref, 'beam1', $i, 'beam1');
               $color1 = $colorb1;
               $style1 = $style." background-color:#$color1; color:#$fcolor1;'";
 
               if ($z3) {                                                                                                 # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
-                  $v      = normBeamWidth ($paref, 'beam2', $i);
+                  $v      = normBeamWidth ($paref, 'beam2', $i, 'beam2');
                   $color2 = $colorb2;
                   $style2 = $style." background-color:#$color2; color:#$fcolor2;'";
               }
           }
           else {
-              $val    = normBeamWidth ($paref, 'beam2', $i);
+              $val    = normBeamWidth ($paref, 'beam2', $i, 'beam2');
               $color1 = $colorb2;
               $style1 = $style." background-color:#$color1; color:#$fcolor2;'";
 
               if ($z3) {
-                  $v      = normBeamWidth ($paref, 'beam1', $i);
+                  $v      = normBeamWidth ($paref, 'beam1', $i, 'beam1');
                   $color2 = $colorb1;
                   $style2 = $style." background-color:#$color2; color:#$fcolor1;'";
               }
@@ -16159,7 +16260,7 @@ sub _beamGraphic {
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
           $ret     .= "<table width='100%' border='0'>\n";                                                      # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
 
-          $val = ($hfcg->{$i}{diff} > 0) ? normBeamWidth ($paref, 'diff', $i) : '';
+          $val = ($hfcg->{$i}{diff} > 0) ? normBeamWidth ($paref, 'diff', $i, 'beam1') : '';
           $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if($hfcg->{$i}{diff} == 0);                                  # Sonderfall , hier wird die 0 gebraucht !
 
           if ($val) {
@@ -16197,7 +16298,7 @@ sub _beamGraphic {
           }
 
           if ($z4) {                                                                                                                     # kann entfallen wenn auch z3 0 ist
-              $val  = $hfcg->{$i}{diff} < 0 ? normBeamWidth ($paref, 'diff', $i) : '&nbsp;';
+              $val  = $hfcg->{$i}{diff} < 0 ? normBeamWidth ($paref, 'diff', $i, 'beam1') : '&nbsp;';
               $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z4."px'>";
               $ret .= "<td class='solarfc' style='vertical-align:top'>".$val;
               $ret .= "</td></tr>";
@@ -16205,8 +16306,14 @@ sub _beamGraphic {
       }
 
       if ($show_diff eq 'bottom') {                                                                                                      # zusätzliche diff Anzeige
-          $val  = normBeamWidth ($paref, 'diff', $i);
-          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;');                    # negative Zahlen in Fettschrift, 0 aber ohne +
+          $val  = normBeamWidth ($paref, 'diff', $i, 'beam1');
+          
+          if ($val ne '&nbsp;') {                                             # negative Zahlen in Fettschrift, 0 aber ohne +
+              $val  = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' : 
+                      $val > 0              ? '+'.$val          : 
+                      $val;
+          }
+                  
           $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val";
           $ret .= "</td></tr>";
       }
@@ -17453,18 +17560,19 @@ return $ret;
 #
 ###############################################################################
 sub normBeamWidth {
-  my $paref   = shift;
-  my $beam    = shift;
-  my $i       = shift;
+  my $paref = shift;
+  my $beam  = shift;
+  my $i     = shift;
+  my $beam1 = shift // '';                             # Anzeige der zusätzlichen Zeile (Content von Beam1/Beam2 als Hilfswert)
   
   my $val     = $paref->{hfcg}{$i}{$beam};
-  my $kw      = $paref->{kw};
   my $weather = $paref->{hfcg}{$i}{weather};
+  my $kw      = $paref->{kw};
   
   my $doconvert = 0;
   
   if ($kw eq 'kWh') {
-	  if ($beam ne 'diff' && $paref->{$beam.'cont'} !~ /batsocforecast_|energycosts|feedincome/xs) {
+	  if ($paref->{$beam1.'cont'} !~ /batsocforecast_|energycosts|feedincome/xs) {
 	      $doconvert = 1;
 	  }
   }
@@ -23482,6 +23590,27 @@ to ensure that the system configuration is correct.
     </li>
     </ul>
     <br>
+    
+    <ul>
+      <a id="SolarForecast-set-attrKeyVal"></a>
+      <li><b>attrKeyVal &lt;Attribute&gt; [&lt;Device&gt;] &lt;Key=Value&gt; </b> <br><br>
+
+      One or more key=value pairs in the collective attributes (aiControl, consumerXX, plantControl, setup.*, etc.) can be
+	  can be reset or changed. <br>
+	  If a device is mandatory, as required in the setup.* attributes, it can also be set or changed.
+	  The change is saved automatically.
+      <br><br>
+
+      <ul>
+        <b>Example: </b> <br>
+		set &lt;name&gt; attrKeyVal setupBatteryDev01 asynchron=1 <br>
+        set &lt;name&gt; attrKeyVal setupBatteryDev02 BatteryDummy2 asynchron=1 <br>
+		set &lt;name&gt; attrKeyVal plantControl cycleInterval=77 <br>
+		set &lt;name&gt; attrKeyVal plantControl batteryPreferredCharge=0 consForecastInPlanning=1 cycleInterval=77 <br>
+      </ul>
+    </li>
+    </ul>
+    <br>
 
     <ul>
       <a id="SolarForecast-set-batteryTrigger"></a>
@@ -25985,6 +26114,27 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 		  <tr><td>                         </td><td>(siehe <a href="#SolarForecast-get-valDecTree">get ... valDecTree aiRawData</a>) vorhanden Werte 'rad1h' ersetzt bzw. 
 		                                             ergänzt wenn sie nicht vorhanden sind.                                                                                 </td></tr>
 		</table>
+      </ul>
+    </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-set-attrKeyVal"></a>
+      <li><b>attrKeyVal &lt;Attribut&gt; [&lt;Gerät&gt;] &lt;Schlüssel=Wert&gt; </b> <br><br>
+
+      Es können ein oder mehrere Schlüssel=Wert Paare in den Sammelattributen (aiControl, consumerXX, plantControl, setup.*, etc.)
+	  neu gesetzt oder verändert werden. <br>
+	  Ist ein Gerät obligatorisch, wie in den setup.*-Attributen verlangt, kann es ebenfalls gesetzt oder geändert werden.
+	  Es erfolgt eine automatische Speicherung der Änderung.
+      <br><br>
+
+      <ul>
+        <b>Beispiel: </b> <br>
+		set &lt;name&gt; attrKeyVal setupBatteryDev01 asynchron=1 <br>
+        set &lt;name&gt; attrKeyVal setupBatteryDev02 BatteryDummy2 asynchron=1 <br>
+		set &lt;name&gt; attrKeyVal plantControl cycleInterval=77 <br>
+		set &lt;name&gt; attrKeyVal plantControl batteryPreferredCharge=0 consForecastInPlanning=1 cycleInterval=77 <br>
       </ul>
     </li>
     </ul>
