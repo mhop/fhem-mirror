@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 76_SMAInverter.pm: fix warning Versions History
  - feature: 76_SolarForecast: Version 1.51.1
  - change:  74_AutomowerConnect: Cref improved, automowerconnect.js fix third
             party file loading, change tp repository, add file size to log
