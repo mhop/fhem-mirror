@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.51.2" => "21.04.2025  Attributes obsolet: graphicHeaderShow replaced by graphicSelect, Value 'none' of consumerControl->showLegend deleted ",
   "1.51.1" => "20.04.2025  consumer: interruptable, swoncond, swoffcond, spignorecond can be perl code enclosed by {..} ".
                            "check key is valid in plantControl, aiControl, flowGraphicControl, consumerControl, setupMeterDev ".
                            "setupOtherProducer, setupInverterDev, setupBatteryDev, consumer ".
@@ -578,6 +579,25 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                    powerTrigger
                    energyH4Trigger
                  );
+                                                                                 # Grafik Selektionsoptionen
+my @gsopt = qw ( both
+                 both_noHead
+                 both_noCons
+                 both_noHead_noCons
+                 swap
+                 swap_noHead
+                 swap_noCons
+                 swap_noHead_noCons
+                 flow
+                 flow_noHead
+                 flow_noCons
+                 flow_noHead_noCons
+                 forecast
+                 forecast_noHead
+                 forecast_noCons
+                 forecast_noHead_noCons
+                 none
+               );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( aiControl 
                    consumerControl
@@ -596,7 +616,7 @@ my @aconfigs = qw( aiControl
                    graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color graphicBeam5Color graphicBeam6Color
                    graphicBeam1FontColor graphicBeam2FontColor graphicBeam3FontColor graphicBeam4FontColor graphicBeam5FontColor graphicBeam6FontColor
                    graphicEnergyUnit graphicHeaderOwnspec graphicHeaderOwnspecValForm
-                   graphicHeaderDetail graphicHeaderShow graphicHistoryHour graphicHourCount graphicHourStyle
+                   graphicHeaderDetail graphicHistoryHour graphicHourCount graphicHourStyle
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicWeatherColor graphicWeatherColorNight
                    plantControl
@@ -605,27 +625,27 @@ my @aconfigs = qw( aiControl
                    setupRoofTops
                  );
 
-for my $cn (1..MAXCONSUMER) {
-  $cn = sprintf "%02d", $cn;
-  push @aconfigs, "consumer${cn}";                            # Anlagenkonfiguration: add Consumer Attribute
-  push @dd,       "consumerSwitching${cn}";                   # ctrlDebug: add specific Consumer
-}
+  for my $cn (1..MAXCONSUMER) {
+      $cn = sprintf "%02d", $cn;
+      push @aconfigs, "consumer${cn}";                            # Anlagenkonfiguration: add Consumer Attribute
+      push @dd,       "consumerSwitching${cn}";                   # ctrlDebug: add specific Consumer
+  }
 
-for my $bn (1..MAXBATTERIES) {
-  $bn = sprintf "%02d", $bn;
-  push @aconfigs, "setupBatteryDev${bn}";                     # Anlagenkonfiguration: add Battery Attribute
-  push @aconfigs, "ctrlBatSocManagement${bn}";
-}
+  for my $bn (1..MAXBATTERIES) {
+      $bn = sprintf "%02d", $bn;
+      push @aconfigs, "setupBatteryDev${bn}";                     # Anlagenkonfiguration: add Battery Attribute
+      push @aconfigs, "ctrlBatSocManagement${bn}";
+  }
 
-for my $in (1..MAXINVERTER) {
-  $in = sprintf "%02d", $in;
-  push @aconfigs, "setupInverterDev${in}";                    # Anlagenkonfiguration: add Inverter Attribute
-}
+  for my $in (1..MAXINVERTER) {
+      $in = sprintf "%02d", $in;
+      push @aconfigs, "setupInverterDev${in}";                    # Anlagenkonfiguration: add Inverter Attribute
+  }
 
-for my $pn (1..MAXPRODUCER) {
-  $pn = sprintf "%02d", $pn;
-  push @aconfigs, "setupOtherProducer${pn}";                  # Anlagenkonfiguration: add Producer Attribute
-}
+  for my $pn (1..MAXPRODUCER) {
+      $pn = sprintf "%02d", $pn;
+      push @aconfigs, "setupOtherProducer${pn}";                  # Anlagenkonfiguration: add Producer Attribute
+  }
 
 my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
 
@@ -1531,7 +1551,8 @@ sub Initialize {
   }
 
   my $allcs = join ",", @allc;
-  my $dm    = 'none,'.join ",", sort @dd;
+  my $dm    = 'none,'.join ",", sort @dd;                                             # Optionen der Debugselektion
+  my $gol   = join ",", @gsopt;                                                       # Optionen der Grafikselektion
 
   $hash->{DefFn}              = \&Define;
   $hash->{UndefFn}            = \&Undef;
@@ -1566,12 +1587,11 @@ sub Initialize {
                                 "graphicHeaderOwnspec:textField-long ".
                                 "graphicHeaderOwnspecValForm:textField-long ".
                                 "graphicHeaderDetail:multiple-strict,all,co,pv,own,status ".
-                                "graphicHeaderShow:1,0 ".
                                 "graphicHistoryHour:slider,0,1,23 ".
                                 "graphicHourCount:slider,4,1,24 ".
                                 "graphicHourStyle ".
                                 "graphicLayoutType:single,double,diff ".
-                                "graphicSelect:both,flow,forecast,none ".
+                                "graphicSelect:$gol ".
                                 "graphicShowDiff:no,top,bottom ".
                                 "graphicShowNight:1,0,01 ".
                                 "graphicShowWeather:1,0 ".
@@ -1603,8 +1623,8 @@ sub Initialize {
   ##########################################################################################################################
   #my $av = 'obsolete#-#use#attr#plantControl#instead';
   #my $av1 = 'obsolete#-#will#be#deleted#soon';
-  #my $av2 = 'obsolete#-#use#attr#consumerControl#instead';
-  #$hash->{AttrList} .= " affectBatteryPreferredCharge:$av ";
+  my $av2 = 'obsolete#-#use#attr#graphicSelect#instead';
+  $hash->{AttrList} .= " graphicHeaderShow:$av2 ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -2742,21 +2762,6 @@ sub Get {
 
   my $type = $hash->{TYPE};
 
-  my @ho   = qw (both
-                 both_noHead
-                 both_noCons
-                 both_noHead_noCons
-                 flow
-                 flow_noHead
-                 flow_noCons
-                 flow_noHead_noCons
-                 forecast
-                 forecast_noHead
-                 forecast_noCons
-                 forecast_noHead_noCons
-                 none
-                );
-
   my @pha  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{pvhist}};
   my @cla  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{circular}};
   my @vcm  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{consumers}};
@@ -2765,7 +2770,7 @@ sub Get {
   my @vpn  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{producers}};
   my @vst  = sort keys %{$data{$name}{strings}};
 
-  my $hol  = join ",", @ho;
+  my $gol  = join ",", @gsopt;                                                       # Optionen der Grafikselektion
   my $pvl  = join ",", @pha;
   my $cll  = join ",", @cla;
   my $cml  = join ",", @vcm;
@@ -2784,7 +2789,7 @@ sub Get {
                 "dwdCatalog ".
                 "forecastQualities:noArg ".
                 "ftuiFramefiles:noArg ".
-                "html:$hol ".
+                "html:$gol ".
                 "nextHours:noArg ".
                 "pvCircular:#,$cll ".
                 "pvHistory:#,exportToCsv,$pvl ".
@@ -6014,15 +6019,15 @@ sub Attr {
   #    }
   #}
   
-  #if ($cmd eq 'set' && $aName =~ /^consumerAdviceIcon$/) {
-  #    my $msg  = "The attribute $aName is replaced by 'consumerControl'.";
-  #    if (!$init_done) {
-  #        Log3 ($name, 1, "$name - $msg");
-  #    }
-  #    else {
-  #        return $msg;
-  #    }
-  #}
+  if ($cmd eq 'set' && $aName =~ /^graphicHeaderShow$/) {
+      my $msg  = "The attribute $aName is replaced by 'graphicSelect'.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg");
+      }
+      else {
+          return $msg;
+      }
+  }
   
   #if ($cmd eq 'set' && $aName =~ /^affectSolCastPercentile$/) {
   #    my $msg1 = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
@@ -6386,10 +6391,10 @@ sub _attrconsumerControl {               ## no critic "not used"
   my $cmd   = $paref->{cmd};
   
   my $valid = {
-      adviceIcon => { comp => '.*',                                               act => 0 },
-      detailLink => { comp => '(0|1)',                                            act => 0 },
-      dummyIcon  => { comp => '.*',                                               act => 0 },
-      showLegend => { comp => '(none|icon_top|icon_bottom|text_top|text_bottom)', act => 0 },
+      adviceIcon => { comp => '.*',                                          act => 0 },
+      detailLink => { comp => '(0|1)',                                       act => 0 },
+      dummyIcon  => { comp => '.*',                                          act => 0 },
+      showLegend => { comp => '(icon_top|icon_bottom|text_top|text_bottom)', act => 0 },
   };
   
   for my $av (keys %{$valid}) {
@@ -14107,16 +14112,12 @@ sub entryGraphic {
       lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
       kw             => AttrVal    ($name, 'graphicEnergyUnit',               'Wh'),
       height         => AttrNum    ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL),
-      width          => $width,
       fsize          => AttrNum    ($name, 'graphicSpaceSize',                  24),
-      layersync      => $layersync,                                                                 # Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen
-      show_night     => $show_night,                                                                # alle Balken (Spalten) anzeigen ?
       show_diff      => AttrVal    ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
       weather        => AttrNum    ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
       colorw         => AttrVal    ($name, 'graphicWeatherColor',       WTHCOLDDEF),                # Wetter Icon Farbe Tag
       colorwn        => AttrVal    ($name, 'graphicWeatherColorNight',  WTHCOLNDEF),                # Wetter Icon Farbe Nacht
       wlalias        => AttrVal    ($name, 'alias',                          $name),
-      sheader        => AttrNum    ($name, 'graphicHeaderShow',                  1),                # Anzeigen des Grafik Headers
       hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       clegendpos     => CurrentVal ($name, 'showLegend',                'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => CurrentVal ($name, 'detailLink',                         1),                # Link zur Detailansicht des Verbrauchers      
@@ -14134,38 +14135,30 @@ sub entryGraphic {
       genpvdva       => CurrentVal ($name, 'genPVdeviation',               'daily'),                # Methode der Abweichungsberechnung
       lang           => getLang    ($hash),
       debug          => getDebug   ($hash),                                                         # Debug Module
+      width          => $width,
+      layersync      => $layersync,                                                                 # Zeitsynchronisation zwischen Ebene 1 und den folgenden Balkengrafikebenen
+      show_night     => $show_night,                                                                # alle Balken (Spalten) anzeigen ?
+      graphicselect  => $gsel,                                                                      # Optionen der Grafikselektion
   };
 
   my $colspan = $maxhours + 2;
   my $ret     = q{};
 
   $ret .= "<span>$dlink </span><br>"  if(CurrentVal ($name, 'showLink', 0));
-
-  #$ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
   $ret .= "<style>TD.solarfc {text-align: center; padding-left:5px; padding-right:5px; margin:0px;}</style>";
   $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
   $ret .= "<tr><td class='solarfc'>";
 
-  # Headerzeile generieren
-  ##########################
+  # Kopfbereich inkl. Benutzerbereich generieren
+  ################################################
   my $header = _graphicHeader ($paref);
 
-  # Verbraucherlegende und Steuerung
-  ###################################
+  # Verbraucherlegende und Steuerung generieren
+  ###############################################
   my $cnmlegend = _graphicConsumerLegend ($paref);
 
-  # Headerzeile und/oder Verbraucherlegende ausblenden
-  ######################################################
-  if ($gsel =~ /_noHead/xs) {
-      $header = q{};
-  }
-
-  if ($gsel =~ /_noCons/xs) {
-      $cnmlegend = q{};
-  }
-
-  $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
   my $m = $paref->{modulo} % 2;
+  $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
 
   if ($header) {                                                                                            # Header ausgeben
       $ret .= "<tr class='$htr{$m}{cl}'>";
@@ -14175,10 +14168,11 @@ sub entryGraphic {
       $paref->{modulo}++;
   }
 
-  my $clegendpos = $paref->{clegendpos};
-  $m             = $paref->{modulo} % 2;
+  $m = $paref->{modulo} % 2;
 
-  if ($cnmlegend && $clegendpos eq 'top') {
+  # Verbraucherlegende oben
+  ###################################################################################
+  if ($cnmlegend && $paref->{clegendpos} =~ /_top$/xs) {
       $ret .= "<tr class='$htr{$m}{cl}'>";
       $ret .= "<td colspan='$colspan' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
       $ret .= $cnmlegend;
@@ -14189,13 +14183,27 @@ sub entryGraphic {
   }
 
   $m = $paref->{modulo} % 2;
+  
+  # Flußgrafik oberhalb Balkengrafik
+  ###################################################################################
+  if ($gsel =~ /swap/xs) {      
+      $ret  .= "<tr class='$htr{$m}{cl}'>";
+      $ret  .= "<td colspan='$colspan' align='center' style='word-break: normal'>";
+      $ret  .= _flowGraphic ($paref);
+      $ret  .= "</td>";
+      $ret  .= "</tr>";
+      $ret  .= _levelSeparator ($paref);
+
+      $paref->{modulo}++;
+  }
+  
+  $m = $paref->{modulo} % 2;
 
   ## Balkengrafiken
-  ###################
-
+  ###################################################################################
   ## Balkengrafik Ebene 1
   #########################
-  if ($gsel =~ /both/xs || $gsel =~ /forecast/xs) {
+  if ($gsel =~ /both|swap|forecast/xs) {
       my %hfcg1;
       $paref->{chartlvl} = 1;                                                                              # Balkengrafik Ebene 1
       $paref->{hfcg}     = \%hfcg1;                                                                        # hfcg = hash forecast graphic
@@ -14321,13 +14329,13 @@ sub entryGraphic {
 
   $m = $paref->{modulo} % 2;
 
-  # Flußgrafik
-  ##############
-  if ($gsel =~ /both/xs || $gsel =~ /flow/xs) {
+  # Flußgrafik unterhalb Balkengrafik
+  ###################################################################################
+  if ($gsel =~ /both|flow/xs) {
       $ret  .= "<tr class='$htr{$m}{cl}'>";
-      my $fg = _flowGraphic ($paref);
       $ret  .= "<td colspan='$colspan' align='center' style='word-break: normal'>";
-      $ret  .= "$fg</td>";
+      $ret  .= _flowGraphic ($paref);
+      $ret  .= "</td>";
       $ret  .= "</tr>";
 
       $paref->{modulo}++;
@@ -14335,11 +14343,10 @@ sub entryGraphic {
 
   $m = $paref->{modulo} % 2;
 
-  # Legende unten
-  #################
-  if ($cnmlegend && ($clegendpos eq 'bottom')) {
+  # Verbraucherlegende unten
+  ###################################################################################
+  if ($cnmlegend && $paref->{clegendpos} =~ /_bottom$/xs) {
       $ret .= "<tr class='$htr{$m}{cl}'>";
-      #$ret .= "<td colspan='$colspan' align='center' style='word-break: normal'>";
       $ret .= "<td colspan='$colspan' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
       $ret .= "$cnmlegend</td>";
       $ret .= "</tr>";
@@ -14482,10 +14489,9 @@ return;
 #         forecastGraphic Headerzeile generieren
 ################################################################
 sub _graphicHeader {
-  my $paref   = shift;
-  my $sheader = $paref->{sheader};
+  my $paref = shift;
 
-  return if(!$sheader);
+  return q{} if($paref->{graphicselect} =~ /_noHead/xs);
 
   my $hdrDetail = $paref->{hdrDetail};                     # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
   my $ftui      = $paref->{ftui};
@@ -15433,16 +15439,15 @@ return;
 #         Verbraucherlegende und Steuerung
 ################################################################
 sub _graphicConsumerLegend {
-  my $paref                    = shift;
-  my $name                     = $paref->{name};
-  my ($clegendstyle, $clegend) = split '_', $paref->{clegendpos};
-  my $clink                    = $paref->{clink};
+  my $paref         = shift;
+  my $name          = $paref->{name};
+  my $clink         = $paref->{clink};
+  my $graphicselect = $paref->{graphicselect};                                               # Optionen der Grafikselektion
 
-  my @consumers                = sort{$a<=>$b} keys %{$data{$name}{consumers}};              # definierte Verbraucher ermitteln
-  $clegend                     = '' if($clegendstyle eq 'none' || !int @consumers);
-  $paref->{clegendpos}         = $clegend;
+  my ($clstyle, $clpos) = split '_', $paref->{clegendpos};
+  my @consumers         = sort{$a<=>$b} keys %{$data{$name}{consumers}};                     # definierte Verbraucher ermitteln
 
-  return if(!$clegend );
+  return q{} if($graphicselect =~ /_noCons/xs || !scalar @consumers);
 
   my $hash   = $defs{$name};
   my $ftui   = $paref->{ftui};
@@ -15485,7 +15490,7 @@ sub _graphicConsumerLegend {
 
   $ctable   .= qq{</tr>};
 
-  if ($clegend ne 'top') {
+  if ($clpos ne 'top') {
        $ctable .= qq{<tr><td colspan="12"><hr></td></tr>};
   }
 
@@ -15611,7 +15616,7 @@ sub _graphicConsumerLegend {
           }
       }
 
-      if ($clegendstyle eq 'icon') {
+      if ($clstyle eq 'icon') {
           $cicon   = FW_makeImage($cicon);
           $ctable .= "<td style='text-align:left; white-space:nowrap;' $dstyle>$calias       </td>";
           $ctable .= "<td style='text-align:center'                    $dstyle>$cicon        </td>";
@@ -15645,7 +15650,7 @@ sub _graphicConsumerLegend {
 
   $ctable .= qq{</tr>} if($tro);
 
-  if ($clegend ne 'bottom') {
+  if ($clpos ne 'bottom') {
        $ctable .= qq{<tr><td colspan='12'><hr></td></tr>};
   }
 
@@ -24138,19 +24143,23 @@ to ensure that the system configuration is correct.
       <ul>
         <table>
         <colgroup> <col width="30%"> <col width="70%"> </colgroup>
-        <tr><td> <b>both</b>                    </td><td>displays the header, consumer legend, energy flow graph and forecast graph (default)       </td></tr>
-        <tr><td> <b>both_noHead</b>             </td><td>displays the consumer legend, energy flow graph and forecast graph                         </td></tr>
-        <tr><td> <b>both_noCons</b>             </td><td>displays the header, energy flow and prediction graphic                                    </td></tr>
-        <tr><td> <b>both_noHead_noCons</b>      </td><td>displays energy flow and prediction graphs                                                 </td></tr>
-        <tr><td> <b>flow</b>                    </td><td>displays the header, the consumer legend and energy flow graphic                           </td></tr>
-        <tr><td> <b>flow_noHead</b>             </td><td>displays the consumer legend and the energy flow graph                                     </td></tr>
-        <tr><td> <b>flow_noCons</b>             </td><td>displays the header and the energy flow graph                                              </td></tr>
-        <tr><td> <b>flow_noHead_noCons</b>      </td><td>displays the energy flow graph                                                             </td></tr>
-        <tr><td> <b>forecast</b>                </td><td>displays the header, the consumer legend and the forecast graphic                          </td></tr>
-        <tr><td> <b>forecast_noHead</b>         </td><td>displays the consumer legend and the forecast graph                                        </td></tr>
-        <tr><td> <b>forecast_noCons</b>         </td><td>displays the header and the forecast graphic                                               </td></tr>
-        <tr><td> <b>forecast_noHead_noCons</b>  </td><td>displays the forecast graph                                                                </td></tr>
-        <tr><td> <b>none</b>                    </td><td>displays only the header and the consumer legend                                           </td></tr>
+        <tr><td> <b>both</b>                    </td><td>displays graphic header, load panel, bar graph and energy flow graph (default)        </td></tr>
+        <tr><td> <b>both_noHead</b>             </td><td>displays load panel, bar graph and energy flow graph                                  </td></tr>
+        <tr><td> <b>both_noCons</b>             </td><td>displays graph header, bar graph and energy flow graph                                </td></tr>
+        <tr><td> <b>both_noHead_noCons</b>      </td><td>displays bar graph and energy flow graph                                              </td></tr>
+        <tr><td> <b>swap</b>                    </td><td>like 'both', with swapped bar and energy flow graph sequence                          </td></tr>
+        <tr><td> <b>swap_noHead</b>             </td><td>like 'both_noHead', with swapped bar and energy flow graph sequence                   </td></tr>
+        <tr><td> <b>swap_noCons</b>             </td><td>like 'both_noCons', with swapped bar and energy flow graph sequence                   </td></tr>
+        <tr><td> <b>swap_noHead_noCons</b>      </td><td>like 'both_noHead_noCons', with swapped bar and energy flow graph sequence            </td></tr>
+        <tr><td> <b>flow</b>                    </td><td>displays graphic header, load panel and energy flow graphic                           </td></tr>
+        <tr><td> <b>flow_noHead</b>             </td><td>displays load panel and energy flow graph                                             </td></tr>
+        <tr><td> <b>flow_noCons</b>             </td><td>displays graphic header and energy flow graphic                                       </td></tr>
+        <tr><td> <b>flow_noHead_noCons</b>      </td><td>displays energy flow graph                                                            </td></tr>
+        <tr><td> <b>forecast</b>                </td><td>displays graphic header, consumer panel and bar graph                                 </td></tr>
+        <tr><td> <b>forecast_noHead</b>         </td><td>displays consumer panel and bar graph                                                 </td></tr>
+        <tr><td> <b>forecast_noCons</b>         </td><td>displays graphic header and bar chart                                                 </td></tr>
+        <tr><td> <b>forecast_noHead_noCons</b>  </td><td>displays bar graph                                                                    </td></tr>
+        <tr><td> <b>none</b>                    </td><td>only displays graphic header and consumer panel                                       </td></tr>
         </table>
       </ul>
       <br>
@@ -24162,6 +24171,7 @@ to ensure that the system configuration is correct.
         define wl.SolCast5 weblink htmlCode { FHEM::SolarForecast::pageAsHtml ('SolCast5', '-', '&lt;argument&gt;') }
       </ul>
       <br>
+      
       'SolCast5' is the name of the SolarForecast device to be included. <b>&lt;argument&gt;</b> is one of the above
       described selection options.
       </li>
@@ -24581,7 +24591,7 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td>The color can be specified as a hex value (e.g. #cc3300) or designation (e.g. red, blue).                               </td></tr>
             <tr><td>                            </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>showLegend</b>          </td><td>Defines the position or display method of the consumer legend if consumers are registered.                              </td></tr>
-		    <tr><td>                            </td><td><b>none</b> - the legend is hidden                                                                                      </td></tr>
+		    <tr><td>                            </td><td>To hide the consumer panel, please use <a href=“#SolarForecast-attr-graphicSelect”>graphicSelect</a>.                   </td></tr>
 			<tr><td>                            </td><td><b>icon_top</b> - the legend is displayed above the bar chart with consumer icons (default)                             </td></tr>
 			<tr><td>                            </td><td><b>icon_bottom</b> - the legend is displayed below the bar and flow chart with consumer icons                           </td></tr>
 			<tr><td>                            </td><td><b>text_top</b> - the legend is displayed above the bar chart without consumer icons                                    </td></tr>
@@ -25297,14 +25307,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicHeaderShow"></a>
-       <li><b>graphicHeaderShow </b><br>
-         Show/hide the graphic table header with forecast data and certain current and
-         statistical values. <br>
-         (default: 1)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-graphicHistoryHour"></a>
        <li><b>graphicHistoryHour </b><br>
          Number of previous hours displayed in the bar graph. <br>
@@ -25357,13 +25359,26 @@ to ensure that the system configuration is correct.
          <br><br>
 
          <ul>
-         <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>both</b>       </td><td>displays the header, consumer legend, energy flow and prediction graph (default)        </td></tr>
-            <tr><td> <b>flow</b>       </td><td>displays the header, the consumer legend and energy flow graphic                        </td></tr>
-            <tr><td> <b>forecast</b>   </td><td>displays the header, the consumer legend and the prediction graphic                     </td></tr>
-            <tr><td> <b>none</b>       </td><td>displays only the header and the consumer legend                                        </td></tr>
-         </table>
+           <table>
+           <colgroup> <col width="30%"> <col width="70%"> </colgroup>
+           <tr><td> <b>both</b>                    </td><td>displays graphic header, load panel, bar graph and energy flow graph (default)        </td></tr>
+           <tr><td> <b>both_noHead</b>             </td><td>displays load panel, bar graph and energy flow graph                                  </td></tr>
+           <tr><td> <b>both_noCons</b>             </td><td>displays graph header, bar graph and energy flow graph                                </td></tr>
+           <tr><td> <b>both_noHead_noCons</b>      </td><td>displays bar graph and energy flow graph                                              </td></tr>
+           <tr><td> <b>swap</b>                    </td><td>like 'both', with swapped bar and energy flow graph sequence                          </td></tr>
+           <tr><td> <b>swap_noHead</b>             </td><td>like 'both_noHead', with swapped bar and energy flow graph sequence                   </td></tr>
+           <tr><td> <b>swap_noCons</b>             </td><td>like 'both_noCons', with swapped bar and energy flow graph sequence                   </td></tr>
+           <tr><td> <b>swap_noHead_noCons</b>      </td><td>like 'both_noHead_noCons', with swapped bar and energy flow graph sequence            </td></tr>
+           <tr><td> <b>flow</b>                    </td><td>displays graphic header, load panel and energy flow graphic                           </td></tr>
+           <tr><td> <b>flow_noHead</b>             </td><td>displays load panel and energy flow graph                                             </td></tr>
+           <tr><td> <b>flow_noCons</b>             </td><td>displays graphic header and energy flow graphic                                       </td></tr>
+           <tr><td> <b>flow_noHead_noCons</b>      </td><td>displays energy flow graph                                                            </td></tr>
+           <tr><td> <b>forecast</b>                </td><td>displays graphic header, consumer panel and bar graph                                 </td></tr>
+           <tr><td> <b>forecast_noHead</b>         </td><td>displays consumer panel and bar graph                                                 </td></tr>
+           <tr><td> <b>forecast_noCons</b>         </td><td>displays graphic header and bar chart                                                 </td></tr>
+           <tr><td> <b>forecast_noHead_noCons</b>  </td><td>displays bar graph                                                                    </td></tr>
+           <tr><td> <b>none</b>                    </td><td>only displays graphic header and consumer panel                                       </td></tr>
+           </table>
          </ul>
        </li>
        <br>
@@ -26672,24 +26687,28 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Als Argument kann dem Befehl eine der folgenden Selektionen mitgegeben werden:
       <br><br>
 
-      <ul>
-        <table>
-        <colgroup> <col width="30%"> <col width="70%"> </colgroup>
-        <tr><td> <b>both</b>                    </td><td>zeigt den Header, die Verbraucherlegende, Energiefluß- und Vorhersagegrafik an (default)   </td></tr>
-        <tr><td> <b>both_noHead</b>             </td><td>zeigt die Verbraucherlegende, Energiefluß- und Vorhersagegrafik an                         </td></tr>
-        <tr><td> <b>both_noCons</b>             </td><td>zeigt den Header, Energiefluß- und Vorhersagegrafik an                                     </td></tr>
-        <tr><td> <b>both_noHead_noCons</b>      </td><td>zeigt Energiefluß- und Vorhersagegrafik an                                                 </td></tr>
-        <tr><td> <b>flow</b>                    </td><td>zeigt den Header, die Verbraucherlegende und Energieflußgrafik an                          </td></tr>
-        <tr><td> <b>flow_noHead</b>             </td><td>zeigt die Verbraucherlegende und die Energieflußgrafik an                                  </td></tr>
-        <tr><td> <b>flow_noCons</b>             </td><td>zeigt den Header und die Energieflußgrafik an                                              </td></tr>
-        <tr><td> <b>flow_noHead_noCons</b>      </td><td>zeigt die Energieflußgrafik an                                                             </td></tr>
-        <tr><td> <b>forecast</b>                </td><td>zeigt den Header, die Verbraucherlegende und die Vorhersagegrafik an                       </td></tr>
-        <tr><td> <b>forecast_noHead</b>         </td><td>zeigt die Verbraucherlegende und die Vorhersagegrafik an                                   </td></tr>
-        <tr><td> <b>forecast_noCons</b>         </td><td>zeigt den Header und die Vorhersagegrafik an                                               </td></tr>
-        <tr><td> <b>forecast_noHead_noCons</b>  </td><td>zeigt die Vorhersagegrafik an                                                              </td></tr>
-        <tr><td> <b>none</b>                    </td><td>zeigt nur den Header und die Verbraucherlegende an                                         </td></tr>
-        </table>
-      </ul>
+       <ul>
+         <table>
+         <colgroup> <col width="30%"> <col width="70%"> </colgroup>
+         <tr><td> <b>both</b>                    </td><td>zeigt Grafikkopf, Verbraucherpaneel, Balken- und Energieflußgrafik an (default)       </td></tr>
+         <tr><td> <b>both_noHead</b>             </td><td>zeigt Verbraucherpaneel, Balken- und Energieflußgrafik an                             </td></tr>
+         <tr><td> <b>both_noCons</b>             </td><td>zeigt Grafikkopf, Balken- und Energieflußgrafik an                                    </td></tr>
+         <tr><td> <b>both_noHead_noCons</b>      </td><td>zeigt Balken- und Energieflußgrafik an                                                </td></tr>
+         <tr><td> <b>swap</b>                    </td><td>wie 'both', mit vertauschter Balken- und Energieflußgrafik Reihenfolge                </td></tr>
+         <tr><td> <b>swap_noHead</b>             </td><td>wie 'both_noHead', mit vertauschter Balken- und Energieflußgrafik Reihenfolge         </td></tr>
+         <tr><td> <b>swap_noCons</b>             </td><td>wie 'both_noCons', mit vertauschter Balken- und Energieflußgrafik Reihenfolge         </td></tr>
+         <tr><td> <b>swap_noHead_noCons</b>      </td><td>wie 'both_noHead_noCons', mit vertauschter Balken- und Energieflußgrafik Reihenfolge  </td></tr>
+         <tr><td> <b>flow</b>                    </td><td>zeigt Grafikkopf, Verbraucherpaneel und Energieflußgrafik an                          </td></tr>
+         <tr><td> <b>flow_noHead</b>             </td><td>zeigt Verbraucherpaneel und Energieflußgrafik an                                      </td></tr>
+         <tr><td> <b>flow_noCons</b>             </td><td>zeigt Grafikkopf und Energieflußgrafik an                                             </td></tr>
+         <tr><td> <b>flow_noHead_noCons</b>      </td><td>zeigt Energieflußgrafik an                                                            </td></tr>
+         <tr><td> <b>forecast</b>                </td><td>zeigt Grafikkopf, Verbraucherpaneel und Balkengrafik an                               </td></tr>
+         <tr><td> <b>forecast_noHead</b>         </td><td>zeigt Verbraucherpaneel und Balkengrafik an                                           </td></tr>
+         <tr><td> <b>forecast_noCons</b>         </td><td>zeigt Grafikkopf und Balkengrafik an                                                  </td></tr>
+         <tr><td> <b>forecast_noHead_noCons</b>  </td><td>zeigt Balkengrafik an                                                                 </td></tr>
+         <tr><td> <b>none</b>                    </td><td>zeigt nur Grafikkopf und Verbraucherpaneel an                                         </td></tr>
+         </table>
+       </ul>
       <br>
 
       Die Grafik kann abgerufen und in eigenen Code eingebettet werden. Auf einfache Weise kann dies durch die Definition
@@ -27118,7 +27137,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td>Die Farbe kann als Hex-Wert (z.B. #cc3300) oder Bezeichnung (z.B. red, blue) angegeben werden.                                  </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
 			<tr><td> <b>showLegend</b>          </td><td>Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher registriert sind.                           </td></tr>
-		    <tr><td>                            </td><td><b>none</b> - die Legende wird ausgeblendet                                                                                     </td></tr>
+		    <tr><td>                            </td><td>Zur Ausblendung des Verbraucherpaneels bitte <a href="#SolarForecast-attr-graphicSelect ">graphicSelect</a> verwenden.          </td></tr>
 			<tr><td>                            </td><td><b>icon_top</b> - die Legende wird oberhalb der Balkengrafik mit Verbrauchericons angezeigt (default)                           </td></tr>
 			<tr><td>                            </td><td><b>icon_bottom</b> - die Legende wird unterhalb der Balken- und Flußgrafik mit Verbrauchericons angezeigt                       </td></tr>
 			<tr><td>                            </td><td><b>text_top</b> - die Legende wird oberhalb der Balkengrafik ohne Verbrauchericons angezeigt                                    </td></tr>
@@ -27834,14 +27853,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicHeaderShow"></a>
-       <li><b>graphicHeaderShow </b><br>
-         Anzeigen/Verbergen des Grafik Tabellenkopfes mit Prognosedaten sowie bestimmten aktuellen und
-         statistischen Werten. <br>
-         (default: 1)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-graphicHistoryHour"></a>
        <li><b>graphicHistoryHour </b><br>
          Anzahl der vorangegangenen Stunden die in der Balkengrafik dargestellt werden. <br>
@@ -27893,15 +27904,28 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Wählt die anzuzeigenden Grafiksegmente des Moduls aus.
          <br><br>
 
-         <ul>
+       <ul>
          <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>both</b>       </td><td>zeigt den Header, die Verbraucherlegende, Energiefluß- und Vorhersagegrafik an (default)   </td></tr>
-            <tr><td> <b>flow</b>       </td><td>zeigt den Header, die Verbraucherlegende und Energieflußgrafik an                          </td></tr>
-            <tr><td> <b>forecast</b>   </td><td>zeigt den Header, die Verbraucherlegende und die Vorhersagegrafik an                       </td></tr>
-            <tr><td> <b>none</b>       </td><td>zeigt nur den Header und die Verbraucherlegende an                                         </td></tr>
+         <colgroup> <col width="30%"> <col width="70%"> </colgroup>
+         <tr><td> <b>both</b>                    </td><td>zeigt Grafikkopf, Verbraucherpaneel, Balken- und Energieflußgrafik an (default)       </td></tr>
+         <tr><td> <b>both_noHead</b>             </td><td>zeigt Verbraucherpaneel, Balken- und Energieflußgrafik an                             </td></tr>
+         <tr><td> <b>both_noCons</b>             </td><td>zeigt Grafikkopf, Balken- und Energieflußgrafik an                                    </td></tr>
+         <tr><td> <b>both_noHead_noCons</b>      </td><td>zeigt Balken- und Energieflußgrafik an                                                </td></tr>
+         <tr><td> <b>swap</b>                    </td><td>wie 'both', mit vertauschter Balken- und Energieflußgrafik Reihenfolge                </td></tr>
+         <tr><td> <b>swap_noHead</b>             </td><td>wie 'both_noHead', mit vertauschter Balken- und Energieflußgrafik Reihenfolge         </td></tr>
+         <tr><td> <b>swap_noCons</b>             </td><td>wie 'both_noCons', mit vertauschter Balken- und Energieflußgrafik Reihenfolge         </td></tr>
+         <tr><td> <b>swap_noHead_noCons</b>      </td><td>wie 'both_noHead_noCons', mit vertauschter Balken- und Energieflußgrafik Reihenfolge  </td></tr>
+         <tr><td> <b>flow</b>                    </td><td>zeigt Grafikkopf, Verbraucherpaneel und Energieflußgrafik an                          </td></tr>
+         <tr><td> <b>flow_noHead</b>             </td><td>zeigt Verbraucherpaneel und Energieflußgrafik an                                      </td></tr>
+         <tr><td> <b>flow_noCons</b>             </td><td>zeigt Grafikkopf und Energieflußgrafik an                                             </td></tr>
+         <tr><td> <b>flow_noHead_noCons</b>      </td><td>zeigt Energieflußgrafik an                                                            </td></tr>
+         <tr><td> <b>forecast</b>                </td><td>zeigt Grafikkopf, Verbraucherpaneel und Balkengrafik an                               </td></tr>
+         <tr><td> <b>forecast_noHead</b>         </td><td>zeigt Verbraucherpaneel und Balkengrafik an                                           </td></tr>
+         <tr><td> <b>forecast_noCons</b>         </td><td>zeigt Grafikkopf und Balkengrafik an                                                  </td></tr>
+         <tr><td> <b>forecast_noHead_noCons</b>  </td><td>zeigt Balkengrafik an                                                                 </td></tr>
+         <tr><td> <b>none</b>                    </td><td>zeigt nur Grafikkopf und Verbraucherpaneel an                                         </td></tr>
          </table>
-         </ul>
+       </ul>
        </li>
        <br>
 
