@@ -34,7 +34,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
   "2.29.5" => "06.04.2025  fix Bug SBS_3.7 BatTemp",
-  "2.29.4" => "25.01.2025  fix Bug isn't Argument "-" numeric in multiplication (*) at ./FHEM/76_SMAInverter.pm line 1377",
+  "2.29.4" => "25.01.2025  fix Bug isn't Argument ''-'' numeric in multiplication (*) at ./FHEM/76_SMAInverter.pm line 1377",
   "2.29.3" => "18.01.2025  fix Bug BAT_P_Charge/Discarge",
   "2.29.2" => "31.12.2024  fix Bug STP X",
   "2.29.1" => "14.12.2024  bat_pwr whith detail-level 0, fix detail-level 0 bug",
