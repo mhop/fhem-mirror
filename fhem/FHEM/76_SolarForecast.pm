@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.51.3" => "22.04.2025  change battery text to 'load if above feed-in limit' ".
+                           "transform set setupStringAzimuth, setupStringDeclination to attr setupStringAzimuth, setupStringDeclination ",
   "1.51.2" => "21.04.2025  Attributes obsolet: graphicHeaderShow replaced by graphicSelect, Value 'none' of consumerControl->showLegend deleted ",
   "1.51.1" => "20.04.2025  consumer: interruptable, swoncond, swoffcond, spignorecond can be perl code enclosed by {..} ".
                            "check key is valid in plantControl, aiControl, flowGraphicControl, consumerControl, setupMeterDev ".
@@ -571,14 +573,6 @@ my @fs = qw( ftui_forecast.css
              ftui_smaportalspg.css
              widget_smaportalspg.js
            );
-                                                                                 # Anlagenkonfiguration: maßgebliche Readings
-my @rconfigs = qw( pvCorrectionFactor_Auto
-                   setupStringAzimuth
-                   setupStringDeclination
-                   batteryTrigger
-                   powerTrigger
-                   energyH4Trigger
-                 );
                                                                                  # Grafik Selektionsoptionen
 my @gsopt = qw ( both
                  both_noHead
@@ -597,7 +591,13 @@ my @gsopt = qw ( both
                  forecast_noCons
                  forecast_noHead_noCons
                  none
-               );
+               ); 
+                                                                                 # Anlagenkonfiguration: maßgebliche Readings
+my @rconfigs = qw( pvCorrectionFactor_Auto
+                   batteryTrigger
+                   powerTrigger
+                   energyH4Trigger
+                 );
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( aiControl 
                    consumerControl
@@ -620,7 +620,7 @@ my @aconfigs = qw( aiControl
                    graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
                    graphicSpaceSize graphicWeatherColor graphicWeatherColorNight
                    plantControl
-                   setupMeterDev setupInverterStrings setupRadiationAPI setupStringPeak
+                   setupMeterDev setupInverterStrings setupRadiationAPI setupStringPeak setupStringAzimuth setupStringDeclination
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    setupRoofTops
                  );
@@ -690,8 +690,6 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_Auto   => { fn => \&_setpvCorrectionFactorAuto    },
   reset                     => { fn => \&_setreset                     },
   roofIdentPair             => { fn => \&_setroofIdentPair             },
-  setupStringDeclination    => { fn => \&_setstringDeclination         },
-  setupStringAzimuth        => { fn => \&_setstringAzimuth             },
   operatingMemory           => { fn => \&_setoperatingMemory           },
   vrmCredentials            => { fn => \&_setVictronCredentials        },
   aiDecTree                 => { fn => \&_setaiDecTree                 },
@@ -735,6 +733,8 @@ my %hattr = (                                                                # H
   setupInverterStrings      => { fn => \&_attrInverterStrings     },
   setupRadiationAPI         => { fn => \&_attrRadiationAPI        },
   setupStringPeak           => { fn => \&_attrStringPeak          },
+  setupStringAzimuth        => { fn => \&_attrstringAzimuth       },
+  setupStringDeclination    => { fn => \&_attrstringDeclination   },
   setupRoofTops             => { fn => \&_attrRoofTops            },
   flowGraphicControl        => { fn => \&_attrflowGraphicControl  },
   aiControl                 => { fn => \&_attraiControl           },
@@ -823,10 +823,10 @@ my %hqtxt = (                                                                # H
               DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "attr LINK setupInverterStrings" an}      },
   mps    => { EN => qq{Please enter the DC peak power of each string with "attr LINK setupStringPeak"},
               DE => qq{Bitte geben sie die DC Spitzenleistung von jedem String mit "attr LINK setupStringPeak" an}          },
-  mdr    => { EN => qq{Please specify the module direction with "set LINK setupStringAzimuth"},
-              DE => qq{Bitte geben sie die Modulausrichtung mit "set LINK setupStringAzimuth" an}                           },
-  mta    => { EN => qq{Please specify the module tilt angle with "set LINK setupStringDeclination"},
-              DE => qq{Bitte geben sie den Modulneigungswinkel mit "set LINK setupStringDeclination" an}                    },
+  mdr    => { EN => qq{Please specify the module direction with "attr LINK setupStringAzimuth"},
+              DE => qq{Bitte geben sie die Modulausrichtung mit "attr LINK setupStringAzimuth" an}                          },
+  mta    => { EN => qq{Please specify the module tilt angle with "attr LINK setupStringDeclination"},
+              DE => qq{Bitte geben sie den Modulneigungswinkel mit "attr LINK setupStringDeclination" an}                   },
   rip    => { EN => qq{Please specify at least one combination Rooftop-ID/SolCast-API with "set LINK roofIdentPair"},
               DE => qq{Bitte geben Sie mindestens eine Kombination Rooftop-ID/SolCast-API mit "set LINK roofIdentPair" an}  },
   mrt    => { EN => qq{Please set the assignment String / Rooftop identification with "attr LINK setupRoofTops"},
@@ -1042,8 +1042,8 @@ my %htitles = (                                                                 
                 DE => qq{SoC am Ende der Stunde}                                                                   },
   bcharrel => { EN => qq{Charging release (activate release for charging the battery if necessary)},
                 DE => qq{Ladefreigabe (evtl. Freigabe zum Laden der Batterie aktivieren)}                          },
-  bncharel => { EN => qq{no Charging release (possibly deactivate release for charging the battery)},
-                DE => qq{keine Ladefreigabe (evtl. Freigabe zum Laden der Batterie deaktivieren)}                  },
+  bncharel => { EN => qq{only charge if the feed-in limit is exceeded},
+                DE => qq{nur laden wenn Einspeiselimit &#252;berschritten}                                         },
   conrec   => { EN => qq{Current time is within the consumption planning},
                 DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}                                      },
   conrecba => { EN => qq{Current time is within the consumption planning, Priority charging Battery is active},
@@ -1606,6 +1606,8 @@ sub Initialize {
                                 "setupWeatherDev3 ".
                                 "setupRoofTops ".
                                 "setupRadiationAPI ".
+                                "setupStringAzimuth ".
+                                "setupStringDeclination ".
                                 "setupStringPeak ".
                                 $beamcont.
                                 $beamcol.
@@ -1752,8 +1754,6 @@ sub Set {
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,on_complex_api_ai,' : ',')."off ".
              "reset:$resets ".
-             "setupStringAzimuth ".
-             "setupStringDeclination ".
              $cf." "
              ;
 
@@ -1940,11 +1940,14 @@ sub _setattrKeyVal {                         ## no critic "not used"
   return if(!$init_done);
   
   my $valid = {
-      flowGraphicControl => '',
-      aiControl          => '',
-      consumerControl    => '',
-      plantControl       => '',
-      setupMeterDev      => '',
+      flowGraphicControl     => '',
+      aiControl              => '',
+      consumerControl        => '',
+      plantControl           => '',
+      setupMeterDev          => '',
+      setupStringAzimuth     => '',
+      setupStringDeclination => '',
+      setupStringPeak        => '',
   };
   
   for my $cn (1..MAXCONSUMER) {
@@ -2162,78 +2165,6 @@ sub _setTrigger {                        ## no critic "not used"
   }
 
   writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration File schreiben
-
-return;
-}
-
-################################################################
-#                      Setter setupStringDeclination
-################################################################
-sub _setstringDeclination {              ## no critic "not used"
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $arg   = $paref->{arg} // return qq{no tilt angle was provided};
-
-  my ($a,$h) = parseParams ($arg);
-
-  if (!keys %$h) {
-      return qq{The specified inclination angle has an incorrect format};
-  }
-
-  while (my ($key, $value) = each %$h) {
-      if ($value !~ /^(?:[0-9]{1,2})$/x || $value > 90) {
-          return qq{The inclination angle of "$key" is incorrect};
-      }
-  }
-
-  my $hash = $defs{$name};
-
-  readingsSingleUpdate ($hash, 'setupStringDeclination', $arg, 1);
-  writeCacheToFile     ($hash, 'plantconfig',    $plantcfg.$name);                # Anlagenkonfiguration File schreiben
-
-  return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
-
-  my $ret = _createStringConfig ($hash);
-  return $ret if($ret);
-
-return;
-}
-
-################################################################
-#                 Setter setupStringAzimuth
-#
-#  Angabe entweder als Azimut-Bezeichner oder direkte
-#  Azimut Angabe -180 ...0...180
-#
-################################################################
-sub _setstringAzimuth {                  ## no critic "not used"
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $arg   = $paref->{arg} // return qq{no module direction was provided};
-
-  my $dirs  = "N|NE|E|SE|S|SW|W|NW";                                                # mögliche Azimut-Bezeichner wenn keine direkte Azimut Angabe
-
-  my ($a,$h) = parseParams ($arg);
-
-  if (!keys %$h) {
-      return qq{The provided module direction has wrong format};
-  }
-
-  while (my ($key, $value) = each %$h) {
-      if ($value !~ /^(?:$dirs)$/x && ($value !~ /^(?:-?[0-9]{1,3})$/x || $value < -180 || $value > 180)) {
-          return qq{The module direction of "$key" is wrong: $value};
-      }
-  }
-
-  my $hash = $defs{$name};
-
-  readingsSingleUpdate ($hash, 'setupStringAzimuth', $arg,    1);
-  writeCacheToFile     ($hash, 'plantconfig',   $plantcfg.$name);                  # Anlagenkonfiguration File schreiben
-
-  return if(_checkSetupNotComplete ($hash));                                       # keine Stringkonfiguration wenn Setup noch nicht komplett
-
-  my $ret = _createStringConfig ($hash);
-  return $ret if($ret);
 
 return;
 }
@@ -4939,7 +4870,7 @@ sub ___createOpenMeteoURL {
   if ($requestmode eq 'GHIREFILL'    && $string eq 'Dummy')    {$tilt = 0; $az = 0;}                              # Dummy Settings
 
   if ($tilt eq '<unknown>' || $az eq '<unknown>') {
-      $err = qq{ERROR OpenMeteo API Call - the reading 'setupStringAzimuth' and/or 'setupStringDeclination' is not set};
+      $err = qq{ERROR OpenMeteo API Call - the attribute 'setupStringAzimuth' and/or 'setupStringDeclination' is not set};
       Log3 ($name, 1, "$name - $err");
       return;
   }
@@ -6996,6 +6927,107 @@ return;
 }
 
 ################################################################
+#                 Attr setupStringAzimuth
+#
+#  Angabe entweder als Azimut-Bezeichner oder direkte
+#  Azimut Angabe -180 ...0...180
+#
+################################################################
+sub _attrstringAzimuth {                  ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+
+  return if(!$init_done);
+
+  my $dirs = "N|NE|E|SE|S|SW|W|NW";                                                # mögliche Azimut-Bezeichner wenn keine direkte Azimut Angabe
+  my $hash = $defs{$name};
+
+  if ($paref->{cmd} eq 'set') {
+      my ($a,$h) = parseParams ($aVal);
+
+      if (!keys %$h) {
+          return qq{The provided module direction has wrong format};
+      }
+
+      while (my ($key, $value) = each %$h) {
+          if ($value !~ /^(?:$dirs)$/x && ($value !~ /^(?:-?[0-9]{1,3})$/x || $value < -180 || $value > 180)) {
+              return qq{The module direction of "$key" is wrong: $value};
+          }
+      }
+
+      return if(_checkSetupNotComplete ($hash));                                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
+
+      my @istrings = split ",", AttrVal ($name, 'setupInverterStrings', '');                          # Stringbezeichner
+
+      if (!@istrings) {
+          return qq{Define all used strings with command "attr $name setupInverterStrings" first.};
+      }
+
+      while (my ($strg, $pp) = each %$h) {
+          if (!grep /^$strg$/, @istrings) {
+              return qq{The stringname '$strg' is not defined as valid string name in attribute 'setupInverterStrings'};
+          }
+      }
+      
+      $data{$name}{current}{allStringsFullfilled} = 0;                                               # Stringkonfiguration neu prüfen lassen
+  }
+
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+
+return;
+}
+
+################################################################
+#                 Attr setupStringDeclination
+################################################################
+sub _attrstringDeclination {             ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aVal  = $paref->{aVal};
+
+  return if(!$init_done);
+
+  my $hash = $defs{$name};
+
+  if ($paref->{cmd} eq 'set') {
+      my ($a,$h) = parseParams ($aVal);
+
+      if (!keys %$h) {
+          return qq{The specified inclination angle has an incorrect format};
+      }
+
+      while (my ($key, $value) = each %$h) {
+          if ($value !~ /^(?:[0-9]{1,2})$/x || $value > 90) {
+              return qq{The inclination angle of "$key" is incorrect};
+          }
+      }
+
+      return if(_checkSetupNotComplete ($hash));                                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
+
+      my @istrings = split ",", AttrVal ($name, 'setupInverterStrings', '');                          # Stringbezeichner
+
+      if (!@istrings) {
+          return qq{Define all used strings with command "attr $name setupInverterStrings" first.};
+      }
+
+      while (my ($strg, $pp) = each %$h) {
+          if (!grep /^$strg$/, @istrings) {
+              return qq{The stringname '$strg' is not defined as valid string name in attribute 'setupInverterStrings'};
+          }
+      }
+      
+      $data{$name}{current}{allStringsFullfilled} = 0;                                               # Stringkonfiguration neu prüfen lassen
+  }
+
+  InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+
+return;
+}
+
+################################################################
 #                 Attr setupRoofTops
 ################################################################
 sub _attrRoofTops {                      ## no critic "not used"
@@ -7170,9 +7202,9 @@ sub _attrWeatherDev {                    ## no critic "not used"
 
           my @istrings = split ",", AttrVal ($name, 'setupInverterStrings', '');          # Stringbezeichner
 
-          if ((!ReadingsVal ($name, 'setupStringAzimuth', '') || !ReadingsVal ($name, 'setupStringDeclination', '')) &&
+          if ((!AttrVal ($name, 'setupStringAzimuth', '') || !AttrVal ($name, 'setupStringDeclination', '')) &&
               !grep /KI-based/, @istrings) {
-              return qq{Execute 'set $name setupStringAzimuth' and/or 'set $name setupStringDeclination' first.};
+              return qq{Execute 'attr $name setupStringAzimuth' and/or 'attr $name setupStringDeclination' first.};
           }
       }
 
@@ -7221,11 +7253,11 @@ sub _attrRadiationAPI {                  ## no critic "not used"
           my ($set, $lat, $lon, $elev) = locCoordinates();
           return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
 
-          my $tilt = ReadingsVal ($name, 'setupStringDeclination', '');                            # Modul Neigungswinkel für jeden Stringbezeichner
-          return qq{Please complete command "set $name setupStringDeclination".} if(!$tilt);
+          my $tilt = AttrVal ($name, 'setupStringDeclination', '');                                # Modul Neigungswinkel für jeden Stringbezeichner
+          return qq{Please complete command "attr $name setupStringDeclination".} if(!$tilt);
 
-          my $dir = ReadingsVal ($name, 'setupStringAzimuth', '');                                 # Modul Ausrichtung für jeden Stringbezeichner
-          return qq{Please complete command "set $name setupStringAzimuth".} if(!$dir);
+          my $dir = AttrVal ($name, 'setupStringAzimuth', '');                                     # Modul Ausrichtung für jeden Stringbezeichner
+          return qq{Please complete command "attr $name setupStringAzimuth".} if(!$dir);
       }
 
       $data{$name}{current}{allStringsFullfilled} = 0;                                             # Stringkonfiguration neu prüfen lassen
@@ -8405,6 +8437,18 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name affectBatteryPreferredCharge"); 
   #}
   
+  my $ssd = ReadingsVal ($name, 'setupStringDeclination', '');          # 22.04.2025
+  if ($ssd) {
+      CommandAttr (undef, "$name setupStringDeclination $ssd");
+      readingsDelete ($hash, "setupStringDeclination");
+  }
+  
+  my $ssa = ReadingsVal ($name, 'setupStringAzimuth', '');             # 22.04.2025
+  if ($ssa) {
+      CommandAttr (undef, "$name setupStringAzimuth $ssa");
+      readingsDelete ($hash, "setupStringAzimuth");      
+  }
+  
   if (CurrentVal ($hash, 'consumerCollected', 0)) {
       for my $c (1..MAXCONSUMER) {                                # 19.04.2025
           $c = sprintf "%02d", $c;
@@ -8577,8 +8621,8 @@ sub _createStringConfig {                 ## no critic "not used"
   }
 
   if (!grep /^KI-based$/, @istrings) {
-      my $tilt = ReadingsVal ($name, 'setupStringDeclination', '');                                    # Modul Neigungswinkel für jeden Stringbezeichner
-      return qq{Please complete command "set $name setupStringDeclination"} if(!$tilt);
+      my $tilt = AttrVal ($name, 'setupStringDeclination', '');                                        # Modul Neigungswinkel für jeden Stringbezeichner
+      return qq{Please complete command "attr $name setupStringDeclination"} if(!$tilt);
 
       my ($at,$ht) = parseParams ($tilt);
 
@@ -8591,11 +8635,11 @@ sub _createStringConfig {                 ## no critic "not used"
           }
       }
 
-      my $dir = ReadingsVal ($name, 'setupStringAzimuth', '');                                         # Modul Ausrichtung für jeden Stringbezeichner
-      return qq{Please complete command "set $name setupStringAzimuth"} if(!$dir);
+      my $dir = AttrVal ($name, 'setupStringAzimuth', '');                                             # Modul Ausrichtung für jeden Stringbezeichner
+      return qq{Please complete command "attr $name setupStringAzimuth"} if(!$dir);
 
       my ($ad,$hd) = parseParams ($dir);
-      my $iwrong   = qq{Please check the input of set "setupStringAzimuth". It seems to be wrong.};
+      my $iwrong   = qq{Please check the input of attr "setupStringAzimuth". It seems to be wrong.};
 
       while (my ($key, $value) = each %$hd) {
           if (grep /^$key$/, @istrings) {
@@ -14370,23 +14414,22 @@ sub _checkSetupNotComplete {
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
 
-  my $strings = AttrVal     ($name, 'setupInverterStrings',   undef);                       # String Konfig
-  my $wedev   = AttrVal     ($name, 'setupWeatherDev1',       undef);                       # Device Vorhersage Wetterdaten (Bewölkung etc.)
-  my $radev   = AttrVal     ($name, 'setupRadiationAPI',      undef);                       # Device Strahlungsdaten Vorhersage
-  my $indev   = AttrVal     ($name, 'setupInverterDev01',     undef);                       # Inverter Device
-  my $medev   = AttrVal     ($name, 'setupMeterDev',          undef);                       # Meter Device
-  my $peaks   = AttrVal     ($name, 'setupStringPeak',        undef);                       # String Peak
-  my $maz     = ReadingsVal ($name, 'setupStringAzimuth',     undef);                       # Modulausrichtung Konfig (Azimut)
-  my $mdec    = ReadingsVal ($name, 'setupStringDeclination', undef);                       # Modul Neigungswinkel Konfig
-  my $mrt     = AttrVal     ($name, 'setupRoofTops',          undef);                       # RoofTop Konfiguration (SolCast API)
+  my $strings = AttrVal ($name, 'setupInverterStrings',   undef);                           # String Konfig
+  my $wedev   = AttrVal ($name, 'setupWeatherDev1',       undef);                           # Device Vorhersage Wetterdaten (Bewölkung etc.)
+  my $radev   = AttrVal ($name, 'setupRadiationAPI',      undef);                           # Device Strahlungsdaten Vorhersage
+  my $indev   = AttrVal ($name, 'setupInverterDev01',     undef);                           # Inverter Device
+  my $medev   = AttrVal ($name, 'setupMeterDev',          undef);                           # Meter Device
+  my $peaks   = AttrVal ($name, 'setupStringPeak',        undef);                           # String Peak
+  my $maz     = AttrVal ($name, 'setupStringAzimuth',     undef);                           # Modulausrichtung Konfig (Azimut)
+  my $mdec    = AttrVal ($name, 'setupStringDeclination', undef);                           # Modul Neigungswinkel Konfig
+  my $mrt     = AttrVal ($name, 'setupRoofTops',          undef);                           # RoofTop Konfiguration (SolCast API)
 
   my $vrmcr   = StatusAPIVal ($hash, '?VRM', '?API', 'credentials', '');                    # Victron VRM Credentials gesetzt
 
   my ($coset, $lat, $lon) = locCoordinates();                                               # Koordinaten im global device
   my $rip;
-  $rip      = 1 if(exists $data{$name}{statusapi}{'?IdPair'});                       # es existiert mindestens ein Paar RoofTop-ID / API-Key
-
-  my $pv0   = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                            # der erste PV ForeCast Wert
+  $rip    = 1 if(exists $data{$name}{statusapi}{'?IdPair'});                                # es existiert mindestens ein Paar RoofTop-ID / API-Key
+  my $pv0 = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                              # der erste PV ForeCast Wert
 
   my $link   = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$name</a>};
   my $height = AttrNum ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL);
@@ -23711,58 +23754,6 @@ to ensure that the system configuration is correct.
     <br>
 
     <ul>
-      <a id="SolarForecast-set-setupStringAzimuth"></a>
-      <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br><br>
-
-      Alignment &lt;dir&gt; of the solar modules in the string "StringnameX". The string name is a key value of the
-      <b>setupInverterStrings</b> attribute. <br>
-      The direction specification &lt;dir&gt; can be specified as an azimuth identifier or as an azimuth value: <br><br>
-
-      <ul>
-         <table>
-         <colgroup> <col width="30%"> <col width="20%"> <col width="50%"> </colgroup>
-            <tr><td> <b>Identifier</b></td><td><b>Azimuth</b></td><td>                            </td></tr>
-            <tr><td> N                </td><td>-180          </td><td>North orientation           </td></tr>
-            <tr><td> NE               </td><td>-135          </td><td>North-East orientation      </td></tr>
-            <tr><td> E                </td><td>-90           </td><td>East orientation            </td></tr>
-            <tr><td> SE               </td><td>-45           </td><td>South-east orientation      </td></tr>
-            <tr><td> S                </td><td>0             </td><td>South orientation           </td></tr>
-            <tr><td> SW               </td><td>45            </td><td>South-west orientation      </td></tr>
-            <tr><td> W                </td><td>90            </td><td>West orientation            </td></tr>
-            <tr><td> NW               </td><td>135           </td><td>North-West orientation      </td></tr>
-         </table>
-      </ul>
-      <br>
-
-      Azimuth values are integers in the range -180 to 180. Although the specified identifiers can be used,
-      it is recommended to specify the exact azimuth value in the attribute. This allows any intermediate values such
-      as 83, 48 etc. to be specified.
-      <br><br>
-
-      <ul>
-        <b>Example: </b> <br>
-        set &lt;name&gt; setupStringAzimuth Ostdach=-85 Südgarage=S S3=132 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-setupStringDeclination"></a>
-      <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Angle&gt; [&lt;Stringname2&gt;=&lt;Angle&gt; &lt;Stringname3&gt;=&lt;Angle&gt; ...] </b> <br><br>
-
-      Tilt angle of the solar modules. The string name is a key value of the attribute <b>setupInverterStrings</b>. <br>
-      Integers between 0 and 90 can be specified as the angle of inclination. (0 = horizontal, 90 = vertical). <br><br>
-
-      <ul>
-        <b>Example: </b> <br>
-        set &lt;name&gt; setupStringDeclination eastroof=40 southgarage=60 S3=30 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
       <a id="SolarForecast-set-operatingMemory"></a>
       <li><b>operatingMemory backup | save | recover-&lt;File&gt; </b> <br><br>
 
@@ -25544,12 +25535,12 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                             </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
-           <tr><td> <b>icon</b>      </td><td>Icon and/or (only) colour for displaying the battery in the bar chart (optional)                              </td></tr>
+           <tr><td> <b>icon</b>      </td><td>Icon and/or (only) color of the battery in the bar graph according to the status (optional).                  </td></tr>
            <tr><td>                  </td><td>The colour can be specified as an identifier (e.g. blue) or HEX value (e.g. #d9d9d9).                         </td></tr>
            <tr><td>                  </td><td><b>&lt;recomm&gt;</b> - Charging is recommended but inactive (no charging or discharging)                     </td></tr>
            <tr><td>                  </td><td><b>&lt;charge&gt;</b> - is used when the battery is currently being charged                                   </td></tr>
 		   <tr><td>                  </td><td><b>&lt;discharge&gt;</b> - is used when the battery is currently being discharged                             </td></tr>
-           <tr><td>                  </td><td><b>&lt;omit&gt;</b> - is used when charging is not recommended                                                </td></tr>
+           <tr><td>                  </td><td><b>&lt;omit&gt;</b> - only charge if the feed-in limit is exceeded                                            </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>show</b>      </td><td>Control of the battery display in the bar graph (optional)                                                    </td></tr>
            <tr><td>                  </td><td><b>0</b> - no display of the device (default)                                                                 </td></tr>
@@ -25883,6 +25874,58 @@ to ensure that the system configuration is correct.
       </ul>
       </li>
       <br>
+      
+    <ul>
+      <a id="SolarForecast-attr-setupStringAzimuth"></a>
+      <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br><br>
+
+      Alignment &lt;dir&gt; of the solar modules in the string "StringnameX". The string name is a key value of the
+      <b>setupInverterStrings</b> attribute. <br>
+      The direction specification &lt;dir&gt; can be specified as an azimuth identifier or as an azimuth value: <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="30%"> <col width="20%"> <col width="50%"> </colgroup>
+            <tr><td> <b>Identifier</b></td><td><b>Azimuth</b></td><td>                            </td></tr>
+            <tr><td> N                </td><td>-180          </td><td>North orientation           </td></tr>
+            <tr><td> NE               </td><td>-135          </td><td>North-East orientation      </td></tr>
+            <tr><td> E                </td><td>-90           </td><td>East orientation            </td></tr>
+            <tr><td> SE               </td><td>-45           </td><td>South-east orientation      </td></tr>
+            <tr><td> S                </td><td>0             </td><td>South orientation           </td></tr>
+            <tr><td> SW               </td><td>45            </td><td>South-west orientation      </td></tr>
+            <tr><td> W                </td><td>90            </td><td>West orientation            </td></tr>
+            <tr><td> NW               </td><td>135           </td><td>North-West orientation      </td></tr>
+         </table>
+      </ul>
+      <br>
+
+      Azimuth values are integers in the range -180 to 180. Although the specified identifiers can be used,
+      it is recommended to specify the exact azimuth value in the attribute. This allows any intermediate values such
+      as 83, 48 etc. to be specified.
+      <br><br>
+
+      <ul>
+        <b>Example: </b> <br>
+        attr &lt;name&gt; setupStringAzimuth Ostdach=-85 Südgarage=S S3=132 <br>
+      </ul>
+      </li>
+    </ul>
+    <br>
+
+    <ul>
+      <a id="SolarForecast-attr-setupStringDeclination"></a>
+      <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Angle&gt; [&lt;Stringname2&gt;=&lt;Angle&gt; &lt;Stringname3&gt;=&lt;Angle&gt; ...] </b> <br><br>
+
+      Tilt angle of the solar modules. The string name is a key value of the attribute <b>setupInverterStrings</b>. <br>
+      Integers between 0 and 90 can be specified as the angle of inclination. (0 = horizontal, 90 = vertical). <br><br>
+
+      <ul>
+        <b>Example: </b> <br>
+        attr &lt;name&gt; setupStringDeclination eastroof=40 southgarage=60 S3=30 <br>
+      </ul>
+      </li>
+    </ul>
+    <br>
 
       <a id="SolarForecast-attr-setupStringPeak"></a>
       <li><b>setupStringPeak &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
@@ -26244,58 +26287,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
         <b>Beispiel: </b> <br>
         set &lt;name&gt; energyH4Trigger 1on=2000 1off=1700 2on=2500 2off=2000 3off=1500 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-setupStringAzimuth"></a>
-      <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br><br>
-
-      Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des
-      Attributs <b>setupInverterStrings</b>. <br>
-      Die Richtungsangabe &lt;dir&gt; kann als Azimut Kennung oder als Azimut Wert angegeben werden: <br><br>
-
-      <ul>
-         <table>
-         <colgroup> <col width="30%"> <col width="20%"> <col width="50%"> </colgroup>
-            <tr><td> <b>Kennung</b>   </td><td><b>Azimut</b> </td><td>                           </td></tr>
-            <tr><td> N                </td><td>-180          </td><td>Nordausrichtung            </td></tr>
-            <tr><td> NE               </td><td>-135          </td><td>Nord-Ost Ausrichtung       </td></tr>
-            <tr><td> E                </td><td>-90           </td><td>Ostausrichtung             </td></tr>
-            <tr><td> SE               </td><td>-45           </td><td>Süd-Ost Ausrichtung        </td></tr>
-            <tr><td> S                </td><td>0             </td><td>Südausrichtung             </td></tr>
-            <tr><td> SW               </td><td>45            </td><td>Süd-West Ausrichtung       </td></tr>
-            <tr><td> W                </td><td>90            </td><td>Westausrichtung            </td></tr>
-            <tr><td> NW               </td><td>135           </td><td>Nord-West Ausrichtung      </td></tr>
-         </table>
-      </ul>
-      <br>
-
-      Azimut Werte sind Ganzzahlen im Bereich von -180 bis 180. Obwohl die genannten Kennungen verwendet werden können,
-      wird empfohlen den genauen Azimut Wert im Attribut anzugeben. Dadurch können beliebige Zwischenwerte wie 83, 48 etc.
-      angeben werden.
-      <br><br>
-
-      <ul>
-        <b>Beispiel: </b> <br>
-        set &lt;name&gt; setupStringAzimuth Ostdach=-85 Südgarage=S S3=132 <br>
-      </ul>
-      </li>
-    </ul>
-    <br>
-
-    <ul>
-      <a id="SolarForecast-set-setupStringDeclination"></a>
-      <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br><br>
-
-      Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Attributs <b>setupInverterStrings</b>. <br>
-      Als Neigungswinkel können Ganzzahlen zwischen 0 und 90 angegeben werden. (0 = waagerecht, 90 = senkrecht). <br><br>
-
-      <ul>
-        <b>Beispiel: </b> <br>
-        set &lt;name&gt; setupStringDeclination Ostdach=40 Südgarage=60 S3=30 <br>
       </ul>
       </li>
     </ul>
@@ -28089,12 +28080,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
-           <tr><td> <b>icon</b>      </td><td>Icon und/oder (nur) Farbe zur Darstellung der Batterie in der Balkengrafik (optional)                    </td></tr>
+           <tr><td> <b>icon</b>      </td><td>Icon und/oder (nur) Farbe der Batterie in der Balkengrafik entsprechend des Status (optional).           </td></tr>
            <tr><td>                  </td><td>Die Farbe kann als Bezeichner (z.B. blue) oder HEX-Wert (z.B. #d9d9d9) angegeben werden.                 </td></tr>
            <tr><td>                  </td><td><b>&lt;empfohlen&gt;</b> - die Aufladung ist empfohlen aber inaktiv (kein Aufladen oder Entladen)        </td></tr>
            <tr><td>                  </td><td><b>&lt;aufladen&gt;</b> - wird verwendet wenn die Batterie aktuell aufgeladen wird                       </td></tr>
 		   <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - wird verwendet wenn die Batterie aktuell entladen wird                         </td></tr>
-           <tr><td>                  </td><td><b>&lt;unterlassen&gt;</b> - wird verwendet wenn die Aufladung nicht empfohlen ist                       </td></tr>
+           <tr><td>                  </td><td><b>&lt;unterlassen&gt;</b> - nur bei Überschreitung des Einspeiselimits aufladen                         </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>show</b>      </td><td>Steuerung der Anzeige der Batterie in der Balkengrafik (optional)                                        </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Anzeige des Gerätes (default)                                                           </td></tr>
@@ -28431,6 +28422,58 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         attr &lt;name&gt; setupRoofTops Ostdach=p1 Südgarage=p2 S3=p3 <br>
       </ul>
       </li>
+      <br>
+      
+      <ul>
+        <a id="SolarForecast-attr-setupStringAzimuth"></a>
+        <li><b>setupStringAzimuth &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br><br>
+
+        Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des
+        Attributs <b>setupInverterStrings</b>. <br>
+        Die Richtungsangabe &lt;dir&gt; kann als Azimut Kennung oder als Azimut Wert angegeben werden: <br><br>
+
+        <ul>
+           <table>
+           <colgroup> <col width="30%"> <col width="20%"> <col width="50%"> </colgroup>
+              <tr><td> <b>Kennung</b>   </td><td><b>Azimut</b> </td><td>                           </td></tr>
+              <tr><td> N                </td><td>-180          </td><td>Nordausrichtung            </td></tr>
+              <tr><td> NE               </td><td>-135          </td><td>Nord-Ost Ausrichtung       </td></tr>
+              <tr><td> E                </td><td>-90           </td><td>Ostausrichtung             </td></tr>
+              <tr><td> SE               </td><td>-45           </td><td>Süd-Ost Ausrichtung        </td></tr>
+              <tr><td> S                </td><td>0             </td><td>Südausrichtung             </td></tr>
+              <tr><td> SW               </td><td>45            </td><td>Süd-West Ausrichtung       </td></tr>
+              <tr><td> W                </td><td>90            </td><td>Westausrichtung            </td></tr>
+              <tr><td> NW               </td><td>135           </td><td>Nord-West Ausrichtung      </td></tr>
+           </table>
+        </ul>
+        <br>
+
+        Azimut Werte sind Ganzzahlen im Bereich von -180 bis 180. Obwohl die genannten Kennungen verwendet werden können,
+        wird empfohlen den genauen Azimut Wert im Attribut anzugeben. Dadurch können beliebige Zwischenwerte wie 83, 48 etc.
+        angeben werden.
+        <br><br>
+
+        <ul>
+          <b>Beispiel: </b> <br>
+          attr &lt;name&gt; setupStringAzimuth Ostdach=-85 Südgarage=S S3=132 <br>
+        </ul>
+        </li>
+      </ul>
+      <br>
+
+      <ul>
+        <a id="SolarForecast-attr-setupStringDeclination"></a>
+        <li><b>setupStringDeclination &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br><br>
+
+        Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Attributs <b>setupInverterStrings</b>. <br>
+        Als Neigungswinkel können Ganzzahlen zwischen 0 und 90 angegeben werden. (0 = waagerecht, 90 = senkrecht). <br><br>
+
+        <ul>
+          <b>Beispiel: </b> <br>
+          attr &lt;name&gt; setupStringDeclination Ostdach=40 Südgarage=60 S3=30 <br>
+        </ul>
+        </li>
+      </ul>
       <br>
 
       <a id="SolarForecast-attr-setupStringPeak"></a>
