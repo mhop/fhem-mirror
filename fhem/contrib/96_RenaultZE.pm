@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# $Id: 96_RenaultZE.pm  2023-10-15 plin $
+# $Id: 96_RenaultZE.pm  2025-04-25 plin $
 # 96_RenaultZE.pm
 #
 # Forum : https://forum.fhem.de/index.php/topic,116273.0.html
@@ -38,6 +38,11 @@
 
 ############################################################################################################################
 # Version History
+# v 1.19 add scubscriptions and act accordingly
+# v 1.18 addesa internalTemperature
+# v 1.17 fixed bug xternalTemperature vs externalTemperature
+# v 1.16 fixed logic regarding variables that are not provided
+# v 1.15 fixed unitialized $model, added attribute ze_getLocation 
 # v 1.14 changed code for automatic update of readings distance/home during 
 # v 1.13 recalculation of varius readings distance/home during update
 # v 1.12 implemented new Attribute ze_homeRadius
@@ -107,7 +112,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.14 / 1.11.2023";
+my $RenaultZE_version ="V1.19 / 25.04.2025";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -140,15 +145,18 @@ sub RenaultZE_Initialize($) {
     $hash->{ReadFn}        = 'RenaultZE_Read';
     $hash->{AsyncOutputFn} = 'RenaultZE_AsyncOutput';
 
-    $hash->{AttrList} = "ze_phase:1,2 ".
-			"ze_brand:Renault,Dacia ".
-    			"ze_user ".
+    $hash->{AttrList} =	"ze_brand:Renault,Dacia ".
 			"ze_country ".
+    			"ze_getLocation:0,1 ".
+			"ze_homeRadius ".
 			"ze_latitude ".
 			"ze_longitude ".
-			"ze_homeRadius ".
+    			"ze_phase:1,2 ".
 			"ze_showaddress:0,1 ".
 			"ze_showimage:0,1,2 ".
+			"ze_AboConnectedServices:yes,no ".
+			"ze_AboPackSmartNavigation:yes,no ".
+    			"ze_user ".
 			"disabled:0,1 ".
                         $readingFnAttributes;
 }
@@ -180,6 +188,8 @@ sub RenaultZE_Define($$) {
 
     $attr{$name}{ze_country}       = 'DE'                  unless (exists($attr{$name}{ze_country}));
     $attr{$name}{ze_showaddress}   = '1'                   unless (exists($attr{$name}{ze_showaddress}));
+    $attr{$name}{ze_AboConnectedServices}     = 'yes'      unless (exists($attr{$name}{ze_AboConnectedServices}));
+    $attr{$name}{ze_AboPackSmartNavigation}   = 'yes'      unless (exists($attr{$name}{ze_AboPackSmartNavigation}));
     $attr{$name}{ze_showimage}     = '1'                   unless (exists($attr{$name}{ze_showimage}));
 
     my $firstTrigger = gettimeofday() + 2;
@@ -494,28 +504,32 @@ sub RenaultZE_Main3($) {
         return undef                    if ($lastErr ne "");
 
 	my $phase = AttrVal($name,"ze_phase","");
+	my $getLocation = AttrVal($name,"getLocation","1");
+	my $naviAbo = AttrVal($name,"ze_AboPackSmartNavigation","yes");
+	my $Conserv = AttrVal($name,"ze_AboConnectedServices","yes");
 
         if ($key eq "GET_update")
         {
 	      #my $res = RenaultZE_getData_Step1($hash);
               my $res = RenaultZE_gData_Step1($hash,'battery-status');
-	      my $model = $hash->{READINGS}{vehicleDetails_model_label}{VAL};
+	      my $model = "any";
+	      $model = $hash->{READINGS}{vehicleDetails_model_label}{VAL}		if (defined($hash->{READINGS}{vehicleDetails_model_label}{VAL}));
               Log3 $name, 5, "RenaultZE_gData_Step1 - battery-status - RC=".$res;
 	      InternalTimer( gettimeofday() + 1, sub() { my $a = 1; 
                  $res = RenaultZE_gData_Step1($hash,'cockpit');
                  Log3 $name, 5, "RenaultZE_gData_Step1 - cockpit - RC=".$res;
 	      }, undef);
 	      InternalTimer( gettimeofday() + 2, sub() { my $a = 1; 
-                 $res = RenaultZE_gData_Step1($hash,'location')				if ($phase eq "2");
-                 Log3 $name, 5, "RenaultZE_gData_Step1 - location - RC=".$res		if ($phase eq "2");
+                 $res = RenaultZE_gData_Step1($hash,'location')				if ($phase eq "2" and $getLocation eq "1" and $naviAbo eq "yes");
+                 Log3 $name, 5, "RenaultZE_gData_Step1 - location - RC=".$res		if ($phase eq "2" and $getLocation eq "1" and $naviAbo eq "yes");
 	      }, undef);
 	      InternalTimer( gettimeofday() + 3, sub() { my $a = 1; 
                  $res = RenaultZE_gData_Step1($hash,'hvac-status')				if ($phase eq "1");
                  Log3 $name, 5, "RenaultZE_gData_Step1 - hvac-status - RC=".$res		if ($phase eq "1");
 	      }, undef);
 	      InternalTimer( gettimeofday() + 4, sub() { my $a = 1; 
-                 $res = RenaultZE_gData_Step1($hash,'charge-mode')			if ($model ne "SPRING");
-                 Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res	if ($model ne "SPRING");
+                 $res = RenaultZE_gData_Step1($hash,'charge-mode')			if ($model ne "SPRING" and $Conserv eq "yes");
+                 Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res	if ($model ne "SPRING" and $Conserv eq "yes");
 	      }, undef);
 	}
 
@@ -539,8 +553,8 @@ sub RenaultZE_Main3($) {
 
         if ($key eq "GET_charging-settings")
         {
-              my $res = RenaultZE_gData_Step1($hash,'charging-settings');
-              Log3 $name, 5, "RenaultZE_gData_Step1 - charging-settings - RC=".$res;
+              my $res = RenaultZE_gData_Step1($hash,'charging-settings')		if ($Conserv eq "yes");
+              Log3 $name, 5, "RenaultZE_gData_Step1 - charging-settings - RC=".$res	if ($Conserv eq "yes");
 	}
 
         if ($key eq "GET_hvac-history")
@@ -1014,8 +1028,8 @@ sub RenaultZE_gData_Step2($)
         readingsBulkUpdate($hash,"batteryLevel",$decode_json->{data}->{attributes}->{batteryLevel});
         readingsBulkUpdate($hash,"batteryTemperature",$decode_json->{data}->{attributes}->{batteryTemperature})			if ($phase eq "1");
         readingsBulkUpdate($hash,"batteryAutonomy",$decode_json->{data}->{attributes}->{batteryAutonomy});
-        readingsBulkUpdate($hash,"batteryCapacity",$decode_json->{data}->{attributes}->{batteryCapacity})			if ($decode_json->{data}->{attributes}->{batteryCapacity} gt 0);
-        readingsBulkUpdate($hash,"batteryAvailableEnergy",$decode_json->{data}->{attributes}->{batteryAvailableEnergy})		if ($decode_json->{data}->{attributes}->{batteryAvailableEnergy} gt 0);
+        readingsBulkUpdate($hash,"batteryCapacity",$decode_json->{data}->{attributes}->{batteryCapacity})			if (defined($decode_json->{data}->{attributes}->{batteryCapacity}));
+        readingsBulkUpdate($hash,"batteryAvailableEnergy",$decode_json->{data}->{attributes}->{batteryAvailableEnergy})		if (defined($decode_json->{data}->{attributes}->{batteryAvailableEnergy}));
         readingsBulkUpdate($hash,"plugStatus",$decode_json->{data}->{attributes}->{plugStatus});
         readingsBulkUpdate($hash,"chargingStatus",$decode_json->{data}->{attributes}->{chargingStatus});
         readingsBulkUpdate($hash,"chargingRemainingTime",$decode_json->{data}->{attributes}->{chargingRemainingTime});
@@ -1028,8 +1042,8 @@ sub RenaultZE_gData_Step2($)
     if($data =~ /totalMileage/) {
        readingsBeginUpdate($hash);
        readingsBulkUpdate($hash,"totalMileageKm",$decode_json->{data}->{attributes}->{totalMileage});
-       readingsBulkUpdate($hash,"fuelAutonomy",$decode_json->{data}->{attributes}->{fuelAutonomy})			if ($decode_json->{data}->{attributes}->{fuelAutonomy} gt 0);
-       readingsBulkUpdate($hash,"fuelQuantity",$decode_json->{data}->{attributes}->{fuelQuantity})			if ($decode_json->{data}->{attributes}->{fuelQuantity} gt 0);
+       readingsBulkUpdate($hash,"fuelAutonomy",$decode_json->{data}->{attributes}->{fuelAutonomy})			if (defined($decode_json->{data}->{attributes}->{fuelAutonomy}));
+       readingsBulkUpdate($hash,"fuelQuantity",$decode_json->{data}->{attributes}->{fuelQuantity})			if (defined($decode_json->{data}->{attributes}->{fuelQuantity}));
        readingsEndUpdate($hash, 1 );
        return 0;
     }
@@ -1038,8 +1052,9 @@ sub RenaultZE_gData_Step2($)
     if($data =~ /hvacStatus/) {
        readingsBeginUpdate($hash);
        readingsBulkUpdate($hash,"hvacStatus",$decode_json->{data}->{attributes}->{hvacStatus});
-       readingsBulkUpdate($hash,"socThreshold",$decode_json->{data}->{attributes}->{socThreshold})			if ($decode_json->{data}->{attributes}->{socThreshold} gt 0);
-       readingsBulkUpdate($hash,"xternalTemperature",$decode_json->{data}->{attributes}->{xternalTemperature})		if ($decode_json->{data}->{attributes}->{xternalTemperature} gt 0);
+       readingsBulkUpdate($hash,"socThreshold",$decode_json->{data}->{attributes}->{socThreshold})			if (defined($decode_json->{data}->{attributes}->{socThreshold}));
+       readingsBulkUpdate($hash,"externalTemperature",$decode_json->{data}->{attributes}->{externalTemperature})	if (defined($decode_json->{data}->{attributes}->{externalTemperature}));
+       readingsBulkUpdate($hash,"internalTemperature",$decode_json->{data}->{attributes}->{internalTemperature})	if (defined($decode_json->{data}->{attributes}->{internalTemperature}));
        readingsEndUpdate($hash, 1 );
        return 0;
     }
@@ -1064,8 +1079,8 @@ sub RenaultZE_gData_Step2($)
 	#my $t       = Time::Piece->strptime($lastUpdateTime, "%Y-%m-%dT%H:%M:%SZ")->epoch;
 	my $t        = RenaultZE_EpochFromDateTime($lastUpdateTime);
 	my $tt      = localtime($t)->strftime('%Y-%m-%d %H:%M:%S');
-	my $oldlat  = ReadingsVal($name,"gpsLatitude","empty");
-	my $oldlong = ReadingsVal($name,"gpsLongitude","empty");
+	my $oldlat  = ReadingsVal($name,"gpsLatitude",0);
+	my $oldlong = ReadingsVal($name,"gpsLongitude",0);
         my $link = "<html><a href=\"https://www.google.com/maps/place/".$gpsLatitude.",".$gpsLongitude."\" target=\”_blank\”>Google Maps</a></html>";
 	if ( $oldlat != $gpsLatitude or $oldlong != $gpsLongitude ) {
             Log3 $name, 5, "RenaultZE_gData_Step2 - GPS ".$oldlat."/".$gpsLatitude." ".$oldlong."/".$gpsLongitude;
@@ -1971,35 +1986,44 @@ sub RenaultZE_EpochFromDateTime($) {
         <br><br>
         Attributes:
         <ul>
-            <li><i>ze_brand</i> Renault|Dacia<br>
+            <a name="ze_AboConnectedServices"></a><li><i>ze_AboConnectedServices</i> yes|no<br>
+                Connected Services subscribed? yes/no
+            </li>
+            <a name="ze_AboPackSmartNavigation"></a><li><i>ze_AboPackSmartNavigation</i> yes|no<br>
+                Pack Smart Navigation subscribed? yes/no
+            </li>
+            <a name="ze_brand"></a><li><i>ze_brand</i> Renault|Dacia<br>
                 Car brand, default is Renault
             </li>
-            <li><i>ze_phase</i> 1|2<br>
-                The phase of ZE technology, either 1 or 2, right now only phase 2 is supported
-            </li>
-            <li><i>ze_country</i><br>
+            <a name="ze_country"></a><li><i>ze_country</i><br>
                 2 letter country code, e.g. DE ot GB
             </li>
-            <li><i>ze_homeRadius</i><br>
+            <a name="ze_getLocation"></a><li><i>ze_getLocation</i><br>
+                allows you to enable/disable the 'get location' call during 'get update'
+            </li>
+            <a name="ze_homeRadius"></a><li><i>ze_homeRadius</i><br>
                 allowed distance of car from home in m that is still considered 'home'
             </li>
-            <li><i>ze_user</i><br>
-                The user-id that you used to register at Renault 
-            </li>
-            <li><i>ze_latitude</i><br>
+            <a name="ze_latitude"></a><li><i>ze_latitude</i><br>
                 Latitude of your home location. Is being used to calculate homeInfo. Function also checks for global attribte latitude als default.
             </li>
-            <li><i>ze_longitude</i><br>
+            <a name="ze_longitude"></a><li><i>ze_longitude</i><br>
                 Longitude of your home location. Is being used to calculate homeInfo. Function also checks for global attribte longitude als default.
             </li>
-            <li><i>ze_showaddress</i><br>
+            <a name="ze_phase"></a><li><i>ze_phase</i> 1|2<br>
+                The phase of ZE technology, either 1 or 2, right now only phase 2 is supported
+            </li>
+            <a name="ze_showaddress"></a><li><i>ze_showaddress</i><br>
                 Retrieve address via reverse geocoding fromn Google Maps and add it to homeInfo.
             </li>
-            <li><i>ze_showimage</i><br>
+            <a name="ze_showimage"></a><li><i>ze_showimage</i><br>
                 Show the image of the car that you get from vehicles as reading<br>
 		0 = off
 		1 = only the small image (default)<br>
 		2 = both, small and large image
+            </li>
+            <a name="ze_user"></a><li><i>ze_user</i><br>
+                The user-id that you used to register at Renault 
             </li>
         </ul>
     </ul>
