@@ -160,6 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.51.4" => "27.04.2025  avoid warnings uninitialized value \$FW_ME, \$FW_subdir in line 14434 ".
+                           "bugfix in attr .*Control, fix 'ERROR deleting file' if no consumers are registered ".
+                           "save batprogsocXX to pvHistory, prepared for new Attr graphicControl ",
   "1.51.3" => "22.04.2025  change battery text to 'load if above feed-in limit' ".
                            "transform set setupStringAzimuth, setupStringDeclination to attr setupStringAzimuth, setupStringDeclination ",
   "1.51.2" => "21.04.2025  Attributes obsolet: graphicHeaderShow replaced by graphicSelect, Value 'none' of consumerControl->showLegend deleted ",
@@ -609,6 +612,7 @@ my @aconfigs = qw( aiControl
                    ctrlSpecialReadings 
                    ctrlUserExitFn
                    disable
+                   graphicControl
                    flowGraphicControl 
                    graphicBeamWidth
                    graphicBeamHeightLevel1 graphicBeamHeightLevel2 graphicBeamHeightLevel3
@@ -736,6 +740,7 @@ my %hattr = (                                                                # H
   setupStringAzimuth        => { fn => \&_attrstringAzimuth       },
   setupStringDeclination    => { fn => \&_attrstringDeclination   },
   setupRoofTops             => { fn => \&_attrRoofTops            },
+  graphicControl            => { fn => \&_attrgraphicControl      },
   flowGraphicControl        => { fn => \&_attrflowGraphicControl  },
   aiControl                 => { fn => \&_attraiControl           },
   plantControl              => { fn => \&_attrplantControl        },
@@ -1466,6 +1471,11 @@ my %hfspvh = (
       $hfspvh{'batoutthishour'.$bn}{storname} = 'batout'.$bn;
       $hfspvh{'batoutthishour'.$bn}{validkey} = undef;
       $hfspvh{'batoutthishour'.$bn}{fpar}     = 'comp99';
+      
+      $hfspvh{'batprogsoc'.$bn}{fn}           = \&_storeVal;                  # Prognose-SOC des Tages
+      $hfspvh{'batprogsoc'.$bn}{storname}     = 'batprogsoc'.$bn;
+      $hfspvh{'batprogsoc'.$bn}{validkey}     = undef;
+      $hfspvh{'batprogsoc'.$bn}{fpar}         = undef;
 
       $hfspvh{'batmaxsoc'.$bn}{fn}            = \&_storeVal;                  # max. erreichter SOC des Tages
       $hfspvh{'batmaxsoc'.$bn}{storname}      = 'batmaxsoc'.$bn;
@@ -1579,6 +1589,7 @@ sub Initialize {
                                 "ctrlUserExitFn:textField-long ".
                                 "disable:1,0 ".
                                 "flowGraphicControl:textField-long ".
+                                #"graphicControl:textField-long ".
                                 "graphicBeamHeightLevel1 ".
                                 "graphicBeamHeightLevel2 ".
                                 "graphicBeamHeightLevel3 ".
@@ -1861,7 +1872,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $planstate = ConsumerVal ($hash, $c, 'planstate', '');
   my $calias    = ConsumerVal ($hash, $c, 'alias',     '');
 
-  writeCacheToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
+  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                      # Cache File Consumer schreiben
 
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
 
@@ -2515,7 +2526,7 @@ sub _setreset {                          ## no critic "not used"
           Log3($name, 3, qq{$name - roofIdentPair: all pair keys deleted});
       }
 
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                # Cache File SolCast API Werte schreiben
+      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                      # Cache File SolCast API Werte schreiben
       return;
   }
 
@@ -2531,7 +2542,7 @@ sub _setreset {                          ## no critic "not used"
           }
       }
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                        # Cache File Consumer schreiben
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name, 'nolog');               # Cache File Consumer schreiben
   }
 
   if ($prop eq 'consumerMaster') {                                                   # Verbraucherhash löschen
@@ -2551,7 +2562,7 @@ sub _setreset {                          ## no critic "not used"
       delete $paref->{c};
       $data{$name}{current}{consumerCollected} = 0;                                  # Consumer neu sammeln
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                        # Cache File Consumer schreiben
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name, 'nolog');               # Cache File Consumer schreiben
       centralTask      ($hash, 0);
   }
 
@@ -6328,13 +6339,11 @@ sub _attrconsumerControl {               ## no critic "not used"
       showLegend => { comp => '(icon_top|icon_bottom|text_top|text_bottom)', act => 0 },
   };
   
-  for my $av (keys %{$valid}) {
-      delete $data{$name}{current}{$av};
-  }
-  
   my ($a, $h) = parseParams ($aVal);
 
   if ($cmd eq 'set') {
+      ## 1. Durchlauf - Prüfungen
+      #############################
       for my $key (keys %{$h}) {
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
@@ -6343,25 +6352,39 @@ sub _attrconsumerControl {               ## no critic "not used"
           my $comp = $valid->{$key}{comp};
           next if(!$comp);
 
-          if ($h->{$key} =~ /^$comp$/xs) {
-              $data{$name}{current}{$key} = $h->{$key};
-          }
-          else {
+          if ($h->{$key} !~ /^$comp$/xs) {
               return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
+      }
+      
+      ## 2. Durchlauf - Umsetzung
+      #############################
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
+      }
+      
+      for my $key (keys %{$h}) {         
+          $data{$name}{current}{$key} = $h->{$key};
+      }
+  }
+  else {                                                                  # Current Keys mit Attribut löschen
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
       }
   }
   
   for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
-      next if(!$valid->{$akey}{act});
-      
-      $paref->{akey}   = $akey;
-      $paref->{keyval} = $h->{$akey};
-      
-      __attrKeyAction ($paref);
-      
-      delete $paref->{keyval};
-      delete $paref->{akey};
+      if ($valid->{$akey}{act}) {
+          $paref->{akey}   = $akey;
+          $paref->{keyval} = $h->{$akey};
+          
+          my $err = __attrKeyAction ($paref);
+          
+          delete $paref->{keyval};
+          delete $paref->{akey};
+          
+          return $err if($err);
+      }
   }
 
 return;
@@ -6440,6 +6463,76 @@ return;
 }
 
 ################################################################
+#                  Attr graphicControl
+################################################################
+sub _attrgraphicControl {                ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aName = $paref->{aName};
+  my $aVal  = $paref->{aVal};
+  my $cmd   = $paref->{cmd};
+  
+  my $valid = {
+      beamWidth    => { comp => '([2-9][0-9]|100)',      act => 0 },
+      hourCount    => { comp => '([4-9]|1[0-9]|2[0-4])', act => 0 },
+      hourStyle    => { comp => ':(0{1,2})',             act => 0 },
+      headerDetail => { comp => '.*',                    act => 1 },
+      energyUnit   => { comp => '(Wh|kWh)',              act => 0 },
+      layoutType   => { comp => '(single|double|diff)',  act => 0 },
+      spaceSize    => { comp => '\d+',                   act => 0 },
+  };
+    
+  my ($a, $h) = parseParams ($aVal);
+
+  if ($cmd eq 'set') {
+      ## 1. Durchlauf - Prüfungen
+      #############################
+      for my $key (keys %{$h}) {
+          if (!grep /^$key$/, keys %{$valid}) {
+              return qq{The key '$key' is not a valid key in attribute '$aName'};
+          } 
+          
+          my $comp = $valid->{$key}{comp};
+          next if(!$comp);
+
+          if ($h->{$key} =~ /^$comp$/xs) {
+              if ($valid->{$key}{act}) {                             
+                  $paref->{akey}   = $key;
+                  $paref->{keyval} = $h->{$key};
+                  
+                  my $err = __attrKeyAction ($paref);
+                  
+                  delete $paref->{keyval};
+                  delete $paref->{akey};
+                  
+                  return $err if($err);
+              }
+          }
+          else {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
+          }
+      }
+            
+      ## 2. Durchlauf - Umsetzung
+      #############################
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
+      }
+      
+      for my $key (keys %{$h}) {         
+          $data{$name}{current}{$key} = $h->{$key};
+      }
+  }
+  else {                                                               # Current Keys mit Attribut löschen
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
+      }
+  }
+
+return;
+}
+
+################################################################
 #                  Attr flowGraphicControl
 ################################################################
 sub _attrflowGraphicControl {            ## no critic "not used"
@@ -6452,46 +6545,70 @@ sub _attrflowGraphicControl {            ## no critic "not used"
   my $hash  = $defs{$name};
   
   my $valid = {
-      animate                => '(0|1)',
-      consumerdist           => '[89]\d{1}|[1234]\d{2}|500',
-      h2consumerdist         => '\d{1,3}',
-      homenodedyncol         => '(0|1)',
-      shiftx                 => '-?[0-7]\d{0,1}|-?80',
-      shifty                 => '\d+',
-      size                   => '\d+',
-      showconsumer           => '(0|1)',
-      showconsumerdummy      => '(0|1)',
-      showconsumerremaintime => '(0|1)',
-      showconsumerpower      => '(0|1)',
-      strokeconsumerdyncol   => '(0|1)',
-      strokeCmrRedColLimit   => '\d+',
-      strokecolstd           => '.*',
-      strokecolsig           => '.*',
-      strokecolina           => '.*',
-      strokewidth            => '\d+',
+      animate                => { comp => '(0|1)',                     act => 0 },
+      consumerdist           => { comp => '[89]\d{1}|[1234]\d{2}|500', act => 0 },
+      h2consumerdist         => { comp => '\d{1,3}',                   act => 0 },
+      homenodedyncol         => { comp => '(0|1)',                     act => 0 },
+      shiftx                 => { comp => '-?[0-7]\d{0,1}|-?80',       act => 0 },
+      shifty                 => { comp => '\d+',                       act => 0 },
+      size                   => { comp => '\d+',                       act => 0 },
+      showconsumer           => { comp => '(0|1)',                     act => 0 },
+      showconsumerdummy      => { comp => '(0|1)',                     act => 0 },
+      showconsumerremaintime => { comp => '(0|1)',                     act => 0 },
+      showconsumerpower      => { comp => '(0|1)',                     act => 0 },
+      strokeconsumerdyncol   => { comp => '(0|1)',                     act => 0 },
+      strokeCmrRedColLimit   => { comp => '\d+',                       act => 0 },
+      strokecolstd           => { comp => '.*',                        act => 0 },
+      strokecolsig           => { comp => '.*',                        act => 0 },
+      strokecolina           => { comp => '.*',                        act => 0 },
+      strokewidth            => { comp => '\d+',                       act => 0 },
   };
-  
-  for my $av (keys %{$valid}) {
-      delete $data{$name}{current}{$av};
-  }
   
   my ($a, $h) = parseParams ($aVal);
 
   if ($cmd eq 'set') {
+      ## 1. Durchlauf - Prüfungen
+      #############################
       for my $key (keys %{$h}) {
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
-          }   
+          } 
           
-          my $comp = $valid->{$key};
+          my $comp = $valid->{$key}{comp};
           next if(!$comp);
 
-          if ($h->{$key} =~ /^$comp$/xs) {
-              $data{$name}{current}{$key} = $h->{$key};
+          if ($h->{$key} !~ /^$comp$/xs) {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
-          else {
-              return "The key '$key=$h->{$key}' is not specified correctly. Please use a valid value.";
-          }
+      }
+      
+      ## 2. Durchlauf - Umsetzung
+      #############################
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
+      }
+      
+      for my $key (keys %{$h}) {         
+          $data{$name}{current}{$key} = $h->{$key};
+      }
+  }
+  else {                                                                  # Current Keys mit Attribut löschen
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
+      }
+  }
+  
+  for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
+      if ($valid->{$akey}{act}) {
+          $paref->{akey}   = $akey;
+          $paref->{keyval} = $h->{$akey};
+          
+          my $err = __attrKeyAction ($paref);
+          
+          delete $paref->{keyval};
+          delete $paref->{akey};
+          
+          return $err if($err);
       }
   }
 
@@ -6513,14 +6630,12 @@ sub _attraiControl {                     ## no critic "not used"
       aiTrainStart      => { comp => '(1?[1-9]|10|2[0-3])',        act => 0 },
       aiTreesPV         => { comp => '(1?[1-9]|10|[2-4][0-9]|50)', act => 0 },
   };
-
-  for my $av (keys %{$valid}) {
-      delete $data{$name}{current}{$av};
-  }
   
   my ($a, $h) = parseParams ($aVal);
 
   if ($cmd eq 'set') {
+      ## 1. Durchlauf - Prüfungen
+      #############################
       for my $key (keys %{$h}) {
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
@@ -6529,25 +6644,39 @@ sub _attraiControl {                     ## no critic "not used"
           my $comp = $valid->{$key}{comp};
           next if(!$comp);
 
-          if ($h->{$key} =~ /^$comp$/xs) {
-              $data{$name}{current}{$key} = $h->{$key};
-          }
-          else {
+          if ($h->{$key} !~ /^$comp$/xs) {
               return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
+      }
+      
+      ## 2. Durchlauf - Umsetzung
+      #############################
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
+      }
+      
+      for my $key (keys %{$h}) {         
+          $data{$name}{current}{$key} = $h->{$key};
+      }
+  }
+  else {                                                                  # Current Keys mit Attribut löschen
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
       }
   }
   
   for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
-      next if(!$valid->{$akey}{act});
-      
-      $paref->{akey}   = $akey;
-      $paref->{keyval} = $h->{$akey};
-      
-      __attrKeyAction ($paref);
-      
-      delete $paref->{keyval};
-      delete $paref->{akey};
+      if ($valid->{$akey}{act}) {
+          $paref->{akey}   = $akey;
+          $paref->{keyval} = $h->{$akey};
+          
+          my $err = __attrKeyAction ($paref);
+          
+          delete $paref->{keyval};
+          delete $paref->{akey};
+          
+          return $err if($err);
+      }
   }
 
 return;
@@ -6575,13 +6704,11 @@ sub _attrplantControl {                  ## no critic "not used"
       showLink                  => { comp => '(0|1)',                              act => 0 },
   };
   
-  for my $av (keys %{$valid}) {
-      delete $data{$name}{current}{$av};
-  }
-  
   my ($a, $h) = parseParams ($aVal);
 
   if ($cmd eq 'set') {
+      ## 1. Durchlauf - Prüfungen
+      #############################
       for my $key (keys %{$h}) {
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
@@ -6590,25 +6717,39 @@ sub _attrplantControl {                  ## no critic "not used"
           my $comp = $valid->{$key}{comp};
           next if(!$comp);
 
-          if ($h->{$key} =~ /^$comp$/xs) {
-              $data{$name}{current}{$key} = $h->{$key};
-          }
-          else {
+          if ($h->{$key} !~ /^$comp$/xs) {
               return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
+      }
+      
+      ## 2. Durchlauf - Umsetzung
+      #############################
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
+      }
+      
+      for my $key (keys %{$h}) {         
+          $data{$name}{current}{$key} = $h->{$key};
+      }
+  }
+  else {                                                                  # Current Keys mit Attribut löschen
+      for my $av (keys %{$valid}) {
+          delete $data{$name}{current}{$av};
       }
   }
   
   for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
-      next if(!$valid->{$akey}{act});
-      
-      $paref->{akey}   = $akey;
-      $paref->{keyval} = $h->{$akey};
-      
-      __attrKeyAction ($paref);
-      
-      delete $paref->{keyval};
-      delete $paref->{akey};
+      if ($valid->{$akey}{act}) {
+          $paref->{akey}   = $akey;
+          $paref->{keyval} = $h->{$akey};
+          
+          my $err = __attrKeyAction ($paref);
+          
+          delete $paref->{keyval};
+          delete $paref->{akey};
+          
+          return $err if($err);
+      }
   }
 
 return;
@@ -7311,12 +7452,23 @@ sub __attrKeyAction {
   my $cmd    = $paref->{cmd};
   
   my $hash = $defs{$name};
+  my $err  = q{};
   
   if ($cmd eq 'set') {
       if ($init_done && $akey eq 'cycleInterval') {
           _newCycTime ($hash, time, $keyval);
           my $nct = CurrentVal ($name, 'nextCycleTime', 0);                                                         # gespeicherte nächste CyleTime
           readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
+      }
+      
+      if ($init_done && $akey eq 'headerDetail') {
+          my @hda = split ",", $keyval;
+
+          for my $val (@hda) {
+              if (!grep /^$val$/, qw (all co pv own status)) {
+                  return qq{The value '$val' is not valid for key '$akey'};
+              }
+          }          
       }
   }
   
@@ -7325,7 +7477,7 @@ sub __attrKeyAction {
       delete $data{$name}{circular}{99}{tdayDvtn};
   }
   
-return;
+return $err;
 }
 
 ################################################################
@@ -9040,7 +9192,7 @@ sub _specialActivities {
               deleteConsumerPlanning ($hash, $c);
           }
 
-          writeCacheToFile ($hash, "consumers", $csmcache.$name);                               # Cache File Consumer schreiben
+          writeCacheToFile ($hash, 'consumers', $csmcache.$name, 'nolog');                      # Cache File Consumer schreiben
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 finished");
       }
@@ -9744,6 +9896,7 @@ sub _transferAPIRadiationValues {
       $paref->{fd}     = $fd;
 
       $data{$name}{nexthours}{$nhtstr}{starttime} = $wantdt;
+      $data{$name}{nexthours}{$nhtstr}{day}       = $wtday;
       $data{$name}{nexthours}{$nhtstr}{hourofday} = $hod;
       $data{$name}{nexthours}{$nhtstr}{today}     = $fd == 0 ? 1 : 0;
       $data{$name}{nexthours}{$nhtstr}{rad1h}     = $rad1h;
@@ -10658,14 +10811,18 @@ sub _transferBatteryValues {
 
       writeToHistory ( { paref => $paref, key => 'batoutthishour'.$bn, val => $batoutthishour, hour => $nhour } );
 
-      # täglichen max. SOC in pvHistory speichern
-      #############################################
+      # täglichen maximalen SOC in pvHistory speichern
+      ##################################################
       my $batmaxsoc = HistoryVal ($hash, $day, 99, 'batmaxsoc'.$bn, 0);                                        # gespeicherter max. SOC des Tages
 
       if ($soc >= $batmaxsoc) {
           writeToHistory ( { paref => $paref, key => 'batmaxsoc'.$bn, val => $soc, hour => 99 } );
       }
 
+      # aktuellen SOC in pvHistory speichern
+      ########################################
+      writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, hour => $nhour } );
+      
       ######
 
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatIn_'. $bn, $batinthishour. ' Wh'.$warnin);
@@ -10686,8 +10843,6 @@ sub _transferBatteryValues {
       $data{$name}{batteries}{$bn}{bshowingraph} = $show;                                                # Batterie in Balkengrafik anzeigen
       $data{$name}{batteries}{$bn}{bposingraph}  = $pos;                                                 # Anzeigeposition in Balkengrafik
       $data{$name}{batteries}{$bn}{bchargewh}    = BatteryVal ($name, $bn, 'binstcap', 0) * $soc / 100;  # Batterie SoC (Wh)
-
-      writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, hour => $nhour } );
 
       $num++;
       $socsum   += $soc;
@@ -11037,6 +11192,7 @@ sub _batChargeRecmd {
 
           my $nhr   = sprintf "%02d", $num;
           my $today = NexthoursVal ($hash, 'NextHour'.$nhr, 'today',      0);
+          my $hod   = NexthoursVal ($hash, 'NextHour'.$nhr, 'hourofday', '');
           my $confc = NexthoursVal ($hash, 'NextHour'.$nhr, 'confc',      0);
           my $pvfc  = NexthoursVal ($hash, 'NextHour'.$nhr, 'pvfc',       0);
           my $stt   = NexthoursVal ($hash, 'NextHour'.$nhr, 'starttime', '');
@@ -11128,6 +11284,12 @@ sub _batChargeRecmd {
 
           $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
+          
+          # prognostizierten SOC in pvHistory speichern
+          ###############################################
+          if ($today && $hod) {                                                                                  # heutiger Tag
+              writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn, val => $progsoc, hour => $hod } );
+          }
 
           debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $crel ($msg)");
       }
@@ -12027,7 +12189,7 @@ sub ___doPlanning {
       Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate $planspmlt});
   }
 
-  writeCacheToFile ($hash, "consumers", $csmcache.$name);                                              # Cache File Consumer schreiben
+  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                              # Cache File Consumer schreiben
 
   ___setPlanningDeleteMeth ($paref);
 
@@ -12503,7 +12665,7 @@ sub ___switchConsumerOn {
           ___setConsumerPlanningState ($paref);
           delete $paref->{ps};
 
-          writeCacheToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
+          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                  # Cache File Consumer schreiben
       }
   }
   elsif ((($isintable == 1 && $isConsRcmd)          ||                                             # unterbrochenen Consumer fortsetzen
@@ -12527,7 +12689,7 @@ sub ___switchConsumerOn {
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                     # Cache File Consumer schreiben
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                     # Cache File Consumer schreiben
   }
 
 return $state;
@@ -12596,7 +12758,7 @@ sub ___switchConsumerOff {
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                     # Cache File Consumer schreiben
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                     # Cache File Consumer schreiben
   }
   elsif ((($isintable && !isConsRcmd ($hash, $c)) || $isintable == 2) &&                          # Consumer unterbrechen
          isInTimeframe ($hash, $c) && $auto && $offcom && !$iilt      &&
@@ -12617,7 +12779,7 @@ sub ___switchConsumerOff {
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                     # Cache File Consumer schreiben
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                     # Cache File Consumer schreiben
   }
 
 return $state;
@@ -12738,7 +12900,7 @@ sub ___setConsumerSwitchingState {
 
   if ($dowri) {
       if (!$fscss) {
-          writeCacheToFile ($hash, "consumers", $csmcache.$name);                           # Cache File Consumer schreiben
+          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                           # Cache File Consumer schreiben
       }
 
       Log3 ($name, 2, "$name - $state");
@@ -13289,17 +13451,16 @@ sub _calcReadingsTomorrowPVFc {
 
   for my $idx (sort keys %{$h}) {
       my $today = NexthoursVal ($hash, $idx, 'today', 1);
-      next if($today);                                                             # aktueller Tag wird nicht benötigt
+      next if($today);                                                               # aktueller Tag wird nicht benötigt
 
-      my $h  = NexthoursVal ($hash, $idx, 'hourofday', '');
-      next if(!$h);
+      my $hod = NexthoursVal ($hash, $idx, 'hourofday', '');
+      next if(!$hod);
 
-      next if($hods !~ /$h/xs);                                                    # diese Stunde des Tages soll nicht erzeugt werden
+      next if($hods !~ /$hod/xs);                                                    # diese Stunde des Tages soll nicht erzeugt werden
 
-      my $st   = NexthoursVal ($hash, $idx, 'starttime', 'XXXX-XX-XX XX:XX:XX');   # Starttime
       my $pvfc = NexthoursVal ($hash, $idx, 'pvfc', 0);
 
-      storeReading ('Tomorrow_Hour'.$h.'_PVforecast', $pvfc.' Wh');
+      storeReading ('Tomorrow_Hour'.$hod.'_PVforecast', $pvfc.' Wh');
   }
 
 return;
@@ -14100,6 +14261,8 @@ sub entryGraphic {
   my $gsel = shift // '';                                                                  # direkte Auswahl welche Grafik zurück gegeben werden soll (both, flow, forecast)
   my $pah  = shift // 0;                                                                   # 1 wenn durch pageAsHtml aufgerufen
 
+  return if(!$init_done);
+  
   my $hash = $defs{$name};
 
   # Setup Vollständigkeit/disabled prüfen
@@ -14408,11 +14571,10 @@ return $ret;
 #       Vollständigkeit Setup prüfen
 ################################################################
 sub _checkSetupNotComplete {
-  my $hash  = shift;
-  my $ret   = q{};
+  my $hash = shift;
+  my $ret  = q{};
 
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
+  my $name = $hash->{NAME};
 
   my $strings = AttrVal ($name, 'setupInverterStrings',   undef);                           # String Konfig
   my $wedev   = AttrVal ($name, 'setupWeatherDev1',       undef);                           # Device Vorhersage Wetterdaten (Bewölkung etc.)
@@ -18829,7 +18991,7 @@ sub setPVhistory {
   my $type      = $paref->{type};
   my $day       = $paref->{day};
   my $dayname   = $paref->{dayname};                                       # aktueller Wochentagsname
-  my $nhour     = $paref->{nhour};
+  my $nhour     = $paref->{nhour};                                         # Stunde des Tages
   my $histname  = $paref->{histname};
   my $val       = $paref->{val};                                           # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
   my $reorg     = $paref->{reorg}     // 0;                                # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
@@ -18960,7 +19122,7 @@ sub setPVhistory {
   }
 
   if ($histname) {
-      debugLog ($paref, 'saveData2Cache', "setPVhistory -> store Day: $day, Hour: $nhour, Key: $histname, Value: ".(defined $val ? $val : 'undef'));
+      debugLog ($paref, 'saveData2Cache', "setPVhistory -> store Day: $day, Hour of Day: $nhour, Key: $histname, Value: ".(defined $val ? $val : 'undef'));
   }
 
 return;
@@ -19177,16 +19339,17 @@ sub _listDataPoolPvHist {
               $prdl .= "pprl${pn}: $pprl";
           }
 
-          my ($btotin, $batin, $btotout, $batout, $batmsoc, $batssoc, $batsoc);
+          my ($btotin, $batin, $btotout, $batout, $batmsoc, $batssoc, $batprogsoc, $batsoc);
           for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
-              $bn          = sprintf "%02d", $bn;
-              my $hbtotin  = HistoryVal ($name, $day, $key, 'batintotal'.$bn,  '-');
-              my $hbtotout = HistoryVal ($name, $day, $key, 'batouttotal'.$bn, '-');
-              my $hbatin   = HistoryVal ($name, $day, $key, 'batin'.$bn,       '-');
-              my $hbatout  = HistoryVal ($name, $day, $key, 'batout'.$bn,      '-');
-              my $hbatmsoc = HistoryVal ($name, $day, $key, 'batmaxsoc'.$bn,   '-');
-              my $hbatssoc = HistoryVal ($name, $day, $key, 'batsetsoc'.$bn,   '-');
-              my $hbatsoc  = HistoryVal ($name, $day, $key, 'batsoc'.$bn,      '-');
+              $bn             = sprintf "%02d", $bn;
+              my $hbtotin     = HistoryVal ($name, $day, $key, 'batintotal'.$bn,  '-');
+              my $hbtotout    = HistoryVal ($name, $day, $key, 'batouttotal'.$bn, '-');
+              my $hbatin      = HistoryVal ($name, $day, $key, 'batin'.$bn,       '-');
+              my $hbatout     = HistoryVal ($name, $day, $key, 'batout'.$bn,      '-');
+              my $hbatmsoc    = HistoryVal ($name, $day, $key, 'batmaxsoc'.$bn,   '-');
+              my $hbatssoc    = HistoryVal ($name, $day, $key, 'batsetsoc'.$bn,   '-');
+              my $hbatprogsoc = HistoryVal ($name, $day, $key, 'batprogsoc'.$bn,  '-');
+              my $hbatsoc     = HistoryVal ($name, $day, $key, 'batsoc'.$bn,      '-');
 
               if ($export eq 'csv') {
                   $hexp->{$day}{$key}{"BatteryInTotal${bn}"}  = $hbtotin;
@@ -19195,23 +19358,26 @@ sub _listDataPoolPvHist {
                   $hexp->{$day}{$key}{"BatteryOut${bn}"}      = $hbatout;
                   $hexp->{$day}{$key}{"BatteryMaxSoc${bn}"}   = $hbatmsoc;
                   $hexp->{$day}{$key}{"BatterySetSoc${bn}"}   = $hbatssoc;
+                  $hexp->{$day}{$key}{"BatteryProgSoc${bn}"}  = $hbatprogsoc;
                   $hexp->{$day}{$key}{"BatterySoc${bn}"}      = $hbatsoc;
               }
 
-              $btotin  .= ', ' if($btotin);
-              $btotin  .= "batintotal${bn}: $hbtotin";
-              $btotout .= ', ' if($btotout);
-              $btotout .= "batouttotal${bn}: $hbtotout";
-              $batin   .= ', ' if($batin);
-              $batin   .= "batin${bn}: $hbatin";
-              $batout  .= ', ' if($batout);
-              $batout  .= "batout${bn}: $hbatout";
-              $batmsoc .= ', ' if($batmsoc);
-              $batmsoc .= "batmaxsoc${bn}: $hbatmsoc";
-              $batssoc .= ', ' if($batssoc);
-              $batssoc .= "batsetsoc${bn}: $hbatssoc";
-              $batsoc .= ', ' if($batsoc);
-              $batsoc .= "batsoc${bn}: $hbatsoc";
+              $btotin     .= ', ' if($btotin);
+              $btotin     .= "batintotal${bn}: $hbtotin";
+              $btotout    .= ', ' if($btotout);
+              $btotout    .= "batouttotal${bn}: $hbtotout";
+              $batin      .= ', ' if($batin);
+              $batin      .= "batin${bn}: $hbatin";
+              $batout     .= ', ' if($batout);
+              $batout     .= "batout${bn}: $hbatout";
+              $batmsoc    .= ', ' if($batmsoc);
+              $batmsoc    .= "batmaxsoc${bn}: $hbatmsoc";
+              $batssoc    .= ', ' if($batssoc);
+              $batssoc    .= "batsetsoc${bn}: $hbatssoc";
+              $batprogsoc .= ', ' if($batprogsoc);
+              $batprogsoc .= "batprogsoc${bn}: $hbatprogsoc";
+              $batsoc     .= ', ' if($batsoc);
+              $batsoc     .= "batsoc${bn}: $hbatsoc";
           }
 
           $ret .= "\n      " if($ret);
@@ -19237,6 +19403,9 @@ sub _listDataPoolPvHist {
           $ret .= "\n            "                               if($key ne '99');
           $ret .= $btotout                                       if($key ne '99');
           $ret .= "\n            "                               if($key ne '99');
+          
+          $ret .= $batprogsoc                                    if($key ne '99');
+          $ret .= "\n            "                               if($key ne '99');            
           $ret .= $batsoc                                        if($key ne '99');
           $ret .= "\n            "                               if($key ne '99');
 
@@ -19245,10 +19414,10 @@ sub _listDataPoolPvHist {
           $ret .= $batout;
           $ret .= "\n            ";
 
-          $ret .= $batmsoc                                         if($key eq '99');
-          $ret .= "\n            "                                 if($key eq '99');
-          $ret .= $batssoc                                         if($key eq '99');
-          $ret .= "\n            "                                 if($key eq '99');
+          $ret .= $batmsoc                                       if($key eq '99');
+          $ret .= "\n            "                               if($key eq '99');
+          $ret .= $batssoc                                       if($key eq '99');
+          $ret .= "\n            "                               if($key eq '99');
 
           if ($key ne '99') {
               $ret .= "weatherid: $wid, ";
@@ -19604,6 +19773,7 @@ sub _listDataPoolNextHours {
 
   for my $idx (sort keys %{$h}) {
       my $nhts    = NexthoursVal ($name, $idx, 'starttime',  '-');
+      my $day     = NexthoursVal ($name, $idx, 'day',        '-');
       my $hod     = NexthoursVal ($name, $idx, 'hourofday',  '-');
       my $today   = NexthoursVal ($name, $idx, 'today',      '-');
       my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',       '-');
@@ -19637,7 +19807,7 @@ sub _listDataPoolNextHours {
 
       $sq .= "\n" if($sq);
       $sq .= $idx." => ";
-      $sq .= "starttime: $nhts, hourofday: $hod, today: $today";
+      $sq .= "starttime: $nhts, day: $day, hourofday: $hod, today: $today";
       $sq .= "\n              ";
       $sq .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit";
       $sq .= "\n              ";
@@ -24172,7 +24342,7 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-get-nextHours"></a>
       <li><b>nextHours </b> <br><br>
-      Lists the expected values for the coming hours. <br><br>
+      Lists the stored values for the coming hours. <br><br>
 
       <ul>
          <table>
@@ -24184,6 +24354,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>correff</b>         </td><td>correction factor/quality used                                                  </td></tr>
             <tr><td>                        </td><td>&lt;factor&gt;/- -> no quality defined                                          </td></tr>
             <tr><td>                        </td><td>&lt;factor&gt;/0..1 - quality of the PV forecast (1 = best quality)             </td></tr>
+            <tr><td> <b>day</b>             </td><td>Date of day                                                                     </td></tr>
             <tr><td> <b>DoN</b>             </td><td>sunrise and sunset status (0 - night, 1 - day)                                  </td></tr>
             <tr><td> <b>hourofday</b>       </td><td>current hour of the day                                                         </td></tr>
             <tr><td> <b>pvapifc</b>         </td><td>expected PV generation (Wh) of the used API incl. a possible correction         </td></tr>
@@ -24227,7 +24398,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batinXX</b>        </td><td>Charge of battery XX within the hour (Wh)                                                                                </td></tr>
             <tr><td> <b>batouttotalXX</b>  </td><td>total battery XX discharge (Wh) at the beginning of the hour                                                             </td></tr>
             <tr><td> <b>batoutXX</b>       </td><td>Discharge of battery XX within the hour (Wh)                                                                             </td></tr>
-            <tr><td> <b>batsocXX</b>       </td><td>State of charge SOC (%) of battery XX at the end of the hour                                                             </td></tr>
+            <tr><td> <b>batprogsocXX</b>   </td><td>predicted state of charge SOC (%) of battery XX at the end of the hour                                                   </td></tr>
+            <tr><td> <b>batsocXX</b>       </td><td>real State of charge SOC (%) of battery XX at the end of the hour                                                        </td></tr>
             <tr><td> <b>batmaxsocXX</b>    </td><td>Maximum SOC (%) achieved by battery XX on the day                                                                        </td></tr>
             <tr><td> <b>batsetsocXX</b>    </td><td>Optimum SOC setpoint (%) of battery XX  for the day                                                                      </td></tr>
             <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                                         </td></tr>
@@ -26718,7 +26890,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-nextHours"></a>
       <li><b>nextHours </b> <br><br>
-      Listet die erwarteten Werte der kommenden Stunden auf. <br><br>
+      Listet die gespeicherte Werte der kommenden Stunden auf. <br><br>
 
       <ul>
          <table>
@@ -26730,6 +26902,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>correff</b>         </td><td>verwendeter Korrekturfaktor/Qualität                                                     </td></tr>
             <tr><td>                        </td><td>&lt;Faktor&gt;/- -> keine Qualität definiert                                             </td></tr>
             <tr><td>                        </td><td>&lt;Faktor&gt;/0..1 - Qualität der PV Prognose (1 = beste Qualität)                      </td></tr>
+            <tr><td> <b>day</b>             </td><td>Tagesdatum                                                                               </td></tr>
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                     </td></tr>
             <tr><td> <b>hourofday</b>       </td><td>laufende Stunde des Tages                                                                </td></tr>
             <tr><td> <b>pvapifc</b>         </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur        </td></tr>
@@ -26773,7 +26946,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batinXX</b>         </td><td>Ladung der Batterie XX innerhalb der Stunde (Wh)                                                   </td></tr>
             <tr><td> <b>batouttotalXX</b>   </td><td>Gesamtentladung der Batterie XX (Wh) zu Beginn der Stunde                                          </td></tr>
             <tr><td> <b>batoutXX</b>        </td><td>Entladung der Batterie XX innerhalb der Stunde (Wh)                                                </td></tr>
-            <tr><td> <b>batsocXX</b>        </td><td>Ladezustand SOC (%) der Batterie XX am Ende der Stunde                                             </td></tr>
+            <tr><td> <b>batprogsocXX</b>    </td><td>prognostizierte Ladezustand SOC (%) der Batterie XX am Ende der Stunde                             </td></tr>
+            <tr><td> <b>batsocXX</b>        </td><td>realer Ladezustand SOC (%) der Batterie XX am Ende der Stunde                                      </td></tr>
             <tr><td> <b>batmaxsocXX</b>     </td><td>maximal erreichter SOC (%) der Batterie XX an dem Tag                                              </td></tr>
             <tr><td> <b>batsetsocXX</b>     </td><td>optimaler SOC Sollwert (%) der Batterie XX für den Tag                                             </td></tr>
             <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total von ConsumerXX                                                              </td></tr>
