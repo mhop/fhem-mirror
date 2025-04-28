@@ -160,6 +160,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.51.5" => "28.04.2025  attr transformed: graphicBeamWidth, graphicHourCount, graphicEnergyUnit, graphicSpaceSize ".
+                           "graphicHeaderDetail, graphicHourStyle, graphicLayoutType ".
+                           "graphicControl->beamWidth, graphicControl->hourCount, graphicControl->energyUnit, graphicControl->spaceSize ".
+                           "graphicControl->headerDetail, graphicControl->hourStyle, graphicControl->layoutType ",
   "1.51.4" => "27.04.2025  avoid warnings uninitialized value \$FW_ME, \$FW_subdir in line 14434 ".
                            "bugfix in attr .*Control, fix 'ERROR deleting file' if no consumers are registered ".
                            "save batprogsocXX to pvHistory, prepared for new Attr graphicControl ",
@@ -476,6 +480,9 @@ use constant {
   HISTHOURDEF     => 2,                                                             # default Anzeige vorangegangene Stunden
   WTHCOLDDEF      => 'C7C979',                                                      # Wetter Icon Tag default Farbe
   WTHCOLNDEF      => 'C7C7C7',                                                      # Wetter Icon Nacht default Farbe
+  BEAMWIDTH       => 20,                                                            # default Balkenbreite
+  HOURCOUNT       => 24,                                                            # default Stundenbalken in Grafik
+  SPACESIZE       => 24,                                                            # default Platz in px über oder unter den Balken
   BHEIGHTLEVEL    => 200,                                                           # default Multiplikator zur Festlegung der maximalen Balkenhöhe
   B1COLDEF        => 'FFAC63',                                                      # default Farbe Beam 1
   B1FONTCOLDEF    => '0D0D0D',                                                      # default Schriftfarbe Beam 1
@@ -604,6 +611,9 @@ my @rconfigs = qw( pvCorrectionFactor_Auto
                                                                                  # Anlagenkonfiguration: maßgebliche Attribute
 my @aconfigs = qw( aiControl 
                    consumerControl
+                   graphicControl
+                   flowGraphicControl 
+                   plantControl
                    ctrlConsRecommendReadings 
                    ctrlLanguage 
                    ctrlNextDayForecastReadings 
@@ -612,18 +622,14 @@ my @aconfigs = qw( aiControl
                    ctrlSpecialReadings 
                    ctrlUserExitFn
                    disable
-                   graphicControl
-                   flowGraphicControl 
-                   graphicBeamWidth
                    graphicBeamHeightLevel1 graphicBeamHeightLevel2 graphicBeamHeightLevel3
                    graphicBeam1Content graphicBeam2Content graphicBeam3Content graphicBeam4Content graphicBeam5Content graphicBeam6Content
                    graphicBeam1Color graphicBeam2Color graphicBeam3Color graphicBeam4Color graphicBeam5Color graphicBeam6Color
                    graphicBeam1FontColor graphicBeam2FontColor graphicBeam3FontColor graphicBeam4FontColor graphicBeam5FontColor graphicBeam6FontColor
-                   graphicEnergyUnit graphicHeaderOwnspec graphicHeaderOwnspecValForm
-                   graphicHeaderDetail graphicHistoryHour graphicHourCount graphicHourStyle
-                   graphicLayoutType graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
-                   graphicSpaceSize graphicWeatherColor graphicWeatherColorNight
-                   plantControl
+                   graphicHeaderOwnspec graphicHeaderOwnspecValForm
+                   graphicHistoryHour
+                   graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
+                   graphicWeatherColor graphicWeatherColorNight
                    setupMeterDev setupInverterStrings setupRadiationAPI setupStringPeak setupStringAzimuth setupStringDeclination
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
                    setupRoofTops
@@ -1589,24 +1595,17 @@ sub Initialize {
                                 "ctrlUserExitFn:textField-long ".
                                 "disable:1,0 ".
                                 "flowGraphicControl:textField-long ".
-                                #"graphicControl:textField-long ".
+                                "graphicControl:textField-long ".
                                 "graphicBeamHeightLevel1 ".
                                 "graphicBeamHeightLevel2 ".
                                 "graphicBeamHeightLevel3 ".
-                                "graphicBeamWidth:slider,20,5,100 ".
-                                "graphicEnergyUnit:Wh,kWh ".
                                 "graphicHeaderOwnspec:textField-long ".
                                 "graphicHeaderOwnspecValForm:textField-long ".
-                                "graphicHeaderDetail:multiple-strict,all,co,pv,own,status ".
                                 "graphicHistoryHour:slider,0,1,23 ".
-                                "graphicHourCount:slider,4,1,24 ".
-                                "graphicHourStyle ".
-                                "graphicLayoutType:single,double,diff ".
                                 "graphicSelect:$gol ".
                                 "graphicShowDiff:no,top,bottom ".
                                 "graphicShowNight:1,0,01 ".
                                 "graphicShowWeather:1,0 ".
-                                "graphicSpaceSize ".
                                 "graphicWeatherColor:colorpicker,RGB ".
                                 "graphicWeatherColorNight:colorpicker,RGB ".
                                 "plantControl:textField-long ".
@@ -1634,10 +1633,10 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  #my $av = 'obsolete#-#use#attr#plantControl#instead';
+  my $av = 'obsolete#-#use#attr#graphicControl#instead';
   #my $av1 = 'obsolete#-#will#be#deleted#soon';
   my $av2 = 'obsolete#-#use#attr#graphicSelect#instead';
-  $hash->{AttrList} .= " graphicHeaderShow:$av2 ";
+  $hash->{AttrList} .= " graphicLayoutType:$av graphicHourStyle:$av graphicHeaderDetail:$av graphicSpaceSize:$av graphicBeamWidth:$av graphicHourCount:$av graphicEnergyUnit:$av graphicHeaderShow:$av2 ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -1951,9 +1950,10 @@ sub _setattrKeyVal {                         ## no critic "not used"
   return if(!$init_done);
   
   my $valid = {
-      flowGraphicControl     => '',
       aiControl              => '',
       consumerControl        => '',
+      flowGraphicControl     => '',
+      graphicControl         => '',
       plantControl           => '',
       setupMeterDev          => '',
       setupStringAzimuth     => '',
@@ -2542,7 +2542,7 @@ sub _setreset {                          ## no critic "not used"
           }
       }
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name, 'nolog');               # Cache File Consumer schreiben
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                        # Cache File Consumer schreiben
   }
 
   if ($prop eq 'consumerMaster') {                                                   # Verbraucherhash löschen
@@ -2562,7 +2562,7 @@ sub _setreset {                          ## no critic "not used"
       delete $paref->{c};
       $data{$name}{current}{consumerCollected} = 0;                                  # Consumer neu sammeln
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name, 'nolog');               # Cache File Consumer schreiben
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                        # Cache File Consumer schreiben
       centralTask      ($hash, 0);
   }
 
@@ -5951,17 +5951,17 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  #if ($cmd eq 'set' && $aName =~ /^affectBatteryPreferredCharge$/) {
-  #    my $msg  = "The attribute $aName is replaced by 'plantControl'.";
-  #    if (!$init_done) {
-  #        Log3 ($name, 1, "$name - $msg");
-  #    }
-  #    else {
-  #        return $msg;
-  #    }
-  #}
+  if ($cmd eq 'set' && $aName =~ /^graphicLayoutType|graphicHourStyle|graphicHeaderDetail|graphicSpaceSize|graphicBeamWidth|graphicHourCount|graphicEnergyUnit$/) {      # 28.04.
+      my $msg  = "The attribute $aName is replaced by 'graphicControl'.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg");
+      }
+      else {
+          return $msg;
+      }
+  }
   
-  if ($cmd eq 'set' && $aName =~ /^graphicHeaderShow$/) {
+  if ($cmd eq 'set' && $aName =~ /^graphicHeaderShow$/) {                          # 15.04.
       my $msg  = "The attribute $aName is replaced by 'graphicSelect'.";
       if (!$init_done) {
           Log3 ($name, 1, "$name - $msg");
@@ -6474,10 +6474,10 @@ sub _attrgraphicControl {                ## no critic "not used"
   
   my $valid = {
       beamWidth    => { comp => '([2-9][0-9]|100)',      act => 0 },
+      energyUnit   => { comp => '(Wh|kWh)',              act => 0 },
+      headerDetail => { comp => '.*',                    act => 1 },
       hourCount    => { comp => '([4-9]|1[0-9]|2[0-4])', act => 0 },
       hourStyle    => { comp => ':(0{1,2})',             act => 0 },
-      headerDetail => { comp => '.*',                    act => 1 },
-      energyUnit   => { comp => '(Wh|kWh)',              act => 0 },
       layoutType   => { comp => '(single|double|diff)',  act => 0 },
       spaceSize    => { comp => '\d+',                   act => 0 },
   };
@@ -8278,10 +8278,12 @@ sub writeCacheToFile {
   }
 
   if (!keys %{$data{$name}{$cachename}}) {
-      my $err = FileDelete ($file);
+      if (-e $file) {
+          my $err = FileDelete ($file);
 
-      if ($err) {
-          Log3 ($name, 1, qq{$name - ERROR deleting file $err}) if(!$nolog);
+          if ($err) {
+              Log3 ($name, 1, qq{$name - ERROR deleting file $err}) if(!$nolog);
+          }
       }
       
       return;
@@ -8579,15 +8581,70 @@ sub centralTask {
   reloadCacheFiles ( {name => $name, type => $type} );                 # Cache-Files vom Filesystem nachladen falls nötig
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ##########################################################################################################################
-  #my $pcb = AttrVal ($name, 'affectBatteryPreferredCharge', undef);
-  #my $apc = AttrVal ($name, 'plantControl', '');
+  ########################################################################################################################
+  my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
+  my $gco = AttrVal ($name, 'graphicControl', '');
 
-  #if (defined $pcb) {
-  #    my $newval = $apc." batteryPreferredCharge=$pcb";
-  #    CommandAttr (undef, "$name plantControl $newval");
-  #    ::CommandDeleteAttr (undef, "$name affectBatteryPreferredCharge"); 
-  #}
+  if (defined $gbw) {
+      my $newval = $gco." beamWidth=$gbw";
+      CommandAttr (undef, "$name graphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name graphicBeamWidth"); 
+  }
+  
+  my $ghc = AttrVal ($name, 'graphicHourCount', undef);                 # 27.04.
+  $gco    = AttrVal ($name, 'graphicControl', '');
+
+  if (defined $ghc) {
+      my $newval = $gco." hourCount=$ghc";
+      CommandAttr (undef, "$name graphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name graphicHourCount"); 
+  }
+  
+  my $geu = AttrVal ($name, 'graphicEnergyUnit', undef);                 # 27.04.
+  $gco    = AttrVal ($name, 'graphicControl', '');
+
+  if (defined $geu) {
+      my $newval = $gco." energyUnit=$geu";
+      CommandAttr (undef, "$name graphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name graphicEnergyUnit"); 
+  }
+  
+  my $gss = AttrVal ($name, 'graphicSpaceSize', undef);                 # 28.04.
+  $gco    = AttrVal ($name, 'graphicControl', '');
+
+  if (defined $gss) {
+      my $newval = $gco." spaceSize=$gss";
+      CommandAttr (undef, "$name graphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name graphicSpaceSize"); 
+  }
+  
+  my $ghd = AttrVal ($name, 'graphicHeaderDetail', undef);                 # 28.04.
+  $gco    = AttrVal ($name, 'graphicControl', '');
+
+  if (defined $ghd) {
+      my $newval = $gco." headerDetail=$ghd";
+      CommandAttr (undef, "$name graphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name graphicHeaderDetail"); 
+  }
+  
+  my $ghs = AttrVal ($name, 'graphicHourStyle', undef);                 # 28.04.
+  $gco    = AttrVal ($name, 'graphicControl', '');
+
+  if (defined $ghs) {
+      my $newval = $gco." hourStyle=$ghs";
+      CommandAttr (undef, "$name graphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name graphicHourStyle"); 
+  }
+  
+  my $glt = AttrVal ($name, 'graphicLayoutType', undef);                 # 28.04.
+  $gco    = AttrVal ($name, 'graphicControl', '');
+
+  if (defined $glt) {
+      my $newval = $gco." layoutType=$glt";
+      CommandAttr (undef, "$name graphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name graphicLayoutType"); 
+  }
+  
   
   my $ssd = ReadingsVal ($name, 'setupStringDeclination', '');          # 22.04.2025
   if ($ssd) {
@@ -8611,7 +8668,7 @@ sub centralTask {
           }
       }
   }
-  #Log3 ($name, 1, "$name - Consumers: ".Dumper $data{$name}{consumers});
+ 
   ##########################################################################################################################
 
   if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -9192,7 +9249,7 @@ sub _specialActivities {
               deleteConsumerPlanning ($hash, $c);
           }
 
-          writeCacheToFile ($hash, 'consumers', $csmcache.$name, 'nolog');                      # Cache File Consumer schreiben
+          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                               # Cache File Consumer schreiben
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 finished");
       }
@@ -14278,9 +14335,9 @@ sub entryGraphic {
 
   # Parameter f. Anzeige extrahieren
   ###################################
-  my $width      = AttrNum ($name, 'graphicBeamWidth',    20);                             # zu klein ist nicht problematisch
-  my $maxhours   = AttrNum ($name, 'graphicHourCount',    24);
-  my $alias      = AttrVal ($name, 'alias',            $name);                             # Linktext als Aliasname oder Devicename setzen
+  my $width      = CurrentVal ($name, 'beamWidth', BEAMWIDTH);                             # zu klein ist nicht problematisch
+  my $maxhours   = CurrentVal ($name, 'hourCount', HOURCOUNT);
+  my $alias      = AttrVal    ($name, 'alias',            $name);                          # Linktext als Aliasname oder Devicename setzen
 
   AttrVal ($name, 'graphicShowNight', 0) =~ /(.)(.)?/xs;
   my $show_night = $1 // 0;
@@ -14305,7 +14362,6 @@ sub entryGraphic {
       modulo         => 1,
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; white-space:nowrap;'},     # TD-Style
       offset         => $offset,
-      hourstyle      => AttrVal    ($name, 'graphicHourStyle',                  ''),
       colorb1        => AttrVal    ($name, 'graphicBeam1Color',           B1COLDEF),
       colorb2        => AttrVal    ($name, 'graphicBeam2Color',           B2COLDEF),
       fcolor1        => AttrVal    ($name, 'graphicBeam1FontColor',   B1FONTCOLDEF),
@@ -14316,16 +14372,17 @@ sub entryGraphic {
       beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
       beam5cont      => AttrVal    ($name, 'graphicBeam5Content',               ''),
       beam6cont      => AttrVal    ($name, 'graphicBeam6Content',               ''),
-      lotype         => AttrVal    ($name, 'graphicLayoutType',           'double'),
-      kw             => AttrVal    ($name, 'graphicEnergyUnit',               'Wh'),
       height         => AttrNum    ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL),
-      fsize          => AttrNum    ($name, 'graphicSpaceSize',                  24),
       show_diff      => AttrVal    ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
       weather        => AttrNum    ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
       colorw         => AttrVal    ($name, 'graphicWeatherColor',       WTHCOLDDEF),                # Wetter Icon Farbe Tag
       colorwn        => AttrVal    ($name, 'graphicWeatherColorNight',  WTHCOLNDEF),                # Wetter Icon Farbe Nacht
       wlalias        => AttrVal    ($name, 'alias',                          $name),
-      hdrDetail      => AttrVal    ($name, 'graphicHeaderDetail',            'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+      lotype         => CurrentVal ($name, 'layoutType',                  'double'),
+      hourstyle      => CurrentVal ($name, 'hourStyle',                         ''),
+      hdrDetail      => CurrentVal ($name, 'headerDetail',                   'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+      fsize          => CurrentVal ($name, 'spaceSize',                  SPACESIZE),    
+      kw             => CurrentVal ($name, 'energyUnit',                      'Wh'),
       clegendpos     => CurrentVal ($name, 'showLegend',                'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => CurrentVal ($name, 'detailLink',                         1),                # Link zur Detailansicht des Verbrauchers      
       caicon         => CurrentVal ($name, 'adviceIcon',                 CAICONDEF),                # Consumer AdviceIcon      
@@ -15239,8 +15296,8 @@ sub __createOwnSpec {
   my $pah       = $paref->{pah};                                                       # 1 wenn durch pageAsHtml abgerufen
 
   my $vinr = 4;                                                                        # Spezifikationen in einer Zeile
-  my $spec = AttrVal ($name, 'graphicHeaderOwnspec', '');
-  my $uatr = AttrVal ($name, 'graphicEnergyUnit',  'Wh');
+  my $spec = AttrVal    ($name, 'graphicHeaderOwnspec', '');
+  my $uatr = CurrentVal ($name, 'energyUnit', 'Wh');
   my $show = $hdrDetail =~ /all|own/xs ? 1 : 0;
 
   return if(!$spec || !$show);
@@ -25321,43 +25378,9 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-graphicBeamHeightLevelX" data-pattern="graphicBeamHeightLevel.*"></a>
        <li><b>graphicBeamHeightLevelX &lt;value&gt; </b><br>
          Multiplier for determining the maximum bar height of the respective level. <br>
-         In conjunction with the attribute <a href=“#SolarForecast-attr-graphicHourCount”>graphicHourCount</a>
+         In conjunction with the attribute <a href=“#SolarForecast-attr-graphicControl”>graphicControl->hourCount</a>
          this can also be used to generate very small graphic outputs. <br>
          (default: 200)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeamWidth"></a>
-       <li><b>graphicBeamWidth &lt;value&gt; </b><br>
-         Width of the bars of the bar chart in px. If no attribute is set, the width of the bars is determined by the
-         module automatically. <br>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicEnergyUnit"></a>
-       <li><b>graphicEnergyUnit &lt;Wh | kWh&gt; </b><br>
-         Defines the unit for displaying the electrical power in the graph. The kilowatt hour is rounded to one
-         decimal place. <br>
-         (default: Wh)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicHeaderDetail"></a>
-       <li><b>graphicHeaderDetail </b><br>
-         Selection of the zones of the graphic header to be displayed. <br>
-         (default: all)
-         <br><br>
-
-         <ul>
-         <table>
-         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>all</b>        </td><td>all zones of the head area (default)        </td></tr>
-            <tr><td> <b>co</b>         </td><td>show consumption range                      </td></tr>
-            <tr><td> <b>pv</b>         </td><td>show creation area                          </td></tr>
-            <tr><td> <b>own</b>        </td><td>user zone (see <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>)   </td></tr>
-            <tr><td> <b>status</b>     </td><td>status information area                     </td></tr>
-         </table>
-         </ul>
        </li>
        <br>
 
@@ -25369,7 +25392,7 @@ to ensure that the system configuration is correct.
          The values to be displayed are separated by spaces.
          Four values (fields) are displayed per line. <br>
          The input can be made in multiple lines. Values with the units "Wh" or "kWh" are converted according to the
-         setting of the attribute <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a>.
+         setting of the attribute <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a>.
          <br><br>
 
          Each value is to be defined by a label and the corresponding reading connected by ":". <br>
@@ -25421,7 +25444,7 @@ to ensure that the system configuration is correct.
          <br><br>
          <b>Note:</b> Values with the units 'Wh' or 'kWh' are automatically converted and displayed according to the setting
          automatically converted and displayed according to the setting of attribute
-         <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a>.
+         <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a>.
          <br><br>
 
          <b>Notation 1: </b> <br>
@@ -25474,45 +25497,6 @@ to ensure that the system configuration is correct.
        <li><b>graphicHistoryHour </b><br>
          Number of previous hours displayed in the bar graph. <br>
          (default: 2)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicHourCount"></a>
-       <li><b>graphicHourCount &lt;4...24&gt; </b><br>
-         Number of bars/hours in the bar graph. <br>
-         (default: 24)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicHourStyle"></a>
-       <li><b>graphicHourStyle </b><br>
-         Format of the time in the bar graph. <br><br>
-
-       <ul>
-         <table>
-           <colgroup> <col width="30%"> <col width="70%"> </colgroup>
-           <tr><td> <b>nicht gesetzt</b>  </td><td>hours only without minutes (default)                    </td></tr>
-           <tr><td> <b>:00</b>            </td><td>Hours as well as minutes in two digits, e.g. 10:00      </td></tr>
-           <tr><td> <b>:0</b>             </td><td>Hours as well as minutes single-digit, e.g. 8:0         </td></tr>
-         </table>
-       </ul>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicLayoutType"></a>
-       <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
-       Layout of the bar graph. The content of the bars to be displayed is determined by the <b>graphicBeamXContent</b> attributes.
-       <br><br>
-
-       <ul>
-       <table>
-       <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-          <tr><td> <b>double</b>  </td><td>displays the primary bar and the secondary bar (default)                                                                </td></tr>
-          <tr><td> <b>single</b>  </td><td>displays only the primary bar                                                                                           </td></tr>
-          <tr><td> <b>diff</b>    </td><td>difference display. It is valid: &lt;Difference&gt; = &lt;Value primary bar&gt; - &lt;Value secondary bar&gt;           </td></tr>
-          <tr><td>                </td><td>The current setting of <a href=“#SolarForecast-attr-graphicEnergyUnit”>graphicEnergyUnit</a> is not taken into account. </td></tr>
-	   </table>
-       </ul>
        </li>
        <br>
 
@@ -25576,15 +25560,6 @@ to ensure that the system configuration is correct.
        <li><b>graphicShowWeather </b><br>
          Show/hide weather icons in the bar graph. <br>
          (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicSpaceSize"></a>
-       <li><b>graphicSpaceSize &lt;value&gt; </b><br>
-         Defines how much space in px above or below the bars (with display type differential (diff)) is kept free for
-         displaying the values. For styles with large fonts the default value may be too small or a
-         bar may slip over the baseline. In these cases please increase the value. <br>
-         (default: 24)
        </li>
        <br>
 
@@ -27871,43 +27846,64 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-graphicBeamHeightLevelX" data-pattern="graphicBeamHeightLevel.*"></a>
        <li><b>graphicBeamHeightLevelX &lt;value&gt; </b><br>
          Multiplikator zur Festlegung der maximalen Balkenhöhe der jeweiligen Ebene. <br>
-         In Verbindung mit dem Attribut <a href="#SolarForecast-attr-graphicHourCount">graphicHourCount</a>
+         In Verbindung mit dem Attribut <a href="#SolarForecast-attr-graphicControl">graphicControl->hourCount</a>
          lassen sich damit auch recht kleine Grafikausgaben erzeugen. <br>
          (default: 200)
        </li>
        <br>
-
-       <a id="SolarForecast-attr-graphicBeamWidth"></a>
-       <li><b>graphicBeamWidth &lt;value&gt; </b><br>
-         Breite der Balken der Balkengrafik in px. Ohne gesetzen Attribut wird die Balkenbreite durch das Modul
-         automatisch bestimmt. <br>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicEnergyUnit"></a>
-       <li><b>graphicEnergyUnit &lt;Wh | kWh&gt; </b><br>
-         Definiert die Einheit zur Anzeige der elektrischen Leistung in der Grafik. Die Kilowattstunde wird auf eine
-         Nachkommastelle gerundet. <br>
-         (default: Wh)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicHeaderDetail"></a>
-       <li><b>graphicHeaderDetail </b><br>
-         Auswahl der anzuzeigenden Zonen des Grafik Kopfbereiches. <br>
-         (default: all)
+       
+       <a id="SolarForecast-attr-graphicControl"></a>
+       <li><b>graphicControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
+         Durch die Angabe der nachfolgend aufgeführten 'Schlüssel=Wert' Paare können verschiedene
+         übergreifende Eigenschaften der Grafik- bzw. Balkengrafikdarstellung eingestellt werden. <br>
+         Die Eingabe kann mehrzeilig erfolgen.
          <br><br>
 
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>all</b>        </td><td>alle Zonen des Kopfbereiches (default)        </td></tr>
-            <tr><td> <b>co</b>         </td><td>Verbrauchsbereich anzeigen                    </td></tr>
-            <tr><td> <b>pv</b>         </td><td>Erzeugungsbereich anzeigen                    </td></tr>
-            <tr><td> <b>own</b>        </td><td>Nutzerzone (siehe <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>)   </td></tr>
-            <tr><td> <b>status</b>     </td><td>Bereich der Statusinformationen               </td></tr>
-         </table>
+			<tr><td> <b>beamWidth</b>           </td><td>Bestimmt die Breite der Balken der Balkengrafik in px.                                                                          </td></tr>
+            <tr><td>                            </td><td>Ohne gesetzen Attribut wird die Balkenbreite durch das Modul automatisch dynamisch angepasst.                                   </td></tr>
+		    <tr><td>                            </td><td>Wert: <b>Ganzzahl 20..100</b>, default: 20                                                                                      </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+			<tr><td> <b>energyUnit</b>          </td><td>Definiert die Einheit zur Anzeige der elektrischen Leistung in der Grafik.                                                      </td></tr>
+            <tr><td>                            </td><td>Die Kilowattstunde wird auf eine Nachkommastelle gerundet.                                                                      </td></tr>
+            <tr><td>                            </td><td>Wert: <b>Wh | kWh</b>, default: Wh                                                                                              </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+			<tr><td> <b>hourCount</b>           </td><td>Anzahl der Balken/Stunden in der Balkengrafk.                                                                                   </td></tr>
+            <tr><td>                            </td><td>Wert: <b>Ganzzahl 4..24</b>, default: 24                                                                                        </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>headerDetail</b>        </td><td>Auswahl der anzuzeigenden Zonen des Grafik Kopfbereiches. Die gewählten Optionen werden durch Komma getrennt angegeben.         </td></tr>
+            <tr><td>                            </td><td><b>all</b>    - alle Zonen des Kopfbereiches (default)                                                                          </td></tr>
+            <tr><td>                            </td><td><b>co</b>     - Verbrauchsbereich                                                                                               </td></tr>
+            <tr><td>                            </td><td><b>pv</b>     - Erzeugungsbereich                                                                                               </td></tr>
+            <tr><td>                            </td><td><b>own</b>    - Nutzerzone (siehe <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>)                  </td></tr>
+            <tr><td>                            </td><td><b>status</b> - Bereich der Statusinformationen                                                                                 </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>hourStyle</b>           </td><td>Format der Zeitangabe in der Balkengrafik.                                                                                      </td></tr>
+            <tr><td>                            </td><td><b>nicht gesetzt</b> - nur Stundenangabe ohne Minuten (default)                                                                 </td></tr>
+            <tr><td>                            </td><td><b>:00</b>           - Stunden sowie Minuten zweistellig, z.B. 10:00                                                            </td></tr>
+            <tr><td>                            </td><td><b>:0</b>            - Stunden sowie Minuten einstellig, z.B. 8:0                                                               </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>layoutType</b>          </td><td>Layout der Balkengrafik. Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeamXContent</b> bestimmt.     </td></tr>
+            <tr><td>                            </td><td><b>double</b> - zeigt den primären Balken und den sekundären Balken an (default)                                                </td></tr>
+            <tr><td>                            </td><td><b>single</b> - zeigt nur den primären Balken an                                                                                </td></tr>
+            <tr><td>                            </td><td><b>diff</b>   - Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;   </td></tr>
+            <tr><td>                            </td><td>Die Einstellung von <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a> wird nicht berücksichtigt.      </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>spaceSize</b>           </td><td>Legt fest, wieviel Platz in px über oder unter den Balken (bei Anzeigetyp layoutType=diff) zur Anzeige der                      </td></tr>
+            <tr><td>                            </td><td>Werte freigehalten wird. Bei Styles mit großen Fonts kann der default-Wert zu klein sein bzw. rutscht ein                       </td></tr>
+            <tr><td>                            </td><td>Balken u.U. über die Grundlinie. In diesen Fällen bitte den Wert erhöhen.                                                       </td></tr>
+            <tr><td>                            </td><td>Wert: <b>Ganzzahl</b>, default: 24                                                                                              </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+          </table>
          </ul>
+
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00
+       </ul>
+
        </li>
        <br>
 
@@ -27919,7 +27915,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
          Es werden vier Werte (Felder) pro Zeile dargestellt. <br>
          Die Eingabe kann mehrzeilig erfolgen. Werte mit den Einheiten "Wh" bzw. "kWh" werden entsprechend der Einstellung
-         des Attributs <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a> umgerechnet.
+         des Attributs <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a> umgerechnet.
          <br><br>
 
          Jeder Wert ist jeweils durch ein Label und das dazugehörige Reading verbunden durch ":" zu definieren. <br>
@@ -27969,7 +27965,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Die Angabe der Notationen erfolgt grundsätzlich innerhalb von zwei geschweiften Klammern {...}.
          <br><br>
          <b>Hinweis:</b> Werte mit den Einheiten 'Wh' oder 'kWh' werden entsprechend der Einstellung
-         des Attributs <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a> automatisch umgerechnet und dargestellt.
+         des Attributs <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a> automatisch umgerechnet und dargestellt.
          <br><br>
 
          <b>Notation 1: </b> <br>
@@ -28022,45 +28018,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>graphicHistoryHour </b><br>
          Anzahl der vorangegangenen Stunden die in der Balkengrafik dargestellt werden. <br>
          (default: 2)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicHourCount"></a>
-       <li><b>graphicHourCount &lt;4...24&gt; </b><br>
-         Anzahl der Balken/Stunden in der Balkengrafk. <br>
-         (default: 24)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicHourStyle"></a>
-       <li><b>graphicHourStyle </b><br>
-         Format der Zeitangabe in der Balkengrafik. <br><br>
-
-       <ul>
-         <table>
-           <colgroup> <col width="30%"> <col width="70%"> </colgroup>
-           <tr><td> <b>nicht gesetzt</b>  </td><td>nur Stundenangabe ohne Minuten (default)                </td></tr>
-           <tr><td> <b>:00</b>            </td><td>Stunden sowie Minuten zweistellig, z.B. 10:00           </td></tr>
-           <tr><td> <b>:0</b>             </td><td>Stunden sowie Minuten einstellig, z.B. 8:0              </td></tr>
-         </table>
-       </ul>
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicLayoutType"></a>
-       <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
-       Layout der Balkengrafik. Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeamXContent</b> bestimmt.
-       <br><br>
-
-       <ul>
-       <table>
-       <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-          <tr><td> <b>double</b>  </td><td>zeigt den primären Balken und den sekundären Balken an (default)                                                               </td></tr>
-          <tr><td> <b>single</b>  </td><td>zeigt nur den primären Balken an                                                                                               </td></tr>
-          <tr><td> <b>diff</b>    </td><td>Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;                  </td></tr>
-		  <tr><td>                </td><td>Die aktuelle Einstellung von <a href="#SolarForecast-attr-graphicEnergyUnit">graphicEnergyUnit</a> wird nicht berücksichtigt.  </td></tr>
-       </table>
-       </ul>
        </li>
        <br>
 
@@ -28124,15 +28081,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>graphicShowWeather </b><br>
          Wettericons in der Balkengrafik anzeigen/verbergen. <br>
          (default: 1)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicSpaceSize"></a>
-       <li><b>graphicSpaceSize &lt;value&gt; </b><br>
-         Legt fest wieviel Platz in px über oder unter den Balken (bei Anzeigetyp Differential (diff)) zur Anzeige der
-         Werte freigehalten wird. Bei Styles mit großen Fonts kann der default-Wert zu klein sein bzw. rutscht ein
-         Balken u.U. über die Grundlinie. In diesen Fällen bitte den Wert erhöhen. <br>
-         (default: 24)
        </li>
        <br>
 
