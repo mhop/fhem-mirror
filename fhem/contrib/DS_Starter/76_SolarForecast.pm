@@ -25383,6 +25383,61 @@ to ensure that the system configuration is correct.
          (default: 200)
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-graphicControl"></a>
+       <li><b>graphicControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
+         By specifying the 'Key=Value' pairs listed below, various overarching properties of the graphic or bar graph display 
+         can be set. <br>
+         The entry can be made in several lines.
+         <br><br>
+
+         <ul>
+         <table>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+			<tr><td> <b>beamWidth</b>           </td><td>Determines the width of the bars of the bar chart in px.                                                                                  </td></tr>
+            <tr><td>                            </td><td>If no attribute is set, the bar width is automatically adjusted dynamically by the module.                                                </td></tr>
+		    <tr><td>                            </td><td>Value: <b>Integer 20..100</b>, default: 20                                                                                                </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
+			<tr><td> <b>energyUnit</b>          </td><td>Defines the unit for displaying the electrical power in the graph.                                                                        </td></tr>
+            <tr><td>                            </td><td>The kilowatt hour is rounded to one decimal place.                                                                                        </td></tr>
+            <tr><td>                            </td><td>Value: <b>Wh | kWh</b>, default: Wh                                                                                                       </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
+			<tr><td> <b>hourCount</b>           </td><td>Number of bars/hours in the bar chart.                                                                                                    </td></tr>
+            <tr><td>                            </td><td>Value: <b>Integer 4..24</b>, default: 24                                                                                                  </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
+            <tr><td> <b>headerDetail</b>        </td><td>Selection of the zones to be displayed in the graphic header area. The selected options are separated by commas.                          </td></tr>
+            <tr><td>                            </td><td><b>all</b>    - all zones of the header area (default)                                                                                    </td></tr>
+            <tr><td>                            </td><td><b>co</b>     - Consumption range                                                                                                         </td></tr>
+            <tr><td>                            </td><td><b>pv</b>     - Production area                                                                                                           </td></tr>
+            <tr><td>                            </td><td><b>own</b>    - User zone (see <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>)                               </td></tr>
+            <tr><td>                            </td><td><b>status</b> - Status information area                                                                                                   </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
+            <tr><td> <b>hourStyle</b>           </td><td>Format of the time in the bar chart.                                                                                                      </td></tr>
+            <tr><td>                            </td><td><b>not set</b> - only hours without minutes (default)                                                                                     </td></tr>
+            <tr><td>                            </td><td><b>:00</b>     - Hours and minutes in two digits, e.g. 10:00                                                                              </td></tr>
+            <tr><td>                            </td><td><b>:0</b>      - Hours and minutes in single digits, e.g. 8:0                                                                             </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
+            <tr><td> <b>layoutType</b>          </td><td>Layout der Balkengrafik. Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeamXContent</b> bestimmt.               </td></tr>
+            <tr><td>                            </td><td><b>double</b> - shows the primary bar and the secondary bar (default)                                                                     </td></tr>
+            <tr><td>                            </td><td><b>single</b> - only shows the primary bar                                                                                                </td></tr>
+            <tr><td>                            </td><td><b>diff</b>   - Difference display. The following applies: &lt;Difference&gt; = &lt;Value primary bar&gt; - &lt;Value secondary bar&gt;   </td></tr>
+            <tr><td>                            </td><td>The setting of <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a> is not taken into account.                     </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
+            <tr><td> <b>spaceSize</b>           </td><td>Defines how much space in px is kept free above or below the bar (for display type layoutType=diff) to display the                        </td></tr>
+            <tr><td>                            </td><td>values. For styles with large fonts, the default value may be too small or a bar may slide over the baseline.                             </td></tr>
+            <tr><td>                            </td><td>In these cases, please increase the value.                                                                                                </td></tr>
+            <tr><td>                            </td><td>Value: <b>Integer</b>, default: 24                                                                                                        </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
+          </table>
+         </ul>
+
+       <ul>
+         <b>Example: </b> <br>
+         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00
+       </ul>
+
+       </li>
+       <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspec"></a>
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b> <br><br>
