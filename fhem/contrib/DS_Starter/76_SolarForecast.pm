@@ -1049,8 +1049,12 @@ my %htitles = (                                                                 
                 DE => qq{real erreichte Batterieladung bzw. SoC Prognose Batterie}                                 },
   socfcbat => { EN => qq{SoC forecast Battery},
                 DE => qq{SoC Prognose Batterie}                                                                    },
+  socfcsum => { EN => qq{SoC forecast (%) as a sum across all batteries},
+                DE => qq{SoC Prognose (%) als Summe &#252;ber alle Batterien}                                      },
   socrebat => { EN => qq{real achieved charge Battery},
                 DE => qq{real erreichte Ladung Batterie}                                                           },
+  socresum => { EN => qq{real SoC achieved (%) as a sum across all batteries},
+                DE => qq{real errreichter SoC (%) als Summe &#252;ber alle Batterien}                              },
   socbacur => { EN => qq{SoC current},
                 DE => qq{SoC aktuell}                                                                              },
   socbatfc => { EN => qq{SoC forecast},
@@ -8539,6 +8543,9 @@ sub _addDynAttr {
 		  push @absoc, "batsocReal_${bn}";
       }
 	  
+	  push @absoc, 'batsocForecastSum';
+	  push @absoc, 'batsocRealSum';
+	  
 	  $gbc .= join ",", sort @absoc;
 	  $gbc .= ',';
 
@@ -10930,7 +10937,7 @@ sub _transferBatteryValues {
   }
 
   if ($num) {
-      writeToHistory ( { paref => $paref, key => 'socwhsum', val => $socwhsum, hour => $nhour } );	  
+      writeToHistory ( { paref => $paref, key => 'socwhsum', val => (sprintf "%.0f", $socwhsum), hour => $nhour } );	  
 	  
       if ($bcapsum) {
           my $soctotal = sprintf "%.0f", ($socwhsum / $bcapsum * 100);                     # resultierender SoC (%) aller Batterien als "eine"
@@ -15981,7 +15988,9 @@ sub _beamGraphicFirstHour {
   my $stt                              = NexthoursVal ($hash, 'NextHour00', 'starttime', '0000-00-00 24');
   my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
 
-  my ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8);
+  my ($val1, $val2, $val3, $val4, $val5, $val6, $val7, $val8);
+  my $val9  = 0;
+  my $val10 = 0;
   my $hbsocs;
 
   $thishour++;
@@ -16038,28 +16047,43 @@ sub _beamGraphicFirstHour {
       $hbsocs->{0}{$bn}{beam1cont} = 100 if($hbsocs->{0}{$bn}{beam1cont} >= 100);
 	  $hbsocs->{0}{$bn}{beam2cont} = 100 if($hbsocs->{0}{$bn}{beam2cont} >= 100);
   }
+  
+  ## Batterien summarische Werte erstellen
+  ##########################################
+  my $bcapsum = CurrentVal ($name, 'batcapsum', 0);                                                        # Summe installierte Batterie Kapazität in Wh  
+  
+  if ($bcapsum) {
+	  my $socprogwhsum = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socprogwhsum', 0);
+	  my $socwhsum     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socwhsum', 0);
+	  $val9            = sprintf "%.1f", (100 * $socprogwhsum / $bcapsum);                                 # Summe Prognose SoC in % über alle Batterien
+      $val10           = sprintf "%.1f", (100 * $socwhsum / $bcapsum);                                     # Summe real erreichter SoC in % über alle Batterien
+  }
 
   ## Zuordnung Werte zu den Balken entsprechend Selektion
   #########################################################
-  $hfcg->{0}{beam1}    = $beam1cont eq 'pvForecast'          ? $val1 :
-                         $beam1cont eq 'pvReal'              ? $val2 :
-                         $beam1cont eq 'gridconsumption'     ? $val3 :
-                         $beam1cont eq 'consumptionForecast' ? $val4 :
-                         $beam1cont eq 'consumption'         ? $val5 :
-                         $beam1cont eq 'energycosts'         ? $val6 :
-                         $beam1cont eq 'gridfeedin'          ? $val7 :
-                         $beam1cont eq 'feedincome'          ? $val8 :
+  $hfcg->{0}{beam1}    = $beam1cont eq 'pvForecast'          ? $val1  :
+                         $beam1cont eq 'pvReal'              ? $val2  :
+                         $beam1cont eq 'gridconsumption'     ? $val3  :
+                         $beam1cont eq 'consumptionForecast' ? $val4  :
+                         $beam1cont eq 'consumption'         ? $val5  :
+                         $beam1cont eq 'energycosts'         ? $val6  :
+                         $beam1cont eq 'gridfeedin'          ? $val7  :
+                         $beam1cont eq 'feedincome'          ? $val8  :
+						 $beam1cont eq 'batsocForecastSum'   ? $val9  :
+						 $beam1cont eq 'batsocRealSum'       ? $val10 :
                          $beam1cont =~ /^batsoc/xs           ? $hbsocs->{0}{(split '_', $beam1cont)[1]}{beam1cont} :
                          undef;
 
-  $hfcg->{0}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
-                         $beam2cont eq 'pvReal'              ? $val2 :
-                         $beam2cont eq 'gridconsumption'     ? $val3 :
-                         $beam2cont eq 'consumptionForecast' ? $val4 :
-                         $beam2cont eq 'consumption'         ? $val5 :
-                         $beam2cont eq 'energycosts'         ? $val6 :
-                         $beam2cont eq 'gridfeedin'          ? $val7 :
-                         $beam2cont eq 'feedincome'          ? $val8 :
+  $hfcg->{0}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1  :
+                         $beam2cont eq 'pvReal'              ? $val2  :
+                         $beam2cont eq 'gridconsumption'     ? $val3  :
+                         $beam2cont eq 'consumptionForecast' ? $val4  :
+                         $beam2cont eq 'consumption'         ? $val5  :
+                         $beam2cont eq 'energycosts'         ? $val6  :
+                         $beam2cont eq 'gridfeedin'          ? $val7  :
+                         $beam2cont eq 'feedincome'          ? $val8  :
+						 $beam2cont eq 'batsocForecastSum'   ? $val9  :
+						 $beam2cont eq 'batsocRealSum'       ? $val10 :
                          $beam2cont =~ /^batsoc/xs           ? $hbsocs->{0}{(split '_', $beam2cont)[1]}{beam2cont} :
                          undef;
 
@@ -16079,6 +16103,8 @@ sub _beamGraphicFirstHour {
                          $beam1cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
                          $beam1cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
                          $beam1cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
+						 $beam1cont eq 'batsocForecastSum'   ? $htitles{socfcsum}{$lang}           :
+						 $beam1cont eq 'batsocRealSum'       ? $htitles{socresum}{$lang}           :
                          $beam1cont =~ /batsocCombi_/xs      ? $htitles{socrfcba}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
                          $beam1cont =~ /batsocForecast_/xs   ? $htitles{socfcbat}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
                          $beam1cont =~ /batsocReal_/xs       ? $htitles{socrebat}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
@@ -16091,6 +16117,8 @@ sub _beamGraphicFirstHour {
                          $beam2cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
                          $beam2cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
                          $beam2cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
+						 $beam2cont eq 'batsocForecastSum'   ? $htitles{socfcsum}{$lang}           :
+						 $beam2cont eq 'batsocRealSum'       ? $htitles{socresum}{$lang}           :
                          $beam2cont =~ /batsocCombi_/xs      ? $htitles{socrfcba}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
                          $beam2cont =~ /batsocForecast_/xs   ? $htitles{socfcbat}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
                          $beam2cont =~ /batsocReal_/xs       ? $htitles{socrebat}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
@@ -16114,17 +16142,18 @@ sub _beamGraphicRemainingHours {
   my $beam1cont = $paref->{beam1cont};
   my $beam2cont = $paref->{beam2cont};
 
-  my ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8);
+  my ($val1, $val2, $val3, $val4, $val5, $val6, $val7, $val8, $val9, $val10);
   my $hbsocs;
 
-  my $hash   = $defs{$name};
-  my $maxVal = $hfcg->{0}{beam1};                                                                       # Startwert
-  my $maxCon = $hfcg->{0}{beam1};
-  my $maxDif = $hfcg->{0}{diff};                                                                        # für Typ diff
-  my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
+  my $hash    = $defs{$name};
+  my $maxVal  = $hfcg->{0}{beam1};                                                                      # Startwert
+  my $maxCon  = $hfcg->{0}{beam1};
+  my $maxDif  = $hfcg->{0}{diff};                                                                       # für Typ diff
+  my $minDif  = $hfcg->{0}{diff};                                                                       # für Typ diff
+  my $bcapsum = CurrentVal ($name, 'batcapsum', 0);                                                     # Summe installierte Batterie Kapazität in Wh  
 
   for my $i (1..($maxhours*2)-1) {                                                                      # doppelte Anzahl berechnen    my $val1 = 0;
-      ($val1,$val2,$val3,$val4,$val5,$val6,$val7,$val8) = (0,0,0,0,0,0,0,0);
+      ($val1, $val2, $val3 ,$val4 ,$val5, $val6, $val7 ,$val8, $val9, $val10) = (0,0,0,0,0,0,0,0,0,0);
 
       $hfcg->{$i}{time} = $hfcg->{0}{time} + $i;
 
@@ -16144,39 +16173,48 @@ sub _beamGraphicRemainingHours {
                   $ds = strftime "%d", localtime ($hfcg->{0}{mktime} - (3600 * (abs($offset-$i+1))));
               }
 
-              $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
-              $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
-              $hfcg->{$i}{sunalt}  = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'sunalt',    '-');
-              $hfcg->{$i}{sunaz}   = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'sunaz',     '-');
+              $hfcg->{$i}{weather} = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
+              $hfcg->{$i}{wcc}     = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
+              $hfcg->{$i}{sunalt}  = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'sunalt',    '-');
+              $hfcg->{$i}{sunaz}   = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'sunaz',     '-');
               $hfcg->{$i}{don}     = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'DoN',         0);
 
-              $val1 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvfc',  0);
-              $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
-              $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
-              $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
-              $val5 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'con',   0);
-              $val6 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
-              $val7 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'gfeedin', 0);
-              $val8 = sprintf "%.2f", (HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
+              $val1 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'pvfc',  0);
+              $val2 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
+              $val3 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
+              $val4 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
+              $val5 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'con',   0);
+              $val6 = sprintf "%.2f", (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
+              $val7 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gfeedin', 0);
+              $val8 = sprintf "%.2f", (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
 
               ## Batterien Selektionshash erstellen
               #######################################
               for my $bn (1..MAXBATTERIES) {
                   $bn = sprintf "%02d", $bn;
                   
-                  $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                                  $beam1cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
-                                                  $beam1cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+                  $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                                  $beam1cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
+                                                  $beam1cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
                                                   0;
                                                   
-                  $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                                  $beam2cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
-                                                  $beam2cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+                  $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                                  $beam2cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
+                                                  $beam2cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
                                                   0;
                   
                   $hbsocs->{$i}{$bn}{beam1cont} = 100 if($hbsocs->{$i}{$bn}{beam1cont} >= 100);
                   $hbsocs->{$i}{$bn}{beam2cont} = 100 if($hbsocs->{$i}{$bn}{beam2cont} >= 100);
               }
+			  
+			  ## Batterien summarische Werte erstellen
+			  ##########################################			  
+			  if ($bcapsum) {
+				  my $socprogwhsum = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'socprogwhsum', 0);
+				  my $socwhsum     = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'socwhsum', 0);
+				  $val9            = sprintf "%.1f", (100 * $socprogwhsum / $bcapsum);                        # Summe Prognose SoC in % über alle Batterien
+				  $val10           = sprintf "%.1f", (100 * $socwhsum / $bcapsum);                            # Summe real erreichter SoC in % über alle Batterien
+			  }
 
               $hfcg->{$i}{day_str} = $ds;
               $hfcg->{$i}{day}     = int($ds);
@@ -16190,30 +16228,37 @@ sub _beamGraphicRemainingHours {
       }
 
       if (defined $nh) {
-          $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, 'weatherid', 999);
-          $hfcg->{$i}{wcc}     = NexthoursVal ($hash, 'NextHour'.$nh, 'wcc',       '-');
-          $hfcg->{$i}{sunalt}  = NexthoursVal ($hash, 'NextHour'.$nh, 'sunalt',    '-');
-          $hfcg->{$i}{sunaz}   = NexthoursVal ($hash, 'NextHour'.$nh, 'sunaz',     '-');
-          $hfcg->{$i}{don}     = NexthoursVal ($hash, 'NextHour'.$nh, 'DoN',         0);
-          my $stt              = NexthoursVal ($hash, 'NextHour'.$nh, 'starttime',  '');
+          $hfcg->{$i}{weather} = NexthoursVal ($name, 'NextHour'.$nh, 'weatherid', 999);
+          $hfcg->{$i}{wcc}     = NexthoursVal ($name, 'NextHour'.$nh, 'wcc',       '-');
+          $hfcg->{$i}{sunalt}  = NexthoursVal ($name, 'NextHour'.$nh, 'sunalt',    '-');
+          $hfcg->{$i}{sunaz}   = NexthoursVal ($name, 'NextHour'.$nh, 'sunaz',     '-');
+          $hfcg->{$i}{don}     = NexthoursVal ($name, 'NextHour'.$nh, 'DoN',         0);
+          my $stt              = NexthoursVal ($name, 'NextHour'.$nh, 'starttime',  '');
 
-          $val1 = NexthoursVal ($hash, 'NextHour'.$nh, 'pvfc',  0);
-          $val4 = NexthoursVal ($hash, 'NextHour'.$nh, 'confc', 0);
+          $val1 = NexthoursVal ($name, 'NextHour'.$nh, 'pvfc',  0);
+          $val4 = NexthoursVal ($name, 'NextHour'.$nh, 'confc', 0);
 
           ## Batterien Selektionshash anreichern
           ########################################
           for my $bn (1..MAXBATTERIES) {
               $bn = sprintf "%02d", $bn;
               
-              $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsoc(Combi|Forecast)_${bn}/xs ? NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0) :     # Kombi-Content oder nur SoC-Prognose
+              $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsoc(Combi|Forecast)_${bn}/xs ? NexthoursVal ($name, 'NextHour'.$nh, 'soc'.$bn, 0) :     # Kombi-Content oder nur SoC-Prognose
                                               0;
                                               
-              $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsoc(Combi|Forecast)_${bn}/xs ? NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0) :     # Kombi-Content oder nur SoC-Prognose
+              $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsoc(Combi|Forecast)_${bn}/xs ? NexthoursVal ($name, 'NextHour'.$nh, 'soc'.$bn, 0) :     # Kombi-Content oder nur SoC-Prognose
                                               0;
               
               $hbsocs->{$i}{$bn}{beam1cont} = 100 if($hbsocs->{$i}{$bn}{beam1cont} >= 100);
               $hbsocs->{$i}{$bn}{beam2cont} = 100 if($hbsocs->{$i}{$bn}{beam2cont} >= 100);
           }
+
+			  ## Batterien summarische Werte erstellen
+			  ##########################################		  
+			  if ($bcapsum) {           
+				  my $socprogwhsum = NexthoursVal ($name, 'NextHour'.$nh, 'socprogwhsum', 0);
+				  $val9            = sprintf "%.1f", (100 * $socprogwhsum / $bcapsum);                                 # Summe Prognose SoC in % über alle Batterien
+			  }
 
           my $day_str = ($stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs)[2];
 
@@ -16225,25 +16270,29 @@ sub _beamGraphicRemainingHours {
 
       ## Zuordnung Werte zu den Balken entsprechend Selektion
       #########################################################
-      $hfcg->{$i}{beam1}    = $beam1cont eq 'pvForecast'          ? $val1 :
-                              $beam1cont eq 'pvReal'              ? $val2 :
-                              $beam1cont eq 'gridconsumption'     ? $val3 :
-                              $beam1cont eq 'consumptionForecast' ? $val4 :
-                              $beam1cont eq 'consumption'         ? $val5 :
-                              $beam1cont eq 'energycosts'         ? $val6 :
-                              $beam1cont eq 'gridfeedin'          ? $val7 :
-                              $beam1cont eq 'feedincome'          ? $val8 :
+      $hfcg->{$i}{beam1}    = $beam1cont eq 'pvForecast'          ? $val1  :
+                              $beam1cont eq 'pvReal'              ? $val2  :
+                              $beam1cont eq 'gridconsumption'     ? $val3  :
+                              $beam1cont eq 'consumptionForecast' ? $val4  :
+                              $beam1cont eq 'consumption'         ? $val5  :
+                              $beam1cont eq 'energycosts'         ? $val6  :
+                              $beam1cont eq 'gridfeedin'          ? $val7  :
+                              $beam1cont eq 'feedincome'          ? $val8  :
+		 				 	  $beam1cont eq 'batsocForecastSum'   ? $val9  :
+							  $beam1cont eq 'batsocRealSum'       ? $val10 :
                               $beam1cont =~ /^batsoc/xs           ? $hbsocs->{$i}{(split '_', $beam1cont)[1]}{beam1cont} :
                               undef;
 
-      $hfcg->{$i}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
-                              $beam2cont eq 'pvReal'              ? $val2 :
-                              $beam2cont eq 'gridconsumption'     ? $val3 :
-                              $beam2cont eq 'consumptionForecast' ? $val4 :
-                              $beam2cont eq 'consumption'         ? $val5 :
-                              $beam2cont eq 'energycosts'         ? $val6 :
-                              $beam2cont eq 'gridfeedin'          ? $val7 :
-                              $beam2cont eq 'feedincome'          ? $val8 :
+      $hfcg->{$i}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1  :
+                              $beam2cont eq 'pvReal'              ? $val2  :
+                              $beam2cont eq 'gridconsumption'     ? $val3  :
+                              $beam2cont eq 'consumptionForecast' ? $val4  :
+                              $beam2cont eq 'consumption'         ? $val5  :
+                              $beam2cont eq 'energycosts'         ? $val6  :
+                              $beam2cont eq 'gridfeedin'          ? $val7  :
+                              $beam2cont eq 'feedincome'          ? $val8  :
+		 				 	  $beam2cont eq 'batsocForecastSum'   ? $val9  :
+							  $beam2cont eq 'batsocRealSum'       ? $val10 :
                               $beam2cont =~ /^batsoc/xs           ? $hbsocs->{$i}{(split '_', $beam2cont)[1]}{beam2cont} :
                               undef;
 
@@ -25441,6 +25490,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batsocCombi_XX</b>      </td><td>the predicted (from the next hour) and actual SOC (%) of the battery XX up to the current time         </td></tr>
             <tr><td> <b>batsocForecast_XX</b>   </td><td>the predicted SOC (%) of the battery XX                                                                </td></tr>
 			<tr><td> <b>batsocReal_XX</b>       </td><td>the real SOC (%) achieved by the battery XX                                                            </td></tr>
+			<tr><td> <b>batsocForecastSum</b>   </td><td>the predicted SOC (%) as a sum across all batteries                                                    </td></tr>
+			<tr><td> <b>batsocRealSum</b>       </td><td>the real SOC achieved (%) as a sum across all batteries                                                </td></tr>
             <tr><td> <b>consumption</b>         </td><td>Energy consumption                                                                                     </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>forecasted energy consumption                                                                          </td></tr>
             <tr><td> <b>energycosts</b>         </td><td>Cost of energy purchased from the grid. The currency is defined in the setupMeterDev, key conprice.    </td></tr>
@@ -27969,6 +28020,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batsocCombi_XX</b>      </td><td>der prognostizierte (ab kommender Stunde) und bis zur aktuellen Zeit real erreichte SOC (%) der Batterie XX  </td></tr>
             <tr><td> <b>batsocForecast_XX</b>   </td><td>der prognostizierte SOC (%) der Batterie XX                                                                  </td></tr>
 			<tr><td> <b>batsocReal_XX</b>       </td><td>der real erreichte SOC (%) der Batterie XX                                                                   </td></tr>
+			<tr><td> <b>batsocForecastSum</b>   </td><td>der prognostizierte SOC (%) als Summe über alle Batterien                                                    </td></tr>
+			<tr><td> <b>batsocRealSum</b>       </td><td>der real erreichte SOC (%) als Summe über alle Batterien                                                     </td></tr>
 			<tr><td> <b>consumption</b>         </td><td>Energieverbrauch                                                                                             </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch                                                                            </td></tr>
             <tr><td> <b>energycosts</b>         </td><td>Kosten des Energiebezuges aus dem Netz. Die Währung ist im setupMeterDev, Schlüssel conprice, definiert.     </td></tr>
