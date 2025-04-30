@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.51.6" => "30.04.2025  graphicBeamXContent: change batsocforecast_XX to batsocCombi_XX, new options batsocForecast_XX, batsocReal_XX ".
+                           "new Paramaeter socprogwhsum, socwhsum in pvHisory & NextHours ",
   "1.51.5" => "28.04.2025  attr transformed: graphicBeamWidth, graphicHourCount, graphicEnergyUnit, graphicSpaceSize ".
                            "graphicHeaderDetail, graphicHourStyle, graphicLayoutType ".
                            "graphicControl->beamWidth, graphicControl->hourCount, graphicControl->energyUnit, graphicControl->spaceSize ".
@@ -180,7 +182,7 @@ my %vNotesIntern = (
                            "affectSolCastPercentile, ctrlSolCastAPIoptimizeReq, consumerAdviceIcon, consumerLink, consumerLegend ",
   "1.50.4" => "16.04.2025  Consumer Strokes: fix __dynColor, new key flowGraphicControl->strokeCmrRedColLimit ".
                            "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ".
-						   "normBeamWidth: decouple content batsocforecast_, energycosts, feedincome from the conversion Wh -> kWh ".
+						   "normBeamWidth: decouple content batsocCombi_, energycosts, feedincome from the conversion Wh -> kWh ".
                            "___getFWwidget: textField-long -> textFieldNL-long ",
   "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
                            "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
@@ -279,7 +281,7 @@ my %vNotesIntern = (
                            "setupBatteryDevXX : new icon & show key, colour of icon can be changed separately, maxbatteries set to 3 ".
                            "medianArray: switch to simpel array sort, Task 1: delete Weather-API status data at night ".
                            "add SoC forecast to NextHours store, Battery bar chart: display of the device in the bar chart level 1 or 2 ".
-                           "add batsocXX to pvHistory, add batsocforecast_XX to Attr graphicBeamXContent ".
+                           "add batsocXX to pvHistory, add batsocCombi_XX to Attr graphicBeamXContent ".
                            " _addDynAttr: add graphicBeamXContent at runtime, attr ctrlBackupFilesKeep can set to 0 ",
   "1.41.4" => "02.01.2025  minor change of Logtext, new special Readings BatPowerIn_Sum, BatPowerOut_Sum ".
                            "rename ctrlStatisticReadings to ctrlSpecialReadings ",
@@ -1043,8 +1045,12 @@ my %htitles = (                                                                 
                 DE => qq{prognostizierte PV-Erzeugung}                                                             },
   onlybatw => { EN => qq{Battery},
                 DE => qq{Batterie}                                                                                 },
-  socofbat => { EN => qq{State of Charge battery},
-                DE => qq{Ladung Batterie}                                                                          },
+  socrfcba => { EN => qq{real battery charge achieved or SoC forecast Battery},
+                DE => qq{real erreichte Batterieladung bzw. SoC Prognose Batterie}                                 },
+  socfcbat => { EN => qq{SoC forecast Battery},
+                DE => qq{SoC Prognose Batterie}                                                                    },
+  socrebat => { EN => qq{real achieved charge Battery},
+                DE => qq{real erreichte Ladung Batterie}                                                           },
   socbacur => { EN => qq{SoC current},
                 DE => qq{SoC aktuell}                                                                              },
   socbatfc => { EN => qq{SoC forecast},
@@ -1422,6 +1428,8 @@ my %hfspvh = (
   temperature       => { fn => \&_storeVal, storname => 'temp',         validkey => undef,    fpar => undef    },    # Außentemperatur
   conprice          => { fn => \&_storeVal, storname => 'conprice',     validkey => undef,    fpar => undef    },    # Bezugspreis pro kWh der Stunde
   feedprice         => { fn => \&_storeVal, storname => 'feedprice',    validkey => undef,    fpar => undef    },    # Einspeisevergütung pro kWh der Stunde
+  socwhsum          => { fn => \&_storeVal, storname => 'socwhsum',     validkey => undef,    fpar => undef    },    # real eerichter SoC (Wh) als Summe über alle Batterien
+  socprogwhsum      => { fn => \&_storeVal, storname => 'socprogwhsum', validkey => undef,    fpar => undef    },    # prognostizierter SoC (Wh) als Summe über alle Batterien
   pvfc              => { fn => \&_storeVal, storname => 'pvfc',         validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
   confc             => { fn => \&_storeVal, storname => 'confc',        validkey => undef,    fpar => 'comp99' },    # prognostizierter Hausverbrauch
   gcons             => { fn => \&_storeVal, storname => 'gcons',        validkey => undef,    fpar => 'comp99' },    # bezogene Energie
@@ -1536,7 +1544,7 @@ sub Initialize {
   my $hod = join ",", map { sprintf "%02d", $_} (1..24);
   my $srd = join ",", sort keys (%hcsr);
 
-  my ($consumer, $setupbat, $ctrlbatsm, $setupprod, $setupinv, $beamcont, $beamcol, $beamfontcol, @allc);
+  my ($consumer, $setupbat, $ctrlbatsm, $setupprod, $setupinv, $beam, @allc, @gb);
 
   for my $c (1..MAXCONSUMER) {
       $c         = sprintf "%02d", $c;
@@ -1544,11 +1552,14 @@ sub Initialize {
       push @allc, $c;
   }
 
-  for my $n (1..6) {
-      $beamcont    .= "graphicBeam${n}Content ";
-      $beamcol     .= "graphicBeam${n}Color:colorpicker,RGB ";
-      $beamfontcol .= "graphicBeam${n}FontColor:colorpicker,RGB ";
+  for my $n (1..6) {	  
+	  push @gb, "graphicBeam${n}Content";
+	  push @gb, "graphicBeam${n}Color:colorpicker,RGB";
+	  push @gb, "graphicBeam${n}FontColor:colorpicker,RGB";
   }
+  
+  $beam .= join ' ', sort @gb;
+  $beam .= ' ';
 
   for my $bn (1..MAXBATTERIES) {
       $bn         = sprintf "%02d", $bn;
@@ -1619,9 +1630,7 @@ sub Initialize {
                                 "setupStringAzimuth ".
                                 "setupStringDeclination ".
                                 "setupStringPeak ".
-                                $beamcont.
-                                $beamcol.
-                                $beamfontcol.
+                                $beam.
                                 $setupbat.
                                 $setupinv.
                                 $setupprod.
@@ -8520,13 +8529,18 @@ sub _addDynAttr {
 
   ## Attr graphicBeamXContent, ctrlNextDayForecastReadings zur Laufzeit hinzufügen
   ##################################################################################
-  my $gbc;
+  my ($gbc, @absoc);
 
   if (isBatteryUsed ($name)) {
       for my $bn (1..MAXBATTERIES) {
-          $bn   = sprintf "%02d", $bn;
-          $gbc .= 'batsocforecast_'.$bn.',';
+          $bn = sprintf "%02d", $bn;
+		  push @absoc, "batsocCombi_${bn}";
+	      push @absoc, "batsocForecast_${bn}";
+		  push @absoc, "batsocReal_${bn}";
       }
+	  
+	  $gbc .= join ",", sort @absoc;
+	  $gbc .= ',';
 
       my $hod = join ",", (map { sprintf "%02d", $_} (0..23));
       push @deva, "ctrlNextHoursSoCForecastReadings:multiple-strict,$hod";
@@ -8656,6 +8670,15 @@ sub centralTask {
   if ($ssa) {
       CommandAttr (undef, "$name setupStringAzimuth $ssa");
       readingsDelete ($hash, "setupStringAzimuth");      
+  }
+  
+  for my $n (1..6) {	                                                 # 30.04.2025
+	  my $gbc = AttrVal ($name, "graphicBeam${n}Content", 'blabla');
+	  if ($gbc =~ /batsocforecast_/xs) {
+		  $gbc =~ s/batsocforecast_/batsocCombi_/xs;
+		  CommandAttr (undef, "$name graphicBeam${n}Content $gbc");
+	  }
+
   }
   
   if (CurrentVal ($hash, 'consumerCollected', 0)) {
@@ -10690,6 +10713,7 @@ sub _transferBatteryValues {
   my $pbisum  = 0;
   my $pbosum  = 0;
   my $bcapsum = 0;
+  my $nhour   = $chour + 1;
   my $socsum;
   my $socwhsum;
 
@@ -10804,8 +10828,6 @@ sub _transferBatteryValues {
       $data{$name}{circular}{99}{'batintot'.$bn}  = $btotin;                                                    # aktuell total Batterieladung (Wh)
       $data{$name}{circular}{99}{'batouttot'.$bn} = $btotout;                                                   # aktuell total Batterieentladung (Wh)
 
-      my $nhour = $chour + 1;
-
       # Batterieladung aktuelle Stunde in pvHistory speichern
       #########################################################
       my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'batintotal'.$bn, undef);             # totale Batterieladung zu Beginn einer Stunde
@@ -10879,8 +10901,6 @@ sub _transferBatteryValues {
       # aktuellen SOC in pvHistory speichern
       ########################################
       writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, hour => $nhour } );
-      
-      ######
 
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatIn_'. $bn, $batinthishour. ' Wh'.$warnin);
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatOut_'.$bn, $batoutthishour.' Wh'.$warnout);
@@ -10910,6 +10930,8 @@ sub _transferBatteryValues {
   }
 
   if ($num) {
+      writeToHistory ( { paref => $paref, key => 'socwhsum', val => $socwhsum, hour => $nhour } );	  
+	  
       if ($bcapsum) {
           my $soctotal = sprintf "%.0f", ($socwhsum / $bcapsum * 100);                     # resultierender SoC (%) aller Batterien als "eine"
           $data{$name}{current}{batsoctotal} = $soctotal;                                  
@@ -10920,7 +10942,7 @@ sub _transferBatteryValues {
 
       $data{$name}{current}{batpowerinsum}  = $pbisum;                                     # summarische laufende Batterieladung
       $data{$name}{current}{batpoweroutsum} = $pbosum;                                     # summarische laufende Batterieentladung
-      $data{$name}{current}{batcapsum}      = $bcapsum;                                    # Summe installierte Batterie Kapazität
+      $data{$name}{current}{batcapsum}      = $bcapsum;                                    # Summe installierte Batterie Kapazität in Wh
   }
 
 return;
@@ -11184,14 +11206,14 @@ sub _batChargeRecmd {
   ##############################
   for my $in (1..MAXINVERTER) {
       $in       = sprintf "%02d", $in;
-      my $iname = InverterVal ($hash, $in, 'iname', '');
+      my $iname = InverterVal ($name, $in, 'iname', '');
       next if(!$iname);
 
-      my $feed = InverterVal ($hash, $in, 'ifeed', 'default');
+      my $feed = InverterVal ($name, $in, 'ifeed', 'default');
       next if($feed eq 'grid');                                                                  # Inverter 'Grid' ausschließen
 
-      my $icap  = InverterVal ($hash, $in, 'invertercap',   0);
-      my $limit = InverterVal ($hash, $in, 'ilimit',      100);                                  # Wirkleistungsbegrenzung  (default keine Begrenzung)
+      my $icap  = InverterVal ($name, $in, 'invertercap',   0);
+      my $limit = InverterVal ($name, $in, 'ilimit',      100);                                  # Wirkleistungsbegrenzung  (default keine Begrenzung)
       my $aplim = $icap * $limit / 100;
       $inplim  += $aplim;                                                                        # max. Leistung aller WR mit Berücksichtigung Wirkleistungsbegrenzung
 
@@ -11202,13 +11224,15 @@ sub _batChargeRecmd {
 
   ## Schleife über alle Batterien
   #################################
+  my %hsoc;                                                                                      # Hilfshash
+  
   for my $bn (1..MAXBATTERIES) {                                                                 # für jede Batterie
       $bn = sprintf "%02d", $bn;
 
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
-      my $batinstcap = BatteryVal  ($hash, $bn, 'binstcap', 0);                                  # installierte Batteriekapazität Wh
+      my $batinstcap = BatteryVal ($name, $bn, 'binstcap', 0);                                   # installierte Batteriekapazität Wh
 
       if (!$inplim || !$batinstcap) {
           debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation are not met. Exit.");
@@ -11221,9 +11245,9 @@ sub _batChargeRecmd {
 	  my $tomconfc  = ReadingsNum ($name, 'Tomorrow_ConsumptionForecast',  0);                   # Verbrauchsprognose nächster Tag
       my $batoptsoc = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                   # aktueller optimierter SoC
       my $confcss   = CurrentVal  ($name, 'tdConFcTillSunset',             0);                   # Verbrauchsprognose bis Sonnenuntergang     
-      my $csoc      = BatteryVal  ($hash, $bn, 'bcharge',                  0);                   # aktuelle Ladung in %
-      my $bpinmax   = BatteryVal  ($hash, $bn, 'bpinmax',           INFINITE);                   # max. mögliche Ladeleistung W
-      my $bpoutmax  = BatteryVal  ($hash, $bn, 'bpoutmax',          INFINITE);                   # max. mögliche Entladeleistung W
+      my $csoc      = BatteryVal  ($name, $bn, 'bcharge',                  0);                   # aktuelle Ladung in %
+      my $bpinmax   = BatteryVal  ($name, $bn, 'bpinmax',           INFINITE);                   # max. mögliche Ladeleistung W
+      my $bpoutmax  = BatteryVal  ($name, $bn, 'bpoutmax',          INFINITE);                   # max. mögliche Entladeleistung W
       my $cgbt      = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
       my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $lowSoc    = 0;
@@ -11248,11 +11272,11 @@ sub _batChargeRecmd {
           next if($fd > 1);
 
           my $nhr   = sprintf "%02d", $num;
-          my $today = NexthoursVal ($hash, 'NextHour'.$nhr, 'today',      0);
-          my $hod   = NexthoursVal ($hash, 'NextHour'.$nhr, 'hourofday', '');
-          my $confc = NexthoursVal ($hash, 'NextHour'.$nhr, 'confc',      0);
-          my $pvfc  = NexthoursVal ($hash, 'NextHour'.$nhr, 'pvfc',       0);
-          my $stt   = NexthoursVal ($hash, 'NextHour'.$nhr, 'starttime', '');
+          my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today',      0);
+          my $hod   = NexthoursVal ($name, 'NextHour'.$nhr, 'hourofday', '');
+          my $confc = NexthoursVal ($name, 'NextHour'.$nhr, 'confc',      0);
+          my $pvfc  = NexthoursVal ($name, 'NextHour'.$nhr, 'pvfc',       0);
+          my $stt   = NexthoursVal ($name, 'NextHour'.$nhr, 'starttime', '');
           $stt      = (split /[-:]/, $stt)[2] if($stt);
 
           my $crel  = 0;                                                                         # Ladefreigabe 0 per Default
@@ -11341,6 +11365,7 @@ sub _batChargeRecmd {
 
           $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
+		  $hsoc{$nhr}{socprogwhsum}                                   += $socwh;                 # Hilfshash Aufsummierung SoC-Prognose (Wh) über alle Batterien
           
           # prognostizierten SOC in pvHistory speichern
           ###############################################
@@ -11350,6 +11375,21 @@ sub _batChargeRecmd {
 
           debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $crel ($msg)");
       }
+  }
+  
+  # prognostizierten SOC über alle Batterien speichern
+  ######################################################
+  for my $nhr (keys %hsoc) {
+	  if (defined $hsoc{$nhr}{socprogwhsum}) {
+		  $data{$name}{nexthours}{'NextHour'.$nhr}{socprogwhsum} = $hsoc{$nhr}{socprogwhsum};
+		  
+		  my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today',      0);
+		  my $hod   = NexthoursVal ($name, 'NextHour'.$nhr, 'hourofday', '');
+		  
+		  if ($today && $hod) {                                                                                  # heutiger Tag
+			  writeToHistory ( { paref => $paref, key => 'socprogwhsum', val => $hsoc{$nhr}{socprogwhsum}, hour => $hod } );
+		  }
+	  }
   }
 
 return;
@@ -15983,9 +16023,20 @@ sub _beamGraphicFirstHour {
   ## Batterien Selektionshash erstellen
   #######################################
   for my $bn (1..MAXBATTERIES) {
-      $bn               = sprintf "%02d", $bn;
-      $hbsocs->{0}{$bn} = sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0);
-      $hbsocs->{0}{$bn} = 100 if($hbsocs->{0}{$bn} >= 100);
+      $bn = sprintf "%02d", $bn;
+      
+	  $hbsocs->{0}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+								     $beam1cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
+									 $beam1cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+									 0;
+									  
+	  $hbsocs->{0}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+									 $beam2cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
+									 $beam2cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+									 0;
+      
+      $hbsocs->{0}{$bn}{beam1cont} = 100 if($hbsocs->{0}{$bn}{beam1cont} >= 100);
+	  $hbsocs->{0}{$bn}{beam2cont} = 100 if($hbsocs->{0}{$bn}{beam2cont} >= 100);
   }
 
   ## Zuordnung Werte zu den Balken entsprechend Selektion
@@ -15998,7 +16049,7 @@ sub _beamGraphicFirstHour {
                          $beam1cont eq 'energycosts'         ? $val6 :
                          $beam1cont eq 'gridfeedin'          ? $val7 :
                          $beam1cont eq 'feedincome'          ? $val8 :
-                         $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{0}{(split '_', $beam1cont)[1]} :
+                         $beam1cont =~ /^batsoc/xs           ? $hbsocs->{0}{(split '_', $beam1cont)[1]}{beam1cont} :
                          undef;
 
   $hfcg->{0}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
@@ -16009,7 +16060,7 @@ sub _beamGraphicFirstHour {
                          $beam2cont eq 'energycosts'         ? $val6 :
                          $beam2cont eq 'gridfeedin'          ? $val7 :
                          $beam2cont eq 'feedincome'          ? $val8 :
-                         $beam2cont =~ /batsocforecast_/xs   ? $hbsocs->{0}{(split '_', $beam2cont)[1]} :
+                         $beam2cont =~ /^batsoc/xs           ? $hbsocs->{0}{(split '_', $beam2cont)[1]}{beam2cont} :
                          undef;
 
   $hfcg->{0}{beam1}  //= 0;
@@ -16028,7 +16079,9 @@ sub _beamGraphicFirstHour {
                          $beam1cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
                          $beam1cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
                          $beam1cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
-                         $beam1cont =~ /batsocforecast_/xs   ? $htitles{socofbat}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
+                         $beam1cont =~ /batsocCombi_/xs      ? $htitles{socrfcba}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
+                         $beam1cont =~ /batsocForecast_/xs   ? $htitles{socfcbat}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
+                         $beam1cont =~ /batsocReal_/xs       ? $htitles{socrebat}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
                          '';
   $hfcg->{0}{beam2txt} = $beam2cont eq 'pvForecast'          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
                          $beam2cont eq 'pvReal'              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
@@ -16038,7 +16091,9 @@ sub _beamGraphicFirstHour {
                          $beam2cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
                          $beam2cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
                          $beam2cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
-                         $beam2cont =~ /batsocforecast_/xs   ? $htitles{socofbat}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
+                         $beam2cont =~ /batsocCombi_/xs      ? $htitles{socrfcba}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
+                         $beam2cont =~ /batsocForecast_/xs   ? $htitles{socfcbat}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
+                         $beam2cont =~ /batsocReal_/xs       ? $htitles{socrebat}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
                          '';
 
   $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
@@ -16107,9 +16162,20 @@ sub _beamGraphicRemainingHours {
               ## Batterien Selektionshash erstellen
               #######################################
               for my $bn (1..MAXBATTERIES) {
-                  $bn                = sprintf "%02d", $bn;
-                  $hbsocs->{$i}{$bn} = sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0);
-                  $hbsocs->{$i}{$bn} = 100 if($hbsocs->{$i}{$bn} >= 100);
+                  $bn = sprintf "%02d", $bn;
+                  
+                  $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                                  $beam1cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
+                                                  $beam1cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+                                                  0;
+                                                  
+                  $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                                  $beam2cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
+                                                  $beam2cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+                                                  0;
+                  
+                  $hbsocs->{$i}{$bn}{beam1cont} = 100 if($hbsocs->{$i}{$bn}{beam1cont} >= 100);
+                  $hbsocs->{$i}{$bn}{beam2cont} = 100 if($hbsocs->{$i}{$bn}{beam2cont} >= 100);
               }
 
               $hfcg->{$i}{day_str} = $ds;
@@ -16137,9 +16203,16 @@ sub _beamGraphicRemainingHours {
           ## Batterien Selektionshash anreichern
           ########################################
           for my $bn (1..MAXBATTERIES) {
-              $bn                = sprintf "%02d", $bn;
-              $hbsocs->{$i}{$bn} = sprintf "%.1f", NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0);
-              $hbsocs->{$i}{$bn} = 100 if($hbsocs->{$i}{$bn} >= 100);
+              $bn = sprintf "%02d", $bn;
+              
+              $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsoc(Combi|Forecast)_${bn}/xs ? NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0) :     # Kombi-Content oder nur SoC-Prognose
+                                              0;
+                                              
+              $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsoc(Combi|Forecast)_${bn}/xs ? NexthoursVal ($hash, 'NextHour'.$nh, 'soc'.$bn, 0) :     # Kombi-Content oder nur SoC-Prognose
+                                              0;
+              
+              $hbsocs->{$i}{$bn}{beam1cont} = 100 if($hbsocs->{$i}{$bn}{beam1cont} >= 100);
+              $hbsocs->{$i}{$bn}{beam2cont} = 100 if($hbsocs->{$i}{$bn}{beam2cont} >= 100);
           }
 
           my $day_str = ($stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs)[2];
@@ -16160,7 +16233,7 @@ sub _beamGraphicRemainingHours {
                               $beam1cont eq 'energycosts'         ? $val6 :
                               $beam1cont eq 'gridfeedin'          ? $val7 :
                               $beam1cont eq 'feedincome'          ? $val8 :
-                              $beam1cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam1cont)[1]} :
+                              $beam1cont =~ /^batsoc/xs           ? $hbsocs->{$i}{(split '_', $beam1cont)[1]}{beam1cont} :
                               undef;
 
       $hfcg->{$i}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1 :
@@ -16171,7 +16244,7 @@ sub _beamGraphicRemainingHours {
                               $beam2cont eq 'energycosts'         ? $val6 :
                               $beam2cont eq 'gridfeedin'          ? $val7 :
                               $beam2cont eq 'feedincome'          ? $val8 :
-                              $beam2cont =~ /batsocforecast_/xs   ? $hbsocs->{$i}{(split '_', $beam2cont)[1]} :
+                              $beam2cont =~ /^batsoc/xs           ? $hbsocs->{$i}{(split '_', $beam2cont)[1]}{beam2cont} :
                               undef;
 
       $hfcg->{$i}{time_str} = sprintf ('%02d', $hfcg->{$i}{time}-1).$hourstyle;
@@ -17839,7 +17912,7 @@ sub normBeamWidth {
   my $doconvert = 0;
   
   if ($kw eq 'kWh') {
-	  if ($paref->{$beam1.'cont'} !~ /batsocforecast_|energycosts|feedincome/xs) {
+	  if ($paref->{$beam1.'cont'} !~ /batsoc|energycosts|feedincome/xs) {
 	      $doconvert = 1;
 	  }
   }
@@ -19319,47 +19392,51 @@ sub _listDataPoolPvHist {
       my $ret;
 
       for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl    = HistoryVal ($name, $day, $key, 'pvrl',        '-');
-          my $pvrlvd  = HistoryVal ($name, $day, $key, 'pvrlvd',      '-');
-          my $pvfc    = HistoryVal ($name, $day, $key, 'pvfc',        '-');
-          my $gcons   = HistoryVal ($name, $day, $key, 'gcons',       '-');
-          my $con     = HistoryVal ($name, $day, $key, 'con',         '-');
-          my $confc   = HistoryVal ($name, $day, $key, 'confc',       '-');
-          my $gfeedin = HistoryVal ($name, $day, $key, 'gfeedin',     '-');
-          my $wid     = HistoryVal ($name, $day, $key, 'weatherid',   '-');
-          my $wcc     = HistoryVal ($name, $day, $key, 'wcc',         '-');
-          my $rr1c    = HistoryVal ($name, $day, $key, 'rr1c',        '-');
-          my $temp    = HistoryVal ($name, $day, $key, 'temp',      undef);
-          my $pvcorrf = HistoryVal ($name, $day, $key, 'pvcorrf',     '-');
-          my $dayname = HistoryVal ($name, $day, $key, 'dayname',   undef);
-          my $rad1h   = HistoryVal ($name, $day, $key, 'rad1h',       '-');
-          my $sunaz   = HistoryVal ($name, $day, $key, 'sunaz',       '-');
-          my $sunalt  = HistoryVal ($name, $day, $key, 'sunalt',      '-');
-          my $don     = HistoryVal ($name, $day, $key, 'DoN',         '-');
-          my $conprc  = HistoryVal ($name, $day, $key, 'conprice',    '-');
-          my $feedprc = HistoryVal ($name, $day, $key, 'feedprice',   '-');
+          my $pvrl         = HistoryVal ($name, $day, $key, 'pvrl',         '-');
+          my $pvrlvd       = HistoryVal ($name, $day, $key, 'pvrlvd',       '-');
+          my $pvfc         = HistoryVal ($name, $day, $key, 'pvfc',         '-');
+          my $gcons        = HistoryVal ($name, $day, $key, 'gcons',        '-');
+          my $con          = HistoryVal ($name, $day, $key, 'con',          '-');
+          my $confc        = HistoryVal ($name, $day, $key, 'confc',        '-');
+          my $gfeedin      = HistoryVal ($name, $day, $key, 'gfeedin',      '-');
+          my $wid          = HistoryVal ($name, $day, $key, 'weatherid',    '-');
+          my $wcc          = HistoryVal ($name, $day, $key, 'wcc',          '-');
+          my $rr1c         = HistoryVal ($name, $day, $key, 'rr1c',         '-');
+          my $temp         = HistoryVal ($name, $day, $key, 'temp',       undef);
+          my $pvcorrf      = HistoryVal ($name, $day, $key, 'pvcorrf',      '-');
+          my $dayname      = HistoryVal ($name, $day, $key, 'dayname',    undef);
+          my $rad1h        = HistoryVal ($name, $day, $key, 'rad1h',        '-');
+          my $sunaz        = HistoryVal ($name, $day, $key, 'sunaz',        '-');
+          my $sunalt       = HistoryVal ($name, $day, $key, 'sunalt',       '-');
+          my $don          = HistoryVal ($name, $day, $key, 'DoN',          '-');
+          my $conprc       = HistoryVal ($name, $day, $key, 'conprice',     '-');
+          my $feedprc      = HistoryVal ($name, $day, $key, 'feedprice',    '-');
+		  my $socprogwhsum = HistoryVal ($name, $day, $key, 'socprogwhsum', '-');
+		  my $socwhsum     = HistoryVal ($name, $day, $key, 'socwhsum',     '-');
 
           if ($export eq 'csv') {
-              $hexp->{$day}{$key}{PVreal}             = $pvrl;
-              $hexp->{$day}{$key}{PVrealValid}        = $pvrlvd;
-              $hexp->{$day}{$key}{PVforecast}         = $pvfc;
-              $hexp->{$day}{$key}{GridConsumption}    = $gcons;
-              $hexp->{$day}{$key}{Consumption}        = $con;
-              $hexp->{$day}{$key}{confc}              = $confc;
-              $hexp->{$day}{$key}{GridFeedIn}         = $gfeedin;
-              $hexp->{$day}{$key}{WeatherId}          = $wid;
-              $hexp->{$day}{$key}{CloudCover}         = $wcc;
-              $hexp->{$day}{$key}{TotalPrecipitation} = $rr1c;
-              $hexp->{$day}{$key}{Temperature}        = $temp    // '';
-              $hexp->{$day}{$key}{PVCorrectionFactor} = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
-              $hexp->{$day}{$key}{Quality}            = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
-              $hexp->{$day}{$key}{DayName}            = $dayname // '';
-              $hexp->{$day}{$key}{GlobalRadiation }   = $rad1h;
-              $hexp->{$day}{$key}{SunAzimuth}         = $sunaz;
-              $hexp->{$day}{$key}{SunAltitude}        = $sunalt;
-              $hexp->{$day}{$key}{DayOrNight}         = $don;
-              $hexp->{$day}{$key}{PurchasePrice}      = $conprc;
-              $hexp->{$day}{$key}{FeedInPrice}        = $feedprc;
+              $hexp->{$day}{$key}{PVreal}              = $pvrl;
+              $hexp->{$day}{$key}{PVrealValid}         = $pvrlvd;
+              $hexp->{$day}{$key}{PVforecast}          = $pvfc;
+              $hexp->{$day}{$key}{GridConsumption}     = $gcons;
+              $hexp->{$day}{$key}{Consumption}         = $con;
+              $hexp->{$day}{$key}{confc}               = $confc;
+              $hexp->{$day}{$key}{GridFeedIn}          = $gfeedin;
+              $hexp->{$day}{$key}{WeatherId}           = $wid;
+              $hexp->{$day}{$key}{CloudCover}          = $wcc;
+              $hexp->{$day}{$key}{TotalPrecipitation}  = $rr1c;
+              $hexp->{$day}{$key}{Temperature}         = $temp    // '';
+              $hexp->{$day}{$key}{PVCorrectionFactor}  = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
+              $hexp->{$day}{$key}{Quality}             = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
+              $hexp->{$day}{$key}{DayName}             = $dayname // '';
+              $hexp->{$day}{$key}{GlobalRadiation }    = $rad1h;
+              $hexp->{$day}{$key}{SunAzimuth}          = $sunaz;
+              $hexp->{$day}{$key}{SunAltitude}         = $sunalt;
+              $hexp->{$day}{$key}{DayOrNight}          = $don;
+              $hexp->{$day}{$key}{PurchasePrice}       = $conprc;
+              $hexp->{$day}{$key}{FeedInPrice}         = $feedprc;
+			  $hexp->{$day}{$key}{BatterySocWhSum}     = $socwhsum;
+			  $hexp->{$day}{$key}{BatteryProgSocWhSum} = $socprogwhsum;
           }
 
           my ($inve, $invl);
@@ -19461,9 +19538,9 @@ sub _listDataPoolPvHist {
           $ret .= $btotout                                       if($key ne '99');
           $ret .= "\n            "                               if($key ne '99');
           
-          $ret .= $batprogsoc                                    if($key ne '99');
+          $ret .= $batprogsoc.", socprogwhsum: $socprogwhsum"    if($key ne '99');
           $ret .= "\n            "                               if($key ne '99');            
-          $ret .= $batsoc                                        if($key ne '99');
+          $ret .= $batsoc.", socwhsum: $socwhsum"                if($key ne '99');
           $ret .= "\n            "                               if($key ne '99');
 
           $ret .= $batin;
@@ -19829,27 +19906,28 @@ sub _listDataPoolNextHours {
   }
 
   for my $idx (sort keys %{$h}) {
-      my $nhts    = NexthoursVal ($name, $idx, 'starttime',  '-');
-      my $day     = NexthoursVal ($name, $idx, 'day',        '-');
-      my $hod     = NexthoursVal ($name, $idx, 'hourofday',  '-');
-      my $today   = NexthoursVal ($name, $idx, 'today',      '-');
-      my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',       '-');
-      my $pvapifc = NexthoursVal ($name, $idx, 'pvapifc',    '-');       # PV Forecast der API
-      my $pvaifc  = NexthoursVal ($name, $idx, 'pvaifc',     '-');       # PV Forecast der KI
-      my $aihit   = NexthoursVal ($name, $idx, 'aihit',      '-');       # KI ForeCast Treffer Status
-      my $wid     = NexthoursVal ($name, $idx, 'weatherid',  '-');
-      my $wcc     = NexthoursVal ($name, $idx, 'wcc',        '-');
-      my $crang   = NexthoursVal ($name, $idx, 'cloudrange', '-');
-      my $rr1c    = NexthoursVal ($name, $idx, 'rr1c',       '-');
-      my $rrange  = NexthoursVal ($name, $idx, 'rainrange',  '-');
-      my $rad1h   = NexthoursVal ($name, $idx, 'rad1h',      '-');
-      my $pvcorrf = NexthoursVal ($name, $idx, 'pvcorrf',    '-');
-      my $temp    = NexthoursVal ($name, $idx, 'temp',       '-');
-      my $confc   = NexthoursVal ($name, $idx, 'confc',      '-');
-      my $confcex = NexthoursVal ($name, $idx, 'confcEx',    '-');
-      my $don     = NexthoursVal ($name, $idx, 'DoN',        '-');
-      my $sunaz   = NexthoursVal ($name, $idx, 'sunaz',      '-');
-      my $sunalt  = NexthoursVal ($name, $idx, 'sunalt',     '-');
+      my $nhts    = NexthoursVal ($name, $idx, 'starttime',    '-');
+      my $day     = NexthoursVal ($name, $idx, 'day',          '-');
+      my $hod     = NexthoursVal ($name, $idx, 'hourofday',    '-');
+      my $today   = NexthoursVal ($name, $idx, 'today',        '-');
+      my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',         '-');
+      my $pvapifc = NexthoursVal ($name, $idx, 'pvapifc',      '-');       # PV Forecast der API
+      my $pvaifc  = NexthoursVal ($name, $idx, 'pvaifc',       '-');       # PV Forecast der KI
+      my $aihit   = NexthoursVal ($name, $idx, 'aihit',        '-');       # KI ForeCast Treffer Status
+      my $wid     = NexthoursVal ($name, $idx, 'weatherid',    '-');
+      my $wcc     = NexthoursVal ($name, $idx, 'wcc',          '-');
+      my $crang   = NexthoursVal ($name, $idx, 'cloudrange',   '-');
+      my $rr1c    = NexthoursVal ($name, $idx, 'rr1c',         '-');
+      my $rrange  = NexthoursVal ($name, $idx, 'rainrange',    '-');
+      my $rad1h   = NexthoursVal ($name, $idx, 'rad1h',        '-');
+      my $pvcorrf = NexthoursVal ($name, $idx, 'pvcorrf',      '-');
+      my $temp    = NexthoursVal ($name, $idx, 'temp',         '-');
+      my $confc   = NexthoursVal ($name, $idx, 'confc',        '-');
+      my $confcex = NexthoursVal ($name, $idx, 'confcEx',      '-');
+      my $don     = NexthoursVal ($name, $idx, 'DoN',          '-');
+      my $sunaz   = NexthoursVal ($name, $idx, 'sunaz',        '-');
+      my $sunalt  = NexthoursVal ($name, $idx, 'sunalt',       '-');
+	  my $socprgs = NexthoursVal ($name, $idx, 'socprogwhsum', '-');
 
       my ($rcdbat, $socs);
       for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
@@ -19874,7 +19952,7 @@ sub _listDataPoolNextHours {
       $sq .= "\n              ";
       $sq .= "rrange: $rrange, crange: $crang, correff: $pvcorrf";
       $sq .= "\n              ";
-      $sq .= $socs;
+      $sq .= $socs.", socprogwhsum: $socprgs";
       $sq .= "\n              ";
       $sq .= $rcdbat;
   }
@@ -24426,7 +24504,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>rcdchargebatXX</b>  </td><td>Charging recommendation for battery XX (1 - Yes, 0 - No)                        </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Total precipitation during the last hour kg/m2                                  </td></tr>
             <tr><td> <b>rrange</b>          </td><td>range of total rain                                                             </td></tr>
-            <tr><td> <b>socXX</b>           </td><td>current (NextHour00) or predicted SoC of battery XX                             </td></tr>
+            <tr><td> <b>socXX</b>           </td><td>current (NextHour00) or predicted SoC (%) of battery XX                         </td></tr>
+			<tr><td> <b>socprogwhsum</b>    </td><td>current (NextHour00) or predicted SoC (Wh) as a sum across all batteries        </td></tr>
             <tr><td> <b>weatherid</b>       </td><td>ID of the predicted weather                                                     </td></tr>
             <tr><td> <b>wcc</b>             </td><td>predicted degree of cloudiness                                                  </td></tr>
          </table>
@@ -24482,6 +24561,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                                   </td></tr>
             <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                                                 </td></tr>
             <tr><td> <b>rr1c</b>           </td><td>Total precipitation during the last hour kg/m2                                                                           </td></tr>
+            <tr><td> <b>socwhsum</b>       </td><td>real SoC achieved (Wh) as a sum across all batteries                                                                     </td></tr>
+			<tr><td> <b>socprogwhsum</b>   </td><td>predicted SoC (Wh) as a sum across all batteries                                                                         </td></tr>
             <tr><td> <b>sunalt</b>         </td><td>Altitude of the sun (in decimal degrees)                                                                                 </td></tr>
             <tr><td> <b>sunaz</b>          </td><td>Azimuth of the sun (in decimal degrees)                                                                                  </td></tr>
             <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                                            </td></tr>
@@ -25357,7 +25438,9 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>batsocforecast_XX</b>   </td><td>the predicted and historically achieved SOC (%) of the battery XX                                      </td></tr>
+            <tr><td> <b>batsocCombi_XX</b>      </td><td>the predicted (from the next hour) and actual SOC (%) of the battery XX up to the current time         </td></tr>
+            <tr><td> <b>batsocForecast_XX</b>   </td><td>the predicted SOC (%) of the battery XX                                                                </td></tr>
+			<tr><td> <b>batsocReal_XX</b>       </td><td>the real SOC (%) achieved by the battery XX                                                            </td></tr>
             <tr><td> <b>consumption</b>         </td><td>Energy consumption                                                                                     </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>forecasted energy consumption                                                                          </td></tr>
             <tr><td> <b>energycosts</b>         </td><td>Cost of energy purchased from the grid. The currency is defined in the setupMeterDev, key conprice.    </td></tr>
@@ -26947,7 +27030,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>rcdchargebatXX</b>  </td><td>Aufladeempfehlung für Batterie XX (1 - Ja, 0 - Nein)                                     </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                           </td></tr>
             <tr><td> <b>rrange</b>          </td><td>Bereich des Gesamtniederschlags                                                          </td></tr>
-            <tr><td> <b>socXX</b>           </td><td>aktueller (NextHour00) oder prognostizierter SoC der Batterie XX                         </td></tr>
+            <tr><td> <b>socXX</b>           </td><td>aktueller (NextHour00) oder prognostizierter SoC (%) der Batterie XX                     </td></tr>
+			<tr><td> <b>socprogwhsum</b>    </td><td>aktueller (NextHour00) oder prognostizierter SoC (Wh) als Summe über alle Batterien      </td></tr>
             <tr><td> <b>weatherid</b>       </td><td>ID des vorhergesagten Wetters                                                            </td></tr>
             <tr><td> <b>wcc</b>             </td><td>vorhergesagter Grad der Bewölkung                                                        </td></tr>
          </table>
@@ -27004,7 +27088,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvcorrf</b>         </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                       </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>Globalstrahlung (kJ/m2)                                                                            </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                     </td></tr>
-            <tr><td> <b>sunalt</b>          </td><td>Höhe der Sonne (in Dezimalgrad)                                                                    </td></tr>
+            <tr><td> <b>socwhsum</b>        </td><td>real erreichter SoC (Wh) als Summe über alle Batterien                                             </td></tr>
+			<tr><td> <b>socprogwhsum</b>    </td><td>prognostizierter SoC (Wh) als Summe über alle Batterien                                            </td></tr>
+			<tr><td> <b>sunalt</b>          </td><td>Höhe der Sonne (in Dezimalgrad)                                                                    </td></tr>
             <tr><td> <b>sunaz</b>           </td><td>Azimuth der Sonne (in Dezimalgrad)                                                                 </td></tr>
             <tr><td> <b>wid</b>             </td><td>Identifikationsnummer des Wetters                                                                  </td></tr>
             <tr><td> <b>wcc</b>             </td><td>effektive Wolkenbedeckung                                                                          </td></tr>
@@ -27880,8 +27966,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>batsocforecast_XX</b>   </td><td>der prognostizierte und in der Vergangenheit erreichte SOC (%) der Batterie XX                               </td></tr>
-            <tr><td> <b>consumption</b>         </td><td>Energieverbrauch                                                                                             </td></tr>
+            <tr><td> <b>batsocCombi_XX</b>      </td><td>der prognostizierte (ab kommender Stunde) und bis zur aktuellen Zeit real erreichte SOC (%) der Batterie XX  </td></tr>
+            <tr><td> <b>batsocForecast_XX</b>   </td><td>der prognostizierte SOC (%) der Batterie XX                                                                  </td></tr>
+			<tr><td> <b>batsocReal_XX</b>       </td><td>der real erreichte SOC (%) der Batterie XX                                                                   </td></tr>
+			<tr><td> <b>consumption</b>         </td><td>Energieverbrauch                                                                                             </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch                                                                            </td></tr>
             <tr><td> <b>energycosts</b>         </td><td>Kosten des Energiebezuges aus dem Netz. Die Währung ist im setupMeterDev, Schlüssel conprice, definiert.     </td></tr>
             <tr><td> <b>feedincome</b>          </td><td>Vergütung für die Netzeinspeisung. Die Währung ist im setupMeterDev, Schlüssel feedprice, definiert.         </td></tr>
