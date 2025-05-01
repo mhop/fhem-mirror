@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.51.7" => "01.05.2025  __createAdditionalEvents: optimized for SVG 'steps', new key plantControl->genPVforecastsToEvent ",
+  "1.51.7" => "01.05.2025  __createAdditionalEvents: optimized for SVG 'steps', new key plantControl->genPVforecastsToEvent ".
+                           "aiAddRawData: add gcons, _listDataPoolCircular: add gcons_a ",
   "1.51.6" => "30.04.2025  graphicBeamXContent: change batsocforecast_XX to batsocCombi_XX, new options batsocForecast_XX, batsocReal_XX ".
                            "new Paramaeter socprogwhsum, socwhsum in pvHisory & NextHours ",
   "1.51.5" => "28.04.2025  attr transformed: graphicBeamWidth, graphicHourCount, graphicEnergyUnit, graphicSpaceSize ".
@@ -425,7 +426,7 @@ use constant {
   DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
   SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
   SPLSLIDEMAX    => 20,                                                             # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß
-  CONDAYSLIDEMAX => 30,                                                             # max. Anzahl der Arrayelemente im Register pvCircular -> con_all -> <Tag>
+  CONDAYSLIDEMAX => 30,                                                             # max. Anzahl der Arrayelemente im Register pvCircular -> con_all / gcons_a -> <Tag>
   WHISTREPEAT    => 851,                                                            # Wiederholungsintervall Cache File Daten schreiben
   EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 
@@ -1050,12 +1051,12 @@ my %htitles = (                                                                 
                 DE => qq{real erreichte Batterieladung bzw. SoC Prognose Batterie}                                 },
   socfcbat => { EN => qq{SoC forecast Battery},
                 DE => qq{SoC Prognose Batterie}                                                                    },
-  socfcsum => { EN => qq{SoC forecast (%) as a sum across all batteries},
-                DE => qq{SoC Prognose (%) als Summe &#252;ber alle Batterien}                                      },
+  socfcsum => { EN => qq{SoC forecast (%) summarized across all batteries},
+                DE => qq{SoC Prognose (%) zusammengefasst &#252;ber alle Batterien}                                },
   socrebat => { EN => qq{real achieved charge Battery},
                 DE => qq{real erreichte Ladung Batterie}                                                           },
-  socresum => { EN => qq{real SoC achieved (%) as a sum across all batteries},
-                DE => qq{real errreichter SoC (%) als Summe &#252;ber alle Batterien}                              },
+  socresum => { EN => qq{real SoC achieved (%) summarized across all batteries},
+                DE => qq{real errreichter SoC (%) zusammengefasst &#252;ber alle Batterien}                        },
   socbacur => { EN => qq{SoC current},
                 DE => qq{SoC aktuell}                                                                              },
   socbatfc => { EN => qq{SoC forecast},
@@ -1433,8 +1434,8 @@ my %hfspvh = (
   temperature       => { fn => \&_storeVal, storname => 'temp',         validkey => undef,    fpar => undef    },    # Außentemperatur
   conprice          => { fn => \&_storeVal, storname => 'conprice',     validkey => undef,    fpar => undef    },    # Bezugspreis pro kWh der Stunde
   feedprice         => { fn => \&_storeVal, storname => 'feedprice',    validkey => undef,    fpar => undef    },    # Einspeisevergütung pro kWh der Stunde
-  socwhsum          => { fn => \&_storeVal, storname => 'socwhsum',     validkey => undef,    fpar => undef    },    # real eerichter SoC (Wh) als Summe über alle Batterien
-  socprogwhsum      => { fn => \&_storeVal, storname => 'socprogwhsum', validkey => undef,    fpar => undef    },    # prognostizierter SoC (Wh) als Summe über alle Batterien
+  socwhsum          => { fn => \&_storeVal, storname => 'socwhsum',     validkey => undef,    fpar => undef    },    # real eerichter SoC (Wh) zusammengefasst über alle Batterien
+  socprogwhsum      => { fn => \&_storeVal, storname => 'socprogwhsum', validkey => undef,    fpar => undef    },    # prognostizierter SoC (Wh) zusammengefasst über alle Batterien
   pvfc              => { fn => \&_storeVal, storname => 'pvfc',         validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
   confc             => { fn => \&_storeVal, storname => 'confc',        validkey => undef,    fpar => 'comp99' },    # prognostizierter Hausverbrauch
   gcons             => { fn => \&_storeVal, storname => 'gcons',        validkey => undef,    fpar => 'comp99' },    # bezogene Energie
@@ -8700,7 +8701,6 @@ sub centralTask {
           }
       }
   }
- 
   ##########################################################################################################################
 
   if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -13690,7 +13690,7 @@ sub _calcDataEveryFullHour {
       _calcCaQsimple    ($paref);                                                                 # einfache Korrekturberechnung duchführen/speichern
       _calcCaQcomplex   ($paref);                                                                 # Korrekturberechnung mit Bewölkung duchführen/speichern
       _addHourAiRawdata ($paref);                                                                 # AI Raw Data hinzufügen
-      _addCon2CircArray ($paref);                                                                 # Hausverbrauch der vergangenen Stunde zum con-Array im Circular Speicher hinzufügen
+      _addCon2CircArray ($paref);                                                                 # Hausverbrauch / Netzbezug der vergangenen Stunde zum con-Array im Circular Speicher hinzufügen
 
       storeReading ('.signaldone_'.$hh, 'done');                                                  # Sperrsignal (erledigt) setzen
 
@@ -13850,18 +13850,20 @@ sub _addCon2CircArray {
   my $dayname  = $paref->{dayname};
   my $ydayname = $paref->{ydayname};
 
-  my $hash  = $defs{$name};
-
   $day      = $yday     if(defined $yday);                                        # der vergangene Tag soll verarbeitet werden
   $dayname  = $ydayname if(defined $ydayname);                                    # Name des Vortages
   my $hh    = sprintf "%02d", $h;
-  my $con   = HistoryVal ($hash, $day, $hh, 'con', 0);                            # Consumption der abgefragten Stunde
+  my $con   = HistoryVal ($name, $day, $hh, 'con',   0);                          # Consumption der abgefragten Stunde
+  my $gcons = HistoryVal ($name, $day, $hh, 'gcons', 0);                          # Netzbezug der abgefragten Stunde
 
-  push @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}, $con if($con >= 0);   # Wert zum Speicherarray hinzufügen
+  push @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}, $con   if($con   >= 0);   # Consumption zum Speicherarray hinzufügen
+  push @{$data{$name}{circular}{$hh}{gcons_a}{"$dayname"}}, $gcons if($gcons >= 0);   # Consumption zum Speicherarray hinzufügen
 
-  limitArray ($data{$name}{circular}{$hh}{con_all}{"$dayname"}, CONDAYSLIDEMAX);
+  limitArray ($data{$name}{circular}{$hh}{con_all}{"$dayname"},   CONDAYSLIDEMAX);
+  limitArray ($data{$name}{circular}{$hh}{gcons_a}{"$dayname"}, CONDAYSLIDEMAX);
 
   debugLog ($paref, 'saveData2Cache', "add consumption into Array (con_all) in Circular - day: $day, hod: $hh, con: $con");
+  debugLog ($paref, 'saveData2Cache', "add consumption into Array (gcons_a) in Circular - day: $day, hod: $hh, gcons: $gcons");
 
 return;
 }
@@ -15998,9 +16000,7 @@ sub _beamGraphicFirstHour {
   my $stt                              = NexthoursVal ($hash, 'NextHour00', 'starttime', '0000-00-00 24');
   my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
 
-  my ($val1, $val2, $val3, $val4, $val5, $val6, $val7, $val8);
-  my $val9  = 0;
-  my $val10 = 0;
+  my ($val1, $val2, $val3, $val4, $val5, $val6, $val7, $val8, $val9, $val10);
   my $hbsocs;
 
   $thishour++;
@@ -19023,6 +19023,7 @@ sub aiAddRawData {
           my $sunalt = HistoryVal ($hash, $pvd, $hod, 'sunalt',        0);
           my $sunaz  = HistoryVal ($hash, $pvd, $hod, 'sunaz',         0);
           my $con    = HistoryVal ($hash, $pvd, $hod, 'con',       undef);
+          my $gcons  = HistoryVal ($name, $pvd, $hod, 'gcons',     undef);
           my $wcc    = HistoryVal ($hash, $pvd, $hod, 'wcc',       undef);
           my $wid    = HistoryVal ($hash, $pvd, $hod, 'weatherid', undef);            # Wetter ID
           my $rr1c   = HistoryVal ($hash, $pvd, $hod, 'rr1c',      undef);
@@ -19033,7 +19034,8 @@ sub aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{dayname}   = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}       = $hod;
           $data{$name}{aidectree}{airaw}{$ridx}{temp}      = sprintf "%.0f", $temp            if(defined $temp);
-          $data{$name}{aidectree}{airaw}{$ridx}{con}       = $con                             if(defined $con && $con >= 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{con}       = $con                             if(defined $con   && $con   >= 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{gcons}     = $gcons                           if(defined $gcons && $gcons >= 0);
           $data{$name}{aidectree}{airaw}{$ridx}{wcc}       = $wcc                             if(defined $wcc);
           $data{$name}{aidectree}{airaw}{$ridx}{weatherid} = $wid >= 100 ? $wid - 100 : $wid  if(defined $wid);
           $data{$name}{aidectree}{airaw}{$ridx}{rr1c}      = $rr1c                            if(defined $rr1c);
@@ -19420,9 +19422,11 @@ sub listDataPool {
           my $temp   = AiRawdataVal ($name, $idx, 'temp',      '-');
           my $nod    = AiRawdataVal ($name, $idx, 'dayname',   '-');
           my $con    = AiRawdataVal ($name, $idx, 'con',       '-');
+          my $gcons  = AiRawdataVal ($name, $idx, 'gcons',     '-');
 
           $sq       .= "\n";
-          $sq       .= "$idx => hod: $hod, nod: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, wid: $wid, rr1c: $rr1c, pvrl: $pvrl, con: $con, temp: $temp";
+          $sq       .= "$idx => hod: $hod, nod: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, ";
+          $sq       .= "wcc: $wcc, wid: $wid, rr1c: $rr1c, pvrl: $pvrl, con: $con, gcons: $gcons, temp: $temp";
       }
   }
 
@@ -19845,10 +19849,11 @@ sub _listDataPoolCircular {
               $bout     .= "batout${bn}: $batout";
           }
 
-            my ($pvrlnew, $pvfcnew, $conall);
-            my @pvrlkeys = map { $_ =~ /^pvrl_/xs   ? $_ : '' } sort keys %{$h->{$idx}};
-            my @pvfckeys = map { $_ =~ /^pvfc_/xs   ? $_ : '' } sort keys %{$h->{$idx}};
-            my @conakeys = map { $_ =~ /^con_all/xs ? $_ : '' } sort keys %{$h->{$idx}};
+            my ($pvrlnew, $pvfcnew, $conall, $gconsall);
+            my @pvrlkeys   = map { $_ =~ /^pvrl_/xs   ? $_ : '' } sort keys %{$h->{$idx}};
+            my @pvfckeys   = map { $_ =~ /^pvfc_/xs   ? $_ : '' } sort keys %{$h->{$idx}};
+            my @conakeys   = map { $_ =~ /^con_all/xs ? $_ : '' } sort keys %{$h->{$idx}};
+            my @gconsakeys = map { $_ =~ /^gcons_a/xs ? $_ : '' } sort keys %{$h->{$idx}};
 
             for my $prl (@pvrlkeys) {
                 next if(!$prl);
@@ -19876,6 +19881,15 @@ sub _listDataPoolCircular {
                 $conall .= "\n      " if($conall);
                 $conall .= _ldchash2val ( { pool => $h, idx => $idx, key => $coa, cval => $caref } );
             }
+            
+            for my $gcoa (@gconsakeys) {
+                next if(!$gcoa);
+                my $gcaref = CircularVal ($hash, $idx, $gcoa, '');
+                next if(!$gcaref);
+
+                $gconsall .= "\n      " if($gconsall);
+                $gconsall .= _ldchash2val ( { pool => $h, idx => $idx, key => $gcoa, cval => $gcaref } );
+            }
 
           $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl";
           $sq .= "\n      $bin";
@@ -19888,9 +19902,10 @@ sub _listDataPoolCircular {
           $sq .= "\n      pvrlsum: $pvrs";
           $sq .= "\n      pvfcsum: $pvfs";
           $sq .= "\n      dnumsum: $dnus";
-          $sq .= "\n      $conall"  if($conall);
-          $sq .= "\n      $pvrlnew" if($pvrlnew);
-          $sq .= "\n      $pvfcnew" if($pvfcnew);
+          $sq .= "\n      $conall"    if($conall);
+          $sq .= "\n      $gconsall"  if($gconsall);
+          $sq .= "\n      $pvrlnew"   if($pvrlnew);
+          $sq .= "\n      $pvfcnew"   if($pvfcnew);
       }
       else {
           my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7);
@@ -24564,7 +24579,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>rr1c</b>            </td><td>Total precipitation during the last hour kg/m2                                  </td></tr>
             <tr><td> <b>rrange</b>          </td><td>range of total rain                                                             </td></tr>
             <tr><td> <b>socXX</b>           </td><td>current (NextHour00) or predicted SoC (%) of battery XX                         </td></tr>
-			<tr><td> <b>socprogwhsum</b>    </td><td>current (NextHour00) or predicted SoC (Wh) as a sum across all batteries        </td></tr>
+			<tr><td> <b>socprogwhsum</b>    </td><td>current (NextHour00) or forecast SoC (Wh) summarized across all batteries       </td></tr>
             <tr><td> <b>weatherid</b>       </td><td>ID of the predicted weather                                                     </td></tr>
             <tr><td> <b>wcc</b>             </td><td>predicted degree of cloudiness                                                  </td></tr>
          </table>
@@ -24620,8 +24635,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                                   </td></tr>
             <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                                                 </td></tr>
             <tr><td> <b>rr1c</b>           </td><td>Total precipitation during the last hour kg/m2                                                                           </td></tr>
-            <tr><td> <b>socwhsum</b>       </td><td>real SoC achieved (Wh) as a sum across all batteries                                                                     </td></tr>
-			<tr><td> <b>socprogwhsum</b>   </td><td>predicted SoC (Wh) as a sum across all batteries                                                                         </td></tr>
+            <tr><td> <b>socwhsum</b>       </td><td>real SoC achieved (Wh) summarized across all batteries                                                                   </td></tr>
+			<tr><td> <b>socprogwhsum</b>   </td><td>predicted SoC (Wh) summarized across all batteries                                                                       </td></tr>
             <tr><td> <b>sunalt</b>         </td><td>Altitude of the sun (in decimal degrees)                                                                                 </td></tr>
             <tr><td> <b>sunaz</b>          </td><td>Azimuth of the sun (in decimal degrees)                                                                                  </td></tr>
             <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                                            </td></tr>
@@ -24653,10 +24668,12 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batouttotXX</b>         </td><td>total energy drawn from the battery XX (Wh)                                                                           </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>current total energy charged into the battery XX (Wh)                                                                 </td></tr>
             <tr><td> <b>confc</b>               </td><td>expected energy consumption (Wh) of the house on the current day                                                      </td></tr>
+            <tr><td> <b>con_all</b>             </td><td>an array of values of the house consumption on certain days of the selected hour                                      </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>remaining days until the battery XX maintenance SoC (default 95%) is reached                                          </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Number of days per cloudy area over the entire term                                                                   </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>total PV energy fed into the public grid (Wh)                                                                         </td></tr>
             <tr><td> <b>gcon</b>                </td><td>real power drawn from the electricity grid                                                                            </td></tr>
+            <tr><td> <b>gcons_a</b>             </td><td>an array of values of energy consumption from the public grid on specific days of the selected hour                   </td></tr>
             <tr><td> <b>gfeedin</b>             </td><td>real power feed-in to the electricity grid                                                                            </td></tr>
             <tr><td> <b>gridcontotal</b>        </td><td>total energy drawn from the public grid (Wh)                                                                          </td></tr>
             <tr><td> <b>initdayfeedin</b>       </td><td>initial PV feed-in value at the beginning of the current day (Wh)                                                     </td></tr>
@@ -24807,14 +24824,13 @@ to ensure that the system configuration is correct.
       <ul>
        <table>
        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-          <tr><td> <b>aiRawData</b>     </td><td>Display of the PV, radiation and environmental data currently stored for the AI.       </td></tr>
-          <tr><td>                      </td><td>(available if the Perl module AI::DecisionTree is installed)                           </td></tr>
-          <tr><td>                      </td><td>                                                                                       </td></tr>
-          <tr><td> <b>aiRuleStrings</b> </td><td>Returns a list that describes the AI's decision tree in the form of rules.             </td></tr>
-          <tr><td>                      </td><td><b>Note:</b> While the order of the rules is not predictable, the                      </td></tr>
-          <tr><td>                      </td><td>order of criteria within each rule, however, reflects the order                        </td></tr>
-          <tr><td>                      </td><td>in which the criteria are considered in the decision-making process.                   </td></tr>
-          <tr><td>                      </td><td>(available if an AI-compatible SolarForecast MODEL of the PV forecast is activated)    </td></tr>
+          <tr><td> <b>aiRawData</b>     </td><td>Display of the PV, radiation and environmental data currently saved for an AI evaluation.   </td></tr>
+          <tr><td>                      </td><td>                                                                                            </td></tr>
+          <tr><td> <b>aiRuleStrings</b> </td><td>Returns a list that describes the AI's decision tree in the form of rules.                  </td></tr>
+          <tr><td>                      </td><td><b>Note:</b> While the order of the rules is not predictable, the                           </td></tr>
+          <tr><td>                      </td><td>order of criteria within each rule, however, reflects the order                             </td></tr>
+          <tr><td>                      </td><td>in which the criteria are considered in the decision-making process.                        </td></tr>
+          <tr><td>                      </td><td>(available if an AI-compatible SolarForecast MODEL of the PV forecast is activated)         </td></tr>
         </table>
       </ul>
     </li>
@@ -27074,32 +27090,32 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aihit</b>           </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)               </td></tr>
-            <tr><td> <b>confc</b>           </td><td>erwarteter Energieverbrauch inklusive der Anteile registrierter Verbraucher              </td></tr>
-            <tr><td> <b>confcEx</b>         </td><td>erwarteter Energieverbrauch ohne Anteile Verbraucher mit gesetztem Schlüssel exconfc=1   </td></tr>
-            <tr><td> <b>crange</b>          </td><td>berechneter Bewölkungsbereich                                                            </td></tr>
-            <tr><td> <b>correff</b>         </td><td>verwendeter Korrekturfaktor/Qualität                                                     </td></tr>
-            <tr><td>                        </td><td>&lt;Faktor&gt;/- -> keine Qualität definiert                                             </td></tr>
-            <tr><td>                        </td><td>&lt;Faktor&gt;/0..1 - Qualität der PV Prognose (1 = beste Qualität)                      </td></tr>
-            <tr><td> <b>day</b>             </td><td>Tagesdatum                                                                               </td></tr>
-            <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                     </td></tr>
-            <tr><td> <b>hourofday</b>       </td><td>laufende Stunde des Tages                                                                </td></tr>
-            <tr><td> <b>pvapifc</b>         </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur        </td></tr>
-            <tr><td> <b>pvaifc</b>          </td><td>erwartete PV Erzeugung der KI (Wh)                                                       </td></tr>
-            <tr><td> <b>pvfc</b>            </td><td>verwendete PV Erzeugungsprognose (Wh)                                                    </td></tr>
-            <tr><td> <b>rad1h</b>           </td><td>vorhergesagte Globalstrahlung                                                            </td></tr>
-            <tr><td> <b>starttime</b>       </td><td>Startzeit des Datensatzes                                                                </td></tr>
-            <tr><td> <b>sunaz</b>           </td><td>Azimuth der Sonne (in Dezimalgrad)                                                       </td></tr>
-            <tr><td> <b>sunalt</b>          </td><td>Höhe der Sonne (in Dezimalgrad)                                                          </td></tr>
-            <tr><td> <b>temp</b>            </td><td>vorhergesagte Außentemperatur                                                            </td></tr>
-            <tr><td> <b>today</b>           </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                            </td></tr>
-            <tr><td> <b>rcdchargebatXX</b>  </td><td>Aufladeempfehlung für Batterie XX (1 - Ja, 0 - Nein)                                     </td></tr>
-            <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                           </td></tr>
-            <tr><td> <b>rrange</b>          </td><td>Bereich des Gesamtniederschlags                                                          </td></tr>
-            <tr><td> <b>socXX</b>           </td><td>aktueller (NextHour00) oder prognostizierter SoC (%) der Batterie XX                     </td></tr>
-			<tr><td> <b>socprogwhsum</b>    </td><td>aktueller (NextHour00) oder prognostizierter SoC (Wh) als Summe über alle Batterien      </td></tr>
-            <tr><td> <b>weatherid</b>       </td><td>ID des vorhergesagten Wetters                                                            </td></tr>
-            <tr><td> <b>wcc</b>             </td><td>vorhergesagter Grad der Bewölkung                                                        </td></tr>
+            <tr><td> <b>aihit</b>           </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                 </td></tr>
+            <tr><td> <b>confc</b>           </td><td>erwarteter Energieverbrauch inklusive der Anteile registrierter Verbraucher                </td></tr>
+            <tr><td> <b>confcEx</b>         </td><td>erwarteter Energieverbrauch ohne Anteile Verbraucher mit gesetztem Schlüssel exconfc=1     </td></tr>
+            <tr><td> <b>crange</b>          </td><td>berechneter Bewölkungsbereich                                                              </td></tr>
+            <tr><td> <b>correff</b>         </td><td>verwendeter Korrekturfaktor/Qualität                                                       </td></tr>
+            <tr><td>                        </td><td>&lt;Faktor&gt;/- -> keine Qualität definiert                                               </td></tr>
+            <tr><td>                        </td><td>&lt;Faktor&gt;/0..1 - Qualität der PV Prognose (1 = beste Qualität)                        </td></tr>
+            <tr><td> <b>day</b>             </td><td>Tagesdatum                                                                                 </td></tr>
+            <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                       </td></tr>
+            <tr><td> <b>hourofday</b>       </td><td>laufende Stunde des Tages                                                                  </td></tr>
+            <tr><td> <b>pvapifc</b>         </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur          </td></tr>
+            <tr><td> <b>pvaifc</b>          </td><td>erwartete PV Erzeugung der KI (Wh)                                                         </td></tr>
+            <tr><td> <b>pvfc</b>            </td><td>verwendete PV Erzeugungsprognose (Wh)                                                      </td></tr>
+            <tr><td> <b>rad1h</b>           </td><td>vorhergesagte Globalstrahlung                                                              </td></tr>
+            <tr><td> <b>starttime</b>       </td><td>Startzeit des Datensatzes                                                                  </td></tr>
+            <tr><td> <b>sunaz</b>           </td><td>Azimuth der Sonne (in Dezimalgrad)                                                         </td></tr>
+            <tr><td> <b>sunalt</b>          </td><td>Höhe der Sonne (in Dezimalgrad)                                                            </td></tr>
+            <tr><td> <b>temp</b>            </td><td>vorhergesagte Außentemperatur                                                              </td></tr>
+            <tr><td> <b>today</b>           </td><td>hat Wert '1' wenn Startdatum am aktuellen Tag                                              </td></tr>
+            <tr><td> <b>rcdchargebatXX</b>  </td><td>Aufladeempfehlung für Batterie XX (1 - Ja, 0 - Nein)                                       </td></tr>
+            <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                             </td></tr>
+            <tr><td> <b>rrange</b>          </td><td>Bereich des Gesamtniederschlags                                                            </td></tr>
+            <tr><td> <b>socXX</b>           </td><td>aktueller (NextHour00) oder prognostizierter SoC (%) der Batterie XX                       </td></tr>
+			<tr><td> <b>socprogwhsum</b>    </td><td>aktueller (NextHour00) oder prognostizierter SoC (Wh) zusammengefasst über alle Batterien  </td></tr>
+            <tr><td> <b>weatherid</b>       </td><td>ID des vorhergesagten Wetters                                                              </td></tr>
+            <tr><td> <b>wcc</b>             </td><td>vorhergesagter Grad der Bewölkung                                                          </td></tr>
          </table>
       </ul>
       </li>
@@ -27154,8 +27170,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvcorrf</b>         </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                       </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>Globalstrahlung (kJ/m2)                                                                            </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                     </td></tr>
-            <tr><td> <b>socwhsum</b>        </td><td>real erreichter SoC (Wh) als Summe über alle Batterien                                             </td></tr>
-			<tr><td> <b>socprogwhsum</b>    </td><td>prognostizierter SoC (Wh) als Summe über alle Batterien                                            </td></tr>
+            <tr><td> <b>socwhsum</b>        </td><td>real erreichter SoC (Wh) zusammengefasst über alle Batterien                                       </td></tr>
+			<tr><td> <b>socprogwhsum</b>    </td><td>prognostizierter SoC (Wh) zusammengefasst über alle Batterien                                      </td></tr>
 			<tr><td> <b>sunalt</b>          </td><td>Höhe der Sonne (in Dezimalgrad)                                                                    </td></tr>
             <tr><td> <b>sunaz</b>           </td><td>Azimuth der Sonne (in Dezimalgrad)                                                                 </td></tr>
             <tr><td> <b>wid</b>             </td><td>Identifikationsnummer des Wetters                                                                  </td></tr>
@@ -27187,10 +27203,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batouttotXX</b>         </td><td>aktuell total aus der Batterie XX entnommene Energie (Wh)                                                                 </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>aktuell total in die Batterie XX geladene Energie (Wh)                                                                    </td></tr>
             <tr><td> <b>confc</b>               </td><td>erwarteter Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                              </td></tr>
+            <tr><td> <b>con_all</b>             </td><td>ein Array aus Werten des Hausverbrauches an bestimmten Tagen der ausgewählten Stunde                                      </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>verbleibende Tage bis der Batterie XX Pflege-SoC (default 95%) erreicht sein soll                                         </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit                                                               </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
             <tr><td> <b>gcon</b>                </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
+            <tr><td> <b>gcons_a</b>             </td><td>ein Array aus Werten des Energiebezuges aus dem öffentlichen Netz an bestimmten Tagen der ausgewählten Stunde             </td></tr>
             <tr><td> <b>gfeedin</b>             </td><td>reale Leistungseinspeisung in das Stromnetz                                                                               </td></tr>
             <tr><td> <b>gridcontotal</b>        </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                         </td></tr>
             <tr><td> <b>initdayfeedin</b>       </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                             </td></tr>
@@ -27340,8 +27358,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td> <b>aiRawData</b>     </td><td>Anzeige der aktuell für die KI gespeicherten PV-, Strahlungs- und Umweltdaten.             </td></tr>
-          <tr><td>                      </td><td>(verfügbar wenn das Perl Modul AI::DecisionTree installiert ist)                           </td></tr>
+          <tr><td> <b>aiRawData</b>     </td><td>Anzeige der aktuell für eine KI-Auswertung gespeicherten PV-, Strahlungs- und Umweltdaten. </td></tr>
           <tr><td>                      </td><td>                                                                                           </td></tr>
           <tr><td> <b>aiRuleStrings</b> </td><td>Gibt eine Liste zurück, die den Entscheidungsbaum der KI in Form von Regeln beschreibt.    </td></tr>
           <tr><td>                      </td><td><b>Hinweis:</b> Die Reihenfolge der Regeln ist zwar nicht vorhersehbar, die                </td></tr>
