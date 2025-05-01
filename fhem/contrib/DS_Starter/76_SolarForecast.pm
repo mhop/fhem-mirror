@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.51.7" => "01.05.2025  __createAdditionalEvents: optimized for SVG 'steps', new key plantControl->genPVforecastsToEvent ",
   "1.51.6" => "30.04.2025  graphicBeamXContent: change batsocforecast_XX to batsocCombi_XX, new options batsocForecast_XX, batsocReal_XX ".
                            "new Paramaeter socprogwhsum, socwhsum in pvHisory & NextHours ",
   "1.51.5" => "28.04.2025  attr transformed: graphicBeamWidth, graphicHourCount, graphicEnergyUnit, graphicSpaceSize ".
@@ -6714,6 +6715,7 @@ sub _attrplantControl {                  ## no critic "not used"
       cycleInterval             => { comp => '\d+',                                act => 1 },
       feedinPowerLimit          => { comp => '\d+',                                act => 0 },    
       genPVdeviation            => { comp => '(daily|continuously)',               act => 1 },
+      genPVforecastsToEvent     => { comp => '(adapt4Steps)',                      act => 0 },
       showLink                  => { comp => '(0|1)',                              act => 0 },
   };
   
@@ -9381,18 +9383,26 @@ return;
 sub __createAdditionalEvents  {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
-  my $hash  = $defs{$name};
 
   my $done  = 0;
+  my $g2ev  = CurrentVal ($name, 'genPVforecastsToEvent', '');
 
   for my $idx (sort keys %{$data{$name}{nexthours}}) {
-      my $nhts = NexthoursVal ($hash, $idx, 'starttime', undef);
-      my $nhfc = NexthoursVal ($hash, $idx, 'pvfc',      undef);
+      my $nhts = NexthoursVal ($name, $idx, 'starttime', undef);
+      my $nhfc = NexthoursVal ($name, $idx, 'pvfc',      undef);
       next if(!defined $nhts || !defined $nhfc);
-
-      $done        = 1;
+      
       my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
+                                                                                       # https://forum.fhem.de/index.php?msg=1340607
+      storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":00:00") if(!$done);  # vor dem ersten Prognosewert immer einen Nullwert setzen
+
+      $done = 1;
+      
+      if ($g2ev eq 'adapt4Steps') {                                                    # für SVG 'steps'-Darstellung optimieren
+          storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":00:00");         # jeden neuen Stundenwert mit 0 starten 
+          storeReading ('AllPVforecastsToEvent', "$nhfc Wh", $dt." ".$h.":00:01");
+      }
+      
       storeReading ('AllPVforecastsToEvent', "$nhfc Wh", $dt." ".$h.":59:59");
   }
 
@@ -25490,8 +25500,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batsocCombi_XX</b>      </td><td>the predicted (from the next hour) and actual SOC (%) of the battery XX up to the current time         </td></tr>
             <tr><td> <b>batsocForecast_XX</b>   </td><td>the predicted SOC (%) of the battery XX                                                                </td></tr>
 			<tr><td> <b>batsocReal_XX</b>       </td><td>the real SOC (%) achieved by the battery XX                                                            </td></tr>
-			<tr><td> <b>batsocForecastSum</b>   </td><td>the predicted SOC (%) as a sum across all batteries                                                    </td></tr>
-			<tr><td> <b>batsocRealSum</b>       </td><td>the real SOC achieved (%) as a sum across all batteries                                                </td></tr>
+			<tr><td> <b>batsocForecastSum</b>   </td><td>the predicted SOC (%) as the resultant across all batteries                                            </td></tr>
+			<tr><td> <b>batsocRealSum</b>       </td><td>the real SOC achieved (%) as the resultant across all batteries                                        </td></tr>
             <tr><td> <b>consumption</b>         </td><td>Energy consumption                                                                                     </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>forecasted energy consumption                                                                          </td></tr>
             <tr><td> <b>energycosts</b>         </td><td>Cost of energy purchased from the grid. The currency is defined in the setupMeterDev, key conprice.    </td></tr>
@@ -25818,6 +25828,11 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td><b>daily</b>        - Calculation and creation of Today_PVdeviation takes place after sunset (default)                               </td></tr>
 			<tr><td>                                  </td><td><b>continuously</b> - Calculation and creation of Today_PVdeviation is continuous                                                    </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
+            <tr><td> <b>genPVforecastsToEvent</b>     </td><td>The module generates daily ‘AllPVforecastsToEvent’ events to visualize the PV forecast.                                              </td></tr>
+            <tr><td>                                  </td><td>Further explanations can be found in the <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Visualisierung_solare_Vorhersage_und_reale_Erzeugung' target='_blank'>german Wiki</a>. </td></tr>
+            <tr><td>                                  </td><td>Event generation can be optimized for specific uses.                                                                                 </td></tr>
+			<tr><td>                                  </td><td><b>adapt4Steps</b> - the events are optimized for the SVG Plot-Type 'steps'                                                          </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
 			<tr><td> <b>showLink</b>                  </td><td>Display of a link to the detailed view of the device above the graphics area                                                         </td></tr>
 			<tr><td>                                  </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                                            </td></tr>
 		    <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
@@ -25826,7 +25841,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps
        </ul>
 
        </li>
@@ -28020,8 +28035,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batsocCombi_XX</b>      </td><td>der prognostizierte (ab kommender Stunde) und bis zur aktuellen Zeit real erreichte SOC (%) der Batterie XX  </td></tr>
             <tr><td> <b>batsocForecast_XX</b>   </td><td>der prognostizierte SOC (%) der Batterie XX                                                                  </td></tr>
 			<tr><td> <b>batsocReal_XX</b>       </td><td>der real erreichte SOC (%) der Batterie XX                                                                   </td></tr>
-			<tr><td> <b>batsocForecastSum</b>   </td><td>der prognostizierte SOC (%) als Summe über alle Batterien                                                    </td></tr>
-			<tr><td> <b>batsocRealSum</b>       </td><td>der real erreichte SOC (%) als Summe über alle Batterien                                                     </td></tr>
+			<tr><td> <b>batsocForecastSum</b>   </td><td>der prognostizierte SOC (%) als Resultierende über alle Batterien                                            </td></tr>
+			<tr><td> <b>batsocRealSum</b>       </td><td>der real erreichte SOC (%) als Resultierende über alle Batterien                                             </td></tr>
 			<tr><td> <b>consumption</b>         </td><td>Energieverbrauch                                                                                             </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch                                                                            </td></tr>
             <tr><td> <b>energycosts</b>         </td><td>Kosten des Energiebezuges aus dem Netz. Die Währung ist im setupMeterDev, Schlüssel conprice, definiert.     </td></tr>
@@ -28346,6 +28361,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td><b>daily</b>        - Berechnung und Erstellung von Today_PVdeviation erfolgt nach Sonnenuntergang (default)                    </td></tr>
 			<tr><td>                                  </td><td><b>continuously</b> - Berechnung und Erstellung von Today_PVdeviation erfolgt fortlaufend                                       </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>genPVforecastsToEvent</b>     </td><td>Das Modul erzeugt täglich 'AllPVforecastsToEvent'-Events zur Visualisierung der PV Prognose.                                    </td></tr>
+            <tr><td>                                  </td><td>Nähere Erläuterungen dazu sind im <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Visualisierung_solare_Vorhersage_und_reale_Erzeugung' target='_blank'>Wiki</a> beschrieben. </td></tr>
+            <tr><td>                                  </td><td>Die Eventerzeugung kann für bestimmte Nutzungen optimiert werden.                                                               </td></tr>
+			<tr><td>                                  </td><td><b>adapt4Steps</b> - die Events werden für den SVG Plot-Type 'steps' optimiert                                                  </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
 			<tr><td> <b>showLink</b>                  </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                         </td></tr>
 			<tr><td>                                  </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                       </td></tr>
 		    <tr><td>                                  </td><td>                                                                                                                                </td></tr>
@@ -28354,7 +28374,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps
        </ul>
 
        </li>
