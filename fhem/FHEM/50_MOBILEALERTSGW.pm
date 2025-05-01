@@ -267,7 +267,7 @@ sub MOBILEALERTSGW_Set ($$@) {
         Log3 $MA_wname, 5,
           "$MA_wname MOBILEALERTSGW: Good Checksum got: 0x"
           . sprintf( "%02X", $sum );
-        my %addvals = ( lastGateway => "Debuginsert");
+        my %addvals = ( lastGateway => "Debuginsert", "lastseen_Debuginsert" => TimeNow());
         Dispatch( $hash, $data, \%addvals );
         return undef;
     }
@@ -605,7 +605,7 @@ sub MOBILEALERTSGW_DecodeData($$$) {
               "$MA_wname MOBILEALERTSGW: Data for $deviceID: "
               . unpack( "H*", $data )
               if ( $verbose >= 5 );
-            my %addvals = ( lastGateway => $gwserial);
+            my %addvals = ( lastGateway => $gwserial, "lastseen_" . $gwserial => TimeNow());
             my $found = Dispatch( $defs{$MA_wname}, $data, \%addvals );
         }
     }
