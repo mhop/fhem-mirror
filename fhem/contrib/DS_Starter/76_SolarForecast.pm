@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.51.8" => "02.05.2025  _specialActivities: delete overhanging days at the change of month ".
+                           "Bugfix: https://forum.fhem.de/index.php?msg=1340666 ",
   "1.51.7" => "01.05.2025  __createAdditionalEvents: optimized for SVG 'steps', new key plantControl->genPVforecastsToEvent ".
                            "aiAddRawData: add gcons, _listDataPoolCircular: add gcons_a ",
   "1.51.6" => "30.04.2025  graphicBeamXContent: change batsocforecast_XX to batsocCombi_XX, new options batsocForecast_XX, batsocReal_XX ".
@@ -9257,6 +9259,18 @@ sub _specialActivities {
           delete $data{$name}{circular}{99}{tdayDvtn};
 
           delete $data{$name}{pvhist}{$day};                                                     # den (alten) aktuellen Tag aus History löschen
+		  
+		  if (int $day == 1) {                                                                   # Monatswechsel: überhängende Tage löschen
+		      my $dtp  = timestringsFromOffset ($t, -86000);                                     # Berechne die Anzahl der Tage im Vormonat 
+			  my $dipm = int $dtp->{day};
+
+			  for my $dtr ($dipm + 1 .. 31) {                                                    # Lösche ungültige Tage des Vormonats
+			      if (exists $data{$name}{pvhist}{$dtr}) {
+					  delete $data{$name}{pvhist}{$dtr};            
+					  Log3 ($name, 3, "$name - history day >$dtr< deleted");
+				  }
+			  }
+		  }
 
           writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration sichern
 
@@ -14228,7 +14242,7 @@ sub _genSpecialReadings {
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
                   readingsDelete ($hash, $prpo.'_currentRunMtsConsumer_'.$c);
-                  return;
+                  next;
               }
 
               my $mion = &{$hcsr{$kpi}{fn}} ($hash, $c, $hcsr{$kpi}{par}, $def);
@@ -14241,7 +14255,7 @@ sub _genSpecialReadings {
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
                   readingsDelete ($hash, $prpo.'_runTimeAvgDayConsumer_'.$c);
-                  return;
+                  next;
               }
 
               my $radc = &{$hcsr{$kpi}{fn}} ($hash, $c, $hcsr{$kpi}{par}, $def);
