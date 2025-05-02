@@ -1754,9 +1754,10 @@ The following local attributes are used by a wider range of devices:
 
     <a name="nofork"></a>
     <li>nofork<br>
-        If set and the logfile is not "-", do not try to background. Needed on
-        some Fritzbox installations, and it will be set automatically for
-        Windows.
+        If set, do not go at startup into background.<br>
+        The standard systemd FHEM startscript expects starting
+        in background, in this case the attribute must not be set.<br>
+        The attribute will be set automatically for Windows.
     </li><br>
 
     <a id="perlSyntaxCheck"></a>
@@ -1764,7 +1765,7 @@ The following local attributes are used by a wider range of devices:
         by setting the <b>global</b> attribute perlSyntaxCheck, a syntax check
         will be executed upon definition or modification, if the command is
         perl and FHEM is already started.
-        </li><br>
+    </li><br>
 
     <a name="pidfilename"></a>
     <li>pidfilename<br>

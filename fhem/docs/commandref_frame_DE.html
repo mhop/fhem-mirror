@@ -1871,10 +1871,10 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 
     <a name="nofork"></a>
     <li>nofork<br>
-        Wenn dieses Attribut oder "attr global logfile -" gesetzt ist, 
-        dann wird FHEM nicht im Hintergrund abgearbeitet.
-        Dieses Attribut ist bei einigen FHEM Installationen auf FRITZ!-Boxen
-        notwendig, und wid fuer Windows automatisch gesetzt.
+        Wenn gesetzt, dann wird FHEM nicht im Hintergrund gestartet.<br>
+        Das ausgelieferte systemd Startskript erwartet ein Start im
+        Hintergrund, in diesem Fall darf dieses Attribut nicht gesetzt sein.<br>
+        Dieses Attribut wird fuer Windows automatisch gesetzt.
     </li><br>
 
     <a id="perlSyntaxCheck"></a>
