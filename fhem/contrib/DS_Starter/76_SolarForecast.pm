@@ -17020,39 +17020,39 @@ sub _flowGraphic {
 
   ## definierte Batterien ermitteln und zusammenfassen
   ######################################################
-  my ($batin, $bat2home);
+  my ($batin, $batout);
 
-  for my $bn (1..MAXBATTERIES) {                                                       # für jede definierte Batterie
+  for my $bn (1..MAXBATTERIES) {                                               # für jede definierte Batterie
       $bn                   = sprintf "%02d", $bn;
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
-      my $batinpow    = ReadingsNum ($name, 'Current_PowerBatIn_'.$bn,  undef);
-      my $bat2homepow = ReadingsNum ($name, 'Current_PowerBatOut_'.$bn, undef);
-      $batin         += $batinpow    if(defined $batinpow);
-      $bat2home      += $bat2homepow if(defined $bat2homepow);
+      my $batinpow  = ReadingsNum ($name, 'Current_PowerBatIn_'.$bn,  undef);
+      my $batoutpow = ReadingsNum ($name, 'Current_PowerBatOut_'.$bn, undef);
+      $batin       += $batinpow  if(defined $batinpow);
+      $batout      += $batoutpow if(defined $batoutpow);
   }
   
   my $soc = CurrentVal ($name, 'batsoctotal', 0);                                      # resultierender SoC (%) aller Batterien als Cluster 
 
-  if (!defined $batin && !defined $bat2home) {
-      $hasbat   = 0;
-      $batin    = 0;
-      $bat2home = 0;
-      $soc      = 0;
+  if (!defined $batin && !defined $batout) {
+      $hasbat = 0;
+      $batin  = 0;
+      $batout = 0;
+      $soc    = 0;
   }
   
-  debugLog ($paref, 'graphic', "Battery initial summary - batin: $batin, bat2home: $bat2home");
+  debugLog ($paref, 'graphic', "Battery initial summary - batin: $batin, batout: $batout");
 
   ## Resultierende von Laden und Entladen berechnen
   ###################################################
-  my $x     = $batin - $bat2home;                                              # können theoretisch gleich groß sein -> 0 setzen und Resultierende neu berechnen
-  $batin    = 0;
-  $bat2home = 0;
+  my $x   = $batin - $batout;                                                         # können theoretisch gleich groß sein -> 0 setzen und Resultierende neu berechnen
+  $batin  = 0;
+  $batout = 0;
 
-  if ($x > 0) { $batin = $x; } else { $bat2home = abs $x; }                    # es darf nur $batin ODER $bat2home mit einem Wert > 0 geben
+  if ($x > 0) { $batin = $x; } else { $batout = abs $x; }                             # es darf nur $batin ODER $batout mit einem Wert > 0 geben
 
-  debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, bat2home: $bat2home");
+  debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, batout: $batout");
 
   my $bat_color = $soc < 26 ? "$stna bat25" :
                   $soc < 76 ? "$stna bat50" :
@@ -17098,9 +17098,9 @@ sub _flowGraphic {
           $pdcr->{$lfn}{isource} = $isource;                                   # Art der Energiequelle (pv oder bat)
           $pdcr->{$lfn}{ptyp}    = 'inverter';                                 # Typ des Producers
           $pdcr->{$lfn}{p}       = $p;                                         # aktuelle PV
-          $pv2node              += $p if($feed eq 'default');                  # PV-Erzeugung Inverter für das Hausnetz
-          $pv2grid              += $p if($feed eq 'grid');                     # PV nur für das öffentliche Netz
-          $pv2bat               += $p if($feed eq 'bat');                      # Direktladen PV nur in die Batterie
+          $pv2node              += $p if($feed    eq 'default');               # PV-Erzeugung Inverter für das Hausnetz
+          $pv2grid              += $p if($feed    eq 'grid');                  # PV nur für das öffentliche Netz
+          $pv2bat               += $p if($feed    eq 'bat');                   # Direktladen PV nur in die Batterie
           $bat2inv              += $p if($isource eq 'bat');                   # Sonderfall Speisung Inverter aus Batterie statt PV
 
           $lfn++;
@@ -17109,12 +17109,16 @@ sub _flowGraphic {
 
   ## Batterie Werte verarbeiten
   ###############################
-  my $grid2home_style = $cgc       ? "$stna active_sig"    : "$stna inactive";            # cgc = current GridConsumption
-  my $bat2home_style  = $bat2home  ? "$stna active_normal" : "$stna inactive";
+  my $bat2home        = $batout - $bat2inv;
+  $bat2home           = $bat2home >= 0 ? $bat2home : 0;
+  my $grid2home_style = $cgc      ? "$stna active_sig"    : "$stna inactive";             # cgc = current GridConsumption
+  my $bat2home_style  = $bat2home ? "$stna active_normal" : "$stna inactive";
+  my $bat2inv_style   = $bat2inv  ? "$stna active_normal" : "$stna inactive";             # Batterie zu Inverter mit source=bat
+  
   my $cgc_direction   = "M250,515 L670,590";
 
   if ($bat2home) {                                                                        # Batterie wird entladen
-      my $cgfo = $node2grid - $pv2node;                                                   # pv2node -> PV-Erzeugung Inverter für das Hausnetz
+      my $cgfo = $node2grid - $pv2node;                                                   # pv2node = PV-Erzeugung Inverter für das Hausnetz
 
       if ($cgfo > 1) {
           $grid2home_style = "$stna active_normal";
@@ -17130,7 +17134,7 @@ sub _flowGraphic {
   if ($batin) {                                                                          # Batterie wird geladen
       my $home2bat = $batin - ($ppall + $pv2node + $pv2bat);                             # V 1.46.4: add $ppall
 
-      if ($home2bat > 1) {                                                               # Batterieladung wird anteilig aus Hausnetz geladen
+      if ($home2bat > 1) {                                                               # Batterieladung anteilig aus Hausnetz
           $node2bat           -= $home2bat;
           $bat2home_style      = "$stna active_sig";
           $bat2home_direction  = "M730,590 L1200,515";
@@ -17140,7 +17144,7 @@ sub _flowGraphic {
 
   ## Producer / Inverter Koordninaten Steuerhash
   ################################################
-  my ($togrid, $tonode, $tobat) = __sortProducer ($pdcr);                                # lfn Producer sortiert nach ptyp und feed
+  my ($togrid, $tonode, $tobat, $toinv) = __sortProducer ($pdcr);                        # lfn Producer sortiert nach ptyp und feed
 
   my $psorted = {
       '1togrid' => { xicon => -100, xchain => 150,  ychain => 400, step => 30,     count => scalar @{$togrid}, sorted => $togrid },      # Producer/PV nur zu Grid
@@ -17149,7 +17153,7 @@ sub _flowGraphic {
   };
 
   my $doproducerrow = 1;
-  $doproducerrow    = 0 if(!$psorted->{'1togrid'}{count} && !$psorted->{'3tobat'}{count}  && $psorted->{'2tonode'}{count} == 1);
+  $doproducerrow    = 0 if(!$psorted->{'1togrid'}{count} && !$psorted->{'3tobat'}{count} && $psorted->{'2tonode'}{count} == 1);
 
   ## definierte Verbraucher ermitteln
   #####################################
@@ -17172,6 +17176,7 @@ sub _flowGraphic {
   $pnodesum     += $node2bat < 0 ? abs $node2bat : 0;                                   # V 1.46.4 - Batterie ist voll und SolarLader liefert an Knoten
   my $node2home  = $pnodesum - $node2grid - ($node2bat > 0 ? $node2bat : 0);            # V 1.46.4 - Energiefluß vom Knoten zum Haus
   $node2home     = __normDecPlaces ($node2home);                                        # V 1.46.4
+
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
@@ -17394,12 +17399,12 @@ END3
           $chain_color = 'style="stroke: #'.__dynColor ($cc_dummy, $strokeredlim).';"';
       }
 
-      $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};
+      $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};  # M790,690 → Move To (Startpunkt bei x=790, y=690), L1200,690 → Line To (Zeichnet eine Linie von 790,690 nach 1200,690)
    }
 
-  ## Producer Laufketten - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
+  ## Producer / Inverter Laufketten - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ## Laufkette nur anzeigen wenn Producerzeile angezeigt werden soll
-  ###############################################################################
+  ###########################################################################################
   if ($doproducerrow) {
       for my $st (sort keys %{$psorted}) {
           my $left   = $psorted->{$st}{start} * 2;                                                # Übertrag aus Producer Icon Abschnitt
@@ -17596,6 +17601,7 @@ sub __sortProducer {
   my @isrcpv  = ();
   my @isrcbat = ();
   my @tonode  = ();
+  my @toinv   = ();
   my @ibat    = ();
   my @tobat   = ();
 
@@ -17609,20 +17615,21 @@ sub __sortProducer {
       push @ibat,  $lfn if($ptyp eq 'inverter' && $feed eq 'bat');            # Lieferung an Batterie
   }
   
-  for my $inv (@idef) {
-      my $isource = $pdcr->{$inv}{isource};
+  for my $lfn (@idef) {
+      my $isource = $pdcr->{$lfn}{isource};
       
-      push @isrcpv,  $inv if($isource eq 'pv');                               # Quelle ist PV-String
-      push @isrcbat, $inv if($isource eq 'bat');                              # Quelle ist Batterie
+      push @isrcpv,  $lfn if($isource eq 'pv');                               # Quelle ist PV-String
+      push @isrcbat, $lfn if($isource eq 'bat');                              # Quelle ist Batterie
   }
 
   push @togrid, @igrid;
   push @tonode, @prod;
   push @tonode, @isrcpv;
   push @tonode, @isrcbat;
+  push @toinv,  @isrcbat;
   push @tobat,  @ibat;
 
-return (\@togrid, \@tonode, \@tobat);
+return (\@togrid, \@tonode, \@tobat, \@toinv);
 }
 
 ################################################################
