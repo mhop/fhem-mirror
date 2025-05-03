@@ -3374,7 +3374,7 @@ sub wsRead {  ## no critic (ProhibitExcessComplexity [complexity core maintenanc
 
     for my $buf (@bufj) { # process each buffer part
 
-      if ( $buf =~ /((position|mower|battery|planner|cuttingHeight|headlights|calendar|message)-event-v2)/ ) { # pass only correct event types and count dubletts
+      if ( $buf =~ /$hash->{helper}{mower_id}.*((position|mower|battery|planner|cuttingHeight|headlights|calendar|message)-event-v2)/ ) { # pass only correct event types and count dubletts
 
         my $evt = $1;
         my $evn = $2;
