@@ -6949,28 +6949,11 @@ sub _attrInverterDev {                   ## no critic "not used"
       if ($in ne '01' && !AttrVal ($name, 'setupInverterDev01', '')) {
           return qq{Set the first Inverter device with attribute 'setupInverterDev01'};
       }
-
-      if (!$h->{pv} || !$h->{etotal} || !$h->{capacity}) {
-          return qq{One or more of the keys 'pv, etotal, capacity' are missing. Please consider the commandref.};
-      }
-
-      if (!isNumeric($h->{capacity})) {
-          return qq{The value of key 'capacity' must be numeric. Please consider the commandref.};
-      }
-
-      if ($h->{limit}) {
-          if (!isNumeric($h->{limit}) || $h->{limit} < 0 || $h->{limit} > 100) {
-              return qq{The value of key 'limit' is not valid. Please consider the commandref.};
-          }
-      }
-
-      if ($h->{feed} && $h->{feed} !~ /^grid|bat$/xs) {
-          return qq{The value of key 'feed' is not valid. Please consider the commandref.};
-      }
-
+      
+      my $none = 0;
+      
       if ($h->{strings}) {
-          my $none = 0;
-          my @as   = split ',', $h->{strings};
+          my @as = split ',', $h->{strings};
           
           for my $s (@as) {
               if ($s eq 'none') {
@@ -6986,6 +6969,24 @@ sub _attrInverterDev {                   ## no critic "not used"
           if ($none && scalar(@as) > 1) {
               return qq{If 'strings=none' is defined, no other string may be specified.};
           }
+      }
+
+      if (!$h->{pv} || (!$h->{etotal} && !$none) || !$h->{capacity}) { 
+          return qq{One or more of the keys 'pv, etotal, capacity' are missing. Please consider the commandref.};
+      }
+
+      if (!isNumeric($h->{capacity})) {
+          return qq{The value of key 'capacity' must be numeric. Please consider the commandref.};
+      }
+
+      if ($h->{limit}) {
+          if (!isNumeric($h->{limit}) || $h->{limit} < 0 || $h->{limit} > 100) {
+              return qq{The value of key 'limit' is not valid. Please consider the commandref.};
+          }
+      }
+
+      if ($h->{feed} && $h->{feed} !~ /^grid|bat$/xs) {
+          return qq{The value of key 'feed' is not valid. Please consider the commandref.};
       }
 
       $data{$name}{circular}{99}{attrInvChangedTs} = int time;
@@ -9887,8 +9888,13 @@ sub _transferInverterValues {
       my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
       next if($err);
 
-      my ($pvread,$pvunit) = split ":", $h->{pv};                                                      # Readingname/Unit für aktuelle PV Erzeugung
-      my ($edread,$etunit) = split ":", $h->{etotal};                                                  # Readingname/Unit für Energie total (PV Erzeugung)
+      my ($pvread, $pvunit) = split ":", $h->{pv};                                                     # Readingname/Unit für aktuelle PV Erzeugung
+      my $source            = defined $h->{strings} && $h->{strings} eq 'none' ? 'bat' : 'pv';         # Energie-Bezug PV oder aus Batterie 
+      
+      delete $h->{etotal} if($source eq 'bat');                                                        # Batteriewechselrichter ohne PV-Erzeugung
+      
+      $h->{etotal}          = defined $h->{etotal} ? $h->{etotal} : 'dum_rdng_no_etot:Wh';             # Dummy Reading für Batterie-Inverter ohne PV-Erzeugung
+      my ($edread, $etunit) = split ":", $h->{etotal};                                                 # Readingname/Unit für Energie total (PV Erzeugung)
 
       next if(!$pvread || !$edread);
 
@@ -9899,8 +9905,7 @@ sub _transferInverterValues {
       my $etuf     = $etunit =~ /^kWh$/xi ? 1000 : 1;
       my $etotal   = ReadingsNum ($indev, $edread, 0) * $etuf;                                         # Erzeugung total (Wh)
       my $histetot = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), 'etotali'.$in, 0);              # etotal zu Beginn einer Stunde                                                        
-      my $source   = defined $h->{strings} && $h->{strings} eq 'none' ? 'bat' : 'pv';                  # Energie-Bezug PV oder aus Batterie 
-
+    
       my ($ethishour, $etotsvd);
 
       if (!$histetot) {                                                                                # etotal der aktuelle Stunde gesetzt ?
@@ -9956,7 +9961,7 @@ sub _transferInverterValues {
 
       writeToHistory ( { paref => $paref, key => 'pvrl'.$in, val => $ethishour, hour => $nhour } );
 
-      debugLog ($paref, "collectData", "collect Inverter $in data - device: $indev, delivery: $feed =>");
+      debugLog ($paref, "collectData", "collect Inverter $in data - device: $indev, source: $source, delivery: $feed =>");
       debugLog ($paref, "collectData", "pv: $pv W, etotal: $etotal Wh");
   }
 
@@ -11582,11 +11587,13 @@ sub _createSummaries {
   my $pv2grid = 0;                                                                                      # PV-Erzeugung zu Grid-only
 
   for my $in (1..MAXINVERTER) {                                                                         # Summe alle Inverter
-      $in      = sprintf "%02d", $in;
-      my $pvi  = InverterVal ($name, $in, 'igeneration', 0);
-      my $feed = InverterVal ($name, $in, 'ifeed',      '');
-      $pvgen   += $pvi;
-      $pv2grid += $pvi if($feed eq 'grid');
+      $in        = sprintf "%02d", $in;
+      my $pvi    = InverterVal ($name, $in, 'igeneration', 0);
+      my $feed   = InverterVal ($name, $in, 'ifeed',      '');
+      my $source = InverterVal ($name, $in, 'isource',  'pv');
+      $pvgen    += $pvi;
+      $pv2grid  += $pvi if($feed eq 'grid');
+      $batout   -= $pvi if($source eq 'bat');                                                           # Doppelgenerierung vermeiden !                                                         
   }
 
   my $othprod = 0;                                                                                      # Summe Otherproducer
@@ -26021,6 +26028,7 @@ to ensure that the system configuration is correct.
            <tr><td>                   </td><td>but can alternatively be the energy generation from a battery if 'strings=none' is specified.                    </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
            <tr><td> <b>etotal</b>     </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                            </td></tr>
+           <tr><td>                   </td><td><b>Note:</b>  If ‘<b>strings=none</b>’ is set, this key can be omitted or is not evaluated.                      </td></tr>
            <tr><td>                   </td><td>If the reading violates the specification of a continuously rising counter,                                      </td></tr>
            <tr><td>                   </td><td>SolarForecast handles this error and reports the situation by means of a log message.                            </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
@@ -26032,7 +26040,7 @@ to ensure that the system configuration is correct.
            <tr><td>                   </td><td>are defined in the <a href=“#SolarForecast-attr-setupInverterStrings”>setupInverterStrings</a> attribute.        </td></tr>
            <tr><td>                   </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                            </td></tr>
            <tr><td>                   </td><td>With ‘<b>strings=none</b>’, no strings are assigned to the inverter and it is assumed that                       </td></tr>
-           <tr><td>                   </td><td>this inverter is supplied by an existing battery as a direct current source.                                     </td></tr>
+           <tr><td>                   </td><td>this inverter is powered by an existing battery instead of PV modeules (battery inverter).                       </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
            <tr><td> <b>feed</b>       </td><td>Defines special properties of the device's energy supply (optional).                                             </td></tr>
            <tr><td>                   </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                                  </td></tr>
@@ -28558,7 +28566,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>pv</b>         </td><td>Reading welches die aktuelle Energie-Erzeugung als positiven Wert liefert. Üblicherweise ist es die PV-Energie,   </td></tr>
            <tr><td>                   </td><td>kann bei Angabe von 'strings=none' alternativ die Energie-Erzeugung aus einer Batterie sein.                      </td></tr>
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
-           <tr><td> <b>etotal</b>     </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler)                         </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler).                        </td></tr>
+           <tr><td>                   </td><td><b>Hinweis:</b>  Wird '<b>strings=none</b>' gesetzt, kann dieser Schlüssel entfallen bzw. wird nicht ausgewertet. </td></tr>
            <tr><td>                   </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                            </td></tr>
            <tr><td>                   </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                         </td></tr>
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
@@ -28570,7 +28579,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                   </td><td>werden im Attribut <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a> definiert.         </td></tr>
            <tr><td>                   </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.                 </td></tr>
            <tr><td>                   </td><td>Mit '<b>strings=none</b>' werden keine Strings dem Wechselrichter zugeordnet und es wird davon ausgegangen, dass  </td></tr>
-           <tr><td>                   </td><td>dieser Wechselrichter von einer vorhandenen Batterie als Gleichstromquelle gespeist wird.                         </td></tr>
+           <tr><td>                   </td><td>dieser Wechselrichter von einer vorhandenen Batterie anstatt PV-Modulen gespeist wird (Batteriewechselrichter).   </td></tr>
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
            <tr><td> <b>feed</b>       </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                                    </td></tr>
            <tr><td>                   </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.          </td></tr>
