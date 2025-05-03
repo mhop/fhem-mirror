@@ -47,9 +47,6 @@ BEGIN {
     GP_Import(
         qw(
           AttrVal
-          CommandAttr
-          CommandDeleteReading
-          FmtDateTime
           FW_ME
           SVG_FwFn
           getKeyValue
@@ -60,12 +57,7 @@ BEGIN {
           Log
           attr
           defs
-          devspec2array
-          deviceEvents
           init_done
-          minNum
-          maxNum
-          modules
           readingFnAttributes
           readingsBeginUpdate
           readingsBulkUpdate
@@ -76,8 +68,6 @@ BEGIN {
           readingsSingleUpdate
           ReadingsVal
           RemoveInternalTimer
-          setKeyValue
-          setNotifyDev
           )
     );
 }
@@ -100,6 +90,7 @@ sub Initialize() {
   $hash->{AttrFn}       = \&Attr;
   $hash->{AttrList}     = 
                           'activeArea ' .
+                          'intervalMultiplier:textField-long ' .
                           'disable:1,0 ' .
                           'disabledForIntervals ' .
                           'SVG_PlotsToShow:textField-long ' .
@@ -168,7 +159,7 @@ sub Define{
         },
         getAlarm                => {
           lasttime              => 0,
-          interval              => $YEARSEC,
+          interval              => $LONG_INTERVAL,
           readings              => {
             og                  => 'alarm_OffGrid',
             isce1               => 'alarm1_DCShortCircuitError',
@@ -178,7 +169,7 @@ sub Define{
         },
         getOnOff                => {
           lasttime              => 0,
-          interval              => $LONG_INTERVAL,
+          interval              => $YEARSEC,
           readings              => {
             status              => 'inverter_Status'
           },
@@ -291,7 +282,7 @@ sub callAPI {
 
   if ( !$update && $::init_done ) {
 
-    readingsSingleUpdate( $hash, 'state', 'initialized', 1 ) if ( $hash->{READINGS}{state}{VAL} != /initialized|connected/ );
+    readingsSingleUpdate( $hash, 'state', 'initialized', 1 ) if ( $hash->{READINGS}{state}{VAL} !~ /initialized|connected/ );
     my $url = $hash->{helper}{url};
     my $timeout = $hash->{helper}{timeout_api};
     my $command = $hash->{helper}{callStack}[0];
@@ -572,6 +563,47 @@ sub Attr {
     delete $hash->{READINGS}{'.associatedWith'} if ( $cmd eq 'del' );
     return;
 
+  ##########
+  } elsif ( $attrName eq 'intervalMultiplier' ) {
+
+    if( $cmd eq 'set' ) {
+
+      my @ivals = split( /\R/, $attrVal );
+
+      for my $ival (@ivals) {
+
+        if ( my ($cm, $val) = $ival =~ /^(getDeviceInfo|getMaxPower|getAlarm|getOnOff|getOutputData)=(\d+)$/ ) {
+
+          $hash->{helper}{cmds}{$cm}{interval} = $MAIN_INTERVAL * $val;
+
+        } else {
+
+          Log3 $name, 1, "$iam $cmd $attrName wrong syntax for $ival, default is used.";
+
+        }
+
+      }
+
+    } elsif( $cmd eq 'del' ) {
+
+      my @ivals = qw( getDeviceInfo=1051200 getMaxPower=1051200 getAlarm=20 getOnOff=1051200 getOutputData=10 );
+
+    for my $ival ( @ivals ) {
+
+        if ( my ($cm, $val) = $ival =~ /^(getDeviceInfo|getMaxPower|getAlarm|getOnOff|getOutputData)=(\d+)$/ ) {
+
+          $hash->{helper}{cmds}{$cm}{interval} = $MAIN_INTERVAL * $val;
+
+        }
+
+      }
+
+    }
+
+    Log3 $name, 3, "$iam $cmd $attrName to default interval multiplier.";
+
+    return;
+
   }
 
   return;
@@ -646,6 +678,21 @@ __END__
     <li><a id='APsystemsEZ1-attr-activeArea'>activeArea</a><br>
       <code>attr &lt;name&gt; activeArea &lt;active cell area in square meter&gt;</code><br>
       Calculates the power density if set.</li>
+
+    <li><a id='APsystemsEZ1-attr-intervalMultiplier'>intervalMultiplier</a><br>
+      <code>attr &lt;name&gt; intervalMultiplier &lt;line break separated pairs of endpoint=multiplier&gt;</code><br>
+      Changes the default polling interval for each endpoint based on the main interval of 30 s.<br>
+      Defaults:
+      <ul>
+      <code>
+        getDeviceInfo=1051200<br>
+        getMaxPower=1051200<br>
+        getAlarm=20<br>
+        getOnOff=1051200<br>
+        getOutputData=10<br>
+      </code>
+      </ul>
+    </li>
 
     <li><a id='APsystemsEZ1-attr-SVG_PlotsToShow'>SVG_PlotsToShow</a><br>
       <code>attr &lt;name&gt; SVG_PlotsToShow &lt;plot name1&gt; &lt;plot name2&gt; &lt;plot name3&gt; ...</code><br>
