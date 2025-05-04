@@ -33,6 +33,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.29.6" => "04.05.2025  fix Bug inv_BAT_UDC ./FHEM/76_SMAInverter.pm line 1432",
   "2.29.5" => "06.04.2025  fix Bug SBS_3.7 BatTemp",
   "2.29.4" => "25.01.2025  fix Bug isn't Argument ''-'' numeric in multiplication (*) at ./FHEM/76_SMAInverter.pm line 1377",
   "2.29.3" => "18.01.2025  fix Bug BAT_P_Charge/Discarge",
@@ -1429,7 +1430,7 @@ sub SMAInverter_getstatusDoParse($) {
 					 push(@row_array, ($sc?"bat_udc_c ":"BAT_UDC_C ").$inv_BAT_UDC_C."\n") if ($inv_BAT_UDC_C ne "-");                                                        
                  }
 				 if($sup_BatteryInfo_IDC) {
-                     push(@row_array, ($sc?"bat_udc ":"BAT_IDC ").$inv_BAT_UDC."\n");                                                       
+                     push(@row_array, ($sc?"bat_idc ":"BAT_IDC ").$inv_BAT_IDC."\n");                                                       
 					 push(@row_array, ($sc?"bat_idc_a ":"BAT_IDC_A ").$inv_BAT_IDC_A."\n") if ($inv_BAT_IDC_A ne "-");
 					 push(@row_array, ($sc?"bat_idc_b ":"BAT_IDC_B ").$inv_BAT_IDC_B."\n") if ($inv_BAT_IDC_B ne "-");
 					 push(@row_array, ($sc?"bat_idc_c ":"BAT_IDC_C ").$inv_BAT_IDC_C."\n") if ($inv_BAT_IDC_C ne "-"); 
@@ -3455,7 +3456,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.29.5",
+  "version": "v2.29.6",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
