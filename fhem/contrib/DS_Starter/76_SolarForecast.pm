@@ -11588,12 +11588,12 @@ sub _createSummaries {
 
   for my $in (1..MAXINVERTER) {                                                                         # Summe alle Inverter
       $in        = sprintf "%02d", $in;
-      my $pvi    = InverterVal ($name, $in, 'igeneration', 0);
-      my $feed   = InverterVal ($name, $in, 'ifeed',      '');
-      my $source = InverterVal ($name, $in, 'isource',  'pv');
+      my $pvi    = InverterVal ($name, $in, 'igeneration',   0);
+      my $feed   = InverterVal ($name, $in, 'ifeed', 'default');
+      my $source = InverterVal ($name, $in, 'isource',    'pv');
       $pvgen    += $pvi;
       $pv2grid  += $pvi if($feed eq 'grid');
-      $batout   -= $pvi if($source eq 'bat');                                                           # Doppelgenerierung vermeiden !                                                         
+      $batout   -= $pvi if($source eq 'bat');                                                           # Doppelberücksichtigung Bat+Inv vermeiden !                                                         
   }
 
   my $othprod = 0;                                                                                      # Summe Otherproducer
@@ -17007,12 +17007,12 @@ sub _flowGraphic {
   my $exth2cdist     = $paref->{flowgh2cDist};                                 # vertikaler Abstand Home -> Consumer Zeile
   my $lang           = $paref->{lang};
 
-  my $cgc            = ReadingsNum ($name, 'Current_GridConsumption', 0);
-  my $node2grid      = ReadingsNum ($name, 'Current_GridFeedIn',      0);      # vom Knoten zum Grid
-  my $cself          = ReadingsNum ($name, 'Current_SelfConsumption', 0);
-  my $cc             = CurrentVal  ($name, 'consumption',             0);
+  my $gcons     = ReadingsNum ($name, 'Current_GridConsumption', 0);
+  my $node2grid = ReadingsNum ($name, 'Current_GridFeedIn',      0);           # vom Inverter-Knoten zum Grid
+  my $cself     = ReadingsNum ($name, 'Current_SelfConsumption', 0);
+  my $consptn   = CurrentVal  ($name, 'consumption',             0);
 
-  my $cc_dummy  = $cc;
+  my $cons_dmy  = $consptn;
   my $scale     = FGSCALEDEF;
   my $pdist     = 130;                                                         # Abstand Producer zueinander
   my $hasbat    = 1;                                                           # initial Batterie vorhanden
@@ -17067,13 +17067,13 @@ sub _flowGraphic {
 
   ## definierte Producer + Inverter ermitteln und zusammenfassen
   ################################################################
-  my $pdcr    = {};                                                            # Hashref Producer
-  my $ppall   = 0;                                                             # Summe Erzeugung alle nicht PV-Producer
-  my $pv2node = 0;                                                             # Summe PV-Erzeugung alle Inverter
-  my $pv2grid = 0;
-  my $pv2bat  = 0;
-  my $bat2inv = 0;                                                             # Sonderfall Speisung Inverter aus Batterie statt PV
-  my $lfn     = 0;
+  my $pdcr        = {};                                                        # Hashref Producer
+  my $ppall       = 0;                                                         # Summe Erzeugung alle nicht PV-Producer
+  my $pv2node     = 0;                                                         # Summe PV-Erzeugung alle Inverter
+  my $pv2grid     = 0;
+  my $pv2bat      = 0;
+  my $dc2inv2node = 0;                                                         # Speisung Inverter aus Gleichstromquelle (nicht PV)
+  my $lfn         = 0;
 
   for my $pn (1..MAXPRODUCER) {
       $pn      = sprintf "%02d", $pn;
@@ -17100,15 +17100,15 @@ sub _flowGraphic {
 
       if (defined $p) {
           $p                     = __normDecPlaces ($p);
-          $pdcr->{$lfn}{pn}      = $in;                                        # Inverternummer
-          $pdcr->{$lfn}{feed}    = $feed;                                      # Eigenschaft der Energielieferung
-          $pdcr->{$lfn}{isource} = $isource;                                   # Art der Energiequelle (pv oder bat)
-          $pdcr->{$lfn}{ptyp}    = 'inverter';                                 # Typ des Producers
-          $pdcr->{$lfn}{p}       = $p;                                         # aktuelle PV
-          $pv2node              += $p if($feed    eq 'default');               # PV-Erzeugung Inverter für das Hausnetz
-          $pv2grid              += $p if($feed    eq 'grid');                  # PV nur für das öffentliche Netz
-          $pv2bat               += $p if($feed    eq 'bat');                   # Direktladen PV nur in die Batterie
-          $bat2inv              += $p if($isource eq 'bat');                   # Sonderfall Speisung Inverter aus Batterie statt PV
+          $pdcr->{$lfn}{pn}      = $in;                                                   # Inverternummer
+          $pdcr->{$lfn}{feed}    = $feed;                                                 # Eigenschaft der Energielieferung
+          $pdcr->{$lfn}{isource} = $isource;                                              # Art der Energiequelle (pv oder bat)
+          $pdcr->{$lfn}{ptyp}    = 'inverter';                                            # Typ des Producers
+          $pdcr->{$lfn}{p}       = $p;                                                    # aktuelle PV
+          $pv2node              += $p if($feed eq 'default' && $isource eq 'pv');         # PV-Erzeugung Inverter für das Hausnetz
+          $pv2grid              += $p if($feed eq 'grid'    && $isource eq 'pv');         # PV nur für das öffentliche Netz
+          $pv2bat               += $p if($feed eq 'bat'     && $isource eq 'pv');         # Direktladen PV nur in die Batterie
+          $dc2inv2node          += $p if($feed eq 'default' && $isource eq 'bat');        # Fall Speisung Inverter aus Batterie statt PV
 
           $lfn++;
       }
@@ -17116,30 +17116,34 @@ sub _flowGraphic {
 
   ## Batterie Werte verarbeiten
   ###############################
-  my $bat2home        = $batout - $bat2inv;
-  $bat2home           = $bat2home >= 0 ? $bat2home : 0;
-  my $grid2home_style = $cgc      ? "$stna active_sig"    : "$stna inactive";             # cgc = current GridConsumption
-  my $bat2home_style  = $bat2home ? "$stna active_normal" : "$stna inactive";
-  my $bat2inv_style   = $bat2inv  ? "$stna active_normal" : "$stna inactive";             # Batterie zu Inverter mit source=bat
+  my $node2bat          = 0;                                                              # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)
+  $node2bat             = $pv2bat * -1 if($pv2bat);                                       # vorbelegen falls Batterie Idle und Smartloader arbeitet                               
+  my $bat2home          = 0;
+  #my $bat2home          = $batout - $dc2inv2node;                                        # V 1.51.9
+  #$bat2home             = $bat2home >= 0 ? $bat2home : 0;                                # V 1.51.9
+  my $grid2home_style   = $gcons       ? "$stna active_sig"    : "$stna inactive";        # GridConsumption
+  my $bat2home_style    = $bat2home    ? "$stna active_normal" : "$stna inactive";
+  my $dc2inv2node_style = $dc2inv2node ? "$stna active_normal" : "$stna inactive";        # Batterie zu Inverter mit source=bat
   
-  my $cgc_direction   = "M250,515 L670,590";
+  my $gcons_direction    = "M250,515 L670,590";
+  my $bat2home_direction = "M1200,515 L730,590";
 
-  if ($bat2home) {                                                                        # Batterie wird entladen
-      my $cgfo = $node2grid - $pv2node;                                                   # pv2node = PV-Erzeugung Inverter für das Hausnetz
+  if ($batout) {                                                                          # Batterie wird entladen
+      $node2bat  = $batout + $pv2bat - $dc2inv2node;                                      # negativ - Richtung Bat -> Inv.Knoten
+      $node2bat *= -1;
+      my $cgfo   = $node2grid - ($pv2node + $dc2inv2node);                                # pv2node + $dc2inv2node = PV-Erzeugung Inverter für das Hausnetz
 
       if ($cgfo > 1) {
           $grid2home_style = "$stna active_normal";
-          $cgc_direction   = "M670,590 L250,515";
-          $node2grid      -= $cgfo;
-          $cgc             = $cgfo;
+          $gcons_direction = "M670,590 L250,515";
+          # $node2grid    -= $cgfo;                                                       # V 1.51.9
+          $gcons           = $cgfo;                                                   
       }
   }
 
-  my $bat2home_direction = "M1200,515 L730,590";
-  my $node2bat           = $batin;
-
   if ($batin) {                                                                          # Batterie wird geladen
-      my $home2bat = $batin - ($ppall + $pv2node + $pv2bat);                             # V 1.46.4: add $ppall
+      $node2bat    = $batin - ($pv2bat - $dc2inv2node);                                  # positiv - Richtung Knoten -> Bat
+      my $home2bat = $batin - ($ppall + $pv2node + $pv2bat + $dc2inv2node);              # V 1.46.4: add $ppall, V 1.51.9 add $dc2inv2node
 
       if ($home2bat > 1) {                                                               # Batterieladung anteilig aus Hausnetz
           $node2bat           -= $home2bat;
@@ -17148,7 +17152,7 @@ sub _flowGraphic {
           $bat2home            = $home2bat;
       }
   }
-
+ 
   ## Producer / Inverter Koordninaten Steuerhash
   ################################################
   my ($togrid, $tonode, $tobat, $toinv) = __sortProducer ($pdcr);                        # lfn Producer sortiert nach ptyp und feed
@@ -17178,8 +17182,7 @@ sub _flowGraphic {
 
   ## Knotensummen Erzeuger - Batterie - Home ermitteln
   ######################################################
-  my $pnodesum   = __normDecPlaces ($ppall + $pv2node);                                 # Erzeugung Summe im Knoten
-  $node2bat     -= $pv2bat;                                                             # Knoten-Bat -> abzüglich Direktladung (pv2bat)
+  my $pnodesum   = __normDecPlaces ($ppall + $pv2node + $dc2inv2node);                  # Erzeugung Summe im Inverter-Knoten
   $pnodesum     += $node2bat < 0 ? abs $node2bat : 0;                                   # V 1.46.4 - Batterie ist voll und SolarLader liefert an Knoten
   my $node2home  = $pnodesum - $node2grid - ($node2bat > 0 ? $node2bat : 0);            # V 1.46.4 - Energiefluß vom Knoten zum Haus
   $node2home     = __normDecPlaces ($node2home);                                        # V 1.46.4
@@ -17205,8 +17208,8 @@ sub _flowGraphic {
   my $svgstyle   = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani  ? '@keyframes dash { to { stroke-dashoffset: 0; } }' : '';     # Animation Ja/Nein
 
-  my $grid_color = $node2grid                        ? "$stna grid_green" :
-                   !$node2grid && !$cgc && $bat2home ? "$stna grid_gray"  :
+  my $grid_color = $node2grid                          ? "$stna grid_green" :
+                   !$node2grid && !$gcons && $bat2home ? "$stna grid_gray"  :
                    "$stna grid_red";
 
   my $strokecolstd = CurrentVal ($name, 'strokecolstd',         STROKCOLSTDDEF);
@@ -17297,7 +17300,7 @@ END0
                                               }
                                             );
 
-          $cc_dummy       -= $currentPower;
+          $cons_dmy       -= $currentPower;
           $cicon           = FW_makeImage    ($cicon, '');
           ($scale, $cicon) = __normIconScale ($name, $cicon);
 
@@ -17356,7 +17359,7 @@ END1
                                          name => $name,
                                          pn    => '',
                                          ptyp  => 'consumerdummy',
-                                         pcurr => $cc_dummy,
+                                         pcurr => $cons_dmy,
                                          lang  => $lang
                                        }
                                      );  
@@ -17379,7 +17382,7 @@ END1
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
   <path id="node2home_$stna" class="$node2home_style" d="M700,400 L700,580" />
   <path id="node2grid_$stna" class="$node2grid_style" d="M670,400 L250,480" />
-  <path id="grid2home_$stna" class="$grid2home_style" d="$cgc_direction" />
+  <path id="grid2home_$stna" class="$grid2home_style" d="$gcons_direction" />
 END2
 
   ## Laufketten PV->Batterie, Batterie->Home
@@ -17399,11 +17402,11 @@ END3
   ##############################
    if ($flowgconX) {
       my $consumer_style = "$stna inactive";
-      $consumer_style    = "$stna active_normal" if($cc_dummy > 1);                           # current consumption Dummy
+      $consumer_style    = "$stna active_normal" if($cons_dmy > 1);                           # current consumption Dummy
       my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
-      if ($cc_dummy > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
-          $chain_color = 'style="stroke: #'.__dynColor ($cc_dummy, $strokeredlim).';"';
+      if ($cons_dmy > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
+          $chain_color = 'style="stroke: #'.__dynColor ($cons_dmy, $strokeredlim).';"';
       }
 
       $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};  # M790,690 → Move To (Startpunkt bei x=790, y=690), L1200,690 → Line To (Zeichnet eine Linie von 790,690 nach 1200,690)
@@ -17490,19 +17493,20 @@ END3
 
   ## Textangaben an Grafikelementen
   ###################################
-  $cc_dummy = sprintf "%.0f", $cc_dummy;                                                           # Verbrauch Dummy-Consumer
-  $bat2home = __normDecPlaces ($bat2home);
-  $node2bat = __normDecPlaces ($node2bat);
+  $cons_dmy    = sprintf "%.0f", $cons_dmy;                                                           # Verbrauch Dummy-Consumer
+  $bat2home    = __normDecPlaces ($bat2home);
+  $dc2inv2node = __normDecPlaces ($dc2inv2node);
+  $node2bat    = __normDecPlaces ($node2bat);
 
   $ret .= qq{<text class="$stna text" id="nodetxt_$stna"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}    if ($pnodesum > 0);
   $ret .= qq{<text class="$stna text" id="batsoctxt_$stna"    x="1380" y="520" style="text-anchor: start;">$soc %</text>}       if ($hasbat);                         # Lage Text Batterieladungszustand
   $ret .= qq{<text class="$stna text" id="node2hometxt_$stna" x="730"  y="520" style="text-anchor: start;">$node2home</text>}   if ($node2home);
   $ret .= qq{<text class="$stna text" id="node2gridtxt_$stna" x="420"  y="420" style="text-anchor: end;">$node2grid</text>}     if ($node2grid);
-  $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="420"  y="610" style="text-anchor: end;">$cgc</text>}           if ($cgc);
+  $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="420"  y="610" style="text-anchor: end;">$gcons</text>}         if ($gcons);
   $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}    if ($bat2home && $hasbat);
   $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="1000" y="420" style="text-anchor: start;">$node2bat</text>}    if ($node2bat && $hasbat);
-  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$cc</text>};                                                 # Current_Consumption Anlage
-  $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1380" y="710" style="text-anchor: start;">$cc_dummy</text>}    if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
+  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$consptn</text>};                                                 # Current_Consumption Anlage
+  $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1380" y="710" style="text-anchor: start;">$cons_dmy</text>}    if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
 
   ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ## Textangabe nur anzeigen wenn Producerzeile angezeigt werden soll
