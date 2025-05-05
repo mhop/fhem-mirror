@@ -627,7 +627,7 @@ __END__
 <a id="APsystemsEZ1" ></a>
 <h3>APsystemsEZ1</h3>
 <ul>
-  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href=""> APsystemsEZ1</a><br>
+  <u><b>FHEM-FORUM:</b></u> <a target="_blank" href="https://forum.fhem.de/index.php?topic=141576.0"> APsystemsEZ1</a><br>
   <br><br>
   <u><b>Introduction</b></u>
   <br><br>
