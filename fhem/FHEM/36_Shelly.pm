@@ -155,7 +155,11 @@
 # 6.03      new: commands script_start, script_stop
 #           fix: recognition of ShellyI4Gen3
 # 6.03.1    change of some log levels
+# 6.03.2    new: some new devices gen4/mini and others
+#           fix: Gen2-energy-meter: incomplete dropdown for attribute 'showunits'
+#           fix: Gen2-energy-meter: missing reading ct_type
 
+# to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
 #           get status on stopp even when interval == 0
 
@@ -178,7 +182,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.03.1 18.03.2025";
+my $version = "6.03.2 06.05.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -187,8 +191,8 @@ my %shelly_firmware = (  # latest known versions  # as of 29.08.2024
     # used by sub Shelly_firmwarecheck
     "gen1"        => "1.14.0",   # v1.14.1-rc1
     "shelly4"     => "1.6.6",
-    "gen2"        => "1.3.3",   # some:  1.4.4  v1.5.0-beta2
-    "walldisplay" => "2.2.1"         # v2.3.0-beta5
+    "gen2"        => "1.5.1",   # some:  1.6.0
+    "walldisplay" => "2.3.6"
     );
 
 #-- Time slices in seconds for time zone Germany CET/CEST
@@ -201,18 +205,21 @@ my %periods = (
    "dayQ"   => [3600,7200,21600],          #  day quarter
    "dayT"   => [10800,14400,28800],        #  day third  =  3x8h:   06:00 -  14:00  -  22:00
    "day"    => [3600,7200,86400],
-   "Week"   => [-342000,-338400,604800]    # offset=-4x24x3600 + 3600 + $isdst x 3600
+   "Week"   => [-342000,-338400,604800],    # offset=-4x24x3600 + 3600 + $isdst x 3600
+   "Month"  => [0,0,0],
+   "Year"   => [0,0,0]    # len=365x24x3600=31536000  +  is_schaljahr x 24x3600
 );
 
 my %attributes = (
-  "modes"          => " mode:relay,roller,white,color",
+  "modes"         => " mode:relay,roller,white,color",
   "multichannel"  => " defchannel",
   "roller"        => " pct100:open,closed maxtime maxtime_close maxtime_open slat_control slat_pos",
   "dimmer"        => " dimstep",
   "input"         => " showinputs:show,hide",
   "emeter"        => " Energymeter_F Energymeter_P Energymeter_R EMchannels:ABC_,L123_,_ABC,_L123".
-                     " Periods:multiple-strict,Week,day,dayT,dayQ,hour,hourQ,hourT,min".                 # @keys = keys %periods   descending order is used by Shelly_procEnergyData()
                      " PeriodsCorr-F Balancing:0,1 interval_power",
+  "emPeriods"     => " Periods:multiple-strict,Week,day,dayT,dayQ,hour,hourQ,hourT,min",   #   Year,Month,
+                                        # @keys = keys %periods   descending order is used by Shelly_procEnergyData()
   "metering"      => " maxpower",
   "showunits"     => " showunits:none,original,normal,normal2,ISO"
 );
@@ -247,7 +254,7 @@ my %shelly_vendor_ids = (
     # value 0:  the 'model' attribute used by the Fhem
     # value 1:  the 'Device name' as in KB 
     # value 2:  the 'Device Bluetooth ID', Gen3 only
-    # Gen1 devices
+    ## Gen1 devices
     "SHSW-1"     => ["shelly1",        "Shelly 1"],   ## no power metering
     "SHSW-PM"    => ["shelly1pm",      "Shelly 1PM"],
     "SHSW-L"     => ["shelly1L",       "Shelly 1L"],  ## with AC power metering
@@ -282,7 +289,7 @@ my %shelly_vendor_ids = (
     "SHMOS-01"   => ["generic",        "Shelly Motion"],        ## motion sensor
     "SHMOS-02"   => ["generic",        "Shelly Motion 2"],      ## motion sensor 2
     "SHSEN-1"    => ["generic",        "Shelly motion & ir-controller"],  ## not listed in KB
-    # Plus devices  ## 2nd Gen
+    ## Plus devices  ## 2nd Gen
     "SNSW-001X16EU" => ["shellyplus1",      "Shelly Plus 1"],
     "SNSW-001P16EU" => ["shellyplus1pm",    "Shelly Plus 1PM"],
     "SNSW-001P15UL" => ["shellyplus1pm",    "Shelly Plus 1PM UL"],  ## new
@@ -306,7 +313,7 @@ my %shelly_vendor_ids = (
     "SNSW-001X8EU"    => ["shellyplus1",    "Shelly Plus 1 Mini"],
     "SNSW-001P8EU"    => ["shellyplus1pm",  "Shelly Plus 1PM Mini"],
     "SNPM-001PCEU16"  => ["shellypmmini",   "Shelly Plus PM Mini"],
-    # Gen3 Devices
+    ## Gen3 Devices
     "S3SW-001X16EU"   => ["shellyplus1",    "Shelly 1 Gen3",           0x1018],   ##new
     "S3SW-001P16EU"   => ["shellyplus1pm",  "Shelly 1PM Gen3",         0x1019],   ##new
     "S3SW-002P16EU"   => ["shellyplus2pm",  "Shelly 2PM Gen3",         0x1005],   # added 10/2024
@@ -322,9 +329,16 @@ my %shelly_vendor_ids = (
     "S3PL-20112EU"    => ["shellyplusplug", "Shelly Outdoor Plug S Gen3",0x1853],   # added 02/2025
     ## Mini Gen3 Devices
     "S3SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen3",      0x1015],
-    "S3SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1 PM Mini Gen3",   0x1016],
+    "S3SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1PM Mini Gen3",    0x1016],
     "S3PM-001PCEU16"  => ["shellypmmini",   "Shelly PM Mini Gen3",     0x1023],
-    # 2nd Gen PRO devices
+    ## Gen4 Devices
+    "S4SW-001X16EU"   => ["shellyplus1",    "Shelly 1 Gen4",           0x1028],   # added 03/2025
+    "S4SW-001P16EU"   => ["shellyplus1pm",  "Shelly 1PM Gen4",         0x1019],   # added 03/2025
+    ## Mini Gen4 Devices
+    "S4SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen4",      0x1030],   # added 03/2025
+    "S4SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1PM Mini Gen4",    0x1031],   # added 03/2025
+    "S4EM-001PXCEU16" => ["shellypmmini",   "Shelly EM Mini Gen4",     0x1033],   # added 03/2025
+    ## 2nd Gen PRO devices
     "SPSW-001XE16EU"  => ["shellypro1",     "Shelly Pro 1"],      ## not listed by KB
     "SPSW-201XE16EU"  => ["shellypro1",     "Shelly Pro 1 v.1"],
     "SPSW-001PE16EU"  => ["shellypro1pm",   "Shelly Pro 1PM"],    ## not listed by KB
@@ -334,9 +348,10 @@ my %shelly_vendor_ids = (
     "SPSW-002PE16EU"  => ["shellypro2pm",   "Shelly Pro 2PM"],    ## not listed by KB
     "SPSW-202PE16EU"  => ["shellypro2pm",   "Shelly Pro 2PM v.1"],
     "SPSH-002PE16EU"  => ["shellyprodual",  "Shelly Pro Dual Cover/Shutter PM"],
+    "SPCC-001PE10EU"  => ["shellyplus010v", "Shelly Pro Dimmer 0/1-10V PM",   0x2011],    # addes 03/2025  <<< 1V base not supported here
     "SPDC-0D5PE16EU"  => ["shellyplusrgbwpm", "Shelly Pro RGBWW PM",  0x2012],    # added 02/2025  <<<< two channels of White not supported here
-    "SPDM-001PE01EU"  => ["shellyprodm1pm", "Shelly Pro Dimmer 1PM"], ##new
-    "SPDM-002PE01EU"  => ["shellyprodm2pm", "Shelly Pro Dimmer 2PM"],
+    "SPDM-001PE01EU"  => ["shellyprodm1pm", "Shelly Pro Dimmer 1PM",  0x200D],    ##new
+    "SPDM-002PE01EU"  => ["shellyprodm2pm", "Shelly Pro Dimmer 2PM",  0x200E],
     "SPSW-003XE16EU"  => ["shellypro3",     "Shelly Pro 3"],
     "SPEM-003CEBEU"   => ["shellypro3em",   "Shelly Pro 3EM"],
     "SPEM-003CEBEU400"=> ["shellypro3em",   "Shelly Pro 3EM-400"],
@@ -346,7 +361,8 @@ my %shelly_vendor_ids = (
     "SPSW-104PE16EU"  => ["shellypro4pm",   "Shelly Pro 4PM V2"],
     # Android Devices / Control Panels
     "SAWD-0A1XX10EU1" => ["walldisplay1",   "Shelly Wall Display"], ## prelim version ?  ## not listed by KB
-    "SAWD1"           => ["walldisplay1",   "Shelly Wall Display"]
+    "SAWD1"           => ["walldisplay1",   "Shelly Wall Display"],
+    "SAWD-2A1XX10EU1" => ["walldisplay1",   "Shelly Wall Display", 0x3002]    # added 03/2025
     );
 
 my %shelly_family = (
@@ -419,6 +435,7 @@ my %shelly_models = (
     "shellypro3em"  => [0,0,0, 0,1,0,  3,0,2],    # has one (1) three-phase meter in triphase profile or (3) meter in monophase-profile
     "shellyprodual" => [0,2,0, 4,1,4,  0,0,0],
     "shellypmmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to ShellyPlusPM
+    #-- Android devices
     "walldisplay1"  => [1,0,0, 0,2,1,  0,0,0]     # similar to ShellyPlus1PM
     #-- 3rd generation devices (not covered by plus or pro devices)
     );
@@ -868,6 +885,7 @@ sub Shelly_Initialize ($) {
                      $attributes{'showunits'}.
                      " webhook:".join(",",devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1')).   ## none,
                      $attributes{'emeter'}.
+                     $attributes{'emPeriods'}.
                      " verbose:0,1,2,3,4,5".
                      " host_dns host_ip".
                      " ".$readingFnAttributes;
@@ -1348,9 +1366,12 @@ sub Shelly_Attr(@) {
           $hash->{helper}{powerNeg} = 0;
 
     }elsif( $attrVal eq "shellypmmini" ){
-          $hash->{'.AttrList'} =~ s/$attributes{'emeter'}/" Periods:multiple-strict,Week,day,dayT,dayQ,hour,hourQ,hourT,min"/e; #allow Periods attribute
+          #allow Periods attribute
+          #$hash->{'.AttrList'} =~ s/$attributes{'emeter'}/" Periods:multiple-strict,Year,Month,Week,day,dayT,dayQ,hour,hourQ,hourT,min"/e; 
+          $hash->{'.AttrList'} =~ s/$attributes{'emeter'}/""/e; 
     }else{
           $hash->{'.AttrList'} =~ s/$attributes{'emeter'}/""/e;
+          $hash->{'.AttrList'} =~ s/$attributes{'emPeriods'}/""/e;
     }
 
     if( $shelly_models{$attrVal}[1]==0 ){  #no roller
@@ -1358,7 +1379,7 @@ sub Shelly_Attr(@) {
           delete $hash->{MOVING}; # ?really necessary?
     }
 
-    if( $shelly_models{$attrVal}[3]==0 ){  #no metering, eg. shellyi3  but we have units for RSSI
+    if( $shelly_models{$attrVal}[3]==0 && $shelly_models{$attrVal}[6]==0 ){  #no metering, eg. shellyi3  but we have units for RSSI
           $hash->{'.AttrList'} =~ s/$attributes{'metering'}/""/e;
           $hash->{'.AttrList'} =~ s/$attributes{'showunits'}/" showunits:none,original"/e;  # shellyuni measures voltage
     }
@@ -1772,7 +1793,7 @@ sub Shelly_Attr(@) {
       return $error;
     }
     my $RP; # Readings-postfix
-    my @keys = keys %periods;   #"min","hourT","hourQ","hour","dayQ","dayT","day","Week"
+    my @keys = keys %periods;   #"min","hourT","hourQ","hour","dayQ","dayT","day","Week", Month, "Year"
     if( $cmd eq "del"){
         foreach $RP ( @keys ){
             fhem("deletereading $name .*_$RP");
@@ -4354,8 +4375,8 @@ sub Shelly_status2G {
   my $mode  = AttrVal($name,"mode","");
 
   my ($comp,$channels,$channel,$id);
-    #(   0      1       2         3    4    5       6    7     8)
-    #(relays,rollers,dimmers,  meters, NG,inputs,  res.,color,modes)
+    #(    0     1     2           3    4    5       6    7    8)
+    #(relays,rollers,dimmers,  meters, NG,inputs,  EM,color,modes)
   my @chnls=@{$shelly_models{$model}};   # extract the array of 'model' out of the hash 
   
   # check we don't have a first gen device
@@ -5156,7 +5177,7 @@ sub Shelly_settings2G {
             readingsBulkUpdateMonitored($hash,"thermostat_relay_mode",  $output );
         }
         # EnergyMeter: CT Types
-        if( $shelly_models{$model}[3]>0 && ReadingsVal($name,"model_function","unknown") eq "energy meter" ){
+        if( $shelly_models{$model}[6]>0 && ReadingsVal($name,"model_function","unknown") eq "energy meter" ){
             readingsBulkUpdateMonitored($hash,"ct_type",  ($jhash->{'em:0'}{ct_type} // ($jhash->{'em1:0'}{ct_type} // "unknown")) );
         }
             
@@ -5628,7 +5649,7 @@ sub Shelly_procEMvalues {
           $hash->{helper}{'react_power'} += $reactive_power;
           $hash->{helper}{'current'} += $current;
           
-          if( $id == $shelly_models{$model}[3]-1 ){ 
+          if( $id == $shelly_models{$model}[6]-1 ){ 
             # write out cumulated values when passed last channel 
             foreach my $helper( 'act_power','aprt_power','react_power','current' ){
                if( $suffix =~ /^_/ ){ # _ABC  _L123
@@ -5647,7 +5668,7 @@ sub Shelly_procEMvalues {
   readingsEndUpdate($hash,1);
   #~~~~~~~~~~~~~~~~~~~~~
   
-  if( ReadingsVal($name,"model_profile","monophase") ne "triphase"    &&    ++$id < $shelly_models{$model}[3] ){
+  if( ReadingsVal($name,"model_profile","monophase") ne "triphase"    &&    ++$id < $shelly_models{$model}[6] ){
          Shelly_HttpRequest($hash,"/rpc/EM1.GetStatus","?id=$id","Shelly_procEMvalues" );
          return;
   }
@@ -5855,7 +5876,7 @@ sub Shelly_procEnergyData {
   }  # Balancing/ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      
   readingsEndUpdate($hash,1);
 
-  if( ReadingsVal($name,"model_profile","monophase") ne "triphase"    &&    ++$id < $shelly_models{$model}[3] ){
+  if( ReadingsVal($name,"model_profile","monophase") ne "triphase"    &&    ++$id < $shelly_models{$model}[6] ){
          Shelly_HttpRequest($hash,"/rpc/EM1Data.GetStatus","?id=$id","Shelly_procEnergyData" );
          return;
   }
@@ -5867,7 +5888,7 @@ sub Shelly_procEnergyData {
       #    $reading = $pr.$mapping{E1}{'total_'}.$ps;
       foreach my $reading( "Purchased_Energy","Returned_Energy","Total_Energy" ){
           $value=0;
-          #   for( my $i=0; $i<$shelly_models{$model}[3]; $i++){
+          #   for( my $i=0; $i<$shelly_models{$model}[6]; $i++){
           foreach my $idx( "A","B","C" ){
               last unless( ReadingsNum($name,"$reading\_$idx",undef) );
               $val = ReadingsVal($name,"$reading\_$idx",0) =~ /(\d+.?\d+)\s(\S*)/;
@@ -7192,7 +7213,18 @@ sub Shelly_readingsBulkUpdate($$$@){ # derived from fhem.pl readingsBulkUpdateIf
         }elsif( $value == -1 && $flag == 4 ){   # time=4
              return;
         }elsif( $flag == 5 && $hash->{units} ){  #  time=5
-             $value .= " sec, last reboot at ".FmtDateTime(time()-$value);
+             my $seconds = $value;  # $value is uptime of device in seconds
+             my $num;
+             $value .= " sec";
+             if(    $seconds > 31536000 ){ $value .= " (more than a year)"; }
+             elsif( $seconds > 5184000 ) { $num = int($seconds/2592000); # 30 day per month
+                                           $value .= " (more than $num months)"; }
+             elsif( $seconds > 2678400 ) { $value .= " (more than a month)"; }  # 31 days
+             elsif( $seconds > 192800 )  { $num = int($seconds/86400); # 24 hrsm per day
+                                           $value .= " (more than $num days)"; }
+             elsif( $seconds > 86400 )   { $value .= " (more than a day)"; }
+             else                        { $value .= " (less than a day)"; } # don't worry if it is exactly a day
+             $value .= ", last reboot at ".FmtDateTime(time()-$seconds);
         }elsif( AttrVal($name,"showunits","none") ne "none" ){
             $value .= $si_units{$unit}[1];  # add a si-units string to the reading
         }

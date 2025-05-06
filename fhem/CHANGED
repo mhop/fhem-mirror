@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 36_Shelly: energy-meter incomplete dropdown, missing reading ct_type
  - bugfix: 76_SMAInverter.pm: fix inv_BAT_UDC line 1432
  - bugfix:  76_SolarForecast: Version 1.51.8
  - feature: 76_SolarForecast: Version 1.51.7
