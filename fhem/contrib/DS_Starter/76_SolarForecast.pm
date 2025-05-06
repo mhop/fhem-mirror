@@ -160,8 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.51.9" => "03.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
-                           "valInverter: add isource ",
+  "1.52.0" => "06.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
+                           "valInverter: add isource & ireverse, _flowGraphic: add battery inverter type and extensive adjustments ".
+						   "code cleaning ",
   "1.51.8" => "02.05.2025  _specialActivities: delete overhanging days at the change of month ". 
                            "Bugfix: https://forum.fhem.de/index.php?msg=1340666 ",
   "1.51.7" => "01.05.2025  __createAdditionalEvents: optimized for SVG 'steps', new key plantControl->genPVforecastsToEvent ".
@@ -454,12 +455,9 @@ use constant {
   AIBCTHHLD      => 0.2,                                                            # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
   AITRSTARTDEF   => 2,                                                              # default Stunde f. Start AI-Training
   AISTDUDEF      => 1825,                                                           # default Haltezeit KI Raw Daten (Tage)
-  AISPREADUPLIM  => 120,                                                            # obere Abweichungsgrenze (%) AI 'Spread' von API Prognose
-  AISPREADLOWLIM => 80,                                                             # untere Abweichungsgrenze (%) AI 'Spread' von API Prognose
   AIACCUPLIM     => 150,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
-  AISPREADTRNMIN => 5500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Spreaded"
 
   SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
   FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
@@ -1652,10 +1650,10 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $av = 'obsolete#-#use#attr#graphicControl#instead';
-  #my $av1 = 'obsolete#-#will#be#deleted#soon';
-  my $av2 = 'obsolete#-#use#attr#graphicSelect#instead';
-  $hash->{AttrList} .= " graphicLayoutType:$av graphicHourStyle:$av graphicHeaderDetail:$av graphicSpaceSize:$av graphicBeamWidth:$av graphicHourCount:$av graphicEnergyUnit:$av graphicHeaderShow:$av2 ";
+  # my $av = 'obsolete#-#use#attr#graphicControl#instead';
+  # my $av1 = 'obsolete#-#will#be#deleted#soon';
+  # my $av2 = 'obsolete#-#use#attr#graphicSelect#instead';
+  # $hash->{AttrList} .= " graphicLayoutType:$av graphicHeaderShow:$av2 ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -5970,25 +5968,25 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^graphicLayoutType|graphicHourStyle|graphicHeaderDetail|graphicSpaceSize|graphicBeamWidth|graphicHourCount|graphicEnergyUnit$/) {      # 28.04.
-      my $msg  = "The attribute $aName is replaced by 'graphicControl'.";
-      if (!$init_done) {
-          Log3 ($name, 1, "$name - $msg");
-      }
-      else {
-          return $msg;
-      }
-  }
+  #if ($cmd eq 'set' && $aName =~ /^graphicLayoutType$/) {      # 28.04.
+  #    my $msg  = "The attribute $aName is replaced by 'graphicControl'.";
+  #    if (!$init_done) {
+  #        Log3 ($name, 1, "$name - $msg");
+  #    }
+  #    else {
+  #        return $msg;
+  #    }
+  #}
   
-  if ($cmd eq 'set' && $aName =~ /^graphicHeaderShow$/) {                          # 15.04.
-      my $msg  = "The attribute $aName is replaced by 'graphicSelect'.";
-      if (!$init_done) {
-          Log3 ($name, 1, "$name - $msg");
-      }
-      else {
-          return $msg;
-      }
-  }
+  #if ($cmd eq 'set' && $aName =~ /^graphicHeaderShow$/) {                          # 15.04.
+  #    my $msg  = "The attribute $aName is replaced by 'graphicSelect'.";
+  #    if (!$init_done) {
+  #        Log3 ($name, 1, "$name - $msg");
+  #    }
+  #    else {
+  #        return $msg;
+  #    }
+  #}
   
   #if ($cmd eq 'set' && $aName =~ /^affectSolCastPercentile$/) {
   #    my $msg1 = "The attribute $aName is obsolete and will be deleted soon. Please press 'save config' when restart is finished.";
@@ -6927,6 +6925,7 @@ sub _attrInverterDev {                   ## no critic "not used"
   
   my $valid = {
       pv        => '',
+      reverse   => '',
       etotal    => '',
       capacity  => '',
       strings   => '',
@@ -6970,8 +6969,20 @@ sub _attrInverterDev {                   ## no critic "not used"
               return qq{If 'strings=none' is defined, no other string may be specified.};
           }
       }
+      
+      if ($none && !$h->{reverse}) {
+          return qq{A battery inverter requires a set key 'reverse'. Please consider the commandref.};
+      }
+      
+      if ($none && $h->{etotal}) {
+          return qq{A battery inverter don't need the key 'etotal'. Please delete this key.};
+      }
+      
+      if (!$none && $h->{reverse}) {
+          return qq{An inverter with connected solar cells don't need the key 'reverse'. Please delete this key.};
+      }
 
-      if (!$h->{pv} || (!$h->{etotal} && !$none) || !$h->{capacity}) { 
+      if (!$h->{pv} || (!$none && !$h->{etotal}) || !$h->{capacity}) { 
           return qq{One or more of the keys 'pv, etotal, capacity' are missing. Please consider the commandref.};
       }
 
@@ -6997,7 +7008,9 @@ sub _attrInverterDev {                   ## no critic "not used"
       delete $data{$name}{inverters}{$in}{istrings};
       delete $data{$name}{inverters}{$in}{iasynchron};
       delete $data{$name}{inverters}{$in}{ifeed};
-      delete $data{$name}{inverters}{$in}{isource};                   
+      delete $data{$name}{inverters}{$in}{isource};
+      delete $data{$name}{inverters}{$in}{ietotal}; 
+      delete $data{$name}{inverters}{$in}{ireverse};       
   }
   elsif ($paref->{cmd} eq 'del') {
       delete $data{$name}{inverters}{$in};
@@ -8628,69 +8641,14 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ########################################################################################################################
-  my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
-  my $gco = AttrVal ($name, 'graphicControl', '');
+  #my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
+  #my $gco = AttrVal ($name, 'graphicControl', '');
 
-  if (defined $gbw) {
-      my $newval = $gco." beamWidth=$gbw";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicBeamWidth"); 
-  }
-  
-  my $ghc = AttrVal ($name, 'graphicHourCount', undef);                 # 27.04.
-  $gco    = AttrVal ($name, 'graphicControl', '');
-
-  if (defined $ghc) {
-      my $newval = $gco." hourCount=$ghc";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicHourCount"); 
-  }
-  
-  my $geu = AttrVal ($name, 'graphicEnergyUnit', undef);                 # 27.04.
-  $gco    = AttrVal ($name, 'graphicControl', '');
-
-  if (defined $geu) {
-      my $newval = $gco." energyUnit=$geu";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicEnergyUnit"); 
-  }
-  
-  my $gss = AttrVal ($name, 'graphicSpaceSize', undef);                 # 28.04.
-  $gco    = AttrVal ($name, 'graphicControl', '');
-
-  if (defined $gss) {
-      my $newval = $gco." spaceSize=$gss";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicSpaceSize"); 
-  }
-  
-  my $ghd = AttrVal ($name, 'graphicHeaderDetail', undef);                 # 28.04.
-  $gco    = AttrVal ($name, 'graphicControl', '');
-
-  if (defined $ghd) {
-      my $newval = $gco." headerDetail=$ghd";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicHeaderDetail"); 
-  }
-  
-  my $ghs = AttrVal ($name, 'graphicHourStyle', undef);                 # 28.04.
-  $gco    = AttrVal ($name, 'graphicControl', '');
-
-  if (defined $ghs) {
-      my $newval = $gco." hourStyle=$ghs";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicHourStyle"); 
-  }
-  
-  my $glt = AttrVal ($name, 'graphicLayoutType', undef);                 # 28.04.
-  $gco    = AttrVal ($name, 'graphicControl', '');
-
-  if (defined $glt) {
-      my $newval = $gco." layoutType=$glt";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicLayoutType"); 
-  }
-  
+  #if (defined $gbw) {
+  #    my $newval = $gco." beamWidth=$gbw";
+  #    CommandAttr (undef, "$name graphicControl $newval");
+  #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth"); 
+  #}  
   
   my $ssd = ReadingsVal ($name, 'setupStringDeclination', '');          # 22.04.2025
   if ($ssd) {
@@ -9891,7 +9849,18 @@ sub _transferInverterValues {
       my ($pvread, $pvunit) = split ":", $h->{pv};                                                     # Readingname/Unit für aktuelle PV Erzeugung
       my $source            = defined $h->{strings} && $h->{strings} eq 'none' ? 'bat' : 'pv';         # Energie-Bezug PV oder aus Batterie 
       
-      delete $h->{etotal} if($source eq 'bat');                                                        # Batteriewechselrichter ohne PV-Erzeugung
+      my $reverse;
+      
+      if ($source eq 'bat') {                                                                          # Batteriewechselrichter ohne PV-Erzeugung
+          delete $h->{etotal}; 
+          
+          if (defined $h->{reverse}) {
+              my ($revread, $revunit) = split ":", $h->{reverse};
+              my $revuf               = $revunit =~ /^kW$/xi ? 1000 : 1;
+              $reverse                = ReadingsNum ($indev, $revread, 0) * $revuf;
+              $reverse                = $reverse < 0 ? 0 : sprintf "%.0f", $reverse;              
+          }
+      }
       
       $h->{etotal}          = defined $h->{etotal} ? $h->{etotal} : 'dum_rdng_no_etot:Wh';             # Dummy Reading für Batterie-Inverter ohne PV-Erzeugung
       my ($edread, $etunit) = split ":", $h->{etotal};                                                 # Readingname/Unit für Energie total (PV Erzeugung)
@@ -9900,7 +9869,7 @@ sub _transferInverterValues {
 
       my $pvuf     = $pvunit =~ /^kW$/xi ? 1000 : 1;
       my $pv       = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                         # aktuelle Erzeugung (W)
-      $pv          = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                               # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
+      $pv          = $pv < 0 ? 0 : sprintf "%.0f", $pv;                                                # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
 
       my $etuf     = $etunit =~ /^kWh$/xi ? 1000 : 1;
       my $etotal   = ReadingsNum ($indev, $edread, 0) * $etuf;                                         # Erzeugung total (Wh)
@@ -9944,7 +9913,8 @@ sub _transferInverterValues {
 
       my $feed = $h->{feed} // 'default';
 
-      $data{$name}{inverters}{$in}{igeneration} = $pv;                                           # Hilfshash Wert current generation, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      $data{$name}{inverters}{$in}{igeneration} = $pv;                                           # aktuell erzeugte DC -> AC Leistung, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      $data{$name}{inverters}{$in}{ireverse}    = $reverse        if(defined $reverse);          # aktuell erzeugte AC -> DC Leistung 
       $data{$name}{inverters}{$in}{ietotal}     = $etotal;                                       # aktuellen etotal des WR speichern
       $data{$name}{inverters}{$in}{iname}       = $indev;                                        # Name des Inverterdevices
       $data{$name}{inverters}{$in}{ialias}      = AttrVal ($indev, 'alias', $indev);             # Alias Inverter
@@ -10078,7 +10048,7 @@ sub _transferAPIRadiationValues {
       my $useai = 0;
       my $pvfc;
 
-      if ($msg eq 'accurate' || $msg eq 'spreaded') {
+      if ($msg eq 'accurate') {                                                                         # KI Treffer
           if ($invcapsum && $pvaifc > $invcapsum) {
               $pvaifc = $invcapsum;                                                                     # PV AI Vorhersage auf Summe aller WR Kapazität begrenzen
 
@@ -10089,40 +10059,22 @@ sub _transferAPIRadiationValues {
           my $aivar = 0;
           $aivar    = sprintf "%.0f", (100 * $pvaifc / $pvapifc) if($pvapifc);                          # Übereinstimmungsgrad KI Forecast zu API Forecast in %
 
-          if ($msg eq 'accurate') {                                                                     # KI liefert 'accurate' Treffer -> verwenden
-              if ($airn >= AIACCTRNMIN || ($aivar >= AIACCLOWLIM && $aivar <= AIACCUPLIM)) {
-                  $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
-                  $useai = 1;
-                  
-                  if ($acu =~ /api_ai/xs) {
-                      $pvfc  = $pvapifc ? (sprintf "%.0f", ($pvaifc + $pvapifc) / 2) : $pvaifc;         # Durchschnitt AI und API verwenden
-                      $dbmsg = 'average of accurate AI & API result used';
-                  }
-                  else {
-                      $pvfc  = $pvaifc;
-                      $dbmsg = 'accurate result used';
-                  }
+		  if ($airn >= AIACCTRNMIN || ($aivar >= AIACCLOWLIM && $aivar <= AIACCUPLIM)) {
+			  $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
+			  $useai = 1;
+			  
+			  if ($acu =~ /api_ai/xs) {
+				  $pvfc  = $pvapifc ? (sprintf "%.0f", ($pvaifc + $pvapifc) / 2) : $pvaifc;             # Durchschnitt AI und API verwenden
+				  $dbmsg = 'average of accurate AI & API result used';
+			  }
+			  else {
+				  $pvfc  = $pvaifc;
+				  $dbmsg = 'accurate result used';
+			  }
 
-                  debugLog ($paref, 'aiData', qq{AI Hit - $dbmsg -> aiRulesNum: $airn, variance: $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
-              }
-          }
-          elsif ($msg eq 'spreaded') {                                                                  # Abweichung AI von Standardvorhersage begrenzen
-              if ($airn >= AISPREADTRNMIN || ($aivar >= AISPREADLOWLIM && $aivar <= AISPREADUPLIM)) {
-                  $data{$name}{nexthours}{$nhtstr}{aihit} = 1;
-                  $useai = 1;
-                  
-                  if ($acu =~ /api_ai/xs) {
-                      $pvfc  = $pvapifc ? (sprintf "%.0f", ($pvaifc + $pvapifc) / 2) : $pvaifc;         # Durchschnitt AI und API verwenden
-                      $dbmsg = 'average of spreaded AI & API result used';
-                  }
-                  else {
-                      $pvfc  = $pvaifc;
-                      $dbmsg = 'spreaded result used';
-                  }
-
-                  debugLog ($paref, 'aiData', qq{AI Hit - $dbmsg -> aiRulesNum: $airn, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
-              }
-          }
+			  debugLog ($paref, 'aiData', qq{AI Hit - $dbmsg -> aiRulesNum: $airn, variance: $aivar, hod: $hod, Rad1h: $rad1h, pvfc: $pvfc Wh});
+		  }
+          
       }
       else {
           debugLog ($paref, 'aiData', $msg);
@@ -17007,19 +16959,19 @@ sub _flowGraphic {
   my $exth2cdist     = $paref->{flowgh2cDist};                                 # vertikaler Abstand Home -> Consumer Zeile
   my $lang           = $paref->{lang};
 
-  my $gcons     = ReadingsNum ($name, 'Current_GridConsumption', 0);
-  my $node2grid = ReadingsNum ($name, 'Current_GridFeedIn',      0);           # vom Inverter-Knoten zum Grid
-  my $cself     = ReadingsNum ($name, 'Current_SelfConsumption', 0);
-  my $consptn   = CurrentVal  ($name, 'consumption',             0);
+  my $gconMetered      = ReadingsNum ($name, 'Current_GridConsumption', 0);
+  my $node2gridMetered = ReadingsNum ($name, 'Current_GridFeedIn',      0);    # vom Inverter-Knoten zum Grid
+  my $cselfMetered     = ReadingsNum ($name, 'Current_SelfConsumption', 0);
+  my $consptn          = CurrentVal  ($name, 'consumption',             0);
 
-  my $cons_dmy  = $consptn;
-  my $scale     = FGSCALEDEF;
-  my $pdist     = 130;                                                         # Abstand Producer zueinander
-  my $hasbat    = 1;                                                           # initial Batterie vorhanden
-  my $stna      = $name;
-  $stna        .= int (rand (1500));
+  my $cons_dmy = $consptn;
+  my $scale    = FGSCALEDEF;
+  my $pdist    = 130;                                                          # Abstand Producer zueinander
+  my $hasbat   = 1;                                                            # initial Batterie vorhanden
+  my $stna     = $name;
+  $stna       .= int (rand (1500));
 
-  my ($lcp, $y_pos, $y_pos1);
+  my ($lcp, $y_pos, $y_pos1, $err);
 
   for my $re (keys %hrepl) {                                                   # V 1.37.1 Ziffern etc. eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
       $stna =~ s/$re/$hrepl{$re}/gxs;
@@ -17030,8 +16982,8 @@ sub _flowGraphic {
   my ($batin, $batout);
 
   for my $bn (1..MAXBATTERIES) {                                               # für jede definierte Batterie
-      $bn                   = sprintf "%02d", $bn;
-      my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
+      $bn    = sprintf "%02d", $bn;
+      ($err) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
       my $batinpow  = ReadingsNum ($name, 'Current_PowerBatIn_'.$bn,  undef);
@@ -17051,20 +17003,6 @@ sub _flowGraphic {
   
   debugLog ($paref, 'graphic', "Battery initial summary - batin: $batin, batout: $batout");
 
-  ## Resultierende von Laden und Entladen berechnen
-  ###################################################
-  my $x   = $batin - $batout;                                                         # können theoretisch gleich groß sein -> 0 setzen und Resultierende neu berechnen
-  $batin  = 0;
-  $batout = 0;
-
-  if ($x > 0) { $batin = $x; } else { $batout = abs $x; }                             # es darf nur $batin ODER $batout mit einem Wert > 0 geben
-
-  debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, batout: $batout");
-
-  my $bat_color = $soc < 26 ? "$stna bat25" :
-                  $soc < 76 ? "$stna bat50" :
-                  "$stna bat75";
-
   ## definierte Producer + Inverter ermitteln und zusammenfassen
   ################################################################
   my $pdcr        = {};                                                        # Hashref Producer
@@ -17072,90 +17010,112 @@ sub _flowGraphic {
   my $pv2node     = 0;                                                         # Summe PV-Erzeugung alle Inverter
   my $pv2grid     = 0;
   my $pv2bat      = 0;
-  my $dc2inv2node = 0;                                                         # Speisung Inverter aus Gleichstromquelle (nicht PV)
+  my $dc2inv2node = 0;                                                         # Batteriewechselrichter DC -> Inverterknoten
+  my $node2inv2dc = 0;                                                         # Batteriewechselrichter Inverterknoten -> DC
   my $lfn         = 0;
 
   for my $pn (1..MAXPRODUCER) {
-      $pn      = sprintf "%02d", $pn;
-      my $p    = ProducerVal ($name, $pn, 'pgeneration',    undef);
+      $pn    = sprintf "%02d", $pn;
+      ($err) = isDeviceValid ( { name => $name, obj => 'setupOtherProducer'.$pn, method => 'attr' } );
+      next if($err);
+	  
+      my $pgen = ProducerVal ($name, $pn, 'pgeneration',        0);
       my $feed = ProducerVal ($name, $pn, 'pfeed',      'default');
 
-      if (defined $p) {
-          $p                  = __normDecPlaces ($p);
-          $pdcr->{$lfn}{p}    = $p;                                            # aktuelle Erzeugung nicht PV-Producer
-          $pdcr->{$lfn}{pn}   = $pn;                                           # Producernummer
-          $pdcr->{$lfn}{feed} = $feed;                                         # Eigenschaft der Energielieferung
-          $pdcr->{$lfn}{ptyp} = 'producer';                                    # Typ des Producers
-          $ppall             += $p;                                            # aktuelle Erzeuguung aller nicht PV-Producer
+	  $pgen               = __normDecPlaces ($pgen);
+	  $pdcr->{$lfn}{pgen} = $pgen;                                             # aktuelle Erzeugung nicht PV-Producer
+	  $pdcr->{$lfn}{pn}   = $pn;                                               # Producernummer
+	  $pdcr->{$lfn}{feed} = $feed;                                             # Eigenschaft der Energielieferung
+	  $pdcr->{$lfn}{ptyp} = 'producer';                                        # Typ des Producers
+	  $ppall             += $pgen;                                             # aktuelle Erzeuguung aller nicht PV-Producer
 
-          $lfn++;
-      }
+	  $lfn++;
   }
 
   for my $in (1..MAXINVERTER) {
-      $in         = sprintf "%02d", $in;
-      my $p       = InverterVal ($name, $in, 'igeneration',    undef);
+      $in    = sprintf "%02d", $in;
+      ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
+      next if($err);
+	  
+      my $pgen    = InverterVal ($name, $in, 'igeneration',        0);                    # Erzeugung aus PV oder alternativer Quelle
+	  my $prevers = InverterVal ($name, $in, 'ireverse',           0);                    # Rückwandlung AC->DC (Batterie-Wechselrichter)
       my $feed    = InverterVal ($name, $in, 'ifeed',      'default');
       my $isource = InverterVal ($name, $in, 'isource',         'pv');
 
-      if (defined $p) {
-          $p                     = __normDecPlaces ($p);
-          $pdcr->{$lfn}{pn}      = $in;                                                   # Inverternummer
-          $pdcr->{$lfn}{feed}    = $feed;                                                 # Eigenschaft der Energielieferung
-          $pdcr->{$lfn}{isource} = $isource;                                              # Art der Energiequelle (pv oder bat)
-          $pdcr->{$lfn}{ptyp}    = 'inverter';                                            # Typ des Producers
-          $pdcr->{$lfn}{p}       = $p;                                                    # aktuelle PV
-          $pv2node              += $p if($feed eq 'default' && $isource eq 'pv');         # PV-Erzeugung Inverter für das Hausnetz
-          $pv2grid              += $p if($feed eq 'grid'    && $isource eq 'pv');         # PV nur für das öffentliche Netz
-          $pv2bat               += $p if($feed eq 'bat'     && $isource eq 'pv');         # Direktladen PV nur in die Batterie
-          $dc2inv2node          += $p if($feed eq 'default' && $isource eq 'bat');        # Fall Speisung Inverter aus Batterie statt PV
+	  $pgen                  = __normDecPlaces ($pgen);
+	  $prevers               = __normDecPlaces ($prevers);
+	  $pdcr->{$lfn}{pn}      = $in;                                                       # Inverternummer
+	  $pdcr->{$lfn}{feed}    = $feed;                                                     # Eigenschaft der Energielieferung
+	  $pdcr->{$lfn}{isource} = $isource;                                                  # Art der Energiequelle (pv oder bat)
+	  $pdcr->{$lfn}{ptyp}    = 'inverter';                                                # Typ des Producers
+	  $pdcr->{$lfn}{pgen}    = $pgen;                                                     # aktuelle Erzeugungsleistung DC->AC
+	  $pdcr->{$lfn}{prevers} = $prevers;                                                  # aktuelle Reverseleistung AC->DC
+	  $pv2node              += $pgen    if($feed eq 'default' && $isource eq 'pv');       # PV-Erzeugung Inverter für das Hausnetz
+	  $pv2grid              += $pgen    if($feed eq 'grid'    && $isource eq 'pv');       # PV nur für das öffentliche Netz
+	  $pv2bat               += $pgen    if($feed eq 'bat'     && $isource eq 'pv');       # Direktladen PV nur in die Batterie
+	  $dc2inv2node          += $pgen    if($feed eq 'default' && $isource eq 'bat');      # Fall Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
+	  $node2inv2dc          += $prevers if($feed eq 'default' && $isource eq 'bat');      # aktuelle Rückerzeugung AC->DC (Batterie-Wechselrichter)
 
-          $lfn++;
-      }
+	  $lfn++;
   }
 
-  ## Batterie Werte verarbeiten
-  ###############################
-  my $node2bat          = 0;                                                              # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)
-  $node2bat             = $pv2bat * -1 if($pv2bat);                                       # vorbelegen falls Batterie Idle und Smartloader arbeitet                               
-  my $bat2home          = 0;
-  #my $bat2home          = $batout - $dc2inv2node;                                        # V 1.51.9
-  #$bat2home             = $bat2home >= 0 ? $bat2home : 0;                                # V 1.51.9
-  my $grid2home_style   = $gcons       ? "$stna active_sig"    : "$stna inactive";        # GridConsumption
-  my $bat2home_style    = $bat2home    ? "$stna active_normal" : "$stna inactive";
-  my $dc2inv2node_style = $dc2inv2node ? "$stna active_normal" : "$stna inactive";        # Batterie zu Inverter mit source=bat
+  ## Knoten <-> Batterie Resultierende und Laufketten Richtungen
+  ################################################################
+  my $x   = $batin - $batout;          # Resultierende von Laden und Entladen berechnen, können theoretisch gleich groß sein -> 0 setzen und Resultierende neu berechnen
+  $batin  = 0;
+  $batout = 0;
+
+  if ($x > 0) { $batin = $x } elsif ($x < 0) { $batout = abs $x }                         # es darf nur $batin ODER $batout mit einem Wert > 0 geben
+
+  debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, batout: $batout");
+
+  my $bat_color = $soc < 26 ? "$stna bat25" :
+                  $soc < 76 ? "$stna bat50" :
+                  "$stna bat75";
+				  
+  my $node2bat = 0;                                                                       # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)                              
+  my $bat2home = 0;
   
-  my $gcons_direction    = "M250,515 L670,590";
-  my $bat2home_direction = "M1200,515 L730,590";
+  my $grid2home_style       = $gconMetered ? "$stna active_sig"    : "$stna inactive";    # GridConsumption
+  my $bat2home_style        = $bat2home    ? "$stna active_normal" : "$stna inactive";
+  my $dc2inv2node_style     = $dc2inv2node ? "$stna active_normal" : "$stna inactive";    # Batterie zu Inverter mit source=bat
+  my $gconMetered_direction = "M250,515 L670,590";
+  my $bat2home_direction    = "M1200,515 L730,590";
 
-  if ($batout) {                                                                          # Batterie wird entladen
-      $node2bat  = $batout + $pv2bat - $dc2inv2node;                                      # negativ - Richtung Bat -> Inv.Knoten
-      $node2bat *= -1;
-      my $cgfo   = $node2grid - ($pv2node + $dc2inv2node);                                # pv2node + $dc2inv2node = PV-Erzeugung Inverter für das Hausnetz
-
-      if ($cgfo > 1) {
-          $grid2home_style = "$stna active_normal";
-          $gcons_direction = "M670,590 L250,515";
-          # $node2grid    -= $cgfo;                                                       # V 1.51.9
-          $gcons           = $cgfo;                                                   
-      }
+  if ($batout) {                                                                          # Batterie wird entladen                                      
+	  $node2bat  = ($batout + $pv2bat) - $dc2inv2node;                                    # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
+      $node2bat *= -1 if($node2bat > 0);                                                  # muß negativ (0) sein: Richtung Bat -> Inv.Knoten
   }
+  elsif ($batin) {                                                                        # Batterie wird geladen
+      $node2bat    = $batin - ($pv2bat - $dc2inv2node);                                   # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
+      my $home2bat = $batin - ($pv2bat + $node2inv2dc + $node2bat);                       
 
-  if ($batin) {                                                                          # Batterie wird geladen
-      $node2bat    = $batin - ($pv2bat - $dc2inv2node);                                  # positiv - Richtung Knoten -> Bat
-      my $home2bat = $batin - ($ppall + $pv2node + $pv2bat + $dc2inv2node);              # V 1.46.4: add $ppall, V 1.51.9 add $dc2inv2node
-
-      if ($home2bat > 1) {                                                               # Batterieladung anteilig aus Hausnetz
+      if ($home2bat > 1) {                                                                # Batterieladung anteilig aus Hausnetz
           $node2bat           -= $home2bat;
           $bat2home_style      = "$stna active_sig";
           $bat2home_direction  = "M730,590 L1200,515";
           $bat2home            = $home2bat;
       }
   }
+  else {
+      $node2bat  = $pv2bat - $dc2inv2node;                                                # falls Batterie Idle und Smartloader arbeitet
+	  $node2bat *= -1 if($node2bat > 0);                                                  # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
+  }
+  
+  ## Knotensummen Erzeuger - Batterie - Home ermitteln
+  ######################################################
+  my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                        # Erzeugung Summe im Inverter-Knoten
+  $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                      # V 1.46.4 - z.B. Batterie ist voll und SolarLader liefert an Knoten
+  $pnodesum     = __normDecPlaces ($pnodesum);
+  
+  my $node2home = $pnodesum - $node2gridMetered - ($node2bat > 0 ? $node2bat : 0);        # V 1.46.4 - Energiefluß vom Knoten zum Haus
+  $node2home    = $node2home + $gconMetered != $consptn ? $consptn : $node2home;
+  $node2home    = __normDecPlaces ($node2home);                                           # V 1.46.4
+  
  
   ## Producer / Inverter Koordninaten Steuerhash
   ################################################
-  my ($togrid, $tonode, $tobat, $toinv) = __sortProducer ($pdcr);                        # lfn Producer sortiert nach ptyp und feed
+  my ($togrid, $tonode, $tobat, $toinv) = __sortProducer ($pdcr);                        # lfn Producer sortiert nach ptyp und feed ($toinv aktuell unbenutzt)
 
   my $psorted = {
       '1togrid' => { xicon => -100, xchain => 150,  ychain => 400, step => 30,     count => scalar @{$togrid}, sorted => $togrid },      # Producer/PV nur zu Grid
@@ -17180,13 +17140,6 @@ sub _flowGraphic {
   $flowgcons        = 0 if(!$consumercount);                                            # Consumer Anzeige ausschalten wenn keine Consumer definiert
   my @consumers     = sort{$a<=>$b} keys %{$cnsmr};
 
-  ## Knotensummen Erzeuger - Batterie - Home ermitteln
-  ######################################################
-  my $pnodesum   = __normDecPlaces ($ppall + $pv2node + $dc2inv2node);                  # Erzeugung Summe im Inverter-Knoten
-  $pnodesum     += $node2bat < 0 ? abs $node2bat : 0;                                   # V 1.46.4 - Batterie ist voll und SolarLader liefert an Knoten
-  my $node2home  = $pnodesum - $node2grid - ($node2bat > 0 ? $node2bat : 0);            # V 1.46.4 - Energiefluß vom Knoten zum Haus
-  $node2home     = __normDecPlaces ($node2home);                                        # V 1.46.4
-
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
@@ -17208,8 +17161,8 @@ sub _flowGraphic {
   my $svgstyle   = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani  ? '@keyframes dash { to { stroke-dashoffset: 0; } }' : '';     # Animation Ja/Nein
 
-  my $grid_color = $node2grid                          ? "$stna grid_green" :
-                   !$node2grid && !$gcons && $bat2home ? "$stna grid_gray"  :
+  my $grid_color = $node2gridMetered                                ? "$stna grid_green" :
+                   !$node2gridMetered && !$gconMetered && $bat2home ? "$stna grid_gray"  :
                    "$stna grid_red";
 
   my $strokecolstd = CurrentVal ($name, 'strokecolstd',         STROKCOLSTDDEF);
@@ -17274,7 +17227,7 @@ END0
   ################################################
   my $cons_left      = 0;
   my $consumer_start = 0;
-  my $currentPower   = 0;
+  my $cnsmrpower     = 0;
   $y_pos             = 505 + $exth2cdist;
 
   if ($flowgcons) {
@@ -17288,19 +17241,19 @@ END0
       $cons_left = $consumer_start + 15;
 
       for my $c (@consumers) {
-          my $calias     = ConsumerVal ($name, $c, 'alias', '');                                           # Name des Consumerdevices
-          $currentPower  = $cnsmr->{$c}{p};
+          my $calias  = ConsumerVal ($name, $c, 'alias', '');                                              # Name des Consumerdevices
+          $cnsmrpower = $cnsmr->{$c}{p};
 
-          my ($cicon)    = __substituteIcon ( { hash => $hash,                                             # Icon des Consumerdevices
-                                                name => $name,
-                                                pn    => $c,
-                                                ptyp  => $cnsmr->{$c}{ptyp},
-                                                pcurr => $currentPower,
-                                                lang  => $lang
-                                              }
-                                            );
+          my ($cicon) = __substituteIcon ( { hash => $hash,                                                # Icon des Consumerdevices
+                                             name => $name,
+                                             pn    => $c,
+                                             ptyp  => $cnsmr->{$c}{ptyp},
+                                             pcurr => $cnsmrpower,
+                                             lang  => $lang
+                                           }
+                                         );
 
-          $cons_dmy       -= $currentPower;
+          $cons_dmy       -= $cnsmrpower;
           $cicon           = FW_makeImage    ($cicon, '');
           ($scale, $cicon) = __normIconScale ($name, $cicon);
 
@@ -17375,14 +17328,14 @@ END1
 
   ## Laufketten Node->Home, Node->Grid, Bat->Home
   #################################################
-  my $node2home_style = $node2home ? "$stna active_normal" : "$stna inactive";
-  my $node2grid_style = $node2grid ? "$stna active_normal" : "$stna inactive";
+  my $node2home_style        = $node2home        ? "$stna active_normal" : "$stna inactive";
+  my $node2gridMetered_style = $node2gridMetered ? "$stna active_normal" : "$stna inactive";
 
   $ret .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
   <path id="node2home_$stna" class="$node2home_style" d="M700,400 L700,580" />
-  <path id="node2grid_$stna" class="$node2grid_style" d="M670,400 L250,480" />
-  <path id="grid2home_$stna" class="$grid2home_style" d="$gcons_direction" />
+  <path id="node2grid_$stna" class="$node2gridMetered_style" d="M670,400 L250,480" />
+  <path id="grid2home_$stna" class="$grid2home_style" d="$gconMetered_direction" />
 END2
 
   ## Laufketten PV->Batterie, Batterie->Home
@@ -17434,16 +17387,35 @@ END3
           my $producer_style;
 
           for my $lfn (@sorted) {
-              my $pn             = $pdcr->{$lfn}{pn};
-              my $p              = $pdcr->{$lfn}{p};
-              $producer_style    = $p > 0 ? "$stna active_normal" : "$stna inactive";
-              my $chain_color    = '';                                                            # Farbe der Laufkette des Producers
+              my $ptyp        = $pdcr->{$lfn}{ptyp};              
+              my $isource     = $pdcr->{$lfn}{isource} // '';
+              my $pn          = $pdcr->{$lfn}{pn};
+              my $pgen        = $pdcr->{$lfn}{pgen};
+              my $prevers     = $pdcr->{$lfn}{prevers};
+              my $chain_color = '';                                        # Farbe der Laufkette des Producers
+              
+              $producer_style = $pgen > 0 || $prevers > 0 ? "$stna active_normal" : "$stna inactive";
 
-              if ($p) {
+              #if ($pgen) {
                   #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+              #}
+              
+              if ($prevers > 0) {                                          # Richtung Knoten -> Inverter
+                  $ret .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M$xchain,$ychain L$left,130" />};
               }
-
-              $ret    .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />};
+              else {                                                       # Richtung Inverter -> Knoten (Standard)
+                  $ret .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M$left,130 L$xchain,$ychain" />};
+              }
+              
+              if ($ptyp eq 'inverter' && $isource eq 'bat') {
+                  if ($prevers > 0) {                                      # Richtung Inverter -> Batterie
+                      $ret .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M$left,130 L1250,440" />};
+                  }                  
+                  else {                                                   # Richtung Batterie -> Inverter (Standard)                  
+                      $ret .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M1250,440 L$left,130" />};
+                  }
+              }
+              
               $left   += ($pdist * 2);
               $xchain += $step;
           }
@@ -17468,21 +17440,21 @@ END3
       my $consumer_style;
 
       for my $c (@consumers) {
-          my $power     = ConsumerVal ($name, $c, 'power',   0);
-          my $rpcurr    = ConsumerVal ($name, $c, 'rpcurr', '');                                   # Reading für akt. Verbrauch angegeben ?
-          $currentPower = $cnsmr->{$c}{p};
+          my $power   = ConsumerVal ($name, $c, 'power',   0);
+          my $rpcurr  = ConsumerVal ($name, $c, 'rpcurr', '');                                     # Reading für akt. Verbrauch angegeben ?
+          $cnsmrpower = $cnsmr->{$c}{p};
 
           if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
-              $currentPower = $power;
+              $cnsmrpower = $power;
           }
 
-          my $p              = $currentPower;
-          $p                 = (($currentPower / $power) * 100) if ($power > 0);
-          $consumer_style    = $p > DEFPOPERCENT ? "$stna active_normal" : "$stna inactive";
-          my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
+          my $p           = $cnsmrpower;
+          $p              = (($cnsmrpower / $power) * 100) if ($power > 0);
+          $consumer_style = $p > DEFPOPERCENT ? "$stna active_normal" : "$stna inactive";
+          my $chain_color = "";                                                                    # Farbe der Laufkette des Consumers
 
           if ($p > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
-              $chain_color = 'style="stroke: #'.__dynColor ($currentPower, $strokeredlim).';"';
+              $chain_color = 'style="stroke: #'.__dynColor ($cnsmrpower, $strokeredlim).';"';
           }
 
           $ret             .= qq{<path id="home2consumer_${c}_$stna" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,$y_pos" />};
@@ -17498,28 +17470,30 @@ END3
   $dc2inv2node = __normDecPlaces ($dc2inv2node);
   $node2bat    = __normDecPlaces ($node2bat);
 
-  $ret .= qq{<text class="$stna text" id="nodetxt_$stna"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}    if ($pnodesum > 0);
-  $ret .= qq{<text class="$stna text" id="batsoctxt_$stna"    x="1380" y="520" style="text-anchor: start;">$soc %</text>}       if ($hasbat);                         # Lage Text Batterieladungszustand
-  $ret .= qq{<text class="$stna text" id="node2hometxt_$stna" x="730"  y="520" style="text-anchor: start;">$node2home</text>}   if ($node2home);
-  $ret .= qq{<text class="$stna text" id="node2gridtxt_$stna" x="420"  y="420" style="text-anchor: end;">$node2grid</text>}     if ($node2grid);
-  $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="420"  y="610" style="text-anchor: end;">$gcons</text>}         if ($gcons);
-  $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}    if ($bat2home && $hasbat);
-  $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="1000" y="420" style="text-anchor: start;">$node2bat</text>}    if ($node2bat && $hasbat);
-  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$consptn</text>};                                                 # Current_Consumption Anlage
-  $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1380" y="710" style="text-anchor: start;">$cons_dmy</text>}    if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
+  $ret .= qq{<text class="$stna text" id="nodetxt_$stna"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}        if ($pnodesum > 0);
+  $ret .= qq{<text class="$stna text" id="batsoctxt_$stna"    x="1380" y="520" style="text-anchor: start;">$soc %</text>}           if ($hasbat);                         # Lage Text Batterieladungszustand
+  $ret .= qq{<text class="$stna text" id="node2hometxt_$stna" x="730"  y="520" style="text-anchor: start;">$node2home</text>}       if ($node2home);
+  $ret .= qq{<text class="$stna text" id="node2gridtxt_$stna" x="420"  y="420" style="text-anchor: end;">$node2gridMetered</text>}  if ($node2gridMetered);
+  $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="420"  y="610" style="text-anchor: end;">$gconMetered</text>}       if ($gconMetered);
+  $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}        if ($bat2home && $hasbat);
+  $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="1000" y="420" style="text-anchor: start;">$node2bat</text>}        if ($node2bat && $hasbat);
+  $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$consptn</text>};                                                # Current_Consumption Anlage
+  $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1380" y="710" style="text-anchor: start;">$cons_dmy</text>}        if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
 
-  ## Textangabe Producer - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
+  ## Textangabe Producer / Inverter - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ## Textangabe nur anzeigen wenn Producerzeile angezeigt werden soll
-  ###############################################################################
+  ###########################################################################################
   if ($doproducerrow) {
       for my $st (sort keys %{$psorted}) {
-          my $left   = $psorted->{$st}{start} * 2 - 70;                                            # Übertrag aus Producer Icon Abschnitt, -XX -> Start Lage Producer Beschriftung
+          my $left   = $psorted->{$st}{start} * 2 - 80;                    # Übertrag aus Producer Icon Abschnitt, -XX -> Start Lage Producer Beschriftung
           my @sorted = @{$psorted->{$st}{sorted}};
 
           for my $lfn (@sorted) {
-              my $pn        = $pdcr->{$lfn}{pn};
-              $currentPower = $pdcr->{$lfn}{p};
-              $lcp          = length $currentPower;
+              my $pn      = $pdcr->{$lfn}{pn};
+              my $pgen    = $pdcr->{$lfn}{pgen};
+              my $prevers = $pdcr->{$lfn}{prevers};
+              my $pval    = $prevers ? $prevers : $pgen;                   # Batterie-Wechselrichter AC->DC oder DC->AC berücksichtigen
+              $lcp        = length $pval;
 
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
               ###############################################################################
@@ -17529,7 +17503,7 @@ END3
               elsif ($lcp == 2) {$left += 20}
               elsif ($lcp == 1) {$left += 40}
 
-              $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$left" y="100">$currentPower</text>} if($flowgPrdsPower);
+              $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$left" y="100">$pval</text>} if($flowgPrdsPower);
 
               # Leistungszahl wieder zurück an den Ursprungspunkt
               ####################################################
@@ -17552,19 +17526,19 @@ END3
       $y_pos1    = 1170 + 2 * $exth2cdist;
 
       for my $c (@consumers) {
-          $currentPower    = sprintf "%.1f", $cnsmr->{$c}{p};
-          $currentPower    = sprintf "%.0f", $currentPower if($currentPower > 10);
+          $cnsmrpower      = sprintf "%.1f", $cnsmr->{$c}{p};
+          $cnsmrpower      = sprintf "%.0f", $cnsmrpower if($cnsmrpower > 10);
           my $consumerTime = ConsumerVal ($name, $c, 'remainTime', '');                               # Restlaufzeit
           my $rpcurr       = ConsumerVal ($name, $c, 'rpcurr',     '');                               # Readingname f. current Power
 
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
-              $currentPower = isConsumerPhysOn($hash, $c) ? 'on' : 'off';
+              $cnsmrpower = isConsumerPhysOn($hash, $c) ? 'on' : 'off';
           }
 
-          $lcp = length $currentPower;
+          $lcp = length $cnsmrpower;
 
-          #$ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconsPower);    # Lage Consumer Consumption
-          #$ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconsTime);     # Lage Consumer Restlaufzeit
+          #$ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="1110" style="text-anchor: start;">$cnsmrpower</text>}   if($flowgconsPower);    # Lage Consumer Consumption
+          #$ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if($flowgconsTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
           ##################################################################################
@@ -17574,7 +17548,7 @@ END3
           elsif ($lcp == 2) {$cons_left += 7 }
           elsif ($lcp == 1) {$cons_left += 25}
 
-          $ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="$y_pos">$currentPower</text>}  if($flowgconsPower);    # Lage Consumer Consumption
+          $ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="$y_pos">$cnsmrpower</text>}    if($flowgconsPower);    # Lage Consumer Consumption
           $ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$cons_left" y="$y_pos1">$consumerTime</text>} if($flowgconsTime);     # Lage Consumer Restlaufzeit
 
           # Verbrauchszahl wieder zurück an den Ursprungspunkt
@@ -17677,12 +17651,16 @@ sub __addProducerIcon {
 
       for my $lfn (@sorted) {
           my $pn             = $pdcr->{$lfn}{pn};
+          my $pgen    = $pdcr->{$lfn}{pgen};
+          my $prevers = $pdcr->{$lfn}{prevers};
+          my $pval    = $prevers ? $prevers : $pgen;                   # Batterie-Wechselrichter AC->DC oder DC->AC berücksichtigen
+          
           my ($picon, $ptxt) = __substituteIcon ( { hash  => $hash,                                                 # Icon des Producerdevices
                                                     name  => $name,
                                                     pn    => $pn,
                                                     ptyp  => $pdcr->{$lfn}{ptyp},
                                                     don   => NexthoursVal ($hash, 'NextHour00', 'DoN', 0),          # Tag oder Nacht
-                                                    pcurr => $pdcr->{$lfn}{p},
+                                                    pcurr => $pval,
                                                     lang  => $lang
                                                   }
                                                 );
@@ -17870,7 +17848,14 @@ sub __substituteIcon {
       }
   }
   elsif ($ptyp eq 'inverter') {                                                          # Inverter, Smartloader
-      my ($iday, $inight) = split ':', InverterVal ($hash, $pn, 'iicon', INVICONDEF);
+      my ($iday, $inight);
+      
+      if (InverterVal ($hash, $pn, 'isource', 'pv') eq 'bat') {
+          ($iday, $inight) = split ':', InverterVal ($hash, $pn, 'iicon', 'inverter:inverter');
+      }
+      else {
+          ($iday, $inight) = split ':', InverterVal ($hash, $pn, 'iicon', INVICONDEF);
+      } 
 
       if ($don || $pcurr) {                                                              # Tag -> eigenes Icon oder Standard
           $txt            = InverterVal ($hash, $pn, 'ialias', '');
@@ -18822,7 +18807,7 @@ return;
 }
 
 ################################################################
-#     AI Ergebnis für ermitteln
+#     AI Ergebnis AI::DecisionTree für ermitteln
 ################################################################
 sub aiGetResult {
   my $paref  = shift;
@@ -18840,7 +18825,7 @@ sub aiGetResult {
   my $rad1h = NexthoursVal ($hash, $nhtstr, 'rad1h', 0);
   return "no rad1h for hod: $hod" if($rad1h <= 0);
 
-  my $cst = [gettimeofday];                                                         # aiGetResult Startzeit
+  my $cst = [gettimeofday];                                                         # Startzeit
 
   debugLog ($paref, 'aiData', "Start AI result check for hod: $hod");
 
@@ -18896,124 +18881,7 @@ sub aiGetResult {
       return ('accurate', $avg_prediction);
   }
 
-  ## Spread Decision
-  ####################
-#  undef @total_prediction;
-#  $tn = 0;
-
-#  debugLog ($paref, 'aiData', qq{AI no accurate result found with initial value "Rad1h: $rad1h" (hod: $hod)});
-
-#  for my $dtree (@{$objref}) {
-#      $tn++;
-
-#      debugLog ($paref, 'aiData', "Start get AI spreaded result from Tree number $tn");
-
-#      my ($msg, $res) = _aiGetSpread ( { name   => $name,
-#                                         rad1h  => $rad1h,
-#                                         temp   => $tbin,
-#                                         wcc    => $cbin,
-#                                         wid    => $wid,
-#                                         rr1c   => $rr1c,
-#                                         sunalt => $sabin,
-#                                         sunaz  => $sunaz,
-#                                         hod    => $hod,
-#                                         dtree  => $dtree,
-#                                         debug  => $paref->{debug}
-#                                       }
-#                                     );
-
-#      push @total_prediction, $res if($msg eq 'spreaded');
-#  }
-
-#  my $sprnum = scalar @total_prediction;
-
-
-#  if ($sprnum) {
-#      my $avg_prediction = sprintf '%.0f', avgArray (\@total_prediction, $sprnum);
-#      # my $avg_prediction = sprintf '%.0f', medianArray (\@total_prediction);
-
-#      debugLog ($paref, 'aiData', qq{AI spreaded result found: pvaifc: $avg_prediction (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)});
-#      return ('spreaded', $avg_prediction);
-#  }
-
-  setTimeTracking ($hash, $cst, 'aiLastGetResultTime');                      # aiGetResult-Laufzeit ermitteln
-
-return 'No AI decision delivered';
-}
-
-################################################################
-#  AI Ergebnis aus einer positiven und negativen
-#  rad1h-Abweichung schätzen
-################################################################
-sub _aiGetSpread {
-  my $paref  = shift;
-  my $rad1h  = $paref->{rad1h};
-  my $temp   = $paref->{temp};
-  my $wcc    = $paref->{wcc};
-  my $wid    = $paref->{wid};
-  my $rr1c   = $paref->{rr1c};
-  my $sunalt = $paref->{sunalt};
-  my $sunaz  = $paref->{sunaz};
-  my $hod    = $paref->{hod};
-  my $dtree  = $paref->{dtree};
-
-  my $dtn  = 20;                               # positive und negative rad1h Abweichung testen mit Schrittweite "$step"
-  my $step = 10;
-
-  my ($pos, $neg, $p, $n);
-
-  my $gra = {
-      temp   => $temp,
-      wcc    => $wcc,
-      wid    => $wid,
-      rr1c   => $rr1c,
-      sunalt => $sunalt,
-      # sunaz  => $sunaz,
-      hod    => $hod
-  };
-
-  for ($p = $rad1h + $step; $p <= $rad1h + $dtn; $p += $step) {
-      $p            = sprintf "%.2f", $p;
-      $gra->{rad1h} = $p;
-
-      debugLog ($paref, 'aiData', qq{AI positive test value "Rad1h: $p"});
-
-      eval { $pos = $dtree->get_result (attributes => $gra);
-             1;
-           }
-           or do { return $@;
-                 };
-
-      if ($pos) {
-          debugLog ($paref, 'aiData', qq{AI positive tolerance hit: $pos Wh});
-          last;
-      }
-  }
-
-  for ($n = $rad1h - $step; $n >= $rad1h - $dtn; $n -= $step) {
-      last if($n <= 0);
-      $n            = sprintf "%.2f", $n;
-      $gra->{rad1h} = $n;
-
-      debugLog ($paref, 'aiData', qq{AI negative test value "Rad1h: $n"});
-
-      eval { $neg = $dtree->get_result (attributes => $gra);
-             1;
-           }
-           or do { return $@;
-                 };
-
-      if ($neg) {
-          debugLog ($paref, 'aiData', qq{AI negative tolerance hit: $neg Wh});
-          last;
-      }
-  }
-
-  my $result = $pos && $neg ? sprintf "%.0f", (($pos + $neg) / 2) : undef;
-
-  if (defined $result) {
-      return ('spreaded', $result);
-  }
+  setTimeTracking ($hash, $cst, 'aiLastGetResultTime');                      # Laufzeit ermitteln
 
 return 'No AI decision delivered';
 }
@@ -23752,7 +23620,7 @@ return $def;
 #
 # $in:  Inverter Nummer (01,02,03,...)
 # $key: ietotal            - Stand etotal des WR
-#       igeneration        - aktuelle PV Erzeugung Inverter
+#       igeneration        - aktuelle Leistung Quelle -> Haus (PV-Erzeugung oder aus Batterie)
 #       invertercap        - Bemessungsleistung der Wechselrichters (max. W)
 #       iname              - Name des Inverterdevices
 #       iicon              - Icon des Inverters
@@ -24912,16 +24780,18 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>iasynchron </b>     </td><td>Mode of processing received inverter events                      </td></tr>
-            <tr><td> <b>ietotal </b>        </td><td>total energy generated by the inverter to date (Wh)              </td></tr>
-            <tr><td> <b>ifeed </b>          </td><td>Energy supply characteristics                                    </td></tr>
-            <tr><td> <b>igeneration </b>    </td><td>current PV generation (W)                                        </td></tr>
-            <tr><td> <b>iicon </b>          </td><td>any icons defined for displaying the device in the graphic       </td></tr>
-            <tr><td> <b>ialias </b>         </td><td>Alias of the device                                              </td></tr>
-            <tr><td> <b>iname </b>          </td><td>Name of the device                                               </td></tr>
-            <tr><td> <b>invertercap </b>    </td><td>the nominal power (W) of the inverter (if defined)               </td></tr>
-            <tr><td> <b>isource </b>        </td><td>Type of energy source of the inverter                            </td></tr>
-            <tr><td> <b>istrings </b>       </td><td>List of strings assigned to the inverter (if defined)            </td></tr>
+            <tr><td> <b>ialias </b>         </td><td>Alias of the device                                                   </td></tr>
+			<tr><td> <b>iasynchron </b>     </td><td>Mode of processing received inverter events                           </td></tr>
+            <tr><td> <b>ietotal </b>        </td><td>total energy generated by the inverter to date (Wh)                   </td></tr>
+            <tr><td> <b>ifeed </b>          </td><td>Energy supply characteristics                                         </td></tr>
+            <tr><td> <b>igeneration </b>    </td><td>current DC->AC or DC->DC power in W (PV or alternative source)        </td></tr>
+            <tr><td> <b>iicon </b>          </td><td>any icons defined for displaying the device in the graphic            </td></tr>
+            <tr><td> <b>ilimit </b>         </td><td>set power limitation in % (e.g. by 70% rule)                          </td></tr>	
+            <tr><td> <b>iname </b>          </td><td>Name of the device                                                    </td></tr>
+            <tr><td> <b>invertercap </b>    </td><td>the nominal power (W) of the inverter (if defined)                    </td></tr>
+            <tr><td> <b>ireverse </b>       </td><td>current AC->DC power (W) of a battery inverter                        </td></tr>
+            <tr><td> <b>isource </b>        </td><td>Type of energy source of the inverter                                 </td></tr>
+            <tr><td> <b>istrings </b>       </td><td>List of strings assigned to the inverter (if defined)                 </td></tr>
 		 </table>
       </ul>
 
@@ -26010,31 +25880,52 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
-       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt;
-                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt]
-                                 [feed=&lt;Delivery type&gt;] [limit=&lt;0..100&gt;]
+       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; reverse=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; <br>
+                                 capacity=&lt;max. inverter power&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt] [feed=&lt;Delivery type&gt;] [limit=&lt;0..100&gt;] <br> 
                                  [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
        Defines any inverter device or solar charger and its readings to supply the current PV generation values. <br>
-       A solar charger does not convert the energy supplied by the solar cells into alternating current,
-       but instead directly charges an existing battery <br>
-       (e.g. a Victron SmartSolar MPPT). <br>
-       Several devices can be defined one after the other in the setupInverterDev01..XX attributes. <br>
        This can also be a dummy device with corresponding readings. <br>
-       The values of several inverters can be combined in a dummy device, for example, and this device can
-       be specified with the corresponding readings. <br>
+       Various operating modes of the inverter can be activated:
        <br><br>
+       
+           <ul>
+        <table>
+        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+           <tr><td> <b>PV-Inverter</b>              </td><td>The standard inverter. It converts the energy from the connected solar cells into alternating current.            </td></tr>
+           <tr><td>                                 </td><td>This device supplies energy to the household grid. Alternatively, <b>feed=grid</b> can be used to change the      </td></tr>
+           <tr><td>                                 </td><td>function of the inverter to exclusive feed-in to the public grid.                                                 </td></tr>
+           <tr><td>                                 </td><td>                                                                                                                  </td></tr>
+		   <tr><td> <b>Solar charger</b>            </td><td>A solar charger does not convert the energy from the connected solar cells into alternating current,              </td></tr>
+           <tr><td>                                 </td><td>but works as a DC-DC converter and charges a battery directly or supplies a battery inverter.                     </td></tr>
+		   <tr><td>                                 </td><td>The function as a solar charger is activated with <b>feed=bat</b> (e.g. a Victron SmartSolar MPPT).               </td></tr>
+           <tr><td>                                 </td><td>                                                                                                                  </td></tr>
+           <tr><td> <b>Battery inverter</b>         </td><td>This device has no connected solar cells and works as a DC-AC converter between a battery                         </td></tr>
+           <tr><td>                                 </td><td>and the household grid.                                                                                           </td></tr>
+           <tr><td>                                 </td><td>The function as a battery inverter is activated with <b>strings=none</b>.                                         </td></tr>
+           <tr><td>                                 </td><td>                                                                                                                  </td></tr>
+         </table>
+       </ul>
+       <br>
+       
+       The following &lt;Key=Value&gt; pairs define the properties of the inverter. The requirement may depend on the activated mode 
+       of operation of the device.
+       <br><br> 
 
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>         </td><td>Reading which provides the current energy generation as a positive value. It is usually the PV energy,           </td></tr>
-           <tr><td>                   </td><td>but can alternatively be the energy generation from a battery if 'strings=none' is specified.                    </td></tr>
+           <tr><td> <b>pv</b>         </td><td>A reading which provides the current DC->AC or DC->DC power as a positive value.                                 </td></tr>
+           <tr><td>                   </td><td>Usually it is the PV power; when activated as a battery inverter, the power is alternatively generated           </td></tr>
+           <tr><td>                   </td><td>from a battery or other DC source.                                                                               </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>etotal</b>     </td><td>Reading which provides the total PV energy generated (a steadily increasing counter).                            </td></tr>
-           <tr><td>                   </td><td><b>Note:</b>  If ‘<b>strings=none</b>’ is set, this key can be omitted or is not evaluated.                      </td></tr>
+           <tr><td> <b>reverse</b>    </td><td>A reading that indicates the current AC->DC power as a positive value.                                           </td></tr>
+           <tr><td>                   </td><td>The key is <b>only valid for battery inverters</b> and can only be set for this type of inverter.                </td></tr>
+           <tr><td>                   </td><td>                                                                                                                 </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>The Reading which provides the total PV energy generated (a steadily increasing counter).                        </td></tr>
            <tr><td>                   </td><td>If the reading violates the specification of a continuously rising counter,                                      </td></tr>
            <tr><td>                   </td><td>SolarForecast handles this error and reports the situation by means of a log message.                            </td></tr>
+           <tr><td>                   </td><td><b>Note:</b> Battery inverters do not require the key and should not be set.                                     </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
            <tr><td> <b>Einheit</b>    </td><td>the respective unit (W,kW,Wh,kWh)                                                                                </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
@@ -26048,7 +25939,7 @@ to ensure that the system configuration is correct.
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
            <tr><td> <b>feed</b>       </td><td>Defines special properties of the device's energy supply (optional).                                             </td></tr>
            <tr><td>                   </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                                  </td></tr>
-           <tr><td>                   </td><td><b>bat</b> - Solar charger for direct battery charging. Any surplus is fed into the Inverter node/house network. </td></tr>
+           <tr><td>                   </td><td><b>bat</b> - the solar charger type is activated. Any surplus is fed to the inverter node/house grid.            </td></tr>
            <tr><td>                   </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                                 </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
            <tr><td> <b>limit</b>      </td><td>Defines any active power limitation in % (optional).                                                             </td></tr>
@@ -27451,14 +27342,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>iasynchron </b>     </td><td>Modus der Verarbeitung empfangener Inverter-Events                          </td></tr>
+            <tr><td> <b>ialias </b>         </td><td>Alias des Gerätes                                                           </td></tr>
+			<tr><td> <b>iasynchron </b>     </td><td>Modus der Verarbeitung empfangener Inverter-Events                          </td></tr>
             <tr><td> <b>ietotal </b>        </td><td>Stand gesamte bisher erzeugte Energie des Wechselrichters (Wh)              </td></tr>
             <tr><td> <b>ifeed </b>          </td><td>Eigenschaften der Energielieferung                                          </td></tr>
-            <tr><td> <b>igeneration </b>    </td><td>aktuelle PV Erzeugung (W)                                                   </td></tr>
+            <tr><td> <b>igeneration </b>    </td><td>aktuelle DC->AC oder DC->DC Leistung in W (PV oder alternative Quelle)      </td></tr>
             <tr><td> <b>iicon </b>          </td><td>die evtl. festgelegten Icons zur Darstellung des Gerätes in der Grafik      </td></tr>
-            <tr><td> <b>ialias </b>         </td><td>Alias des Gerätes                                                           </td></tr>
+			<tr><td> <b>ilimit </b>         </td><td>eingestellte Leistungsbegrenzung in % (z.B. durch 70% Regel)                </td></tr>
             <tr><td> <b>iname </b>          </td><td>Name des Gerätes                                                            </td></tr>
             <tr><td> <b>invertercap </b>    </td><td>die nominale Leistung (W) des Wechselrichters (falls definiert)             </td></tr>
+            <tr><td> <b>ireverse </b>       </td><td>aktuelle AC->DC Leistung (W) eines Batterie-Wechselrichters                 </td></tr>
             <tr><td> <b>isource </b>        </td><td>Art der Energiequelle des Inverters                                         </td></tr>
             <tr><td> <b>istrings </b>       </td><td>Liste der dem Wechselrichter zugeordneten Strings (falls definiert)         </td></tr>
 		 </table>
@@ -28548,32 +28441,54 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
-       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt;
-                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt]
-                                 [feed=&lt;Liefertyp&gt;] [limit=&lt;0..100&gt;]
+       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; reverse=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; <br>
+                                 capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt] [feed=&lt;Liefertyp&gt;] [limit=&lt;0..100&gt;] <br> 
                                  [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
        Legt ein beliebiges Wechselrichter-Gerät bzw. Solar-Ladegerät und dessen Readings zur Lieferung der aktuellen
        PV Erzeugungswerte fest. <br>
-       Ein Solar-Ladegerät wandelt die von den Solarzellen gelieferte Energie nicht in Wechselstrom um, sondern
-       lädt damit direkt eine vorhandene Batterie <br>
-       (z.B. ein Victron SmartSolar MPPT). <br>
-       Es können nacheinander mehrere Geräte in den Attributen setupInverterDev01..XX definiert werden. <br>
        Dabei kann es sich auch um ein Dummy Gerät mit entsprechenden Readings handeln. <br>
-       Die Werte mehrerer Wechselrichter kann man z.B. in einem Dummy Gerät zusammenführen und gibt dieses Gerät mit
-       den entsprechenden Readings an. <br>
+       Es können verschiedene Arbeitsweisen des Wechselrichters aktiviert werden:
        <br><br>
+       
+       <ul>
+        <table>
+        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+           <tr><td> <b>PV-Wechselrichter</b>        </td><td>Der Standard Wechselrichter. Er wandelt die Energie der angeschlossenen Solarzellen in Wechselstrom um.           </td></tr>
+           <tr><td>                                 </td><td>Dieses Gerät liefert die Energie in das Hausnetz. Alternativ kann mit <b>feed=grid</b> die Funktion des           </td></tr>
+           <tr><td>                                 </td><td>Wechselrichters in exklusive Einspeisung in das öffentliche Netz geändert werden.                                 </td></tr>
+           <tr><td>                                 </td><td>                                                                                                                  </td></tr>
+		   <tr><td> <b>Solar-Ladegerät</b>          </td><td>Ein Solar-Ladegerät wandelt die Energie der angeschlossenen Solarzellen nicht in Wechselstrom um, sondern         </td></tr>
+           <tr><td>                                 </td><td>arbeitet als DC-DC Wandler und lädt direkt eine Batterie bzw. versorgt einen Batteriewechselrichter.              </td></tr>
+		   <tr><td>                                 </td><td>Die Funktion als Solar-Ladegerät wird mit <b>feed=bat</b> aktiviert (z.B. ein Victron SmartSolar MPPT).           </td></tr>
+           <tr><td>                                 </td><td>                                                                                                                  </td></tr>
+           <tr><td> <b>Batterie-Wechselrichter</b>  </td><td>Dieses Gerät hat keine angeschlossenen Solarzellen und arbeitet als DC-AC Wandler zwischen einer                  </td></tr>
+           <tr><td>                                 </td><td>Batterie und dem Hausnetz.                                                                                        </td></tr>
+           <tr><td>                                 </td><td>Die Funktion als Batterie-Wechselrichter wird mit <b>strings=none</b> aktiviert.                                  </td></tr>
+           <tr><td>                                 </td><td>                                                                                                                  </td></tr>
+         </table>
+       </ul>
+       <br>
+       
+       Die nachfolgenden &lt;Schlüssel=Wert&gt; Paare legen die Eigenschaften des Wechselrichters fest. Der Bedarf kann von der aktivierten Arbeitsweise des Gerätes 
+       abhängen.
+       <br><br>     
 
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>         </td><td>Reading welches die aktuelle Energie-Erzeugung als positiven Wert liefert. Üblicherweise ist es die PV-Energie,   </td></tr>
-           <tr><td>                   </td><td>kann bei Angabe von 'strings=none' alternativ die Energie-Erzeugung aus einer Batterie sein.                      </td></tr>
+           <tr><td> <b>pv</b>         </td><td>Ein Reading welches die aktuelle DC->AC oder DC->DC Leistung als positiven Wert liefert.                          </td></tr>
+           <tr><td>                   </td><td>Üblicherweise ist es die PV-Leistung, bei Aktivierung als Batterie-Wechselrichter wird die Leistung alternativ    </td></tr>
+           <tr><td>                   </td><td>aus einer Batterie oder anderen Gleichstronquelle erzeugt.                                                        </td></tr>
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
-           <tr><td> <b>etotal</b>     </td><td>Reading welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler).                        </td></tr>
-           <tr><td>                   </td><td><b>Hinweis:</b>  Wird '<b>strings=none</b>' gesetzt, kann dieser Schlüssel entfallen bzw. wird nicht ausgewertet. </td></tr>
+           <tr><td> <b>reverse</b>    </td><td>Ein Reading, der die aktuelle AC->DC-Leistung als positiven Wert angibt.                                          </td></tr>
+           <tr><td>                   </td><td>Der Schlüssel ist <b>nur für Batteriewechselrichter gültig</b> und kann nur für diesen Wechselrichtertyp          </td></tr>
+           <tr><td>                   </td><td>eingestellt werden.                                                                                               </td></tr>
+           <tr><td>                   </td><td>                                                                                                                  </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>Das Reading, welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler).                   </td></tr>
            <tr><td>                   </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                            </td></tr>
-           <tr><td>                   </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                         </td></tr>
+           <tr><td>                   </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                         </td></tr>           
+           <tr><td>                   </td><td><b>Hinweis:</b> Batterie-Wechselrichter benötigen den Schlüssel nicht und soll nicht gesetzt werden.              </td></tr>
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
            <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                               </td></tr>
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
@@ -28587,7 +28502,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
            <tr><td> <b>feed</b>       </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                                    </td></tr>
            <tr><td>                   </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.          </td></tr>
-           <tr><td>                   </td><td><b>bat</b> - Solar-Ladegerät zur Batterie Direktladung. Ein Überschuß wird dem Inverterknoten/Hausnetz zugeführt. </td></tr>
+           <tr><td>                   </td><td><b>bat</b> - der Typ Solar-Ladegerät wird aktiviert. Ein Überschuß wird dem Inverterknoten/Hausnetz zugeführt.    </td></tr>
            <tr><td>                   </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentliche Netz eingespeist                                 </td></tr>
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
            <tr><td> <b>limit</b>      </td><td>Definiert eine eventuelle Wirkleistungsbeschränkung in % (optional).                                              </td></tr>
