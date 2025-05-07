@@ -17086,10 +17086,10 @@ sub _flowGraphic {
   my $bat2home_direction    = "M1200,515 L730,590";
 
    if ($batout || $batin) {                                                               # Batterie wird geladen oder entladen
-      $node2bat = ($batin + $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
-	  $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
+      $node2bat  = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;            # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
+	  $node2bat  = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
 	  
-	  my $home2bat = ($batin + $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
+	  my $home2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
 
       if ($home2bat > 1) {                                                                # Batterieladung anteilig aus Hausnetz
           $node2bat           -= $home2bat;
@@ -17110,7 +17110,7 @@ sub _flowGraphic {
   $pnodesum     = __normDecPlaces ($pnodesum);
   
   my $node2home = $pnodesum - $node2gridMetered - ($node2bat > 0 ? $node2bat : 0);        # V 1.46.4 - Energiefluß vom Knoten zum Haus
-  $node2home    = $node2home + $gconMetered != $consptn ? $consptn : $node2home;
+  #$node2home    = $node2home + $gconMetered != $consptn ? $consptn : $node2home;
   $node2home    = __normDecPlaces ($node2home);                                           # V 1.46.4
   
  
