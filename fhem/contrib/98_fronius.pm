@@ -2,6 +2,11 @@
 #
 ##############################################
 #
+# 2025.05.07 - fichtennadel v0.5
+# - CHANGE: 
+#          - keep (inverted) sign on PowerFlow_Site_P_Load (https://forum.fhem.de/index.php?topic=138356.msg1341014#msg1341014)
+#          - lower limit interval to 4s (Fronius Solar API V1 Doku - "Up to 2 realtime requests are allowed to be performed in parallel with keeping a timeout of 4 seconds between two consecutive calls.")
+#
 # 2025.03.24 - fichtennadel v0.4
 # - CHANGE: 
 #          - change in Fronius API, make https configurable (https://forum.fhem.de/index.php?topic=138356.msg1337761#msg1337761)
@@ -124,7 +129,7 @@ use Date::Parse;
 use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 
-my $ModulVersion        = "0.4";
+my $ModulVersion        = "0.5";
 
 ##############################################################################
 sub fronius_Initialize($) {
@@ -233,9 +238,9 @@ sub fronius_StartUp($) {
   
   # Internaltimer Realtime Daten
   InternalTimer(gettimeofday() + 10, "fronius_GetPowerFlowRealtimeData", $hash, 0) if AttrVal( $name, "IntervalPowerFlowRealtimeData", AttrVal( $name, "IntervalRealtimeData", 60 ) ) > 0;
-  InternalTimer(gettimeofday() + 12, "fronius_GetStorageRealtimeData",   $hash, 0) if AttrVal( $name, "IntervalStorageRealtimeData"  , AttrVal( $name, "IntervalRealtimeData", 60 ) ) > 0;
-  InternalTimer(gettimeofday() + 14, "fronius_GetMeterRealtimeData",     $hash, 0) if AttrVal( $name, "IntervalMeterRealtimeData"    , AttrVal( $name, "IntervalRealtimeData", 60 ) ) > 0;
-  InternalTimer(gettimeofday() + 16, "fronius_GetInverterRealtimeData",  $hash, 0) if AttrVal( $name, "IntervalInverterRealtimeData" , AttrVal( $name, "IntervalRealtimeData", 60 ) ) > 0;
+  InternalTimer(gettimeofday() + 15, "fronius_GetStorageRealtimeData",   $hash, 0) if AttrVal( $name, "IntervalStorageRealtimeData"  , AttrVal( $name, "IntervalRealtimeData", 60 ) ) > 0;
+  InternalTimer(gettimeofday() + 20, "fronius_GetMeterRealtimeData",     $hash, 0) if AttrVal( $name, "IntervalMeterRealtimeData"    , AttrVal( $name, "IntervalRealtimeData", 60 ) ) > 0;
+  InternalTimer(gettimeofday() + 25, "fronius_GetInverterRealtimeData",  $hash, 0) if AttrVal( $name, "IntervalInverterRealtimeData" , AttrVal( $name, "IntervalRealtimeData", 60 ) ) > 0;
   Log3 $name, 4, "[$name] [fronius_StartUp] InternalTimer Realtime Daten";
 
   # align GetArchiveData on 5min intervals
@@ -430,6 +435,9 @@ sub fronius_GetPowerFlowRealtimeData($) {
   fronius_SendCommand($hash,"GetPowerFlowRealtimeData","");
   
   if ($interval > 0) {
+    # Fronius Solar API V1 Doku - "Up to 2 realtime requests are allowed to be performed in parallel with keeping a timeout of 4 seconds between two consecutive calls."
+    $interval = $interval < 4 ? 4 : $interval;
+
     InternalTimer(gettimeofday() + $interval, "fronius_GetPowerFlowRealtimeData", $hash, 0);
     Log3 $name, 4, "[$name] [fronius_GetPowerFlowRealtimeData] Timer $interval";
   } else {
@@ -499,6 +507,9 @@ sub fronius_GetStorageRealtimeData($) {
   }
 
   if ($interval > 0) {
+    # Fronius Solar API V1 Doku - "Up to 2 realtime requests are allowed to be performed in parallel with keeping a timeout of 4 seconds between two consecutive calls."
+    $interval = $interval < 4 ? 4 : $interval;
+
     InternalTimer(gettimeofday() + $interval, "fronius_GetStorageRealtimeData", $hash, 0);  
     Log3 $name, 4, "[$name] [fronius_GetStorageRealtimeData] Timer $interval";
   } else {  
@@ -539,6 +550,10 @@ sub fronius_GetMeterRealtimeData($) {
   }
 
   if ($interval > 0) {
+
+    # Fronius Solar API V1 Doku - "Up to 2 realtime requests are allowed to be performed in parallel with keeping a timeout of 4 seconds between two consecutive calls."
+    $interval = $interval < 4 ? 4 : $interval;
+
     InternalTimer(gettimeofday() + $interval, "fronius_GetMeterRealtimeData", $hash, 0);  
     Log3 $name, 4, "[$name] [fronius_GetMeterRealtimeData] Timer $interval";
   } else {  
@@ -584,6 +599,10 @@ sub fronius_GetInverterRealtimeData($) {
   }
 
   if ($interval > 0) {
+
+    # Fronius Solar API V1 Doku - "Up to 2 realtime requests are allowed to be performed in parallel with keeping a timeout of 4 seconds between two consecutive calls."
+    $interval = $interval < 4 ? 4 : $interval;
+
     InternalTimer(gettimeofday() + $interval, "fronius_GetInverterRealtimeData", $hash, 0); 
     Log3 $name, 4, "[$name] [fronius_GetInverterRealtimeData] Timer $interval";
   } else {  
@@ -824,7 +843,7 @@ sub fronius_expandJSON($$$$;$$) {
 
         if ($reading eq "PowerFlow_Site_P_Load") {
           if ( $value + 0 eq $value) {
-            if ($value < 0) {$value = $value * -1}
+            $value = $value * -1;
           }       
         }
         
@@ -907,7 +926,7 @@ sub fronius_setState($$) {
 =item summary Fronius 
 =begin html
 
-<a name="fronius"></a>
+<a id="fronius"></a>
 <h3>fronius</h3>
 <ul>
   Module to read data from Fronius inverter devices using <a href="https://www.fronius.com/~/downloads/Solar%20Energy/Operating%20Instructions/42,0410,2012.pdf">Fronius Solar API V1</a>
@@ -947,11 +966,11 @@ sub fronius_setState($$) {
   <a id="fronius-attr"></a>
     <b>Attributes</b>
     <ul>      
-      <li><a id="fronius-IntervalRealtimeData">IntervalRealtimeData</a><br>
+      <li><a id="fronius-attr-IntervalRealtimeData">IntervalRealtimeData</a><br>
       Interval in seconds for requesting data from inverter, default 60s, 0 to disable requests.
       </li>
   
-      <li><a id="fronius-IntervalArchiveData">IntervalArchiveData</a><br>
+      <li><a id="fronius-attr-IntervalArchiveData">IntervalArchiveData</a><br>
       Interval in seconds for requesting GetArchiveData data from inverter, default MAX(300,IntervalRealtimeData), minimum allowed value 120s (Fronius Solar API V1 Doku - "Archive requests are not allowed to be performed in parallel and need to keep a timeout of 120 seconds between two consecutive calls.")
       <br>
       if set to 300, GetArchiveData calls are aligned on 5min intervals
@@ -959,28 +978,28 @@ sub fronius_setState($$) {
       0 to disable requests.
       </li>
 
-      <li><a id="fronius-IntervalPowerFlowRealtimeData">IntervalPowerFlowRealtimeData</a><br>
+      <li><a id="fronius-attr-IntervalPowerFlowRealtimeData">IntervalPowerFlowRealtimeData</a><br>
       Interval in seconds for requesting GetPowerFlowRealtimeData data from inverter, default IntervalRealtimeData, 0 to disable requests.
      </li>
 
-      <li><a id="fronius-IntervalStorageRealtimeData">IntervalStorageRealtimeData</a><br>
+      <li><a id="fronius-attr-IntervalStorageRealtimeData">IntervalStorageRealtimeData</a><br>
       Interval in seconds for requesting GetStorageRealtimeData data from inverter, default IntervalRealtimeData, 0 to disable requests.
       </li>
 
-      <li><a id="fronius-IntervalMeterRealtimeData">IntervalMeterRealtimeData</a><br>
+      <li><a id="fronius-attr-IntervalMeterRealtimeData">IntervalMeterRealtimeData</a><br>
       Interval in seconds for requesting GetMeterRealtimeData data from inverter, default IntervalRealtimeData, 0 to disable requests.
       </li>
 
-      <li><a id="fronius-IntervalInverterRealtimeData">IntervalInverterRealtimeData</a><br>
+      <li><a id="fronius-attr-IntervalInverterRealtimeData">IntervalInverterRealtimeData</a><br>
       Interval in seconds for requesting GetInverterRealtimeData data from inverter, default IntervalRealtimeData, 0 to disable requests.
       </li>
 
-      <li><a id="fronius-useHTTPS">useHTTPS</a><br>
+      <li><a id="fronius-attr-useHTTPS">useHTTPS</a><br>
       1 to use https to access Fronius Solar API, 0 to use http (default)
       </li>
 
-      <li><a id="fronius-sslargs">sslargs</a><br>
-      sslargs to pass to HttpUtils_BlockingGet, see <a href="https://wiki.fhem.de/wiki/HttpUtils">https://wiki.fhem.de/wiki/HttpUtils</a> / <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods">http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods</a>
+      <li><a id="fronius-attr-sslargs">sslargs</a><br>
+      sslargs to pass to HttpUtils_NonblockingGet, see <a href="https://wiki.fhem.de/wiki/HttpUtils">https://wiki.fhem.de/wiki/HttpUtils</a> / <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods">http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods</a>
       </li>
 
     </ul>
