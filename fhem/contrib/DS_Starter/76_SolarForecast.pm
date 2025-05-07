@@ -17086,10 +17086,10 @@ sub _flowGraphic {
   my $bat2home_direction    = "M1200,515 L730,590";
 
    if ($batout || $batin) {                                                               # Batterie wird geladen oder entladen
-      $node2bat    = $batin + $batout - $pv2bat + $dc2inv2node - $node2inv2dc;            # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
-	  $node2bat  = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
+      $node2bat = ($batin + $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
+	  $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
 	  
-	  my $home2bat = $batin + $batout - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
+	  my $home2bat = ($batin + $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
 
       if ($home2bat > 1) {                                                                # Batterieladung anteilig aus Hausnetz
           $node2bat           -= $home2bat;
