@@ -9852,8 +9852,8 @@ sub _transferInverterValues {
 	  my $pvgen   = 0;
 	  my $etotal  = 0;
       
-      if ($source eq 'bat') {                                                                          # Batteriewechselrichter ohne PV-Erzeugung
-          $h->{etotal} = 'dum_rdng_no_etot:Wh';             # Dummy Reading für Batterie-Inverter ohne PV-Erzeugung 
+      if ($source eq 'bat') {                                                               # Batteriewechselrichter ohne PV-Erzeugung
+          $h->{etotal} = 'dum_rdng_no_etot:Wh';                                             # Dummy Reading für Batterie-Inverter ohne PV-Erzeugung 
           
           if (defined $h->{reverse}) {
               my ($revread, $revunit) = split ":", $h->{reverse};
@@ -9864,15 +9864,15 @@ sub _transferInverterValues {
       }
       
 	  if ($source eq 'pv') {
-		  my ($edread, $etunit) = split ":", $h->{etotal};                                                 # Readingname/Unit für Energie total (PV Erzeugung)
+		  my ($edread, $etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
 		  my $etuf              = $etunit =~ /^kWh$/xi ? 1000 : 1;
-		  $etotal               = ReadingsNum ($indev, $edread, 0) * $etuf;                                         # Erzeugung total (Wh)
+		  $etotal               = ReadingsNum ($indev, $edread, 0) * $etuf;                            # Erzeugung total (Wh)
       }
 	  
 	  my ($pvread, $pvunit) = split ":", $h->{pv};                                                     # Readingname/Unit für aktuelle PV Erzeugung
 	  my $pvuf              = $pvunit =~ /^kW$/xi ? 1000 : 1;
-	  $pvgen                = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                         # aktuelle Erzeugung (W)
-	  $pvgen                = $pvgen <= 0 ? 0 : sprintf "%.0f", $pvgen;                                                # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
+	  $pvgen                = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                # aktuelle Erzeugung (W)
+	  $pvgen                = $pvgen <= 0 ? 0 : sprintf "%.0f", $pvgen;                                # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
            
       my $histetot = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), 'etotali'.$in, 0);              # etotal zu Beginn einer Stunde                                                        
     
@@ -11548,8 +11548,7 @@ sub _createSummaries {
 	  my $prevers = InverterVal ($name, $in, 'ireverse',      0);                                       # Rückwandlung AC->DC (Batterie-Wechselrichter)
       $pvgen     += $pvi     if($isource eq 'pv'  && $ifeed ne 'grid');                                 # nur PV Erzeugung berücksichtigen
       $pv2grid   += $pvi     if($isource eq 'pv'  && $ifeed eq 'grid');                                 # nur PV Erzeugung mit Ziel 'Grid'
-	  $inv2dc    += $prevers if($isource eq 'bat' && $ifeed eq 'default');                              # aktuelle Rückerzeugung AC->DC (Batterie-Wechselrichter)
-      # $batout    -= $pvi if($isource eq 'bat');                                                           # Doppelberücksichtigung Bat+Inv vermeiden !                                                         
+	  $inv2dc    += $prevers if($isource eq 'bat' && $ifeed eq 'default');                              # aktuelle Rückerzeugung AC->DC (Batterie-Wechselrichter)                                                       
   }
 
   my $othprod = 0;                                                                                      # Summe Otherproducer
@@ -17090,7 +17089,7 @@ sub _flowGraphic {
       $node2bat    = $batin + $batout - $pv2bat + $dc2inv2node - $node2inv2dc;            # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
 	  $node2bat  = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
 	  
-	  my $home2bat = $batin - ($pv2bat + $node2inv2dc + $node2bat);                       
+	  my $home2bat = $batin + $batout - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
 
       if ($home2bat > 1) {                                                                # Batterieladung anteilig aus Hausnetz
           $node2bat           -= $home2bat;
