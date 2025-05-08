@@ -161,7 +161,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.52.0" => "06.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
-                           "valInverter: add isource & ireverse, _flowGraphic: add battery inverter type and extensive adjustments ".
+                           "valInverter: add isource & ipac2dc, _flowGraphic: add battery inverter type and extensive adjustments ".
 						   "code cleaning ",
   "1.51.8" => "02.05.2025  _specialActivities: delete overhanging days at the change of month ". 
                            "Bugfix: https://forum.fhem.de/index.php?msg=1340666 ",
@@ -6925,7 +6925,7 @@ sub _attrInverterDev {                   ## no critic "not used"
   
   my $valid = {
       pv        => '',
-      reverse   => '',
+      ac2dc     => '',
       etotal    => '',
       capacity  => '',
       strings   => '',
@@ -6970,16 +6970,16 @@ sub _attrInverterDev {                   ## no critic "not used"
           }
       }
       
-      if ($none && !$h->{reverse}) {
-          return qq{A battery inverter requires a set key 'reverse'. Please consider the commandref.};
+      if ($none && !$h->{ac2dc}) {
+          return qq{A battery inverter requires a set key 'ac2dc'. Please consider the commandref.};
       }
       
       if ($none && $h->{etotal}) {
           return qq{A battery inverter don't need the key 'etotal'. Please delete this key.};
       }
       
-      if (!$none && $h->{reverse}) {
-          return qq{An inverter with connected solar cells don't need the key 'reverse'. Please delete this key.};
+      if (!$none && $h->{ac2dc}) {
+          return qq{An inverter with connected solar cells don't need the key 'ac2dc'. Please delete this key.};
       }
 
       if (!$h->{pv} || (!$none && !$h->{etotal}) || !$h->{capacity}) { 
@@ -7010,7 +7010,7 @@ sub _attrInverterDev {                   ## no critic "not used"
       delete $data{$name}{inverters}{$in}{ifeed};
       delete $data{$name}{inverters}{$in}{isource};
       delete $data{$name}{inverters}{$in}{ietotal}; 
-      delete $data{$name}{inverters}{$in}{ireverse};       
+      delete $data{$name}{inverters}{$in}{ipac2dc};       
   }
   elsif ($paref->{cmd} eq 'del') {
       delete $data{$name}{inverters}{$in};
@@ -8668,8 +8668,18 @@ sub centralTask {
 		  $gbc =~ s/batsocforecast_/batsocCombi_/xs;
 		  CommandAttr (undef, "$name graphicBeam${n}Content $gbc");
 	  }
-
   }
+  
+    for my $in (1..MAXINVERTER) {                                      # 08.05.
+        $in    = sprintf "%02d", $in;
+        my ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
+        if($err) {
+			delete $data{$name}{inverters}{$in};
+		next;
+		}
+		
+        delete $data{$name}{inverters}{$in}{ireverse};
+    }
   
   if (CurrentVal ($hash, 'consumerCollected', 0)) {
       for my $c (1..MAXCONSUMER) {                                # 19.04.2025
@@ -9848,18 +9858,18 @@ sub _transferInverterValues {
 
       my $source = defined $h->{strings} && $h->{strings} eq 'none' ? 'bat' : 'pv';         # Energie-Bezug PV oder aus Batterie 
       
-      my $reverse = 0;
-	  my $pvgen   = 0;
-	  my $etotal  = 0;
+      my $pac2dc = 0;
+	  my $pgen   = 0;
+	  my $etotal = 0;
       
       if ($source eq 'bat') {                                                               # Batteriewechselrichter ohne PV-Erzeugung
           $h->{etotal} = 'dum_rdng_no_etot:Wh';                                             # Dummy Reading für Batterie-Inverter ohne PV-Erzeugung 
           
-          if (defined $h->{reverse}) {
-              my ($revread, $revunit) = split ":", $h->{reverse};
+          if (defined $h->{ac2dc}) {
+              my ($revread, $revunit) = split ":", $h->{ac2dc};
               my $revuf               = $revunit =~ /^kW$/xi ? 1000 : 1;
-              $reverse                = ReadingsNum ($indev, $revread, 0) * $revuf;
-              $reverse                = $reverse <= 0 ? 0 : sprintf "%.0f", $reverse;              
+              $pac2dc                 = ReadingsNum ($indev, $revread, 0) * $revuf;
+              $pac2dc                 = $pac2dc <= 0 ? 0 : sprintf "%.0f", $pac2dc;              
           }
       }
       
@@ -9871,8 +9881,8 @@ sub _transferInverterValues {
 	  
 	  my ($pvread, $pvunit) = split ":", $h->{pv};                                                     # Readingname/Unit für aktuelle PV Erzeugung
 	  my $pvuf              = $pvunit =~ /^kW$/xi ? 1000 : 1;
-	  $pvgen                = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                # aktuelle Erzeugung (W)
-	  $pvgen                = $pvgen <= 0 ? 0 : sprintf "%.0f", $pvgen;                                # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
+	  $pgen                 = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                # aktuelle Erzeugung (W)
+	  $pgen                 = $pgen <= 0 ? 0 : sprintf "%.0f", $pgen;                                  # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
            
       my $histetot = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), 'etotali'.$in, 0);              # etotal zu Beginn einer Stunde                                                        
     
@@ -9914,8 +9924,8 @@ sub _transferInverterValues {
 
       my $feed = $h->{feed} // 'default';
 
-      $data{$name}{inverters}{$in}{igeneration} = $pvgen;                                        # aktuell erzeugte DC -> AC Leistung, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-      $data{$name}{inverters}{$in}{ireverse}    = $reverse        if(defined $reverse);          # aktuell erzeugte AC -> DC Leistung 
+      $data{$name}{inverters}{$in}{igeneration} = $pgen;                                         # aktuell erzeugte PV-Leistung, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      $data{$name}{inverters}{$in}{ipac2dc}     = $pac2dc        if(defined $pac2dc);            # aktuell erzeugte AC->DC Leistung 
       $data{$name}{inverters}{$in}{ietotal}     = $etotal;                                       # aktuellen etotal des WR speichern
       $data{$name}{inverters}{$in}{iname}       = $indev;                                        # Name des Inverterdevices
       $data{$name}{inverters}{$in}{ialias}      = AttrVal ($indev, 'alias', $indev);             # Alias Inverter
@@ -9927,13 +9937,13 @@ sub _transferInverterValues {
       $data{$name}{inverters}{$in}{ifeed}       = $feed;                                         # Eigenschaften der Energielieferung
       $data{$name}{inverters}{$in}{isource}     = $source;                                       # Eigenschaften des Energiebezugs, normal pv
 
-      $pvsum        += $pvgen if($source eq 'pv');
+      $pvsum        += $pgen if($source eq 'pv');
       $ethishoursum += $ethishour;
 
       writeToHistory ( { paref => $paref, key => 'pvrl'.$in, val => $ethishour, hour => $nhour } );
 
       debugLog ($paref, "collectData", "collect Inverter $in data - device: $indev, source: $source, delivery: $feed =>");
-      debugLog ($paref, "collectData", "pv: $pvgen W, etotal: $etotal Wh");
+      debugLog ($paref, "collectData", "pv: $pgen W, etotal: $etotal Wh");
   }
 
   storeReading ('Current_PV', $pvsum.' W');
@@ -11536,19 +11546,21 @@ sub _createSummaries {
       $batout += BatteryVal ($name, $bn, 'bpowerout', 0);                                               # Summe momentane Batterieentladung
   }
 
-  my $pvgen   = 0;
-  my $pv2grid = 0;                                                                                      # PV-Erzeugung zu Grid-only
-  my $inv2dc  = 0;
+  my $pv2node     = 0;
+  my $pv2grid     = 0;                                                                                  # PV-Erzeugung zu Grid-only
+  my $inv2dc      = 0;
+  my $dc2inv2node = 0;
   
   for my $in (1..MAXINVERTER) {                                                                         # Summe alle Inverter
-      $in         = sprintf "%02d", $in;
-      my $pvi     = InverterVal ($name, $in, 'igeneration',   0);
-      my $ifeed   = InverterVal ($name, $in, 'ifeed', 'default');
-      my $isource = InverterVal ($name, $in, 'isource',    'pv');
-	  my $prevers = InverterVal ($name, $in, 'ireverse',      0);                                       # Rückwandlung AC->DC (Batterie-Wechselrichter)
-      $pvgen     += $pvi     if($isource eq 'pv'  && $ifeed ne 'grid');                                 # nur PV Erzeugung berücksichtigen
-      $pv2grid   += $pvi     if($isource eq 'pv'  && $ifeed eq 'grid');                                 # nur PV Erzeugung mit Ziel 'Grid'
-	  $inv2dc    += $prevers if($isource eq 'bat' && $ifeed eq 'default');                              # aktuelle Rückerzeugung AC->DC (Batterie-Wechselrichter)                                                       
+      $in           = sprintf "%02d", $in;
+      my $pgen      = InverterVal ($name, $in, 'igeneration',   0);
+      my $ifeed     = InverterVal ($name, $in, 'ifeed', 'default');
+      my $isource   = InverterVal ($name, $in, 'isource',    'pv');
+	  my $pac2dc    = InverterVal ($name, $in, 'ipac2dc',       0);                                     # Rückwandlung AC->DC (Batterie-Wechselrichter)
+      $pv2node     += $pgen   if($ifeed ne 'grid'    && $isource eq 'pv');                              # nur PV Erzeugung berücksichtigen
+      $dc2inv2node += $pgen   if($ifeed eq 'default' && $isource eq 'bat');                             # Fall Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
+      $pv2grid     += $pgen   if($ifeed eq 'grid'    && $isource eq 'pv');                              # nur PV Erzeugung mit Ziel 'Grid'
+	  $inv2dc      += $pac2dc if($ifeed eq 'default' && $isource eq 'bat');                             # aktuelle Rückerzeugung AC->DC (Batterie-Wechselrichter)                                                       
   }
 
   my $othprod = 0;                                                                                      # Summe Otherproducer
@@ -11558,17 +11570,17 @@ sub _createSummaries {
       $othprod += ProducerVal ($hash, $pn, 'pgeneration', 0);
   }
 
-  my $consumption         = int ($pvgen + $othprod - $gfeedin + $gcon - $batin + $batout);              # ohne PV2Grid
-  my $selfconsumption     = int ($pvgen - $gfeedin - $batin);
+  my $consumption         = int ($pv2node + $othprod - $gfeedin + $gcon - $batin + $batout);            # ohne PV2Grid
+  my $selfconsumption     = int ($pv2node - $gfeedin - $batin);
   $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
 
-  my $surplus             = int ($pvgen - $pv2grid + $othprod - $consumption);                          # aktueller Überschuß
+  my $surplus             = int ($pv2node - $pv2grid + $othprod - $consumption);                        # aktueller Überschuß
   $surplus                = 0 if($surplus < 0);                                                         # wegen Vergleich nompower vs. surplus
 
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
   my $divi                = $selfconsumption + $batout + $gcon;
-  $selfconsumptionrate    = sprintf "%.0f", ($selfconsumption / $pvgen * 100)          if($pvgen * 1 > 0);
+  $selfconsumptionrate    = sprintf "%.0f", ($selfconsumption / $pv2node * 100)        if($pv2node * 1 > 0);
   $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / $divi * 100 if($divi);       # vermeide Illegal division by zero
 
   $data{$name}{current}{consumption}         = $consumption;
@@ -17041,23 +17053,23 @@ sub _flowGraphic {
       next if($err);
 	  
       my $pgen    = InverterVal ($name, $in, 'igeneration',        0);                    # Erzeugung aus PV oder alternativer Quelle
-	  my $prevers = InverterVal ($name, $in, 'ireverse',           0);                    # Rückwandlung AC->DC (Batterie-Wechselrichter)
+	  my $pac2dc  = InverterVal ($name, $in, 'ipac2dc',            0);                    # Rückwandlung AC->DC (Batterie-Wechselrichter)
       my $feed    = InverterVal ($name, $in, 'ifeed',      'default');
       my $isource = InverterVal ($name, $in, 'isource',         'pv');
 
 	  $pgen                  = __normDecPlaces ($pgen);
-	  $prevers               = __normDecPlaces ($prevers);
+	  $pac2dc                = __normDecPlaces ($pac2dc);
 	  $pdcr->{$lfn}{pn}      = $in;                                                       # Inverternummer
 	  $pdcr->{$lfn}{feed}    = $feed;                                                     # Eigenschaft der Energielieferung
 	  $pdcr->{$lfn}{isource} = $isource;                                                  # Art der Energiequelle (pv oder bat)
 	  $pdcr->{$lfn}{ptyp}    = 'inverter';                                                # Typ des Producers
 	  $pdcr->{$lfn}{pgen}    = $pgen;                                                     # aktuelle Erzeugungsleistung DC->AC
-	  $pdcr->{$lfn}{prevers} = $prevers;                                                  # aktuelle Reverseleistung AC->DC
-	  $pv2node              += $pgen    if($feed eq 'default' && $isource eq 'pv');       # PV-Erzeugung Inverter für das Hausnetz
-	  $pv2grid              += $pgen    if($feed eq 'grid'    && $isource eq 'pv');       # PV nur für das öffentliche Netz
-	  $pv2bat               += $pgen    if($feed eq 'bat'     && $isource eq 'pv');       # Direktladen PV nur in die Batterie
-	  $dc2inv2node          += $pgen    if($feed eq 'default' && $isource eq 'bat');      # Fall Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
-	  $node2inv2dc          += $prevers if($feed eq 'default' && $isource eq 'bat');      # aktuelle Rückerzeugung AC->DC (Batterie-Wechselrichter)
+	  $pdcr->{$lfn}{pac2dc}  = $pac2dc;                                                   # aktuelle Reverseleistung AC->DC
+	  $pv2node              += $pgen   if($feed eq 'default' && $isource eq 'pv');        # PV-Erzeugung Inverter für das Hausnetz
+	  $pv2grid              += $pgen   if($feed eq 'grid'    && $isource eq 'pv');        # PV nur für das öffentliche Netz
+	  $pv2bat               += $pgen   if($feed eq 'bat'     && $isource eq 'pv');        # Direktladen PV nur in die Batterie
+	  $dc2inv2node          += $pgen   if($feed eq 'default' && $isource eq 'bat');       # Fall Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
+	  $node2inv2dc          += $pac2dc if($feed eq 'default' && $isource eq 'bat');       # aktuelle Rückerzeugung AC->DC (Batterie-Wechselrichter)
 
 	  $lfn++;
   }
@@ -17078,6 +17090,7 @@ sub _flowGraphic {
 				  
   my $node2bat = 0;                                                                       # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)                              
   my $bat2home = 0;
+  my $home2bat = 0;
   
   my $grid2home_style       = $gconMetered ? "$stna active_sig"    : "$stna inactive";    # GridConsumption
   my $bat2home_style        = $bat2home    ? "$stna active_normal" : "$stna inactive";
@@ -17088,8 +17101,7 @@ sub _flowGraphic {
    if ($batout || $batin) {                                                               # Batterie wird geladen oder entladen
       $node2bat  = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;            # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
 	  $node2bat  = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
-	  
-	  my $home2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
+	  $home2bat  = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
 
       if ($home2bat > 1) {                                                                # Batterieladung anteilig aus Hausnetz
           $node2bat           -= $home2bat;
@@ -17111,7 +17123,8 @@ sub _flowGraphic {
   
   my $node2home = $pnodesum - $node2gridMetered - ($node2bat > 0 ? $node2bat : 0);        # V 1.46.4 - Energiefluß vom Knoten zum Haus
   #$node2home    = $node2home + $gconMetered != $consptn ? $consptn : $node2home;
-  $node2home    = __normDecPlaces ($node2home);                                           # V 1.46.4
+  $node2home    = __normDecPlaces ($node2home);                                           
+  $consptn      = $gconMetered + $node2home;                                              # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
   
  
   ## Producer / Inverter Koordninaten Steuerhash
@@ -17392,16 +17405,16 @@ END3
               my $isource     = $pdcr->{$lfn}{isource} // '';
               my $pn          = $pdcr->{$lfn}{pn};
               my $pgen        = $pdcr->{$lfn}{pgen};
-              my $prevers     = $pdcr->{$lfn}{prevers};
+              my $pac2dc      = $pdcr->{$lfn}{pac2dc};
               my $chain_color = '';                                        # Farbe der Laufkette des Producers
               
-              $producer_style = $pgen > 0 || $prevers > 0 ? "$stna active_normal" : "$stna inactive";
+              $producer_style = $pgen > 0 || $pac2dc > 0 ? "$stna active_normal" : "$stna inactive";
 
               #if ($pgen) {
                   #$chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
               #}
               
-              if ($prevers > 0) {                                          # Richtung Knoten -> Inverter
+              if ($pac2dc > 0) {                                          # Richtung Knoten -> Inverter
                   $ret .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M$xchain,$ychain L$left,130" />};
               }
               else {                                                       # Richtung Inverter -> Knoten (Standard)
@@ -17409,7 +17422,7 @@ END3
               }
               
               if ($ptyp eq 'inverter' && $isource eq 'bat') {
-                  if ($prevers > 0) {                                      # Richtung Inverter -> Batterie
+                  if ($pac2dc > 0) {                                      # Richtung Inverter -> Batterie
                       $ret .= qq{<path id="genproducer_${pn}_$stna" class="$producer_style" $chain_color d=" M$left,130 L1250,440" />};
                   }                  
                   else {                                                   # Richtung Batterie -> Inverter (Standard)                  
@@ -17492,8 +17505,8 @@ END3
           for my $lfn (@sorted) {
               my $pn      = $pdcr->{$lfn}{pn};
               my $pgen    = $pdcr->{$lfn}{pgen};
-              my $prevers = $pdcr->{$lfn}{prevers};
-              my $pval    = $prevers ? $prevers : $pgen;                   # Batterie-Wechselrichter AC->DC oder DC->AC berücksichtigen
+              my $pac2dc  = $pdcr->{$lfn}{pac2dc};
+              my $pval    = $pac2dc ? $pac2dc : $pgen;                   # Batterie-Wechselrichter AC->DC oder DC->AC berücksichtigen
               $lcp        = length $pval;
 
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
@@ -17651,10 +17664,10 @@ sub __addProducerIcon {
       $left                  = $xicon + 5;
 
       for my $lfn (@sorted) {
-          my $pn             = $pdcr->{$lfn}{pn};
+          my $pn      = $pdcr->{$lfn}{pn};
           my $pgen    = $pdcr->{$lfn}{pgen};
-          my $prevers = $pdcr->{$lfn}{prevers};
-          my $pval    = $prevers ? $prevers : $pgen;                   # Batterie-Wechselrichter AC->DC oder DC->AC berücksichtigen
+          my $pac2dc  = $pdcr->{$lfn}{pac2dc};
+          my $pval    = $pac2dc ? $pac2dc : $pgen;                   # Batterie-Wechselrichter AC->DC oder DC->AC berücksichtigen
           
           my ($picon, $ptxt) = __substituteIcon ( { hash  => $hash,                                                 # Icon des Producerdevices
                                                     name  => $name,
@@ -23621,7 +23634,7 @@ return $def;
 #
 # $in:  Inverter Nummer (01,02,03,...)
 # $key: ietotal            - Stand etotal des WR
-#       igeneration        - aktuelle Leistung Quelle -> Haus (PV-Erzeugung oder aus Batterie)
+#       igeneration        - aktuelle PV-Leistung
 #       invertercap        - Bemessungsleistung der Wechselrichters (max. W)
 #       iname              - Name des Inverterdevices
 #       iicon              - Icon des Inverters
@@ -24790,7 +24803,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>ilimit </b>         </td><td>set power limitation in % (e.g. by 70% rule)                          </td></tr>	
             <tr><td> <b>iname </b>          </td><td>Name of the device                                                    </td></tr>
             <tr><td> <b>invertercap </b>    </td><td>the nominal power (W) of the inverter (if defined)                    </td></tr>
-            <tr><td> <b>ireverse </b>       </td><td>current AC->DC power (W) of a battery inverter                        </td></tr>
+            <tr><td> <b>ipac2dc </b>        </td><td>current AC->DC power (W) of a battery inverter                        </td></tr>
             <tr><td> <b>isource </b>        </td><td>Type of energy source of the inverter                                 </td></tr>
             <tr><td> <b>istrings </b>       </td><td>List of strings assigned to the inverter (if defined)                 </td></tr>
 		 </table>
@@ -25881,7 +25894,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
-       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; reverse=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; <br>
+       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; ac2dc=&lt;Readingname&gt;:&lt;Unit&gt; etotal=&lt;Readingname&gt;:&lt;Unit&gt; <br>
                                  capacity=&lt;max. inverter power&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt] [feed=&lt;Delivery type&gt;] [limit=&lt;0..100&gt;] <br> 
                                  [icon=&lt;Day&gt;[@&lt;Color&gt;][:&lt;Night&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
@@ -25920,7 +25933,7 @@ to ensure that the system configuration is correct.
            <tr><td>                   </td><td>Usually it is the PV power; when activated as a battery inverter, the power is alternatively generated           </td></tr>
            <tr><td>                   </td><td>from a battery or other DC source.                                                                               </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>reverse</b>    </td><td>A reading that indicates the current AC->DC power as a positive value.                                           </td></tr>
+           <tr><td> <b>ac2dc</b>      </td><td>A reading that indicates the current AC->DC power as a positive value.                                           </td></tr>
            <tr><td>                   </td><td>The key is <b>only valid for battery inverters</b> and can only be set for this type of inverter.                </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
            <tr><td> <b>etotal</b>     </td><td>The Reading which provides the total PV energy generated (a steadily increasing counter).                        </td></tr>
@@ -27352,7 +27365,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td> <b>ilimit </b>         </td><td>eingestellte Leistungsbegrenzung in % (z.B. durch 70% Regel)                </td></tr>
             <tr><td> <b>iname </b>          </td><td>Name des Gerätes                                                            </td></tr>
             <tr><td> <b>invertercap </b>    </td><td>die nominale Leistung (W) des Wechselrichters (falls definiert)             </td></tr>
-            <tr><td> <b>ireverse </b>       </td><td>aktuelle AC->DC Leistung (W) eines Batterie-Wechselrichters                 </td></tr>
+            <tr><td> <b>ipac2dc </b>        </td><td>aktuelle AC->DC Leistung (W) eines Batterie-Wechselrichters                 </td></tr>
             <tr><td> <b>isource </b>        </td><td>Art der Energiequelle des Inverters                                         </td></tr>
             <tr><td> <b>istrings </b>       </td><td>Liste der dem Wechselrichter zugeordneten Strings (falls definiert)         </td></tr>
 		 </table>
@@ -28442,7 +28455,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
-       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; reverse=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; <br>
+       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; ac2dc=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; <br>
                                  capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt] [feed=&lt;Liefertyp&gt;] [limit=&lt;0..100&gt;] <br> 
                                  [icon=&lt;Tag&gt;[@&lt;Farbe&gt;][:&lt;Nacht&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
@@ -28482,7 +28495,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                   </td><td>Üblicherweise ist es die PV-Leistung, bei Aktivierung als Batterie-Wechselrichter wird die Leistung alternativ    </td></tr>
            <tr><td>                   </td><td>aus einer Batterie oder anderen Gleichstronquelle erzeugt.                                                        </td></tr>
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
-           <tr><td> <b>reverse</b>    </td><td>Ein Reading, der die aktuelle AC->DC-Leistung als positiven Wert angibt.                                          </td></tr>
+           <tr><td> <b>ac2dc</b>      </td><td>Ein Reading, der die aktuelle AC->DC-Leistung als positiven Wert angibt.                                          </td></tr>
            <tr><td>                   </td><td>Der Schlüssel ist <b>nur für Batteriewechselrichter gültig</b> und kann nur für diesen Wechselrichtertyp          </td></tr>
            <tr><td>                   </td><td>eingestellt werden.                                                                                               </td></tr>
            <tr><td>                   </td><td>                                                                                                                  </td></tr>
