@@ -158,6 +158,9 @@
 # 6.03.2    new: some new devices gen4/mini and others
 #           fix: Gen2-energy-meter: incomplete dropdown for attribute 'showunits'
 #           fix: Gen2-energy-meter: missing reading ct_type
+# 6.03.3    fix: number of channels of ShellyProEM50
+#           fix: init of EM-Devices
+#           add: errors in authentication
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -182,7 +185,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.03.2 06.05.2025";
+my $version = "6.03.3 09.05.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -323,8 +326,8 @@ my %shelly_vendor_ids = (
     "S3PL-00112EU"    => ["shellyplusplug", "Shelly Plug S MTR Gen3",  0x1805],   # added 10/2024
     "S3DM-0A101WWL"   => ["shellyprodm1pm", "Shelly Dimmer Gen3",      0x1073],   # added 01/2025
     "S3DM-0A1WW"      => ["generic",        "Shelly DALI Dimmer Gen3", 0x1071],   # added 10/2024
-    "S3EM-002CXEU"    => ["generic",        "Shelly EM Gen3",          0x1027],   # added 10/2024
-    "S3EM-003CXCEU63" => ["generic",        "Shelly 3EM 63 Gen3",      0x1026],   # added 01/2025    
+    "S3EM-002CXCEU"   => ["shellyem",       "Shelly EM Gen3",          0x1027],   # added 10/2024
+    "S3EM-003CXCEU63" => ["shelly3em",      "Shelly 3EM 63 Gen3",      0x1026],   # added 01/2025    
     "S3PL-10112EU"    => ["shellyplusplug", "Shelly AZ Plug",          0x1850],   # added 01/2025  amazon compatible
     "S3PL-20112EU"    => ["shellyplusplug", "Shelly Outdoor Plug S Gen3",0x1853],   # added 02/2025
     ## Mini Gen3 Devices
@@ -337,7 +340,7 @@ my %shelly_vendor_ids = (
     ## Mini Gen4 Devices
     "S4SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen4",      0x1030],   # added 03/2025
     "S4SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1PM Mini Gen4",    0x1031],   # added 03/2025
-    "S4EM-001PXCEU16" => ["shellypmmini",   "Shelly EM Mini Gen4",     0x1033],   # added 03/2025
+    "S4EM-001PXCEU16" => ["shellyemmini",   "Shelly EM Mini Gen4",     0x1033],   # added 03/2025
     ## 2nd Gen PRO devices
     "SPSW-001XE16EU"  => ["shellypro1",     "Shelly Pro 1"],      ## not listed by KB
     "SPSW-201XE16EU"  => ["shellypro1",     "Shelly Pro 1 v.1"],
@@ -397,7 +400,7 @@ my %shelly_category = (
 
 my %shelly_models = (
     #(   0      1       2         3    4    5       6    7     8)
-    #(relays,rollers,dimmers,  meters, NG,inputs,  EM,color,modes)
+    #(relays,rollers,dimmers,  meters, NG,inputs,  EM1,color,modes)
     "generic"       => [0,0,0, 0,0,0,  0,0,0],
     "shellyi3"      => [0,0,0, 0,0,3,  0,0,0],    # 3 inputs
     "shelly1"       => [1,0,0, 0,0,1,  0,0,0],    # not metering, only a power constant in older fw
@@ -431,10 +434,15 @@ my %shelly_models = (
     "shellypro4pm"  => [4,0,0, 4,1,4,  0,0,0],
     "shellyprodm1pm"=> [0,0,1, 1,2,2,  0,0,0],    # 1 dimmer with 2 inputs
     "shellyprodm2pm"=> [0,0,2, 2,2,4,  0,0,0],    # 2 dimmer with each 2 inputs
-    "shellyproem50" => [1,0,0, 0,1,0,  1,0,0],    # has two single-phase meter and one relay
-    "shellypro3em"  => [0,0,0, 0,1,0,  3,0,2],    # has one (1) three-phase meter in triphase profile or (3) meter in monophase-profile
+    "shellyproem50" => [1,0,0, 0,1,0,  2,0,0],    # has two single-phase meter and one relay
+    "shellypro3em"  => [0,0,0, 0,1,0,  3,0,2],    # has 1 three-phase meter [EM] in triphase profile or 3 meter [EM1] in monophase-profile
     "shellyprodual" => [0,2,0, 4,1,4,  0,0,0],
+    #-- 3nd generation devices (Gen3)
     "shellypmmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to ShellyPlusPM
+    "shellyem"      => [1,0,0, 0,3,0,  2,0,0],    # similar to 'shellyproem50'
+    "shelly3em"     => [0,0,0, 0,3,0,  3,0,2],    # similar to 'shellypro3em'
+    #-- 4nd generation devices (Gen4)
+    "shellyemmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to 'shellypmmini'    EM1 or PM1 ?
     #-- Android devices
     "walldisplay1"  => [1,0,0, 0,2,1,  0,0,0]     # similar to ShellyPlus1PM
     #-- 3rd generation devices (not covered by plus or pro devices)
@@ -1083,16 +1091,17 @@ sub Shelly_getModel {
           # set the type / vendor-id as internal
           $model_id=$jhash->{type};
           $mode=$jhash->{mode};   # mode is not supported by all devices within the /shelly call
-          $auth=$jhash->{auth};
+          $auth=$jhash->{auth}; 
       }elsif( defined($jhash->{model}) ){ #2G
           # set the type / vendor-id as internal
           $model_id=$jhash->{model};
           $mode=$jhash->{profile};
-          $auth=$jhash->{auth_en};
+          $auth=$jhash->{auth_en}; 
       }else{
           Log3 $name,4,"[Shelly_getModel] $name: have no result with the /shelly call, calling /settings";
           Shelly_HttpRequest($hash,"/settings",undef,"Shelly_getModel" );
       }
+      
       ### MAC
       my $mac = $jhash->{mac};
       $mac =~ m/(\w\w)(\w\w)(\w\w)(\w\w)(\w\w)(\w\w)/;  # matching word characters (alphanumeric plus '_')
@@ -1131,7 +1140,8 @@ sub Shelly_getModel {
           Log3 $name,2,"[Shelly_getModel] type not found, proposed model of device $name is \'generic\'";
           $model_id = "unknown";
           $model = "generic";
-      }  
+      } 
+      $auth=$jhash->{auth_en}; 
   }
   if( defined($model_id) ){
         Log3 $name,4,"[Shelly_getModel] device $name is of model_ID \'$model_id\'";
@@ -1194,13 +1204,30 @@ sub Shelly_getModel {
   }
   
   # auth
-  if( defined($auth) && $auth==1 && !defined(AttrVal($name,"shellyuser",undef)) && $shelly_models{$model}[4]==0 ){
-     Shelly_error_handling($hash,"Shelly_getModel","Authentication required",1);
-     return;
-  }else{
-     readingsSingleUpdate($hash,"state","initialized",1);
-  }
-
+  my $login = "unknown";
+  if( defined($auth) ){
+     my ($err, $pw) = getKeyValue("SHELLY_PASSWORD_$name");
+     my $shellyuser = AttrVal($name,"shellyuser",undef);
+     $shellyuser = "admin" if( $shelly_models{$model}[4] > 0 );
+     if( $auth==1 ){
+         if( !defined($shellyuser) ){
+             $login="ERROR";
+             Shelly_error_handling($hash,"Shelly_getModel","shellyuser required",1);
+         }elsif( !$pw ){
+             $login="ERROR";
+             Shelly_error_handling($hash,"Shelly_getModel","password required",1);
+         }elsif( $shelly_models{$model}[4]>0 ){
+             $login = "password";
+         }else{ # Gen1
+             $login = "username:password";
+         }
+     }else{
+         $login = "open";
+     }
+  } 
+ # readingsSingleUpdate($hash,"auth",$auth,1);
+  readingsSingleUpdate($hash,"login",$login,1);
+         
   delete($hash->{helper}{Sets}); # build up the sets-dropdown with next refresh
 
   if( $param->{cmd} eq "/shelly" && $shelly_models{$model}[8]>1  && $shelly_models{$model}[4]==0 && !defined($mode) ){
@@ -1349,7 +1376,7 @@ sub Shelly_Attr(@) {
           $hash->{'.AttrList'} =~ s/ slat_pos//;
     }
 
-    if( $attrVal =~ /pro3em|proem50/ ){  # "shellyproem50"  "shellypro3em"
+    if( $shelly_models{$attrVal}[6]>0 ){  # "shellyproem50"  "shellypro3em"  ## $attrVal =~ /pro3em|proem50/
           $hash->{'.AttrList'} =~ s/\smaxpower//;
     ##    $hash->{'.AttrList'} =~ s/ webhook:(\S+?)\s//;  # Shelly actions do not work properly (fw v0.14.1)
     ##      $hash->{'.AttrList'} .= " Energymeter_F Energymeter_P Energymeter_R EMchannels:ABC_,L123_,_ABC,_L123";
@@ -1569,7 +1596,7 @@ sub Shelly_Attr(@) {
       }
       return;
     }
-    if( $model ne "shellypro3em" && $model ne "shellypmmini"){
+    if( $shelly_models{$model}[6]==0 && $model ne "shellypmmini"){  # $model ne "shellypro3em"
       $error="Setting of the attribute \"$attrName\" only works for ShellyPro3EM / ShellyPMmini ";
       Log3 $name,1,"[Shelly_Attr] $name\: $error ";
       return $error;
@@ -1787,7 +1814,7 @@ sub Shelly_Attr(@) {
     }
   #---------------------------------------
   }elsif( $attrName eq "Periods" ){
-    if( $model ne "shellypro3em" && $model ne "shellyproem50" && $model ne "shellypmmini" && $init_done ){
+    if( $shelly_models{$model}[6]==0 && $model ne "shellypmmini" && $init_done ){ # $model ne "shellypro3em" && $model ne "shellyproem50"
       $error="Setting of the attribute \"$attrName\" only works for ShellyPro3EM / ShellyPro50EM / ShellyPMmini";
       Log3 $name,1,"[Shelly_Attr] $name\: $error ";
       return $error;
@@ -1815,7 +1842,7 @@ sub Shelly_Attr(@) {
               my $energy;
               my $factor=$energy_units{AttrVal($name,"showunits","none")}[1];  # normalize readings values to "Wh"
               my @readings = ("energy");
-              if( $model =~ /shellypro3em|shellyproem50/ ){
+              if( $shelly_models{$model}[6]>0 ){  # $model =~ /shellypro3em|shellyproem50/
                   @readings = ("Purchased_Energy_S","Returned_Energy_S","Total_Energy_S");
                   push( @readings,"Purchased_Energy_T","Returned_Energy_T","Total_Energy_T" ) if(AttrVal($name,"Balancing",0) == 1);
               }
@@ -1882,8 +1909,8 @@ sub Shelly_Attr(@) {
     }
   #---------------------------------------
   }elsif( $attrName eq "interval_power" && $cmd eq "set" ){
-    #-- update timer for power-readings of ShellyPro3EM
-    if( $model ne "shellypro3em" && $model ne "shellyproem50" ){
+    #-- update timer for power-readings of EnergyMeter (ShellyPro3EM,ShellyProEM50)
+    if( $shelly_models{$model}[6]==0 ){  # $model ne "shellypro3em" && $model ne "shellyproem50"
          return "wrong model";
     }
     if( $attrVal =~ /\D/ || $attrVal == 0 ){
@@ -3188,7 +3215,7 @@ sub Shelly_Set ($@) {
           #-- scheduling next status update
           Shelly_status($hash,"Shelly_Set",$timer);
           $msg .= "status-timer=$timer";
-          if( $model =~ /shellypro3em|shellyproem50/ ){
+          if( $shelly_models{$model}[6]>0 ){ # $model =~ /shellypro3em|shellyproem50/
               #
               RemoveInternalTimer($hash,"Shelly_getEMvalues");
               $timer=1; #$hash->{INTERVAL}/4;
@@ -3584,6 +3611,7 @@ sub Shelly_getEMvalues($){
  
   my $EMcall="EM1.GetStatus";
   $EMcall="EM.GetStatus"  if( ReadingsVal($name,"model_profile","monophase") eq "triphase");
+  # request starts with id=0, following id's are called by Shelly_procEMvalues()
   Shelly_HttpRequest($hash,"/rpc/$EMcall","?id=0","Shelly_procEMvalues" );
 } #end Shelly_getEMvalues()
 
@@ -3595,6 +3623,7 @@ sub Shelly_getEnergyData($){
   
   my $EMcall="EM1Data.GetStatus";
   $EMcall="EMData.GetStatus"  if( ReadingsVal($name,"model_profile","monophase") eq "triphase");
+  # request starts with id=0, following id's are called by Shelly_procEnergyData()
   Shelly_HttpRequest($hash,"/rpc/$EMcall","?id=0","Shelly_procEnergyData" );
 } #end Shelly_getEnergyData()
 
@@ -5544,8 +5573,8 @@ sub Shelly_procEMvalues {
   my @chnls=@{$shelly_models{$model}}; 
 
   Log3 $name,4,"[Shelly_procEMvalues] processing Shelly_procEMvalues() for device $name channel/id=$id"; #4
-  return  if( $chnls[6]==0 );  # check number of EM-channels
-  return  if( $model ne "shellypro3em" && $model ne "shellyproem50" );  # 
+  return  if( $chnls[6]==0 );  # check number of EM1-channels
+#  return  if( $model ne "shellypro3em" && $model ne "shellyproem50" );  # 
 
   readingsBeginUpdate($hash);
 
@@ -5698,13 +5727,14 @@ sub Shelly_procEnergyData {
   my $hash=$param->{hash};
   my $name=$hash->{NAME};
   my $id=$jhash->{id};  
+  my $V;  # set verbose focus; set undefined to use 'normal' verbose values
   my $model = AttrVal($name,"model","generic");
 
   my $unixtime = time();####$jhash->{sys}{unixtime};
   my $TimeStamp = strftime("%Y-%m-%d %H:%M:%S",localtime($unixtime) );
   readingsBeginUpdate($hash);
   #readingsBulkUpdateMonitored($hash,"timestamp", $TimeStamp);
-  Log3 $name,5,"[Shelly_procEnergyData] processing Shelly_procEnergyData() for device $name, channel=$id";   #5
+  Log3 $name,$V//5,"[Shelly_procEnergyData] processing Shelly_procEnergyData() for device $name, channel=$id";   #5
 
   # Energy Readings are calculated by the Shelly every minute, matching "zero"-seconds
   # with some processing time the result will appear in fhem some seconds later
@@ -5717,6 +5747,11 @@ sub Shelly_procEnergyData {
   my ($active_energy,$return_energy,$deltaEnergy,$deltaAge);
   
   my (@emchannels,$mpsub,$mpch);  
+  
+  #prepare the list of Time-Periods
+  my @TPs=split(/,/x, AttrVal($name,"Periods", "") );
+  my $TP;
+  
   if( ReadingsVal($name,"model_profile","monophase") eq "triphase" ){
     # triphase: we have for the channel 0:
     # a_total_act_energy
@@ -5737,6 +5772,7 @@ sub Shelly_procEnergyData {
   }
   #--- looping all phases
   foreach my $emch ( @emchannels ){                  # "a_","b_","c_","total_"
+       # Log3 $name,$V//5,"[Shelly_procEnergyData:0] $name channel=$id: processing EM-channel=$emch <$mpsub>$suffix<";   #5
         if( $suffix =~ /_$/ ){  # ABC_  L123_
             $pr=$mapping{sf}{$suffix}{$mpch//$emch};  # take $emch if $mpch is undefined
             $ps="";
@@ -5757,7 +5793,14 @@ sub Shelly_procEnergyData {
                   $return_energy = $value;
               }
             }
+            Log3 $name,$V//5,"[Shelly_procEnergyData:0] $name channel=$id: updating reading=$reading";   #5
             Shelly_readingsBulkUpdate($hash,$reading,$value,"energy/Wh",undef,$TimeStamp);
+            #new#            
+            Log3 $name,$V//5,"[Shelly_procEnergyData:0] $name channel=$id: updating delta values of reading=$reading";   #5
+            foreach $TP (@TPs){
+          #  Shelly_delta_energy($hash,$reading,$TP,$unixtime,$value,$TimeStamp,$dst); 
+            Shelly_delta_energy($hash,$reading."_",$TP,$unixtime,$value,$TimeStamp,1); 
+            }
         }
   }
 
@@ -5771,17 +5814,18 @@ sub Shelly_procEnergyData {
 
   ### processing calculated values ###
   ### 1. calculate Total Energy
-        Shelly_readingsBulkUpdate($hash,$pr."Total_Energy".$ps,$active_energy - $return_energy,"energy/Wh",undef,$TimeStamp);
+        $reading = $pr."Total_Energy".$ps;
+        Log3 $name,$V//5,"[Shelly_procEnergyData:1] $name channel=$id: updating reading=$reading";   #5
+        Shelly_readingsBulkUpdate($hash,$reading,$active_energy - $return_energy,"energy/Wh",undef,$TimeStamp);
 
   ### 2. calculate Energy-differences for a set of different periods   //  all meters
-        #prepare the list of periods
-        my @TPs=split(/,/x, AttrVal($name,"Periods", "") );
+        Log3 $name,$V//5,"[Shelly_procEnergyData:2] $name channel=$id: preparing periods ".AttrVal($name,"Periods", "");
 
         #calculate all periods
         my $dst = fhem('{$isdst}',1); # is daylight saving time (Sommerzeit) ?   silent/no log entry {$isdst} at level 3
         $unixtime = $unixtime-$unixtime%60;  # adjust to lass full minute
-        foreach my $TP (@TPs){
-           Log3 $name,5,"[Shelly_procEnergyData] calling Shelly_delta_energy for period \'$TP\' ";
+        foreach $TP (@TPs){
+           Log3 $name,$V//5,"[Shelly_procEnergyData:2] $name channel=$id: $pr$ps calling Shelly_delta_energy for period \'$TP\' ";
            # Shellie'S Energy value 'S'
            Shelly_delta_energy($hash,$pr."Total_Energy".    $ps."_",$TP,$unixtime,$active_energy-$return_energy,$TimeStamp,$dst);
            Shelly_delta_energy($hash,$pr."Purchased_Energy".$ps."_",$TP,$unixtime,$active_energy,$TimeStamp,$dst);
@@ -5801,6 +5845,7 @@ sub Shelly_procEnergyData {
         $value  = sprintf("%4.1f",3600*$deltaEnergy/$deltaAge) if( $deltaAge>0 );  # this is a Power value in Watts.
         $value .= $si_units{power}[$hash->{units}];
         $value .= sprintf(" \( %d Ws = %5.2f Wh in %d s \)",3600*$deltaEnergy,$deltaEnergy,$deltaAge);
+        Log3 $name,$V//5,"[Shelly_procEnergyData:3] $name channel=$id: updating triphase reading=$reading";   #5
         Shelly_readingsBulkUpdate($hash,$reading,$value,undef,undef,$TimeStamp);
   }  # Triphase/
 
@@ -5808,7 +5853,7 @@ sub Shelly_procEnergyData {
   if( ReadingsVal($name,"model_profile","monophase") eq "triphase"  
     &&  AttrVal($name,"Balancing",1) == 1 
     &&  $hash->{helper}{powerCnt} ){   # don't divide by zero
-      Log3 $name,5,"[Shelly_procEnergyData] processing Balancing";
+      Log3 $name,$V//5,"[Shelly_procEnergyData] processing Balancing";
       ### 4. calculate a power value by integration of single power values
       ### calculate purchased and returned Energy out of integration of positive and negative power values
           my ($mypower,$mypowerPos,$mypowerNeg)=(0,0,0);
@@ -5817,15 +5862,18 @@ sub Shelly_procEnergyData {
                                                     $si_units{power}[$hash->{units}],$hash->{helper}{powerCnt} );
           $mypowerPos = $hash->{helper}{powerPos} / $hash->{helper}{powerCnt};
           $mypowerNeg = $hash->{helper}{powerNeg} / $hash->{helper}{powerCnt};
-
-          $hash->{helper}{Energymeter_P}=1000*ReadingsNum($name,"Purchased_Energy_T",ReadingsNum($name,"Purchased_Energy_S",0))
+# showunits
+        my $factor=$energy_units{AttrVal($name,"showunits","none")}[1];  # normalize readings values to "Wh"
+        my $decimals=$energy_units{AttrVal($name,"showunits","none")}[2];
+        $factor=1/$factor//1; #Debug $factor;
+          $hash->{helper}{Energymeter_P}=$factor*ReadingsNum($name,"Purchased_Energy_T",ReadingsNum($name,"Purchased_Energy_S",0))
           	unless( $hash->{helper}{Energymeter_P} ); #$active_energy;
-          $hash->{helper}{Energymeter_R}=1000*ReadingsNum($name,"Returned_Energy_T", ReadingsNum($name,"Returned_Energy_S", 0))
+          $hash->{helper}{Energymeter_R}=$factor*ReadingsNum($name,"Returned_Energy_T", ReadingsNum($name,"Returned_Energy_S", 0))
                 unless( $hash->{helper}{Energymeter_R} ); #=$return_energy;
 
           $active_energy_i = $mypowerPos/60 + $hash->{helper}{Energymeter_P};    # Energy in Watthours
           $return_energy_i = $mypowerNeg/60 + $hash->{helper}{Energymeter_R};
-          Log3 $name,5,"[Shelly_procEnergyData] integrated Energy= $active_energy_i   $return_energy_i   in Watthours";
+          Log3 $name,$V//5,"[Shelly_procEnergyData:4] integrated Energy= $active_energy_i   $return_energy_i   in Watthours";
           $mypowerPos = sprintf("%4.1f %s (%d Ws = %5.2f Wh)", $mypowerPos,$si_units{power}[$hash->{units}],$mypowerPos*60,$mypowerPos/60 );
           $mypowerNeg = sprintf("%4.1f %s (%d Ws = %5.2f Wh)", $mypowerNeg,$si_units{power}[$hash->{units}],$mypowerNeg*60,$mypowerNeg/60);
           # don't write out when not calculated
@@ -5867,7 +5915,8 @@ sub Shelly_procEnergyData {
           Shelly_readingsBulkUpdate($hash,"Total_Energy_T",$active_energy_i-$return_energy_i,"energy/Wh", undef, $TimeStamp);
 
      ### 9. calculate Energy-differences for a set of different periods
-          foreach my $TP (@TPs){
+          foreach $TP (@TPs){
+          Log3 $name,$V//5,"[Shelly_procEnergyData:9] $name channel=$id calling delta for totals of Total/Purch./Ret. periode=$TP <$dst>";
               # integrated (balanced) energy values 'T'
               Shelly_delta_energy($hash,"Total_Energy_T_",    $TP,$unixtime,$active_energy_i-$return_energy_i,$TimeStamp,$dst); # $return_energy is positive
               Shelly_delta_energy($hash,"Purchased_Energy_T_",$TP,$unixtime,$active_energy_i,$TimeStamp,$dst);
@@ -5877,6 +5926,7 @@ sub Shelly_procEnergyData {
   readingsEndUpdate($hash,1);
 
   if( ReadingsVal($name,"model_profile","monophase") ne "triphase"    &&    ++$id < $shelly_models{$model}[6] ){
+         Log3 $name,$V//5,"[Shelly_procEnergyData] $name requesting next EnergyData channel=$id";
          Shelly_HttpRequest($hash,"/rpc/EM1Data.GetStatus","?id=$id","Shelly_procEnergyData" );
          return;
   }
@@ -5898,10 +5948,10 @@ sub Shelly_procEnergyData {
           }
           # Shellie'S Energy value 'S'
           $pr="";$ps="_S";
-          ##    Log3 $name,0,"[Shelly_procEnergyData] $name: val=$value unit >$unit<"; 
+          Log3 $name,$V//5,"[Shelly_procEnergyData] $name: val=$value unit >$unit<"; 
           Shelly_readingsBulkUpdate($hash,$pr.$reading.$ps,$value,"energy/$unit"); # Purchased_Energy, ...
-          foreach my $TP (@TPs){
-              Log3 $name,5,"[Shelly_procEnergyData] calling Shelly_delta_energy for period \'$TP\' for Shelly in monophase-profile";
+          foreach $TP (@TPs){
+              Log3 $name,$V//5,"[Shelly_procEnergyData] calling Shelly_delta_energy for period \'$TP\' for Shelly in monophase-profile";
               Shelly_delta_energy($hash,$pr.$reading.$ps."_",$TP,$unixtime,$value,$TimeStamp,$dst);
           } 
       }
@@ -5914,7 +5964,8 @@ sub Shelly_procEnergyData {
       $perds=~/(\w+)$/; # \w matches all word chars, looking for last key in descending order   
       my $timer=($periods{$1}[2]  //   60); 
       my $Time=(int(time()/$timer)+1)*$timer+1; 
-      Log3 $name,4,"[Shelly_procEnergyData] $name: \'EM Data\' update interval is $timer sec, next update \@ ".strftime("%H:%M:%S",localtime($Time)); #4
+      Log3 $name,$V//4,"[Shelly_procEnergyData] $name: \'EM Data\' update interval is $timer sec, next update \@ ".
+                        strftime("%H:%M:%S",localtime($Time) ); #4
       RemoveInternalTimer($hash,"Shelly_getEnergyData");
       InternalTimer( $Time, "Shelly_getEnergyData", $hash);
   }
@@ -5963,6 +6014,7 @@ sub Shelly_delta_energy {
           }
 
           my $power = $dtime ? sprintf(" %4.1f %s",3600*$denergy/$dtime,$si_units{power}[$hash->{units}]) : "-";
+          Log3 $hash->{NAME},5,"[Shelly_delta_energy] updating $reading";
           readingsBulkUpdateIfChanged($hash,$reading,
                   shelly_energy_fmt($hash,$denergy,"Wh").sprintf(" (%7.4f) ",$energy).$power,
                   undef, $TimeStamp);
@@ -6411,9 +6463,7 @@ sub Shelly_webhook_create {
           # ShellyPlus2PM in roller mode does not support Actions for both inputs, even with detached inputs.
           # We don't care, because we can use actions on 'opening' and 'closing'
           $compCount   = abs($shelly_models{$model}[5]);  # number of inputs on ShellyPlug is -1, because it's a button, not an wired input
-       }elsif( $component eq "emeter" && $model eq "shellypro3em" ){
-          $compCount   = 1;
-       }elsif( $component eq "emeter" && $model eq "shellyproem50" ){
+       }elsif( $component eq "emeter" && $model =~ /shellypro3em|shellyproem50/ ){
           $compCount   = 1;
        }elsif( $component eq "pm1" && $model eq "shellypmmini" ){
           $compCount   = 1;
@@ -6978,7 +7028,7 @@ sub Shelly_firmwarecheck {
   my ($hash,$firmware,$update,$beta) = @_;
   my $name=$hash->{NAME};
   my $model = AttrVal($name,"model","generic");
-  Log3 $name,5,"[Shelly_firmwarecheck] $name: current=$firmware update=".($update?$update:"-")." beta=$beta";#2
+  Log3 $name,3,"[Shelly_firmwarecheck] $name: current=$firmware update=".($update?$update:"-")." beta=$beta";#2
   my (@num_fw,@num_upd,$firmwareV,$updateV);
   my $txt ="-";
   my $icon="/";
@@ -7414,7 +7464,7 @@ sub Shelly_HttpResponse($){
         # calling the sub() forwarded by $param
         $param->{function}->($param,$jhash);
     }else{
-        Log3 $name,4,"[Shelly_HttpResponse] ERROR haven't error neither data for $name";
+        Log3 $name,3,"[Shelly_HttpResponse] ERROR haven't error neither data for $name (maybe missing credentials)";
     }
 }   #end Shelly_HttpResponse()
 
