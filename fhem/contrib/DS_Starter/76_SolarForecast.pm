@@ -17236,7 +17236,7 @@ sub _flowGraphic {
   my $strokewidth  = CurrentVal ($name, 'strokewidth',           STROKWIDTHDEF);
   my $strokeredlim = CurrentVal ($name, 'strokeCmrRedColLimit', STROKCMRREDLIM);
 
-  my $styles = {
+  my $svg = {
       text          => "{ stroke: none; fill: gray; font-size: 60px; }",
       bat25         => "{ stroke: red; fill: red; }",
       bat50         => "{ stroke: darkorange; fill: darkorange; }",
@@ -17251,16 +17251,16 @@ sub _flowGraphic {
 
   my $ret = << "END0";
       <style>
-      .$stna.text          $styles->{text}
-      .$stna.bat25         $styles->{bat25}
-      .$stna.bat50         $styles->{bat50}
-      .$stna.bat75         $styles->{bat75}
-      .$stna.grid_green    $styles->{grid_green}
-      .$stna.grid_red      $styles->{grid_red}
-      .$stna.grid_gray     $styles->{grid_gray}
-      .$stna.inactive      $styles->{inactive}
-      .$stna.active_sig    $styles->{active_sig}
-      .$stna.active_normal $styles->{active_normal}
+      .$stna.text          $svg->{text}
+      .$stna.bat25         $svg->{bat25}
+      .$stna.bat50         $svg->{bat50}
+      .$stna.bat75         $svg->{bat75}
+      .$stna.grid_green    $svg->{grid_green}
+      .$stna.grid_red      $svg->{grid_red}
+      .$stna.grid_gray     $svg->{grid_gray}
+      .$stna.inactive      $svg->{inactive}
+      .$stna.active_sig    $svg->{active_sig}
+      .$stna.active_normal $svg->{active_normal}
       
       $animation
       </style>
@@ -17620,7 +17620,7 @@ END3
               elsif ($lpv1 == 4) {$xtext -= 15}
               elsif ($lpv1 == 3) {$xtext -=  5}
               elsif ($lpv1 == 2) {$xtext += 10}
-              elsif ($lpv1 == 1) {$xtext += 10}             
+              elsif ($lpv1 == 1) {$xtext += 30}             
               
               $ret .= qq{<text class="$stna text" id="generatortxt_${pn}_$stna" x="$xtext" y="$ytext">$pval1</text>};
           }
@@ -17647,7 +17647,7 @@ END3
               elsif ($lpv1 == 4) {$left += 10}
               elsif ($lpv1 == 3) {$left += 15}
               elsif ($lpv1 == 2) {$left += 20}
-              elsif ($lpv1 == 1) {$left += 40}
+              elsif ($lpv1 == 1) {$left += 50}
 
               $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$left" y="100">$pval1</text>} if($flowgPrdsPower);
 
@@ -17657,7 +17657,7 @@ END3
               elsif ($lpv1 == 4) {$left -= 10}
               elsif ($lpv1 == 3) {$left -= 15}
               elsif ($lpv1 == 2) {$left -= 20}
-              elsif ($lpv1 == 1) {$left -= 40}
+              elsif ($lpv1 == 1) {$left -= 50}
 
               $left += ($pdist * 2);
           }
