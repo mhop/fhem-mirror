@@ -178,9 +178,10 @@ sub OBIS_Define($$)
     "E110"		=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "E350USB"	=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "AS1440"	=> 	["/2!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
-    "MT382"	=> 	["/?!".chr(13).chr(10),    20,    chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)] #this line added by alkazaa
+    "MT382"	=>	["/?!".chr(13).chr(10),    20,    chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)], #this line added by alkazaa
+    "EMQ3C"	=>	[join('', map { chr(hex($_)) } unpack("(A2)*", "1b1b1b1b010101017603303062006200726500000100770101093131333131383632010101016303360076033031620062007265000007007501010101016314cb007603303262006200726500000200710163756d0000001b1b1b1b1a027241")), 10, ""]
     );
-  if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110, E350USB, AS1440, MT382'};
+  if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110, E350USB, AS1440, MT382, EMQ3C'};
   $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
   $hash->{helper}{DEVICES} =$devs{$type};
   $hash->{helper}{RULECACHE} = {};
@@ -609,7 +610,7 @@ sub OBIS_Parse($$)
 	my %dir=("<"=>"out",">"=>"in");
 	my $buffer=$hash->{helper}{BUFFER};
 	my $remainingSML;
-	($buffer,$remainingSML) = OBIS_trySMLdecode($hash,$buffer) if ($hash->{MeterType}=~/SML|Ext|Unknown/);
+	($buffer,$remainingSML) = OBIS_trySMLdecode($hash,$buffer) if ($hash->{MeterType}=~/SML|Ext|EMQ3C|Unknown/);
 	my $type= $hash->{MeterType};
 	$buf='/'.$buf;  
 	$buf =~ /!((?!\/).*)$/gmsi;
