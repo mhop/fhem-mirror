@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
   "1.52.0" => "11.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
                            "valInverter: add isource, new keys: ac2dc, dc2ac, _flowGraphic: add battery inverter type ".
 						   "and extensive adjustments, new sub removeMinMaxArray, ___getFWwidget: bugfix with state-Reading ". 
@@ -760,6 +761,39 @@ my %hattr = (                                                                # H
   for my $prn (1..MAXPRODUCER) {
       $prn = sprintf "%02d", $prn;
       $hattr{'setupOtherProducer'.$prn}{fn} = \&_attrProducerDev;
+  }
+  
+my $hcompoattr = {
+  aiControl              => '',
+  consumerControl        => '',
+  flowGraphicControl     => '',
+  graphicControl         => '',
+  plantControl           => '',
+  setupMeterDev          => '',
+  setupStringAzimuth     => '',
+  setupStringDeclination => '',
+  setupStringPeak        => '',
+};
+  
+  for my $cn (1..MAXCONSUMER) {
+      $cn = sprintf "%02d", $cn;
+      $hcompoattr->{'consumer'.${cn}} = '';                                               
+  }
+
+  for my $bn (1..MAXBATTERIES) {
+      $bn = sprintf "%02d", $bn;
+      $hcompoattr->{'setupBatteryDev'.${bn}} = '';                    
+      $hcompoattr->{'ctrlBatSocManagement'.${bn}} = '';
+  }
+
+  for my $in (1..MAXINVERTER) {
+      $in = sprintf "%02d", $in;
+      $hcompoattr->{'setupInverterDev'.${in}} = '';                    
+  }
+
+  for my $pn (1..MAXPRODUCER) {
+      $pn = sprintf "%02d", $pn;
+      $hcompoattr->{'setupOtherProducer'.${pn}} = '';             
   }
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -1954,45 +1988,12 @@ sub _setattrKeyVal {                         ## no critic "not used"
   my $arg   = $paref->{arg} // return;
   
   return if(!$init_done);
-  
-  my $valid = {
-      aiControl              => '',
-      consumerControl        => '',
-      flowGraphicControl     => '',
-      graphicControl         => '',
-      plantControl           => '',
-      setupMeterDev          => '',
-      setupStringAzimuth     => '',
-      setupStringDeclination => '',
-      setupStringPeak        => '',
-  };
-  
-  for my $cn (1..MAXCONSUMER) {
-      $cn = sprintf "%02d", $cn;
-      $valid->{'consumer'.${cn}} = '';                                               
-  }
-
-  for my $bn (1..MAXBATTERIES) {
-      $bn = sprintf "%02d", $bn;
-      $valid->{'setupBatteryDev'.${bn}} = '';                    
-      $valid->{'ctrlBatSocManagement'.${bn}} = '';
-  }
-
-  for my $in (1..MAXINVERTER) {
-      $in = sprintf "%02d", $in;
-      $valid->{'setupInverterDev'.${in}} = '';                    
-  }
-
-  for my $pn (1..MAXPRODUCER) {
-      $pn = sprintf "%02d", $pn;
-      $valid->{'setupOtherProducer'.${pn}} = '';             
-  }
 
   my ($a, $h)    = parseParams ($arg);
   my $targetattr = $a->[0];
   my $devn       = $a->[1] // '';
   
-  return "The '$opt' command requires a valid attribute as a passed parameter." if(!$targetattr || !grep /^$targetattr$/, keys %{$valid});
+  return "The '$opt' command requires a valid attribute as a passed parameter." if(!$targetattr || !grep /^$targetattr$/, keys %{$hcompoattr});
   
   my $av = AttrVal ($name, $targetattr, undef);
   
@@ -4996,7 +4997,7 @@ sub ___15Minutes2HourAggregator {
               next;
           }
           
-          $haggr->{hourly}{$otmstr}{$indicator} = sprintf "%.0f", $haggr->{hourly}{$key}{$indicator};
+          $haggr->{hourly}{$otmstr}{$indicator} = sprintf "%.0f", $haggr->{hourly}{$key}{$indicator} if(defined $haggr->{hourly}{$key}{$indicator});
           delete $haggr->{hourly}{$key};
       }
   }
@@ -17018,7 +17019,6 @@ sub _flowGraphic {
 
   my $cons_dmy = $consptn;
   my $scale    = FGSCALEDEF;
-  my $hasbat   = 1;                                                            # initial Batterie vorhanden
   my $stna     = $name;
   $stna       .= int (rand (1500));
 
@@ -17030,6 +17030,7 @@ sub _flowGraphic {
 
   ## definierte Batterien ermitteln und zusammenfassen
   ######################################################
+  my $hasbat = 1;                                                            # initial Batterie vorhanden
   my ($batin, $batout);
 
   for my $bn (1..MAXBATTERIES) {                                               # für jede definierte Batterie
@@ -17190,7 +17191,7 @@ sub _flowGraphic {
   my $pdist = 130;                                                                         # Abstand Producer zueinander
   my ($togrid, $tonode, $tobat, $toinv) = __sortProducer ($pdcr);                          # lfn Producer sortiert nach ptyp und feed ($toinv aktuell unbenutzt)
 
-  my $psorted = {
+  my $psorted = {                                                                          # Gruppen zusammenstellen
       '1togrid' => { xicon => -100, xchain => 150,  ychain => 400, step => 30,     count => scalar @{$togrid}, sorted => $togrid },      # Producer/PV nur zu Grid
       '2tonode' => { xicon =>  350, xchain => 700,  ychain => 200, step => $pdist, count => scalar @{$tonode}, sorted => $tonode },      # Producer/PV zum Knoten
       '3tobat'  => { xicon =>  750, xchain => 1370, ychain => 430, step => 30,     count => scalar @{$tobat},  sorted => $tobat  },      # Producer/PV nur zu Batterie
@@ -17201,7 +17202,7 @@ sub _flowGraphic {
   my $doproducerrow  = 1;
   my $flowgPrdsPower = 1;                                                                  # initial Producer akt. Erzeugung anzeigen
 
-  $doproducerrow    = 0 if(!$psorted->{'1togrid'}{count} && !$psorted->{'3tobat'}{count} && $psorted->{'2tonode'}{count} == 1);
+  $doproducerrow    = 0 if(!$hasbat && $psorted->{'2tonode'}{count} == 1);
   my $vbwidth       = 800;                                                                 # width and height specify the viewBox size
   
   my $vbminx        = -10 * $flowgxshift;                                                  # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
@@ -17312,14 +17313,8 @@ END0
   $y_pos             = 505 + $exth2cdist;
 
   if ($flowgconsumer) {
-      if ($consumercount % 2) {
-          $consumer_start = 350 - ($cdist  * ($consumercount -1) / 2);
-      }
-      else {
-          $consumer_start = 350 - ($cdist / 2 * ($consumercount-1));
-      }
-
-      $cons_left = $consumer_start + 15;
+      $consumer_start = __groupXstart (350, $consumercount, $cdist);
+      $cons_left      = $consumer_start + 15;
 
       for my $c (@consumers) {
           my $calias  = ConsumerVal ($name, $c, 'alias', '');                                              # Name des Consumerdevices
@@ -17450,7 +17445,7 @@ END3
   ## Laufketten nur anzeigen wenn Solarzellen/Input-Zeile angezeigt werden soll
   ###############################################################################
   if ($showgenerators) {      
-      for my $st (sort keys %{$psorted}) {          
+      for my $st (sort keys %{$psorted}) {                                 # für jede Gruppe von Icons ('1togrid', '2tonode', '3tobat') die Gruppenmitglieder @sorted behandeln
           my @sorted;
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
           
@@ -17477,7 +17472,7 @@ END3
   ## Laufkette nur anzeigen wenn Producerzeile angezeigt werden soll
   ########################################################################################
   if ($doproducerrow) {
-      for my $st (sort keys %{$psorted}) {
+      for my $st (sort keys %{$psorted}) {                                                        # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
           my $left   = $psorted->{$st}{start} * 2;                                                # Übertrag aus Producer Icon Abschnitt
           my $count  = $psorted->{$st}{count};
           my $xchain = $psorted->{$st}{xchain};                                                   # X- Koordinate Kette am Ziel
@@ -17486,13 +17481,8 @@ END3
           
           my @sorted;
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
-
-          if ($count % 2) {
-              $xchain = $xchain - ($pdist  * ($count -1) / 2);
-          }
-          else {
-              $xchain = $xchain - ($pdist / 2 * ($count - 1));
-          }
+          
+          $xchain = __groupXstart ($xchain, $count, $pdist);
 
           my $producer_style;
 
@@ -17540,13 +17530,8 @@ END3
       my $cons_left_start = 0;
       my $distance_con    = 65;
       $y_pos              = 880 + 2 * $exth2cdist;
-
-      if ($consumercount % 2) {
-          $cons_left_start = 700 - ($distance_con  * ($consumercount -1) / 2);
-      }
-      else {
-          $cons_left_start = 700 - ($distance_con / 2 * ($consumercount-1));
-      }
+      
+      $cons_left_start = __groupXstart (700, $consumercount, $distance_con);
 
       my $consumer_style;
 
@@ -17596,7 +17581,7 @@ END3
   ## Text nur anzeigen wenn die Generator-Zeile angezeigt werden soll
   #####################################################################
   if ($showgenerators) {      
-      for my $st (sort keys %{$psorted}) {          
+      for my $st (sort keys %{$psorted}) {                                 # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln 
           my @sorted;
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
           
@@ -17631,8 +17616,9 @@ END3
   ## Textangabe nur anzeigen wenn Producerzeile angezeigt werden soll
   ###########################################################################################
   if ($doproducerrow) {      
-      for my $st (sort keys %{$psorted}) {
+      for my $st (sort keys %{$psorted}) {                               # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
           my $left = $psorted->{$st}{start} * 2 - 80;                    # Übertrag aus Producer Icon Abschnitt, -XX -> Start Lage Producer Beschriftung
+          
           my @sorted;
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
 
@@ -17647,7 +17633,7 @@ END3
               elsif ($lpv1 == 4) {$left += 10}
               elsif ($lpv1 == 3) {$left += 15}
               elsif ($lpv1 == 2) {$left += 20}
-              elsif ($lpv1 == 1) {$left += 50}
+              elsif ($lpv1 == 1) {$left += 55}
 
               $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$left" y="100">$pval1</text>} if($flowgPrdsPower);
 
@@ -17657,7 +17643,7 @@ END3
               elsif ($lpv1 == 4) {$left -= 10}
               elsif ($lpv1 == 3) {$left -= 15}
               elsif ($lpv1 == 2) {$left -= 20}
-              elsif ($lpv1 == 1) {$left -= 50}
+              elsif ($lpv1 == 1) {$left -= 55}
 
               $left += ($pdist * 2);
           }
@@ -17805,18 +17791,15 @@ sub __addInputProducerIcon {
   my $don = NexthoursVal ($hash, 'NextHour00', 'DoN', 0);
   my ($scale, $ret);
 
-  for my $st (sort keys %{$psorted}) {                                                     # Gruppenarray Reihenfolge: 1togrid, 2tonode, 3tobat
+  for my $st (sort keys %{$psorted}) {                                                     # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
       my $left   = 0;
       my $xicon  = $psorted->{$st}{xicon};
       my $count  = $psorted->{$st}{count};
-      my @sorted = @{$psorted->{$st}{sorted}};
-
-      if ($count % 2) {
-          $xicon = $xicon - ($pdist  * ($count - 1) / 2);
-      }
-      else {
-          $xicon = $xicon - ($pdist / 2 * ($count - 1));
-      }
+            
+      my @sorted;
+      @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
+      
+      $xicon = __groupXstart ($xicon, $count, $pdist);
 
       $psorted->{$st}{start} = $xicon;                                                     # Übertrag Koordinaten
       $left                  = $xicon;
@@ -18103,6 +18086,28 @@ sub __substituteIcon {
   $icon .= '@'.$color if($color);
 
 return ($icon, $txt);
+}
+
+###############################################################################
+#   liefert ausgehend von der initialen X-Koordinate für jede Gruppe
+#   eine optimierte X-Start Koordinate abhängig von der Anzahl der 
+#   Gruppenmitglieder (count) und dem Sollabstand (dist)
+###############################################################################
+sub __groupXstart {
+  my $xinit = shift;
+  my $count = shift;
+  my $dist  = shift;
+
+  my $xstart;
+  
+  if ($count % 2) {
+      $xstart = $xinit - ($dist  * ($count -1) / 2);
+  }
+  else {
+      $xstart = $xinit - ($dist / 2 * ($count - 1));
+  }
+
+return $xstart;
 }
 
 ###################################################################
