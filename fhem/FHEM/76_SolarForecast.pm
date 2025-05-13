@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
   "1.52.0" => "11.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
                            "valInverter: add isource, new keys: ac2dc, dc2ac, _flowGraphic: add battery inverter type ".
 						   "and extensive adjustments, new sub removeMinMaxArray, ___getFWwidget: bugfix with state-Reading ". 
@@ -17018,7 +17019,6 @@ sub _flowGraphic {
 
   my $cons_dmy = $consptn;
   my $scale    = FGSCALEDEF;
-  my $hasbat   = 1;                                                            # initial Batterie vorhanden
   my $stna     = $name;
   $stna       .= int (rand (1500));
 
@@ -17030,6 +17030,7 @@ sub _flowGraphic {
 
   ## definierte Batterien ermitteln und zusammenfassen
   ######################################################
+  my $hasbat = 1;                                                            # initial Batterie vorhanden
   my ($batin, $batout);
 
   for my $bn (1..MAXBATTERIES) {                                               # für jede definierte Batterie
@@ -17201,7 +17202,7 @@ sub _flowGraphic {
   my $doproducerrow  = 1;
   my $flowgPrdsPower = 1;                                                                  # initial Producer akt. Erzeugung anzeigen
 
-  $doproducerrow    = 0 if(!$psorted->{'1togrid'}{count} && !$psorted->{'3tobat'}{count} && $psorted->{'2tonode'}{count} == 1);
+  $doproducerrow    = 0 if(!$hasbat && $psorted->{'2tonode'}{count} == 1);
   my $vbwidth       = 800;                                                                 # width and height specify the viewBox size
   
   my $vbminx        = -10 * $flowgxshift;                                                  # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
@@ -26163,7 +26164,8 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>         </td><td>A reading which provides the current PV power as a positive value.                                               </td></tr>
+           <tr><td> <b>pv</b>         </td><td>A reading that provides the current power from PV generation that is supplied to the domestic or pblic grid.     </td></tr>
+           <tr><td>                   </td><td>A positive numerical value is expected.                                                                          </td></tr>
            <tr><td>                   </td><td>When activated as a battery inverter without solar cells, this key cannot be set.                                </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
            <tr><td> <b>ac2dc</b>      </td><td>A reading that indicates the current AC->DC power (house network to battery) as a positive value.                </td></tr>
@@ -28729,7 +28731,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>         </td><td>Ein Reading welches die aktuelle PV-Leistung als positiven Wert liefert.                                            </td></tr>
+           <tr><td> <b>pv</b>         </td><td>Ein Reading welches die aktuelle Leistung aus PV-Erzeugung, die an das Hausnetz oder öffentliche Netz               </td></tr>
+           <tr><td>                   </td><td>geliefert wird, bereitstellt. Es wird ein ein positiver numerischer Wert erwartet.                                  </td></tr>
            <tr><td>                   </td><td>Bei Aktivierung als Batterie-Wechselrichter ohne Solarzellen kann dieser Schlüssel nicht gesetzt werden.            </td></tr>
            <tr><td>                   </td><td>                                                                                                                    </td></tr>
            <tr><td> <b>ac2dc</b>      </td><td>Ein Reading, das die aktuelle AC->DC-Leistung (Hausnetz zur Batterie) als positiven Wert angibt.                    </td></tr>
