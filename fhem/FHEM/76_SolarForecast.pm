@@ -17567,6 +17567,7 @@ END3
   $bat2home    = __normDecPlaces ($bat2home);
   $dc2inv2node = __normDecPlaces ($dc2inv2node);
   $node2bat    = __normDecPlaces ($node2bat);
+  $consptn     = __normDecPlaces ($consptn);
 
   $ret .= qq{<text class="$stna text" id="nodetxt_$stna"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}        if ($pnodesum > 0);
   $ret .= qq{<text class="$stna text" id="batsoctxt_$stna"    x="1380" y="520" style="text-anchor: start;">$soc %</text>}           if ($hasbat);                         # Lage Text Batterieladungszustand
