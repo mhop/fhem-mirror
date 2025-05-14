@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ",
   "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
   "1.52.0" => "11.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
                            "valInverter: add isource, new keys: ac2dc, dc2ac, _flowGraphic: add battery inverter type ".
@@ -17126,7 +17127,7 @@ sub _flowGraphic {
   $batin  = 0;
   $batout = 0;
 
-  if ($x > 0) { $batin = $x } elsif ($x < 0) { $batout = abs $x }                         # es darf nur $batin ODER $batout mit einem Wert > 0 geben
+  if ($x > 0) {$batin = $x; $batout = 0;} elsif ($x < 0) {$batout = abs $x; $batin;}      # es darf nur $batin ODER $batout mit einem Wert > 0 geben
 
   debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, batout: $batout");
 
@@ -17136,7 +17137,7 @@ sub _flowGraphic {
 				  
   my $node2bat = 0;                                                                       # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)                              
   my $bat2home = 0;
-  my $home2bat = 0;
+  # my $home2bat = 0;
   
   my $grid2home_style       = $gconMetered ? "$stna active_sig"    : "$stna inactive";    # GridConsumption
   my $bat2home_style        = $bat2home    ? "$stna active_normal" : "$stna inactive";
@@ -17145,15 +17146,15 @@ sub _flowGraphic {
   my $bat2home_direction    = "M1200,515 L730,590";
 
    if ($batout || $batin) {                                                               # Batterie wird geladen oder entladen
-      $node2bat  = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;            # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
-	  $node2bat  = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
-	  $home2bat  = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
+      $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
+	  $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
+	  #$home2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
 
-      if ($home2bat > 1) {                                                                # Batterieladung anteilig aus Hausnetz
-          $node2bat           -= $home2bat;
-          $bat2home_style      = "$stna active_sig";
-          $bat2home_direction  = "M730,590 L1200,515";
-          $bat2home            = $home2bat;
+      if ($node2bat < 0 && !$dc2inv2node) {                                               # Batterieentladung direkt ins Hausnetz wenn kein Batterie- / Hybridwechselrichter definiert
+          $bat2home           = abs $node2bat;
+          $node2bat           = 0;
+          $bat2home_style     = "$stna active_normal";
+          $bat2home_direction = "M1200,515 L730,590";
       }
   }
   else {
@@ -26164,7 +26165,8 @@ to ensure that the system configuration is correct.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>         </td><td>A reading which provides the current PV power as a positive value.                                               </td></tr>
+           <tr><td> <b>pv</b>         </td><td>A reading that provides the current power from PV generation that is supplied to the domestic or pblic grid.     </td></tr>
+           <tr><td>                   </td><td>A positive numerical value is expected.                                                                          </td></tr>
            <tr><td>                   </td><td>When activated as a battery inverter without solar cells, this key cannot be set.                                </td></tr>
            <tr><td>                   </td><td>                                                                                                                 </td></tr>
            <tr><td> <b>ac2dc</b>      </td><td>A reading that indicates the current AC->DC power (house network to battery) as a positive value.                </td></tr>
@@ -28730,7 +28732,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>         </td><td>Ein Reading welches die aktuelle PV-Leistung als positiven Wert liefert.                                            </td></tr>
+           <tr><td> <b>pv</b>         </td><td>Ein Reading welches die aktuelle Leistung aus PV-Erzeugung, die an das Hausnetz oder öffentliche Netz               </td></tr>
+           <tr><td>                   </td><td>geliefert wird, bereitstellt. Es wird ein ein positiver numerischer Wert erwartet.                                  </td></tr>
            <tr><td>                   </td><td>Bei Aktivierung als Batterie-Wechselrichter ohne Solarzellen kann dieser Schlüssel nicht gesetzt werden.            </td></tr>
            <tr><td>                   </td><td>                                                                                                                    </td></tr>
            <tr><td> <b>ac2dc</b>      </td><td>Ein Reading, das die aktuelle AC->DC-Leistung (Hausnetz zur Batterie) als positiven Wert angibt.                    </td></tr>
