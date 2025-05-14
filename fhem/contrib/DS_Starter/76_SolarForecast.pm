@@ -6560,6 +6560,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
       consumerdist           => { comp => '[89]\d{1}|[1234]\d{2}|500', act => 0 },
       h2consumerdist         => { comp => '\d{1,3}',                   act => 0 },
       homenodedyncol         => { comp => '(0|1)',                     act => 0 },
+      inverterNodeIcon       => { comp => '',                          act => 0 },
       shiftx                 => { comp => '-?[0-7]\d{0,1}|-?80',       act => 0 },
       shifty                 => { comp => '\d+',                       act => 0 },
       size                   => { comp => '\d+',                       act => 0 },
@@ -17139,7 +17140,6 @@ sub _flowGraphic {
 				  
   my $node2bat = 0;                                                                       # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)                              
   my $bat2home = 0;
-  # my $home2bat = 0;
   
   my $grid2home_style       = $gconMetered ? "$stna active_sig"    : "$stna inactive";    # GridConsumption
   my $bat2home_style        = $bat2home    ? "$stna active_normal" : "$stna inactive";
@@ -17149,8 +17149,7 @@ sub _flowGraphic {
 
    if ($batout || $batin) {                                                               # Batterie wird geladen oder entladen
       $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
-	  $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
-	  #$home2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
+	  $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);                  
 
       if ($node2bat < 0 && !$dc2inv2node && !$pv2bat) {                                   # Batterieentladung direkt ins Hausnetz wenn kein Batterie- / Hybridwechselrichter und kein Batterieladegerät aktiv
           $bat2home           = abs $node2bat;
@@ -18069,7 +18068,9 @@ sub __substituteIcon {
       }
   }
   elsif ($ptyp eq 'node') {                                                            # Knoten-Icon
-      ($icon, $color) = split '@', NODEICONDEF;
+      #($icon, $color) = split '@', NODEICONDEF;
+      ($icon, $color) = split '@', CurrentVal ($name, 'inverterNodeIcon', NODEICONDEF);
+      
       $color          = !$pcurr ? INACTCOLDEF :
                         $color  ? $color      :
                         ACTCOLDEF;
@@ -20849,7 +20850,7 @@ sub checkPlantConfig {
       if ($aidtabs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
-          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree".<br>};
+          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree" or "sudo apt-get install libai-decisiontree-perl" on Linux Systems if the installation with cpan doesn't work.<br>};
           $result->{'Common Settings'}{info}    = 1;
       }
 
@@ -25609,11 +25610,15 @@ to ensure that the system configuration is correct.
             <tr><td> <b>homenodedyncol</b>          </td><td>The house node icon can be colored dynamically depending on the current self-sufficiency.                               </td></tr>
             <tr><td>                                </td><td><b>0</b> - no dynamic coloring,  <b>1</b> - dynamic coloring, default: 0                                                </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>inverterNodeIcon</b>        </td><td>Icon for the inverter node (the icon below the inverter line) and, if applicable, its color when active.                </td></tr>
+			<tr><td>                                </td><td>The color can be specified as a hex value (e.g. #cc3300) or designation (e.g. red, blue).                               </td></tr>
+            <tr><td>                                </td><td>Syntax: <b>&lt;Icon&gt;[@&lt;Farbe&gt;]</b>                                                                             </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shiftx</b>                  </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
 			<tr><td>                                </td><td>Value: <b>-80 ... 80</b>, default: 0                                                                                    </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shifty</b>                  </td><td>Vertical shift of the energy flow chart.                                                                                </td></tr>
-			<tr><td>                                </td><td>Wert: <b>Integer</b>, default: 0                                                                                        </td></tr>
+			<tr><td>                                </td><td>Value: <b>Integer</b>, default: 0                                                                                       </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>showconsumer</b>            </td><td>Display of consumers in the energy flow chart.                                                                          </td></tr>
 			<tr><td>                                </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 1                                                               </td></tr>
@@ -28177,6 +28182,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>homenodedyncol</b>          </td><td>Das Hausknoten-Icon kann dynamisch in Abhängigkeit der aktuellen Autarkie eingefärbt werden.                            </td></tr>
             <tr><td>                                </td><td><b>0</b> - keine dynamische Färbung,  <b>1</b> - dynamische Färbung, default: 0                                         </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>inverterNodeIcon</b>        </td><td>Icon für den Inverterknoten (das Icon unter der Wechselrichterzeile) und ggf. dessen Farbe bei Aktivität.               </td></tr>
+			<tr><td>                                </td><td>Die Farbe kann als Hex-Wert (z.B. #cc3300) oder Bezeichnung (z.B. red, blue) angegeben werden.                          </td></tr>
+            <tr><td>                                </td><td>Syntax: <b>&lt;Icon&gt;[@&lt;Farbe&gt;]</b>                                                                             </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shiftx</b>                  </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
 			<tr><td>                                </td><td>Wert: <b>-80 ... 80</b>, default: 0                                                                                     </td></tr>
