@@ -161,7 +161,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ".
-                           "correction of inverter x-start ",
+                           "correction of inverter x-start, ".
+                           "isConsumerLogOn: bugfix Threshold value detection if threshold value specification above 1% of power ",
   "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
   "1.52.0" => "11.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
                            "valInverter: add isource, new keys: ac2dc, dc2ac, _flowGraphic: add battery inverter type ".
@@ -21985,7 +21986,7 @@ sub isConsumerLogOn {
   my $pcurr = shift // 0;
 
   my $name  = $hash->{NAME};
-  my $cname = ConsumerVal ($hash, $c, 'name', '');                                         # Devicename Customer
+  my $cname = ConsumerVal ($name, $c, 'name', '');                                         # Devicename Customer
   my ($err) = isDeviceValid ( { name => $name, obj => $cname, method => 'string' } );
 
   if ($err) {
@@ -21998,9 +21999,9 @@ sub isConsumerLogOn {
   }
 
   my $type       = $hash->{TYPE};
-  my $nompower   = ConsumerVal ($hash, $c, "power",          0);                           # nominale Leistung lt. Typenschild
-  my $rpcurr     = ConsumerVal ($hash, $c, "rpcurr",        "");                           # Reading für akt. Verbrauch angegeben ?
-  my $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 0);                           # Schwellenwert (W) ab der ein Verbraucher als aktiv gewertet wird
+  my $nompower   = ConsumerVal ($name, $c, "power",          0);                           # nominale Leistung lt. Typenschild
+  my $rpcurr     = ConsumerVal ($name, $c, "rpcurr",        "");                           # Reading für akt. Verbrauch angegeben ?
+  my $pthreshold = ConsumerVal ($name, $c, "powerthreshold", 0);                           # Schwellenwert (W) ab der ein Verbraucher als aktiv gewertet wird
 
   if (!$rpcurr && isConsumerPhysOn ($hash, $c)) {                                          # Workaround wenn Verbraucher ohne Leistungsmessung
       $pcurr = $nompower;
@@ -22010,8 +22011,8 @@ sub isConsumerLogOn {
   $currpowerpercent    = ($pcurr / $nompower) * 100 if($nompower > 0);
 
   $data{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
-
-  if ($pcurr > $pthreshold || $currpowerpercent > DEFPOPERCENT) {                          # Verbraucher ist logisch aktiv
+  
+  if ($pcurr > $pthreshold || (!$pthreshold && $currpowerpercent > DEFPOPERCENT)) {        # Verbraucher ist logisch aktiv
       return 1;
   }
 
