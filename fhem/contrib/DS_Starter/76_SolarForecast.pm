@@ -17150,7 +17150,7 @@ sub _flowGraphic {
 	  $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
 	  #$home2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
 
-      if ($node2bat < 0 && !$dc2inv2node) {                                               # Batterieentladung direkt ins Hausnetz wenn kein Batterie- / Hybridwechselrichter definiert
+      if ($node2bat < 0 && !$dc2inv2node && !$pv2bat) {                                   # Batterieentladung direkt ins Hausnetz wenn kein Batterie- / Hybridwechselrichter und kein Batterieladegerät aktiv
           $bat2home           = abs $node2bat;
           $node2bat           = 0;
           $bat2home_style     = "$stna active_normal";
