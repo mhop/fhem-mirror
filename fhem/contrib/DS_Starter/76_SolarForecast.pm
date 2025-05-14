@@ -17170,7 +17170,7 @@ sub _flowGraphic {
   
   my $node2home = $pnodesum - $node2gridMetered - ($node2bat > 0 ? $node2bat : 0);        # Energiefluß vom Knoten zum Haus
   $node2home    = __normDecPlaces ($node2home);                                           
-  $consptn      = $gconMetered + $node2home;                                              # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
+  $consptn      = $gconMetered + $node2home + $bat2home;                                  # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
   
   ## definierte Verbraucher ermitteln
   #####################################
