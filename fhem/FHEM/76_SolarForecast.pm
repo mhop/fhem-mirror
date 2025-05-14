@@ -160,6 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ".
+                           "correction of inverter x-start, ".
+                           "isConsumerLogOn: bugfix Threshold value detection if threshold value specification above 1% of power ",
   "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
   "1.52.0" => "11.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
                            "valInverter: add isource, new keys: ac2dc, dc2ac, _flowGraphic: add battery inverter type ".
@@ -6557,6 +6560,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
       consumerdist           => { comp => '[89]\d{1}|[1234]\d{2}|500', act => 0 },
       h2consumerdist         => { comp => '\d{1,3}',                   act => 0 },
       homenodedyncol         => { comp => '(0|1)',                     act => 0 },
+      inverterNodeIcon       => { comp => '',                          act => 0 },
       shiftx                 => { comp => '-?[0-7]\d{0,1}|-?80',       act => 0 },
       shifty                 => { comp => '\d+',                       act => 0 },
       size                   => { comp => '\d+',                       act => 0 },
@@ -17126,7 +17130,7 @@ sub _flowGraphic {
   $batin  = 0;
   $batout = 0;
 
-  if ($x > 0) { $batin = $x } elsif ($x < 0) { $batout = abs $x }                         # es darf nur $batin ODER $batout mit einem Wert > 0 geben
+  if ($x > 0) {$batin = $x; $batout = 0;} elsif ($x < 0) {$batout = abs $x; $batin = 0;}                      # es darf nur $batin ODER $batout mit einem Wert > 0 geben
 
   debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, batout: $batout");
 
@@ -17136,7 +17140,6 @@ sub _flowGraphic {
 				  
   my $node2bat = 0;                                                                       # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)                              
   my $bat2home = 0;
-  my $home2bat = 0;
   
   my $grid2home_style       = $gconMetered ? "$stna active_sig"    : "$stna inactive";    # GridConsumption
   my $bat2home_style        = $bat2home    ? "$stna active_normal" : "$stna inactive";
@@ -17145,15 +17148,14 @@ sub _flowGraphic {
   my $bat2home_direction    = "M1200,515 L730,590";
 
    if ($batout || $batin) {                                                               # Batterie wird geladen oder entladen
-      $node2bat  = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;            # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
-	  $node2bat  = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
-	  $home2bat  = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc - $node2bat if($node2bat > 0);                       
+      $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
+	  $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);                  
 
-      if ($home2bat > 1) {                                                                # Batterieladung anteilig aus Hausnetz
-          $node2bat           -= $home2bat;
-          $bat2home_style      = "$stna active_sig";
-          $bat2home_direction  = "M730,590 L1200,515";
-          $bat2home            = $home2bat;
+      if ($node2bat < 0 && !$dc2inv2node && !$pv2bat) {                                   # Batterieentladung direkt ins Hausnetz wenn kein Batterie- / Hybridwechselrichter und kein Batterieladegerät aktiv
+          $bat2home           = abs $node2bat;
+          $node2bat           = 0;
+          $bat2home_style     = "$stna active_normal";
+          $bat2home_direction = "M1200,515 L730,590";
       }
   }
   else {
@@ -17169,7 +17171,7 @@ sub _flowGraphic {
   
   my $node2home = $pnodesum - $node2gridMetered - ($node2bat > 0 ? $node2bat : 0);        # Energiefluß vom Knoten zum Haus
   $node2home    = __normDecPlaces ($node2home);                                           
-  $consptn      = $gconMetered + $node2home;                                              # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
+  $consptn      = $gconMetered + $node2home + $bat2home;                                  # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
   
   ## definierte Verbraucher ermitteln
   #####################################
@@ -17199,23 +17201,23 @@ sub _flowGraphic {
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
-  my $doproducerrow  = 1;
+  my $showproducers  = 1;
   my $flowgPrdsPower = 1;                                                                  # initial Producer akt. Erzeugung anzeigen
 
-  $doproducerrow    = 0 if(!$hasbat && $psorted->{'2tonode'}{count} == 1);
+  $showproducers    = 0 if(!$hasbat && $psorted->{'2tonode'}{count} == 1);
   my $vbwidth       = 800;                                                                 # width and height specify the viewBox size
   
   my $vbminx        = -10 * $flowgxshift;                                                  # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
   
   my $vbminy        = 125;
-  $vbminy          -= 150 if($doproducerrow);                                              # mehr Platz oben schaffen wenn Poducerreihe angezeigt
+  $vbminy          -= 150 if($showproducers);                                              # mehr Platz oben schaffen wenn Poducerreihe angezeigt
   $vbminy          -= INPUTROWSHIFT if($showgenerators);                                   # mehr Platz oben schaffen wenn Zellen/Input-Reihe angezeigt 
 
   my $vbhight       = 610;
   $vbhight         -= 20  if(!$flowgconsTime);
   $vbhight         -= 230 if(!$flowgconsumer);
                         
-  $vbhight         += PRDCRROWSHIFT if($doproducerrow);                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
+  $vbhight         += PRDCRROWSHIFT if($showproducers);                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
   $vbhight         += INPUTROWSHIFT if($showgenerators);                                   # Höhe Box vergrößern wenn Zellen/Input-Reihe angezeigt
   
   $vbhight         += $exth2cdist;
@@ -17283,7 +17285,7 @@ END0
   $paref->{pdist}          = $pdist;
   $paref->{showgenerators} = $showgenerators; 
 
-  if (!$doproducerrow) {
+  if (!$showproducers) {
       $paref->{y_coord}  = 165;
       $ret .= __addInputProducerIcon ($paref);                      # Solarzellen/Input-Zeile und einzelnes Producer Icon wird an Stelle des Knotens eingefügt
   }
@@ -17456,7 +17458,7 @@ END3
               next if(!$xchain);
               
               my $ystart          = $pdcr->{$lfn}{ysgenerator}; 
-              $ystart             = $doproducerrow ? $ystart - PRDCRROWSHIFT + 15 : $ystart + PRDCRROWSHIFT - 20;   # Unterscheidung wenn ProducerZeile angezeigt werden soll
+              $ystart             = $showproducers ? $ystart - PRDCRROWSHIFT + 15 : $ystart + PRDCRROWSHIFT - 20;   # Unterscheidung wenn ProducerZeile angezeigt werden soll
               my $pgen            = $pdcr->{$lfn}{pgen};
               my $chain_color     = '';                                                          
               my $generator_style = $pgen > 0 ? "$stna active_normal" : "$stna inactive";
@@ -17471,7 +17473,7 @@ END3
   ## Laufketten Producer/Inverter - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ## Laufkette nur anzeigen wenn Producerzeile angezeigt werden soll
   ########################################################################################
-  if ($doproducerrow) {
+  if ($showproducers) {
       for my $st (sort keys %{$psorted}) {                                                        # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
           my $left   = $psorted->{$st}{start} * 2;                                                # Übertrag aus Producer Icon Abschnitt
           my $count  = $psorted->{$st}{count};
@@ -17586,17 +17588,15 @@ END3
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
           
           for my $lfn (@sorted) {
-              my $pn        = $pdcr->{$lfn}{pn};
-              my $generator = $pdcr->{$lfn}{generator};                    # Angaben zum Generator (Namen der Strings)
-              
+              my $pn    = $pdcr->{$lfn}{pn};              
               my $xtext = $pdcr->{$lfn}{xsgenerator};                      # Übernahme aus __addInputProducerIcon
               next if(!$xtext);
               
               $xtext    = $xtext * 2 - 80;                                 # Korrektur Start X-Koordinate des Textes 
               my $ytext = $pdcr->{$lfn}{ysgenerator}; 
-              $ytext    = $doproducerrow ? $ytext - PRDCRROWSHIFT + 5 : $ytext + PRDCRROWSHIFT - 30;   # Unterscheidung wenn ProducerZeile angezeigt werden soll
+              $ytext    = $showproducers ? $ytext - PRDCRROWSHIFT + 5 : $ytext + PRDCRROWSHIFT - 30;     # Unterscheidung wenn ProducerZeile angezeigt werden soll
               
-              my $pval1 = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );                       # aktuelle Generatorleistung
+              my $pval1 = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );                         # aktuelle Generatorleistung
               my $lpv1  = length $pval1;
                   
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
@@ -17615,37 +17615,29 @@ END3
   ## Textangabe Producer / Inverter - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ## Textangabe nur anzeigen wenn Producerzeile angezeigt werden soll
   ###########################################################################################
-  if ($doproducerrow) {      
-      for my $st (sort keys %{$psorted}) {                               # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
-          my $left = $psorted->{$st}{start} * 2 - 80;                    # Übertrag aus Producer Icon Abschnitt, -XX -> Start Lage Producer Beschriftung
-          
+  if ($showproducers) {      
+      for my $st (sort keys %{$psorted}) {                                 # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
           my @sorted;
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
-
+          
           for my $lfn (@sorted) {
-              my $pn    = $pdcr->{$lfn}{pn};              						
+              my $pn    = $pdcr->{$lfn}{pn};     
+              my $xtext = $pdcr->{$lfn}{xsproducer};                       # Übernahme aus __addInputProducerIcon
+              next if(!$xtext);
+              
+              $xtext    = $xtext * 2 - 70;                                 # Korrektur Start X-Koordinate des Textes               
 			  my $pval1 = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );		
 			  my $lpv1  = length $pval1;
 
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
               ###############################################################################
-              if    ($lpv1 >= 5) {$left -= 10}
-              elsif ($lpv1 == 4) {$left += 10}
-              elsif ($lpv1 == 3) {$left += 15}
-              elsif ($lpv1 == 2) {$left += 20}
-              elsif ($lpv1 == 1) {$left += 55}
+              if    ($lpv1 >= 5) {$xtext -= 30}
+              elsif ($lpv1 == 4) {$xtext -= 15}
+              elsif ($lpv1 == 3) {$xtext -=  5}
+              elsif ($lpv1 == 2) {$xtext += 10}
+              elsif ($lpv1 == 1) {$xtext += 30}   
 
-              $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$left" y="100">$pval1</text>} if($flowgPrdsPower);
-
-              # Leistungszahl wieder zurück an den Ursprungspunkt
-              ####################################################
-              if    ($lpv1 >= 5) {$left += 10}
-              elsif ($lpv1 == 4) {$left -= 10}
-              elsif ($lpv1 == 3) {$left -= 15}
-              elsif ($lpv1 == 2) {$left -= 20}
-              elsif ($lpv1 == 1) {$left -= 55}
-
-              $left += ($pdist * 2);
+              $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$xtext" y="100">$pval1</text>} if($flowgPrdsPower);
           }
       }
   }
@@ -17792,7 +17784,7 @@ sub __addInputProducerIcon {
   my ($scale, $ret);
 
   for my $st (sort keys %{$psorted}) {                                                     # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
-      my $left   = 0;
+      my $xstart = 0;
       my $xicon  = $psorted->{$st}{xicon};
       my $count  = $psorted->{$st}{count};
             
@@ -17802,19 +17794,17 @@ sub __addInputProducerIcon {
       $xicon = __groupXstart ($xicon, $count, $pdist);
 
       $psorted->{$st}{start} = $xicon;                                                     # Übertrag Koordinaten
-      $left                  = $xicon;
+      $xstart                = $xicon + 10;
 
       for my $lfn (@sorted) {
           my $pn        = $pdcr->{$lfn}{pn};
           my $ptyp      = $pdcr->{$lfn}{ptyp};
           my $generator = $pdcr->{$lfn}{generator};                                        # Angaben zum Generator (Namen der Strings)
           my $pval      = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );           # aktuelle Generatorleistung
-          
+         
           if ($showgenerators) {                                                           # Anzeige Input-Reihe
               my $ystart = $y_coord;
               $ystart   -= INPUTROWSHIFT;
-              
-              my $xstart = $left + 10;
 
               if ($generator && $generator ne 'none') {
                   $pdcr->{$lfn}{xsgenerator} = $xstart;                                    # Übertrag Koordinaten für Laufketten/Text Anzeige
@@ -17853,11 +17843,12 @@ sub __addInputProducerIcon {
           $picon           = FW_makeImage    ($picon, '');
           ($scale, $picon) = __normIconScale ($name, $picon);
 
-          $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($left,$y_coord),scale($scale)">};
+          $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($xstart,$y_coord),scale($scale)">};
           $ret .= "<title>$ptxt</title>".$picon;
           $ret .= '</g> ';
-
-          $left += $pdist;
+          
+          $pdcr->{$lfn}{xsproducer} = $xstart;                              # Übertrag Koordinaten für Laufketten/Text Anzeige
+          $xstart += $pdist;
       }
   }
 
@@ -18077,7 +18068,9 @@ sub __substituteIcon {
       }
   }
   elsif ($ptyp eq 'node') {                                                            # Knoten-Icon
-      ($icon, $color) = split '@', NODEICONDEF;
+      #($icon, $color) = split '@', NODEICONDEF;
+      ($icon, $color) = split '@', CurrentVal ($name, 'inverterNodeIcon', NODEICONDEF);
+      
       $color          = !$pcurr ? INACTCOLDEF :
                         $color  ? $color      :
                         ACTCOLDEF;
@@ -20857,7 +20850,7 @@ sub checkPlantConfig {
       if ($aidtabs) {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{The Perl module AI::DecisionTree is missing. <br>};
-          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree".<br>};
+          $result->{'Common Settings'}{note}   .= qq{If you want use AI support, please install it with e.g. "cpan install AI::DecisionTree" or "sudo apt-get install libai-decisiontree-perl" on Linux Systems if the installation with cpan doesn't work.<br>};
           $result->{'Common Settings'}{info}    = 1;
       }
 
@@ -21994,7 +21987,7 @@ sub isConsumerLogOn {
   my $pcurr = shift // 0;
 
   my $name  = $hash->{NAME};
-  my $cname = ConsumerVal ($hash, $c, 'name', '');                                         # Devicename Customer
+  my $cname = ConsumerVal ($name, $c, 'name', '');                                         # Devicename Customer
   my ($err) = isDeviceValid ( { name => $name, obj => $cname, method => 'string' } );
 
   if ($err) {
@@ -22007,9 +22000,9 @@ sub isConsumerLogOn {
   }
 
   my $type       = $hash->{TYPE};
-  my $nompower   = ConsumerVal ($hash, $c, "power",          0);                           # nominale Leistung lt. Typenschild
-  my $rpcurr     = ConsumerVal ($hash, $c, "rpcurr",        "");                           # Reading für akt. Verbrauch angegeben ?
-  my $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 0);                           # Schwellenwert (W) ab der ein Verbraucher als aktiv gewertet wird
+  my $nompower   = ConsumerVal ($name, $c, "power",          0);                           # nominale Leistung lt. Typenschild
+  my $rpcurr     = ConsumerVal ($name, $c, "rpcurr",        "");                           # Reading für akt. Verbrauch angegeben ?
+  my $pthreshold = ConsumerVal ($name, $c, "powerthreshold", 0);                           # Schwellenwert (W) ab der ein Verbraucher als aktiv gewertet wird
 
   if (!$rpcurr && isConsumerPhysOn ($hash, $c)) {                                          # Workaround wenn Verbraucher ohne Leistungsmessung
       $pcurr = $nompower;
@@ -22019,8 +22012,8 @@ sub isConsumerLogOn {
   $currpowerpercent    = ($pcurr / $nompower) * 100 if($nompower > 0);
 
   $data{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
-
-  if ($pcurr > $pthreshold || $currpowerpercent > DEFPOPERCENT) {                          # Verbraucher ist logisch aktiv
+  
+  if ($pcurr > $pthreshold || (!$pthreshold && $currpowerpercent > DEFPOPERCENT)) {        # Verbraucher ist logisch aktiv
       return 1;
   }
 
@@ -25617,11 +25610,15 @@ to ensure that the system configuration is correct.
             <tr><td> <b>homenodedyncol</b>          </td><td>The house node icon can be colored dynamically depending on the current self-sufficiency.                               </td></tr>
             <tr><td>                                </td><td><b>0</b> - no dynamic coloring,  <b>1</b> - dynamic coloring, default: 0                                                </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>inverterNodeIcon</b>        </td><td>Icon for the inverter node (the icon below the inverter line) and, if applicable, its color when active.                </td></tr>
+			<tr><td>                                </td><td>The color can be specified as a hex value (e.g. #cc3300) or designation (e.g. red, blue).                               </td></tr>
+            <tr><td>                                </td><td>Syntax: <b>&lt;Icon&gt;[@&lt;Farbe&gt;]</b>                                                                             </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shiftx</b>                  </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
 			<tr><td>                                </td><td>Value: <b>-80 ... 80</b>, default: 0                                                                                    </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shifty</b>                  </td><td>Vertical shift of the energy flow chart.                                                                                </td></tr>
-			<tr><td>                                </td><td>Wert: <b>Integer</b>, default: 0                                                                                        </td></tr>
+			<tr><td>                                </td><td>Value: <b>Integer</b>, default: 0                                                                                       </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>showconsumer</b>            </td><td>Display of consumers in the energy flow chart.                                                                          </td></tr>
 			<tr><td>                                </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 1                                                               </td></tr>
@@ -28185,6 +28182,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>homenodedyncol</b>          </td><td>Das Hausknoten-Icon kann dynamisch in Abhängigkeit der aktuellen Autarkie eingefärbt werden.                            </td></tr>
             <tr><td>                                </td><td><b>0</b> - keine dynamische Färbung,  <b>1</b> - dynamische Färbung, default: 0                                         </td></tr>
+			<tr><td>                                </td><td>                                                                                                                        </td></tr>
+            <tr><td> <b>inverterNodeIcon</b>        </td><td>Icon für den Inverterknoten (das Icon unter der Wechselrichterzeile) und ggf. dessen Farbe bei Aktivität.               </td></tr>
+			<tr><td>                                </td><td>Die Farbe kann als Hex-Wert (z.B. #cc3300) oder Bezeichnung (z.B. red, blue) angegeben werden.                          </td></tr>
+            <tr><td>                                </td><td>Syntax: <b>&lt;Icon&gt;[@&lt;Farbe&gt;]</b>                                                                             </td></tr>
 			<tr><td>                                </td><td>                                                                                                                        </td></tr>
 			<tr><td> <b>shiftx</b>                  </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
 			<tr><td>                                </td><td>Wert: <b>-80 ... 80</b>, default: 0                                                                                     </td></tr>
