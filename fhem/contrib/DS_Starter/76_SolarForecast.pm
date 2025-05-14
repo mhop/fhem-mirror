@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ",
+  "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ".
+                           "correction of inverter x-start ",
   "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
   "1.52.0" => "11.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
                            "valInverter: add isource, new keys: ac2dc, dc2ac, _flowGraphic: add battery inverter type ".
@@ -17127,7 +17128,7 @@ sub _flowGraphic {
   $batin  = 0;
   $batout = 0;
 
-  if ($x > 0) {$batin = $x; $batout = 0;} elsif ($x < 0) {$batout = abs $x; $batin;}      # es darf nur $batin ODER $batout mit einem Wert > 0 geben
+  if ($x > 0) {$batin = $x; $batout = 0;} elsif ($x < 0) {$batout = abs $x; $batin = 0;}                      # es darf nur $batin ODER $batout mit einem Wert > 0 geben
 
   debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, batout: $batout");
 
@@ -17200,23 +17201,23 @@ sub _flowGraphic {
 
   ## SVG Box initialisieren mit Grid-Icon
   #########################################
-  my $doproducerrow  = 1;
+  my $showproducers  = 1;
   my $flowgPrdsPower = 1;                                                                  # initial Producer akt. Erzeugung anzeigen
 
-  $doproducerrow    = 0 if(!$hasbat && $psorted->{'2tonode'}{count} == 1);
+  $showproducers    = 0 if(!$hasbat && $psorted->{'2tonode'}{count} == 1);
   my $vbwidth       = 800;                                                                 # width and height specify the viewBox size
   
   my $vbminx        = -10 * $flowgxshift;                                                  # min-x and min-y represent the smallest X and Y coordinates that the viewBox may have
   
   my $vbminy        = 125;
-  $vbminy          -= 150 if($doproducerrow);                                              # mehr Platz oben schaffen wenn Poducerreihe angezeigt
+  $vbminy          -= 150 if($showproducers);                                              # mehr Platz oben schaffen wenn Poducerreihe angezeigt
   $vbminy          -= INPUTROWSHIFT if($showgenerators);                                   # mehr Platz oben schaffen wenn Zellen/Input-Reihe angezeigt 
 
   my $vbhight       = 610;
   $vbhight         -= 20  if(!$flowgconsTime);
   $vbhight         -= 230 if(!$flowgconsumer);
                         
-  $vbhight         += PRDCRROWSHIFT if($doproducerrow);                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
+  $vbhight         += PRDCRROWSHIFT if($showproducers);                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
   $vbhight         += INPUTROWSHIFT if($showgenerators);                                   # Höhe Box vergrößern wenn Zellen/Input-Reihe angezeigt
   
   $vbhight         += $exth2cdist;
@@ -17284,7 +17285,7 @@ END0
   $paref->{pdist}          = $pdist;
   $paref->{showgenerators} = $showgenerators; 
 
-  if (!$doproducerrow) {
+  if (!$showproducers) {
       $paref->{y_coord}  = 165;
       $ret .= __addInputProducerIcon ($paref);                      # Solarzellen/Input-Zeile und einzelnes Producer Icon wird an Stelle des Knotens eingefügt
   }
@@ -17457,7 +17458,7 @@ END3
               next if(!$xchain);
               
               my $ystart          = $pdcr->{$lfn}{ysgenerator}; 
-              $ystart             = $doproducerrow ? $ystart - PRDCRROWSHIFT + 15 : $ystart + PRDCRROWSHIFT - 20;   # Unterscheidung wenn ProducerZeile angezeigt werden soll
+              $ystart             = $showproducers ? $ystart - PRDCRROWSHIFT + 15 : $ystart + PRDCRROWSHIFT - 20;   # Unterscheidung wenn ProducerZeile angezeigt werden soll
               my $pgen            = $pdcr->{$lfn}{pgen};
               my $chain_color     = '';                                                          
               my $generator_style = $pgen > 0 ? "$stna active_normal" : "$stna inactive";
@@ -17472,7 +17473,7 @@ END3
   ## Laufketten Producer/Inverter - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ## Laufkette nur anzeigen wenn Producerzeile angezeigt werden soll
   ########################################################################################
-  if ($doproducerrow) {
+  if ($showproducers) {
       for my $st (sort keys %{$psorted}) {                                                        # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
           my $left   = $psorted->{$st}{start} * 2;                                                # Übertrag aus Producer Icon Abschnitt
           my $count  = $psorted->{$st}{count};
@@ -17587,17 +17588,15 @@ END3
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
           
           for my $lfn (@sorted) {
-              my $pn        = $pdcr->{$lfn}{pn};
-              my $generator = $pdcr->{$lfn}{generator};                    # Angaben zum Generator (Namen der Strings)
-              
+              my $pn    = $pdcr->{$lfn}{pn};              
               my $xtext = $pdcr->{$lfn}{xsgenerator};                      # Übernahme aus __addInputProducerIcon
               next if(!$xtext);
               
               $xtext    = $xtext * 2 - 80;                                 # Korrektur Start X-Koordinate des Textes 
               my $ytext = $pdcr->{$lfn}{ysgenerator}; 
-              $ytext    = $doproducerrow ? $ytext - PRDCRROWSHIFT + 5 : $ytext + PRDCRROWSHIFT - 30;   # Unterscheidung wenn ProducerZeile angezeigt werden soll
+              $ytext    = $showproducers ? $ytext - PRDCRROWSHIFT + 5 : $ytext + PRDCRROWSHIFT - 30;     # Unterscheidung wenn ProducerZeile angezeigt werden soll
               
-              my $pval1 = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );                       # aktuelle Generatorleistung
+              my $pval1 = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );                         # aktuelle Generatorleistung
               my $lpv1  = length $pval1;
                   
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
@@ -17616,37 +17615,29 @@ END3
   ## Textangabe Producer / Inverter - in Reihenfolge: zum Grid - zum Knoten - zur Batterie
   ## Textangabe nur anzeigen wenn Producerzeile angezeigt werden soll
   ###########################################################################################
-  if ($doproducerrow) {      
-      for my $st (sort keys %{$psorted}) {                               # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
-          my $left = $psorted->{$st}{start} * 2 - 80;                    # Übertrag aus Producer Icon Abschnitt, -XX -> Start Lage Producer Beschriftung
-          
+  if ($showproducers) {      
+      for my $st (sort keys %{$psorted}) {                                 # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
           my @sorted;
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
-
+          
           for my $lfn (@sorted) {
-              my $pn    = $pdcr->{$lfn}{pn};              						
+              my $pn    = $pdcr->{$lfn}{pn};     
+              my $xtext = $pdcr->{$lfn}{xsproducer};                       # Übernahme aus __addInputProducerIcon
+              next if(!$xtext);
+              
+              $xtext    = $xtext * 2 - 70;                                 # Korrektur Start X-Koordinate des Textes               
 			  my $pval1 = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );		
 			  my $lpv1  = length $pval1;
 
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
               ###############################################################################
-              if    ($lpv1 >= 5) {$left -= 10}
-              elsif ($lpv1 == 4) {$left += 10}
-              elsif ($lpv1 == 3) {$left += 15}
-              elsif ($lpv1 == 2) {$left += 20}
-              elsif ($lpv1 == 1) {$left += 55}
+              if    ($lpv1 >= 5) {$xtext -= 30}
+              elsif ($lpv1 == 4) {$xtext -= 15}
+              elsif ($lpv1 == 3) {$xtext -=  5}
+              elsif ($lpv1 == 2) {$xtext += 10}
+              elsif ($lpv1 == 1) {$xtext += 30}   
 
-              $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$left" y="100">$pval1</text>} if($flowgPrdsPower);
-
-              # Leistungszahl wieder zurück an den Ursprungspunkt
-              ####################################################
-              if    ($lpv1 >= 5) {$left += 10}
-              elsif ($lpv1 == 4) {$left -= 10}
-              elsif ($lpv1 == 3) {$left -= 15}
-              elsif ($lpv1 == 2) {$left -= 20}
-              elsif ($lpv1 == 1) {$left -= 55}
-
-              $left += ($pdist * 2);
+              $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$xtext" y="100">$pval1</text>} if($flowgPrdsPower);
           }
       }
   }
@@ -17793,7 +17784,7 @@ sub __addInputProducerIcon {
   my ($scale, $ret);
 
   for my $st (sort keys %{$psorted}) {                                                     # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
-      my $left   = 0;
+      my $xstart = 0;
       my $xicon  = $psorted->{$st}{xicon};
       my $count  = $psorted->{$st}{count};
             
@@ -17803,19 +17794,17 @@ sub __addInputProducerIcon {
       $xicon = __groupXstart ($xicon, $count, $pdist);
 
       $psorted->{$st}{start} = $xicon;                                                     # Übertrag Koordinaten
-      $left                  = $xicon;
+      $xstart                = $xicon + 10;
 
       for my $lfn (@sorted) {
           my $pn        = $pdcr->{$lfn}{pn};
           my $ptyp      = $pdcr->{$lfn}{ptyp};
           my $generator = $pdcr->{$lfn}{generator};                                        # Angaben zum Generator (Namen der Strings)
           my $pval      = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );           # aktuelle Generatorleistung
-          
+         
           if ($showgenerators) {                                                           # Anzeige Input-Reihe
               my $ystart = $y_coord;
               $ystart   -= INPUTROWSHIFT;
-              
-              my $xstart = $left + 10;
 
               if ($generator && $generator ne 'none') {
                   $pdcr->{$lfn}{xsgenerator} = $xstart;                                    # Übertrag Koordinaten für Laufketten/Text Anzeige
@@ -17854,11 +17843,12 @@ sub __addInputProducerIcon {
           $picon           = FW_makeImage    ($picon, '');
           ($scale, $picon) = __normIconScale ($name, $picon);
 
-          $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($left,$y_coord),scale($scale)">};
+          $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($xstart,$y_coord),scale($scale)">};
           $ret .= "<title>$ptxt</title>".$picon;
           $ret .= '</g> ';
-
-          $left += $pdist;
+          
+          $pdcr->{$lfn}{xsproducer} = $xstart;                              # Übertrag Koordinaten für Laufketten/Text Anzeige
+          $xstart += $pdist;
       }
   }
 
