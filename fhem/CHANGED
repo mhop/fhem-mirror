@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - fix/new: 36_Shelly: log fw-check, model of Shelly3EM, PLUGS_UI implemented
  - feature: 76_SolarForecast: new key flowGraphicControl->inverterNodeIcon
  - change: 76_SolarForecast: Version 1.52.1
  - feature: 76_SolarForecast: Version 1.52.0
