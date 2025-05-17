@@ -511,6 +511,7 @@ FW_Read($$)
 
   #############################
   # AUTH
+  $FW_httpheader{_Path} = $arg;
   if(!defined($FW_chash->{Authenticated})) {
     my $ret = Authenticate($FW_chash, \%FW_httpheader);
     if($ret == 0) {
@@ -522,6 +523,8 @@ FW_Read($$)
       my $ah = $FW_chash->{".httpAuthHeader"};
       $FW_headerlines .= $ah if($ah);
       delete $FW_chash->{".httpAuthHeader"};
+
+    } elsif($ret == 3) { # OK for this URL
 
     } else {
       my $ah = $FW_chash->{".httpAuthHeader"};

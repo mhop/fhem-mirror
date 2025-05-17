@@ -4,7 +4,6 @@ package main;
 
 use strict;
 use warnings;
-use vars qw(@FW_httpheader); # HTTP header, line by line
 use MIME::Base64;
 my $allowed_haveSha;
 
@@ -34,6 +33,7 @@ allowed_Initialize($)
     disable:1,0
     disabledForIntervals
     globalpassword
+    noCheckFor
     password
     reportAuthAttempts
     validFor
@@ -130,7 +130,11 @@ allowed_Authorize($$$$;$)
 }
 
 #####################################
-# Return 0 for authentication not needed, 1 for auth-ok, 2 for wrong password
+# Return
+# - 0 for authentication not needed
+# - 1 for auth-ok
+# - 2 for wrong username/password
+# - 3 authentication not needed this time (FHEMWEB special)
 sub
 allowed_Authenticate($$$$)
 {
@@ -160,6 +164,9 @@ allowed_Authenticate($$$$)
     delete $cl->{".httpAuthHeader"};
     return &$doReturn(0) if(!$basicAuth);
     return &$doReturn(2) if(!$param);
+
+    my $exc = AttrVal($aName, "noCheckFor", undef); #141561
+    return 3 if($exc && $param->{_Path} =~ m/$exc/);
 
     my $FW_httpheader = $param;
     my $secret = $FW_httpheader->{Authorization};
@@ -406,12 +413,12 @@ EOF
 =item summary_DE authorisiert Befehlsausf&uuml;hrung basierend auf dem Frontend
 =begin html
 
-<a name="allowed"></a>
+<a id="allowed"></a>
 <h3>allowed</h3>
 <ul>
   <br>
 
-  <a name="alloweddefine"></a>
+  <a id="alloweddefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; allowed &lt;deviceList&gt;</code>
@@ -440,7 +447,7 @@ EOF
     <br>
   </ul>
 
-  <a name="allowedset"></a>
+  <a id="allowed-set"></a>
   <b>Set</b>
   <ul>
     <li>basicAuth &lt;username&gt; &lt;password&gt;</li>
@@ -452,13 +459,13 @@ EOF
     </li>
   </ul><br>
 
-  <a name="allowedget"></a>
+  <a id="allowed-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="allowedattr"></a>
+  <a id="allowed-attr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="allowedCommands"></a>
+    <a id="allowed-attr-allowedCommands"></a>
     <li>allowedCommands<br>
         A comma separated list of commands allowed from the matching frontend
         (see validFor).<br>
@@ -468,19 +475,19 @@ EOF
         configuration is forbidden.<br>
         </li><br>
 
-    <a name="allowedDevices"></a>
+    <a id="allowed-attr-allowedDevices"></a>
     <li>allowedDevices<br>
         A comma or space separated list of device names which can be
         manipulated via the matching frontend (see validFor).
         </li><br>
 
-    <a name="allowedDevicesRegexp"></a>
+    <a id="allowed-attr-allowedDevicesRegexp"></a>
     <li>allowedDevicesRegexp<br>
         Regexp to match the devicenames, which can be manipulated. The regexp
         is prepended with ^ and suffixed with $, as usual.
         </li><br>
 
-    <a name="allowedIfAuthenticatedByMe"></a>
+    <a id="allowed-attr-allowedIfAuthenticatedByMe"></a>
     <li>allowedIfAuthenticatedByMe<br>
         By default (value is 1), the rules only apply, if the connection was
         authenticated (via username/password) by this allowed instance. Set the
@@ -488,8 +495,9 @@ EOF
         username or password set.
         </li><br>
 
-    <a name="basicAuth"></a>
     <li>basicAuth, basicAuthMsg<br>
+        <a id="allowed-attr-basicAuth"></a>
+        <a id="allowed-attr-basicAuthMsg"></a>
         Request a username/password authentication for FHEMWEB access.
         It can be a base64 encoded string of user:password, an SHA256 hash
         (which should be set via the corresponding set command) or a perl
@@ -505,7 +513,7 @@ EOF
         feature.<br>
     </li><br>
 
-    <a name="basicAuthExpiry"></a>
+    <a id="allowed-attr-basicAuthExpiry"></a>
     <li>basicAuthExpiry<br>
         allow the basicAuth to be kept valid for a given number of days.
         So username/password as specified in basicAuth are only requested
@@ -518,7 +526,7 @@ EOF
     <li><a href="#disable">disable</a></li></br>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li></br>
 
-    <a name="password"></a>
+    <a id="allowed-attr-password"></a>
     <li>password<br>
         Specify a password for telnet instances, which has to be entered as the
         very first string after the connection is established. The same rules
@@ -531,14 +539,28 @@ EOF
         </ul>
         </li><br>
 
-    <a name="globalpassword"></a>
+    <a id="allowed-attr-globalpassword"></a>
     <li>globalpassword<br>
         Just like the attribute password, but a password will only required for
         non-local connections.
         </li><br>
 
+    <a id="allowed-attr-noCheckFor"></a>
+    <li>noCheckFor<br>
+        a regexp matching a path, for wich no authentication is required
+        (FHEMWEB only).<br> A specific iOS Safari version wont send BasicAuth
+        for certain files, this can be solved by setting the attribut to:<br>
+        ^(/[^/]+|/fhem/icons/favicon)$
+        </li>
 
-    <a name="validFor"></a>
+    <a id="allowed-attr-reportAuthAttempts"></a>
+    <li>reportAuthAttempts {1|2|3}<br>
+        If set to 1 or 3, each successful Authentication attempt will generate
+        a FHEM event. If set to 2 or 3, generates an event on each unsuccesful
+        Auth attempt.
+        </li>
+
+    <a id="allowed-attr-validFor"></a>
     <li>validFor<br>
         A comma separated list of frontend names. Currently supported frontends
         are all devices connected through the FHEM TCP/IP library, e.g. telnet
@@ -555,12 +577,12 @@ EOF
 
 =begin html_DE
 
-<a name="allowed"></a>
+<a id="allowed"></a>
 <h3>allowed</h3>
 <ul>
   <br>
 
-  <a name="alloweddefine"></a>
+  <a id="alloweddefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; allowed &lt;deviceList&gt;</code>
@@ -593,7 +615,7 @@ EOF
     <br>
   </ul>
 
-  <a name="allowedset"></a>
+  <a id="allowed-set"></a>
   <b>Set</b>
   <ul>
     <li>basicAuth &lt;username&gt; &lt;password&gt;</li>
@@ -606,13 +628,13 @@ EOF
   </ul><br>
 
 
-  <a name="allowedget"></a>
+  <a id="allowed-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="allowedattr"></a>
+  <a id="allowed-attr"></a>
   <b>Attribute</b>
   <ul>
-    <a name="allowedCommands"></a>
+    <a id="allowed-attr-allowedCommands"></a>
     <li>allowedCommands<br>
         Eine Komma getrennte Liste der erlaubten Befehle des passenden
         Frontends (siehe validFor). Bei einer leeren Liste (, dh. nur ein
@@ -622,19 +644,19 @@ EOF
         "normale" Bedienung der Schalter/etc.
         </li><br>
 
-    <a name="allowedDevices"></a>
+    <a id="allowed-attr-allowedDevices"></a>
     <li>allowedDevices<br>
         Komma getrennte Liste von Ger&auml;tenamen, die mit dem passenden
         Frontend (siehe validFor) ge&auml;ndert werden k&ouml;nnen.
         </li><br>
 
-    <a name="allowedDevicesRegexp"></a>
+    <a id="allowed-attr-allowedDevicesRegexp"></a>
     <li>allowedDevicesRegexp<br>
         Regexp um die Ger&auml;te zu spezifizieren, die man bearbeiten darf.
         Das Regexp wird (wie in FHEM &uuml;blich) mit ^ und $ erg&auml;nzt.
         </li><br>
 
-    <a name="allowedIfAuthenticatedByMe"></a>
+    <a id="allowed-attr-allowedIfAuthenticatedByMe"></a>
     <li>allowedIfAuthenticatedByMe<br>
         Per Voreinstellung (Wert ist 1) werden die Regel nur dann angewendet,
         falls die Authentifikation (per Benutzername / Passwort) durch diese
@@ -643,8 +665,9 @@ EOF
         Benutzername/Passwort gesetzt ist.
         </li><br>
 
-    <a name="basicAuth"></a>
     <li>basicAuth, basicAuthMsg<br>
+        <a id="allowed-attr-basicAuth"></a>
+        <a id="allowed-attr-basicAuthMsg"></a>
         Erzwingt eine Authentifizierung mit Benutzername/Passwort f&uuml;r die
         zugerdnete FHEMWEB Instanzen. Der Wert kann entweder das base64
         kodierte Benutzername:Passwort sein, ein SHA256 hash (was man am besten
@@ -661,11 +684,18 @@ EOF
         &Uuml;berschrift angezeigt.<br>
     </li><br>
 
+    <a id="allowed-attr-basicAuthExpiry"></a>
+    <li>basicAuthExpiry<br>
+        erlaubt basicAuth f&uuml;r die angegebene Anzahl von Tagen.  Das wird
+        durch ein Cookie gel&ouml;st, f&uuml;r den Ablauf sorgt der Browser.
+        Gilt nur falls basicAuth gesetzt ist.
+    </li><br>
+
 
     <li><a href="#disable">disable</a><br>disable</li></br>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li></br>
 
-    <a name="password"></a>
+    <a id="allowed-attr-password"></a>
     <li>password<br>
         Betrifft nur telnet Instanzen (siehe validFor): Bezeichnet ein
         Passwort, welches als allererster String eingegeben werden muss,
@@ -682,22 +712,31 @@ EOF
         </code></ul>
     </li><br>
 
-    <a name="reportAuthAttempts"></a>
-    <li>reportAuthAttempts {1|2|3}<br>
-        If set to 1 or 3, each successful Authentication attempt will generate
-        a FHEM event. If set to 2 or 3, generates an event on each unsuccesful
-        Auth attempt.
-        </li>
-
-    <a name="globalpassword"></a>
-    <li>globalpassword<br>
+    <a id="allowed-attr-globalpassword"></a>
+    <li>allowed-attr-globalpassword<br>
         Betrifft nur telnet Instanzen (siehe validFor): Entspricht dem
         Attribut password; ein Passwort wird aber ausschlie&szlig;lich f&uuml;r
         nicht-lokale Verbindungen verlangt.
         </li><br>
 
-    <a name="validFor"></a>
-    <li>validFor<br>
+    <a id="allowed-attr-noCheckFor"></a>
+    <li>noCheckFor<br>
+        FHEMWEB spezifisch. Der Wert ist ein Regexp, und falls es den
+        Aufrufpfad matcht, dann wird f&uuml;r dieses URL keine Authentifizierung
+        ben&ouml;tigt.<br> Bestimmte iOS Safari Versionen senden kein BasicAuth
+        f&uuml;r einige Dateien, mit Folgendem kann man das Problem
+        l&ouml;sen:<br>
+        ^(/fhem/icons/favicon)$
+        </li>
+
+    <a id="allowed-attr-reportAuthAttempts"></a>
+    <li>reportAuthAttempts {1|2|3}<br>
+        mit 1 oder 3 werden erfolgreiche Authentifizierungen gemeldet, mit 2
+        oder 3 nicht erfolgreiche.
+        </li>
+
+    <a id="allowed-attr-validFor"></a>
+    <li>allowed-attr-validFor<br>
         Komma separierte Liste von Frontend-Instanznamen.  Aktuell werden nur
         Frontends unterst&uuml;tzt, die das FHEM TCP/IP Bibliothek verwenden,
         z.Bsp. telnet und FHEMWEB. Falls nicht gesetzt, ist die allowed Instanz
