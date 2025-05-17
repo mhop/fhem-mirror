@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.3" => "17.05.2025  _transferInverterValues: new property itype, graphicControl: new keys beamPaddingBottom, beamPaddingTop ".
+                           " setter attrKeyVal has dorp down list of all composite attributes ",
   "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ".
                            "correction of inverter x-start, ".
                            "isConsumerLogOn: bugfix Threshold value detection if threshold value specification above 1% of power ",
@@ -766,7 +768,7 @@ my %hattr = (                                                                # H
       $hattr{'setupOtherProducer'.$prn}{fn} = \&_attrProducerDev;
   }
   
-my $hcompoattr = {
+my $hcompoattr = {                                                           # Composit-Attribute
   aiControl              => '',
   consumerControl        => '',
   flowGraphicControl     => '',
@@ -798,6 +800,8 @@ my $hcompoattr = {
       $pn = sprintf "%02d", $pn;
       $hcompoattr->{'setupOtherProducer'.${pn}} = '';             
   }
+  
+my @hcompoattrkeys = keys %{$hcompoattr};                                    # Array der Schlüssel aller Composit-Attribute
 
 my %htr = (                                                                  # Hash even/odd für <tr>
   0 => { cl => 'even' },
@@ -1792,6 +1796,9 @@ sub Set {
 
   closedir (DIR);
   my $rf = @bkps ? ','.join ",", reverse sort @bkps : '';
+  
+  my $cakeys = join ',', sort @hcompoattrkeys;
+  my $keynum = scalar @hcompoattrkeys + 1;
 
   ## allg. gültige Setter
   #########################
@@ -1799,8 +1806,8 @@ sub Set {
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
              "cycleInterval ".
-             "attrKeyVal:textField-long ".
-             "energyH4Trigger:textField-long ".
+             "energyH4Trigger:textField-long ".                                                          # vor attrKeyVal textField-long laden         
+             "attrKeyVal:widgetList,$keynum,select,$cakeys,1,textField-long ".
              "operatingMemory:backup,save".$rf." ".
              "operationMode:active,inactive ".
              "plantConfiguration:check,save,restore ".
@@ -1991,6 +1998,8 @@ sub _setattrKeyVal {                         ## no critic "not used"
   my $arg   = $paref->{arg} // return;
   
   return if(!$init_done);
+  
+  $arg =~ s/^([^=]*?),/$1 /;
 
   my ($a, $h)    = parseParams ($arg);
   my $targetattr = $a->[0];
@@ -6484,13 +6493,15 @@ sub _attrgraphicControl {                ## no critic "not used"
   my $cmd   = $paref->{cmd};
   
   my $valid = {
-      beamWidth    => { comp => '([2-9][0-9]|100)',      act => 0 },
-      energyUnit   => { comp => '(Wh|kWh)',              act => 0 },
-      headerDetail => { comp => '.*',                    act => 1 },
-      hourCount    => { comp => '([4-9]|1[0-9]|2[0-4])', act => 0 },
-      hourStyle    => { comp => ':(0{1,2})',             act => 0 },
-      layoutType   => { comp => '(single|double|diff)',  act => 0 },
-      spaceSize    => { comp => '\d+',                   act => 0 },
+      beamPaddingBottom => { comp => '\d+',                   act => 0 },
+      beamPaddingTop    => { comp => '\d+',                   act => 0 },
+      beamWidth         => { comp => '([2-9][0-9]|100)',      act => 0 },
+      energyUnit        => { comp => '(Wh|kWh)',              act => 0 },
+      headerDetail      => { comp => '.*',                    act => 1 },
+      hourCount         => { comp => '([4-9]|1[0-9]|2[0-4])', act => 0 },
+      hourStyle         => { comp => ':(0{1,2})',             act => 0 },
+      layoutType        => { comp => '(single|double|diff)',  act => 0 },
+      spaceSize         => { comp => '\d+',                   act => 0 },
   };
     
   my ($a, $h) = parseParams ($aVal);
@@ -9880,23 +9891,23 @@ sub _transferInverterValues {
 	  my $etotal = 0;
       my $source = 'pv';
 	  
-      my ($strings, @astrings);
+      my $strings;
       
       if (defined $h->{strings}) {                                             # Strings und Wechselrichtertyp feststellen 
            $strings = $h->{strings};
            $source  = 'bat' if($h->{strings} eq 'none');                    
       }
-      else {                                                                   # keine Strings explizit angegeben
+      else {                                                                   # keine Strings explizit angegeben -> alles Strings zuordnen
+          my @astrings;
+          
           for my $str (sort keys %{$data{$name}{strings}}) {
               push @astrings, $str;  
           }
+          
+          $strings = join ",", @astrings;
       }
-      
-      $strings = join ",", @astrings if(@astrings);
 
-      my $feed   = defined $h->{feed}                                            ? $h->{feed} :
-                   $source eq 'pv' && defined $h->{ac2dc} && defined $h->{dc2ac} ? 'hybrid'   :
-                   'default';
+      my ($itype, $feed) = exploreInverterType ($h);
       
 	  if (defined $h->{ac2dc}) {                                                                       
 		  my ($a2dread, $a2dunit) = split ":", $h->{ac2dc};
@@ -9971,6 +9982,7 @@ sub _transferInverterValues {
       $data{$name}{inverters}{$in}{ilimit}      = $h->{limit} // 100;                            # Wirkleistungsbegrenzung
       $data{$name}{inverters}{$in}{iicon}       = $h->{icon}      if($h->{icon});                # Icon des Inverters
       $data{$name}{inverters}{$in}{istrings}    = $strings;                                      # dem Inverter zugeordnete Strings | none
+      $data{$name}{inverters}{$in}{itype}       = $itype;                                        # Inverter Arbeitsvariante
       $data{$name}{inverters}{$in}{iasynchron}  = $h->{asynchron} if($h->{asynchron});           # Inverter Mode
       $data{$name}{inverters}{$in}{ifeed}       = $feed;                                         # Eigenschaften der Energielieferung
       $data{$name}{inverters}{$in}{isource}     = $source;                                       # Eigenschaften des Energiebezugs, normal pv
@@ -11589,17 +11601,20 @@ sub _createSummaries {
       $batout += BatteryVal ($name, $bn, 'bpowerout', 0);                                               # Summe momentane Batterieentladung
   }
 
-  my $pv2node     = 0;
-  my $pv2grid     = 0;                                                                                  # PV-Erzeugung zu Grid-only
+  my $pv2node = 0;
+  my $pv2grid = 0;                                                                                      # PV-Erzeugung zu Grid-only
   
   for my $in (1..MAXINVERTER) {                                                                         # Summe alle Inverter
-      $in           = sprintf "%02d", $in;
-      my $pgen      = InverterVal ($name, $in, 'igeneration',   0);
-      my $ifeed     = InverterVal ($name, $in, 'ifeed', 'default');
-      my $isource   = InverterVal ($name, $in, 'isource',    'pv');
-	  my $pac2dc    = InverterVal ($name, $in, 'ipac2dc',       0);                                     # Rückwandlung AC->DC (Batterie-Wechselrichter)
-      $pv2node     += $pgen   if($ifeed ne 'grid'    && $isource eq 'pv');                              # nur PV Erzeugung berücksichtigen
-      $pv2grid     += $pgen   if($ifeed eq 'grid'    && $isource eq 'pv');                              # nur PV Erzeugung mit Ziel 'Grid'                             
+      $in       = sprintf "%02d", $in;
+      my ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
+      next if($err);
+      
+      my $pgen     = InverterVal ($name, $in, 'igeneration',   0);
+      my $ifeed    = InverterVal ($name, $in, 'ifeed', 'default');
+      my $isource  = InverterVal ($name, $in, 'isource',    'pv');
+	  my $pac2dc   = InverterVal ($name, $in, 'ipac2dc',       0);                                      # Rückwandlung AC->DC (Batterie-Wechselrichter)
+      $pv2node    += $pgen   if($ifeed ne 'grid' && $isource eq 'pv');                                  # nur PV Erzeugung berücksichtigen
+      $pv2grid    += $pgen   if($ifeed eq 'grid' && $isource eq 'pv');                                  # nur PV Erzeugung mit Ziel 'Grid'                             
   }
 
   my $othprod = 0;                                                                                      # Summe Otherproducer
@@ -16480,6 +16495,20 @@ sub _beamGraphic {
 
   $paref->{beampos} = 'top';                                                                                    # Lagedefinition "über den Balken"
   my $ret           = q{};
+  
+  my $colspan = $maxhours + 2;
+  my $m       = $paref->{modulo} % 2;
+  
+  ## zusätzlicher Abstand vor der ersten Reihe
+  ##############################################
+  my $pt = CurrentVal ($name, 'beamPaddingTop', 0);
+  
+  if ($pt) {
+      $ret .= "<tr class='$htr{$m}{cl}'>";
+  $ret .= "<td colspan='$colspan' align='center' style='padding-left: 10px; padding-top: ${pt}px; padding-bottom: 0px;'>";
+      $ret .= "</td>";
+      $ret .= "</tr>"; 
+  }
 
   ## Wetteranzeige über den Balken
   ##################################
@@ -16488,8 +16517,6 @@ sub _beamGraphic {
   ## Batterieanzeige über den Balken
   ####################################
   $ret .= __batteryOnBeam ($paref);
-
-  my $m = $paref->{modulo} % 2;
 
   if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
@@ -16792,6 +16819,17 @@ sub _beamGraphic {
   $ret .= __batteryOnBeam ($paref);
 
   delete $paref->{beampos};
+  
+  ## zusätzlicher Abstand nach der letzten Reihe
+  ################################################
+  my $pb = CurrentVal ($name, 'beamPaddingBottom', 0);
+  
+  if ($pb) {
+      $ret .= "<tr class='$htr{$m}{cl}'>";
+      $ret .= "<td colspan='$colspan' align='center' style='padding-left: 10px; padding-top: 0px; padding-bottom: ${pb}px;'>";
+      $ret .= "</td>";
+      $ret .= "</tr>"; 
+  }
 
 return $ret;
 }
@@ -18181,6 +18219,32 @@ sub __normIconScale {
   $icon =~ s/height="(.*?)"/height="$heightnormpt"/;
 
 return (FGSCALEDEF, $icon);
+}
+
+################################################################
+#  ermittelt den Wechselrichter Arbeitstyp sowie die 
+#  Speisevariante
+################################################################
+sub exploreInverterType {
+  my $h = shift;
+
+  my $source = 'pv';
+  
+  if (defined $h->{strings}) {                                             # Strings und Wechselrichtertyp feststellen 
+       $source = 'bat' if($h->{strings} eq 'none');                    
+  }
+  
+  my $feed   = defined $h->{feed}                                                ? $h->{feed} :
+               $source eq 'pv' && defined $h->{acInOut} && defined $h->{dcInOut} ? 'hybrid'   :
+               'default';
+               
+  my $itype = $feed   eq 'grid'   ? 'GridInverter'    :
+              $feed   eq 'bat'    ? 'SolarCharger'    :
+              $source eq 'bat'    ? 'BatteryInverter' :
+              $feed   eq 'hybrid' ? 'HybridInverter'  :
+              'StandardInverter';
+
+return ($itype, $feed);
 }
 
 ################################################################
@@ -25739,6 +25803,16 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>beamPaddingBottom</b>   </td><td>Defines the space in px in the bar chart that is inserted between the last text or icon row of the respective bar chart layer             </td></tr>
+            <tr><td>                            </td><td>and the bottom edge of this layer.                                                                                                        </td></tr>
+            <tr><td>                            </td><td>The value applies uniformly to all bar chart levels.                                                                                      </td></tr>
+            <tr><td>                            </td><td>Value: <b>Integer</b>, default: 0                                                                                                         </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
+            <tr><td> <b>beamPaddingTop</b>      </td><td>Defines the space in px in the bar chart that is inserted between the upper edge of the respective bar chart layer and the first          </td></tr>
+            <tr><td>                            </td><td>text or icon row of this layer.                                                                                                           </td></tr>
+            <tr><td>                            </td><td>The value applies uniformly to all bar chart levels.                                                                                      </td></tr>
+            <tr><td>                            </td><td>Value: <b>Integer</b>, default: 0                                                                                                         </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
 			<tr><td> <b>beamWidth</b>           </td><td>Determines the width of the bars of the bar chart in px.                                                                                  </td></tr>
             <tr><td>                            </td><td>If no attribute is set, the bar width is automatically adjusted dynamically by the module.                                                </td></tr>
 		    <tr><td>                            </td><td>Value: <b>Integer 20..100</b>, default: 20                                                                                                </td></tr>
@@ -28312,6 +28386,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>beamPaddingBottom</b>   </td><td>Legt den Platz in px im Balkendiagramm fest, der zwischen der letzten Text- oder Iconreihe der jeweiligen Balkengrafik Ebene    </td></tr>
+            <tr><td>                            </td><td>und dem unteren Rand dieser Ebene eingefügt wird.                                                                               </td></tr>
+            <tr><td>                            </td><td>Der Wert gilt einheitlich für alle Balkengrafik Ebenen.                                                                         </td></tr>
+            <tr><td>                            </td><td>Wert: <b>Ganzzahl</b>, default: 0                                                                                               </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>beamPaddingTop</b>      </td><td>Legt den Platz in px im Balkendiagramm fest, der zwischen dem oberen Rand der jeweiligen Balkengrafik Ebene und der ersten      </td></tr>
+            <tr><td>                            </td><td>Text- oder Iconreihe dieser Ebene eingefügt wird.                                                                               </td></tr>
+            <tr><td>                            </td><td>Der Wert gilt einheitlich für alle Balkengrafik Ebenen.                                                                         </td></tr>
+            <tr><td>                            </td><td>Wert: <b>Ganzzahl</b>, default: 0                                                                                               </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
 			<tr><td> <b>beamWidth</b>           </td><td>Bestimmt die Breite der Balken der Balkengrafik in px.                                                                          </td></tr>
             <tr><td>                            </td><td>Ohne gesetzen Attribut wird die Balkenbreite durch das Modul automatisch dynamisch angepasst.                                   </td></tr>
 		    <tr><td>                            </td><td>Wert: <b>Ganzzahl 20..100</b>, default: 20                                                                                      </td></tr>
