@@ -2,6 +2,7 @@
 # Do not insert empty lines here, update check depends on it
  - feature: 76_SolarForecast: graphicControl  keys beamPaddingBottom/Top
  - fix/new: 36_Shelly: log fw-check, model of Shelly3EM, PLUGS_UI implemented
+ - fix/new: 36_Shelly: log fw-check, model of Shelly3EM, PLUGS_UI implemented
  - feature: 76_SolarForecast: new key flowGraphicControl->inverterNodeIcon
  - change: 76_SolarForecast: Version 1.52.1
  - feature: 76_SolarForecast: Version 1.52.0

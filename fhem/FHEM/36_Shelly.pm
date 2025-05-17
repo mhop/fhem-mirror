@@ -161,6 +161,9 @@
 # 6.03.3    fix: number of channels of ShellyProEM50
 #           fix: init of EM-Devices
 #           add: errors in authentication
+# 6.04      fix: loglevel of firmwarecheck
+#           fix: model reference of Shelly3EM
+#           new: commands for PLUGS_UI implemented
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -185,7 +188,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.03.3 09.05.2025";
+my $version = "6.04 16.05.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -243,6 +246,7 @@ my %shelly_dropdowns = (
     "Input"   => " input:momentary,toggle,edge,detached,activation", 
     "Input1"  => ",momentary_on_release",  # only Shelly1
     "Input2"  => ",cycle",                  # only ShellyPlus2
+    "PlugsUI" => " colorOn colorOff",       # only Shelly Plugs Gen2+
     "Therm"   => " target, thermostat_type:heating,cooling thermostat_output:straight,invert"    # Wall display thermostat target temperature °C
 );
 ## may be used for RgbwC:
@@ -326,8 +330,8 @@ my %shelly_vendor_ids = (
     "S3PL-00112EU"    => ["shellyplusplug", "Shelly Plug S MTR Gen3",  0x1805],   # added 10/2024
     "S3DM-0A101WWL"   => ["shellyprodm1pm", "Shelly Dimmer Gen3",      0x1073],   # added 01/2025
     "S3DM-0A1WW"      => ["generic",        "Shelly DALI Dimmer Gen3", 0x1071],   # added 10/2024
-    "S3EM-002CXCEU"   => ["shellyem",       "Shelly EM Gen3",          0x1027],   # added 10/2024
-    "S3EM-003CXCEU63" => ["shelly3em",      "Shelly 3EM 63 Gen3",      0x1026],   # added 01/2025    
+    "S3EM-002CXCEU"   => ["shellyemG3",     "Shelly EM Gen3",          0x1027],   # added 10/2024
+    "S3EM-003CXCEU63" => ["shelly3emG3",    "Shelly 3EM 63 Gen3",      0x1026],   # added 01/2025    
     "S3PL-10112EU"    => ["shellyplusplug", "Shelly AZ Plug",          0x1850],   # added 01/2025  amazon compatible
     "S3PL-20112EU"    => ["shellyplusplug", "Shelly Outdoor Plug S Gen3",0x1853],   # added 02/2025
     ## Mini Gen3 Devices
@@ -439,8 +443,8 @@ my %shelly_models = (
     "shellyprodual" => [0,2,0, 4,1,4,  0,0,0],
     #-- 3nd generation devices (Gen3)
     "shellypmmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to ShellyPlusPM
-    "shellyem"      => [1,0,0, 0,3,0,  2,0,0],    # similar to 'shellyproem50'
-    "shelly3em"     => [0,0,0, 0,3,0,  3,0,2],    # similar to 'shellypro3em'
+    "shellyemG3"    => [1,0,0, 0,3,0,  2,0,0],    # similar to 'shellyproem50'
+    "shelly3emG3"   => [0,0,0, 0,3,0,  3,0,2],    # similar to 'shellypro3em'
     #-- 4nd generation devices (Gen4)
     "shellyemmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to 'shellypmmini'    EM1 or PM1 ?
     #-- Android devices
@@ -1796,7 +1800,7 @@ sub Shelly_Attr(@) {
       Log3 $name,1,"[Shelly_Attr] $name\: $error ";
       return $error;
     }
-    if( AttrVal($name,"interval_power",AttrVal($name,"interval",$defaultINTERVAL))>20 && $init_done ){  # $hash->{INTERVAL}
+    if( AttrVal($name,"interval_power",AttrVal($name,"interval",$defaultINTERVAL))>20 && $attrVal == 1 && $init_done ){  # $hash->{INTERVAL}
       $error="For using the \"Balancing\" the interval must not exceed 20 seconds";
       Log3 $name,1,"[Shelly_Attr] $name\: $error ";
       return $error;
@@ -1993,7 +1997,7 @@ sub Shelly_Notify($$) {
 	    return;
 	}
         $hash->{INTERVAL} = $interval; # Updates each minute, if not set as attribute
-	Log3 $name,3,"[Shelly_Notify] $name: starting timer ($interval sec) and calling actions update"; #3
+	Log3 $name,4,"[Shelly_Notify] $name: starting timer ($interval sec) and calling actions update"; #3
 	Shelly_Set($hash,$name,"startTimer");
         Shelly_Set($hash,$name,"actions","update");
         
@@ -2262,6 +2266,8 @@ sub Shelly_Set ($@) {
                                     if( $shelly_models{$model}[4]>-1 ); ## all Gens
       $newkeys .= $shelly_dropdowns{Scripts}
                                     if( $shelly_models{$model}[4]>=1 ); ## Gen2+
+      $newkeys .= $shelly_dropdowns{PlugsUI}
+                                    if( $model eq "shellyplusplug" ); ## Shelly Plugs Gen2+                                    
       # most of devices, except roller, metering
       $newkeys .= $shelly_dropdowns{Onoff}
                                     if( ($mode ne "thermostat" && $mode ne "roller" && $shelly_models{$model}[0]>0) ||  $shelly_models{$model}[2]>0 || $shelly_models{$model}[7]>0 );
@@ -3152,10 +3158,54 @@ sub Shelly_Set ($@) {
         $CMD2="/0?$cmd0$tmrcmd";
     }
     Shelly_HttpRequest($hash,$CMD1,$CMD2,"Shelly_response","dim");
-    return;  
-    
+    return;    
   ################################################################################################################
-  #-- we have a Walldisplay with thermostat  
+  #-- we have a Shelly Plug Gen2+ with PLUGS-UserInterface PLUGS_UI
+  # colorOn  colorOff
+  }elsif( $model eq "shellyplusplug" && $cmd =~ /color(.*)$/ ){  #
+    my $onoff=lc($1);
+    my ($leds,$rgb);
+    my $brightness="";
+    if( $value eq "off" ){
+          $leds = "\"mode\":\"off\"";
+    }elsif( $value eq "power" ){
+          $leds = "\"mode\":\"power\"";   
+          if( scalar(@a)==1 ){ # power-brightness given   
+              $brightness = shift @a;
+              if( $brightness =~ /^(100|([1-9]|)\d)$/ ){ # 0 ... 100
+                  $leds .= ",\"colors\":{\"power\":{\"brightness\":$brightness}}";  
+              }
+          }
+    }else{
+          $leds = "\"mode\":\"switch\"";
+          if( $value =~ /^((100|([1-9]|)\d)\,?\b){3}$/ ){ # 0 ... 100
+              $rgb="\"rgb\":[$value]";
+          }elsif( $value =~ /^([0-9A-Fa-f]){6}$/ ){ # 6-digit hexadecimal value 
+              sub HX{sprintf("%.3f",hex(substr($_[0],$_[1],2))/2.55)}
+              $rgb = "\"rgb\":[".&HX($value,0).",".&HX($value,2).",".&HX($value,4)."]";
+          }elsif( $value =~ /^(100|([1-9]|)\d)$/ && scalar(@a)==0 ){ # only brightness given              
+              $brightness = "\"brightness\":$value";
+              $rgb = "";
+          }else{
+              my $err = "wrong value: \'$value\'";
+              Shelly_error_handling($hash,"Shelly_Set:PLUG_UI",$err,1);
+              return $err;
+          }
+          if( scalar(@a) == 1 ){  # one more parameter
+              $brightness = shift @a;
+              if( $brightness !~ /^(100|([1-9]|)\d)$/ ){ # 0 ... 100
+                  my $err = "wrong brightness value: \'$brightness\'";
+                  Shelly_error_handling($hash,"Shelly_Set:PLUG_UI",$err,1);
+                  return $err;
+              }
+              $brightness = ",\"brightness\":$brightness";
+         }
+         $leds .= ",\"colors\":{\"switch:0\":{\"$onoff\":{$rgb$brightness}}}";
+    }
+    Shelly_HttpRequest($hash,"/rpc/PLUGS_UI.SetConfig","?config={\"leds\":{$leds}}","Shelly_response","plugsui","set");
+    return; 
+  ################################################################################################################
+  #-- we have a Walldisplay with thermostat  ]
   }elsif( $cmd eq "target" ){  # desired temperature, in °C
      $channel = shift @a;
      Shelly_HttpRequest($hash,"/rpc/Thermostat.SetConfig","?config={\"id\":0,\"target_C\":$value}","Shelly_response","target");
@@ -3230,7 +3280,7 @@ sub Shelly_Set ($@) {
       }else{
           $msg =  "Device $name is disabled, timer canceled";
       }
-      Log3 $name,3,"[Shelly_Set:startTimer] $name: $msg";
+      Log3 $name,4,"[Shelly_Set:startTimer] $name: $msg";
       return undef;
 
   }elsif( $cmd eq "calibrate" ){  # shelly-dimmer
@@ -5303,14 +5353,14 @@ sub Shelly_settings2G {
            }
            
            if( $client_name ){
-               Log3 $name,3,"[Shelly_settings2G:APclients] $name: found client \'$client_name\' with MAC=$mac";
+               Log3 $name,4,"[Shelly_settings2G:APclients] $name: found client \'$client_name\' with MAC=$mac";
                Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_model",ReadingsVal($client_name,"model_name","unknown"),undef,undef,$timestamp );
                $client = InternalVal($client_name,"DEF",undef);
                if( $client ne $ip_int ) {
                    Log3 $name,1,"[Shelly_settings2G:APclients] $client_name: wrong definition \'$client\', use <DNS-name>:<port>";
                    $client = "clients \'$client_name\' definition \'$client\' is wrong";                  
                }else{
-                   Log3 $name,3,"[Shelly_settings2G:APclients] device \'$client_name\' is defined as $client (OK)"; 
+                   Log3 $name,4,"[Shelly_settings2G:APclients] device \'$client_name\' is defined as $client (OK)"; 
                    # format as clickable link
                    $client = "<html><a href=\"http://$ip_int\">$client_name</a></html>";  
                }
@@ -5732,6 +5782,8 @@ sub Shelly_procEnergyData {
 
   my $unixtime = time();####$jhash->{sys}{unixtime};
   my $TimeStamp = strftime("%Y-%m-%d %H:%M:%S",localtime($unixtime) );
+  my $dst = fhem('{$isdst}',1); # is daylight saving time (Sommerzeit) ?   silent/no log entry {$isdst} at level 3
+  
   readingsBeginUpdate($hash);
   #readingsBulkUpdateMonitored($hash,"timestamp", $TimeStamp);
   Log3 $name,$V//5,"[Shelly_procEnergyData] processing Shelly_procEnergyData() for device $name, channel=$id";   #5
@@ -5768,7 +5820,7 @@ sub Shelly_procEnergyData {
     # total_act_ret_energy
     @emchannels = ("total_");
     $mpsub = "_energy";
-    $mpch=$id2ch[$id];
+    $mpch=$id2ch[$id];  # monophase channel
   }
   #--- looping all phases
   foreach my $emch ( @emchannels ){                  # "a_","b_","c_","total_"
@@ -5780,7 +5832,7 @@ sub Shelly_procEnergyData {
             $pr="";
             $ps=$mapping{sf}{$suffix}{$mpch//$emch};
         }
-        foreach my $flow ("act","act_ret"){
+        foreach my $flow ("act","act_ret"){ 
             if( $emch ne "total_" ){
               $reading = $pr.$mapping{E1}{'total_'.$flow.'_energy'}.$ps;
               $value = $jhash->{$emch.'total_'.$flow.'_energy'};
@@ -5791,15 +5843,15 @@ sub Shelly_procEnergyData {
                   $active_energy = $value;
               }else{
                   $return_energy = $value;
-              }
+              } 
+              Log3 $name,$V//6,"[Shelly_procEnergyDamy] $emch  $flow   $value"; 
             }
             Log3 $name,$V//5,"[Shelly_procEnergyData:0] $name channel=$id: updating reading=$reading";   #5
             Shelly_readingsBulkUpdate($hash,$reading,$value,"energy/Wh",undef,$TimeStamp);
             #new#            
             Log3 $name,$V//5,"[Shelly_procEnergyData:0] $name channel=$id: updating delta values of reading=$reading";   #5
             foreach $TP (@TPs){
-          #  Shelly_delta_energy($hash,$reading,$TP,$unixtime,$value,$TimeStamp,$dst); 
-            Shelly_delta_energy($hash,$reading."_",$TP,$unixtime,$value,$TimeStamp,1); 
+                Shelly_delta_energy($hash,$reading."_",$TP,$unixtime,$value,$TimeStamp,$dst); 
             }
         }
   }
@@ -5822,7 +5874,6 @@ sub Shelly_procEnergyData {
         Log3 $name,$V//5,"[Shelly_procEnergyData:2] $name channel=$id: preparing periods ".AttrVal($name,"Periods", "");
 
         #calculate all periods
-        my $dst = fhem('{$isdst}',1); # is daylight saving time (Sommerzeit) ?   silent/no log entry {$isdst} at level 3
         $unixtime = $unixtime-$unixtime%60;  # adjust to lass full minute
         foreach $TP (@TPs){
            Log3 $name,$V//5,"[Shelly_procEnergyData:2] $name channel=$id: $pr$ps calling Shelly_delta_energy for period \'$TP\' ";
@@ -5948,7 +5999,7 @@ sub Shelly_procEnergyData {
           }
           # Shellie'S Energy value 'S'
           $pr="";$ps="_S";
-          Log3 $name,$V//5,"[Shelly_procEnergyData] $name: val=$value unit >$unit<"; 
+          Log3 $name,$V//3,"[Shelly_procEnergyData:m] $name: reading=$pr.$reading.$ps val=$value unit >$unit<"; 
           Shelly_readingsBulkUpdate($hash,$pr.$reading.$ps,$value,"energy/$unit"); # Purchased_Energy, ...
           foreach $TP (@TPs){
               Log3 $name,$V//5,"[Shelly_procEnergyData] calling Shelly_delta_energy for period \'$TP\' for Shelly in monophase-profile";
@@ -6394,12 +6445,48 @@ if(0){
             readingsSingleUpdate($hash,"config","register \'$reg\' not found or empty $chan",1);
         }
         return undef;  # do not perform call for status
+  }elsif( $comp eq "plugsui" ){ # PLUGS_UI
+    # rpc/PLUGS_UI.GetConfig  rpc/Shelly.GetConfig
+         Shelly_HttpRequest($hash,"/rpc/PLUGS_UI.GetConfig",undef,"PLUGS_UI_config","Get" );
+  }else{
+        Log3 $name,3,"[Shelly_response] called by $name for \'$comp\': not implemented";  
   }
   #---------------------------
   #-- scheduling next status update
   Shelly_status($hash,"Shelly_response",$timer);
   return undef;
 } #end Shelly_response()
+
+
+########################################################################################
+#
+# PLUGS_UI_config - process the answer of /rpc/PLUGS_UI.SetConfig
+#
+########################################################################################settings2G
+sub PLUGS_UI_config{
+  my ($param,$jhash) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  my $comp = $param->{comp};
+  my $model= AttrVal($name,"model","generic");
+  
+  Log3 $name,4,"[PLUGS_UI_config] $name: processing the answer /rpc/PLUGS_UI.GetConfig ($comp)";
+  my $mode = ($jhash->{leds}{mode})//"wrong";
+  my $colors = $mode;
+  if( $mode eq "switch" ){
+     $colors   .= " on: ".($jhash->{leds}{colors}{'switch:0'}{on}{rgb}[0])//"wrong";
+     $colors   .= ",".    ($jhash->{leds}{colors}{'switch:0'}{on}{rgb}[1])//"wrong";
+     $colors   .= ",".    ($jhash->{leds}{colors}{'switch:0'}{on}{rgb}[2])//"wrong";
+     $colors   .= ";".    ($jhash->{leds}{colors}{'switch:0'}{on}{brightness})//"wrong";
+     $colors   .= " off: ".($jhash->{leds}{colors}{'switch:0'}{off}{rgb}[0])//"wrong";
+     $colors   .= ",".    ($jhash->{leds}{colors}{'switch:0'}{off}{rgb}[1])//"wrong";
+     $colors   .= ",".    ($jhash->{leds}{colors}{'switch:0'}{off}{rgb}[2])//"wrong";
+     $colors   .= ";".    ($jhash->{leds}{colors}{'switch:0'}{off}{brightness})//"wrong";
+  }elsif( $mode eq "power" ){
+     $colors   .= " ".    ($jhash->{leds}{colors}{power}{brightness})//"wrong";
+  }
+  readingsSingleUpdate($hash,"color",$colors,1);  
+}
 
 ########################################################################################
 #
@@ -6595,7 +6682,7 @@ sub Shelly_webhook_update {
   my $gen  = $shelly_models{$model}[4]; # 0 is Gen1,  1 or 2 is Gen2
   ##############
   my $id;
-  Log3 $name,3,"[Shelly_webhook_update] $name: calling with comp=$comp".(defined($val)?" and val=[$val]":", without ID");
+  Log3 $name,5,"[Shelly_webhook_update] $name: calling with comp=$comp".(defined($val)?" and val=[$val]":", without ID");
   if( $comp eq "proc" ){
       $val--;
       if( $val < 0 ){
@@ -7028,7 +7115,7 @@ sub Shelly_firmwarecheck {
   my ($hash,$firmware,$update,$beta) = @_;
   my $name=$hash->{NAME};
   my $model = AttrVal($name,"model","generic");
-  Log3 $name,3,"[Shelly_firmwarecheck] $name: current=$firmware update=".($update?$update:"-")." beta=$beta";#2
+  Log3 $name,5,"[Shelly_firmwarecheck] $name: current=$firmware update=".($update?$update:"-")." beta=$beta";#2
   my (@num_fw,@num_upd,$firmwareV,$updateV);
   my $txt ="-";
   my $icon="/";
@@ -7198,7 +7285,7 @@ sub Shelly_error_handling {
     if( $errN ){        
         #******* RESTARTING TIMERS ***********
         # we need this after 'readingsEndUpdate'
-        Log3 $name,3,"($func) calling Shelly_Set for restarting timer(s) caused by network-error of device $name";
+        Log3 $name,4,"($func) calling Shelly_Set for restarting timer(s) caused by network-error of device $name";
         Shelly_Set($hash,$name,"startTimer");
         #*************************************
     }
@@ -7663,6 +7750,16 @@ sub Shelly_HttpResponse($){
                 <code>set &lt;name&gt; white &lt;integer&gt;</code>
                 <br /> number 0..100 to set the white value</li>
         </ul>
+        <br/>For Shelly Plugs Gen2+ devices (model=shellyplusplug)
+        <ul>
+            <li>
+                <a id="Shelly-set-colorOn"></a>
+                <code>set &lt;name&gt; colorOn|colorOff red,green,blue [brightness]</code>
+                red, green, blue and brightness are integer values 0-100
+                <br />setting the plug's color of f</li>
+        </ul>
+                
+                
         <a id="Shelly-get"></a>
         <h4>Get</h4>
         <ul>
@@ -8375,6 +8472,17 @@ sub Shelly_HttpResponse($){
                 <code>set &lt;name&gt; ct &lt;integer&gt;</code>
                 <br/>setzt die Farbtemperatur auf einen Wert 3000...6500 K</li>
             </ul>
+            
+        <br/>For Shelly Plugs Gen2+ devices (model=shellyplusplug)
+        <ul>
+            <li>
+                <a id="Shelly-set-colorOn"></a>
+                <a id="Shelly-set-colorOff"></a>
+                <code>set &lt;name&gt; colorOn|colorOff &lt;Rot&gt;,&lt;Grün&gt;,&lt;Blau&gt; [&lt;Helligkeit&gt;]</code>
+                
+                <br />Einstellen der Farbe des Leuchtrings. 
+                <br />Rot, Grün, Blau und Helligkeit: Werte 0...100</li>
+        </ul>
 
             <br/> Für Shellies Gen2:
             <ul>
