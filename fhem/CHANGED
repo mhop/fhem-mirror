@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 98_weekprofile: attribute extraClientModules
+            to support further modules with attribute weekprofile
  - feature: 76_SolarForecast: graphicControl  keys beamPaddingBottom/Top
  - fix/new: 36_Shelly: log fw-check, model of Shelly3EM, PLUGS_UI implemented
  - fix/new: 36_Shelly: log fw-check, model of Shelly3EM, PLUGS_UI implemented
