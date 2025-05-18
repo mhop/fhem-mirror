@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.4" => "18.05.2025  commandref edited, setupInverterDevXX: change pv to pvOut, new key pvIn ",
   "1.52.3" => "17.05.2025  _transferInverterValues: new property itype, graphicControl: new keys beamPaddingBottom, beamPaddingTop ".
                            " setter attrKeyVal has dorp down list of all composite attributes ",
   "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ".
@@ -6931,7 +6932,8 @@ sub _attrInverterDev {                   ## no critic "not used"
   my $in   = (split 'setupInverterDev', $aName)[1];
   
   my $valid = {
-      pv        => { comp => '.*:(W|kW)',     act => 0 },
+      pvIn      => { comp => '.*:(W|kW)',     act => 0 },
+      pvOut     => { comp => '.*:(W|kW)',     act => 0 },
       ac2dc     => { comp => '.*:(W|kW)',     act => 0 },
 	  dc2ac     => { comp => '.*:(W|kW)',     act => 0 },
       etotal    => { comp => '.*:(Wh|kWh)',   act => 0 },
@@ -7007,8 +7009,8 @@ sub _attrInverterDev {                   ## no critic "not used"
 			  return qq{A battery inverter requires a set key 'dc2ac'. Please consider the commandref.};
 		  }
 		  
-		  if ($h->{pv}) {
-			  return qq{A battery inverter without associated solar cells don't need the key 'pv'. Please delete this key.};
+		  if ($h->{pvOut}) {
+			  return qq{A battery inverter without associated solar cells don't need the key 'pvOut'. Please delete this key.};
 		  }
 		  
 		  if ($h->{etotal}) {
@@ -7026,8 +7028,8 @@ sub _attrInverterDev {                   ## no critic "not used"
 		  }
       }
 
-      if ((!$none && !$h->{pv}) || (!$none && !$h->{etotal}) || !$h->{capacity}) { 
-          return qq{One or more of the keys 'pv, etotal, capacity' are missing. Please consider the commandref.};
+      if ((!$none && !$h->{pvOut}) || (!$none && !$h->{etotal}) || !$h->{capacity}) { 
+          return qq{One or more of the keys 'pvOut, etotal, capacity' are missing. Please consider the commandref.};
       }
 
       $data{$name}{circular}{99}{attrInvChangedTs} = int time;  
@@ -8702,13 +8704,28 @@ sub centralTask {
 	  }
   }
   
-    for my $in (1..MAXINVERTER) {                                      # 08.05.
-        $in    = sprintf "%02d", $in;
-        my ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
-        next if($err);		
+  for my $in (1..MAXINVERTER) {                                     
+      $in    = sprintf "%02d", $in;
+      my ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
+      next if($err);		
 		
-        delete $data{$name}{inverters}{$in}{ireverse};
-    }
+      delete $data{$name}{inverters}{$in}{ireverse};                      # 08.05.
+      delete $data{$name}{inverters}{$in}{igeneration};                   # 19.05.
+        
+      my $sidv = AttrVal ($name, "setupInverterDev${in}", '');            # 19.05.
+      if ($sidv =~ /pv=/xs) {
+          my ($a, $h) = parseParams ($sidv);                    
+          my $new = $a->[0];
+          
+          while (my($key, $value) = each (%$h)) {
+              if ($key eq 'pv') {
+                  $key = 'pvOut';
+              }
+              $new .= ' '.$key.'='.$value;
+          }
+          CommandAttr (undef, "$name setupInverterDev$in $new");
+      }
+  }
   
   if (CurrentVal ($hash, 'consumerCollected', 0)) {
       for my $c (1..MAXCONSUMER) {                                # 19.04.2025
@@ -9887,7 +9904,8 @@ sub _transferInverterValues {
 
       my $pac2dc = 0;
 	  my $pdc2ac = 0;
-	  my $pgen   = 0;
+      my $pvin   = 0;
+	  my $pvout  = 0;
 	  my $etotal = 0;
       my $source = 'pv';
 	  
@@ -9924,24 +9942,29 @@ sub _transferInverterValues {
 	  }
       
 	  if ($source eq 'pv') {
-		  my ($edread, $etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
-		  my $etuf              = $etunit =~ /^kWh$/xi ? 1000 : 1;
-		  $etotal               = ReadingsNum ($indev, $edread, 0) * $etuf;                            # Erzeugung total (Wh)
+		  my ($edread, $etunit)   = split ":", $h->{etotal};                                           # Readingname/Unit für Energie total (PV Erzeugung)
+		  my $etuf                = $etunit =~ /^kWh$/xi ? 1000 : 1;
+		  $etotal                 = ReadingsNum ($indev, $edread, 0) * $etuf;                          # Erzeugung total (Wh)
      
-          my ($pvread, $pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
-          my $pvuf              = $pvunit =~ /^kW$/xi ? 1000 : 1;
-          $pgen                 = ReadingsNum ($indev, $pvread, 0) * $pvuf;                            # aktuelle Erzeugung (W)
-          $pgen                 = $pgen <= 0 ? 0 : sprintf "%.0f", $pgen;                              # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
+          my ($pvoread, $pvounit) = split ":", $h->{pvOut};                                            # Readingname/Unit für aktuelle Leistung aus PV-Erzeugung
+          my $pvouf               = $pvounit =~ /^kW$/xi ? 1000 : 1;
+          $pvout                  = ReadingsNum ($indev, $pvoread, 0) * $pvouf;                        
+          $pvout                  = $pvout <= 0 ? 0 : sprintf "%.0f", $pvout;                          # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
+
+          my ($pviread, $pviunit) = split ":", $h->{pvIn};                                             # Readingname/Unit für PV-DC-Eingangsleistung
+          my $pviuf               = $pviunit =~ /^kW$/xi ? 1000 : 1;
+          $pvin                   = ReadingsNum ($indev, $pviread, 0) * $pviuf;                        
+          $pvin                   = $pvin <= 0 ? 0 : sprintf "%.0f", $pvin;                          
       }
       
-      my $histetot = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), 'etotali'.$in, 0);              # etotal zu Beginn einer Stunde                                                        
+      my $histetot = HistoryVal ($name, $day, sprintf("%02d",$nhour), 'etotali'.$in, 0);               # etotal zu Beginn einer Stunde                                                        
     
       my ($ethishour, $etotsvd);
 
       if (!$histetot) {                                                                                # etotal der aktuelle Stunde gesetzt ?
           writeToHistory ( { paref => $paref, key => 'etotali'.$in, val => $etotal, hour => $nhour } );
 
-          $etotsvd   = InverterVal ($hash, $in, 'ietotal', $etotal);
+          $etotsvd   = InverterVal ($name, $in, 'ietotal', $etotal);
           $ethishour = int ($etotal - $etotsvd);
       }
       else {
@@ -9953,7 +9976,7 @@ sub _transferInverterValues {
 
               writeToHistory ( { paref => $paref, key => 'etotali'.$in, val => $etotal, hour => $nhour } );
 
-              $etotsvd   = InverterVal ($hash, $in, 'ietotal', $etotal);
+              $etotsvd   = InverterVal ($name, $in, 'ietotal', $etotal);
               $ethishour = int ($etotal - $etotsvd);
           }
       }
@@ -9972,7 +9995,8 @@ sub _transferInverterValues {
           $warn = ' (WARNING invalid real PV occured - see Logfile)';
       }
 
-      $data{$name}{inverters}{$in}{igeneration} = $pgen;                                         # aktuell erzeugte PV-Leistung, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      $data{$name}{inverters}{$in}{ipvin}       = $pvin;                                         # aktuelle DC PV-Eingangsleistung
+      $data{$name}{inverters}{$in}{ipvout}      = $pvout;                                        # aktuelle Leistung aus PV-Erzeugung, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
       $data{$name}{inverters}{$in}{ipac2dc}     = $pac2dc;                                       # aktuelle Leistung AC->DC
       $data{$name}{inverters}{$in}{ipdc2ac}     = $pdc2ac;	                                     # aktuelle Leistung DC->AC
       $data{$name}{inverters}{$in}{ietotal}     = $etotal;                                       # aktuellen etotal des WR speichern
@@ -9987,13 +10011,13 @@ sub _transferInverterValues {
       $data{$name}{inverters}{$in}{ifeed}       = $feed;                                         # Eigenschaften der Energielieferung
       $data{$name}{inverters}{$in}{isource}     = $source;                                       # Eigenschaften des Energiebezugs, normal pv
 
-      $pvsum        += $pgen if($source eq 'pv');
+      $pvsum        += $pvout if($source eq 'pv');
       $ethishoursum += $ethishour;
 
       writeToHistory ( { paref => $paref, key => 'pvrl'.$in, val => $ethishour, hour => $nhour } );
 
       debugLog ($paref, "collectData", "collect Inverter $in data - device: $indev, source: $source, delivery: $feed =>");
-      debugLog ($paref, "collectData", "pv: $pgen W, AC->DC: $pac2dc W, DC->AC: $pdc2ac W, etotal: $etotal Wh");
+      debugLog ($paref, "collectData", "pv: $pvout W, AC->DC: $pac2dc W, DC->AC: $pdc2ac W, etotal: $etotal Wh");
   }
 
   storeReading ('Current_PV', $pvsum.' W');
@@ -11609,12 +11633,12 @@ sub _createSummaries {
       my ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
       next if($err);
       
-      my $pgen     = InverterVal ($name, $in, 'igeneration',   0);
+      my $pvout    = InverterVal ($name, $in, 'ipvout',        0);
       my $ifeed    = InverterVal ($name, $in, 'ifeed', 'default');
       my $isource  = InverterVal ($name, $in, 'isource',    'pv');
 	  my $pac2dc   = InverterVal ($name, $in, 'ipac2dc',       0);                                      # Rückwandlung AC->DC (Batterie-Wechselrichter)
-      $pv2node    += $pgen   if($ifeed ne 'grid' && $isource eq 'pv');                                  # nur PV Erzeugung berücksichtigen
-      $pv2grid    += $pgen   if($ifeed eq 'grid' && $isource eq 'pv');                                  # nur PV Erzeugung mit Ziel 'Grid'                             
+      $pv2node    += $pvout  if($ifeed ne 'grid' && $isource eq 'pv');                                  # nur PV Erzeugung berücksichtigen
+      $pv2grid    += $pvout  if($ifeed eq 'grid' && $isource eq 'pv');                                  # nur PV Erzeugung mit Ziel 'Grid'                             
   }
 
   my $othprod = 0;                                                                                      # Summe Otherproducer
@@ -17125,6 +17149,7 @@ sub _flowGraphic {
       $pdcr->{$lfn}{source}    = 'other';                                      # Art der Energiequelle 
       $pdcr->{$lfn}{generator} = 'none';                                       # Angaben zum Generator
       $pdcr->{$lfn}{ptyp}      = 'producer';                                   # Typ des Producers
+      $pdcr->{$lfn}{psubtyp}   = 'none';                                       # Subtyp des Producers
 	  $ppall                  += $pgen;                                        # aktuelle Erzeuguung aller nicht PV-Producer
 
 	  $lfn++;
@@ -17135,27 +17160,26 @@ sub _flowGraphic {
       ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
       next if($err);
 	  
-      my $pgen     = InverterVal ($name, $in, 'igeneration',        0);                    # Erzeugung aus PV
-	  my $pdc2ac   = InverterVal ($name, $in, 'ipdc2ac',            0);                    # Wandlung DC->AC (Batterie-Wechselrichter)
-	  my $pac2dc   = InverterVal ($name, $in, 'ipac2dc',            0);                    # Rückwandlung AC->DC (Batterie-Wechselrichter)
-      my $feed     = InverterVal ($name, $in, 'ifeed',      'default');
-      my $isource  = InverterVal ($name, $in, 'isource',         'pv');
-      my $istrings = InverterVal ($name, $in, 'istrings',          '');
+      my $pvin     = __normDecPlaces (InverterVal ($name, $in, 'ipvin',   0));                    # DC PV-Eingangsleistung (Summe aller zugeordnete Strings)
+      my $pvout    = __normDecPlaces (InverterVal ($name, $in, 'ipvout',  0));                    # Erzeugung aus PV
+	  my $pdc2ac   = __normDecPlaces (InverterVal ($name, $in, 'ipdc2ac', 0));                    # Wandlung DC->AC (Batterie-Wechselrichter)
+	  my $pac2dc   = __normDecPlaces (InverterVal ($name, $in, 'ipac2dc', 0));                    # Rückwandlung AC->DC (Batterie-Wechselrichter)
+      my $feed     = InverterVal ($name, $in, 'ifeed',   'default');
+      my $isource  = InverterVal ($name, $in, 'isource',      'pv');                      
 
-	  $pgen                    = __normDecPlaces ($pgen);
-	  $pdc2ac                  = __normDecPlaces ($pdc2ac);
-	  $pac2dc                  = __normDecPlaces ($pac2dc);
 	  $pdcr->{$lfn}{pn}        = $in;                                                                         # Inverternummer
 	  $pdcr->{$lfn}{feed}      = $feed;                                                                       # Eigenschaft der Energielieferung
 	  $pdcr->{$lfn}{source}    = $isource;                                                                    # Art der Energiequelle
-	  $pdcr->{$lfn}{generator} = $istrings;                                                                   # Angaben zum Generator (Namen der Strings)
+	  $pdcr->{$lfn}{generator} = InverterVal ($name, $in, 'istrings', 'none');                                # Angaben zum Generator (Namen der Strings)
       $pdcr->{$lfn}{ptyp}      = 'inverter';                                                                  # Typ des Producers
-	  $pdcr->{$lfn}{pgen}      = $pgen;                                                                       # aktuelle PV Erzeugungsleistung
+	  $pdcr->{$lfn}{psubtyp}   = InverterVal ($name, $in, 'itype', '');                                       # SubTyp des Inverters
+      $pdcr->{$lfn}{pvin}      = $pvin;                                                                       # aktuelle DC PV-Erzeugungsleistung
+      $pdcr->{$lfn}{pgen}      = $pvout;                                                                      # aktuelleLeistung aus PV-Erzeugung
 	  $pdcr->{$lfn}{pdc2ac}    = $pdc2ac;                                                                     # aktuelle Leistung DC->AC
 	  $pdcr->{$lfn}{pac2dc}    = $pac2dc;                                                                     # aktuelle Leistung AC->DC
-	  $pv2node                += $pgen   if($feed eq 'default' && $isource eq 'pv');                          # PV-Erzeugung Inverter für das Hausnetz
-	  $pv2grid                += $pgen   if($feed eq 'grid'    && $isource eq 'pv');                          # PV nur für das öffentliche Netz
-	  $pv2bat                 += $pgen   if($feed eq 'bat'     && $isource eq 'pv');                          # Direktladen PV nur in die Batterie
+	  $pv2node                += $pvout  if($feed eq 'default' && $isource eq 'pv');                          # PV-Erzeugung Inverter für das Hausnetz
+	  $pv2grid                += $pvout  if($feed eq 'grid'    && $isource eq 'pv');                          # PV nur für das öffentliche Netz
+	  $pv2bat                 += $pvout  if($feed eq 'bat'     && $isource eq 'pv');                          # Direktladen PV nur in die Batterie
 	  $dc2inv2node            += $pdc2ac if($feed eq 'hybrid' || ($feed eq 'default' && $isource eq 'bat'));  # DC->AC / Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
 	  $node2inv2dc            += $pac2dc if($feed eq 'hybrid' || ($feed eq 'default' && $isource eq 'bat'));  # AC->DC (Batterie- oder Hybrid-Wechselrichter)
 
@@ -17497,10 +17521,10 @@ END3
               
               my $ystart          = $pdcr->{$lfn}{ysgenerator}; 
               $ystart             = $showproducers ? $ystart - PRDCRROWSHIFT + 15 : $ystart + PRDCRROWSHIFT - 20;   # Unterscheidung wenn ProducerZeile angezeigt werden soll
-              my $pgen            = $pdcr->{$lfn}{pgen};
+              my $genpow          = __getGeneratorPower ( { pdcr => $pdcr, lfn => $lfn } );                         # aktuelle Generatorleistung
               my $chain_color     = '';                                                          
-              my $generator_style = $pgen > 0 ? "$stna active_normal" : "$stna inactive";
-              my $xcstart         = ($xchain * 2) - 30;                                          # X-Lage Korrektur der Laufkette zur Mitte des Icons 
+              my $generator_style = $genpow > 0 ? "$stna active_normal" : "$stna inactive";
+              my $xcstart         = ($xchain * 2) - 30;                                                             # X-Lage Korrektur der Laufkette zur Mitte des Icons 
               my $yend            = $ystart  + 120;
               
               $ret .= qq{<path id="geninput_${pn}_$stna" class="$generator_style" $chain_color d=" M$xcstart,$ystart L$xcstart,$yend" />};                 
@@ -17622,21 +17646,21 @@ END3
   ## Text nur anzeigen wenn die Generator-Zeile angezeigt werden soll
   #####################################################################
   if ($showgenerators) {      
-      for my $st (sort keys %{$psorted}) {                                 # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln 
+      for my $st (sort keys %{$psorted}) {                                                                # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln 
           my @sorted;
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
           
           for my $lfn (@sorted) {
               my $pn    = $pdcr->{$lfn}{pn};              
-              my $xtext = $pdcr->{$lfn}{xsgenerator};                      # Übernahme aus __addInputProducerIcon
+              my $xtext = $pdcr->{$lfn}{xsgenerator};                                                     # Übernahme aus __addInputProducerIcon
               next if(!$xtext);
               
-              $xtext    = $xtext * 2 - 80;                                 # Korrektur Start X-Koordinate des Textes 
+              $xtext    = $xtext * 2 - 80;                                                                # Korrektur Start X-Koordinate des Textes 
               my $ytext = $pdcr->{$lfn}{ysgenerator}; 
-              $ytext    = $showproducers ? $ytext - PRDCRROWSHIFT + 5 : $ytext + PRDCRROWSHIFT - 30;     # Unterscheidung wenn ProducerZeile angezeigt werden soll
+              $ytext    = $showproducers ? $ytext - PRDCRROWSHIFT + 5 : $ytext + PRDCRROWSHIFT - 30;      # Unterscheidung wenn ProducerZeile angezeigt werden soll
               
-              my $pval1 = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );                         # aktuelle Generatorleistung
-              my $lpv1  = length $pval1;
+              my $genpow = __getGeneratorPower ( { pdcr => $pdcr, lfn => $lfn } );                        # aktuelle Generatorleistung
+              my $lpv1   = length $genpow;
                   
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
               #################################################################################
@@ -17646,7 +17670,7 @@ END3
               elsif ($lpv1 == 2) {$xtext += 10}
               elsif ($lpv1 == 1) {$xtext += 30}             
               
-              $ret .= qq{<text class="$stna text" id="generatortxt_${pn}_$stna" x="$xtext" y="$ytext">$pval1</text>};
+              $ret .= qq{<text class="$stna text" id="generatortxt_${pn}_$stna" x="$xtext" y="$ytext">$genpow</text>};
           }
       }
   }
@@ -17655,18 +17679,18 @@ END3
   ## Textangabe nur anzeigen wenn Producerzeile angezeigt werden soll
   ###########################################################################################
   if ($showproducers) {      
-      for my $st (sort keys %{$psorted}) {                                 # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
+      for my $st (sort keys %{$psorted}) {                                                  # jedes Mitglied @sorted des Gruppenarray ('1togrid', '2tonode', '3tobat') behandeln
           my @sorted;
           @sorted = @{$psorted->{$st}{sorted}} if(defined $psorted->{$st}{sorted});
           
           for my $lfn (@sorted) {
               my $pn    = $pdcr->{$lfn}{pn};     
-              my $xtext = $pdcr->{$lfn}{xsproducer};                       # Übernahme aus __addInputProducerIcon
+              my $xtext = $pdcr->{$lfn}{xsproducer};                                        # Übernahme aus __addInputProducerIcon
               next if(!$xtext);
               
-              $xtext    = $xtext * 2 - 70;                                 # Korrektur Start X-Koordinate des Textes               
-			  my $pval1 = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );		
-			  my $lpv1  = length $pval1;
+              $xtext     = $xtext * 2 - 70;                                                 # Korrektur Start X-Koordinate des Textes               
+			  my $pdrpow = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );		
+			  my $lpv1   = length $pdrpow;
 
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
               ###############################################################################
@@ -17676,7 +17700,7 @@ END3
               elsif ($lpv1 == 2) {$xtext += 10}
               elsif ($lpv1 == 1) {$xtext += 30}   
 
-              $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$xtext" y="100">$pval1</text>} if($flowgPrdsPower);
+              $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$xtext" y="100">$pdrpow</text>} if($flowgPrdsPower);
           }
       }
   }
@@ -17732,6 +17756,25 @@ return $ret;
 }
 
 ################################################################
+#      die anzuzeigende Generatorenleistung
+################################################################
+sub __getGeneratorPower {
+  my $paref = shift;
+  my $pdcr  = $paref->{pdcr};
+  my $lfn   = $paref->{lfn};
+
+  my $pvin    = $pdcr->{$lfn}{pvin};
+  my $ptyp    = $pdcr->{$lfn}{ptyp};                       # Producertyp
+  my $psubtyp = $pdcr->{$lfn}{psubtyp};                    # Subtyp des Inverters 
+ 
+  my $genpow  = $ptyp eq 'inverter' && $psubtyp eq 'StandardInverter' ? $pvin :      
+                $ptyp eq 'inverter' && $psubtyp eq 'SolarCharger'     ? $pvin :                           
+                0;
+                            
+return $genpow;
+}    
+
+################################################################
 #    die anzuzeigende Producer / Inverter Leistung liefern
 ################################################################
 sub __getProducerPower {
@@ -17746,13 +17789,13 @@ sub __getProducerPower {
   my $source = $pdcr->{$lfn}{source};
   my $ptyp   = $pdcr->{$lfn}{ptyp}; 
  
-  my $pval1  = ($source eq 'pv'  && $feed eq 'default') || $ptyp eq 'producer' ? $pgen   :   # Otherproducer oder Standard-Wechselrichter
-                $source eq 'pv'  && $feed eq 'bat'                             ? $pgen   :   # Solar-Ladegerät
-                $source eq 'bat' && $feed eq 'default' && $pac2dc              ? $pac2dc :   # Batterie-Wechselrichter                                          
-                $source eq 'bat' && $feed eq 'default' && $pdc2ac              ? $pdc2ac :   # Batterie-Wechselrichter
-                0;
+  my $pdrpow  = ($source eq 'pv'  && $feed eq 'default') || $ptyp eq 'producer' ? $pgen   :   # Otherproducer oder Standard-Wechselrichter
+                 $source eq 'pv'  && $feed eq 'bat'                             ? $pgen   :   # Solar-Ladegerät
+                 $source eq 'bat' && $feed eq 'default' && $pac2dc              ? $pac2dc :   # Batterie-Wechselrichter                                          
+                 $source eq 'bat' && $feed eq 'default' && $pdc2ac              ? $pdc2ac :   # Batterie-Wechselrichter
+                 0;
                             
-return $pval1;
+return $pdrpow;
 }
 
 ################################################################
@@ -17839,9 +17882,10 @@ sub __addInputProducerIcon {
           my $pn        = $pdcr->{$lfn}{pn};
           my $ptyp      = $pdcr->{$lfn}{ptyp};
           my $generator = $pdcr->{$lfn}{generator};                                        # Angaben zum Generator (Namen der Strings)
-          my $pval      = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );           # aktuelle Generatorleistung
+          my $pdrpow    = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );           # aktuelle Producerleistung
          
           if ($showgenerators) {                                                           # Anzeige Input-Reihe
+              my $genpow = __getGeneratorPower ( { pdcr => $pdcr, lfn => $lfn } );         # aktuelle Generatorleistung
               my $ystart = $y_coord;
               $ystart   -= INPUTROWSHIFT;
 
@@ -17855,7 +17899,7 @@ sub __addInputProducerIcon {
                                                                     pn    => $pn,
                                                                     ptyp  => 'generator',
                                                                     don   => $don,         # Tag oder Nacht
-                                                                    pcurr => $pval,
+                                                                    pcurr => $genpow,
                                                                     lang  => $lang
                                                                   }
                                                                 );
@@ -17874,7 +17918,7 @@ sub __addInputProducerIcon {
                                                     pn    => $pn,
                                                     ptyp  => $ptyp,
                                                     don   => $don,          # Tag oder Nacht
-                                                    pcurr => $pval,
+                                                    pcurr => $pdrpow,
                                                     lang  => $lang
                                                   }
                                                 );
@@ -23922,7 +23966,7 @@ return $def;
 #
 # $in:  Inverter Nummer (01,02,03,...)
 # $key: ietotal            - Stand etotal des WR
-#       igeneration        - aktuelle PV-Leistung
+#       ipvout             - aktuelle Leistung an Netz oder Batterie aus PV Erzeugung
 #       invertercap        - Bemessungsleistung der Wechselrichters (max. W)
 #       iname              - Name des Inverterdevices
 #       iicon              - Icon des Inverters
@@ -25087,7 +25131,8 @@ to ensure that the system configuration is correct.
 			<tr><td> <b>iasynchron </b>     </td><td>Mode of processing received inverter events                           </td></tr>
             <tr><td> <b>ietotal </b>        </td><td>total energy generated by the inverter to date (Wh)                   </td></tr>
             <tr><td> <b>ifeed </b>          </td><td>Energy supply characteristics                                         </td></tr>
-            <tr><td> <b>igeneration </b>    </td><td>Current PV power in W                                                 </td></tr>
+            <tr><td> <b>ipvin </b>          </td><td>current DC PV input power in W (sum of all connected strings)         </td></tr>
+            <tr><td> <b>ipvout </b>         </td><td>current PV power from PV generation in W                              </td></tr>
             <tr><td> <b>iicon </b>          </td><td>any icons defined for displaying the device in the graphic            </td></tr>
             <tr><td> <b>ilimit </b>         </td><td>set power limitation in % (e.g. by 70% rule)                          </td></tr>	
             <tr><td> <b>iname </b>          </td><td>Name of the device                                                    </td></tr>
@@ -26201,11 +26246,11 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
-       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Unit&gt; ac2dc=&lt;Readingname&gt;:&lt;Unit&gt; dc2ac=&lt;Readingname&gt;:&lt;Unit&gt; <br>
-                                 etotal=&lt;Readingname&gt;:&lt;Unit&gt; capacity=&lt;max. inverter power&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt]  <br> 
+       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pvOut=&lt;Reading&gt;:&lt;Unit&gt; ac2dc=&lt;Reading&gt;:&lt;Unit&gt; dc2ac=&lt;Reading&gt;:&lt;Unit&gt;             <br>
+                                 etotal=&lt;Reading&gt;:&lt;Unit&gt; capacity=&lt;max. inverter power&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt]  <br> 
                                  [feed=&lt;Delivery type&gt;] [limit=&lt;0..100&gt;] [icon=&lt;active&gt;[@&lt;Color&gt;][:&lt;inactive&gt;[@&lt;Color&gt;]]] </b> <br><br>
 
-       Defines any inverter device or solar charger and its readings to supply the current PV generation values. <br>
+       Specifies any inverter device or solar charger and its readings to provide the required information. <br>
        This can also be a dummy device with corresponding readings. <br>
        Various operating modes of the inverter can be activated:
        <br><br>
@@ -26229,50 +26274,72 @@ to ensure that the system configuration is correct.
        </ul>
        <br>
        
-       The following &lt;Key=Value&gt; pairs define the properties of the inverter. The requirement may depend on the activated mode 
-       of operation of the device.
+       The following &lt;Key=Value&gt; pairs define the properties of the inverter. <br>
+       Keys that depend on the activated inverter type are assigned to the corresponding inverter type below.
        <br><br> 
 
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>         </td><td>A reading that provides the current power from PV generation that is supplied to the domestic or pblic grid.     </td></tr>
-           <tr><td>                   </td><td>A positive numerical value is expected.                                                                          </td></tr>
-           <tr><td>                   </td><td>When activated as a battery inverter without solar cells, this key cannot be set.                                </td></tr>
-           <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>ac2dc</b>      </td><td>A reading that indicates the current AC->DC power (house network to battery) as a positive value.                </td></tr>
-           <tr><td>                   </td><td>The key can <b>only be set for battery inverters</b>.                                                            </td></tr>
-           <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>etotal</b>     </td><td>The Reading which provides the total PV energy generated (a steadily increasing counter).                        </td></tr>
-           <tr><td>                   </td><td>If the reading violates the specification of a continuously rising counter,                                      </td></tr>
-           <tr><td>                   </td><td>SolarForecast handles this error and reports the situation by means of a log message.                            </td></tr>
-           <tr><td>                   </td><td>The key cannot be set for <b>battery inverters without solar cells</b>.                                          </td></tr>
-           <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>Einheit</b>    </td><td>the respective unit (W,kW,Wh,kWh)                                                                                </td></tr>
-           <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>capacity</b>   </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                          </td></tr>
-           <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>strings</b>    </td><td>Comma-separated list of the strings assigned to the inverter (optional). The string names                        </td></tr>
-           <tr><td>                   </td><td>are defined in the <a href=“#SolarForecast-attr-setupInverterStrings”>setupInverterStrings</a> attribute.        </td></tr>
-           <tr><td>                   </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                            </td></tr>
-           <tr><td>                   </td><td>With ‘<b>strings=none</b>’, no strings are assigned to the inverter and it is assumed that                       </td></tr>
-           <tr><td>                   </td><td>this inverter is powered by an existing battery instead of PV modeules (battery inverter).                       </td></tr>
-           <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>feed</b>       </td><td>Defines special properties of the device's energy supply (optional).                                             </td></tr>
-           <tr><td>                   </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                                  </td></tr>
-           <tr><td>                   </td><td><b>bat</b> - the solar charger type is activated. Any surplus is fed to the inverter node/house grid.            </td></tr>
-           <tr><td>                   </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                                 </td></tr>
-           <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>limit</b>      </td><td>Defines any active power limitation in % (optional).                                                             </td></tr>
-           <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>icon</b>       </td><td>Icon for displaying the inverter in the flow chart (optional), otherwise standards are used.                     </td></tr>
-           <tr><td>                   </td><td><b>&lt;active&gt;</b> - Icon and, if applicable, color for activity or PV generation                             </td></tr>
-           <tr><td>                   </td><td><b>&lt;inactive&gt;</b> - Icon and possibly color for inactivity                                                 </td></tr>
-           <tr><td>                   </td><td>                                                                                                                 </td></tr>
-           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the plantControl->cycleInterval setting (synchronous) or additionally by       </td></tr>
-           <tr><td>                   </td><td>event processing (asynchronous). (optional)                                                                      </td></tr>
-           <tr><td>                   </td><td><b>0</b> - no data collection after receiving an event from the device (default)                                 </td></tr>
-           <tr><td>                   </td><td><b>1</b> - trigger a data collection when an event is received from the device                                   </td></tr>
+           <tr><td> <b>strings</b>    </td><td>Comma-separated list of the strings assigned to the inverter (optional). The string names                                   </td></tr>
+           <tr><td>                   </td><td>are defined in the <a href=“#SolarForecast-attr-setupInverterStrings”>setupInverterStrings</a> attribute.                   </td></tr>
+           <tr><td>                   </td><td>If 'strings' is not specified, all defined string names are assigned to the inverter.                                       </td></tr>
+           <tr><td>                   </td><td>With '<b>strings=none</b>', no strings are assigned to the inverter and the inverter type                                   </td></tr>
+           <tr><td>                   </td><td><b>battery inverter is activated</b>.                                                                                       </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>feed</b>       </td><td>Defines special properties of the device's energy supply (optional).                                                        </td></tr>
+           <tr><td>                   </td><td>If the key is not set, the device feeds the PV energy into the house's AC grid.                                             </td></tr>
+           <tr><td>                   </td><td><b>bat</b> - the <b>solar charger type is activated</b>. Any surplus is fed to the inverter node/house grid.                </td></tr>
+           <tr><td>                   </td><td><b>grid</b> - the energy is fed exclusively into the public grid                                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>capacity</b>   </td><td>Rated power of the inverter according to data sheet, i.e. max. possible output in Watts                                     </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>limit</b>      </td><td>Defines any active power limitation in % (optional).                                                                        </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>icon</b>       </td><td>Icon for displaying the inverter in the flow chart (optional), otherwise standards are used.                                </td></tr>
+           <tr><td>                   </td><td><b>&lt;active&gt;</b> - Icon and, if applicable, color for activity or PV generation                                        </td></tr>
+           <tr><td>                   </td><td><b>&lt;inactive&gt;</b> - Icon and possibly color for inactivity                                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Data collection mode according to the plantControl->cycleInterval setting (synchronous) or additionally by                  </td></tr>
+           <tr><td>                   </td><td>event processing (asynchronous). (optional)                                                                                 </td></tr>
+           <tr><td>                   </td><td><b>0</b> - no data collection after receiving an event from the device (default)                                            </td></tr>
+           <tr><td>                   </td><td><b>1</b> - trigger a data collection when an event is received from the device                                              </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>Unit</b>       </td><td>the respective unit (W,kW,Wh,kWh)                                                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td>                   </td><td><b><u>PV-Inverter</u></b>                                                                                                   </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>pvIn</b>       </td><td>A reading that provides the current DC PV input power in W (sum of all connected strings).                                  </td></tr>
+           <tr><td>                   </td><td>A positive numerical value is expected.                                                                                     </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>pvOut</b>      </td><td>A reading that provides the current power from PV generation that is supplied to the domestic or pblic grid.                </td></tr>
+           <tr><td>                   </td><td>A positive numerical value is expected.                                                                                     </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>The Reading which provides the total PV energy generated (a steadily increasing counter).                                   </td></tr>
+           <tr><td>                   </td><td>If the reading violates the specification of a continuously rising counter,                                                 </td></tr>
+           <tr><td>                   </td><td>SolarForecast handles this error and reports the situation by means of a log message.                                       </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td>                   </td><td><b><u>Solar charger</u></b>                                                                                                 </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>pvIn</b>       </td><td>A reading that provides the current DC PV input power in W (sum of all connected strings).                                  </td></tr>
+           <tr><td>                   </td><td>A positive numerical value is expected.                                                                                     </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>pvOut</b>      </td><td>A reading that provides the current power from PV generation that is supplied to the battery(ies) or to a battery inverter. </td></tr>
+           <tr><td>                   </td><td>A positive numerical value is expected.                                                                                     </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>The Reading which provides the total PV energy generated (a steadily increasing counter).                                   </td></tr>
+           <tr><td>                   </td><td>If the reading violates the specification of a continuously rising counter,                                                 </td></tr>
+           <tr><td>                   </td><td>SolarForecast handles this error and reports the situation by means of a log message.                                       </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td>                   </td><td><b><u>Battery inverter</u></b>                                                                                              </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>ac2dc</b>      </td><td>A reading that indicates the current AC->DC power (house network to battery) as a positive value.                           </td></tr>
+           <tr><td>                   </td><td>The key can <b>only be set for battery inverters</b>.                                                                       </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
+           <tr><td> <b>dc2ac</b>      </td><td>A reading that indicates the current DC->AC power (battery/solar charger to the household grid) as a positive value.        </td></tr>
+           <tr><td>                   </td><td>The key can <b>only be set for battery inverters</b>.                                                                       </td></tr>
+           <tr><td>                   </td><td>                                                                                                                            </td></tr>
         </table>
        </ul>
        <br>
@@ -27668,7 +27735,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td> <b>iasynchron </b>     </td><td>Modus der Verarbeitung empfangener Inverter-Events                          </td></tr>
             <tr><td> <b>ietotal </b>        </td><td>Stand gesamte bisher erzeugte Energie des Wechselrichters (Wh)              </td></tr>
             <tr><td> <b>ifeed </b>          </td><td>Eigenschaften der Energielieferung                                          </td></tr>
-            <tr><td> <b>igeneration </b>    </td><td>aktuelle PV-Leistung in W                                                   </td></tr>
+            <tr><td> <b>ipvin </b>          </td><td>aktuelle DC PV-Eingangsleistung in W (Summe aller angeschlossenen Strings)  </td></tr>
+            <tr><td> <b>ipvout </b>         </td><td>aktuelle Leistung aus PV-Erzeugung in W                                     </td></tr>
             <tr><td> <b>iicon </b>          </td><td>die evtl. festgelegten Icons zur Darstellung des Gerätes in der Grafik      </td></tr>
 			<tr><td> <b>ilimit </b>         </td><td>eingestellte Leistungsbegrenzung in % (z.B. durch 70% Regel)                </td></tr>
             <tr><td> <b>iname </b>          </td><td>Name des Gerätes                                                            </td></tr>
@@ -28781,12 +28849,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-setupInverterDev" data-pattern="setupInverterDev.*"></a>
-       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; ac2dc=&lt;Readingname&gt;:&lt;Einheit&gt; dc2ac=&lt;Readingname&gt;:&lt;Einheit&gt; <br>
-                                 etotal=&lt;Readingname&gt;:&lt;Einheit&gt; capacity=&lt;max. WR-Leistung&gt; [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt] <br> 
-                                 [feed=&lt;Liefertyp&gt;] [limit=&lt;0..100&gt;] [icon=&lt;aktiv&gt;[@&lt;Farbe&gt;][:&lt;inaktiv&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
+       <li><b>setupInverterDevXX &lt;Inverter Device Name&gt; pvOut=&lt;Reading&gt;:&lt;Einheit&gt; [pvIn=&lt;Reading&gt;:&lt;Einheit&gt;]                                              <br>
+                                  ac2dc=&lt;Reading&gt;:&lt;Einheit&gt; dc2ac=&lt;Reading&gt;:&lt;Einheit&gt; etotal=&lt;Reading&gt;:&lt;Einheit&gt; capacity=&lt;max. WR-Leistung&gt;  <br> 
+                                 [strings=&lt;String1&gt;,&lt;String2&gt;,...] [asynchron=&lt;Option&gt] [feed=&lt;Liefertyp&gt;] [limit=&lt;0..100&gt;] [icon=&lt;aktiv&gt;[@&lt;Farbe&gt;][:&lt;inaktiv&gt;[@&lt;Farbe&gt;]]] </b> <br><br>
 
-       Legt ein beliebiges Wechselrichter-Gerät bzw. Solar-Ladegerät und dessen Readings zur Lieferung der aktuellen
-       PV Erzeugungswerte fest. <br>
+       Legt ein beliebiges Wechselrichter-Gerät bzw. Solar-Ladegerät und dessen Readings zur Lieferung der benötigten Angaben fest. <br>
        Dabei kann es sich auch um ein Dummy Gerät mit entsprechenden Readings handeln. <br>
        Es können verschiedene Arbeitsweisen des Wechselrichters aktiviert werden:
        <br><br>
@@ -28810,53 +28877,72 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </ul>
        <br>
        
-       Die nachfolgenden &lt;Schlüssel=Wert&gt; Paare legen die Eigenschaften des Wechselrichters fest. Der Bedarf kann von der aktivierten Arbeitsweise des Gerätes 
-       abhängen.
+       Die nachfolgenden &lt;Schlüssel=Wert&gt; Paare legen die Eigenschaften des Wechselrichters fest.  <br>
+       Schlüssel, die von dem aktivierten Wechselrichtertyp abhängen, werden nachfolgend dem entsprechenden Wechselrichtertyp zugeordnet.
        <br><br>     
 
        <ul>
         <table>
         <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-           <tr><td> <b>pv</b>         </td><td>Ein Reading welches die aktuelle Leistung aus PV-Erzeugung, die an das Hausnetz oder öffentliche Netz               </td></tr>
-           <tr><td>                   </td><td>geliefert wird, bereitstellt. Es wird ein ein positiver numerischer Wert erwartet.                                  </td></tr>
-           <tr><td>                   </td><td>Bei Aktivierung als Batterie-Wechselrichter ohne Solarzellen kann dieser Schlüssel nicht gesetzt werden.            </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>ac2dc</b>      </td><td>Ein Reading, das die aktuelle AC->DC-Leistung (Hausnetz zur Batterie) als positiven Wert angibt.                    </td></tr>
-           <tr><td>                   </td><td>Der Schlüssel kann <b>nur für Batterie-Wechselrichter</b> gesetzt werden.                                           </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>dc2ac</b>      </td><td>Ein Reading, das die aktuelle DC->AC-Leistung (Batterie / Solar-Ladegerät zum Hausnetz) als positiven Wert angibt.  </td></tr>
-           <tr><td>                   </td><td>Der Schlüssel kann <b>nur für Batterie-Wechselrichter</b> gesetzt werden.                                           </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>etotal</b>     </td><td>Das Reading, welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler).                     </td></tr>
-           <tr><td>                   </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                              </td></tr>
-           <tr><td>                   </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                           </td></tr>           
-           <tr><td>                   </td><td>Der Schlüssel kann für <b>Batterie-Wechselrichter ohne Solarzellen nicht</b> gesetzt werden.                        </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                 </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>capacity</b>   </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt                         </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>strings</b>    </td><td>Komma getrennte Liste der dem Wechselrichter zugeordneten Strings (optional). Die Stringnamen                       </td></tr>
-           <tr><td>                   </td><td>werden im Attribut <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a> definiert.           </td></tr>
-           <tr><td>                   </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.                   </td></tr>
-           <tr><td>                   </td><td>Mit '<b>strings=none</b>' werden keine Strings dem Wechselrichter zugeordnet und es wird davon ausgegangen, dass    </td></tr>
-           <tr><td>                   </td><td>dieser Wechselrichter von einer vorhandenen Batterie anstatt PV-Modulen gespeist wird (Batteriewechselrichter).     </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>feed</b>       </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                                      </td></tr>
-           <tr><td>                   </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.            </td></tr>
-           <tr><td>                   </td><td><b>bat</b> - der Typ Solar-Ladegerät wird aktiviert. Ein Überschuß wird dem Inverterknoten/Hausnetz zugeführt.      </td></tr>
-           <tr><td>                   </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentliche Netz eingespeist                                   </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>limit</b>      </td><td>Definiert eine eventuelle Wirkleistungsbeschränkung in % (optional).                                                </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>icon</b>       </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional), sonst werden Standards verwendet.                  </td></tr>
-           <tr><td>                   </td><td><b>&lt;aktiv&gt;</b> - Icon und ggf. Farbe bei Aktivität bzw. PV Erzeugung                                          </td></tr>
-           <tr><td>                   </td><td><b>&lt;inaktiv&gt;</b> - Icon und ggf. Farbe bei Inaktivität                                                        </td></tr>
-           <tr><td>                   </td><td>                                                                                                                    </td></tr>
-           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung plantControl->cycleInterval (synchron) oder                        </td></tr>
-           <tr><td>                   </td><td> zusätzlich durch Eventverarbeitung (asynchron). (optional)                                                         </td></tr>
-           <tr><td>                   </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                                      </td></tr>
-           <tr><td>                   </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                                        </td></tr>
+           <tr><td> <b>strings</b>    </td><td>Komma getrennte Liste der dem Wechselrichter zugeordneten Strings (optional). Die Stringnamen                             </td></tr>
+           <tr><td>                   </td><td>werden im Attribut <a href="#SolarForecast-attr-setupInverterStrings">setupInverterStrings</a> definiert.                 </td></tr>
+           <tr><td>                   </td><td>Ist 'strings' nicht angegeben, werden alle definierten Stringnamen dem Wechselrichter zugeordnet.                         </td></tr>
+           <tr><td>                   </td><td>Mit '<b>strings=none</b>' werden dem Wechselrichter keine Strings zugeordnet und der Wechselrichtertyp                    </td></tr>
+           <tr><td>                   </td><td><b>Batterie-Wechselrichter wird aktiviert</b>.                                                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>feed</b>       </td><td>Definiert spezielle Eigenschaften der Energielieferung des Gerätes (optional).                                            </td></tr>
+           <tr><td>                   </td><td>Ist der Schlüssel nicht gesetzt, speist das Gerät die PV-Energie in das Wechselstromnetz des Hauses ein.                  </td></tr>
+           <tr><td>                   </td><td><b>bat</b> - es wird ein <b>Solar-Ladegerät aktiviert</b>. Ein Überschuß wird dem Inverterknoten/Hausnetz zugeführt.      </td></tr>
+           <tr><td>                   </td><td><b>grid</b> - die Energie wird ausschließlich in das öffentliche Netz eingespeist                                         </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>capacity</b>   </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt, d.h. max. möglicher Output in Watt                               </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>limit</b>      </td><td>Definiert eine eventuelle Wirkleistungsbeschränkung in % (optional).                                                      </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>icon</b>       </td><td>Icon zur Darstellung des Inverters in der Flowgrafik (optional), sonst werden Standards verwendet.                        </td></tr>
+           <tr><td>                   </td><td><b>&lt;aktiv&gt;</b> - Icon und ggf. Farbe bei Aktivität bzw. PV Erzeugung                                                </td></tr>
+           <tr><td>                   </td><td><b>&lt;inaktiv&gt;</b> - Icon und ggf. Farbe bei Inaktivität                                                              </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>asynchron</b>  </td><td>Modus der Datensammlung entsprechend Einstellung plantControl->cycleInterval (synchron) oder                              </td></tr>
+           <tr><td>                   </td><td>zusätzlich durch Eventverarbeitung (asynchron). (optional)                                                                </td></tr>
+           <tr><td>                   </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                                            </td></tr>
+           <tr><td>                   </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                                              </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                       </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td>                   </td><td><b><u>PV-Wechselrichter</u></b>                                                                                           </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>pvIn</b>       </td><td>Ein Reading, welches die aktuelle DC PV-Eingangsleistung in W liefert (Summe aller angeschlossenen Strings).              </td></tr>
+           <tr><td>                   </td><td>Es wird ein positiver numerischer Wert erwartet.                                                                          </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>pvOut</b>      </td><td>Ein Reading, welches die aktuelle Leistung aus PV-Erzeugung, die an das Hausnetz oder öffentliche Netz                    </td></tr>
+           <tr><td>                   </td><td>geliefert wird, bereitstellt. Es wird ein positiver numerischer Wert erwartet.                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>Das Reading, welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler).                           </td></tr>
+           <tr><td>                   </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                                    </td></tr>
+           <tr><td>                   </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                                 </td></tr>           
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td>                   </td><td><b><u>Solar-Ladegerät</u></b>                                                                                             </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>pvIn</b>       </td><td>Ein Reading, welches die aktuelle DC PV-Eingangsleistung in W liefert (Summe aller angeschlossenen Strings).              </td></tr>
+           <tr><td>                   </td><td>Es wird ein positiver numerischer Wert erwartet.                                                                          </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>pvOut</b>      </td><td>Ein Reading welches die aktuelle Leistung aus PV-Erzeugung, die an die Batterie(n) bzw. an Batterie-Wechselrichter        </td></tr>
+           <tr><td>                   </td><td>geliefert wird, bereitstellt. Es wird ein positiver numerischer Wert erwartet.                                            </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>Das Reading, welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler).                           </td></tr>
+           <tr><td>                   </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                                    </td></tr>
+           <tr><td>                   </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                                 </td></tr>           
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td>                   </td><td><b><u>Batterie-Wechselrichter</u></b>                                                                                     </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>ac2dc</b>      </td><td>Ein Reading, das die aktuelle AC->DC-Leistung (Hausnetz zur Batterie) als positiven Wert angibt.                          </td></tr>
+           <tr><td>                   </td><td>Der Schlüssel kann <b>nur für Batterie-Wechselrichter</b> gesetzt werden.                                                 </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
+           <tr><td> <b>dc2ac</b>      </td><td>Ein Reading, das die aktuelle DC->AC-Leistung (Batterie / Solar-Ladegerät zum Hausnetz) als positiven Wert angibt.        </td></tr>
+           <tr><td>                   </td><td>Der Schlüssel kann <b>nur für Batterie-Wechselrichter</b> gesetzt werden.                                                 </td></tr>
+           <tr><td>                   </td><td>                                                                                                                          </td></tr>
          </table>
        </ul>
        <br>
