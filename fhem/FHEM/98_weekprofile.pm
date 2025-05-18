@@ -804,19 +804,19 @@ sub sort_by_name
 ############################################## 
 sub dumpData($$$) 
 {
-	require Data::Dumper;
-	
-	my ($hash,$prefix,$data) = @_;
-	
-	my $me = $hash->{NAME};	 
-	my $dmp = Dumper($data);
-	
-	$dmp =~ s/^\s+|\s+$//g; #trim whitespace both ends
-	if (AttrVal($me,"verbose",3) < 4) {
-		Log3($me, 1, "$me$prefix - set verbose to 4 to see the data");
-	} else {
-		Log3($me, 4, "$me$prefix $dmp");
-	}
+    require Data::Dumper;
+    
+    my ($hash,$prefix,$data) = @_;
+    
+    my $me = $hash->{NAME};	 
+    my $dmp = Dumper($data);
+    
+    $dmp =~ s/^\s+|\s+$//g; #trim whitespace both ends
+    if (AttrVal($me,"verbose",3) < 4) {
+    Log3($me, 1, "$me$prefix - set verbose to 4 to see the data");
+    } else {
+    Log3($me, 4, "$me$prefix $dmp");
+    }
 }
 ############################################## 
 sub weekprofile_Get($$@)
@@ -1274,17 +1274,17 @@ sub weekprofile_Set($$@)
   #----------------------------------------------------------
   $list.= " reread_master:noArg" if (defined($hash->{MASTERDEV}));
   if ($cmd eq 'reread_master') {
-	  return "Error no master device assigned" if (!defined($hash->{MASTERDEV}));
-	  my $devName = $hash->{MASTERDEV}->{NAME};
-	  Log3($me, 4, "$me(Set): reread master profile from $devName");
+      return "Error no master device assigned" if (!defined($hash->{MASTERDEV}));
+      my $devName = $hash->{MASTERDEV}->{NAME};
+      Log3($me, 4, "$me(Set): reread master profile from $devName");
       my $prfDev = weekprofile_readDevProfile($hash->{MASTERDEV}->{NAME},$hash->{MASTERDEV}->{TYPE}, $me);
       if(defined($prfDev)) {
         $hash->{PROFILES}[0]->{DATA} = $prfDev;
         weekprofile_updateReadings($hash);
         return undef;
       } else {
-		  return "Error reading master profile";
-	  }
+      return "Error reading master profile";
+      }
   }
 
   #----------------------------------------------------------  
@@ -1473,8 +1473,8 @@ sub weekprofile_writeProfilesToFile(@)
   my $me = $hash->{NAME};
   
   if (!defined($hash->{PROFILES})) {
-	  Log3($me, 4, "$me(writeProfileToFile): no profiles to save");
-	  return;
+      Log3($me, 4, "$me(writeProfileToFile): no profiles to save");
+      return;
   }
   
   my $start = (defined($hash->{MASTERDEV})) ? 1:0;
