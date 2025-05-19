@@ -14066,9 +14066,6 @@ sub __calcFcQuality {
 
   return if(!$pvfc || !$pvrl);
 
-  #$pvrl = sprintf "%.0f", $pvrl;
-  #$pvfc = sprintf "%.0f", $pvfc;
-
   my $diff = $pvfc - $pvrl;
   my $hdv  = 1 - abs ($diff / $pvrl);                                      # Abweichung der Stunde, 1 = bestmöglicher Wert
 
@@ -17359,7 +17356,7 @@ END0
       $paref->{y_coord}  = 0;
       $ret .= __addInputProducerIcon ($paref);                      # Solarzellen/Input-Zeile und Producer Icons row einfügen
 
-      $paref->{x_coord} = 360;
+      $paref->{x_coord} = 365;
       $paref->{y_coord} = 165;
       $ret .= __addNodeIcon ($paref);                               # Knoten Icon     
   }
