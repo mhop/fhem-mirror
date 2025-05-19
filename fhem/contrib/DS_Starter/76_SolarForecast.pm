@@ -161,7 +161,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.52.4" => "19.05.2025  commandref edited, setupInverterDevXX: change pv to pvOut, new key pvIn ".
-                           "fix devision by zero -Forum: https://forum.fhem.de/index.php?msg=1341884 ",
+                           "fix devision by zero -Forum: https://forum.fhem.de/index.php?msg=1341884, __calcFcQuality: minor code change ",
   "1.52.3" => "17.05.2025  _transferInverterValues: new property itype, graphicControl: new keys beamPaddingBottom, beamPaddingTop ".
                            " setter attrKeyVal has dorp down list of all composite attributes ",
   "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ".
@@ -11035,7 +11035,7 @@ sub _transferBatteryValues {
       writeToHistory ( { paref => $paref, key => 'socwhsum', val => (sprintf "%.0f", $socwhsum), hour => $nhour } );	  
 	  
       if ($bcapsum) {
-          my $soctotal = sprintf "%.0f", ($socwhsum / $bcapsum * 100);                     # resultierender SoC (%) aller Batterien als "eine"
+          my $soctotal = sprintf "%.2f", ($socwhsum / $bcapsum * 100);                     # resultierender SoC (%) aller Batterien als "eine"
           $data{$name}{current}{batsoctotal} = $soctotal;                                  
           push @{$data{$name}{current}{batsocslidereg}}, $soctotal;                        # Schieberegister average SOC aller Batterien
       }
@@ -14032,8 +14032,8 @@ sub __calcNewFactor_migrated {
   ## Qualität berechnen
   #######################
   $oldfac  = sprintf "%.2f", $oldfac;
-  $pvrl    = sprintf "%.0f", $pvrl;
-  $pvfc    = sprintf "%.0f", $pvfc;
+  #$pvrl    = sprintf "%.0f", $pvrl;
+  #$pvfc    = sprintf "%.0f", $pvfc;
   my $qual = __calcFcQuality ($pvfc, $pvrl);                                                             # Qualität der Vorhersage für die vergangene Stunde
 
   debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $hh, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
@@ -14066,8 +14066,8 @@ sub __calcFcQuality {
 
   return if(!$pvfc || !$pvrl);
 
-  $pvrl = sprintf "%.0f", $pvrl;
-  $pvfc = sprintf "%.0f", $pvfc;
+  #$pvrl = sprintf "%.0f", $pvrl;
+  #$pvfc = sprintf "%.0f", $pvfc;
 
   my $diff = $pvfc - $pvrl;
   my $hdv  = 1 - abs ($diff / $pvrl);                                      # Abweichung der Stunde, 1 = bestmöglicher Wert
@@ -17100,10 +17100,10 @@ sub _flowGraphic {
 
   ## definierte Batterien ermitteln und zusammenfassen
   ######################################################
-  my $hasbat = 1;                                                            # initial Batterie vorhanden
+  my $hasbat = 1;                                                                       # initial Batterie vorhanden
   my ($batin, $batout);
 
-  for my $bn (1..MAXBATTERIES) {                                               # für jede definierte Batterie
+  for my $bn (1..MAXBATTERIES) {                                                        # für jede definierte Batterie
       $bn    = sprintf "%02d", $bn;
       ($err) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
