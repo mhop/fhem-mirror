@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.52.4" => "18.05.2025  commandref edited, setupInverterDevXX: change pv to pvOut, new key pvIn ",
+  "1.52.4" => "19.05.2025  commandref edited, setupInverterDevXX: change pv to pvOut, new key pvIn ".
+                           "fix devision by zero -Forum: https://forum.fhem.de/index.php?msg=1341884 ",
   "1.52.3" => "17.05.2025  _transferInverterValues: new property itype, graphicControl: new keys beamPaddingBottom, beamPaddingTop ".
                            " setter attrKeyVal has dorp down list of all composite attributes ",
   "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ".
@@ -9951,10 +9952,12 @@ sub _transferInverterValues {
           $pvout                  = ReadingsNum ($indev, $pvoread, 0) * $pvouf;                        
           $pvout                  = $pvout <= 0 ? 0 : sprintf "%.0f", $pvout;                          # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
 
-          my ($pviread, $pviunit) = split ":", $h->{pvIn};                                             # Readingname/Unit für PV-DC-Eingangsleistung
-          my $pviuf               = $pviunit =~ /^kW$/xi ? 1000 : 1;
-          $pvin                   = ReadingsNum ($indev, $pviread, 0) * $pviuf;                        
-          $pvin                   = $pvin <= 0 ? 0 : sprintf "%.0f", $pvin;                          
+          if (defined $h->{pvIn}) {                                                                    # ist optional
+              my ($pviread, $pviunit) = split ":", $h->{pvIn};                                         # Readingname/Unit für PV-DC-Eingangsleistung
+              my $pviuf               = $pviunit =~ /^kW$/xi ? 1000 : 1;
+              $pvin                   = ReadingsNum ($indev, $pviread, 0) * $pviuf;                        
+              $pvin                   = $pvin <= 0 ? 0 : sprintf "%.0f", $pvin; 
+          }          
       }
       
       my $histetot = HistoryVal ($name, $day, sprintf("%02d",$nhour), 'etotali'.$in, 0);               # etotal zu Beginn einer Stunde                                                        
@@ -10017,7 +10020,7 @@ sub _transferInverterValues {
       writeToHistory ( { paref => $paref, key => 'pvrl'.$in, val => $ethishour, hour => $nhour } );
 
       debugLog ($paref, "collectData", "collect Inverter $in data - device: $indev, source: $source, delivery: $feed =>");
-      debugLog ($paref, "collectData", "pv: $pvout W, AC->DC: $pac2dc W, DC->AC: $pdc2ac W, etotal: $etotal Wh");
+      debugLog ($paref, "collectData", "pvOut: $pvout W, pvIn: $pvin W, AC->DC: $pac2dc W, DC->AC: $pdc2ac W, etotal: $etotal Wh");
   }
 
   storeReading ('Current_PV', $pvsum.' W');
@@ -10837,7 +10840,7 @@ sub _transferBatteryValues {
       my $pinmax           = $h->{pinmax}  // INFINITE;                                           # max. mögliche Ladeleistung
       my $poutmax          = $h->{poutmax} // INFINITE;                                           # max. mögliche Entladeleistung 
       
-      return if(!$pin || !$pou);
+      next if(!$pin || !$pou);
 
       $pounit   //= $piunit;
       $piunit   //= $pounit;
@@ -14006,9 +14009,10 @@ sub __calcNewFactor_migrated {
   else {
      $pvrl = sprintf "%.0f", medianArray (\@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});     # neuen Median berechnen
      $pvfc = sprintf "%.0f", medianArray (\@{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}});     # neuen Median berechnen
-
+     
+     $factor = 0;
      $dnum   = scalar (@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});
-     $factor = sprintf "%.2f", ($pvrl / $pvfc);
+     $factor = sprintf "%.2f", ($pvrl / $pvfc) if($pvfc);                                                 # devision by zero Forum: https://forum.fhem.de/index.php?msg=1341884
 
      debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read stored values: PVreal median: $pvrl, PVforecast median: $pvfc, days: $dnum");
   }
@@ -17876,7 +17880,7 @@ sub __addInputProducerIcon {
       $xicon = __groupXstart ($xicon, $count, $pdist);
 
       $psorted->{$st}{start} = $xicon;                                                     # Übertrag Koordinaten
-      $xstart                = $xicon + 10;
+      $xstart                = $xicon + 15;
 
       for my $lfn (@sorted) {
           my $pn        = $pdcr->{$lfn}{pn};
