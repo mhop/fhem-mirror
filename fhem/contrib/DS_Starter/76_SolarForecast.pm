@@ -1402,7 +1402,7 @@ my %hcsr = (                                                                    
   todayConsumptionForecastDay => { fnr => 4, fn => \&HistoryVal,      par => 99,                  par1 => 'confc', unit => ' Wh',  def => '-'         },
   BatPowerIn_Sum              => { fnr => 5, fn => \&CurrentVal,      par => 'batpowerinsum',     par1 => '',      unit => ' W',   def => '-'         },
   BatPowerOut_Sum             => { fnr => 5, fn => \&CurrentVal,      par => 'batpoweroutsum',    par1 => '',      unit => ' W',   def => '-'         },
-  BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',       par1 => '',      unit => ' Wh',  def => 0           },
+  BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',       par1 => '',      unit => ' %',   def => 0           },
   SunHours_Remain             => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
   SunMinutes_Remain           => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },
   dayAfterTomorrowPVforecast  => { fnr => 5, fn => \&RadiationAPIVal, par => 'pv_estimate50',     par1 => '',      unit => '',     def => 0           },
@@ -25635,7 +25635,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>BatPowerIn_Sum</b>             </td><td>the sum of the current battery charging power of all defined battery devices                                         </td></tr>
             <tr><td> <b>BatPowerOut_Sum</b>            </td><td>the sum of the current battery discharge power of all defined battery devices                                        </td></tr>
-            <tr><td> <b>BatWeightedTotalSOC</b>        </td><td>the resulting (weighted) SOC across all installed batteries                                                          </td></tr>
+            <tr><td> <b>BatWeightedTotalSOC</b>        </td><td>the resulting (weighted) SOC across all installed batteries in %                                                     </td></tr>
 			<tr><td> <b>allStringsFullfilled</b>       </td><td>Fulfillment status of error-free generation of all strings                                                           </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Consumption forecast from current hour to the coming sunrise                                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>the current polling interval of the selected radiation data API in seconds                                           </td></tr>
@@ -28242,7 +28242,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>BatPowerIn_Sum</b>             </td><td>die Summe der momentanen Batterieladeleistung aller definierten Batterie Geräte                                 </td></tr>
             <tr><td> <b>BatPowerOut_Sum</b>            </td><td>die Summe der momentanen Batterieentladeleistung aller definierten Batterie Geräte                              </td></tr>
-			<tr><td> <b>BatWeightedTotalSOC</b>        </td><td>der resultierende (gewichtete) SOC über alle installierten Batterien                                            </td></tr>
+			<tr><td> <b>BatWeightedTotalSOC</b>        </td><td>der resultierende (gewichtete) SOC über alle installierten Batterien in %                                       </td></tr>
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Verbrauchsprognose von aktueller Stunde bis zum kommenden Sonnenaufgang                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der gewählten Strahlungsdaten-API in Sekunden                                       </td></tr>
