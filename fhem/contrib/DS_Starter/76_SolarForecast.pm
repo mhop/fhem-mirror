@@ -160,8 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.52.4" => "19.05.2025  commandref edited, setupInverterDevXX: change pv to pvOut, new key pvIn ".
-                           "fix devision by zero -Forum: https://forum.fhem.de/index.php?msg=1341884, __calcFcQuality: minor code change ",
+  "1.52.4" => "20.05.2025  commandref edited, setupInverterDevXX: change pv to pvOut, new key pvIn ".
+                           "fix devision by zero -Forum: https://forum.fhem.de/index.php?msg=1341884, __calcFcQuality: minor code change ".
+						   "ctrlSpecialReadings: new Topic BatWeightedTotalSOC ",
   "1.52.3" => "17.05.2025  _transferInverterValues: new property itype, graphicControl: new keys beamPaddingBottom, beamPaddingTop ".
                            " setter attrKeyVal has dorp down list of all composite attributes ",
   "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ".
@@ -1401,6 +1402,7 @@ my %hcsr = (                                                                    
   todayConsumptionForecastDay => { fnr => 4, fn => \&HistoryVal,      par => 99,                  par1 => 'confc', unit => ' Wh',  def => '-'         },
   BatPowerIn_Sum              => { fnr => 5, fn => \&CurrentVal,      par => 'batpowerinsum',     par1 => '',      unit => ' W',   def => '-'         },
   BatPowerOut_Sum             => { fnr => 5, fn => \&CurrentVal,      par => 'batpoweroutsum',    par1 => '',      unit => ' W',   def => '-'         },
+  BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',       par1 => '',      unit => ' Wh',  def => 0           },
   SunHours_Remain             => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
   SunMinutes_Remain           => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },
   dayAfterTomorrowPVforecast  => { fnr => 5, fn => \&RadiationAPIVal, par => 'pv_estimate50',     par1 => '',      unit => '',     def => 0           },
@@ -14007,10 +14009,8 @@ sub __calcNewFactor_migrated {
       }
   }
   else {
-     #$pvrl = sprintf "%.0f", medianArray (\@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});     # neuen Median berechnen
-     #$pvfc = sprintf "%.0f", medianArray (\@{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}});     # neuen Median berechnen
-     $pvrl = medianArray (\@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});     # neuen Median berechnen
-     $pvfc = medianArray (\@{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}});     # neuen Median berechnen
+     $pvrl = medianArray (\@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});                     # neuen Median berechnen
+     $pvfc = medianArray (\@{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}});                     # neuen Median berechnen
 
      $factor = 0;
      $dnum   = scalar (@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});
@@ -14034,8 +14034,6 @@ sub __calcNewFactor_migrated {
   ## Qualität berechnen
   #######################
   $oldfac  = sprintf "%.2f", $oldfac;
-  #$pvrl    = sprintf "%.0f", $pvrl;
-  #$pvfc    = sprintf "%.0f", $pvfc;
   my $qual = __calcFcQuality ($pvfc, $pvrl);                                                             # Qualität der Vorhersage für die vergangene Stunde
 
   debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $hh, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
@@ -17113,7 +17111,7 @@ sub _flowGraphic {
       $batout      += $batoutpow if(defined $batoutpow);
   }
 
-  my $soc = CurrentVal ($name, 'batsoctotal', 0);                                      # resultierender SoC (%) aller Batterien als Cluster
+  my $soc = __normDecPlaces (CurrentVal ($name, 'batsoctotal', 0));                     # resultierender SoC (%) aller Batterien als Cluster
 
   if (!defined $batin && !defined $batout) {
       $hasbat = 0;
@@ -25637,7 +25635,8 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>BatPowerIn_Sum</b>             </td><td>the sum of the current battery charging power of all defined battery devices                                         </td></tr>
             <tr><td> <b>BatPowerOut_Sum</b>            </td><td>the sum of the current battery discharge power of all defined battery devices                                        </td></tr>
-            <tr><td> <b>allStringsFullfilled</b>       </td><td>Fulfillment status of error-free generation of all strings                                                           </td></tr>
+            <tr><td> <b>BatWeightedTotalSOC</b>        </td><td>the resulting (weighted) SOC across all installed batteries                                                          </td></tr>
+			<tr><td> <b>allStringsFullfilled</b>       </td><td>Fulfillment status of error-free generation of all strings                                                           </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Consumption forecast from current hour to the coming sunrise                                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>the current polling interval of the selected radiation data API in seconds                                           </td></tr>
             <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>the running time (minutes) of the consumer "XX" since the last switch-on. (last running cycle)                       </td></tr>
@@ -28243,6 +28242,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
             <tr><td> <b>BatPowerIn_Sum</b>             </td><td>die Summe der momentanen Batterieladeleistung aller definierten Batterie Geräte                                 </td></tr>
             <tr><td> <b>BatPowerOut_Sum</b>            </td><td>die Summe der momentanen Batterieentladeleistung aller definierten Batterie Geräte                              </td></tr>
+			<tr><td> <b>BatWeightedTotalSOC</b>        </td><td>der resultierende (gewichtete) SOC über alle installierten Batterien                                            </td></tr>
             <tr><td> <b>allStringsFullfilled</b>       </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Verbrauchsprognose von aktueller Stunde bis zum kommenden Sonnenaufgang                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der gewählten Strahlungsdaten-API in Sekunden                                       </td></tr>
