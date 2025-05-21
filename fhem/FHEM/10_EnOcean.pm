@@ -12345,7 +12345,8 @@ sub EnOcean_Parse($$) {
         my @blockState = ('unlocked', 'locked', 'unknown', 'reserved');
         push @event, "1:blockState:" . $blockState[$blockState];
         my $reply = sprintf "%02X", 0x80 | (ReadingsVal($name, 'block', 'unlock') eq 'lock' ? 0 : 1);
-        EnOcean_SndRadio(undef, $hash, $packetType, 'D2', $reply, AttrVal($name, "subDef", "0" x 8), '00', $hash->{DEF});
+        # Unlock-Reply Message
+        EnOcean_SndRadio(undef, $hash, $packetType, 'D2', $reply, AttrVal($name, "subDef", "0" x 8), '00', $hash->{DEF}) if ($db[0] & 1);
         # forward handle position (RPS telegam)
         if (defined($handlePosition{$position}[1]) && defined(AttrVal($name, "subDefH", undef))) {
           EnOcean_SndRadio(undef, $hash, $packetType, "F6", $handlePosition{$position}[1], AttrVal($name, "subDefH", "0" x 8), '20', 'FFFFFFFF');
