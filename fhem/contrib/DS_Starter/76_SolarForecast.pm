@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.52.5" => "22.05.2025  edit commandref, _batChargeRecmd: add load management time slot, ctrlBatSocManagementXX: new key lcslot ".
+  "1.52.5" => "22.05.2025  edit commandref, _batChargeRecmd: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
                            "check attribute values for prohibited occurrence [...] Forum: https://forum.fhem.de/index.php?msg=1342147 ".
                            "_flowGraphic: bugfix chain style in case of logical on/off Forum: https://forum.fhem.de/index.php?msg=1342122 ",
   "1.52.4" => "20.05.2025  commandref edited, setupInverterDevXX: change pv to pvOut, new key pvIn ".
@@ -7440,7 +7440,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
       upSoC     => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
       maxSoC    => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
       careCycle => { comp => '\d+',                                                   must => 0, act => 0 },
-      lcslot    => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
+      lcSlot    => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -7482,7 +7482,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
 
       ## 2. Durchlauf - Endprüfung
       #############################
-	  my ($lowSoc, $upSoc, $maxsoc, $careCycle, $lcslot) = __parseAttrBatSoc ($name, $aVal);
+	  my ($lowSoc, $upSoc, $maxsoc, $careCycle, $lcSlot) = __parseAttrBatSoc ($name, $aVal);
 
 	  if (!($lowSoc > 0 && $lowSoc < $upSoc && $upSoc < $maxsoc)) {
 		  return 'The specified values are not plausible. Compare the attribute help.';
@@ -7664,7 +7664,7 @@ sub __attrKeyAction {
       }
   }
   
-  if ($akey eq 'lcslot') {
+  if ($akey eq 'lcSlot') {
 	  my $dt                = timestringsFromOffset (time, 0);
       my ($lcstart, $lcend) = split "-", $keyval;
       my $lcstartts         = timestringToTimestamp ("$dt->{date} ${lcstart}:00");
@@ -11356,7 +11356,7 @@ sub __parseAttrBatSoc {
   my ($pa,$ph)  = parseParams ($cgbt);
   my $lowSoc    = $ph->{lowSoc};
   my $upSoc     = $ph->{upSoC};
-  my $lcslot    = $ph->{lcslot};
+  my $lcslot    = $ph->{lcSlot};
   my $maxsoc    = $ph->{maxSoC}    // MAXSOCDEF;                                          # optional (default: MAXSOCDEF)
   my $careCycle = $ph->{careCycle} // CARECYCLEDEF;                                       # Ladungszyklus (Maintenance) für maxSoC in Tagen
 
@@ -25608,7 +25608,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] [lcslot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] </b> <br><br>
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] </b> <br><br>
          If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management for this
          battery device. <br>
          The <b>Battery_OptimumTargetSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
@@ -25637,7 +25637,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>careCycle</b> </td><td>Maximum interval in days that may occur between two states of charge                         </td></tr>
             <tr><td>                  </td><td>of at least 'maxSoC'. The specification is optional (default: 20)                            </td></tr>
             <tr><td>                  </td><td>                                                                                             </td></tr>
-            <tr><td> <b>lcslot</b>    </td><td>A daily time window is defined in which the charging control of the module should be active  </td></tr>
+            <tr><td> <b>lcSlot</b>    </td><td>A daily time window is defined in which the charging control of the module should be active  </td></tr>
             <tr><td>                  </td><td>for this battery. Outside the time window, the battery charge is released                    </td></tr>
             <tr><td>                  </td><td>at full power. The SoC management of the battery is not affected by this.                    </td></tr>
             <tr><td>                  </td><td>Value: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: all day                                  </td></tr>			
@@ -25649,7 +25649,7 @@ to ensure that the system configuration is correct.
          All SoC values are whole numbers in %. The following applies: 'lowSoc' &lt; 'upSoC' &lt; 'maxSoC'. <br><br>
 
          <b>Example: </b> <br>
-         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcslot=11:00-17:30 <br>
+         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 <br>
        </li>
        <br>
 
@@ -28209,7 +28209,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] [lcslot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] </b> <br><br>
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] </b> <br><br>
          Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
          SoC- und Lade-Management für dieses Batteriegerät. <br>
          Das Reading <b>Battery_OptimumTargetSoC_XX</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
@@ -28239,7 +28239,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>careCycle</b> </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'          </td></tr>
             <tr><td>                  </td><td>auftreten darf. Die Angabe ist optional (default: 20)                                           </td></tr>
             <tr><td>                  </td><td>                                                                                                </td></tr>        
-            <tr><td> <b>lcslot</b>    </td><td>Es wird ein tägliches Zeitfenster festgelegt, in dem die Ladesteuerung des Moduls für diese     </td></tr>
+            <tr><td> <b>lcSlot</b>    </td><td>Es wird ein tägliches Zeitfenster festgelegt, in dem die Ladesteuerung des Moduls für diese     </td></tr>
             <tr><td>                  </td><td>Batterie aktiv sein soll. Außerhalb des Zeitfensters wird die Batterieladung mit voller         </td></tr>
             <tr><td>                  </td><td>Leistung freigegeben. Das SoC-Management der Batterie ist davon nicht betroffen.                </td></tr>
             <tr><td>                  </td><td>Wert: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: ganztägig                                    </td></tr>			
@@ -28251,7 +28251,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Alle SoC-Werte sind ganze Zahlen in %. Dabei gilt: 'lowSoc' &lt; 'upSoC' &lt; 'maxSoC'. <br><br>
 
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcslot=11:00-17:30 <br>
+         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 <br>
        </li>
        <br>
 
