@@ -6125,13 +6125,13 @@ sub _attrconsumer {                      ## no critic "not used"
       exconfc       => '',
   };
 
-  if ($cmd eq "set") {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-      
+  if ($cmd eq "set") {      
       my ($err, $codev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
 
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
@@ -6371,12 +6371,12 @@ sub _attrconsumerControl {               ## no critic "not used"
 
   my ($a, $h) = parseParams ($aVal);
 
-  if ($cmd eq 'set') {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-      
+  if ($cmd eq 'set') {      
       ## 1. Durchlauf - Prüfungen
       #############################
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
@@ -6518,12 +6518,12 @@ sub _attrgraphicControl {                ## no critic "not used"
 
   my ($a, $h) = parseParams ($aVal);
 
-  if ($cmd eq 'set') {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-      
+  if ($cmd eq 'set') {      
       ## 1. Durchlauf - Prüfungen
       #############################
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
@@ -6673,12 +6673,12 @@ sub _attraiControl {                     ## no critic "not used"
 
   my ($a, $h) = parseParams ($aVal);
 
-  if ($cmd eq 'set') {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-      
+  if ($cmd eq 'set') {      
       ## 1. Durchlauf - Prüfungen
       #############################
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
@@ -6749,12 +6749,12 @@ sub _attrplantControl {                  ## no critic "not used"
 
   my ($a, $h) = parseParams ($aVal);
 
-  if ($cmd eq 'set') {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-      
+  if ($cmd eq 'set') {      
       ## 1. Durchlauf - Prüfungen
       #############################
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
@@ -6824,13 +6824,13 @@ sub _attrMeterDev {                    ## no critic "not used"
       asynchron => '',
   };
 
-  if ($paref->{cmd} eq 'set') {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-      
+  if ($paref->{cmd} eq 'set') {      
       my ($err, $medev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
 
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
@@ -6901,13 +6901,13 @@ sub _attrProducerDev {                   ## no critic "not used"
       etotal => '',
   };
 
-  if ($paref->{cmd} eq 'set') {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-      
+  if ($paref->{cmd} eq 'set') {      
       my ($err, $dev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
 
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
@@ -6967,9 +6967,7 @@ sub _attrInverterDev {                   ## no critic "not used"
       asynchron => { comp => '(0|1)',         act => 0 },
   };
 
-  if ($paref->{cmd} eq 'set') {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-       
+  if ($paref->{cmd} eq 'set') {       
       my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
 
@@ -6978,6 +6976,8 @@ sub _attrInverterDev {                   ## no critic "not used"
       }
 
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
@@ -7341,13 +7341,13 @@ sub _attrBatteryDev {                    ## no critic "not used"
       asynchron => '',
   };
 
-  if ($paref->{cmd} eq 'set') {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-      
+  if ($paref->{cmd} eq 'set') {      
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
 
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
@@ -7445,9 +7445,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
 
   my ($a, $h) = parseParams ($aVal);
 
-  if ($cmd eq 'set') {
-      return 'The parameters entered must not contain square brackets [...]' if($aVal =~ /[\[\]]+/xs);          # Absturzschutz!
-      
+  if ($cmd eq 'set') {      
       ## 1. Durchlauf - Prüfungen
       #############################
       for my $mkey (keys %{$valid}) {
@@ -7455,6 +7453,8 @@ sub _attrBatSocManagement {              ## no critic "not used"
 	  }
 	  
       for my $key (keys %{$h}) {
+		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+		  
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
