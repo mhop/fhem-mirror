@@ -17844,7 +17844,7 @@ END3
               elsif ($lpv1 == 4) {$xtext -= 15}
               elsif ($lpv1 == 3) {$xtext -=  5}
               elsif ($lpv1 == 2) {$xtext += 10}
-              elsif ($lpv1 == 1) {$xtext += 30}
+              elsif ($lpv1 == 1) {$xtext += 25}
 
               $ret .= qq{<text class="$stna text" id="producertxt_${pn}_$stna" x="$xtext" y="100">$pdrpow</text>} if($flowgPrdsPower);
           }
