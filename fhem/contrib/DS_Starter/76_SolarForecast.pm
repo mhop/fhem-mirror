@@ -160,9 +160,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.52.5" => "22.05.2025  edit commandref, _batChargeMgmt: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
+  "1.52.5" => "25.05.2025  edit commandref, _batChargeMgmt: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
                            "check attribute values for prohibited occurrence [...] Forum: https://forum.fhem.de/index.php?msg=1342147 ".
-                           "_flowGraphic: bugfix chain style in case of logical on/off Forum: https://forum.fhem.de/index.php?msg=1342122 ",
+                           "_flowGraphic: bugfix chain style in case of logical on/off Forum: https://forum.fhem.de/index.php?msg=1342122 ".
+                           "_attrBatteryDev: more checks (cap) ",
   "1.52.4" => "20.05.2025  commandref edited, setupInverterDevXX: change pv to pvOut, new key pvIn ".
                            "fix devision by zero -Forum: https://forum.fhem.de/index.php?msg=1341884, __calcFcQuality: minor code change ".
 						   "ctrlSpecialReadings: new Topic BatWeightedTotalSOC ",
@@ -7339,22 +7340,26 @@ sub _attrBatteryDev {                    ## no critic "not used"
   my $bn   = (split 'setupBatteryDev', $aName)[1];
 
   my $valid = {
-      pin       => '',
-      pout      => '',
-      pinmax    => '',
-      poutmax   => '',
-      intotal   => '',
-      outtotal  => '',
-      cap       => '',
-      charge    => '',
-      icon      => '',
-      show      => '',
-      asynchron => '',
+      pin       => { comp => '.+',                                           must => 1, act => 0 },
+      pout      => { comp => '.+',                                           must => 1, act => 0 },
+      pinmax    => { comp => '\d+',                                          must => 0, act => 0 },
+      poutmax   => { comp => '\d+',                                          must => 0, act => 0 },
+      intotal   => { comp => '.*',                                           must => 0, act => 0 },
+      outtotal  => { comp => '.*',                                           must => 0, act => 0 },
+      cap       => { comp => '((?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh)$))', must => 1, act => 0 },
+      charge    => { comp => '.*',                                           must => 0, act => 0 },
+      icon      => { comp => '.*',                                           must => 0, act => 0 },
+      show      => { comp => '(?:[0-3](?::(?:top|bottom))?)',                must => 0, act => 0 },
+      asynchron => { comp => '(0|1)',                                        must => 0, act => 0 },
   };
 
   if ($paref->{cmd} eq 'set') {      
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
+      
+      for my $mkey (keys %{$valid}) {
+	      return qq{The key '$mkey' is mandatory for setting in attribute '$aName'} if($valid->{$mkey}{must} && !exists $h->{$mkey});
+	  }
 
       for my $key (keys %{$h}) {
 		  return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
@@ -7362,29 +7367,30 @@ sub _attrBatteryDev {                    ## no critic "not used"
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
-      }
+          
+          my $comp = $valid->{$key}{comp};
+          next if(!$comp);
 
-      if (!$h->{pin} || !$h->{pout} || !$h->{cap}) {
-          return qq{One or more of the keys 'pin, pout, cap' are missing. Please note the command reference.};
-      }
+          if ($h->{$key} =~ /^$comp$/xs) {
+              if ($valid->{$key}{act}) {
+                  $paref->{akey}   = $key;
+                  $paref->{keyval} = $h->{$key};
 
-      if ($h->{pinmax} && $h->{pinmax} !~ /^\d+$/xs) {
-          return qq{The key “pinmax” may only be specified by whole numbers};
-      }
+                  my $err = __attrKeyAction ($paref);
 
-      if ($h->{poutmax} && $h->{poutmax} !~ /^\d+$/xs) {
-          return qq{The key “poutmax” may only be specified by whole numbers};
-      }
+                  delete $paref->{keyval};
+                  delete $paref->{akey};
 
-      if ($h->{show} && $h->{show} =~ /:/xs) {
-          my ($show, $pos) = split ':', $h->{show};
-          $pos //= 'xx';
-
-          if ($pos !~ /^(top|bottom)$/xs) {
-              return qq{The key 'show' is not set correctly. Please note the command reference.};
+                  return $err if($err);
+              }
+          }
+          else {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
       }
 
+      ## 2. Durchlauf - Endprüfung
+      #############################
       if (($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   ||
          ($h->{pout} !~ /-/xs && $h->{pout} !~ /:/xs)) {
           return qq{The keys 'pin' and/or 'pout' are not set correctly. Please note the command reference.};
@@ -7398,6 +7404,8 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{batteries}{$bn}{bicon};
       delete $data{$name}{batteries}{$bn}{bshowingraph};
       delete $data{$name}{batteries}{$bn}{bposingraph};
+      delete $data{$name}{batteries}{$bn}{bpinmax}; 
+      delete $data{$name}{batteries}{$bn}{bpoutmax};
   }
   elsif ($paref->{cmd} eq 'del') {
       readingsDelete    ($hash, 'Current_PowerBatIn_'.$bn);
@@ -11462,7 +11470,7 @@ sub _batChargeMgmt {
       my $batinstcap = BatteryVal ($name, $bn, 'binstcap', 0);                                   # installierte Batteriekapazität Wh
 
       if (!$inplim || !$batinstcap) {
-          debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation are not met. Exit.");
+          debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation are not met. Check the key 'cap' for Bat '$bn'. Exit.");
           return;
       }
 
@@ -11634,10 +11642,10 @@ sub _batChargeMgmt {
 		  $data{$name}{nexthours}{'NextHour'.$nhr}{socprogwhsum} = $hsoc{$nhr}{socprogwhsum};
 
 		  my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today',      0);
-		  my $hody  = NexthoursVal ($name, 'NextHour'.$nhr, 'hourofday', '');
+		  my $hod   = NexthoursVal ($name, 'NextHour'.$nhr, 'hourofday', '');
 
-		  if ($today && $hody) {                                                                                  # heutiger Tag
-			  writeToHistory ( { paref => $paref, key => 'socprogwhsum', val => $hsoc{$nhr}{socprogwhsum}, hour => $hody } );
+		  if ($today && $hod) {                                                                                  # heutiger Tag
+			  writeToHistory ( { paref => $paref, key => 'socprogwhsum', val => $hsoc{$nhr}{socprogwhsum}, hour => $hod } );
 		  }
 	  }
   }
@@ -17143,8 +17151,8 @@ sub __batteryOnBeam {
       my $bpos  = BatteryVal ($name, $bn, 'bposingraph', 'totp');
       next if($bshow != $paref->{chartlvl} || $bpos ne $paref->{beampos});                            # Anzeige nur auf Grafikebene "chartlvl" bzw. oberhalb/unterhalb der Balken
 
-      $ret        .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                            # freier Platz am Anfang
-      my $ii       = 0;
+      $ret  .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                  # freier Platz am Anfang
+      my $ii = 0;
 
       for my $i (0..($maxhours * 2) - 1) {
           my $skip = __dontNightshowSkipSync ($name, $paref, $i);
@@ -17197,7 +17205,7 @@ sub __batteryOnBeam {
 
           debugLog ($paref, 'graphic', "Battery $bn pos >$i< day: $day_str, time: $time_str, Power ('-' = out): ".(defined $bpower ? $bpower : 'undef').
                                        " W, Rcmd: ".(defined $hfcg->{$i}{'rcdchargebat'.$bn} ? $hfcg->{$i}{'rcdchargebat'.$bn} : 'undef').
-                                       ", SoC: ".(defined $soc ? $soc : 'undef')." %, lcintime: $lcintime");
+                                       ", SoC: ".(defined $soc ? $soc : 'undef')." %, lcintime: ".(defined $lcintime ? $lcintime : 'undef'));   
       }
 
       $ret .= "<td class='solarfc'></td></tr>" if($ret);                                                  # freier Platz am Ende der Icon Zeile
@@ -25626,6 +25634,10 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>0</b> - the stored energy consumption shares are retained as part of the general consumption forecast (default)                                </td></tr>
             <tr><td>                       </td><td><b>1</b> - the general consumption forecast is reduced by the stored energy consumption shares.                                                   </td></tr>
             <tr><td>                       </td><td><b>2</b> - as with '1', but the consumer's planning data is included in the forecast for the coming hours.                                        </td></tr>
+            <tr><td>                       </td><td><b>Note:</b> When using exconfc, <b>plantControl->consForecastIdentWeekdays=1</b> and <b>plantControl->consForecastLastDays=4</b>                 </td></tr>
+            <tr><td>                       </td><td>should be set.                                                                                                                                    </td></tr>
+            <tr><td>                       </td><td>See the explanations in the <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wie_wird_die_Verbrauchsprognose_erstellt?' target='_blank'>German Wiki</a>  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
          </table>
          </ul>
        <br>
@@ -26358,7 +26370,7 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td>this error and reports the situation that has occurred with a log entry with verbose 2.                       </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>cap</b>       </td><td>installed battery capacity. Option can be:                                                                    </td></tr>
-           <tr><td>                  </td><td><b>numerical value</b> - direct specification of the battery capacity in Wh without specifying the unit!      </td></tr>
+           <tr><td>                  </td><td><b>Integer</b> - direct specification of the battery capacity in Wh without specifying the unit!              </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;unit&gt;</b> - Reading which provides the capacity and unit (Wh, kWh)              </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                                </td></tr>
@@ -28229,6 +28241,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>0</b> - die gespeicherten Energieverbrauchsanteile bleiben als Bestandteil der allgemeinen Verbrauchsprognose erhalten (default)                </td></tr>
             <tr><td>                       </td><td><b>1</b> - die allgemeine Verbrauchsprognose wird um die gespeicherten Energieverbrauchsanteile reduziert.                                         </td></tr>
             <tr><td>                       </td><td><b>2</b> - wie bei '1', jedoch gehen die Planungsdaten des Verbrauchers bei der Prognose der kommenden Stunden wieder mit ein.                     </td></tr>
+            <tr><td>                       </td><td><b>Hinweis:</b> Bei Verwendung von exconfc sollte <b>plantControl->consForecastIdentWeekdays=1</b> und <b>plantControl->consForecastLastDays=4</b> </td></tr>
+            <tr><td>                       </td><td>gesetzt werden.                                                                                                                                    </td></tr>
+            <tr><td>                       </td><td>Siehe dazu die Erläuterungen im <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wie_wird_die_Verbrauchsprognose_erstellt?' target='_blank'>Wiki</a>  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
          </table>
          </ul>
        <br>
@@ -28960,7 +28976,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag mit verbose 2.  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>cap</b>       </td><td>installierte Batteriekapazität. Option kann sein:                                                        </td></tr>
-           <tr><td>                  </td><td><b>numerischer Wert</b> - direkte Angabe der Batteriekapazität in Wh ohne die Einheit anzugeben!         </td></tr>
+           <tr><td>                  </td><td><b>Ganzzahl</b> - direkte Angabe der Batteriekapazität in Wh ohne die Einheit anzugeben!                 </td></tr>
            <tr><td>                  </td><td><b>&lt;Readingname&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und Einheit (Wh, kWh) </td></tr>
            <tr><td> <b>charge</b>    </td><td>Reading welches den aktuellen Ladezustand (SOC in Prozent) liefert (optional)                            </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
