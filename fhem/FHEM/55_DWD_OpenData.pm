@@ -20,6 +20,10 @@ Use of HttpUtils instead of LWP::Simple:
   Copyright (C) 2018 JoWiemann
     see https://forum.fhem.de/index.php/topic,83097.msg761015.html#msg761015
 
+MOSMIX S forecast data support:
+
+  Copyright (C) 2024 DS_Starter + Jens B.
+
 Sun position:
 
   Copyright (c) Plataforma Solar de Almerýa, Spain
@@ -158,7 +162,7 @@ sub JulianDateToEpoch {
 
     my $seconds = sprintf("%0.0f", 86400*($jd - $j + 0.5)); # round()
 
-    return timegm(0, 0, 0, $day, $month - 1, $year - 1900) + $seconds;
+    return ::fhemTimeGm(0, 0, 0, $day, $month - 1, $year - 1900) + $seconds;
   }
 }
 
@@ -596,7 +600,9 @@ package DWD_OpenData;
 use strict;
 use warnings;
 
-use Encode 'encode';
+use Encode qw(decode encode);
+use utf8;
+use File::Basename 'dirname';
 use File::Temp 'tempfile';
 use IO::Uncompress::Unzip qw(unzip $UnzipError);
 use POSIX qw(floor strftime);
@@ -616,8 +622,14 @@ use constant UPDATE_DISTRICTS     => -1;
 use constant UPDATE_COMMUNEUNIONS => -2;
 use constant UPDATE_ALL           => -3;
 
+use constant DOWNLOAD_TIMEOUT_MIN     =>  30; # [s]
+use constant DOWNLOAD_TIMEOUT_MAX     => 120; # [s]
+use constant DOWNLOAD_TIMEOUT_DEFAULT => DOWNLOAD_TIMEOUT_MIN; # [s]
+use constant PROCESSING_TIMEOUT       => DOWNLOAD_TIMEOUT_MAX + 60; # [s]
+use constant SCHEDULING_RANGE         => 15*60 - PROCESSING_TIMEOUT - 60; # [s]
+
 require Exporter;
-our $VERSION   = '1.016003';
+our $VERSION   = '1.017005';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -629,9 +641,13 @@ my %forecastPropertyPeriods = (
                                'PEvap' => 24, 'PSd00' => 24, 'PSd30' => 24, 'PSd60' => 24, 'RRdc' => 24, 'RSunD' => 24, 'Rd00' => 24, 'Rd02' => 24, 'Rd10' => 24, 'Rd50' => 24, 'SunD' => 24, 'SunRise' => 24, 'SunSet' => 24, 'Tg' => 24, 'Tm' => 24, 'Tn' => 24, 'Tx' => 24
                               );
 
-my %forecastDefaultProperties = (
+my %forecastDefaultPropertiesS = (
+                                  'Tn' => 1, 'Tx' => 1, 'DD' => 1, 'FX1' => 1, 'Neff' => 1, 'RR1c' => 1, 'R602' => 1, 'RR3c' => 1, 'Rh00' => 1, 'TTT' => 1, 'ww' => 1, 'SunUp' => 1
+                                 );
+
+my %forecastDefaultPropertiesL = (
                                  'Tg' => 1, 'Tn' => 1, 'Tx' => 1, 'DD' => 1, 'FX1' => 1, 'Neff' => 1, 'RR6c' => 1, 'R600' => 1, 'RRhc' => 1, 'Rh00' => 1, 'TTT' => 1, 'ww' => 1, 'SunUp' => 1
-                                );
+                                 );
 
 # conversion of DWD value to: 1 = temperature in K, 2 = integer value, 3 = wind speed in m/s, 4 = pressure in Pa
 my %forecastPropertyTypes = (
@@ -794,7 +810,13 @@ sub Define {
   $hash->{'.TZ'} = ::AttrVal($hash, 'timezone', $hash->{FHEM_TZ});
 
   ::readingsSingleUpdate($hash, 'state', ::IsDisabled($name)? 'disabled' : 'defined', 1);
-  ::InternalTimer(gettimeofday() + 3, 'DWD_OpenData::Timer', $hash, 0);
+
+  # randomize start of next update check by SCHEDULING_RANGE to distribute load cause by mulitple module instances
+  my $nextUpdate = gettimeofday() + int(rand(SCHEDULING_RANGE));
+  ::readingsSingleUpdate($hash, 'nextUpdate', ::FmtTime($nextUpdate), 1);
+  ::InternalTimer($nextUpdate, 'DWD_OpenData::Timer', $hash);
+
+  $hash->{'.firstRun'} = 1;
 
   return undef;
 }
@@ -888,10 +910,8 @@ sub Attr {
   my ($command, $name, $attribute, $value) = @_;
   my $hash = $::defs{$name};
 
-  for ($command) {
-    when ("set") {
-      for ($attribute) {
-        when ("disable") {
+    if ($command eq 'set') {                                       # V 1.17.7: change "when" to "if" - https://forum.fhem.de/index.php?msg=1319475
+        if ($attribute eq "disable") {
           # enable/disable polling
           if ($::init_done) {
             if ($value) {
@@ -903,7 +923,16 @@ sub Attr {
             }
           }
         }
-        when ("forecastResolution") {
+        elsif ($attribute eq "forecastRefresh") {
+          if (!(defined($value) && looks_like_number($value) && $value >= 1 && $value <= 6)) {
+            my $oldRefresh = ::AttrVal($name, 'forecastRefresh', 6);
+            if ($::init_done && (($oldRefresh < 6 && $value >= 6) || ($oldRefresh >= 6 && $value < 6))) {
+              # delete readings when switching between MOSMIX S and L
+              ::CommandDeleteReading(undef, "$name ^fc.*");
+            }
+          }
+        }
+        elsif ($attribute eq "forecastResolution") {
           if (defined($value) && looks_like_number($value) && $value > 0) {
             my $oldForecastResolution = ::AttrVal($name, 'forecastResolution', 6);
             if ($::init_done && defined($oldForecastResolution) && $oldForecastResolution != $value) {
@@ -913,51 +942,54 @@ sub Attr {
             return "invalid value for forecastResolution (possible values are 1, 3 and 6)";
           }
         }
-        when ("forecastStation") {
+        elsif ($attribute eq "downloadTimeout") {
+          if (!(defined($value) && looks_like_number($value) && $value >= DOWNLOAD_TIMEOUT_MIN && $value <= DOWNLOAD_TIMEOUT_MAX)) {
+            return "invalid value for downloadTimeout (" . DOWNLOAD_TIMEOUT_MIN . " .. " . DOWNLOAD_TIMEOUT_MAX . ")";
+          }
+        }
+        elsif ($attribute eq "forecastStation") {
           my $oldForecastStation = ::AttrVal($name, 'forecastStation', undef);
           if ($::init_done && defined($oldForecastStation) && $oldForecastStation ne $value) {
             ::CommandDeleteReading(undef, "$name ^fc.*");
           }
         }
-        when ("forecastWW2Text") {
+        elsif ($attribute eq "forecastWW2Text") {
           if ($::init_done && !$value) {
             ::CommandDeleteReading(undef, "$name ^fc.*wwd\$");
           }
         }
-        when ("timezone") {
+        elsif ($attribute eq "timezone") {
           if (defined($value) && length($value) > 0) {
             $hash->{'.TZ'} = $value;
           } else {
             return "timezone (e.g. Europe/Berlin) required";
           }
         }
-      }
     }
-
-    when ("del") {
-      for ($attribute) {
-        when ("disable") {
+    elsif ($command eq 'del') {
+        if ($attribute eq "disable") {
           ::readingsSingleUpdate($hash, 'state', 'defined', 1);
           ::InternalTimer(gettimeofday() + 3, 'DWD_OpenData::Timer', $hash, 0);
         }
-        when ("forecastResolution") {
+        elsif ($attribute eq "forecastResolution") {
           my $oldForecastResolution = ::AttrVal($name, 'forecastResolution', 6);
           if ($oldForecastResolution != 6) {
             ::CommandDeleteReading(undef, "$name ^fc.*");
           }
         }
-        when ("forecastStation") {
+        elsif ($attribute eq "forecastStation") {
           ::CommandDeleteReading(undef, "$name ^fc.*");
         }
-        when ("forecastWW2Text") {
+        elsif ($attribute eq "forecastResolution") {
+          ::CommandDeleteReading(undef, "$name ^fc.*");
+        }
+        elsif ($attribute eq "forecastWW2Text") {
           ::CommandDeleteReading(undef, "$name ^fc.*wwd\$");
         }
-        when ("timezone") {
+        elsif ($attribute eq "timezone") {
           $hash->{'.TZ'} = $hash->{FHEM_TZ};
         }
-      }
     }
-  }
 
   return undef;
 }
@@ -990,7 +1022,7 @@ sub Get {
       $warncellId = ::AttrVal($name, 'alertArea', undef) if (!defined($warncellId));
       if (defined($warncellId)) {
         my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-        if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < 60)) {
+        if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {
           # abort if update is in progress
           $result = "alerts cache update in progress, please wait and try again";
         } elsif (defined($alertsReceived[$communeUnion]) && (time() - $alertsReceived[$communeUnion] < 900)) {
@@ -1009,10 +1041,12 @@ sub Get {
       my $station = $a[2];
       $station = ::AttrVal($name, 'forecastStation', undef) if (!defined($station));
       if (defined($station)) {
-        if (defined($hash->{forecastUpdating}) && (time() - $hash->{forecastUpdating} < 60)) {
+        if (defined($hash->{forecastUpdating}) && (time() - $hash->{forecastUpdating} < PROCESSING_TIMEOUT)) {
           # abort if update is in progress
           $result = "forecast update in progress, please wait and try again";
         } else {
+          # force forecast update
+          ::readingsSingleUpdate($hash, 'fc_dwdDocSize', 0, 0);
           delete $hash->{".fetchAlerts"};
           $result = GetForecast($hash, $station);
         }
@@ -1039,7 +1073,7 @@ sub Get {
         }
       }
       my $communeUnion = IsCommuneUnionWarncellId($updateMode);
-      if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < 60)) {
+      if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {
         # abort if update is in progress
         $result = "alerts cache update in progress, please wait and try again";
       } else {
@@ -1076,31 +1110,45 @@ sub Timer {
 
   my $time = time();
   my ($tSec, $tMin, $tHour, $tMday, $tMon, $tYear, $tWday, $tYday, $tIsdst) = gmtime($time);
-  my $actQuarter = int($tMin/15);
+  my $actQuarter = int($tMin/15); # 0 .. 3
 
-  if ($actQuarter == 0 && !(defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"})) {
-    # preset: try to fetch alerts immediately
+  # cancel periodic timer
+  ::RemoveInternalTimer($hash);
+
+  # perform updates every quarter of an hour: alerts=every, forecast=specific
+  my $firstRun = delete $hash->{'.firstRun'} // 0;
+  my $forecastQuarter = ::AttrVal($name, 'forecastRefresh', 6) >= 6 ? 0 : 3;                                        # V 1.17.6
+  my $fetchAlerts = defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"}; # fetch either alerts or forecast
+
+  ::Log3 $name, 5, "$name: Timer first:$firstRun forecastQuarter:$forecastQuarter fetchAlerts:$fetchAlerts";
+
+  # update forecast and alerts immediately at startup
+  $forecastQuarter = $actQuarter if ($firstRun);
+
+  if ($actQuarter == $forecastQuarter && !$fetchAlerts) {
+    # preset: fetch alerts if not fetching forecast
     $hash->{".fetchAlerts"} = 1;
     my $forecastStation = ::AttrVal($name, 'forecastStation', undef);
     if (defined($forecastStation)) {
-      if (!defined($hash->{forecastUpdating}) || ($time - $hash->{forecastUpdating} >= 60)) {
+      if (!defined($hash->{forecastUpdating}) || ($time - $hash->{forecastUpdating} >= PROCESSING_TIMEOUT)) {
         my $result = GetForecast($hash, $forecastStation);
         if (defined($result)) {
           ::Log3 $name, 4, "$name: error retrieving forecast: $result";
         } else {
-          # fetching forecast started: wait for forecast fetch to complete
+          # fetching forecast started: wait for forecast fetch to complete before fetching alerts
           $hash->{".fetchAlerts"} = 0;
         }
       }
     }
   }
 
-  if ($actQuarter > 0 || (defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"})) {
+  $fetchAlerts = defined($hash->{".fetchAlerts"}) && $hash->{".fetchAlerts"};
+  if ($actQuarter != $forecastQuarter || $fetchAlerts) {
     my $warncellId = ::AttrVal($name, 'alertArea', undef);
     if (defined($warncellId)) {
       # skip update if already in progress
       my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-      if (!defined($alertsUpdating[$communeUnion]) || ($time - $alertsUpdating[$communeUnion] >= 60)) {
+      if (!defined($alertsUpdating[$communeUnion]) || ($time - $alertsUpdating[$communeUnion] >= PROCESSING_TIMEOUT)) {
         my $result = GetAlerts($hash, $warncellId);
         if (defined($result)) {
           ::Log3 $name, 4, "$name: error retrieving alerts: $result";
@@ -1108,13 +1156,14 @@ sub Timer {
       }
     }
 
-    $hash->{".fetchAlerts"} = $actQuarter < 3;
+    # fetch forecast at next timer execution
+    $hash->{".fetchAlerts"} = 0;
   }
 
-  # reschedule next run for 5 seconds past next quarter
-  ::RemoveInternalTimer($hash);
-  my $nextTime = timegm(0, $actQuarter*15, $tHour, $tMday, $tMon, $tYear) + 905;
-  ::InternalTimer($nextTime, 'DWD_OpenData::Timer', $hash);
+  # reschedule next run to 5 .. SCHEDULING_RANGE seconds past next quarter
+  my $nextUpdate = ::fhemTimeGm(0, $actQuarter*15, $tHour, $tMday, $tMon, $tYear) + 905 + int(rand(SCHEDULING_RANGE - 5));
+  ::readingsSingleUpdate($hash, 'nextUpdate', ::FmtTime($nextUpdate), 1);
+  ::InternalTimer($nextUpdate, 'DWD_OpenData::Timer', $hash);
 
   ::Log3 $name, 5, "$name: Timer END";
 }
@@ -1204,6 +1253,45 @@ sub LocaltimeOffset  {
     delete $ENV{"TZ"};
   }
   return $tzo;
+}
+
+=head2 FormatDateTimeUTC($)
+
+=over
+
+=item * param t: epoch seconds
+
+=item * return date time string with with format "YYYY-MM-DD HH:MM:SSZ" with UTC timezone
+
+=back
+
+=cut
+
+sub FormatDateTimeUTC {
+  my $t = shift;
+  #return strftime('%Y-%m-%d %H:%M:%SZ', gmtime(@_));         # Heiko
+  return $t.'Z';                                              # Heiko
+}
+
+=head2 ParseDateTimeUTC($$)
+
+=over
+
+=item * param s: date string with format "YYYY-MM-DD HH:MM:SSZ" with UTC timezone
+
+=item * return epoch seconds or C<undef> on error
+
+=back
+
+=cut
+
+sub ParseDateTimeUTC {
+  my $int = shift;
+  my $t;
+  my ($y, $mo, $d, $h, $m, $s) = $int =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;  # Heiko
+  eval { $t = ::fhemTimeGm($s, $m, $h, $d, $mo - 1, $y - 1900) };                 # Heiko
+  ::Log 1, 'eval: '.$@ if($@);                                          # Heiko
+  return $t;
 }
 
 =head2 FormatDateTimeLocal($$)
@@ -1316,7 +1404,7 @@ sub ParseDateTimeLocal {
 sub ParseDateLocal {
   my ($hash, $s) = @_;
   my $t;
-  eval { $t = Timelocal($hash, ::strptime($s, '%Y-%m-%d')) };
+  eval { $t = Timelocal($hash, Time::Piece->strptime($s, '%Y-%m-%d')) };
   return $t;
 }
 
@@ -1408,7 +1496,7 @@ sub RotateForecast {
   my $stationChanged = ::ReadingsVal($name, 'fc_station', '') ne $station;
   if ($stationChanged) {
     # different station, delete all existing readings
-    ::Log3 $name, 3, "$name: RotateForecast: station has changed, deleting exisiting readings";
+    ::Log3 $name, 3, "$name: RotateForecast: station has changed, deleting existing readings";
     ::CommandDeleteReading(undef, "$name ^fc.*");
     $daysAvailable = 0;
   } elsif (defined($oldToday)) {
@@ -1580,7 +1668,8 @@ sub GetForecast {
       # kill old blocking call
       ::BlockingKill($hash->{".forecastBlockingCall"});
     }
-    $hash->{".forecastBlockingCall"} = ::BlockingCall("DWD_OpenData::GetForecastStart", $hash, "DWD_OpenData::GetForecastFinish", 30, "DWD_OpenData::GetForecastAbort", $hash);
+    my $timeout = ::AttrVal($name, 'downloadTimeout', DOWNLOAD_TIMEOUT_DEFAULT);
+    $hash->{".forecastBlockingCall"} = ::BlockingCall("DWD_OpenData::GetForecastStart", $hash, "DWD_OpenData::GetForecastFinish", $timeout, "DWD_OpenData::GetForecastAbort", $hash);
 
     $hash->{forecastUpdating} = time();
 
@@ -1591,6 +1680,136 @@ sub GetForecast {
   } else {
     return "disabled";
   }
+}
+
+=head2 GetHeaders($)
+
+=over
+
+=item * param name: name of DWD_OpenData device
+
+=item * param url: URL for wich the HTTP headers should be retrieved.
+
+=item * return hash of header entries: content_length (bytes), last_modified (epoch time) or C<undef> on error
+
+=back
+
+=cut
+
+sub GetHeaders {
+  my ($name, $url) = @_;
+
+  my $param = {
+                url     => $url,
+                method  => "HEAD",
+                timeout => ::AttrVal($name, 'downloadTimeout', DOWNLOAD_TIMEOUT_DEFAULT)
+              };
+
+  my ($httpError, $content) = ::HttpUtils_BlockingGet($param);
+  if (!$httpError) {
+    my @entries = split /\n/, $param->{httpheader};
+    my %headers;
+    for my $entry (@entries) {
+      if ($entry =~ /Content-Length/xs) {
+        ($headers{content_length}) = $entry =~ /Content-Length:\s([0-9]*)/xs;
+        ::Log3 $name, 5, "$name: GetHeaders content_length: $headers{content_length}";
+      } elsif ($entry =~ /Last-Modified/xs) {
+        my ($lastModified) = $entry =~ /Last-Modified:\s(.*GMT)/;                                # Heiko
+        ::Log3 $name, 5, "$name: GetHeaders last_modified raw: $lastModified";
+        eval {
+          my $lm = gmtime(Time::Piece->strptime ($lastModified, '%a, %d %b %Y %H:%M:%S %Z'))->datetime;   # Heiko
+          $lm =~ s/T/ /;                                                                                   # Heiko
+          $headers{last_modified} = $lm;                                                                   # Heiko
+        };
+        ::Log3 $name, 5, "$name: GetHeaders last_modified formatted: $headers{last_modified}";
+      }
+    }
+    return %headers;
+  }
+  return undef;
+}
+
+=head2 IsDocumentUpdated($$$)
+
+Check if a web document was updated by comparing the webserver header info with reading values.
+
+=over
+
+=item * param hash: hash of DWD_OpenData device
+
+=item * param url: URL for wich the HTTP headers should be retrieved.
+
+=item * param prefix: reading name prefix ('fc' or 'a') for document size and timestamp
+
+=item * param docSize: output, size [bytes] of the web document
+
+=item * param docTime: output, timestamp [UTC] of the web document
+
+=item * return true if new and old document properties differ
+
+=back
+
+=cut
+
+sub IsDocumentUpdated {
+  my ($hash, $url, $prefix) = @_;
+  my $name = $hash->{NAME};
+
+  # check if file on webserver was modified
+  ::Log3 $name, 5, "$name: IsDocumentUpdated BEFORE";
+  my %headers = GetHeaders($name, $url);
+  my $update = 1;
+  if (%headers) {
+    $_[3] = $headers{content_length}; # docSize
+    $_[4] = FormatDateTimeUTC($headers{last_modified}); # docTime
+    my $lastURL = ::ReadingsVal($name, $prefix.'_url', '');
+    my $lastSize = ::ReadingsVal($name, $prefix.'_dwdDocSize', 0);
+    my $lastTime = ::ReadingsVal($name , $prefix.'_dwdDocTime', '');
+    my $emptyAlertsZipSize = 22; # bytes of empty zip file
+    ::Log3 $name, 5, "$name: IsDocumentUpdated docSize:$_[3]/$lastSize docTime:$_[4]/$lastTime URL:$url/$lastURL";
+    if ($url eq $lastURL && ($_[3] == $lastSize && $_[4] eq $lastTime) || ($prefix eq 'a' && $_[3] == $emptyAlertsZipSize && $lastSize == $emptyAlertsZipSize)) {
+      # not modified
+      $update = 0;
+    }
+  }
+  else
+  {
+    # headers not available
+    $_[3] = 0; # docSize
+    $_[4] = ''; # docTime
+  }
+  ::Log3 $name, 5, "$name: IsDocumentUpdated AFTER return update: $update, docSize: $_[3], docTime: $_[4]";
+
+  return ($update, $_[3], $_[4]);                        # Heiko
+}
+
+=over
+
+extract parts of exception stacktrace and log
+
+=cut
+
+sub ConvertToErrorMessage {
+  my ($exception, $name, $sub) = @_;
+
+  # exception?
+  my $errorMessage = '';
+  if ($exception) {
+    my @parts = split(/ at |\n/, $exception); # discard anything after " at " or newline
+    if (@parts) {
+      $errorMessage = $parts[0];
+      ::Log3 $name, 4, "$name: $sub ERROR: $parts[0]";
+    } else {
+      $errorMessage = $@;
+      ::Log3 $name, 4, "$name: $sub ERROR: $exception";
+    }
+  }
+
+  # get rid of newlines and commas because of Blocking InformFn parameter restrictions
+  $errorMessage =~ s/\n/; /g;
+  $errorMessage =~ s/,/;/g;
+
+  return $errorMessage;
 }
 
 =head2 GetForecastStart($)
@@ -1621,26 +1840,100 @@ sub GetForecastStart {
   usleep(100);
 
   # get forecast for station from DWD server
-  my $url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_L/single_stations/' . $station . '/kml/MOSMIX_L_LATEST_' . $station . '.kmz ';
-  my $param = {
-                url        => $url,
-                method     => "GET",
-                timeout    => 10,
-                hash       => $hash,
-                station    => $station
-              };
-  ::Log3 $name, 5, "$name: GetForecastStart START (PID $$): $url";
-  my ($httpError, $fileContent) = ::HttpUtils_BlockingGet($param);
+  my $url;
+  my $mosmixType = ::AttrVal($name, 'forecastRefresh', 6) < 6 ? 'S' : 'L';
+  if ($mosmixType eq 'S') {
+    $url = "https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz";
+  } else {
+    $url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_L/single_stations/' . $station . '/kml/MOSMIX_L_LATEST_' . $station . '.kmz';
+  }
 
-  # process retrieved data
-  my $result = ProcessForecast($param, $httpError, $fileContent);
+  # determine if a new forecast report should be downloaded
+  #my ($dwdDocSize, $dwdDocTime);                                       # Heiko
+  my ($update, $dwdDocSize, $dwdDocTime) = IsDocumentUpdated($hash, $url, 'fc');     # Heiko
+  my $lastDocSize = ::ReadingsVal($name , 'fc_dwdDocSize', 0);
+  my $lastDocTimestamp = ParseDateTimeUTC(::ReadingsVal($name , 'fc_dwdDocTime', '1970-01-01 00:00:00')); # Heiko
+  my $dwdDocTimestamp = length($dwdDocTime) ? ParseDateTimeUTC($dwdDocTime) : time();
+  my $maxDocAge = (::AttrVal($name, 'forecastRefresh', 6) - 0.5) * 60 * 60; # [s]
+  $maxDocAge = 0;     # Heiko ... wozu nochmal Wartezeit checken wenn bereits in IsDocumentUpdated?
+  $update = $update && ($lastDocSize == 0 || ($dwdDocTimestamp - $lastDocTimestamp) >= $maxDocAge);
 
-  ::Log3 $name, 5, "$name: GetForecastStart END";
+  ::Log3 $name, 5, "$name: GetForecastStart dwdDocTime: $dwdDocTime, dwdDocTimestamp: $dwdDocTimestamp,  dwdDocSize: $dwdDocSize, lastDocTimestamp: $lastDocTimestamp, maxDocAge: $maxDocAge, lastDocSize: $lastDocSize : update: $update";
+
+  my $result;
+  if ($update) {
+    # define download and processing properties
+    my $param = {
+                  url           => $url,
+                  method        => "GET",
+                  timeout       => ::AttrVal($name, 'downloadTimeout', DOWNLOAD_TIMEOUT_DEFAULT),
+                  hash          => $hash,
+                  station       => $station,
+                  mosmixType    => $mosmixType,
+                  dwdDocSize    => $dwdDocSize,
+                  dwdDocTime    => $dwdDocTime,
+                  forceEncoding => 0
+                };
+
+    # download and unpack forecast report
+    ::Log3 $name, 5, "$name: GetForecastStart START (PID $$): $url";
+
+    $result = ProcessForecast($param);
+
+    ::Log3 $name, 5, "$name: GetForecastStart END";
+  } else {
+    # already up to date
+    $result = [$name, 'up-to-date'];
+
+    ::Log3 $name, 5, "$name: GetForecastStart UP-TO-DATE";
+  }
 
   return $result;
 }
 
-=head2 ProcessForecast($$$)
+=head2 getStationPos($$$)
+
+=over
+
+=item * param name: name of DWD_OpenData device
+
+=item * param station: name of station to search for
+
+=item * param placemarkNodeList: XML node to search
+
+=item * index in list (1 ..) or 0 if not found
+
+=back
+
+find XML node of station
+
+=cut
+
+sub getStationPos {
+  my $name              = shift;
+  my $station           = shift;
+  my $placemarkNodeList = shift;
+
+  my $pos = 0;
+  my $listSize = $placemarkNodeList->size();
+  LOOP:
+  for my $n (1..$listSize) {
+    my $pn = $placemarkNodeList->get_node($n);
+    for my $placemarkChildNode ($pn->nonBlankChildNodes()) {
+      if ($placemarkChildNode->nodeName() eq 'kml:name') {
+        my $stname = $placemarkChildNode->textContent();
+        if ($stname eq $station) {
+          $pos = $n;
+          last LOOP;
+        }
+      }
+    }
+  }
+
+  return $pos;
+}
+
+=head2 ProcessForecast($)
 
 =over
 
@@ -1662,30 +1955,41 @@ ATTENTION: This method is executed in a different process than FHEM.
 =cut
 
 sub ProcessForecast {
-  my ($param, $httpError, $fileContent) = @_;
-  my $hash    = $param->{hash};
-  my $name    = $hash->{NAME};
-  my $url     = $param->{url};
-  my $code    = $param->{code};
-  my $station = $param->{station};
+  my $param         = shift;
+  my $hash          = $param->{hash};
+  my $name          = $hash->{NAME};
+  my $url           = $param->{url};
+  my $station       = $param->{station};
+  my $mosmixType    = $param->{mosmixType};
+  my $dwdDocSize    = $param->{dwdDocSize};
+  my $dwdDocTime    = $param->{dwdDocTime};
 
   ::Log3 $name, 5, "$name: ProcessForecast START";
 
   my %forecast;
   my $relativeDay = 0;
   my @coordinates;
-  eval {
+  {
+    ::Log3 $name, 5, "$name: ProcessForecast: download data ...";
+    
+    # download forecast document into variable
+    my ($httpError, $zipFileContent) = ::HttpUtils_BlockingGet($param);
+    
+    my $url = $param->{url};
+    my $code = $param->{code};
     if (defined($httpError) && length($httpError) > 0) {
       die "error retrieving URL '$url': $httpError";
     }
     if (defined($code) && $code != 200) {
       die "HTTP error $code retrieving URL '$url'";
     }
-    if (!defined($fileContent) || length($fileContent) == 0) {
+    if (!defined($zipFileContent) || length($zipFileContent) == 0) {
       die "no data retrieved from URL '$url'";
     }
-
-    ::Log3 $name, 5, "$name: ProcessForecast: data received, decoding ...";
+    
+    ::Log3 $name, 5, "$name: ProcessForecast: HTTP-Header received:\n".$param->{httpheader};
+    
+    ::Log3 $name, 5, "$name: ProcessForecast: data received, unzipping and decoding ...";
 
     # prepare processing
     my $forecastProperties = ::AttrVal($name, 'forecastProperties', undef);
@@ -1693,158 +1997,227 @@ sub ProcessForecast {
     my %selectedProperties;
     if (!@properties) {
       # no selection: use defaults
-      %selectedProperties = %forecastDefaultProperties;
+      if ($mosmixType eq 'S') {
+        %selectedProperties = %forecastDefaultPropertiesS;
+      } else {
+        %selectedProperties = %forecastDefaultPropertiesL;
+      }
     } else {
       # use selected properties
-      foreach my $property (@properties) {
-        $property =~ s/^\s+|\s+$//g; # trim
+      for my $property (@properties) {                                           # use selected properties
+        $property =~ s/^\s+|\s+$//g;                                             # trim
         $selectedProperties{$property} = 1;
       }
     }
 
-    # create memory mapped file from received data and unzip
-    open my $zipFileHandle, '<', \$fileContent;
-    my @xmlStrings;
-    unzip($zipFileHandle => \@xmlStrings, MultiStream => 1) or die "unzip failed: $UnzipError\n";
-
+    # collect forecast header data
     my %header;
     $header{station} = $station;
+    $header{url} = $url;
+    $header{dwdDocSize} = $dwdDocSize;
+    $header{dwdDocTime} = $dwdDocTime;
 
-    # parse XML strings (files from zip)
-    foreach my $xmlString (@xmlStrings) {
-      if (substr(${$xmlString}, 0, 2) eq 'PK') {
-        # empty string, skip
-        next;
-      }
+    my $zip = new IO::Uncompress::Unzip(\$zipFileContent) or die "unzip failed: $UnzipError\n";
 
-      # parse XML string
-      ::Log3 $name, 5, "$name: ProcessForecast: parsing XML document";
-      my $dom = XML::LibXML->load_xml(string => $xmlString);
-      if (!$dom) {
-        die "parsing XML failed";
-      }
+    my $buffer;
+    my $offset = 0;
+    my $startOfLine = 0;
+    my $endOfLine = 0;
+    my $line;
+    my $collect = 0;
+    my $collectString = '';
+    my $headerParsed = 0;
+    my $xmlVersion = '<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>';
+    my $xmlFormat = '<kml:kml xmlns:dwd="https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:xal="urn:oasis:names:tc:ciq:xsdschema:xAL:2.0" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">';
 
-      ::Log3 $name, 5, "$name: ProcessForecast: extracting data";
+    my @timestamps;
+    my $issuer = undef;
+    my $defaultUndefSign = '-';
+    my %timeProperties;
+    my ($longitude, $latitude, $altitude);
 
-      # extract header data
-      my @timestamps;
-      my $issuer = undef;
-      my $defaultUndefSign = '-';
-      my $productDefinitionNodeList = $dom->getElementsByLocalName('ProductDefinition');
-      if ($productDefinitionNodeList->size()) {
-        my $productDefinitionNode = $productDefinitionNodeList->get_node(1);
-        foreach my $productDefinitionChildNode ($productDefinitionNode->nonBlankChildNodes()) {
-          if ($productDefinitionChildNode->nodeName() eq 'dwd:Issuer') {
-            $issuer = $productDefinitionChildNode->textContent();
-            $header{copyright} = "Datenbasis: $issuer";
-          } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:IssueTime') {
-            my $issueTime = $productDefinitionChildNode->textContent();
-            $header{time} = FormatDateTimeLocal($hash, ParseKMLTime($issueTime));
-          } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:ForecastTimeSteps') {
-            foreach my $forecastTimeStepsChildNode ($productDefinitionChildNode->nonBlankChildNodes()) {
-              if ($forecastTimeStepsChildNode->nodeName() eq 'dwd:TimeStep') {
-                my $forecastTimeSteps = $forecastTimeStepsChildNode->textContent();
-                push(@timestamps, ParseKMLTime($forecastTimeSteps));
-              }
+    # split into chunks of 1MB
+    READ_CHUNKS:
+    while ($zip->read($buffer, 1000000, $offset) > 0) {
+      $endOfLine = index($buffer, "\n");
+
+      while ($endOfLine != -1) {
+        $line = substr($buffer, $startOfLine, $endOfLine - $startOfLine + 1);
+        $startOfLine = $endOfLine + 1;
+        $endOfLine = index($buffer, "\n", $startOfLine);
+
+        if ($headerParsed == 0) {
+          if (index($line, '<?xml') != -1) {
+            $xmlVersion = $line;
+          } elsif (index($line, '<kml:kml') != -1) {
+            $xmlFormat = $line;
+          } elsif (index($line, '<dwd:Issuer>') != -1) {
+            if ($line =~ /<dwd:Issuer>([^<]+)<\/dwd:Issuer>/) {
+              $issuer = $1;
+              $header{copyright} = "Datenbasis: $issuer";
             }
-          } elsif ($productDefinitionChildNode->nodeName() eq 'dwd:FormatCfg') {
-            foreach my $formatCfgChildNode ($productDefinitionChildNode->nonBlankChildNodes()) {
-              if ($formatCfgChildNode->nodeName() eq 'dwd:DefaultUndefSign') {
-                $defaultUndefSign = $formatCfgChildNode->textContent();
-              }
+          } elsif (index($line, '<dwd:IssueTime>') != -1) {
+            if ($line =~ /<dwd:IssueTime>([^<]+)<\/dwd:IssueTime>/) {
+              my $issueTime = $1;
+              $header{time} = FormatDateTimeLocal($hash, ParseKMLTime($issueTime));
             }
+          } elsif (index($line, '<dwd:ForecastTimeSteps>') != -1) {
+            $collect = 1;
+          } elsif (index($line, '</dwd:ForecastTimeSteps>') != -1) {
+            $collect = 0;
+
+            while ($collectString =~ m/<dwd:TimeStep>([^<]+)<\/dwd:TimeStep>/g) {
+              my $forecastTimeSteps = $1;
+              push(@timestamps, ParseKMLTime($forecastTimeSteps));
+            }
+
+            $collectString = '';
+          } elsif (index($line, '<dwd:FormatCfg>') != -1) {
+            $collect = 1;
+          } elsif (index($line, '</dwd:FormatCfg>') != -1) {
+            $collect = 0;
+
+            if ($collectString =~ m/<dwd:DefaultUndefSign>([^<]+)<\/dwd:DefaultUndefSign>/) {
+              $defaultUndefSign = $1;
+            }
+
+            $collectString = '';
           }
         }
-      }
-      $forecast{timestamps} = \@timestamps;
-      $header{defaultUndefSign} = $defaultUndefSign;
 
-      if (!defined($issuer)) {
-        die "error in XML data, forecast issuer not found";
-      }
+        if (index($line, '<kml:Placemark>') != -1) {
+          # parsing the header data is not needed anymore
+          $headerParsed = 1;
+          $collect = 1;
+        } elsif (($collect == 1) && (index($line, '<kml:name>') != -1)) {
+          if (index($line, $station.'</kml:name>', 10) == -1) {
+            # no match
+            $collect = 0;
+            $collectString = '';
+          }
+        } elsif (($collect == 1) && (index($line, '</kml:Placemark>') != -1)) {
+          $collect = 0;
+          # add some additional tags needed for libXML
+          $collectString = $xmlVersion."\n".$xmlFormat."\n<kml:Document>\n".$collectString.$line."\n</kml:Document>\n</kml:kml>";
 
-      # extract time data
-      my %timeProperties;
-      my ($longitude, $latitude, $altitude);
-      my $placemarkNodeList = $dom->getElementsByLocalName('Placemark');
-      if ($placemarkNodeList->size()) {
-        my $placemarkNode = $placemarkNodeList->get_node(1);
-        foreach my $placemarkChildNode ($placemarkNode->nonBlankChildNodes()) {
-          if ($placemarkChildNode->nodeName() eq 'kml:description') {
-            my $description = $placemarkChildNode->textContent();
-            $header{description} = encode('UTF-8', $description);
-          } elsif ($placemarkChildNode->nodeName() eq 'kml:ExtendedData') {
-            foreach my $extendedDataChildNode ($placemarkChildNode->nonBlankChildNodes()) {
-              if ($extendedDataChildNode->nodeName() eq 'dwd:Forecast') {
-                my $elementName = $extendedDataChildNode->getAttribute('dwd:elementName');
-                # convert some elements names for backward compatibility
-                my $alias = $forecastPropertyAliases{$elementName};
-                if (defined($alias)) { $elementName = $alias };
-                my $selectedProperty = $selectedProperties{$elementName};
-                if (defined($selectedProperty)) {
-                  my $textContent = $extendedDataChildNode->nonBlankChildNodes()->get_node(1)->textContent();
-                  $textContent =~ s/^\s+|\s+$//g; # trim outside
-                  $textContent =~ s/\s+/ /g; # trim inside
-                  my @values = split(' ', $textContent);
-                  $timeProperties{$elementName} = \@values;
+          my $dom = XML::LibXML->load_xml(string => $collectString);
+          if (!$dom) {
+            die "parsing XML failed";
+          }
+
+          my $placemarkNodeList = $dom->getElementsByLocalName('Placemark');
+          if ($placemarkNodeList->size()) {
+            my $placemarkNode = $placemarkNodeList->get_node(1);
+
+            for my $placemarkChildNode ($placemarkNode->nonBlankChildNodes()) {
+              if ($placemarkChildNode->nodeName() eq 'kml:description') {
+                my $description = $placemarkChildNode->textContent();
+                $header{description} = encode('UTF-8', $description);
+              } elsif ($placemarkChildNode->nodeName() eq 'kml:ExtendedData') {
+                for my $extendedDataChildNode ($placemarkChildNode->nonBlankChildNodes()) {
+                  if ($extendedDataChildNode->nodeName() eq 'dwd:Forecast') {
+                    my $elementName = $extendedDataChildNode->getAttribute('dwd:elementName');
+                    # convert some elements names for backward compatibility
+                    my $alias = $forecastPropertyAliases{$elementName};
+                    if (defined($alias)) {
+                      $elementName = $alias
+                    }
+
+                    my $selectedProperty = $selectedProperties{$elementName};
+                    if (defined($selectedProperty)) {
+                      my $textContent = $extendedDataChildNode->nonBlankChildNodes()->get_node(1)->textContent();
+                      $textContent =~ s/^\s+|\s+$//g;                  # trim outside
+                      $textContent =~ s/\s+/ /g;                       # trim inside
+                      my @values = split(' ', $textContent);
+                      $timeProperties{$elementName} = \@values;
+                    }
+                  }
                 }
+              } elsif ($placemarkChildNode->nodeName() eq 'kml:Point') {
+                my $coordinates = $placemarkChildNode->nonBlankChildNodes()->get_node(1)->textContent();
+                $header{coordinates} = $coordinates;
+                ($longitude, $latitude, $altitude) = split(',', $coordinates);
               }
             }
-          } elsif ($placemarkChildNode->nodeName() eq 'kml:Point') {
-            my $coordinates = $placemarkChildNode->nonBlankChildNodes()->get_node(1)->textContent();
-            $header{coordinates} = $coordinates;
-            ($longitude, $latitude, $altitude) = split(',', $coordinates);
           }
+
+          # jump out of chunk loop
+          last READ_CHUNKS;
+        }
+
+        if ($collect == 1) {
+          $collectString .= $line;
         }
       }
 
-      # calculate sun position dependent properties for each timestamp
-      if (defined($longitude) && defined($latitude) && defined($altitude)) {
-        my @azimuths;
-        my @elevations;
-        my @sunups;
-        my @sunrises;
-        my @sunsets;
-        my $lastDate = '';
-        my $sunElevationCorrection = AstroSun::ElevationCorrection($altitude);
-        foreach my $timestamp (@timestamps) {
-          my ($azimuth, $elevation) = AstroSun::AzimuthElevation($timestamp, $longitude, $latitude);
-          push(@azimuths, $azimuth);     # [deg]
-          push(@elevations, $elevation); # [deg]
-          push(@sunups, $elevation >= $sunElevationCorrection? 1 : 0);
-          my $date = FormatDateLocal($hash, $timestamp);
-          if ($date ne $lastDate) {
-            # one calculation per day
-            my ($rise, $transit, $set) = AstroSun::RiseSet($timestamp + LocaltimeOffset($hash, $timestamp), $longitude, $latitude, $altitude);
-            push(@sunrises, FormatTimeLocal($hash, $rise));    # round down to current minute
-            push(@sunsets, FormatTimeLocal($hash, $set + 30)); # round up to next minute
-            $lastDate = $date;
-
-            #::Log3 $name, 3, "$name: ProcessForecast " . FormatDateTimeLocal($hash, $timestamp) . " $rise " . FormatDateTimeLocal($hash, $rise) . " $transit " . FormatDateTimeLocal($hash, $transit). " $set " . FormatDateTimeLocal($hash, $set + 30);
-          } else {
-            push(@sunrises, $defaultUndefSign); # round down to current minute
-            push(@sunsets, $defaultUndefSign);  # round up to next minute
-          }
-        }
-        if (defined($selectedProperties{SunAz})) {
-          $timeProperties{SunAz} = \@azimuths;
-        }
-        if (defined($selectedProperties{SunEl})) {
-          $timeProperties{SunEl} = \@elevations;
-        }
-        if (defined($selectedProperties{SunUp})) {
-          $timeProperties{SunUp} = \@sunups;
-        }
-        if (defined($selectedProperties{SunRise})) {
-          $timeProperties{SunRise} = \@sunrises;
-        }
-        if (defined($selectedProperties{SunSet})) {
-          $timeProperties{SunSet} = \@sunsets;
-        }
+      # find end of last line within chunk
+      my $end = rindex($buffer, "\n");
+      # copy the last incomplete line to the buffer of the next chunk
+      if (($end > 0) && ($end < length($buffer) - 1)) {
+        $buffer = substr($buffer, $end + 1);
+        $offset = length($buffer);
       }
-
-      $forecast{timeProperties} = \%timeProperties;
+      
+      $startOfLine = 0;
     }
+
+    $zip->close();
+
+    $forecast{timestamps} = \@timestamps;
+    $header{defaultUndefSign} = $defaultUndefSign;
+
+    if (!defined($issuer)) {
+      die "error in XML data, forecast issuer not found";
+    }
+
+    ::Log3 $name, 5, "$name: ProcessForecast: extracting data";
+
+    # calculate sun position dependent properties for each timestamp
+    if (defined($longitude) && defined($latitude) && defined($altitude)) {
+      my @azimuths;
+      my @elevations;
+      my @sunups;
+      my @sunrises;
+      my @sunsets;
+      my $lastDate = '';
+      my $sunElevationCorrection = AstroSun::ElevationCorrection($altitude);
+      for my $timestamp (@timestamps) {
+        my ($azimuth, $elevation) = AstroSun::AzimuthElevation($timestamp, $longitude, $latitude);
+        push(@azimuths, $azimuth);     # [deg]
+        push(@elevations, $elevation); # [deg]
+        push(@sunups, $elevation >= $sunElevationCorrection? 1 : 0);
+        my $date = FormatDateLocal($hash, $timestamp);
+        if ($date ne $lastDate) {
+          # one calculation per day
+          my ($rise, $transit, $set) = AstroSun::RiseSet($timestamp + LocaltimeOffset($hash, $timestamp), $longitude, $latitude, $altitude);
+          push(@sunrises, FormatTimeLocal($hash, $rise));    # round down to current minute
+          push(@sunsets, FormatTimeLocal($hash, $set + 30)); # round up to next minute
+          $lastDate = $date;
+
+          #::Log3 $name, 3, "$name: ProcessForecast " . FormatDateTimeLocal($hash, $timestamp) . " $rise " . FormatDateTimeLocal($hash, $rise) . " $transit " . FormatDateTimeLocal($hash, $transit). " $set " . FormatDateTimeLocal($hash, $set + 30);
+        } else {
+          push(@sunrises, $defaultUndefSign); # round down to current minute
+          push(@sunsets, $defaultUndefSign);  # round up to next minute
+        }
+      }
+      if (defined($selectedProperties{SunAz})) {
+        $timeProperties{SunAz} = \@azimuths;
+      }
+      if (defined($selectedProperties{SunEl})) {
+        $timeProperties{SunEl} = \@elevations;
+      }
+      if (defined($selectedProperties{SunUp})) {
+        $timeProperties{SunUp} = \@sunups;
+      }
+      if (defined($selectedProperties{SunRise})) {
+        $timeProperties{SunRise} = \@sunrises;
+      }
+      if (defined($selectedProperties{SunSet})) {
+        $timeProperties{SunSet} = \@sunsets;
+      }
+    }
+
+    $forecast{timeProperties} = \%timeProperties;
     $forecast{header} = \%header;
   };
 
@@ -1934,11 +2307,14 @@ sub GetForecastFinish {
     }
 
     if (defined($errorMessage) && length($errorMessage) > 0) {
-      ::readingsSingleUpdate($hash, 'state', "forecast error: $errorMessage", 1);
-
       ::readingsBeginUpdate($hash);
-      ::readingsBulkUpdate($hash, 'state', "forecast error: $errorMessage");
-      ::readingsBulkUpdate($hash, 'fc_state', "error: $errorMessage");
+      if ($errorMessage eq 'up-to-date') {
+        ::readingsBulkUpdate($hash, 'state', "forecast unchanged");
+        ::readingsBulkUpdate($hash, 'fc_state', 'updated');
+      } else {
+        ::readingsBulkUpdate($hash, 'state', "forecast error: $errorMessage");
+        ::readingsBulkUpdate($hash, 'fc_state', "error: $errorMessage");
+      }
 
       # rotate forecast anyway
       my $station = $hash->{".station"};
@@ -2033,7 +2409,7 @@ sub UpdateForecast {
   delete $forecast->{header}{defaultUndefSign};
   while (my ($property, $value) = each %{$forecast->{header}})
   {
-    ::readingsBulkUpdate($hash, 'fc_'.$property, $value);
+    ::readingsBulkUpdate($hash, 'fc_'.$property, (!$::unicodeEncoding ? encode('UTF-8', $value) : $value));
   }
 
   # prepare time processing
@@ -2062,7 +2438,7 @@ sub UpdateForecast {
     # write data
     my $dayPrefix = 'fc'.$relativeDay.'_';
     if ($dayPrefix ne $lastDayPrefix) {
-      ::readingsBulkUpdate($hash, $dayPrefix.'date', FormatDateLocal($hash, $forecastTime));
+      ::readingsBulkUpdate($hash, $dayPrefix.'date',    FormatDateLocal   ($hash, $forecastTime));
       ::readingsBulkUpdate($hash, $dayPrefix.'weekday', FormatWeekdayLocal($hash, $forecastTime));
       $lastDayPrefix = $dayPrefix;
     }
@@ -2092,7 +2468,7 @@ sub UpdateForecast {
             elsif ($forecastPropertyType == 2) {
               $value = sprintf('%0.0f', $value); # round()
               if ($forecastWW2Text && ($property eq 'ww') && defined($hourPrefix) && length($value) > 0) {
-                ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.'wwd', $wwdText[$value]);
+                ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.'wwd', (!$::unicodeEncoding ? encode('UTF-8', $wwdText[$value]) : $wwdText[$value]));   
               }
             }
             elsif ($forecastPropertyType == 3) {
@@ -2108,10 +2484,10 @@ sub UpdateForecast {
           my $forecastPropertyPeriod = $forecastPropertyPeriods{$property};
           if ($forecastPropertyPeriod == 24) {
             # day property
-            ::readingsBulkUpdate($hash, $dayPrefix.$property, $value);
+            ::readingsBulkUpdate($hash, $dayPrefix.$property, (!$::unicodeEncoding ? encode('UTF-8', $value) : $value));
           } elsif (defined($hourPrefix)) {
             # hour property
-            ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.$property, $value);
+            ::readingsBulkUpdate($hash, $dayPrefix.$hourPrefix.$property, (!$::unicodeEncoding ? encode('UTF-8', $value) : $value));
           }
         }
       }
@@ -2179,7 +2555,8 @@ sub GetAlerts {
       # kill old blocking call
       ::BlockingKill($hash->{".alertsBlockingCall".$communeUnion});
     }
-    $hash->{".alertsBlockingCall".$communeUnion} = ::BlockingCall("DWD_OpenData::GetAlertsStart", $hash, "DWD_OpenData::GetAlertsFinish", 60, "DWD_OpenData::GetAlertsAbort", $hash);
+    my $timeout = ::AttrVal($name, 'downloadTimeout', DOWNLOAD_TIMEOUT_DEFAULT);
+    $hash->{".alertsBlockingCall".$communeUnion} = ::BlockingCall("DWD_OpenData::GetAlertsStart", $hash, "DWD_OpenData::GetAlertsFinish", $timeout, "DWD_OpenData::GetAlertsAbort", $hash);
 
     $alertsUpdating[$communeUnion] = time();
 
@@ -2225,20 +2602,35 @@ sub GetAlertsStart {
   my $communeUnion = IsCommuneUnionWarncellId($warncellId);
   my $alertLanguage = ::AttrVal($name, 'alertLanguage', 'DE');
   my $url = 'https://opendata.dwd.de/weather/alerts/cap/'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_CELLS_STAT/Z_CAP_C_EDZW_LATEST_PVW_STATUS_PREMIUMCELLS_'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_'.$alertLanguage.'.zip';
-  my $param = {
-                url        => $url,
-                method     => "GET",
-                timeout    => 30,
-                hash       => $hash,
-                warncellId => $warncellId
-              };
-  ::Log3 $name, 5, "$name: GetAlertsStart START (PID $$): $url";
-  my ($httpError, $fileContent) = ::HttpUtils_BlockingGet($param);
 
-  # process retrieved data
-  my $result = ProcessAlerts($param, $httpError, $fileContent);
+  my ($dwdDocSize, $dwdDocTime);
+  my $update = IsDocumentUpdated($hash, $url, 'a', $dwdDocSize, $dwdDocTime);
 
-  ::Log3 $name, 5, "$name: GetAlertsStart END";
+  my $result;
+  if ($update) {
+    my $param = {
+                  url        => $url,
+                  method     => "GET",
+                  timeout    => ::AttrVal($name, 'downloadTimeout', DOWNLOAD_TIMEOUT_DEFAULT),
+                  hash       => $hash,
+                  warncellId => $warncellId,
+                  dwdDocSize => $dwdDocSize,
+                  dwdDocTime => $dwdDocTime,
+                };
+
+    ::Log3 $name, 5, "$name: GetAlertsStart START (PID $$): $url $dwdDocSize $dwdDocTime";
+    my ($httpError, $fileContent) = ::HttpUtils_BlockingGet($param);
+
+    # process retrieved data
+    $result = ProcessAlerts($param, $httpError, $fileContent);
+
+    ::Log3 $name, 5, "$name: GetAlertsStart END";
+  } else {
+    # already up to date
+    $result = [$name, 'up-to-date', $warncellId, time()];
+
+    ::Log3 $name, 5, "$name: GetAlertsStart UP-TO-DATE";
+  }
 
   return $result;
 }
@@ -2247,7 +2639,11 @@ sub GetAlertsStart {
 
 =over
 
-=item * param hash: hash of DWD_OpenData device
+=item * param param: parameter hash from call to HttpUtils_NonblockingGet
+
+=item * param httpError: nothing or HTTP error string
+
+=item * param fileContent: data retrieved from URL
 
 =item * return result required by function L</GetAlertsFinish(@)>
 
@@ -2262,14 +2658,15 @@ ATTENTION: This method is executed in a different process than FHEM.
 
 sub ProcessAlerts {
   my ($param, $httpError, $fileContent) = @_;
-  my $time       = time();
   my $hash       = $param->{hash};
   my $name       = $hash->{NAME};
   my $url        = $param->{url};
   my $code       = $param->{code};
   my $warncellId = $param->{warncellId};
 
-  ::Log3 $name, 5, "$name: ProcessAlerts START (PID $$)";
+  $param->{receivedTime} = time();
+
+  ::Log3 $name, 5, "$name: ProcessAlerts START (PID $$) $warncellId";
 
   my %alerts;
   eval {
@@ -2429,7 +2826,7 @@ sub ProcessAlerts {
 
   ::Log3 $name, 5, "$name: ProcessAlerts END";
 
-  return [$name, $errorMessage, $warncellId, $time];
+  return [$name, $errorMessage, $param->{warncellId}, $param->{receivedTime}, $param->{url}, $param->{dwdDocSize}, $param->{dwdDocTime}];
 }
 
 =head2 GetAlertsFinish(@)
@@ -2451,10 +2848,20 @@ BlockingCall I<FinishFn> callback, expects array returned by function L</GetAler
 =cut
 
 sub GetAlertsFinish {
-  my ($name, $errorMessage, $warncellId, $time) = @_;
+  my ($name, $errorMessage, $warncellId, $receivedTime, $url, $dwdDocSize, $dwdDocTime) = @_;
+  my $paramCount = @_;
+
+  my %docHeader;
+  if ($paramCount > 3) {
+    $docHeader{warncellId} = $warncellId;
+    $docHeader{receivedTime} = $receivedTime;
+    $docHeader{url} = $url;
+    $docHeader{dwdDocSize} = $dwdDocSize;
+    $docHeader{dwdDocTime} = $dwdDocTime;
+  }
 
   if (defined($name)) {
-    ::Log3 $name, 5, "$name: GetAlertsFinish START (PID $$)";
+    ::Log3 $name, 5, "$name: GetAlertsFinish START (PID $$) $warncellId";
 
     my $hash = $::defs{$name};
     my $communeUnion = IsCommuneUnionWarncellId($warncellId);
@@ -2506,7 +2913,7 @@ sub GetAlertsFinish {
       $alertsData[$communeUnion] = $alerts;
 
       if ($warncellId == UPDATE_ALL) {
-        if (!defined($alertsUpdating[0]) || (time() - $alertsUpdating[0] >= 60)) {
+        if (!defined($alertsUpdating[0]) || (time() - $alertsUpdating[0] >= PROCESSING_TIMEOUT)) {
           # communeunions cache updated, start district cache update;
           GetAlerts($hash, UPDATE_DISTRICTS);
         }
@@ -2514,18 +2921,25 @@ sub GetAlertsFinish {
         ::readingsSingleUpdate($hash, 'state', 'alerts cache updated', 1);
       }
     }
-    $alertsReceived[$communeUnion] = $time;
+    $alertsReceived[$communeUnion] = $receivedTime;
 
     if (defined($errorMessage) && length($errorMessage) > 0) {
-      $alertsErrorMessage[$communeUnion] = $errorMessage;
-      ::readingsSingleUpdate($hash, 'state', "alerts error: $errorMessage", 1);
+      if ($errorMessage eq 'up-to-date') {
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdate($hash, 'a_time', FormatDateTimeLocal($hash, $receivedTime));
+        ::readingsBulkUpdate($hash, 'a_state', 'updated');
+        ::readingsBulkUpdate($hash, 'state', "alerts unchanged");
+        ::readingsEndUpdate($hash, 1);
+      } else {
+        ::readingsSingleUpdate($hash, 'state', "alerts error: $errorMessage", 1);
+      }
     } else {
       $alertsErrorMessage[$communeUnion] = undef;
     }
 
-    if ($warncellId >= 0) {
+    if ($paramCount > 3 && $errorMessage ne 'up-to-date') {
       # update alert readings for warncell id
-      UpdateAlerts($hash, $warncellId);
+      UpdateAlerts($hash, $warncellId, \%docHeader);
     }
 
     $alertsUpdating[$communeUnion] = undef;
@@ -2587,11 +3001,11 @@ update alert readings for given warncell id from global alerts list
 =cut
 
 sub UpdateAlerts {
-  my ($hash, $warncellId) = @_;
+  my ($hash, $warncellId, $docHeader) = @_;
   my $name = $hash->{NAME};
 
   # delete existing alert readings
-  ::CommandDeleteReading(undef, "$name ^(?!a_count|a_state|a_time)a_.*");
+  ::CommandDeleteReading(undef, "$name ^(?!a_count|a_state|a_time|a_url|a_dwdDocSize|a_dwdDocTime)a_.*");
 
   ::readingsBeginUpdate($hash);
 
@@ -2647,7 +3061,7 @@ sub UpdateAlerts {
           my $prefix = 'a_'.$index.'_';
           ::readingsBulkUpdate($hash, $prefix.'category',     $alert->{category});
           ::readingsBulkUpdate($hash, $prefix.'event',        $alert->{eventCode});
-          ::readingsBulkUpdate($hash, $prefix.'eventDesc',    encode('UTF-8', $alert->{event}));
+          ::readingsBulkUpdate($hash, $prefix.'eventDesc',    (!$::unicodeEncoding ? encode('UTF-8', $alert->{event}) : $alert->{event}));
           ::readingsBulkUpdate($hash, $prefix.'eventGroup',   $alert->{eventGroup});
           ::readingsBulkUpdate($hash, $prefix.'responseType', $alert->{responseType});
           ::readingsBulkUpdate($hash, $prefix.'urgency',      $alert->{urgency});
@@ -2655,11 +3069,11 @@ sub UpdateAlerts {
           ::readingsBulkUpdate($hash, $prefix.'areaColor',    $alert->{areaColor});
           ::readingsBulkUpdate($hash, $prefix.'onset',        FormatDateTimeLocal($hash, $alert->{onset}));
           ::readingsBulkUpdate($hash, $prefix.'expires',      FormatDateTimeLocal($hash, $alert->{expires}));
-          ::readingsBulkUpdate($hash, $prefix.'headline',     encode('UTF-8', $alert->{headline}));
-          ::readingsBulkUpdate($hash, $prefix.'description',  encode('UTF-8', $alert->{description}));
-          ::readingsBulkUpdate($hash, $prefix.'instruction',  encode('UTF-8', $alert->{instruction}));
+          ::readingsBulkUpdate($hash, $prefix.'headline',     (!$::unicodeEncoding ? encode('UTF-8', $alert->{headline}) : $alert->{headline}));
+          ::readingsBulkUpdate($hash, $prefix.'description',  (!$::unicodeEncoding ? encode('UTF-8', $alert->{description}) : $alert->{description}));
+          ::readingsBulkUpdate($hash, $prefix.'instruction',  (!$::unicodeEncoding ? encode('UTF-8', $alert->{instruction}) : $alert->{instruction}));
           ::readingsBulkUpdate($hash, $prefix.'area',         $alert->{warncellid}[$areaIndex]);
-          ::readingsBulkUpdate($hash, $prefix.'areaDesc',     encode('UTF-8', $alert->{areaDesc}[$areaIndex]));
+          ::readingsBulkUpdate($hash, $prefix.'areaDesc',     (!$::unicodeEncoding ? encode('UTF-8', $alert->{areaDesc}[$areaIndex]) : $alert->{areaDesc}[$areaIndex]));
           ::readingsBulkUpdate($hash, $prefix.'altitude',     floor(0.3048*$alert->{altitude}[$areaIndex] + 0.5));
           ::readingsBulkUpdate($hash, $prefix.'ceiling',      floor(0.3048*$alert->{ceiling}[$areaIndex] + 0.5));
           $index++;
@@ -2670,14 +3084,20 @@ sub UpdateAlerts {
 
       # license
       if ($index == 1 && defined($alert->{license})) {
-        ::readingsBulkUpdate($hash, 'a_copyright', encode('UTF-8', $alert->{license}));
+        ::readingsBulkUpdate($hash, 'a_copyright', (!$::unicodeEncoding ? encode('UTF-8', $alert->{license}) : $alert->{license}));
       }
     }
   }
 
-  # alert count and receive time
+  # alert count, receive time and DWD document properties
   ::readingsBulkUpdate($hash, 'a_count', $index);
-  ::readingsBulkUpdate($hash, "a_time", FormatDateTimeLocal($hash, $alertsReceived[$communeUnion]));
+  if (defined($docHeader)) {
+    ::readingsBulkUpdate($hash, "a_time", FormatDateTimeLocal($hash, $docHeader->{receivedTime}));
+    ::readingsBulkUpdate($hash, "a_url", $docHeader->{url});
+    ::readingsBulkUpdate($hash, "a_dwdDocSize", $docHeader->{dwdDocSize});
+    ::readingsBulkUpdate($hash, "a_dwdDocTime", $docHeader->{dwdDocTime});
+  }
+
   ::readingsBulkUpdate($hash, 'state', 'alerts updated');
 
   ::readingsEndUpdate($hash, 1);
@@ -2715,9 +3135,10 @@ sub DWD_OpenData_Initialize {
   $hash->{GetFn}      = 'DWD_OpenData::Get';
 
   $hash->{AttrList} = 'disable:0,1 '
-                      .'forecastStation forecastDays forecastProperties forecastResolution:1,3,6 forecastWW2Text:0,1 forecastPruning:0,1 '
+                      .'forecastStation forecastDays forecastProperties forecastResolution:1,3,6 forecastWW2Text:0,1 forecastPruning:0,1 forecastRefresh:slider,6,-1,1 '
                       .'alertArea alertLanguage:DE,EN alertExcludeEvents '
                       .'timezone '
+                      .'downloadTimeout '
                       .$readingFnAttributes;
 }
 
@@ -2728,6 +3149,37 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 25.05.2025 (version 1.17.7) DS_Starter
+# check in the previous contrib version into FHEM SVN
+# 
+# 18.10.2024 (version 1.17.7) DS_Starter
+# 1.17.7: bugfix: change attr "when" to "if" - https://forum.fhem.de/index.php?msg=1319475
+#
+# 17.10.2024 (version 1.17.6) DS_Starter
+# feature: Timer - quarter 3 
+#
+# 20.05.2024 (version 1.17.5) DS_Starter
+# feature: use utf8, accept global encode=unicode
+#
+# 18.05.2024 (version 1.17.4) mumpitzstuff
+# feature: RAM/Flash consumption significantly reduced
+#
+# 01.03.2024 (version 1.17.3) jensb + DS_Starter
+# feature: unzip large forecast files to disk and filter out selected station before processing
+# change: increased max value for attribute downloadTimeout to 120 s
+# change: LWP request HEAD replaced with HttpUtils_BlockingGet
+#
+# 01.03.2024 (version 1.17.2) jensb
+# feature: skip download of alert data if DWD document is unchanged
+# change: attribute forecastDataPresision replaced with attribute forecastRefresh
+#
+# 28.02.2024 (version 1.17.1) jensb
+# feature: skip download of forecast data if DWD document is unchanged
+# feature: show context description for get commands and attributes in FHEMWEB
+#
+# 25.02.2024 (version 1.17.0) DS_Starter + jensb
+# feature: support MOSMIX S
 #
 # 16.02.2021 (version 1.16.3) jensb
 # bugfix: fix version for experimental::smartmatch
@@ -2831,8 +3283,8 @@ sub DWD_OpenData_Initialize {
 # 22.03.2018 jensb
 # bugfix: replaced trunc with round when calculating delta days to cope with summertime
 #
-# 18.02.2018 jensb
-# feature: LWP::Simple replaced by HttpUtils_NonblockingGet (provided by JoWiemann)
+# 18.02.2018 JoWiemann + jensb
+# feature: LWP::Simple replaced by HttpUtils_NonblockingGet
 #
 # -----------------------------------------------------------------------------
 
@@ -2860,7 +3312,7 @@ sub DWD_OpenData_Initialize {
 
 =begin html
 
-<a name="DWD_OpenData"></a>
+<a id="DWD_OpenData"></a>
 <h3>DWD_OpenData</h3>
 <ul>
   The Deutsche Wetterdienst (DWD) provides public weather related data via its <a href="https://www.dwd.de/DE/leistungen/opendata/opendata.html">Open Data Server</a>. Any usage of the service and the data provided by the DWD is subject to the usage conditions on the Open Data Server webpage. An overview of the available content can be found at <a href="https://www.dwd.de/DE/leistungen/opendata/help/inhalt_allgemein/opendata_content_de_en_xls.xls">OpenData_weather_content.xls</a>. <br><br>
@@ -2906,25 +3358,27 @@ sub DWD_OpenData_Initialize {
       <li>This module provides sun position related information that is not available from the DWD. The properties for sunrise, sunset and sun up are calculated for the upper solar limb at given altitude and typical atmospheric refraction. </li><br>
   </ul><br>
 
-  <a name="DWD_OpenDatadefine"></a>
+  <a id="DWD_OpenData-define"></a>
   <b>Define</b> <br><br>
   <code>define &lt;name&gt; DWD_OpenData</code> <br><br><br>
 
-
-  <a name="DWD_OpenDataget"></a>
+  <a id="DWD_OpenData-get"></a>
   <b>Get</b>
   <ul> <br>
+      <a id="DWD_OpenData-get-forecast"></a>
       <li>
           <code>get forecast [&lt;station code&gt;]</code><br>
           Fetch forecast for a station from DWD and update readings. The station code is either a 5 digit WMO station code or an alphanumeric DWD station code from the <a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.pdf">MOSMIX station catalogue</a>. If the attribute <code>forecastStation</code> is set, no <i>station code</i> must be provided. <br>
           The operation is performed non-blocking.
       </li> <br>
+      <a id="DWD_OpenData-get-alerts"></a>
       <li>
           <code>get alerts [&lt;warncell id&gt;]</code><br>
           Set alert readings for given warncell id. A warncell id is a 9 digit numeric value from the <a href="https://www.dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.csv">Warncell-IDs for CAP alerts catalogue</a>. Supported ids start with 8 (communeunion), 1 and 9 (district) or 5 (coast). If the attribute <code>alertArea</code> is set, no <i>warncell id</i> must be provided. <br>
           If the alerts cache is empty or older than 15 minutes the cache is updated first and the operation is non-blocking. If the cache is valid the operation is blocking. If a cache update is already in progress the operation fails. <br>
           To verify that alerts are provided for the warncell id you selected you should consult another source, wait for an alert situation and compare.
       </li> <br>
+      <a id="DWD_OpenData-get-updateAlertsCache"></a>
       <li>
           <code>get updateAlertsCache { communeUnions|districts|all }</code><br>
           Fetch alerts to update the alerts cache. Note that 'coast' alerts are part of the 'communeUnion' cache data. <br>
@@ -2934,12 +3388,20 @@ sub DWD_OpenData_Initialize {
   </ul> <br><br>
 
 
-  <a name="DWD_OpenDataattr"></a>
+  <a id="DWD_OpenData-attr"></a>
   <b>Attributes</b><br>
   <ul> <br>
+      <a id="DWD_OpenData-attr-disable"></a>
       <li>disable {0|1}, default: 0<br>
           Disable fetching data.
       </li><br>
+      
+      <a id="DWD_OpenData-attr-downloadTimeout"></a>
+      <li>downloadTimeout &lt;n&gt;, 30 .. 60 s, default: 30 s<br>
+          Timeout for downloading data (alerts, forecasts) from DWD server.
+      </li><br>
+      
+      <a id="DWD_OpenData-attr-timezone"></a>
       <li>timezone &lt;tz&gt;, default: OS dependent<br>
           <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">IANA TZ string</a> for date and time readings (e.g. "Europe/Berlin"), can be used to assume the perspective of a station that is in a different timezone or if your OS timezone settings do not match your local timezone. Alternatively you may use <code>tzselect</code> on the Linux command line to find a valid timezone string.
       </li><br>
@@ -2947,27 +3409,60 @@ sub DWD_OpenData_Initialize {
 
   <b>forecast</b> related:
   <ul> <br>
+      <a id="DWD_OpenData-attr-forecastStation"></a>
       <li>forecastStation &lt;station code&gt;, default: none<br>
           Setting forecastStation enables automatic updates every hour.
-          The station code is either a 5 digit WMO station code or an alphanumeric DWD station code from the <code>id</code> column of the <a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.pdf">MOSMIX station catalogue</a>.<br>
+          The station code is either a 5 digit WMO station code or an alphanumeric DWD station code from the <code>id</code> column of the
+          <a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.pdf">MOSMIX station catalogue</a>.<br>
           Note: When value is changed all existing forecast readings will be deleted.
       </li><br>
-      <li>forecastDays &lt;n&gt;, default: 6<br>
+      
+      <a id="DWD_OpenData-attr-forecastDays"></a>
+      <li>forecastDays &lt;n&gt;, default: 6 d<br>
           Limits number of forecast days. Setting 0 will still provide forecast data for today. The maximum value is 9 (for today and 9 future days).
       </li><br>
+      
+      <a id="DWD_OpenData-attr-forecastResolution"></a>
       <li>forecastResolution {1|3|6}, default: 6 h<br>
           Time resolution (number of hours between 2 samples).<br>
           Note: When value is changed all existing forecast readings will be deleted.
       </li><br>
+      
+      <a id="DWD_OpenData-attr-forecastRefresh"></a>
+      <li>forecastRefresh &lt;n&gt;, 1 .. 6 h, default: 6 h<br>
+          The DWD distinguishes between MOSMIX S and L reports, which differ in terms of update frequency and available data elements:<br>
+          - 1 .. 5 h: MOSMIX S, 40 data elements, updated every 1 h at ~25 min past every hour, download volume ~40 MB/h<br>
+          - 6 h: MOSMIX L, ~115 data elements, updated every 6 h at ~55 min past 21/3/9/15 UTC, download volume ~3 kB/h<br>
+
+          See the
+          <a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_verfahrenbeschreibung_gesamt.pdf">MOSMIX processes description</a>
+          and the
+          <a href="https://www.dwd.de/DE/leistungen/opendata/help/schluessel_datenformate/kml/mosmix_elemente_xls.html">MOSMIX data element discription</a>
+          for more details.<br><br>
+
+          Notes for using MOSMIX S:<br>
+          - MOSMIX S requires more ressources than the recources of MOSMIX L.<br>
+          - Minimum hardware recommendations: CPU with 2 cores, 2 GB RAM, 1 GB tmpfs for /tmp or magnetic disk.<br>
+          - When using an SD card for /tmp its lifetime could be reduced due to the write rate of ~700 MB/h.<br>
+          - Processing time dependes on download bandwidth and hardware performance.<br>
+          - Depending on the available download bandwidth the attribute downloadTimeout must be adjusted.<br>
+          - When switching between MOSMIX S and L all existing forecast readings will be deleted.
+      </li><br>
+      
+      <a id="DWD_OpenData-attr-forecastProperties"></a>
       <li>forecastProperties [&lt;p1&gt;[,&lt;p2&gt;]...], default: Tx, Tn, Tg, TTT, DD, FX1, Neff, RR6c, RRhc, Rh00, ww<br>
           See the <a href="https://opendata.dwd.de/weather/lib/MetElementDefinition.xml">DWD forecast property defintions</a> for more details.<br>
           Notes:<br>
           - Not all properties are available for all stations and for all hours.<br>
           - If you remove a property from the list then already existing readings must be deleted manually in continuous mode.<br>
       </li><br>
+      
+      <a id="DWD_OpenData-attr-forecastWW2Text"></a>
       <li>forecastWW2Text {0|1}, default: 0<br>
           Create additional wwd readings containing the weather code as a descriptive text in German language.
       </li><br>
+      
+      <a id="DWD_OpenData-attr-forecastPruning"></a>
       <li>forecastPruning {0|1}, default: 0<br>
           Search for and delete forecast readings that are more then one day older then other forecast readings of the same day. Pruning will be performed after a successful forecast update.<br>
           Notes:<br>
@@ -2978,13 +3473,18 @@ sub DWD_OpenData_Initialize {
 
   <b>alert</b> related:
   <ul> <br>
+      <a id="DWD_OpenData-attr-alertArea"></a>
       <li>alertArea &lt;warncell id&gt;, default: none<br>
           Setting alertArea enables automatic updates of the alerts cache every 15 minutes.<br>
           A warncell id is a 9 digit numeric value from the <a href="https://www.dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.csv">Warncell-IDs for CAP alerts catalogue</a>. Supported ids start with 7 and 8 (communeunion), 1 and 9 (district) or 5 (coast). To verify that alerts are provided for the warncell id you selected you should consult another source, wait for an alert situation and compare.
       </li>
+      
+      <a id="DWD_OpenData-attr-alertLanguage"></a>
       <li>alertLanguage [DE|EN], default: DE<br>
           Language of descriptive alert properties.
       </li>
+      
+      <a id="DWD_OpenData-attr-alertExcludeEvents"></a>
       <li>alertExcludeEvents &lt;event code&gt;, default: none<br>
           Comma separated list of numeric events codes for which no alerts should be created.<br>
           Only minor alerts may be suppressed. Use at your own risk!
@@ -2992,7 +3492,7 @@ sub DWD_OpenData_Initialize {
   </ul> <br><br>
 
 
-  <a name="DWD_OpenDatareadings"></a>
+  <a id="DWD_OpenData-readings"></a>
   <b>Readings</b> <br><br>
 
   The <b>forecast</b> readings are build like this: <br><br>
@@ -3072,6 +3572,9 @@ sub DWD_OpenData_Initialize {
       <li>fc_description - station description</li>
       <li>fc_coordinates - world coordinate and height of station</li>
       <li>fc_time        - time the forecast was issued based on the timezone attribute</li>
+      <li>fc_url         - URL of the forecast report document on the DWD webserver</li>
+      <li>fc_dwdDocTime  - time of the forecast report document on the DWD webserver (UTC)</li>
+      <li>fc_dwdDocSize  - size of the forecast report document on the DWD webserver (bytes)</li>
       <li>fc_copyright   - legal information, must be displayed with forecast data, see DWD usage conditions</li>
     </ul>
   </ul> <br>
@@ -3110,10 +3613,13 @@ sub DWD_OpenData_Initialize {
 
   <ul>
     <ul>
-      <li>a_state     - state of the last alerts update, possible values are 'updated' and 'error: ...'</li>
-      <li>a_time      - time the last alerts update was downloaded, based on the timezone attribute</li>
-      <li>a_count     - number of alerts available for selected warncell id</li>
-      <li>a_copyright - legal information, must be displayed with forecast data, see DWD usage conditions, not available if count is zero</li>
+      <li>a_state      - state of the last alerts update, possible values are 'updated' and 'error: ...'</li>
+      <li>a_time       - time the last alerts update was downloaded, based on the timezone attribute</li>
+      <li>a_count      - number of alerts available for selected warncell id</li>
+      <li>a_url        - URL of the alerts report document on the DWD webserver</li>
+      <li>a_dwdDocTime - time of the alerts report document on the DWD webserver (UTC)</li>
+      <li>a_dwdDocSize - size of the alerts report document on the DWD webserver (bytes)</li>
+      <li>a_copyright  - legal information, must be displayed with forecast data, see DWD usage conditions, not available if count is zero</li>
     </ul>
   </ul> <br>
 
@@ -3134,7 +3640,7 @@ sub DWD_OpenData_Initialize {
 
 =begin html_DE
 
-<a name="DWD_OpenData"></a>
+<a id="DWD_OpenData"></a>
 <h3>DWD_OpenData</h3>
 <ul>
   Der Deutsche Wetterdienst (DWD) stellt Wetterdaten &uuml;ber den <a href="https://www.dwd.de/DE/leistungen/opendata/opendata.html">Open Data Server</a> zur Verf&uuml;gung. Die Verwendung dieses Dienstes und der vom DWD zur Verf&uuml;gung gestellten Daten unterliegt den auf der OpenData Webseite beschriebenen Bedingungen. Einen &Uuml;berblick &uuml;ber die verf&uuml;gbaren Daten findet man in der Tabelle <a href="https://www.dwd.de/DE/leistungen/opendata/help/inhalt_allgemein/opendata_content_de_en_xls.xls">OpenData_weather_content.xls</a>. <br><br>

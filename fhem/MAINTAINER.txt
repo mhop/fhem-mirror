@@ -303,7 +303,7 @@ FHEM/52_I2C_PCF8574          klausw               Sonstige Systeme
 FHEM/52_I2C_SHT21            klausw               Sonstige Systeme
 FHEM/52_I2C_SHT3x            macs                 Sonstige Systeme
 FHEM/53_GHoma.pm             klausw               Sonstige Systeme
-FHEM/55_DWD_OpenData.pm      jensb                Unterstützende Dienste/Wettermodule
+FHEM/55_DWD_OpenData.pm      DS_Starter/orphan    Unterstützende Dienste/Wettermodule
 FHEM/55_InfoPanel.pm         betateilchen         Sonstiges
 FHEM/55_PIFACE.pm            klaus.schauer        Einplatinencomputer
 FHEM/56_POKEYS.pm            axelberner           Sonstiges
