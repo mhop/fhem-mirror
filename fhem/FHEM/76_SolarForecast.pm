@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.6" => "27.05.2025  verbose 3 for consumer switch log ",
   "1.52.5" => "25.05.2025  edit commandref, _batChargeMgmt: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
                            "check attribute values for prohibited occurrence [...] Forum: https://forum.fhem.de/index.php?msg=1342147 ".
                            "_flowGraphic: bugfix chain style in case of logical on/off Forum: https://forum.fhem.de/index.php?msg=1342122 ".
@@ -13016,7 +13017,7 @@ sub ___switchConsumerOn {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
           }
           else {
-              Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+              Log3 ($name, 3, "$name - $state (Automatic = $auto)");
           }
 
           CommandSet (undef, "$dswname $oncom");
@@ -13040,7 +13041,7 @@ sub ___switchConsumerOn {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
       }
       else {
-          Log3 ($name, 2, "$name - $state");
+          Log3 ($name, 3, "$name - $state");
       }
 
       CommandSet (undef, "$dswname $oncom");
@@ -13109,7 +13110,7 @@ sub ___switchConsumerOff {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $offcom"});
       }
       else {
-          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+          Log3 ($name, 3, "$name - $state (Automatic = $auto)");
       }
 
       CommandSet (undef,"$dswname $offcom");
@@ -13130,7 +13131,7 @@ sub ___switchConsumerOff {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $offcom"});
       }
       else {
-          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+          Log3 ($name, 3, "$name - $state (Automatic = $auto)");
       }
 
       CommandSet (undef,"$dswname $offcom");
@@ -13263,7 +13264,7 @@ sub ___setConsumerSwitchingState {
           writeCacheToFile ($hash, 'consumers', $csmcache.$name);                           # Cache File Consumer schreiben
       }
 
-      Log3 ($name, 2, "$name - $state");
+      Log3 ($name, 3, "$name - $state");
   }
 
 return $state;
