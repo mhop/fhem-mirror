@@ -263,8 +263,8 @@ while loop_date <= end_date:
 
           if (Prognose > Limit):
             if (verbose >= 4):
-                print("Forecast value to high : " + str(Prognose)+" > " + str(Limit))
-            Prognose = Limit
+                print("Forecast value to high : " + str(Prognose)+" | " + str(Limit) +" > " + str(round((Prognose+Limit)/2,0)))
+            Prognose = round((Prognose+Limit)/2,0)
 
         ## hier beginnt die Ermittung für das Mittagshoch
         if ( middayhigh == 0 and Prognose > Inverter_Max_Power["Value"] ):
