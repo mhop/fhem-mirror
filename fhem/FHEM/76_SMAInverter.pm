@@ -33,6 +33,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.29.7" => "29.05.2025  sum PDC",
   "2.29.6" => "04.05.2025  fix Bug inv_BAT_UDC ./FHEM/76_SMAInverter.pm line 1432",
   "2.29.5" => "06.04.2025  fix Bug SBS_3.7 BatTemp",
   "2.29.4" => "25.01.2025  fix Bug isn't Argument ''-'' numeric in multiplication (*) at ./FHEM/76_SMAInverter.pm line 1377",
@@ -767,7 +768,7 @@ sub SMAInverter_getstatusDoParse($) {
      $inv_susyid,
      $inv_serial,
 	 $inv_Firmware,
-     $inv_SPOT_PDC,$inv_SPOT_PDC1, $inv_SPOT_PDC2, $inv_SPOT_PDC3,
+     $inv_SPOT_PDC,$inv_SPOT_PDC1, $inv_SPOT_PDC2, $inv_SPOT_PDC3, $inv_SPOT_PDC_sum,
      $inv_SPOT_PAC1, $inv_SPOT_PAC2, $inv_SPOT_PAC3, $inv_SPOT_PACTOT,
      $inv_PACMAX1, $inv_PACMAX2, $inv_PACMAX3, $inv_PACMAX1_2,
      $inv_ChargeStatus,
@@ -1049,7 +1050,7 @@ sub SMAInverter_getstatusDoParse($) {
              }
              elsif ($i eq "sup_SpotDCPower") {
 			      Log3 $name, 5, "$name -> sup_SpotDCPower";
-                 ($sup_SpotDCPower,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
+                 ($sup_SpotDCPower,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_SPOT_PDC_sum,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
              }
 			 elsif ($i eq "sup_SpotDCPower_3") {
 			     Log3 $name, 5, "$name -> sup_SpotDCPower_3";
@@ -1335,7 +1336,8 @@ sub SMAInverter_getstatusDoParse($) {
              if($sup_SpotDCPower) {
                  push(@row_array, ($sc?"string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000):"SPOT_PDC1 ".$inv_SPOT_PDC1)."\n") if ($inv_SPOT_PDC1 ne "-");
                  push(@row_array, ($sc?"string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000):"SPOT_PDC2 ".$inv_SPOT_PDC2)."\n") if ($inv_SPOT_PDC2 ne "-");	
-				 push(@row_array, ($sc?"string_3_pdc ".sprintf("%.3f",$inv_SPOT_PDC3/1000):"SPOT_PDC3 ".$inv_SPOT_PDC3)."\n") if ($inv_SPOT_PDC3 ne "-");				 
+				 push(@row_array, ($sc?"string_3_pdc ".sprintf("%.3f",$inv_SPOT_PDC3/1000):"SPOT_PDC3 ".$inv_SPOT_PDC3)."\n") if ($inv_SPOT_PDC3 ne "-");	
+				 push(@row_array, ($sc?"string_sum_pdc ".sprintf("%.3f",$inv_SPOT_PDC_sum/1000):"SPOT_PDC_SUM ".$inv_SPOT_PDC_sum)."\n") if ($inv_SPOT_PDC_sum ne "-");	
              }
 			 if($sup_SpotDCPower_3) {
 				 push(@row_array, ($sc?"strings_pdc ".sprintf("%.3f",$inv_SPOT_PDC/1000):"SPOT_PDC ".$inv_SPOT_PDC)."\n");
@@ -1650,7 +1652,7 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_susyid,
      $inv_serial,
 	 $inv_Firmware,
-     $inv_SPOT_PDC, $inv_SPOT_PDC1, $inv_SPOT_PDC2, $inv_SPOT_PDC3,
+     $inv_SPOT_PDC, $inv_SPOT_PDC1, $inv_SPOT_PDC2, $inv_SPOT_PDC3, $inv_SPOT_PDC_sum,
      $inv_SPOT_PAC1, $inv_SPOT_PAC2, $inv_SPOT_PAC3, $inv_SPOT_PACTOT,
      $inv_PACMAX1, $inv_PACMAX2, $inv_PACMAX3, $inv_PACMAX1_2,
      $inv_ChargeStatus,
@@ -2047,20 +2049,23 @@ sub SMAInverter_SMAcommand($$$$$) {
 		 $inv_SPOT_PDC1 = unpack("l*", substr $data, 62, 4);
 		 #$inv_SPOT_PDC1 = (abs($inv_SPOT_PDC1) eq 2147483648) ? 0 : $inv_SPOT_PDC1;
 		 if(($inv_SPOT_PDC1 eq -2147483648) || ($inv_SPOT_PDC1 eq 0xFFFFFFFF)) {$inv_SPOT_PDC1 = "-"; }
+		 else {$inv_SPOT_PDC_sum = $inv_SPOT_PDC1;}
 		 
 		 if($size < 90) {$inv_SPOT_PDC2 = "-"; }  else {
 			$inv_SPOT_PDC2 = unpack("l*", substr $data, 90, 4);
 			#$inv_SPOT_PDC2 = (abs($inv_SPOT_PDC2) eq 2147483648) ? 0 : $inv_SPOT_PDC2;
 			if(($inv_SPOT_PDC2 eq -2147483648) || ($inv_SPOT_PDC2 eq 0xFFFFFFFF)) {$inv_SPOT_PDC2 = "-"; }
+			else {$inv_SPOT_PDC_sum = $inv_SPOT_PDC_sum + $inv_SPOT_PDC2;}
 		 } # catch short response, in case PDC2 not supported
 		 if($size < 118) {$inv_SPOT_PDC3 = "-"; } else {
 			$inv_SPOT_PDC3 = unpack("l*", substr $data, 118, 4); 
 			#$inv_SPOT_PDC3 = (abs($inv_SPOT_PDC3) eq 2147483648) ? 0 : $inv_SPOT_PDC3;
 			if(($inv_SPOT_PDC3 eq -2147483648) || ($inv_SPOT_PDC3 eq 0xFFFFFFFF)) {$inv_SPOT_PDC3 = "-"; }
+			else {$inv_SPOT_PDC_sum = $inv_SPOT_PDC_sum + $inv_SPOT_PDC3;}
 		 } # catch short response, in case PDC3 not supported
-		 
-		 Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1, SPOT_PDC2=$inv_SPOT_PDC2 and SPOT_PDC3=$inv_SPOT_PDC3";
-		 return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_susyid,$inv_serial);
+		 		 
+		 Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1, SPOT_PDC2=$inv_SPOT_PDC2 and SPOT_PDC3=$inv_SPOT_PDC3, SPOT_PDC_SUM=$inv_SPOT_PDC_sum";
+		 return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_SPOT_PDC3,$inv_SPOT_PDC_sum,$inv_susyid,$inv_serial);
 	 }
 	 
 	 elsif ($data_ID == 0x46C2) {
@@ -3456,7 +3461,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.29.6",
+  "version": "v2.29.7",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
