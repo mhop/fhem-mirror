@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.7" => "30.05.2025  _calcConsForecast_circular: excludes/includes only if number included days <= number of days in pvHistory ",
+  "1.52.6" => "27.05.2025  verbose 3 for consumer switch log ",
   "1.52.5" => "25.05.2025  edit commandref, _batChargeMgmt: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
                            "check attribute values for prohibited occurrence [...] Forum: https://forum.fhem.de/index.php?msg=1342147 ".
                            "_flowGraphic: bugfix chain style in case of logical on/off Forum: https://forum.fhem.de/index.php?msg=1342122 ".
@@ -13016,7 +13018,7 @@ sub ___switchConsumerOn {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
           }
           else {
-              Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+              Log3 ($name, 3, "$name - $state (Automatic = $auto)");
           }
 
           CommandSet (undef, "$dswname $oncom");
@@ -13040,7 +13042,7 @@ sub ___switchConsumerOn {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
       }
       else {
-          Log3 ($name, 2, "$name - $state");
+          Log3 ($name, 3, "$name - $state");
       }
 
       CommandSet (undef, "$dswname $oncom");
@@ -13109,7 +13111,7 @@ sub ___switchConsumerOff {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $offcom"});
       }
       else {
-          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+          Log3 ($name, 3, "$name - $state (Automatic = $auto)");
       }
 
       CommandSet (undef,"$dswname $offcom");
@@ -13130,7 +13132,7 @@ sub ___switchConsumerOff {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $offcom"});
       }
       else {
-          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+          Log3 ($name, 3, "$name - $state (Automatic = $auto)");
       }
 
       CommandSet (undef,"$dswname $offcom");
@@ -13263,7 +13265,7 @@ sub ___setConsumerSwitchingState {
           writeCacheToFile ($hash, 'consumers', $csmcache.$name);                           # Cache File Consumer schreiben
       }
 
-      Log3 ($name, 2, "$name - $state");
+      Log3 ($name, 3, "$name - $state");
   }
 
 return $state;
@@ -13557,80 +13559,86 @@ sub _calcConsForecast_circular {
   my $exnum = 0;
   my $ex    = 0;
   my $lap   = 1;
+  my $ncds  = $swdfcfc ? $acld * 7 : $acld;                                                            # effektive Anzahl Vergleichstage 
+  my $nhist = scalar keys %{$data{$name}{pvhist}};
+  
+  debugLog ($paref, 'consumption_long', "Need number of stored days: $ncds, Number of days in History: $nhist => can calculate excludes/includes: ".($ncds <= $nhist ? 'yes' : 'no'));
+  
+  if ($ncds <= $nhist) {                                                                               # V 1.52.7
+      for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
+          next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
+          my $do = 1;
 
-  for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
-      next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
-      my $do = 1;
+          for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
+              $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);
 
-      for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
-          $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);
+              if ($exconfc) {
+                  ## Tageswert Excludes finden und summieren
+                  ############################################
+                  if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+                      if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+                          my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
+                          $do     = 0 if(!$hdn || $hdn ne $tomdayname);
+                      }
 
-          if ($exconfc) {
-              ## Tageswert Excludes finden und summieren
-              ############################################
-              if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+                      if ($do) {
+                          $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
+
+                          if ($csme > 0) {
+                              $ex   += $csme;
+                              $exnum++;
+
+                              debugLog ($paref, 'consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
+                          }
+                      }
+                  }
+
+                  ## Stundenweise exkludes und inkludes aufnehmen
+                  #################################################
+                  $do = 1;
                   if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
                       my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
-                      $do     = 0 if(!$hdn || $hdn ne $tomdayname);
+                      $do     = 0 if(!$hdn || $hdn ne $todayname);
                   }
 
                   if ($do) {
-                      $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
+                      my $epiecelem = 1;
 
-                      if ($csme > 0) {
-                          $ex   += $csme;
-                          $exnum++;
+                      for my $h (1..24) {                                                                   # excludieren ob exconfc 1 oder 2
+                          my $hh = sprintf "%02d", $h;
+                          $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
 
-                          debugLog ($paref, 'consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
-                      }
-                  }
-              }
+                          if ($csme) {
+                              $csme                 = sprintf "%.2f", $csme;
+                              $usage{$hh}{histcon} += $csme;
+                              $usage{$hh}{histnum}++;
 
-              ## Stundenweise exkludes und inkludes aufnehmen
-              #################################################
-              $do = 1;
-              if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
-                  my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
-                  $do     = 0 if(!$hdn || $hdn ne $todayname);
-              }
+                              debugLog ($paref, 'consumption_long', "consumer '$c' register for exclude day $n, hod: $hh - ".$csme." Wh");
+                          }
 
-              if ($do) {
-                  my $epiecelem = 1;
+                          if ($exconfc == 2 && $lap == 1) {                                                 # AVG-Daten des Consumers inkludieren
+                              my $rt     = $st + (3600 * ($h - 1));                                         # Schleifenlaufzeit
+                              my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
+                              my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
 
-                  for my $h (1..24) {                                                                   # excludieren ob exconfc 1 oder 2
-                      my $hh = sprintf "%02d", $h;
-                      $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
+                              if ($rt >= $plson && $rt <= $plsoff) {
+                                  if (defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}) {
+                                      $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem};
+                                      $usage{$hh}{plannum}++;
 
-                      if ($csme) {
-                          $csme                 = sprintf "%.2f", $csme;
-                          $usage{$hh}{histcon} += $csme;
-                          $usage{$hh}{histnum}++;
+                                      debugLog ($paref, 'consumption_long', "consumer '$c' register epiecAVG: ".$data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}." Wh for include in Hour $hh");
 
-                          debugLog ($paref, 'consumption_long', "consumer '$c' register for exclude day $n, hod: $hh - ".$csme." Wh");
-                      }
-
-                      if ($exconfc == 2 && $lap == 1) {                                                 # AVG-Daten des Consumers inkludieren
-                          my $rt     = $st + (3600 * ($h - 1));                                         # Schleifenlaufzeit
-                          my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
-                          my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
-
-                          if ($rt >= $plson && $rt <= $plsoff) {
-                              if (defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}) {
-                                  $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem};
-                                  $usage{$hh}{plannum}++;
-
-                                  debugLog ($paref, 'consumption_long', "consumer '$c' register epiecAVG: ".$data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}." Wh for include in Hour $hh");
-
-                                  $epiecelem++;
+                                      $epiecelem++;
+                                  }
                               }
                           }
                       }
                   }
               }
           }
-      }
 
-      $lap++;
+          $lap++;
+      }
   }
 
   ## effektiven StundenForecast berechnen
