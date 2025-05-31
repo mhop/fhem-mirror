@@ -33,6 +33,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.29.8" => "31.05.2025  fix Bug sum PDC",
   "2.29.7" => "29.05.2025  sum PDC",
   "2.29.6" => "04.05.2025  fix Bug inv_BAT_UDC ./FHEM/76_SMAInverter.pm line 1432",
   "2.29.5" => "06.04.2025  fix Bug SBS_3.7 BatTemp",
@@ -2046,6 +2047,7 @@ sub SMAInverter_SMAcommand($$$$$) {
 	 }
 
 	 elsif ($data_ID == 0x251E) {
+		 $inv_SPOT_PDC_sum = 0;
 		 $inv_SPOT_PDC1 = unpack("l*", substr $data, 62, 4);
 		 #$inv_SPOT_PDC1 = (abs($inv_SPOT_PDC1) eq 2147483648) ? 0 : $inv_SPOT_PDC1;
 		 if(($inv_SPOT_PDC1 eq -2147483648) || ($inv_SPOT_PDC1 eq 0xFFFFFFFF)) {$inv_SPOT_PDC1 = "-"; }
@@ -3461,7 +3463,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.29.7",
+  "version": "v2.29.8",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
