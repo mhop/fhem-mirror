@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.8" => "01.06.2025  _calcConsForecast_circular: use avgArray if number included days <= number of days in pvHistory ",
   "1.52.7" => "30.05.2025  _calcConsForecast_circular: excludes/includes only if number included days <= number of days in pvHistory ",
   "1.52.6" => "27.05.2025  verbose 3 for consumer switch log ",
   "1.52.5" => "25.05.2025  edit commandref, _batChargeMgmt: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
@@ -13491,12 +13492,16 @@ sub _calcConsForecast_circular {
   my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname kommender Tag
   my $lct        = LOCALE_TIME =~ /^de_/xs ? 'DE' : 'EN';
   my $st         = timestringToTimestamp ("$date 00:00:00");                                            # Startzeit 00:00 am aktuellen Tag
+  my $ncds       = $swdfcfc ? $acld * 7 : $acld;                                                        # effektive Anzahl Vergleichstage 
+  my $nhist      = scalar keys %{$data{$name}{pvhist}};
 
   my (@cona, $exconfc, $csme, %usage);
   $usage{tom}{con} = 0;
-
+  
   debugLog ($paref, 'consumption|consumption_long', "################### Start Consumption forecast ###################");
-  debugLog ($paref, 'consumption_long', "Basics - installed locale: ".LOCALE_TIME.", used scheme: $lct");
+  debugLog ($paref, 'consumption_long', "Basics - installed locale: ".LOCALE_TIME.", used scheme: $lct"); 
+  debugLog ($paref, 'consumption_long', "Need number of stored days: $ncds, Number of days in History: $nhist => can calculate excludes/includes: ".($ncds <= $nhist ? 'yes' : 'no'));
+
 
   ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
   ###############################################################
@@ -13536,8 +13541,10 @@ sub _calcConsForecast_circular {
               @conh = splice (@conh, $acld * -1);
               $hnum = scalar @conh;
           }
-
-          my $hcon         = sprintf "%.0f", medianArray (\@conh);
+ 
+          # my $hcon         = sprintf "%.0f", medianArray (\@conh);                                    
+          my $hcon         = $ncds <= $nhist ? (sprintf "%.0f", avgArray (\@conh, $hnum)) : 
+                                               (sprintf "%.0f", medianArray (\@conh));                  # V 1.52.8
           $usage{$hh}{con} = $hcon;                                                                     # prognostizierter Verbrauch (Median) der Stunde hh (Hour of Day)
           $usage{$hh}{num} = $hnum;
       }
@@ -13548,7 +13555,9 @@ sub _calcConsForecast_circular {
               $hnumtom = scalar @conhtom;
           }
 
-          my $hcontom       = sprintf "%.0f", medianArray (\@conhtom);
+          # my $hcontom       = sprintf "%.0f", medianArray (\@conhtom);
+          my $hcontom       = $ncds <= $nhist ? (sprintf "%.0f", avgArray (\@conhtom, $hnumtom)) :        
+                                                (sprintf "%.0f", medianArray (\@conhtom));              # V 1.52.8
           $usage{tom}{con} += $hcontom;                                                                 # Summe prognostizierter Verbrauch (Median) des Tages
           $usage{tom}{num} += $hnumtom;
       }
@@ -13559,10 +13568,6 @@ sub _calcConsForecast_circular {
   my $exnum = 0;
   my $ex    = 0;
   my $lap   = 1;
-  my $ncds  = $swdfcfc ? $acld * 7 : $acld;                                                            # effektive Anzahl Vergleichstage 
-  my $nhist = scalar keys %{$data{$name}{pvhist}};
-  
-  debugLog ($paref, 'consumption_long', "Need number of stored days: $ncds, Number of days in History: $nhist => can calculate excludes/includes: ".($ncds <= $nhist ? 'yes' : 'no'));
   
   if ($ncds <= $nhist) {                                                                               # V 1.52.7
       for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
