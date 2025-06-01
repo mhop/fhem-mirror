@@ -56,6 +56,9 @@ our @EXPORT_OK = qw(UpdateTimer FhemCaller
                     DateDiff date_str2num
                     ReadableArray HexIfNeeded
                     Statistics Profiler
+                    setAttr
+                    setAttrIfNew
+                    removeAttr
                     );
 
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -98,6 +101,8 @@ BEGIN {
         getUniqueId
         getKeyValue
         setKeyValue
+        CommandAttr
+        CommandDeleteAttr
 
     ));
 };
@@ -328,8 +333,10 @@ sub EvalExpr {
 ###########################################################
 # return the name of the caling function for debug output
 sub FhemCaller {
-    my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = caller 2;
+    my $level = shift // 1;
+    my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = caller $level + 1;
     return 'Fhem internal timer' if ($subroutine =~ /main::HandleTimeout/);
+    return $1 if ($subroutine =~ /main::HTTPMOD_(.*)/);
     return $1 if ($subroutine =~ /main::HTTPMOD_(.*)/);
     return $1 if ($subroutine =~ /main::Modbus_(.*)/);
     return $1 if ($subroutine =~ /::(.*)/);
@@ -838,7 +845,7 @@ sub FmtDateTimeNice {
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(shift);
     my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
     my @days   = qw(So Mo Di Mi Do Fr Sa);
-    return sprintf("%s %d.%s %04d %02d:%02d", $days[$wday], $mday, $months[$mon], $year+1900, $hour, $min);
+    return sprintf("%s %d. %s %04d %02d:%02d", $days[$wday], $mday, $months[$mon], $year+1900, $hour, $min);
 }
 
 
@@ -994,5 +1001,58 @@ sub Profiler {
     }
     return;
 }
+
+
+
+####################################################################
+# remove an attribute and log
+sub removeAttr {
+    my $hash = shift;
+    my $attr = shift;
+    my $info = shift;
+    my $name = $hash->{NAME};
+    my $sub  = FhemCaller();
+    Log3 $name, 3, "$name: $sub remove attr $attr ($info)";
+    CommandDeleteAttr(undef, "$name $attr");
+    return;
+}
+
+
+####################################################################
+# set an attribute and log
+sub setAttr {
+    my $hash = shift;
+    my $attr = shift;
+    my $val  = shift;
+    my $info = shift;
+    my $name = $hash->{NAME};
+    my $sub  = FhemCaller();
+    Log3 $name, 3, "$name: $sub set attr $attr to $val ($info)";
+    CommandAttr(undef, "$name $attr $val");
+    return;
+}
+
+
+####################################################################
+# set an attribute and log if it doesn't already exist
+sub setAttrIfNew {
+    my $hash = shift;
+    my $attr = shift;
+    my $val  = shift;
+    my $info = shift;
+    my $name = $hash->{NAME};
+    my $sub  = FhemCaller();
+
+    # check if such an attr already exists
+    my $aVal = AttrVal($name, $attr, 'AttrNotDef');
+    if ($aVal ne 'AttrNotDef' && $aVal ne $val) {
+        return "$sub aborted because attr $attr already exists with value $attr{$name}{$attr} (parseInfo contains $val)";
+    }
+    Log3 $name, 3, "$name: $sub set attr $attr to $val ($info)";
+    CommandAttr(undef, "$name $attr $val");
+    return;
+}
+
+
 
 1;
