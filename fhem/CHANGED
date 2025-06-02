@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 76_SMAInverter.pm: INV_BACKRELAYRELAY to INV_BACKUPRELAY
  - bugfix: 76_SMAInverter.pm: SPOT_DC_sum bug uninitialized value 
                                inv_SPOT_PDC_sum
  - feature: 76_SMAInverter.pm: add SPOT_DC_sum 
