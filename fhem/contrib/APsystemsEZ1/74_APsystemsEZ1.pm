@@ -91,6 +91,7 @@ sub Initialize() {
   $hash->{AttrList}     = 
                           'activeArea ' .
                           'intervalMultiplier:textField-long ' .
+                          'energyDecimalPlaces:0,1,2,3,4 ' .
                           'disable:1,0 ' .
                           'disabledForIntervals ' .
                           'SVG_PlotsToShow:textField-long ' .
@@ -221,7 +222,7 @@ sub Define{
 }
 
 #########################
-sub FW_detailFn { ## no critic (ProhibitExcessComplexity [complexity core maintenance])
+sub FW_detailFn { 
   my ($FW_wname, $name, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$name};
   my $type = $hash->{TYPE};
@@ -384,9 +385,9 @@ sub APIresponse {
 
           if ( $hash->{helper}{callStack}[0] eq 'getOutputData' ) {
 
-            readingsBulkUpdate( $hash, 'inverter_OnlineTime', int( $hash->{helper}{inverter}{duration} /3600 ) , 0 );
+            readingsBulkUpdate( $hash, 'inverter_OnlineTime', int( $hash->{helper}{inverter}{duration} / 3600 ) , 0 );
             readingsBulkUpdateIfChanged( $hash, 'Power', $result->{data}{p1} + $result->{data}{p2} );
-            readingsBulkUpdateIfChanged( $hash, 'Energy', sprintf( "%.1f", $result->{data}{e1} + $result->{data}{e2} ) );
+            readingsBulkUpdateIfChanged( $hash, 'TodayEnergy', sprintf( "%.".AttrVal( $name, 'energyDecimalPlaces', 1 )."f", $result->{data}{e1} + $result->{data}{e2} ) );
             readingsBulkUpdateIfChanged( $hash, 'LifeTimeEnergy', sprintf( "%.1f", $result->{data}{te1} + $result->{data}{te2} ) );
             readingsBulkUpdate( $hash, 'PowerDensity', int( ( $result->{data}{p1} + $result->{data}{p2} ) / AttrVal( $name, 'activeArea', 4.10592 ) ), 0 ) if ( AttrVal( $name, 'activeArea', 0 ) );
 
