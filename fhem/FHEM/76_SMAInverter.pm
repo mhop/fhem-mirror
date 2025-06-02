@@ -33,6 +33,8 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.30.1" => "02.06.2025  INV_BACKRELAYRELAY to INV_BACKUPRELAY",
+  "2.30.0" => "31.05.2025  sup_MaxACPower2",
   "2.29.8" => "31.05.2025  fix Bug sum PDC",
   "2.29.7" => "29.05.2025  sum PDC",
   "2.29.6" => "04.05.2025  fix Bug inv_BAT_UDC ./FHEM/76_SMAInverter.pm line 1432",
@@ -991,9 +993,10 @@ sub SMAInverter_getstatusDoParse($) {
           push(@commands, "sup_OperationTime");         # Check OperationTime
           #push(@commands, "sup_InverterTemperature");   # Check InverterTemperature ?
           push(@commands, "sup_MaxACPower");            # Check MaxACPower
-          push(@commands, "sup_MaxACPower2");           # Check MaxACPower2 ?
           push(@commands, "sup_GridRelayStatus");       # Check GridRelayStatus
           push(@commands, "sup_DeviceStatus");          # Check DeviceStatus
+		  
+		  push(@commands, "sup_MaxACPower2") if ($INVTYPE_NAME =~ /SB(3300|1200)/xs);    # Check MaxACPower2 ?  SB3300/SB1200   
 
 		  push(@commands, "sup_Firmware") if($readParameter == 1); #Read WR Firmwareversion
 		  
@@ -1502,7 +1505,7 @@ sub SMAInverter_getstatusDoParse($) {
                  }
 				 
 				 if($sup_BackupRelayStatus) {
-                     push(@row_array, ($sc?"backuprelay_status ":"INV_BACKRELAYRELAY ").SMAInverter_StatusText($inv_BACKUPRELAY)."\n");
+                     push(@row_array, ($sc?"backuprelay_status ":"INV_BACKUPRELAY ").SMAInverter_StatusText($inv_BACKUPRELAY)."\n");
                  }
 				 if($sup_GridConection) {
                      push(@row_array, ($sc?"GridConection ":"INV_GridConection ").SMAInverter_StatusText($inv_GridConection)."\n");
@@ -3463,7 +3466,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.29.8",
+  "version": "v2.30.0",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
