@@ -3466,7 +3466,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.30.0",
+  "version": "v2.30.1",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
