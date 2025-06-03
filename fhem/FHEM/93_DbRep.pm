@@ -3,7 +3,7 @@
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016-2024 by Heiko Maaz
+#       (c) 2016-2025 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -58,6 +58,8 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.54.17" => "03.05.2025  DbRep_optimizeTables: fix resolution of symbolic links in Optimize Tables for SQLite ".
+                            "DbRep_sqlCmd / DbRep_sqlCmdBlocking: add commands analyze, check ",
   "8.53.16" => "01.12.2024  fix check changeValue Forum: #139950.0, Role Agent can use executeBeforeProc, executeAfterProc ",
   "8.53.15" => "18.08.2024  DbRep_diffvalDone: change loglevel to 2, Forum:#138986 ",
   "8.53.14" => "29.05.2024  _DbRep_avgTimeWeightMean: accept if \$val1=0 (use looks_like_number) ",
@@ -6935,11 +6937,11 @@ sub DbRep_sqlCmd {
   my (@rows,$row,@head);
   my $nrows = 0;
 
-  if($sql =~ m/^\s*(call|explain|select|pragma|show|describe)/is) {
+  if ($sql =~ m/^\s*(call|explain|select|pragma|show|describe|analyze|check)/is) {
       @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};                   # https://metacpan.org/pod/DBI#NAME1
       if (@head) {
-          $row = join("$srs", @head);
-          push(@rows, $row);
+          $row = join "$srs", @head;
+          push @rows, $row;
       }
 
       while (my @line = $sth->fetchrow_array()) {
@@ -6948,7 +6950,7 @@ sub DbRep_sqlCmd {
 
           $row =~ s/§/|°escaped°|/g;                                              # join Delimiter "§" escapen
 
-          push(@rows, $row);
+          push @rows, $row;
           $nrows++;                                                               # Anzahl der Datensätze
       }
   }
@@ -7107,11 +7109,11 @@ sub DbRep_sqlCmdBlocking {
   }
 
   my $nrows = 0;
-  if($sql =~ m/^\s*(call|explain|select|pragma|show|describe)/is) {
+  if ($sql =~ m/^\s*(call|explain|select|pragma|show|describe|analyze|check)/is) {
       while (my @line = $sth->fetchrow_array()) {
           Log3 ($name, 4, "DbRep $name - SQL result: @line");
           $ret .= "\n" if($nrows);                                              # Forum: #103295
-          $ret .= join("$srs", @line);
+          $ret .= join "$srs", @line;
           $nrows++;                                                             # Anzahl der Datensätze
       }
   }
@@ -8003,7 +8005,7 @@ sub DbRep_optimizeTables {
   my $dbname = $hash->{DATABASE};
   my $value  = 0;
 
-  my ($sth,$query,$db_MB_start,$db_MB_end);
+  my ($sth, $query, $db_MB_start, $db_MB_end);
   my (%db_tables,@tablenames);
 
   my $bst = [gettimeofday];                                                                   # Background-Startzeit
@@ -8060,10 +8062,10 @@ sub DbRep_optimizeTables {
       return "$name|$err" if ($err);
   }
 
-  if ($dbmodel =~ /SQLITE/) {
-      $db_MB_start = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);  # Anfangsgröße ermitteln
-
-      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
+  if ($dbmodel =~ /SQLITE/) {  
+      $db_MB_start = sprintf "%.3f", ((-s $hash->{DATABASE}) / 1048576);                                     # Anfangsgröße ermitteln
+      
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize: $db_MB_start MB");
 
       $query = "PRAGMA auto_vacuum = FULL;";
 
@@ -8075,22 +8077,22 @@ sub DbRep_optimizeTables {
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query, "VACUUM database $dbname....");
       return "$name|$err" if ($err);
 
-      $db_MB_end = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);    # Endgröße ermitteln
+      $db_MB_end = sprintf "%.3f", ((-s $hash->{DATABASE}) / 1048576);                                       # Endgröße ermitteln
 
-      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize: $db_MB_end MB");
   }
 
   if ($dbmodel =~ /POSTGRESQL/) {
-      $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))";                                   # Anfangsgröße ermitteln
+      $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))";                                         # Anfangsgröße ermitteln
 
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
       return "$name|$err" if ($err);
 
       $value       = $sth->fetchrow();
       $value       =~ tr/MB//d;
-      $db_MB_start = sprintf("%.2f",$value);
+      $db_MB_start = sprintf "%.3f", $value;
 
-      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize: $db_MB_start MB");
 
       $query = "vacuum history";
 
@@ -8104,9 +8106,9 @@ sub DbRep_optimizeTables {
 
       $value     = $sth->fetchrow();
       $value     =~ tr/MB//d;
-      $db_MB_end = sprintf("%.2f",$value);
+      $db_MB_end = sprintf "%.3f", $value;
 
-      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize: $db_MB_end MB");
   }
 
   DbRep_clearConn ($dbh, $sth);
@@ -8915,7 +8917,7 @@ sub DbRep_sqlite_Dump {
      $fsBytes  = _DbRep_fsizeInBytes ($dbname);
      $db_MB    = _DbRep_byteOutput   ($fsBytes);
 
-     Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB");
+     Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize: $db_MB MB");
 
      $query  ="VACUUM";
 
@@ -8927,7 +8929,7 @@ sub DbRep_sqlite_Dump {
      $fsBytes  = _DbRep_fsizeInBytes ($dbname);
      $db_MB    = _DbRep_byteOutput   ($fsBytes);
 
-     Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB");
+     Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize: $db_MB MB");
  }
 
  $dbname = (split /[\/]/, $dbname)[-1];
@@ -13550,7 +13552,7 @@ sub _DbRep_fsizeInBytes {
 
   $fs //= '';
 
-return ($fs);
+return $fs;
 }
 
 ####################################################################################################
