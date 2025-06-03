@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.10"=> "03.06.2025  attr plantControl->genPVforecastsToEvent new possible value 'adapt4fSteps' ",
   "1.52.9" => "02.06.2025  __getDWDSolarData: new sub azSolar2Astro, ctrlBatSocManagementXX: new key loadAbort ",
   "1.52.8" => "01.06.2025  _calcConsForecast_circular: use avgArray if number included days <= number of days in pvHistory ",
   "1.52.7" => "30.05.2025  _calcConsForecast_circular: excludes/includes only if number included days <= number of days in pvHistory ",
@@ -402,19 +403,6 @@ my %vNotesIntern = (
                            "tranformed setter moduleDeclination to setupStringDeclination ".
                            "tranformed setter moduleRoofTops to setupRoofTops ",
   "1.28.0" => "15.06.2024  new consumer key exconfc, Forum: https://forum.fhem.de/index.php?msg=1315111 ",
-  "1.27.0" => "12.06.2024  __VictronVRM_ApiResponseLogin: check token not empty ".
-                           "transformed setter modulePeakString to attr setupStringPeak ",
-  "1.26.0" => "10.06.2024  transformed setter currentRadiationAPI to attr setupRadiationAPI ",
-  "1.25.2" => "09.06.2024  _specialActivities: change delete readings exec ",
-  "1.25.1" => "08.06.2024  Illegal division by zero Forum:https://forum.fhem.de/index.php?msg=1314730 ",
-  "1.25.0" => "05.06.2024  transformed setter inverterStrings to attr setupInverterStrings, _calcTodayPVdeviation: fix continuously calc again ",
-  "1.24.0" => "03.06.2024  transformed setter currentInverterDev to attr setupInverterDev, _calcTodayPVdeviation: fix continuously calc ",
-  "1.23.0" => "02.06.2024  transformed setter currentBatteryDev to attr setupBatteryDev, _transferInverterValues: change output for DEBUG ".
-                           "new key attrInvChangedTs in circular, prepare transformation of currentInverterDev ".
-                           "_calcTodayPVdeviation: fix daily calc ",
-  "1.22.0" => "01.06.2024  transformed setter currentMeterDev to attr setupMeterDev, plantConfiguration: setModel after restore ".
-                           "delete reset currentMeterSet ",
-  "1.21.5" => "30.05.2024  listDataPool: list current can operate three hash levels, first preparation for remote objects ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -6743,7 +6731,7 @@ sub _attrplantControl {                  ## no critic "not used"
       cycleInterval             => { comp => '\d+',                                act => 1 },
       feedinPowerLimit          => { comp => '\d+',                                act => 0 },
       genPVdeviation            => { comp => '(daily|continuously)',               act => 1 },
-      genPVforecastsToEvent     => { comp => '(adapt4Steps)',                      act => 0 },
+      genPVforecastsToEvent     => { comp => '(adapt4(?:f)?Steps)',                act => 0 },
       showLink                  => { comp => '(0|1)',                              act => 0 },
   };
 
@@ -9564,9 +9552,14 @@ sub __createAdditionalEvents  {
   for my $idx (sort keys %{$data{$name}{nexthours}}) {
       my $nhts = NexthoursVal ($name, $idx, 'starttime', undef);
       my $nhfc = NexthoursVal ($name, $idx, 'pvfc',      undef);
-      next if(!defined $nhts || !defined $nhfc);
-
-      my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
+	  next if(!defined $nhts || !defined $nhfc);
+	  
+	  my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
+      
+	  if (!$nhfc && $g2ev eq 'adapt4fSteps') {                                         # für SVG 'fsteps'-Darstellung optimieren                                                     
+	       storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":59:59");   
+	       next;  
+      }
                                                                                        # https://forum.fhem.de/index.php?msg=1340607
       storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":00:00") if(!$done);  # vor dem ersten Prognosewert immer einen Nullwert setzen
 
@@ -26377,8 +26370,10 @@ to ensure that the system configuration is correct.
 			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
             <tr><td> <b>genPVforecastsToEvent</b>     </td><td>The module generates daily ‘AllPVforecastsToEvent’ events to visualize the PV forecast.                                              </td></tr>
             <tr><td>                                  </td><td>Further explanations can be found in the <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Visualisierung_solare_Vorhersage_und_reale_Erzeugung' target='_blank'>german Wiki</a>. </td></tr>
-            <tr><td>                                  </td><td>Event generation can be optimized for specific uses.                                                                                 </td></tr>
-			<tr><td>                                  </td><td><b>adapt4Steps</b> - the events are optimized for the SVG Plot-Type 'steps'                                                          </td></tr>
+            <tr><td>                                  </td><td><b>Note:</b> When using the attribute, the attribute <b>event-on-update-reading=AllPVforecastsToEvent</b> must also be set.          </td></tr>
+			<tr><td>                                  </td><td>Event generation can be optimized for specific uses:                                                                                 </td></tr>
+			<tr><td>                                  </td><td><b>adapt4Steps</b> - the events are optimized for the SVG plot type 'steps'                                                          </td></tr>
+			<tr><td>                                  </td><td><b>adapt4fSteps</b> - the events are optimized for the SVG plot type 'fsteps'                                                        </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
 			<tr><td> <b>showLink</b>                  </td><td>Display of a link to the detailed view of the device above the graphics area                                                         </td></tr>
 			<tr><td>                                  </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                                            </td></tr>
@@ -28989,8 +28984,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>genPVforecastsToEvent</b>     </td><td>Das Modul erzeugt täglich 'AllPVforecastsToEvent'-Events zur Visualisierung der PV Prognose.                                    </td></tr>
             <tr><td>                                  </td><td>Nähere Erläuterungen dazu sind im <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Visualisierung_solare_Vorhersage_und_reale_Erzeugung' target='_blank'>Wiki</a> beschrieben. </td></tr>
-            <tr><td>                                  </td><td>Die Eventerzeugung kann für bestimmte Nutzungen optimiert werden.                                                               </td></tr>
+            <tr><td>                                  </td><td><b>Hinweis:</b> Bei Nutzung des Attributes ist ebenfalls das Attribut <b>event-on-update-reading=AllPVforecastsToEvent</b> zu setzen.  </td></tr>
+			<tr><td>                                  </td><td>Die Eventerzeugung kann für bestimmte Nutzungen optimiert werden:                                                               </td></tr>
 			<tr><td>                                  </td><td><b>adapt4Steps</b> - die Events werden für den SVG Plot-Type 'steps' optimiert                                                  </td></tr>
+			<tr><td>                                  </td><td><b>adapt4fSteps</b> - die Events werden für den SVG Plot-Type 'fsteps' optimiert                                                </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
 			<tr><td> <b>showLink</b>                  </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                         </td></tr>
 			<tr><td>                                  </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                       </td></tr>
