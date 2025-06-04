@@ -160,6 +160,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.11"=> "03.06.2025  _genSpecialReadings: new option todayNotOwnerConsumption ",
+  "1.52.10"=> "03.06.2025  attr plantControl->genPVforecastsToEvent new possible value 'adapt4fSteps' ",
+  "1.52.9" => "02.06.2025  __getDWDSolarData: new sub azSolar2Astro, ctrlBatSocManagementXX: new key loadAbort ",
+  "1.52.8" => "01.06.2025  _calcConsForecast_circular: use avgArray if number included days <= number of days in pvHistory ",
+  "1.52.7" => "30.05.2025  _calcConsForecast_circular: excludes/includes only if number included days <= number of days in pvHistory ",
   "1.52.6" => "27.05.2025  verbose 3 for consumer switch log ",
   "1.52.5" => "25.05.2025  edit commandref, _batChargeMgmt: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
                            "check attribute values for prohibited occurrence [...] Forum: https://forum.fhem.de/index.php?msg=1342147 ".
@@ -399,19 +404,6 @@ my %vNotesIntern = (
                            "tranformed setter moduleDeclination to setupStringDeclination ".
                            "tranformed setter moduleRoofTops to setupRoofTops ",
   "1.28.0" => "15.06.2024  new consumer key exconfc, Forum: https://forum.fhem.de/index.php?msg=1315111 ",
-  "1.27.0" => "12.06.2024  __VictronVRM_ApiResponseLogin: check token not empty ".
-                           "transformed setter modulePeakString to attr setupStringPeak ",
-  "1.26.0" => "10.06.2024  transformed setter currentRadiationAPI to attr setupRadiationAPI ",
-  "1.25.2" => "09.06.2024  _specialActivities: change delete readings exec ",
-  "1.25.1" => "08.06.2024  Illegal division by zero Forum:https://forum.fhem.de/index.php?msg=1314730 ",
-  "1.25.0" => "05.06.2024  transformed setter inverterStrings to attr setupInverterStrings, _calcTodayPVdeviation: fix continuously calc again ",
-  "1.24.0" => "03.06.2024  transformed setter currentInverterDev to attr setupInverterDev, _calcTodayPVdeviation: fix continuously calc ",
-  "1.23.0" => "02.06.2024  transformed setter currentBatteryDev to attr setupBatteryDev, _transferInverterValues: change output for DEBUG ".
-                           "new key attrInvChangedTs in circular, prepare transformation of currentInverterDev ".
-                           "_calcTodayPVdeviation: fix daily calc ",
-  "1.22.0" => "01.06.2024  transformed setter currentMeterDev to attr setupMeterDev, plantConfiguration: setModel after restore ".
-                           "delete reset currentMeterSet ",
-  "1.21.5" => "30.05.2024  listDataPool: list current can operate three hash levels, first preparation for remote objects ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -1395,36 +1387,37 @@ my %hef = (                                                                     
 );
 
 my %hcsr = (                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
-  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
-  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => '-'         },
-  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => '-'         },
-  response_message            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => '-'         },
-  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 'apimaxreq' },
-  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 0           },
-  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 0           },
-  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 'apimaxreq' },
-  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 'apimaxreq' },
-  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => ' s',   def => '-'         },
-  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => '-'         },
-  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => '-'         },
-  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },
-  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', par1 => '',      unit => ' Wh',  def => 0           },
-  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' s',   def => '-'         },
-  todayConsumption            => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
-  todayConsumptionForecastDay => { fnr => 4, fn => \&HistoryVal,      par => 99,                  par1 => 'confc', unit => ' Wh',  def => '-'         },
-  BatPowerIn_Sum              => { fnr => 5, fn => \&CurrentVal,      par => 'batpowerinsum',     par1 => '',      unit => ' W',   def => '-'         },
-  BatPowerOut_Sum             => { fnr => 5, fn => \&CurrentVal,      par => 'batpoweroutsum',    par1 => '',      unit => ' W',   def => '-'         },
-  BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',       par1 => '',      unit => ' %',   def => 0           },
-  SunHours_Remain             => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
-  SunMinutes_Remain           => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },
-  dayAfterTomorrowPVforecast  => { fnr => 5, fn => \&RadiationAPIVal, par => 'pv_estimate50',     par1 => '',      unit => '',     def => 0           },
-  todayGridFeedIn             => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => '',     def => 0           },
-  todayGridConsumption        => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => '',     def => 0           },
-  todayConsumptionForecast    => { fnr => 5, fn => \&HistoryVal,      par => '',                  par1 => 'confc', unit => ' Wh',  def => '-'         },
-  tomorrowConsumptionForecast => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',      unit => ' Wh',  def => '-'         },
-  conForecastTillNextSunrise  => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',      unit => ' Wh',  def => 0           },
-  todayBatInSum               => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
-  todayBatOutSum              => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
+  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
+  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  response_message            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 'apimaxreq' },
+  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 0           },
+  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 0           },
+  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 'apimaxreq' },
+  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 'apimaxreq' },
+  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => ' s',   def => '-'         },
+  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => 0           },
+  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', par1 => '',                  unit => ' Wh',  def => 0           },
+  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' s',   def => '-'         },
+  todayConsumption            => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
+  todayConsumptionForecastDay => { fnr => 4, fn => \&HistoryVal,      par => 99,                  par1 => 'confc',             unit => ' Wh',  def => '-'         },
+  BatPowerIn_Sum              => { fnr => 5, fn => \&CurrentVal,      par => 'batpowerinsum',     par1 => '',                  unit => ' W',   def => '-'         },
+  BatPowerOut_Sum             => { fnr => 5, fn => \&CurrentVal,      par => 'batpoweroutsum',    par1 => '',                  unit => ' W',   def => '-'         },
+  BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',       par1 => '',                  unit => ' %',   def => 0           },
+  SunHours_Remain             => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
+  SunMinutes_Remain           => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => 0           },
+  dayAfterTomorrowPVforecast  => { fnr => 5, fn => \&RadiationAPIVal, par => 'pv_estimate50',     par1 => '',                  unit => '',     def => 0           },
+  todayGridFeedIn             => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => '',     def => 0           },
+  todayGridConsumption        => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => '',     def => 0           },
+  todayNotOwnerConsumption    => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => 'todayConsumption',  unit => ' Wh',  def => 0           },
+  todayConsumptionForecast    => { fnr => 5, fn => \&HistoryVal,      par => '',                  par1 => 'confc',             unit => ' Wh',  def => '-'         },
+  tomorrowConsumptionForecast => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => '-'         },
+  conForecastTillNextSunrise  => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => 0           },
+  todayBatInSum               => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
+  todayBatOutSum              => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
 );
 
   for my $csr (1..MAXCONSUMER) {
@@ -3410,9 +3403,9 @@ sub __forecastSolar_ApiRequest {
       return $err;
   }
 
-  my $tilt = StringVal ($hash, $string, 'tilt',   '<unknown>');
-  my $az   = StringVal ($hash, $string, 'azimut', '<unknown>');
-  my $peak = StringVal ($hash, $string, 'peak',   '<unknown>');
+  my $tilt = StringVal ($name, $string, 'tilt',   '<unknown>');
+  my $az   = StringVal ($name, $string, 'azimut', '<unknown>');
+  my $peak = StringVal ($name, $string, 'peak',   '<unknown>');
 
   my $url = "https://api.forecast.solar/estimate/watthours/period/".
             $lat."/".
@@ -3749,11 +3742,20 @@ sub __getDWDSolarData {
       my $dday            = (split '-', $ddate)[2];                                            # abzurufender Tag: 01, 02 ... 31
 
       for my $string (@strings) {                                                              # für jeden String der Config ..
-          my $peak = $data{$name}{strings}{$string}{peak};                                     # String Peak (kWp)
-          $peak   *= 1000;                                                                     # kWp in Wp umrechnen
-          my $ti   = $data{$name}{strings}{$string}{tilt};                                     # Neigungswinkel Solarmodule
-          my $az   = $data{$name}{strings}{$string}{azimut};                                   # Ausrichtung der Solarmodule
-          $az     += 180;                                                                      # Umsetzung -180 - 180 in 0 - 360
+          my $ti   = StringVal ($name, $string, 'tilt',   undef);                              # Neigungswinkel Solarmodule
+          my $peak = StringVal ($name, $string, 'peak',   undef);                              # String Peak (kWp)
+          my $az   = StringVal ($name, $string, 'azimut', undef);                              # Ausrichtung der Solarmodule
+          
+          if (!defined $ti || !defined $peak || !defined $az) {
+              $ti   //= 'undef';
+              $peak //= 'undef';
+              $az   //= 'undef';
+              Log3 ($name, 1, "$name - ERROR - no of these parameter must be undef -> azimuth: $az, peak: $peak, tilt: $ti");
+              next;
+          }
+          
+          $peak *= 1000;                                                                       # kWp in Wp umrechnen                                 
+          $az    = azSolar2Astro ($az);                                                        # Konvertiert Azimut der Solar-Konvention in die astronomische Konvention
 
           my ($af, $pv, $sdr, $wcc);
 
@@ -3864,20 +3866,18 @@ sub ___areaFactorTrack {
   my $tilt   = $paref->{tilt};                                                  # String Anstellwinkel / Neigung
   my $azimut = $paref->{azimut};                                                # String Ausrichtung / Azimut
 
-  my $hash   = $defs{$name};
-
   my ($sunalt, $sunaz, $wcc);
 
   if ($dday eq $day) {
-      $sunalt = HistoryVal ($hash, $dday, $hod, 'sunalt', undef);               # Sonne Höhe (Altitude)
-      $sunaz  = HistoryVal ($hash, $dday, $hod, 'sunaz',  undef);               # Sonne Azimuth
-      $wcc    = HistoryVal ($hash, $dday, $hod, 'wcc',        0);               # Bewölkung
+      $sunalt = HistoryVal ($name, $dday, $hod, 'sunalt', undef);               # Sonne Höhe (Altitude)
+      $sunaz  = HistoryVal ($name, $dday, $hod, 'sunaz',  undef);               # Sonne Azimuth
+      $wcc    = HistoryVal ($name, $dday, $hod, 'wcc',        0);               # Bewölkung
   }
   else {
       my $nhtstr = 'NextHour'.sprintf "%02d",  (23 - (int $chour) + $hod);
-      $sunalt    = NexthoursVal ($hash, $nhtstr, 'sunalt', undef);
-      $sunaz     = NexthoursVal ($hash, $nhtstr, 'sunaz',  undef);
-      $wcc       = NexthoursVal ($hash, $nhtstr, 'wcc',        0);
+      $sunalt    = NexthoursVal ($name, $nhtstr, 'sunalt', undef);
+      $sunaz     = NexthoursVal ($name, $nhtstr, 'sunaz',  undef);
+      $wcc       = NexthoursVal ($name, $nhtstr, 'wcc',        0);
   }
 
   return ('-', '-', '-') if(!defined $sunalt || !defined $sunaz);
@@ -4656,7 +4656,7 @@ sub __openMeteoDWD_ApiResponse {
 
       my $date  = strftime "%Y-%m-%d", localtime(time);
       my $refts = timestringToTimestamp ($date.' 00:00:00');                                      # Referenztimestring
-      my $peak  = StringVal ($hash, $string, 'peak', 0);                                          # String Peak (kWp)
+      my $peak  = StringVal ($name, $string, 'peak', 0);                                          # String Peak (kWp)
       $peak    *= 1000;                                                                           # kWp in Wp
 
       ## aktuelle Wetterdaten
@@ -6043,29 +6043,6 @@ sub Attr {
       deleteReadingspec ($hash, "Battery_NextHour.._SoCforecast_..");
   }
 
-  #if ($aName =~ /ctrlBatSocManagement/xs && $init_done) {
-  #    my $bn = (split 'ctrlBatSocManagement', $aName)[1];
-
-  #    if ($cmd eq 'set') {
-  #        return qq{Define the key 'cap' with "attr $name setupBatteryDev${bn}" before this attribute in the correct form.}
-  #               if(!BatteryVal ($hash, $bn, 'binstcap', 0));                    # https://forum.fhem.de/index.php?msg=1310930
-
-  #        my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $aVal);
-
-  #        return 'The attribute syntax is wrong' if(!$lowSoc || !$upSoc || $lowSoc !~ /[0-9]+$/xs);
-
-  #        if (!($lowSoc > 0 && $lowSoc < $upSoc && $upSoc < $maxsoc && $maxsoc <= 100)) {
-  #            return 'The specified values are not plausible. Compare the attribute help.';
-  #        }
-  #    }
-  #    else {
-  #        deleteReadingspec ($hash, 'Battery_.*');
-  #    }
-
-  #    delete $data{$name}{circular}{99}{'lastTsMaxSocRchd'.$bn};
-  #    delete $data{$name}{circular}{99}{'nextTsMaxSocChge'.$bn};
-  #}
-
   if ($aName eq 'graphicHeaderOwnspecValForm') {
       $err = isGhoValFormValid ($name, $aVal);
       return $err if($err);
@@ -6756,7 +6733,7 @@ sub _attrplantControl {                  ## no critic "not used"
       cycleInterval             => { comp => '\d+',                                act => 1 },
       feedinPowerLimit          => { comp => '\d+',                                act => 0 },
       genPVdeviation            => { comp => '(daily|continuously)',               act => 1 },
-      genPVforecastsToEvent     => { comp => '(adapt4Steps)',                      act => 0 },
+      genPVforecastsToEvent     => { comp => '(adapt4(?:f)?Steps)',                act => 0 },
       showLink                  => { comp => '(0|1)',                              act => 0 },
   };
 
@@ -7461,6 +7438,8 @@ sub _attrBatSocManagement {              ## no critic "not used"
       maxSoC    => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
       careCycle => { comp => '\d+',                                                   must => 0, act => 0 },
       lcSlot    => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
+      careCycle => { comp => '\d+',                                                   must => 0, act => 0 },
+      loadAbort => { comp => '(?:100|[1-9]?[0-9]):\d+',                               must => 0, act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -7502,9 +7481,12 @@ sub _attrBatSocManagement {              ## no critic "not used"
 
       ## 2. Durchlauf - Endprüfung
       #############################
-	  my ($lowSoc, $upSoc, $maxsoc, $careCycle, $lcSlot) = __parseAttrBatSoc ($name, $aVal);
+      my $parsed = __parseAttrBatSoc ($name, $aVal);
+      my $lowSoc = $parsed->{lowSoc};
+      my $upSoc  = $parsed->{upSoc};
+      my $maxSoc = $parsed->{maxSoc};
 
-	  if (!($lowSoc > 0 && $lowSoc < $upSoc && $upSoc < $maxsoc)) {
+	  if (!($lowSoc > 0 && $lowSoc < $upSoc && $upSoc < $maxSoc)) {
 		  return 'The specified values are not plausible. Compare the attribute help.';
 	  }
   }                                                             
@@ -9572,9 +9554,14 @@ sub __createAdditionalEvents  {
   for my $idx (sort keys %{$data{$name}{nexthours}}) {
       my $nhts = NexthoursVal ($name, $idx, 'starttime', undef);
       my $nhfc = NexthoursVal ($name, $idx, 'pvfc',      undef);
-      next if(!defined $nhts || !defined $nhfc);
-
-      my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
+	  next if(!defined $nhts || !defined $nhfc);
+	  
+	  my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
+      
+	  if (!$nhfc && $g2ev eq 'adapt4fSteps') {                                         # für SVG 'fsteps'-Darstellung optimieren                                                     
+	       storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":59:59");   
+	       next;  
+      }
                                                                                        # https://forum.fhem.de/index.php?msg=1340607
       storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":00:00") if(!$done);  # vor dem ersten Prognosewert immer einen Nullwert setzen
 
@@ -11197,7 +11184,9 @@ sub _batSocTarget {
   my $hash = $defs{$name};
 
   for my $bn (1..MAXBATTERIES) {
-      $bn = sprintf "%02d", $bn;
+      $bn      = sprintf "%02d", $bn;
+      my $cgbt = AttrVal ($name, 'ctrlBatSocManagement'.$bn, undef);
+      next if(!$cgbt);
 
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
@@ -11206,20 +11195,27 @@ sub _batSocTarget {
       my $ltsmsr     = CircularVal ($hash, 99, 'lastTsMaxSocRchd'.$bn, undef);
       my $soc        = BatteryVal  ($hash, $bn, 'bcharge',                 0);                   # aktuelle Ladung in %
       my $batinstcap = BatteryVal  ($hash, $bn, 'binstcap',                0);                   # installierte Batteriekapazität Wh
-      my $cgbt       = AttrVal     ($name, 'ctrlBatSocManagement'.$bn, undef);
-
-      if ($cgbt && !$batinstcap) {
-      Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement${bn} is active, but the required key 'cap' is not setup in setupBatteryDev. Exit.");
-          return;
+      
+      if (!$batinstcap) {
+          Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement${bn} is active, but required key 'cap' is not set. Go to Next...");
+          next;
       }
 
-      my ($lowSoc, $upSoc, $maxsoc, $careCycle) = __parseAttrBatSoc ($name, $cgbt);
-      return if(!$lowSoc ||!$upSoc);
+      my $parsed    = __parseAttrBatSoc ($name, $cgbt);
+      my $lowSoc    = $parsed->{lowSoc};
+      my $upSoc     = $parsed->{upSoc};
+      my $maxSoc    = $parsed->{maxSoc};
+      my $careCycle = $parsed->{careCycle};
+      
+      if (!$lowSoc || !$upSoc) {
+          Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement${bn} is active, but required keys 'lowSoc' and 'upSoC' are not set. Go to Next...");
+          next;          
+      }
 
       $paref->{batnmb}    = $bn;
       $paref->{careCycle} = $careCycle;
 
-      __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $soc >= $maxsoc || $soc >= MAXSOCDEF || $oldd2care < 0);
+      __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $soc >= $maxSoc || $soc >= MAXSOCDEF || $oldd2care < 0);
 
       my $nt         = '';
       my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
@@ -11229,8 +11225,8 @@ sub _batSocTarget {
       my $batymaxsoc = HistoryVal ($hash, $yday, 99, 'batmaxsoc'.$bn,       0);                 # gespeicherter max. SOC des Vortages
       my $batysetsoc = HistoryVal ($hash, $yday, 99, 'batsetsoc'.$bn, $lowSoc);                 # gespeicherter SOC Sollwert des Vortages
 
-      $target = $batymaxsoc <  $maxsoc ? $batysetsoc + BATSOCCHGDAY :
-                $batymaxsoc >= $maxsoc ? $batysetsoc - BATSOCCHGDAY :
+      $target = $batymaxsoc <  $maxSoc ? $batysetsoc + BATSOCCHGDAY :
+                $batymaxsoc >= $maxSoc ? $batysetsoc - BATSOCCHGDAY :
                 $batysetsoc;                                                                    # neuer Min SOC für den laufenden Tag
 
       ## erwartete PV ermitteln & Anteilsfaktor Bat an Gesamtbatteriekapazität anwenden
@@ -11261,7 +11257,7 @@ sub _batSocTarget {
       my $days2care = floor       (($ntsmsc - $t) / 86400);                                    # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
       my $docare    = 0;                                                                       # keine Zwangsanwendung care SoC
 
-      my $whneed    = ($maxsoc / 100 * $batinstcap) - ($soc / 100 * $batinstcap);              # benötigte Ladeenergie in Wh bis $maxsoc
+      my $whneed    = ($maxSoc / 100 * $batinstcap) - ($soc / 100 * $batinstcap);              # benötigte Ladeenergie in Wh bis $maxSoc
       $whneed       = $whneed < 0 ? 0 : $whneed;
       $whneed       = sprintf "%.0f", $whneed;
 
@@ -11270,7 +11266,7 @@ sub _batSocTarget {
           __batSaveSocKeyFigures ($paref);
           delete $paref->{days2care};
 
-          $careSoc = $maxsoc - ($days2care * BATSOCCHGDAY);                                    # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
+          $careSoc = $maxSoc - ($days2care * BATSOCCHGDAY);                                    # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei 5% Steigerung pro Tag
           $careSoc = $careSoc < $lowSoc ? $lowSoc : $careSoc;
 
           if ($careSoc >= $target) {
@@ -11373,14 +11369,18 @@ sub __parseAttrBatSoc {
   my $name = shift;
   my $cgbt = shift // return;
 
-  my ($pa,$ph)  = parseParams ($cgbt);
-  my $lowSoc    = $ph->{lowSoc};
-  my $upSoc     = $ph->{upSoC};
-  my $lcslot    = $ph->{lcSlot};
-  my $maxsoc    = $ph->{maxSoC}    // MAXSOCDEF;                                          # optional (default: MAXSOCDEF)
-  my $careCycle = $ph->{careCycle} // CARECYCLEDEF;                                       # Ladungszyklus (Maintenance) für maxSoC in Tagen
+  my ($pa,$ph) = parseParams ($cgbt);
 
-return ($lowSoc, $upSoc, $maxsoc, $careCycle, $lcslot);
+  my $parsed = {
+      lowSoc    => $ph->{lowSoc},                                               
+      upSoc     => $ph->{upSoC}, 
+      maxSoc    => $ph->{maxSoC}    // MAXSOCDEF,                                         # optional (default: MAXSOCDEF)
+      careCycle => $ph->{careCycle} // CARECYCLEDEF,                                      # Ladungszyklus (Maintenance) für maxSoC in Tagen     
+      lcslot    => $ph->{lcSlot}, 
+      loadAbort => $ph->{loadAbort},   
+  };
+  
+return $parsed;
 }
 
 ################################################################
@@ -11464,15 +11464,15 @@ sub _batChargeMgmt {
 
   for my $bn (1..MAXBATTERIES) {                                                                 # für jede Batterie
       $bn = sprintf "%02d", $bn;
-
+      
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
       my $batinstcap = BatteryVal ($name, $bn, 'binstcap', 0);                                   # installierte Batteriekapazität Wh
 
       if (!$inplim || !$batinstcap) {
-          debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation are not met. Check the key 'cap' for Bat '$bn'. Exit.");
-          return;
+          debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation for Bat '$bn' are not met. Check key 'cap'. Go to Next.");
+          next;
       }
 
       my $maxfctim  = timestringToTimestamp (ReadingsVal ($name, 'Today_MaxPVforecastTime', '')) // $t;
@@ -11484,15 +11484,41 @@ sub _batChargeMgmt {
       my $csoc      = BatteryVal  ($name, $bn, 'bcharge',                  0);                   # aktuelle Ladung in %
       my $bpinmax   = BatteryVal  ($name, $bn, 'bpinmax',           INFINITE);                   # max. mögliche Ladeleistung W
       my $bpoutmax  = BatteryVal  ($name, $bn, 'bpoutmax',          INFINITE);                   # max. mögliche Entladeleistung W
+      my $bpowerin  = BatteryVal  ($name, $bn, 'bpowerin',          INFINITE);                   # aktuelle Ladeleistung W
       my $cgbt      = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
-      my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
-      my $lowSoc    = 0;
+ 	  my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
+	  my $lowSoc    = 0;
+	  my $loadAbort = '';
       my $lcslot;
-
+	  
       if ($cgbt) {
-          ($lowSoc, undef, undef, undef, $lcslot) = __parseAttrBatSoc ($name, $cgbt);     
-      }
+		  my $parsed = __parseAttrBatSoc ($name, $cgbt);
+		  $lowSoc    = $parsed->{lowSoc} // 0;
+		  $lcslot    = $parsed->{lcslot};
+		  $loadAbort = $parsed->{loadAbort}; 
+	  }
 
+      ## generelle Ladeabbruchbedingung evaluieren
+      ##############################################
+      if ($loadAbort) {
+          my ($abortSoc, $abortpin) = split ':', $loadAbort;                                    # Ladeabbruch Forum: https://forum.fhem.de/index.php?msg=1342556      
+          
+          if ($csoc >= $abortSoc && $bpowerin <= $abortpin) {
+              $data{$name}{batteries}{$bn}{bloadAbortCond} = 1;
+          }
+          elsif ($csoc < $abortSoc) {
+              $data{$name}{batteries}{$bn}{bloadAbortCond} = 0;
+          }
+      }
+      else {
+          delete $data{$name}{batteries}{$bn}{bloadAbortCond};
+          readingsDelete ($hash, 'Battery_ChargeAbort_'.$bn);
+      }
+      
+      my $labortCond = BatteryVal ($name, $bn, 'bloadAbortCond', 0);                            # Ladeabbruchbedingung gesetzt 1 oder nicht 0
+      
+      debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - General load termination condition: $labortCond");
+      
       ## Zeitfenster für aktives Lademanagement ermitteln
       #####################################################
       $lcslot             //= '00:00-23:59';
@@ -11576,6 +11602,7 @@ sub _batChargeMgmt {
 		  if ( $bpin && ($gfeedin - $bpin) > $feedinlim ) {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
           if ( !$cgbt )                                   {$crel = 1}                            # Ladefreigabe wenn kein BatSoc-Management
           if ( !$lcintime )                               {$crel = 1}                            # Ladefreigabe wenn nicht innerhalb Zeitslot für Ladesteuerung
+          if ( $labortCond )                              {$crel = 0}                            # keine Ladefreigabe bei genereller Abbruchbedingung 
 
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
@@ -11605,31 +11632,32 @@ sub _batChargeMgmt {
                                          }
                                        );                                                        # Readings NextHourXX_Bat_XX_ChargeForecast erstellen
 
-          my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W, inTime: $lcintime";
+          my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W, inTime: ".($cgbt ? $lcintime : '-');
 
           if ($num) {
-              $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: $lcintime";
+              $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
 
               if (!$today) {
-                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh, inTime: $lcintime";
+                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
               }
           }
           else {
-              storeReading ('Battery_ChargeRecommended_'.$bn, $crel);                            # Reading nur für aktuelle Stunde
+              storeReading ('Battery_ChargeRecommended_'.$bn,       $crel);                      # Reading nur für aktuelle Stunde
+              storeReading ('Battery_ChargeAbort_'.$bn,       $labortCond) if ($loadAbort);      # Ladeabbruchbedingung
           }
 
 		  $whneed = $batinstcap - $socwh;
 
           $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
-		  $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime;              # Ladesteuerung ist "In Time" oder nicht
+		  $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);    # Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
 		  $hsoc{$nhr}{socprogwhsum}                                   += $socwh;                 # Hilfshash Aufsummierung SoC-Prognose (Wh) über alle Batterien
 
           # prognostizierten Daten in pvHistory speichern
           #################################################
           if ($today && $hod) {                                                                                  # heutiger Tag
               writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
-			  writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } );
+			  writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } ) if($cgbt);
           }
 
           debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $crel ($msg)");
@@ -13490,12 +13518,16 @@ sub _calcConsForecast_circular {
   my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname kommender Tag
   my $lct        = LOCALE_TIME =~ /^de_/xs ? 'DE' : 'EN';
   my $st         = timestringToTimestamp ("$date 00:00:00");                                            # Startzeit 00:00 am aktuellen Tag
+  my $ncds       = $swdfcfc ? $acld * 7 : $acld;                                                        # notwendige Anzahl Vergleichstage die vorhanden sein sollen
+  my $nhist      = scalar keys %{$data{$name}{pvhist}};
 
   my (@cona, $exconfc, $csme, %usage);
   $usage{tom}{con} = 0;
-
+  
   debugLog ($paref, 'consumption|consumption_long', "################### Start Consumption forecast ###################");
-  debugLog ($paref, 'consumption_long', "Basics - installed locale: ".LOCALE_TIME.", used scheme: $lct");
+  debugLog ($paref, 'consumption_long', "Basics - installed locale: ".LOCALE_TIME.", used scheme: $lct"); 
+  debugLog ($paref, 'consumption_long', "Need number of stored days: $ncds, Number of days in History: $nhist => can calculate excludes/includes: ".($ncds <= $nhist ? 'yes' : 'no'));
+
 
   ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
   ###############################################################
@@ -13535,8 +13567,10 @@ sub _calcConsForecast_circular {
               @conh = splice (@conh, $acld * -1);
               $hnum = scalar @conh;
           }
-
-          my $hcon         = sprintf "%.0f", medianArray (\@conh);
+ 
+          # my $hcon         = sprintf "%.0f", medianArray (\@conh);                                    
+          my $hcon         = $ncds <= $nhist ? (sprintf "%.0f", avgArray (\@conh, $hnum)) : 
+                                               (sprintf "%.0f", medianArray (\@conh));                  # V 1.52.8
           $usage{$hh}{con} = $hcon;                                                                     # prognostizierter Verbrauch (Median) der Stunde hh (Hour of Day)
           $usage{$hh}{num} = $hnum;
       }
@@ -13547,7 +13581,9 @@ sub _calcConsForecast_circular {
               $hnumtom = scalar @conhtom;
           }
 
-          my $hcontom       = sprintf "%.0f", medianArray (\@conhtom);
+          # my $hcontom       = sprintf "%.0f", medianArray (\@conhtom);
+          my $hcontom       = $ncds <= $nhist ? (sprintf "%.0f", avgArray (\@conhtom, $hnumtom)) :        
+                                                (sprintf "%.0f", medianArray (\@conhtom));              # V 1.52.8
           $usage{tom}{con} += $hcontom;                                                                 # Summe prognostizierter Verbrauch (Median) des Tages
           $usage{tom}{num} += $hnumtom;
       }
@@ -13558,80 +13594,82 @@ sub _calcConsForecast_circular {
   my $exnum = 0;
   my $ex    = 0;
   my $lap   = 1;
+  
+  if ($ncds <= $nhist) {                                                                               # V 1.52.7
+      for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
+          next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
+          my $do = 1;
 
-  for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
-      next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
-      my $do = 1;
+          for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
+              $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);
 
-      for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
-          $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);
+              if ($exconfc) {
+                  ## Tageswert Excludes finden und summieren
+                  ############################################
+                  if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+                      if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+                          my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
+                          $do     = 0 if(!$hdn || $hdn ne $tomdayname);
+                      }
 
-          if ($exconfc) {
-              ## Tageswert Excludes finden und summieren
-              ############################################
-              if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+                      if ($do) {
+                          $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
+
+                          if ($csme > 0) {
+                              $ex   += $csme;
+                              $exnum++;
+
+                              debugLog ($paref, 'consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
+                          }
+                      }
+                  }
+
+                  ## Stundenweise exkludes und inkludes aufnehmen
+                  #################################################
+                  $do = 1;
                   if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
                       my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
-                      $do     = 0 if(!$hdn || $hdn ne $tomdayname);
+                      $do     = 0 if(!$hdn || $hdn ne $todayname);
                   }
 
                   if ($do) {
-                      $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
+                      my $epiecelem = 1;
 
-                      if ($csme > 0) {
-                          $ex   += $csme;
-                          $exnum++;
+                      for my $h (1..24) {                                                                   # excludieren ob exconfc 1 oder 2
+                          my $hh = sprintf "%02d", $h;
+                          $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
 
-                          debugLog ($paref, 'consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
-                      }
-                  }
-              }
+                          if ($csme) {
+                              $csme                 = sprintf "%.2f", $csme;
+                              $usage{$hh}{histcon} += $csme;
+                              $usage{$hh}{histnum}++;
 
-              ## Stundenweise exkludes und inkludes aufnehmen
-              #################################################
-              $do = 1;
-              if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
-                  my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
-                  $do     = 0 if(!$hdn || $hdn ne $todayname);
-              }
+                              debugLog ($paref, 'consumption_long', "consumer '$c' register for exclude day $n, hod: $hh - ".$csme." Wh");
+                          }
 
-              if ($do) {
-                  my $epiecelem = 1;
+                          if ($exconfc == 2 && $lap == 1) {                                                 # AVG-Daten des Consumers inkludieren
+                              my $rt     = $st + (3600 * ($h - 1));                                         # Schleifenlaufzeit
+                              my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
+                              my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
 
-                  for my $h (1..24) {                                                                   # excludieren ob exconfc 1 oder 2
-                      my $hh = sprintf "%02d", $h;
-                      $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
+                              if ($rt >= $plson && $rt <= $plsoff) {
+                                  if (defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}) {
+                                      $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem};
+                                      $usage{$hh}{plannum}++;
 
-                      if ($csme) {
-                          $csme                 = sprintf "%.2f", $csme;
-                          $usage{$hh}{histcon} += $csme;
-                          $usage{$hh}{histnum}++;
+                                      debugLog ($paref, 'consumption_long', "consumer '$c' register epiecAVG: ".$data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}." Wh for include in Hour $hh");
 
-                          debugLog ($paref, 'consumption_long', "consumer '$c' register for exclude day $n, hod: $hh - ".$csme." Wh");
-                      }
-
-                      if ($exconfc == 2 && $lap == 1) {                                                 # AVG-Daten des Consumers inkludieren
-                          my $rt     = $st + (3600 * ($h - 1));                                         # Schleifenlaufzeit
-                          my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
-                          my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
-
-                          if ($rt >= $plson && $rt <= $plsoff) {
-                              if (defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}) {
-                                  $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem};
-                                  $usage{$hh}{plannum}++;
-
-                                  debugLog ($paref, 'consumption_long', "consumer '$c' register epiecAVG: ".$data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}." Wh for include in Hour $hh");
-
-                                  $epiecelem++;
+                                      $epiecelem++;
+                                  }
                               }
                           }
                       }
                   }
               }
           }
-      }
 
-      $lap++;
+          $lap++;
+      }
   }
 
   ## effektiven StundenForecast berechnen
@@ -14354,30 +14392,26 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, sprintf "%.2f", $shr);
           }
-
-          if ($kpi eq 'SunMinutes_Remain') {
+          elsif ($kpi eq 'SunMinutes_Remain') {
               my $ss  = &{$hcsr{$kpi}{fn}} ($hash, 'sunsetTodayTs',  $def);
               my $smr = ($ss - $t) / 60;
               $smr    = $smr < 0 ? 0 : $smr;
 
               storeReading ($prpo.'_'.$kpi, sprintf "%.0f", $smr);
           }
-
-          if ($kpi =~ /BatPower(In|Out)_Sum/xs) {
+          elsif ($kpi =~ /BatPower(In|Out)_Sum/xs) {
               my $bsum = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $def);
               $bsum   .= $bsum eq $def ? '' : $hcsr{$kpi}{unit};
 
               storeReading ($prpo.'_'.$kpi, $bsum);
           }
-
-          if ($kpi =~ /daysUntilBatteryCare_/xs) {
+          elsif ($kpi =~ /daysUntilBatteryCare_/xs) {
               my $bn = (split "_", $kpi)[1];                                                          # Batterienummer extrahieren
               my $d2c = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'days2care'.$bn, $def);
 
               storeReading ($prpo.'_'.$kpi, $d2c);
           }
-
-          if ($kpi eq 'todayGridFeedIn') {
+          elsif ($kpi eq 'todayGridFeedIn') {
               my $idfi = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdayfeedin', $def);         # initialer Tagesstartwert
               my $cfi  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'feedintotal',   $def);         # aktuelles total Feed In
 
@@ -14385,8 +14419,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dfi).' Wh');
           }
-
-          if ($kpi eq 'todayGridConsumption') {
+          elsif ($kpi eq 'todayGridConsumption') {
               my $idgcon = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaygcon',  $def);         # initialer Tagesstartwert
               my $cgcon  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'gridcontotal', $def);         # aktuelles total Netzbezug
 
@@ -14394,8 +14427,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $dgcon).' Wh');
           }
-
-          if ($kpi eq 'todayBatInSum') {                                                                       # Summe tägl. Ladeenergie (alle Batterien)
+          elsif ($kpi eq 'todayBatInSum') {                                                                    # Summe tägl. Ladeenergie (alle Batterien)
               my $tdbisum = 0;
 
               for my $bn (1..MAXBATTERIES) {
@@ -14409,8 +14441,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbisum).' '.$hcsr{$kpi}{unit});
           }
-
-          if ($kpi eq 'todayBatOutSum') {                                                                      # Summe tägl. Entadeenergie (alle Batterien)
+          elsif ($kpi eq 'todayBatOutSum') {                                                                   # Summe tägl. Entadeenergie (alle Batterien)
               my $tdbosum = 0;
 
               for my $bn (1..MAXBATTERIES) {
@@ -14424,8 +14455,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbosum).' '.$hcsr{$kpi}{unit});
           }
-
-          if ($kpi =~ /todayBatIn_/xs) {
+          elsif ($kpi =~ /todayBatIn_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
               my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot'.$bn, $def);     # initialer Tagesstartwert Batterie In total
               my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot'.$bn,        $def);     # aktuell total Batterieladung (Wh)
@@ -14434,8 +14464,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbi).' '.$hcsr{$kpi}{unit});
           }
-
-          if ($kpi =~ /todayBatOut_/xs) {
+          elsif ($kpi =~ /todayBatOut_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
               my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot'.$bn, $def);    # initialer Tagesstartwert Batterie Out total
               my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot'.$bn,        $def);    # aktuelles total Batterie Out
@@ -14444,8 +14473,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbo).' '.$hcsr{$kpi}{unit});
           }
-
-          if ($kpi eq 'dayAfterTomorrowPVforecast') {                                                      # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
+          elsif ($kpi eq 'dayAfterTomorrowPVforecast') {                                                   # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
               my $dayaftertomorrow = strftime "%Y-%m-%d", localtime($t + 172800);                          # Datum von Übermorgen
               my @allstrings       = split ",", AttrVal ($name, 'setupInverterStrings', '');
               my $fcsumdat         = 0;
@@ -14468,8 +14496,7 @@ sub _genSpecialReadings {
                   storeReading ($prpo.'_'.$kpi, $fcsumdat. ' (no data available)');
               }
           }
-
-          if ($kpi =~ /currentRunMtsConsumer_/xs) {
+          elsif ($kpi =~ /currentRunMtsConsumer_/xs) {
               my $c = (split "_", $kpi)[1];                                                          # Consumer Nummer extrahieren
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
@@ -14481,8 +14508,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $mion).$hcsr{$kpi}{unit});
           }
-
-          if ($kpi =~ /runTimeAvgDayConsumer_/xs) {
+          elsif ($kpi =~ /runTimeAvgDayConsumer_/xs) {
               my $c = (split "_", $kpi)[1];                                                          # Consumer Nummer extrahieren
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
@@ -14494,8 +14520,23 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, $radc.$hcsr{$kpi}{unit});
           }
+          elsif ($kpi eq 'todayNotOwnerConsumption') {                                                         # Summe Verbrauch, der nicht Consumern zugeordnet werden kann
+              my $csme = 0;
+              
+              my $contoday = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $hcsr{$kpi}{par1}, $def);            # Tagesverbrauch Summe (Wh)
+              
+              for my $c (1..MAXCONSUMER) {                                                                     # Verbrauch alle Consumer
+                  $c     = sprintf "%02d", $c;
+                  $csme += HistoryVal ($name, $day, '99', "csme${c}", 0); 
+                  
+              }
+              
+              my $nowncon = $contoday - $csme;
+              $nowncon = max (0, $nowncon);
 
-          if ($kpi eq 'todayConsumptionForecast') {
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $nowncon).' '.$hcsr{$kpi}{unit});
+          }
+          elsif ($kpi eq 'todayConsumptionForecast') {
              for my $hod (sort keys %{$data{$name}{pvhist}{$day}}) {
                  next if(!$hod || $hod == 99);
 
@@ -14504,8 +14545,7 @@ sub _genSpecialReadings {
                  storeReading ($prpo.'_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
              }
           }
-
-          if ($kpi eq 'tomorrowConsumptionForecast') {
+          elsif ($kpi eq 'tomorrowConsumptionForecast') {
              for my $idx (sort keys %{$data{$name}{nexthours}}) {
                  my $istoday = NexthoursVal ($hash, $idx, 'today', 0);
                  next if($istoday);
@@ -14516,8 +14556,7 @@ sub _genSpecialReadings {
                  storeReading ($prpo.'_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
              }
           }
-
-          if ($kpi eq 'conForecastTillNextSunrise') {
+          elsif ($kpi eq 'conForecastTillNextSunrise') {
              my $confc = 0;
              my $dono  = 1;
              my $hrs   = 0;
@@ -21862,6 +21901,16 @@ sub debugLog {
 return;
 }
 
+##################################################################
+# Konvertiert Azimut von der Solar-Konvention (+180 .. 0 .. -180) 
+# in die astronomische Konvention (0 ... 360°)
+##################################################################
+sub azSolar2Astro {
+  my ($azsolar) = @_;
+
+return ($azsolar + 180) % 360;
+}
+
 ################################################################
 #    alle Readings eines Devices oder nur Reading-Regex
 #    löschen
@@ -25230,7 +25279,7 @@ to ensure that the system configuration is correct.
 
       <ul>
          <table>
-         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+         <colgroup> <col width="30%"> <col width="70%"> </colgroup>
             <tr><td> <b>bname </b>          </td><td>Name of the device                                     </td></tr>
             <tr><td> <b>balias </b>         </td><td>Alias of the device                                    </td></tr>
             <tr><td> <b>basynchron </b>     </td><td>Mode of processing received battery events             </td></tr>
@@ -25241,7 +25290,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>bpinmax </b>        </td><td>maximum possible charging power (W)                    </td></tr>
             <tr><td> <b>bpowerout </b>      </td><td>current discharge power (W)                            </td></tr>
             <tr><td> <b>bpoutmax </b>       </td><td>maximum possible discharging power (W)                 </td></tr>
-		 </table>
+		    <tr><td> <b>bloadAbortCond </b> </td><td>general load termination condition (boolean)           </td></tr>
+         </table>
       </ul>
 
       </li>
@@ -25657,7 +25707,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] </b> <br><br>
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC&gt;:&lt;PowerIn&gt;] </b> <br><br>
          If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management for this
          battery device. <br>
          The <b>Battery_OptimumTargetSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
@@ -25673,24 +25723,29 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>lowSoc</b>    </td><td>lower minimum SoC - The battery is not discharged lower than this value (> 0)                </td></tr>
-            <tr><td>                  </td><td>                                                                                             </td></tr>
-            <tr><td> <b>upSoC</b>     </td><td>upper minimum SoC - The usual value of the optimum SoC tends to be                           </td></tr>
-            <tr><td>                  </td><td>between 'lowSoC' and 'upSoC' in periods with a high PV surplus                               </td></tr>
-            <tr><td>                  </td><td>and between 'upSoC' and 'maxSoC' in periods with a low PV surplus                            </td></tr>
-            <tr><td>                  </td><td>                                                                                             </td></tr>
-            <tr><td> <b>maxSoC</b>    </td><td>Maximum minimum SoC - SoC value that must be reached at least every 'careCycle' days         </td></tr>
-            <tr><td>                  </td><td>in order to balance the charge in the storage network.                                       </td></tr>
-            <tr><td>                  </td><td>The specification is optional (&lt;= 100, default: 95)                                       </td></tr>
-            <tr><td>                  </td><td>                                                                                             </td></tr>
-            <tr><td> <b>careCycle</b> </td><td>Maximum interval in days that may occur between two states of charge                         </td></tr>
-            <tr><td>                  </td><td>of at least 'maxSoC'. The specification is optional (default: 20)                            </td></tr>
-            <tr><td>                  </td><td>                                                                                             </td></tr>
-            <tr><td> <b>lcSlot</b>    </td><td>A daily time window is defined in which the charging control of the module should be active  </td></tr>
-            <tr><td>                  </td><td>for this battery. Outside the time window, the battery charge is released                    </td></tr>
-            <tr><td>                  </td><td>at full power. The SoC management of the battery is not affected by this.                    </td></tr>
-            <tr><td>                  </td><td>Value: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: all day                                  </td></tr>			
-            <tr><td>                  </td><td>                                                                                             </td></tr>			
+            <tr><td> <b>lowSoc</b>    </td><td>lower minimum SoC - The battery is not discharged lower than this value (> 0)                   </td></tr>
+            <tr><td>                  </td><td>                                                                                                </td></tr>
+            <tr><td> <b>upSoC</b>     </td><td>upper minimum SoC - The usual value of the optimum SoC tends to be                              </td></tr>
+            <tr><td>                  </td><td>between 'lowSoC' and 'upSoC' in periods with a high PV surplus                                  </td></tr>
+            <tr><td>                  </td><td>and between 'upSoC' and 'maxSoC' in periods with a low PV surplus                               </td></tr>
+            <tr><td>                  </td><td>                                                                                                </td></tr>
+            <tr><td> <b>maxSoC</b>    </td><td>Maximum minimum SoC - SoC value that must be reached at least every 'careCycle' days            </td></tr>
+            <tr><td>                  </td><td>in order to balance the charge in the storage network.                                          </td></tr>
+            <tr><td>                  </td><td>The specification is optional (&lt;= 100, default: 95)                                          </td></tr>
+            <tr><td>                  </td><td>                                                                                                </td></tr>
+            <tr><td> <b>careCycle</b> </td><td>Maximum interval in days that may occur between two states of charge                            </td></tr>
+            <tr><td>                  </td><td>of at least 'maxSoC'. The specification is optional (default: 20)                               </td></tr>
+            <tr><td>                  </td><td>                                                                                                </td></tr>
+            <tr><td> <b>lcSlot</b>    </td><td>A daily time window is defined in which the charging control of the module should be active     </td></tr>
+            <tr><td>                  </td><td>for this battery. Outside the time window, the battery charge is released                       </td></tr>
+            <tr><td>                  </td><td>at full power. The SoC management of the battery is not affected by this.                       </td></tr>
+            <tr><td>                  </td><td>Value: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: all day                                     </td></tr>			
+            <tr><td>                  </td><td>                                                                                                </td></tr>			
+            <tr><td> <b>loadAbort</b> </td><td>Condition for a general charging abort. The condition is fulfilled if the specified             </td></tr>
+            <tr><td>                  </td><td>SoC (%) is reached or exceeded <b>AND</b> the specified charging power (W)                      </td></tr>
+            <tr><td>                  </td><td>has been undercut -> Reading <b>Battery_ChargeAbort_XX = 1</b>.                                 </td></tr>
+            <tr><td>                  </td><td>If the current SoC falls below the specified SoC again, the <b>Battery_ChargeAbort_XX = 0</b>   </td></tr>
+            <tr><td>                  </td><td>                                                                                                </td></tr>            
          </table>
          </ul>
          <br>
@@ -25823,6 +25878,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>the remaining minutes until sunset of the current day                                                                </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>the remaining hours until sunset of the current day                                                                  </td></tr>
             <tr><td> <b>todayConsumption</b>           </td><td>the energy consumption of the house on the current day                                                               </td></tr>
+            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>the energy consumption on the current day that cannot be allocated to the registered consumers                       </td></tr>
             <tr><td> <b>todayConsumptionForecastDay</b></td><td>Consumption forecast for the current day                                                                             </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Consumption forecast per hour of the current day (01-24)                                                             </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Consumption forecast from current hour to hour before sunset                                                         </td></tr>
@@ -26322,8 +26378,10 @@ to ensure that the system configuration is correct.
 			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
             <tr><td> <b>genPVforecastsToEvent</b>     </td><td>The module generates daily ‘AllPVforecastsToEvent’ events to visualize the PV forecast.                                              </td></tr>
             <tr><td>                                  </td><td>Further explanations can be found in the <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Visualisierung_solare_Vorhersage_und_reale_Erzeugung' target='_blank'>german Wiki</a>. </td></tr>
-            <tr><td>                                  </td><td>Event generation can be optimized for specific uses.                                                                                 </td></tr>
-			<tr><td>                                  </td><td><b>adapt4Steps</b> - the events are optimized for the SVG Plot-Type 'steps'                                                          </td></tr>
+            <tr><td>                                  </td><td><b>Note:</b> When using the attribute, the attribute <b>event-on-update-reading=AllPVforecastsToEvent</b> must also be set.          </td></tr>
+			<tr><td>                                  </td><td>Event generation can be optimized for specific uses:                                                                                 </td></tr>
+			<tr><td>                                  </td><td><b>adapt4Steps</b> - the events are optimized for the SVG plot type 'steps'                                                          </td></tr>
+			<tr><td>                                  </td><td><b>adapt4fSteps</b> - the events are optimized for the SVG plot type 'fsteps'                                                        </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                     </td></tr>
 			<tr><td> <b>showLink</b>                  </td><td>Display of a link to the detailed view of the device above the graphics area                                                         </td></tr>
 			<tr><td>                                  </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                                            </td></tr>
@@ -27837,7 +27895,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
          <table>
-         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+         <colgroup> <col width="30%"> <col width="70%"> </colgroup>
             <tr><td> <b>bname </b>          </td><td>Name des Gerätes                                       </td></tr>
             <tr><td> <b>balias </b>         </td><td>Alias des Gerätes                                      </td></tr>
             <tr><td> <b>basynchron </b>     </td><td>Modus der Verarbeitung empfangener Batterie-Events     </td></tr>
@@ -27848,6 +27906,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>bpinmax </b>        </td><td>maximal mögliche Ladeleistung (W)                      </td></tr>
             <tr><td> <b>bpowerout </b>      </td><td>momentane Entladeleistung (W)                          </td></tr>
             <tr><td> <b>bpoutmax </b>       </td><td>maximal mögliche Entladeleistung (W)                   </td></tr>
+            <tr><td> <b>bloadAbortCond </b> </td><td>generelle Ladeabbruchbedingung                         </td></tr>
 		 </table>
       </ul>
 
@@ -28264,7 +28323,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] </b> <br><br>
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC&gt;:&lt;PowerIn&gt;] </b> <br><br>
          Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
          SoC- und Lade-Management für dieses Batteriegerät. <br>
          Das Reading <b>Battery_OptimumTargetSoC_XX</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
@@ -28299,6 +28358,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                  </td><td>Leistung freigegeben. Das SoC-Management der Batterie ist davon nicht betroffen.                </td></tr>
             <tr><td>                  </td><td>Wert: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: ganztägig                                    </td></tr>			
             <tr><td>                  </td><td>                                                                                                </td></tr>			
+            <tr><td> <b>loadAbort</b> </td><td>Bedingung für einen generellen Ladeabbruch. Die Bedingung ist erfüllt, wenn der angegebene      </td></tr>
+            <tr><td>                  </td><td>SoC (%) erreicht bzw. überschritten ist <b>UND</b> die angegebene Ladeleistung (W)              </td></tr>
+            <tr><td>                  </td><td>unterschritten wurde -> Reading <b>Battery_ChargeAbort_XX = 1</b>.                              </td></tr>
+            <tr><td>                  </td><td>Fällt der aktuelle SoC wieder unter den angegebenen SoC, wird <b>Battery_ChargeAbort_XX = 0</b> </td></tr>
+            <tr><td>                  </td><td>                                                                                                </td></tr>            
          </table>
          </ul>
          <br>
@@ -28431,6 +28495,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>todayConsumption</b>           </td><td>der Energieverbrauch des Hauses am aktuellen Tag                                                                </td></tr>
+            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>der Energieverbrauch am aktuellen Tag, der den registrierten Verbrauchern nicht zugeordnet werden kann          </td></tr>
             <tr><td> <b>todayConsumptionForecastDay</b></td><td>Verbrauchsprognose für den aktuellen Tag                                                                        </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Verbrauchsprognose pro Stunde des aktuellen Tages (01-24)                                                       </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Verbrauchsprognose von aktueller Stunde bis Stunde vor Sonnenuntergang                                          </td></tr>
@@ -28928,8 +28993,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>genPVforecastsToEvent</b>     </td><td>Das Modul erzeugt täglich 'AllPVforecastsToEvent'-Events zur Visualisierung der PV Prognose.                                    </td></tr>
             <tr><td>                                  </td><td>Nähere Erläuterungen dazu sind im <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Visualisierung_solare_Vorhersage_und_reale_Erzeugung' target='_blank'>Wiki</a> beschrieben. </td></tr>
-            <tr><td>                                  </td><td>Die Eventerzeugung kann für bestimmte Nutzungen optimiert werden.                                                               </td></tr>
+            <tr><td>                                  </td><td><b>Hinweis:</b> Bei Nutzung des Attributes ist ebenfalls das Attribut <b>event-on-update-reading=AllPVforecastsToEvent</b> zu setzen.  </td></tr>
+			<tr><td>                                  </td><td>Die Eventerzeugung kann für bestimmte Nutzungen optimiert werden:                                                               </td></tr>
 			<tr><td>                                  </td><td><b>adapt4Steps</b> - die Events werden für den SVG Plot-Type 'steps' optimiert                                                  </td></tr>
+			<tr><td>                                  </td><td><b>adapt4fSteps</b> - die Events werden für den SVG Plot-Type 'fsteps' optimiert                                                </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                </td></tr>
 			<tr><td> <b>showLink</b>                  </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                         </td></tr>
 			<tr><td>                                  </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                       </td></tr>

@@ -11463,9 +11463,7 @@ sub _batChargeMgmt {
   my %hsoc;                                                                                      # Hilfshash
 
   for my $bn (1..MAXBATTERIES) {                                                                 # für jede Batterie
-      $bn      = sprintf "%02d", $bn;
-      my $cgbt = AttrVal ($name, 'ctrlBatSocManagement'.$bn,  undef);
-      next if(!$cgbt);
+      $bn = sprintf "%02d", $bn;
       
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
@@ -11487,12 +11485,18 @@ sub _batChargeMgmt {
       my $bpinmax   = BatteryVal  ($name, $bn, 'bpinmax',           INFINITE);                   # max. mögliche Ladeleistung W
       my $bpoutmax  = BatteryVal  ($name, $bn, 'bpoutmax',          INFINITE);                   # max. mögliche Entladeleistung W
       my $bpowerin  = BatteryVal  ($name, $bn, 'bpowerin',          INFINITE);                   # aktuelle Ladeleistung W
-      my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
-
-      my $parsed    = __parseAttrBatSoc ($name, $cgbt);
-      my $lowSoc    = $parsed->{lowSoc} // 0;
-      my $lcslot    = $parsed->{lcslot};
-      my $loadAbort = $parsed->{loadAbort}; 
+      my $cgbt      = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
+ 	  my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
+	  my $lowSoc    = 0;
+	  my $loadAbort = '';
+      my $lcslot;
+	  
+      if ($cgbt) {
+		  my $parsed = __parseAttrBatSoc ($name, $cgbt);
+		  $lowSoc    = $parsed->{lowSoc} // 0;
+		  $lcslot    = $parsed->{lcslot};
+		  $loadAbort = $parsed->{loadAbort}; 
+	  }
 
       ## generelle Ladeabbruchbedingung evaluieren
       ##############################################
@@ -11628,13 +11632,13 @@ sub _batChargeMgmt {
                                          }
                                        );                                                        # Readings NextHourXX_Bat_XX_ChargeForecast erstellen
 
-          my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W, inTime: $lcintime";
+          my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W, inTime: ".($cgbt ? $lcintime : '-');
 
           if ($num) {
-              $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: $lcintime";
+              $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
 
               if (!$today) {
-                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh, inTime: $lcintime";
+                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
               }
           }
           else {
@@ -11646,14 +11650,14 @@ sub _batChargeMgmt {
 
           $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
-		  $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime;              # Ladesteuerung ist "In Time" oder nicht
+		  $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);    # Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
 		  $hsoc{$nhr}{socprogwhsum}                                   += $socwh;                 # Hilfshash Aufsummierung SoC-Prognose (Wh) über alle Batterien
 
           # prognostizierten Daten in pvHistory speichern
           #################################################
           if ($today && $hod) {                                                                                  # heutiger Tag
               writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
-			  writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } );
+			  writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } ) if($cgbt);
           }
 
           debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $crel ($msg)");
@@ -25874,7 +25878,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>the remaining minutes until sunset of the current day                                                                </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>the remaining hours until sunset of the current day                                                                  </td></tr>
             <tr><td> <b>todayConsumption</b>           </td><td>the energy consumption of the house on the current day                                                               </td></tr>
-            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>the energy consumption on the current day that could not be allocated to the registered consumers                    </td></tr>
+            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>the energy consumption on the current day that cannot be allocated to the registered consumers                       </td></tr>
             <tr><td> <b>todayConsumptionForecastDay</b></td><td>Consumption forecast for the current day                                                                             </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Consumption forecast per hour of the current day (01-24)                                                             </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Consumption forecast from current hour to hour before sunset                                                         </td></tr>
@@ -28491,7 +28495,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>todayConsumption</b>           </td><td>der Energieverbrauch des Hauses am aktuellen Tag                                                                </td></tr>
-            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>der Energieverbrauch am aktuellen Tag, der den registrierten Verbrauchern nicht zugeordnet werden konnte        </td></tr>
+            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>der Energieverbrauch am aktuellen Tag, der den registrierten Verbrauchern nicht zugeordnet werden kann          </td></tr>
             <tr><td> <b>todayConsumptionForecastDay</b></td><td>Verbrauchsprognose für den aktuellen Tag                                                                        </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Verbrauchsprognose pro Stunde des aktuellen Tages (01-24)                                                       </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Verbrauchsprognose von aktueller Stunde bis Stunde vor Sonnenuntergang                                          </td></tr>

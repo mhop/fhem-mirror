@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature: 76_SolarForecast: Version 1.52.11
  - change: 55_DWD_OpenData: set internal version to 1.017007
  - bugfix: 93_DbRep: resolution of symbolic links in Optimize Tables for SQLite
  - bugfix: 76_SMAInverter.pm: INV_BACKRELAYRELAY to INV_BACKUPRELAY
