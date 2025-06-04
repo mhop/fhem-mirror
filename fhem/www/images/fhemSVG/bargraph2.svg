@@ -1,0 +1,123 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="--rssi:100">
+  <style>
+    #bar00 {
+      height: 1%;
+      y: 99%;
+      fill: #ff0000; /* Red for 0% */
+    }
+
+    /* For bars from 10% to 100% */
+    #bar10 {
+      --cmp: max(0, calc(var(--rssi) - 10));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 10%);
+      y: calc(100% - var(--cmp2) * 10%);
+      fill: #ff0000; /* Red for 10% */
+    }
+
+    #bar20 {
+      --cmp: max(0, calc(var(--rssi) - 20));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 20%);
+      y: calc(100% - var(--cmp2) * 20%);
+      fill: #ff5500; /* Orange for 20% */
+    }
+
+    #bar30 {
+      --cmp: max(0, calc(var(--rssi) - 30));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 30%);
+      y: calc(100% - var(--cmp2) * 30%);
+      fill: #ff9900; /* Yellow-Orange for 30% */
+    }
+
+    #bar40 {
+      --cmp: max(0, calc(var(--rssi) - 40));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 40%);
+      y: calc(100% - var(--cmp2) * 40%);
+      fill: #ffcc00; /* Yellow for 40% */
+    }
+
+    #bar50 {
+      --cmp: max(0, calc(var(--rssi) - 50));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 50%);
+      y: calc(100% - var(--cmp2) * 50%);
+      fill: #ffff00; /* Yellow for 50% */
+    }
+
+    #bar60 {
+      --cmp: max(0, calc(var(--rssi) - 60));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 60%);
+      y: calc(100% - var(--cmp2) * 60%);
+      fill: #99ff00; /* Light Green for 60% */
+    }
+
+    #bar70 {
+      --cmp: max(0, calc(var(--rssi) - 70));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 70%);
+      y: calc(100% - var(--cmp2) * 70%);
+      fill: #66cc00; /* Green for 70% */
+    }
+
+    #bar80 {
+      --cmp: max(0, calc(var(--rssi) - 80));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 80%);
+      y: calc(100% - var(--cmp2) * 80%);
+      fill: #339900; /* Darker Green for 80% */
+    }
+
+    #bar90 {
+      --cmp: max(0, calc(var(--rssi) - 90));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 90%);
+      y: calc(100% - var(--cmp2) * 90%);
+      fill: #006600; /* Dark Green for 90% */
+    }
+
+    #bar100 {
+      --cmp: max(0, calc(var(--rssi) - 99));
+      --cmp2: min(1, calc(var(--cmp)));
+      height: calc(var(--cmp2) * 100%);
+      y: calc(100% - var(--cmp2) * 100%);
+      fill: #004d00; /* Dark Green for 100% */
+    }
+    
+    .background {
+      fill: #cccccc;
+    }
+    
+    rect {
+      transition: height 1s ease-in-out, y 1s ease-in-out;
+    }
+
+  </style>
+  
+  <rect class="background" x="0" y="99%" width="7%" height="1%" />
+  <rect class="background" x="9%" y="90%" width="7%" height="10%" />
+  <rect class="background" x="18%" y="80%" width="7%" height="20%" />
+  <rect class="background" x="27%" y="70%" width="7%" height="30%" />
+  <rect class="background" x="36%" y="60%" width="7%" height="40%" />
+  <rect class="background" x="45%" y="50%" width="7%" height="50%" />
+  <rect class="background" x="54%" y="40%" width="7%" height="60%" />
+  <rect class="background" x="63%" y="30%" width="7%" height="70%" />
+  <rect class="background" x="72%" y="20%" width="7%" height="80%" />
+  <rect class="background" x="81%" y="10%" width="7%" height="90%" />
+  <rect class="background" x="90%" y="0%" width="7%" height="100%" />
+
+  <rect id="bar00" x="0" width="7%" />
+  <rect id="bar10" x="9%" width="7%" />
+  <rect id="bar20" x="18%" width="7%" />
+  <rect id="bar30" x="27%" width="7%" />
+  <rect id="bar40" x="36%" width="7%" />
+  <rect id="bar50" x="45%" width="7%" />
+  <rect id="bar60" x="54%" width="7%" />
+  <rect id="bar70" x="63%" width="7%" />
+  <rect id="bar80" x="72%" width="7%" />
+  <rect id="bar90" x="81%" width="7%" />
+  <rect id="bar100" x="90%" width="7%" />
+</svg>
