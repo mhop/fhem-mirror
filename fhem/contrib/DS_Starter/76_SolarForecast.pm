@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.11"=> "03.06.2025  _genSpecialReadings: new option todayNotOwnerConsumption ",
   "1.52.10"=> "03.06.2025  attr plantControl->genPVforecastsToEvent new possible value 'adapt4fSteps' ",
   "1.52.9" => "02.06.2025  __getDWDSolarData: new sub azSolar2Astro, ctrlBatSocManagementXX: new key loadAbort ",
   "1.52.8" => "01.06.2025  _calcConsForecast_circular: use avgArray if number included days <= number of days in pvHistory ",
@@ -1386,36 +1387,37 @@ my %hef = (                                                                     
 );
 
 my %hcsr = (                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
-  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
-  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => '-'         },
-  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => '-'         },
-  response_message            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => '-'         },
-  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 'apimaxreq' },
-  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 0           },
-  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 0           },
-  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 'apimaxreq' },
-  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',      unit => '',     def => 'apimaxreq' },
-  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => ' s',   def => '-'         },
-  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => '-'         },
-  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => '-'         },
-  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },
-  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', par1 => '',      unit => ' Wh',  def => 0           },
-  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' s',   def => '-'         },
-  todayConsumption            => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
-  todayConsumptionForecastDay => { fnr => 4, fn => \&HistoryVal,      par => 99,                  par1 => 'confc', unit => ' Wh',  def => '-'         },
-  BatPowerIn_Sum              => { fnr => 5, fn => \&CurrentVal,      par => 'batpowerinsum',     par1 => '',      unit => ' W',   def => '-'         },
-  BatPowerOut_Sum             => { fnr => 5, fn => \&CurrentVal,      par => 'batpoweroutsum',    par1 => '',      unit => ' W',   def => '-'         },
-  BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',       par1 => '',      unit => ' %',   def => 0           },
-  SunHours_Remain             => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
-  SunMinutes_Remain           => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',      unit => '',     def => 0           },
-  dayAfterTomorrowPVforecast  => { fnr => 5, fn => \&RadiationAPIVal, par => 'pv_estimate50',     par1 => '',      unit => '',     def => 0           },
-  todayGridFeedIn             => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => '',     def => 0           },
-  todayGridConsumption        => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => '',     def => 0           },
-  todayConsumptionForecast    => { fnr => 5, fn => \&HistoryVal,      par => '',                  par1 => 'confc', unit => ' Wh',  def => '-'         },
-  tomorrowConsumptionForecast => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',      unit => ' Wh',  def => '-'         },
-  conForecastTillNextSunrise  => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',      unit => ' Wh',  def => 0           },
-  todayBatInSum               => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
-  todayBatOutSum              => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',      unit => ' Wh',  def => 0           },
+  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
+  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  response_message            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 'apimaxreq' },
+  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 0           },
+  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 0           },
+  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 'apimaxreq' },
+  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 'apimaxreq' },
+  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => ' s',   def => '-'         },
+  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => '-'         },
+  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => 0           },
+  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', par1 => '',                  unit => ' Wh',  def => 0           },
+  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' s',   def => '-'         },
+  todayConsumption            => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
+  todayConsumptionForecastDay => { fnr => 4, fn => \&HistoryVal,      par => 99,                  par1 => 'confc',             unit => ' Wh',  def => '-'         },
+  BatPowerIn_Sum              => { fnr => 5, fn => \&CurrentVal,      par => 'batpowerinsum',     par1 => '',                  unit => ' W',   def => '-'         },
+  BatPowerOut_Sum             => { fnr => 5, fn => \&CurrentVal,      par => 'batpoweroutsum',    par1 => '',                  unit => ' W',   def => '-'         },
+  BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',       par1 => '',                  unit => ' %',   def => 0           },
+  SunHours_Remain             => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
+  SunMinutes_Remain           => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => 0           },
+  dayAfterTomorrowPVforecast  => { fnr => 5, fn => \&RadiationAPIVal, par => 'pv_estimate50',     par1 => '',                  unit => '',     def => 0           },
+  todayGridFeedIn             => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => '',     def => 0           },
+  todayGridConsumption        => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => '',     def => 0           },
+  todayNotOwnerConsumption    => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => 'todayConsumption',  unit => ' Wh',  def => 0           },
+  todayConsumptionForecast    => { fnr => 5, fn => \&HistoryVal,      par => '',                  par1 => 'confc',             unit => ' Wh',  def => '-'         },
+  tomorrowConsumptionForecast => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => '-'         },
+  conForecastTillNextSunrise  => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => 0           },
+  todayBatInSum               => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
+  todayBatOutSum              => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
 );
 
   for my $csr (1..MAXCONSUMER) {
@@ -14386,30 +14388,26 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, sprintf "%.2f", $shr);
           }
-
-          if ($kpi eq 'SunMinutes_Remain') {
+          elsif ($kpi eq 'SunMinutes_Remain') {
               my $ss  = &{$hcsr{$kpi}{fn}} ($hash, 'sunsetTodayTs',  $def);
               my $smr = ($ss - $t) / 60;
               $smr    = $smr < 0 ? 0 : $smr;
 
               storeReading ($prpo.'_'.$kpi, sprintf "%.0f", $smr);
           }
-
-          if ($kpi =~ /BatPower(In|Out)_Sum/xs) {
+          elsif ($kpi =~ /BatPower(In|Out)_Sum/xs) {
               my $bsum = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $def);
               $bsum   .= $bsum eq $def ? '' : $hcsr{$kpi}{unit};
 
               storeReading ($prpo.'_'.$kpi, $bsum);
           }
-
-          if ($kpi =~ /daysUntilBatteryCare_/xs) {
+          elsif ($kpi =~ /daysUntilBatteryCare_/xs) {
               my $bn = (split "_", $kpi)[1];                                                          # Batterienummer extrahieren
               my $d2c = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'days2care'.$bn, $def);
 
               storeReading ($prpo.'_'.$kpi, $d2c);
           }
-
-          if ($kpi eq 'todayGridFeedIn') {
+          elsif ($kpi eq 'todayGridFeedIn') {
               my $idfi = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdayfeedin', $def);         # initialer Tagesstartwert
               my $cfi  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'feedintotal',   $def);         # aktuelles total Feed In
 
@@ -14417,8 +14415,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dfi).' Wh');
           }
-
-          if ($kpi eq 'todayGridConsumption') {
+          elsif ($kpi eq 'todayGridConsumption') {
               my $idgcon = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaygcon',  $def);         # initialer Tagesstartwert
               my $cgcon  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'gridcontotal', $def);         # aktuelles total Netzbezug
 
@@ -14426,8 +14423,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $dgcon).' Wh');
           }
-
-          if ($kpi eq 'todayBatInSum') {                                                                       # Summe tägl. Ladeenergie (alle Batterien)
+          elsif ($kpi eq 'todayBatInSum') {                                                                    # Summe tägl. Ladeenergie (alle Batterien)
               my $tdbisum = 0;
 
               for my $bn (1..MAXBATTERIES) {
@@ -14441,8 +14437,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbisum).' '.$hcsr{$kpi}{unit});
           }
-
-          if ($kpi eq 'todayBatOutSum') {                                                                      # Summe tägl. Entadeenergie (alle Batterien)
+          elsif ($kpi eq 'todayBatOutSum') {                                                                   # Summe tägl. Entadeenergie (alle Batterien)
               my $tdbosum = 0;
 
               for my $bn (1..MAXBATTERIES) {
@@ -14456,8 +14451,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbosum).' '.$hcsr{$kpi}{unit});
           }
-
-          if ($kpi =~ /todayBatIn_/xs) {
+          elsif ($kpi =~ /todayBatIn_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
               my $idbitot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatintot'.$bn, $def);     # initialer Tagesstartwert Batterie In total
               my $cbitot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batintot'.$bn,        $def);     # aktuell total Batterieladung (Wh)
@@ -14466,8 +14460,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbi).' '.$hcsr{$kpi}{unit});
           }
-
-          if ($kpi =~ /todayBatOut_/xs) {
+          elsif ($kpi =~ /todayBatOut_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
               my $idbotot = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaybatouttot'.$bn, $def);    # initialer Tagesstartwert Batterie Out total
               my $cbotot  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'batouttot'.$bn,        $def);    # aktuelles total Batterie Out
@@ -14476,8 +14469,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbo).' '.$hcsr{$kpi}{unit});
           }
-
-          if ($kpi eq 'dayAfterTomorrowPVforecast') {                                                      # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
+          elsif ($kpi eq 'dayAfterTomorrowPVforecast') {                                                   # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
               my $dayaftertomorrow = strftime "%Y-%m-%d", localtime($t + 172800);                          # Datum von Übermorgen
               my @allstrings       = split ",", AttrVal ($name, 'setupInverterStrings', '');
               my $fcsumdat         = 0;
@@ -14500,8 +14492,7 @@ sub _genSpecialReadings {
                   storeReading ($prpo.'_'.$kpi, $fcsumdat. ' (no data available)');
               }
           }
-
-          if ($kpi =~ /currentRunMtsConsumer_/xs) {
+          elsif ($kpi =~ /currentRunMtsConsumer_/xs) {
               my $c = (split "_", $kpi)[1];                                                          # Consumer Nummer extrahieren
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
@@ -14513,8 +14504,7 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $mion).$hcsr{$kpi}{unit});
           }
-
-          if ($kpi =~ /runTimeAvgDayConsumer_/xs) {
+          elsif ($kpi =~ /runTimeAvgDayConsumer_/xs) {
               my $c = (split "_", $kpi)[1];                                                          # Consumer Nummer extrahieren
 
               if (!AttrVal ($name, 'consumer'.$c, '')) {
@@ -14526,8 +14516,23 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, $radc.$hcsr{$kpi}{unit});
           }
+          elsif ($kpi eq 'todayNotOwnerConsumption') {                                                         # Summe Verbrauch, der nicht Consumern zugeordnet werden kann
+              my $csme = 0;
+              
+              my $contoday = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, $hcsr{$kpi}{par1}, $def);            # Tagesverbrauch Summe (Wh)
+              
+              for my $c (1..MAXCONSUMER) {                                                                     # Verbrauch alle Consumer
+                  $c     = sprintf "%02d", $c;
+                  $csme += HistoryVal ($name, $day, '99', "csme${c}", 0); 
+                  
+              }
+              
+              my $nowncon = $contoday - $csme;
+              $nowncon = max (0, $nowncon);
 
-          if ($kpi eq 'todayConsumptionForecast') {
+              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $nowncon).' '.$hcsr{$kpi}{unit});
+          }
+          elsif ($kpi eq 'todayConsumptionForecast') {
              for my $hod (sort keys %{$data{$name}{pvhist}{$day}}) {
                  next if(!$hod || $hod == 99);
 
@@ -14536,8 +14541,7 @@ sub _genSpecialReadings {
                  storeReading ($prpo.'_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
              }
           }
-
-          if ($kpi eq 'tomorrowConsumptionForecast') {
+          elsif ($kpi eq 'tomorrowConsumptionForecast') {
              for my $idx (sort keys %{$data{$name}{nexthours}}) {
                  my $istoday = NexthoursVal ($hash, $idx, 'today', 0);
                  next if($istoday);
@@ -14548,8 +14552,7 @@ sub _genSpecialReadings {
                  storeReading ($prpo.'_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
              }
           }
-
-          if ($kpi eq 'conForecastTillNextSunrise') {
+          elsif ($kpi eq 'conForecastTillNextSunrise') {
              my $confc = 0;
              my $dono  = 1;
              my $hrs   = 0;
@@ -25871,6 +25874,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>the remaining minutes until sunset of the current day                                                                </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>the remaining hours until sunset of the current day                                                                  </td></tr>
             <tr><td> <b>todayConsumption</b>           </td><td>the energy consumption of the house on the current day                                                               </td></tr>
+            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>the energy consumption on the current day that could not be allocated to the registered consumers                    </td></tr>
             <tr><td> <b>todayConsumptionForecastDay</b></td><td>Consumption forecast for the current day                                                                             </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Consumption forecast per hour of the current day (01-24)                                                             </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Consumption forecast from current hour to hour before sunset                                                         </td></tr>
@@ -28487,6 +28491,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>SunMinutes_Remain</b>          </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>SunHours_Remain</b>            </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
             <tr><td> <b>todayConsumption</b>           </td><td>der Energieverbrauch des Hauses am aktuellen Tag                                                                </td></tr>
+            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>der Energieverbrauch am aktuellen Tag, der den registrierten Verbrauchern nicht zugeordnet werden konnte        </td></tr>
             <tr><td> <b>todayConsumptionForecastDay</b></td><td>Verbrauchsprognose für den aktuellen Tag                                                                        </td></tr>
             <tr><td> <b>todayConsumptionForecast</b>   </td><td>Verbrauchsprognose pro Stunde des aktuellen Tages (01-24)                                                       </td></tr>
             <tr><td> <b>todayConForecastTillSunset</b> </td><td>Verbrauchsprognose von aktueller Stunde bis Stunde vor Sonnenuntergang                                          </td></tr>
