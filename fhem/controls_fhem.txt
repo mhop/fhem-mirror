@@ -1,6 +1,6 @@
-REV 30023
+REV 30028
 DIR unused
-UPD 2025-06-04_07:45:10 445558 ./CHANGED
+UPD 2025-06-05_07:45:05 445665 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2025-05-26_07:45:05 47157 ./MAINTAINER.txt
 UPD 2025-03-18_07:45:03 47176 ./configDB.pm
@@ -295,7 +295,7 @@ UPD 2019-06-05_07:45:02 18742 FHEM/52_I2C_PCF8574.pm
 UPD 2019-06-05_07:45:02 13038 FHEM/52_I2C_SHT21.pm
 UPD 2016-07-11_07:45:14 12508 FHEM/52_I2C_SHT3x.pm
 UPD 2022-04-02_07:45:02 29905 FHEM/53_GHoma.pm
-UPD 2025-05-26_07:45:05 139324 FHEM/55_DWD_OpenData.pm
+UPD 2025-06-05_07:45:05 139324 FHEM/55_DWD_OpenData.pm
 UPD 2024-04-06_07:45:02 66973 FHEM/55_InfoPanel.pm
 UPD 2025-01-31_07:45:06 24804 FHEM/55_PIFACE.pm
 UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
@@ -421,7 +421,7 @@ UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
 UPD 2016-12-08_07:45:12 17663 FHEM/76_MSGMail.pm
 UPD 2022-11-02_07:45:02 77314 FHEM/76_SMAEVCharger.pm
 UPD 2025-06-03_07:45:03 173445 FHEM/76_SMAInverter.pm
-UPD 2025-05-28_07:45:11 1609874 FHEM/76_SolarForecast.pm
+UPD 2025-06-05_07:45:05 1617104 FHEM/76_SolarForecast.pm
 UPD 2025-01-21_07:45:03 43252 FHEM/76_msgDialog.pm
 UPD 2021-10-29_07:45:03 57317 FHEM/77_SMAEM.pm
 UPD 2016-07-19_07:45:16 23026 FHEM/77_SMASTP.pm
@@ -763,12 +763,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2025-05-26_07:45:11 5331484 docs/commandref.html
-UPD 2025-05-26_07:45:15 3347707 docs/commandref_DE.html
+UPD 2025-06-05_07:45:13 5333067 docs/commandref.html
+UPD 2025-06-05_07:45:17 3349233 docs/commandref_DE.html
 UPD 2025-05-03_07:45:04 86553 docs/commandref_frame.html
 UPD 2025-05-03_07:45:04 97225 docs/commandref_frame_DE.html
-UPD 2025-06-04_07:45:22 325918 docs/commandref_modular.html
-UPD 2025-06-04_07:45:23 337768 docs/commandref_modular_DE.html
+UPD 2025-06-05_07:45:18 325918 docs/commandref_modular.html
+UPD 2025-06-05_07:45:19 337768 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1382,6 +1382,7 @@ UPD 2015-08-11_07:45:11 1801 www/images/fhemSVG/awning.off.svg
 UPD 2015-08-11_07:45:11 1794 www/images/fhemSVG/awning.svg
 UPD 2015-07-28_14:05:32 11079 www/images/fhemSVG/bag.svg
 UPD 2020-07-26_07:45:03 15078 www/images/fhemSVG/balkon_icon.svg
+UPD 2025-06-05_07:45:05 4030 www/images/fhemSVG/bargraph2.svg
 UPD 2015-07-28_14:05:32 2402 www/images/fhemSVG/batterie.svg
 UPD 2015-07-28_14:05:32 2379 www/images/fhemSVG/bluetooth.svg
 UPD 2021-05-11_07:45:02 8960 www/images/fhemSVG/briefkasten.svg
@@ -1928,6 +1929,7 @@ UPD 2021-05-11_07:45:02 65758 www/images/fhemSVG/weather/weather.svg
 UPD 2021-05-11_07:45:02 760 www/images/fhemSVG/weather/weather_sagittarius.svg
 UPD 2021-05-11_07:45:02 1332 www/images/fhemSVG/weather/weather_sunset.svg
 UPD 2021-05-11_07:45:02 4820 www/images/fhemSVG/weather/windy.svg
+UPD 2025-06-05_07:45:05 4733 www/images/fhemSVG/weather_directions2.svg
 UPD 2019-05-30_07:45:03 4934 www/images/fhemSVG/weather_fog.svg
 UPD 2019-05-30_07:45:03 2002 www/images/fhemSVG/weather_night.svg
 UPD 2019-05-30_07:45:03 4140 www/images/fhemSVG/weather_night_cloudy.svg
