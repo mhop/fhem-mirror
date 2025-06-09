@@ -1022,7 +1022,7 @@ sub addproperty($$) {
   #    DTSTART:20140211T212000Z
   #    DTSTART;VALUE=DATE:20130619
   my ($key,$parts,$parameter);
-  if($line =~ /^([\w\d\-]+)(;(.*))?:(.*)$/) {
+  if($line =~ /^([\w\d\-]+)(;((?:[^\:]+|\"[^\"]*\")*))?:(.*)$/) { # forum 140729
     $key= $1;
     $parts= $3 // "";
     $parameter= $4 // "";
@@ -3476,7 +3476,7 @@ sub CalendarEventsAsHtml($;$) {
     <br/>
     Note for users of Netxtcloud Calendar: you can use an URL of the form
     <code>https://admin:admin@demo.nextcloud.com/wid0ohgh/remote.php/dav/calendars/admin/personal/?export</code>.
-    <p>
+    <br><br>
 
     The optional parameter <code>interval</code> is the time between subsequent updates
     in seconds. It defaults to 3600 (1 hour).<br>
@@ -3795,12 +3795,12 @@ sub CalendarEventsAsHtml($;$) {
         Sets the default format for the <code>get &lt;name&gt; events</code>
         command. The specification is explained there. You must enclose
         the &lt;formatSpec&gt; in double quotes (") like input
-        in <code>attr myCalendar defaultFormat "$T1 $D $S"</code>.</li></p>
+        in <code>attr myCalendar defaultFormat "$T1 $D $S"</code>.</li><br><br>
 
     <li><code>defaultTimeFormat &lt;timeFormatSpec&gt;</code><br>
       Sets the default time format for the <code>get &lt;name&gt;events</code>
       command. The specification is explained there. Do not enclose
-      the &lt;timeFormatSpec&gt; in quotes.</li></p>
+      the &lt;timeFormatSpec&gt; in quotes.</li><br><br>
 
     <li><code>synchronousUpdate 0|1</code><br>
         If this attribute is not set or if it is set to 0, the processing is done
@@ -3810,45 +3810,45 @@ sub CalendarEventsAsHtml($;$) {
         <br/>
         Attribute value will be ignored if FHEM is running on a Windows platform.<br/>
         On Windows platforms the processing will always be done synchronously<br/>
-        </li><p>
+        </li><br><br>
 
     <li><code>update onUrlChanged|none</code><br>
         If this attribute is set to <code>onUrlChanged</code>, the processing is done only
         if url to calendar has changed since last calendar update.<br/>
         If this attribute is set to <code>none</code>, the calendar will not be updated at all.
-        </li><p>
+        </li><br><br>
 
     <li><code>delay &lt;time&gt;</code><br>
         The waiting time in seconds after the initialization of FHEM or a configuration change before 
         actually retrieving the calendar from its source. If not set, a random time between 10 and 29 
         seconds is chosen. When several calendar devices are defined, staggered delays reduce
         load error rates.
-        </li><p>
+        </li><br><br>
 
     <li><code>timeout &lt;time&gt;</code><br>
         The timeout in seconds for retrieving the calendar from its source. The default is 30. 
         Increase for very large calendars that take time to be assembled and retrieved from 
         their sources.
-        </li><p>
+        </li><br><br>
 
     <li><code>removevcalendar 0|1</code><br>
         If this attribute is set to 1, the vCalendar will be discarded after the processing to reduce the memory consumption of the module.
         A retrieval via <code>get &lt;name&gt; vcalendar</code> is then no longer possible.
-        </li><p>
+        </li><br><br>
 
     <li><code>hideOlderThan &lt;timespec&gt;</code><br>
-        <code>hideLaterThan &lt;timespec&gt;</code><br><p>
+        <code>hideLaterThan &lt;timespec&gt;</code><br><br><br>
 
         These attributes limit the list of events shown by
-        <code>get &lt;name&gt; full|debug|text|summary|location|alarm|start|end ...</code>.<p>
+        <code>get &lt;name&gt; full|debug|text|summary|location|alarm|start|end ...</code>.<br><br>
 
         The time is specified relative to the current time t. If hideOlderThan is set,
         calendar events that ended before t-hideOlderThan are not shown. If hideLaterThan is
-        set, calendar events that will start after t+hideLaterThan are not shown.<p>
+        set, calendar events that will start after t+hideLaterThan are not shown.<br><br>
 
         Please note that an action triggered by a change to mode "end" cannot access the calendar event
         if you set hideOlderThan to 0 because the calendar event will already be hidden at that time. Better set
-        hideOlderThan to 10.<p>
+        hideOlderThan to 10.<br><br>
 
         <code>&lt;timespec&gt;</code> must have one of the following formats:<br>
         <table>
@@ -3860,7 +3860,7 @@ sub CalendarEventsAsHtml($;$) {
         <tr><td>D:HH:MM:SS</td><td>days:hours:minutes:seconds</td><td>122:10:00:00</td></tr>
         <tr><td>DDDd</td><td>days</td><td>100d</td></tr>
         </table></li>
-        <p>
+        <br><br>
 
     <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
         <code>cutoffLaterThan &lt;timespec&gt;</code><br>
@@ -3868,13 +3868,13 @@ sub CalendarEventsAsHtml($;$) {
         before or a timespan cutoffLaterThan after the last update of the calendar.
         The purpose of setting this attribute is to save memory and processing time.
         Such calendar events cannot be accessed at all from FHEM.
-    </li><p>
+    </li><br><br>
 
     <li><code>onCreateEvent &lt;perl-code&gt;</code><br>
 
         This attribute allows to run the Perl code &lt;perl-code&gt; for every
         calendar event that is created. See section <a href="#CalendarPlugIns">Plug-ins</a> below.
-    </li><p>
+    </li><br><br>
 
     <li><code>SSLVerify</code><br>
 
@@ -3882,17 +3882,17 @@ sub CalendarEventsAsHtml($;$) {
         SSL. Set attribute either to 0 for SSL_VERIFY_NONE (no certificate verification) or
         to 1 for SSL_VERIFY_PEER (certificate verification). Disabling verification is useful
         for local calendar installations (e.g. OwnCloud, NextCloud) without valid SSL certificate.
-    </li><p>
+    </li><br><br>
 
     <li><code>ignoreCancelled</code><br>
         Set to 1 to ignore events with status "CANCELLED".
         Set this attribute to 1 if calanedar events of a series are returned
         although they are cancelled.
-    </li><p>
+    </li><br><br>
 
     <li><code>hasModeReadings</code><br>
         Set to 1 to use the obsolete mode readings.
-    </li><p>
+    </li><br><br>
 
     <li><code>quirks &lt;values&gt;</code><br>
         Parameters to handle special situations. <code>&lt;values&gt;</code> is
@@ -3903,7 +3903,7 @@ sub CalendarEventsAsHtml($;$) {
           <li><code>noWildcards</code>: if present, wildcards in the calendar's
           URL will not be expanded.</li>
         </ul>
-    </li><p>
+    </li><br><br>
 
 
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -3914,11 +3914,11 @@ sub CalendarEventsAsHtml($;$) {
   <ul>
   <br>
   A calendar is a set of calendar events. The calendar events are
-  fetched from the source calendar at the given URL on a regular basis.<p>
+  fetched from the source calendar at the given URL on a regular basis.<br><br>
 
   A calendar event has a summary (usually the title shown in a visual
   representation of the source calendar), a start time, an end time, and zero, one or more alarm times. In case of multiple alarm times for a calendar event, only the
-  earliest alarm time is kept.<p>
+  earliest alarm time is kept.<br><br>
 
   Recurring calendar events (series) are currently supported to an extent:
   FREQ INTERVAL UNTIL COUNT are interpreted, BYMONTHDAY BYMONTH WKST
@@ -3928,21 +3928,21 @@ sub CalendarEventsAsHtml($;$) {
   Out-of-order events and events excluded from a series (EXDATE) are handled.
   Calendar events are only created within &pm;400 days around the time of the
   last update.
-  <p>
+  <br><br>
 
   Calendar events are created when FHEM is started or when the respective entry in the source
   calendar has changed and the calendar is updated or when the calendar is reloaded with
   <code>get &lt;name&gt; reload</code>.
   Only calendar events within &pm;400 days around the event creation time are created. Consider
-  reloading the calendar from time to time to avoid running out of upcoming events. You can use something like <code>define reloadCalendar at +*240:00:00 set MyCalendar reload</code> for that purpose.<p>
+  reloading the calendar from time to time to avoid running out of upcoming events. You can use something like <code>define reloadCalendar at +*240:00:00 set MyCalendar reload</code> for that purpose.<br><br>
 
   Some dumb calendars do not use LAST-MODIFIED. This may result in modifications in the source calendar
-  go unnoticed. Reload the calendar if you experience this issue.<p>
+  go unnoticed. Reload the calendar if you experience this issue.<br><br>
 
   A calendar event is identified by its UID. The UID is taken from the source calendar.
   All events in a series including out-of-order events habe the same UID.
   All non-alphanumerical characters
-  are stripped off the original UID to make your life easier.<p>
+  are stripped off the original UID to make your life easier.<br><br>
 
   A calendar event can be in one of the following modes:
   <table>
@@ -3954,10 +3954,10 @@ sub CalendarEventsAsHtml($;$) {
 
   A calendar event transitions from one mode to another immediately when the time for the change has come. This is done by waiting
   for the earliest future time among all alarm, start or end times of all calendar events.
-  <p>
+  <br><br>
 
   For backward compatibility, mode readings are filled when the <code>hasModeReadings</code> attribute is set. The remainder of
-  this description applies to the obsolete mode readings.<p>
+  this description applies to the obsolete mode readings.<br><br>
 
   Each mode reading is a semicolon-separated list of UIDs of
   calendar events that satisfy certain conditions:
@@ -3973,15 +3973,15 @@ sub CalendarEventsAsHtml($;$) {
   <tr><td>modeStarted</td><td>events that have just transitioned to start mode</td></tr>
   <tr><td>modeUpcoming</td><td>events in upcoming mode</td></tr>
   </table>
-  <p>
+  <br><br>
 
   For recurring events, usually several calendar events exists with the same UID. In such a case,
   the UID is only shown in the mode reading for the most interesting mode. The most
-  interesting mode is the first applicable of start, alarm, upcoming, end.<p>
+  interesting mode is the first applicable of start, alarm, upcoming, end.<br><br>
 
   In particular, you will never see the UID of a series in modeEnd or modeEnded as long as the series
   has not yet ended - the UID will be in one of the other mode... readings. This means that you better
-  do not trigger FHEM events for series based on mode... readings. See below for a recommendation.<p>
+  do not trigger FHEM events for series based on mode... readings. See below for a recommendation.<br><br>
   </ul>
   <br>
 
@@ -3989,20 +3989,20 @@ sub CalendarEventsAsHtml($;$) {
   <br><br>
   <ul>
   When the calendar was reloaded or updated or when an alarm, start or end time was reached, one
-  FHEM event is created:<p>
+  FHEM event is created:<br><br>
 
   <code>triggered</code><br><br>
 
   When you receive this event, you can rely on the calendar's readings being in a consistent and
-  most recent state.<p>
+  most recent state.<br><br>
 
-  When a calendar event has changed, two FHEM events are created:<p>
+  When a calendar event has changed, two FHEM events are created:<br><br>
 
   <code>changed: UID &lt;mode&gt;</code><br>
   <code>&lt;mode&gt;: UID</code><br><br>
 
   &lt;mode&gt; is the current mode of the calendar event after the change. Note: there is a
-  colon followed by a single space in the FHEM event specification.<p>
+  colon followed by a single space in the FHEM event specification.<br><br>
 
   The recommended way of reacting on mode changes of calendar events is to get notified
   on the aforementioned FHEM events and do not check for the FHEM events triggered
@@ -4153,7 +4153,7 @@ sub CalendarEventsAsHtml($;$) {
   <br><br>
   Tip: use single quotes as outer quotes.
 
-  <p>
+  <br><br>
   </ul>
 
 
@@ -4208,7 +4208,7 @@ sub CalendarEventsAsHtml($;$) {
     Solltest Du unsicher sein, ob dies der Fall ist, &uuml;berpr&uuml;fe es bitte zuerst mit deinem Browser.</li>
     </ul>
     Hinweis f&uuml;r Nutzer des Nextcloud-Kalenders: Du kannst eine URL der folgenden Form benutzen:
-    <code>https://admin:admin@demo.nextcloud.com/wid0ohgh/remote.php/dav/calendars/admin/personal/?export</code>.<p>
+    <code>https://admin:admin@demo.nextcloud.com/wid0ohgh/remote.php/dav/calendars/admin/personal/?export</code>.<br><br>
 
     Der optionale Parameter <code>interval</code> bestimmt die Zeit in Sekunden zwischen den Updates. Default-Wert ist 3600 (1 Stunde).<br>
     Eine Intervallangabe von 0 ist nicht erlaubt. Diese wird automatisch durch den Standardwert 3600 ersetzt und im Log protokolliert.<br><br/>
@@ -4469,11 +4469,11 @@ sub CalendarEventsAsHtml($;$) {
     <li><code>defaultFormat &lt;formatSpec&gt;</code><br>
         Setzt das Standardformat f&uuml;r <code>get &lt;name&gt; events</code>.
         Der Aufbau wird dort erkl&auml;t. &lt;formatSpec&gt; muss in doppelte
-        Anf&uuml;hrungszeichen (") gesetzt werden, wie z.B. <code>attr myCalendar defaultFormat "$T1 $D $S"</code>.</li></p>
+        Anf&uuml;hrungszeichen (") gesetzt werden, wie z.B. <code>attr myCalendar defaultFormat "$T1 $D $S"</code>.</li><br><br>
 
     <li><code>defaultTimeFormat &lt;timeFormatSpec&gt;</code><br>
         Setzt das Standardzeitformat f&uuml;r <code>get &lt;name&gt; events</code>.
-        Der Aufbau wird dort erkl&auml;t. &lt;timeFormatSpec&gt; <b>nicht</b> in Anf&uuml;hrungszeichen setzten. </li></p>
+        Der Aufbau wird dort erkl&auml;t. &lt;timeFormatSpec&gt; <b>nicht</b> in Anf&uuml;hrungszeichen setzten. </li><br><br>
 
     <li><code>synchronousUpdate 0|1</code><br>
         Wenn dieses Attribut nicht oder auf 0 gesetzt ist, findet die Verarbeitung im Hintergrund statt
@@ -4483,44 +4483,44 @@ sub CalendarEventsAsHtml($;$) {
         <br/>
         Das Attribut wird ignoriert, falls FHEM unter Windows betrieben wird.
         In diesem Fall erfolgt die Verarbeitung immer synchron.<br/>
-       </li><p>
+       </li><br><br>
 
     <li><code>update none|onUrlChanged</code><br>
         Wird dieses Attribut auf <code>none</code> gesetzt ist, wird der Kalender &uuml;berhaupt nicht aktualisiert.<br/>
         Wird dieses Attribut auf <code>onUrlChanged</code> gesetzt ist, wird der Kalender nur dann aktualisiert, wenn sich die
         URL seit dem letzten Aufruf ver&auml;ndert hat, insbesondere nach der Auswertung von wildcards im define.<br/>
-        </li><p>
+        </li><br><br>
 
      <li><code>delay &lt;time&gt;</code><br>
         Wartezeit in Sekunden nach der Initialisierung von FHEM oder einer Konfigurations&auml;nderung bevor
         der Kalender tats&auml;chlich von der Quelle geladen wird. Wenn nicht gesetzt wird eine
         Zufallszeit zwischen 10 und 29 Sekunden gew&auml;hlt. Wenn mehrere Kalender definiert sind, f&uuml;hren
         gestaffelte Wartezeiten zu einer Verminderung der Ladefehleranf&auml;lligkeit.
-        </li><p>
+        </li><br><br>
 
       <li><code>timeout &lt;time&gt;</code><br>
         Der Timeout in Sekunden um einen Kalender von seiner Quelle zu holen. Standard ist 30.
         Erh&ouml;hen f&uuml;r sehr gro&szlig;e Kalender, bei denen es eine Weile dauert,
         sie an der Quelle zusammenzustellen und herunterzuladen.
-        </li><p>
+        </li><br><br>
 
     <li><code>removevcalendar 0|1</code><br>
 		Wenn dieses Attribut auf 1 gesetzt ist, wird der vCalendar nach der Verarbeitung verworfen,
 		gleichzeitig reduziert sich der Speicherverbrauch des Moduls.
 		Ein Abruf &uuml;ber <code>get &lt;name&gt; vcalendar</code> ist dann nicht mehr m&ouml;glich.
-        </li><p>
+        </li><br><br>
 
     <li><code>hideOlderThan &lt;timespec&gt;</code><br>
-        <code>hideLaterThan &lt;timespec&gt;</code><br><p>
+        <code>hideLaterThan &lt;timespec&gt;</code><br><br><br>
 
 		Dieses Attribut grenzt die Liste der durch <code>get &lt;name&gt; full|debug|text|summary|location|alarm|start|end ...</code> gezeigten Termine ein.
 
         Die Zeit wird relativ zur aktuellen Zeit <var>t</var> angegeben.<br>
 		Wenn &lt;hideOlderThan&gt; gesetzt ist, werden Termine, die vor &lt;t-hideOlderThan&gt; enden, ingnoriert.<br>
-        Wenn &lt;hideLaterThan&gt; gesetzt ist, werden Termine, die nach &lt;t+hideLaterThan&gt; anfangen, ignoriert.<p>
+        Wenn &lt;hideLaterThan&gt; gesetzt ist, werden Termine, die nach &lt;t+hideLaterThan&gt; anfangen, ignoriert.<br><br>
 
         Bitte beachte, dass eine Aktion, die durch einen Wechsel in den Modus "end" ausgel&ouml;st wird, nicht auf den Termin
-        zugreifen kann, wenn <code>hideOlderThan</code> 0 ist, denn der Termin ist dann schon versteckt. Setze <code>hideOlderThan</code> besser auf 10.<p>
+        zugreifen kann, wenn <code>hideOlderThan</code> 0 ist, denn der Termin ist dann schon versteckt. Setze <code>hideOlderThan</code> besser auf 10.<br><br>
 
 
         <code>&lt;timespec&gt;</code> muss; einem der folgenden Formate entsprechen:<br>
@@ -4533,7 +4533,7 @@ sub CalendarEventsAsHtml($;$) {
         <tr><td>D:HH:MM:SS</td><td>Tage:Stunden:Minuten:Sekunden</td><td>122:10:00:00</td></tr>
         <tr><td>DDDd</td><td>Tage</td><td>100d</td></tr>
         </table></li>
-        <p>
+        <br><br>
 
     <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
         <code>cutoffLaterThan &lt;timespec&gt;</code><br>
@@ -4543,13 +4543,13 @@ sub CalendarEventsAsHtml($;$) {
         es Speicher und Verarbeitungszeit zu
         sparen. Auf solche Termine kann gar nicht mehr aus FHEM heraus zugegriffen
         werden.
-    </li><p>
+    </li><br><br>
 
     <li><code>onCreateEvent &lt;perl-code&gt;</code><br>
 
 		Dieses Attribut f&uuml;hrt ein Perlprogramm &lt;perl-code&gt; f&uuml;r jeden erzeugten Termin aus.
         Weitere Informationen unter <a href="#CalendarPlugIns">Plug-ins</a> im Text.
-    </li><p>
+    </li><br><br>
 
         <li><code>SSLVerify</code><br>
 
@@ -4559,17 +4559,17 @@ sub CalendarEventsAsHtml($;$) {
         SSL_VERIFY_PEER (&Uuml;berpr&uuml;fung des Zertifikats). Die &Uuml;berpr&uuml;fung auszuschalten
         ist n&uuml;tzlich f&uuml;r lokale Kalenderinstallationen(e.g. OwnCloud, NextCloud)
         ohne g&uuml;tiges SSL-Zertifikat.
-    </li><p>
+    </li><br><br>
 
     <li><code>ignoreCancelled</code><br>
         Wenn dieses Attribut auf 1 gesetzt ist, werden Termine im Status "CANCELLED" ignoriert.
         Dieses Attribut auf 1 setzen, falls Termine in einer
         Serie zur&uuml;ckgegeben werden, die gel&ouml;scht sind.
-    </li><p>
+    </li><br><br>
 
     <li><code>hasModeReadings</code><br>
         Auf 1 setzen, um die veralteten mode-Readings zu benutzen.
-    </li><p>
+    </li><br><br>
 
 
     <li><code>quirks &lt;values&gt;</code><br>
@@ -4582,7 +4582,7 @@ sub CalendarEventsAsHtml($;$) {
           <li><code>noWildcards</code>: wenn gesetzt, werden Wildcards in der
             URL des Kalenders nicht ersetzt.</li>
         </ul>
-    </li><p>
+    </li><br><br>
 
 
 <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -4596,17 +4596,17 @@ sub CalendarEventsAsHtml($;$) {
   aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r einen Termin existieren, wird nur der fr&uuml;heste Alarmzeitpunkt beibehalten. Wiederkehrende Kalendereintr&auml;ge werden in einem gewiss;en Umfang unterst&uuml;tzt:
   FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYMONTH WKST
   werden erkannt aber nicht ausgewertet. BYDAY wird f&uuml;r w&ouml;chentliche und monatliche Termine
-  korrekt behandelt. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Termine mit unerkannten oder nicht ausgewerteten Schl&uuml;sselw&ouml;rtern hast.<p>
+  korrekt behandelt. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Termine mit unerkannten oder nicht ausgewerteten Schl&uuml;sselw&ouml;rtern hast.<br><br>
 
   Termine werden erzeugt, wenn FHEM gestartet wird oder der betreffende Eintrag im Quell-Kalender ver&auml;ndert
   wurde oder der Kalender mit <code>get &lt;name&gt; reload</code> neu geladen wird. Es werden nur Termine
   innerhalb &pm;400 Tage um die Erzeugungs des Termins herum erzeugt. Ziehe in Betracht, den Kalender von Zeit zu Zeit
-  neu zu laden, um zu vermeiden, dass; FHEM die k&uuml;nftigen Termine ausgehen. Du kann so etwas wie <code>define reloadCalendar at +*240:00:00 set MyCalendar reload</code> daf&uuml;r verwenden.<p>
+  neu zu laden, um zu vermeiden, dass; FHEM die k&uuml;nftigen Termine ausgehen. Du kann so etwas wie <code>define reloadCalendar at +*240:00:00 set MyCalendar reload</code> daf&uuml;r verwenden.<br><br>
 
   Manche dumme Kalender benutzen LAST-MODIFIED nicht. Das kann dazu f&uuml;hren, dass Ver&auml;nderungen im
-  Quell-Kalender unbemerkt bleiben. Lade den Kalender neu, wenn Du dieses Problem hast.<p>
+  Quell-Kalender unbemerkt bleiben. Lade den Kalender neu, wenn Du dieses Problem hast.<br><br>
 
-  Ein Termin wird durch seine UID identifiziert. Die UID wird vom Quellkalender bezogen. Um das Leben leichter zu machen, werden alle nicht-alphanumerischen Zeichen automatisch aus der UID entfernt.<p>
+  Ein Termin wird durch seine UID identifiziert. Die UID wird vom Quellkalender bezogen. Um das Leben leichter zu machen, werden alle nicht-alphanumerischen Zeichen automatisch aus der UID entfernt.<br><br>
 
   Ein Termin kann sich in einem der folgenden Modi befinden:
   <table>
@@ -4616,10 +4616,10 @@ sub CalendarEventsAsHtml($;$) {
   <tr><td>end</td><td>Die Endzeit des Kalender-Ereignisses wurde &uuml;berschritten.</td></tr>
   </table><br>
   Ein Kalender-Ereignis wechselt umgehend von einem Modus zum anderen, wenn die Zeit f&uuml;r eine &Auml;nderung erreicht wurde. Dies wird dadurch erreicht, dass auf die fr&uuml;heste zuk&uuml;nftige Zeit aller Alarme, Start- oder Endzeiten aller Kalender-Ereignisse gewartet wird.
-  <p>
+  <br><br>
 
   Aus Gr&uuml;nden der Abw&auml;rtskompatibilit&auml;t werden mode-Readings gef&uuml;llt, wenn das Attribut <code>hasModeReadings</code> gesetzt ist.
-  Der Rest dieser Beschreibung bezieht sich auf diese veralteten mode-Readings.<p>
+  Der Rest dieser Beschreibung bezieht sich auf diese veralteten mode-Readings.<br><br>
   
   Ein Kalender-Device hat verschiedene mode-Readings. Jedes mode-Reading stellt eine semikolonseparierte Liste aus UID von Kalender-Ereignisse dar, welche bestimmte Zust&auml;nde haben:
   <table>
@@ -4634,44 +4634,44 @@ sub CalendarEventsAsHtml($;$) {
   <tr><td>modeStarted</td><td>Ereignisse, welche gerade in den Startmodus gewechselt haben</td></tr>
   <tr><td>modeUpcoming</td><td>Ereignisse im zuk&uuml;nftigen Modus</td></tr>
   </table>
-  <p>
+  <br><br>
 
   F&uuml;r Serientermine werden mehrere Termine mit identischer UID erzeugt. In diesem Fall
   wird die UID nur im interessantesten gelesenen Modus-Reading angezeigt.
-  Der interessanteste Modus ist der erste zutreffende Modus aus der Liste der Modi start, alarm, upcoming, end.<p>
+  Der interessanteste Modus ist der erste zutreffende Modus aus der Liste der Modi start, alarm, upcoming, end.<br><br>
 
   Die UID eines Serientermins wird nicht angezeigt, solange sich der Termin im Modus: modeEnd oder modeEnded befindet
   und die Serie nicht beendet ist. Die UID befindet sich in einem der anderen mode... Readings.
   Hieraus ergibts sich, das FHEM-Events nicht auf einem mode... Reading basieren sollten.
-  Weiter unten im Text gibt es hierzu eine Empfehlung.<p>
+  Weiter unten im Text gibt es hierzu eine Empfehlung.<br><br>
   </ul>
 
   <b>Events</b>
   <ul><br>
   Wenn der Kalendar neu geladen oder aktualisiert oder eine Alarm-, Start- oder Endzeit
-  erreicht wurde, wird ein FHEM-Event erzeugt:<p>
+  erreicht wurde, wird ein FHEM-Event erzeugt:<br><br>
 
   <code>triggered</code><br><br>
 
   Man kann sich darauf verlassen, dass alle Readings des Kalenders in einem konsistenten und aktuellen
-  Zustand befinden, wenn dieses Event empfangen wird.<p>
+  Zustand befinden, wenn dieses Event empfangen wird.<br><br>
 
-  Wenn ein Termin ge&auml;ndert wurde, werden zwei FHEM-Events erzeugt:<p>
+  Wenn ein Termin ge&auml;ndert wurde, werden zwei FHEM-Events erzeugt:<br><br>
 
   <code>changed: UID &lt;mode&gt;</code><br>
   <code>&lt;mode&gt;: UID</code><br><br>
 
-  &lt;mode&gt; ist der aktuelle Modus des Termins nach der &auml;nderung. Bitte beachten: Im FHEM-Event befindet sich ein Doppelpunkt gefolgt von einem Leerzeichen.<p>
+  &lt;mode&gt; ist der aktuelle Modus des Termins nach der &auml;nderung. Bitte beachten: Im FHEM-Event befindet sich ein Doppelpunkt gefolgt von einem Leerzeichen.<br><br>
 
   FHEM-Events sollten nur auf den vorgenannten Events basieren und nicht auf FHEM-Events, die durch &auml;ndern eines mode... Readings ausgel&ouml;st werden.
-  <p>
+  <br><br>
   </ul>
 
   <a name="CalendarPlugIns"></a>
   <b>Plug-ins</b>
   <ul>
   <br>
-  Experimentell, bitte mit Vorsicht nutzen.<p>
+  Experimentell, bitte mit Vorsicht nutzen.<br><br>
 
   Ein Plug-In ist ein kleines Perl-Programm, das Termine nebenher ver&auml;ndern kann.
   Das Perl-Programm arbeitet mit der Hash-Referenz <code>$e</code>.<br>
@@ -4811,7 +4811,7 @@ sub CalendarEventsAsHtml($;$) {
     { CalendarEventsAsHtml('F','format:custom="$T1 $D $S" timeFormat:"%d.%m" series:next=3') }</code>
     <br><br>
     Empfehlung: Benutze einfache Anf&uuml;hrungszeichen als &auml;u&szlig;ere Anf&uuml;hrungszeichen.
-  <p>
+  <br><br>
   </ul>
 </ul>
 
