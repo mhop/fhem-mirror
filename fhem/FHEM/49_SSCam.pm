@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.9" => "20.05.2025  change cleanData ",
   "9.12.8" => "04.04.2025  set verifiedversion to 9.2.3 ",
   "9.12.7" => "27.01.2025  _setsnapGallery: limit getClHash to the calling FHEMWEB Device ",
   "9.12.6" => "17.01.2025  __stopLiveview: fix Warning, set verifiedversion to 9.2.2 ",
@@ -3034,7 +3035,7 @@ sub __camStopRec {
     }
 
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{OPMODE}               = "Stop";
+        $hash->{OPMODE} = "Stop";
         return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
 
@@ -3543,7 +3544,7 @@ sub __delPreset {
 
     my $caller  = (caller(0))[3];
 
-    RemoveInternalTimer($hash, $caller);
+    RemoveInternalTimer ($hash, $caller);
 
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Preset of Camera $camname can't be deleted"));
@@ -3582,7 +3583,7 @@ sub __setHome {
 
     my $caller  = (caller(0))[3];
 
-    RemoveInternalTimer($hash, $caller);
+    RemoveInternalTimer ($hash, $caller);
 
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Home preset of Camera $camname can't be set"));
@@ -6020,7 +6021,7 @@ sub camOp_Parse {
                 __getPtzPresetList  ($hash);
             }
             elsif ($OpMode eq "setoptpar") {
-                my $rid  = $owndata{TMPDA}->{'data'}{'id'};                                   # Cam ID return wenn i.O.
+                my $rid  = $owndata{TMPDA}->{'data'}{'id'};                                             # Cam ID return wenn i.O.
                 my $ropt = $rid == $hash->{CAMID} ? "none" : "error in operation";
 
                 delete $hash->{HELPER}{NTPSERV};
@@ -11747,47 +11748,28 @@ sub cleanData {
   my $str         = shift;
   my ($name,$tac) = split ":", $str;
   my $hash        = $defs{$name};
-  my $del         = 0;
 
   RemoveInternalTimer ($hash, "FHEM::SSCam::cleanData");
 
-  if ($tac && exists $owndata{SENDCOUNT}{$tac} && $owndata{SENDCOUNT}{$tac} > 0) {     # Cacheinhalt erst löschen wenn Sendezähler 0
-      InternalTimer (gettimeofday()+1, "FHEM::SSCam::cleanData", "$name:$tac", 0);
+  if ($tac && exists $owndata{SENDCOUNT}{$tac} && $owndata{SENDCOUNT}{$tac} > 0) {             # Cacheinhalt erst löschen wenn Sendezähler 0
+      InternalTimer (gettimeofday() + 1, "FHEM::SSCam::cleanData", "$name:$tac", 0);
       return;
   }
 
   if (AttrVal ($name, 'cacheType', 'internal') eq 'internal') {                                # internes Caching
-      if ($tac) {
-          if (exists $owndata{RS}{$tac}) {
-              delete $owndata{RS}{$tac};
-              $del = 1;
-          }
+      if ($tac) {          
+          delete $owndata{RS}{$tac};
+          delete $owndata{SENDRECS}{$tac};
+          delete $owndata{SENDSNAPS}{$tac};
+          delete $owndata{PARAMS}{$tac};
+          delete $owndata{SENDCOUNT}{$tac};          
 
-          if (exists $owndata{SENDRECS}{$tac}) {
-              delete $owndata{SENDRECS}{$tac};
-              $del = 1;
-          }
+          delete $hash->{HELPER}{TRANSACTION};                                                 # diese Transaktion ist beendet
 
-          if (exists $owndata{SENDSNAPS}{$tac}) {
-              delete $owndata{SENDSNAPS}{$tac};
-              $del = 1;
+          if (AttrVal ($name, 'debugactivetoken', 0)) {
+              Log3 ($name, 1, qq/$name - cacheType 'internal' Data of Transaction "$tac" removed/);
+              Log3 ($name, 1, qq/$name - Transaction "$tac" closed/);
           }
-
-          if (exists $owndata{PARAMS}{$tac}) {
-              delete $owndata{PARAMS}{$tac};
-              $del = 1;
-          }
-
-          if ($del) {
-              delete $hash->{HELPER}{TRANSACTION};                                           # diese Transaktion ist beendet
-
-              if (AttrVal ($name, 'debugactivetoken', 0)) {
-                  Log3 ($name, 1, qq/$name - Data of Transaction "$tac" removed/);
-                  Log3 ($name, 1, qq/$name - Transaction "$tac" closed/);
-              }
-          }
-          
-          delete $owndata{SENDCOUNT}{$tac};
       }
       else {          
           delete $owndata{RS};
@@ -11795,28 +11777,36 @@ sub cleanData {
           delete $owndata{SENDSNAPS};
           delete $owndata{PARAMS};
 
-          Log3 ($name, 1, "$name - Data of internal Cache removed") if(AttrVal ($name, 'debugactivetoken', 0));
+          Log3 ($name, 1, "$name - cacheType 'internal' Data without Transaction removed") if(AttrVal ($name, 'debugactivetoken', 0));
       }
   }
-  else {                                                                                   # Caching mit CHI
-      my @as = cache ($name, "c_getkeys");
-      
+  else {                                                                                       # Caching mit CHI      
       if ($tac) {
+          my @as = cache ($name, "c_getkeys");
+          
           for my $k (@as) {
               if ($k =~ /$tac/x) {
                   cache ($name, "c_remove", $k);
-                  $del = 1;
               }
           }
+          
+          delete $owndata{RS}{$tac};
+          delete $owndata{SENDRECS}{$tac};
+          delete $owndata{SENDSNAPS}{$tac};
+          delete $owndata{PARAMS}{$tac};
+          delete $owndata{SENDCOUNT}{$tac}; 
 
-          if ($del) {
-              delete $hash->{HELPER}{TRANSACTION};                                        # diese Transaktion ist beendet
+          delete $hash->{HELPER}{TRANSACTION};                                                  # diese Transaktion ist beendet
 
-              if (AttrVal ($name, 'debugactivetoken', 0)) {
-                  Log3 ($name, 1, qq/$name - Data of Transaction "$tac" removed/);
-                  Log3 ($name, 1, qq/$name - Transaction "$tac" closed/);
-              }
+          if (AttrVal ($name, 'debugactivetoken', 0)) {
+              Log3 ($name, 1, qq/$name - CHI cache Data of Transaction "$tac" removed/);
+              Log3 ($name, 1, qq/$name - Transaction "$tac" closed/);
           }
+      }
+      
+      if (AttrVal ($name, 'debugactivetoken', 0)) {
+          Log3 ($name, 1, "$name - Number of remaining entries in owndata Hash: ".scalar (keys %owndata));
+          Log3 ($name, 1, "$name - Number of remaining entries in owndata Hash: ".Dumper %owndata);
       }
   }
 
