@@ -38,8 +38,8 @@ use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
 use Math::Trig;
-use List::Util qw(max shuffle);
-use Scalar::Util qw(blessed);
+use List::Util qw(min max shuffle);
+use Scalar::Util qw(blessed weaken);
 
 eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
 eval "use FHEM::Utility::CTZ qw(:all);1;" or my $ctzAbsent     = 1;                  ## no critic 'eval'
@@ -63,7 +63,7 @@ use FHEM::SynoModules::SMUtils qw (checkModVer
 
 use Data::Dumper;
 use Blocking;
-use Storable qw(dclone freeze thaw nstore store retrieve);
+use Storable qw(dclone freeze thaw nstore retrieve);
 use MIME::Base64;
 
 # Run before module compilation
@@ -160,6 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.12"=> "15.06.2025  readCacheFile: option aitrained -> Code optimized for saving memory ".
+                           "fillupMessageSystem: prevent Icon failore if SV contain spaces ".
+                           "setupBatteryDevXX: 'dyn' -> Battery color can be dynamically set depending from SoC value ",
   "1.52.11"=> "03.06.2025  _genSpecialReadings: new option todayNotOwnerConsumption ",
   "1.52.10"=> "03.06.2025  attr plantControl->genPVforecastsToEvent new possible value 'adapt4fSteps' ",
   "1.52.9" => "02.06.2025  __getDWDSolarData: new sub azSolar2Astro, ctrlBatSocManagementXX: new key loadAbort ",
@@ -207,7 +210,7 @@ my %vNotesIntern = (
   "1.51.0" => "16.04.2025  obsolete Attr deleted: affectBatteryPreferredCharge, affectConsForecastInPlanning, ctrlShowLink, ctrlBackupFilesKeep ".
                            "affectConsForecastIdentWeekdays, affectConsForecastLastDays, ctrlInterval, ctrlGenPVdeviation ".
                            "affectSolCastPercentile, ctrlSolCastAPIoptimizeReq, consumerAdviceIcon, consumerLink, consumerLegend ",
-  "1.50.4" => "16.04.2025  Consumer Strokes: fix __dynColor, new key flowGraphicControl->strokeCmrRedColLimit ".
+  "1.50.4" => "16.04.2025  Consumer Strokes: fix val2pahColor, new key flowGraphicControl->strokeCmrRedColLimit ".
                            "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ".
 						   "normBeamWidth: decouple content batsocCombi_, energycosts, feedincome from the conversion Wh -> kWh ".
                            "___getFWwidget: textField-long -> textFieldNL-long ",
@@ -397,12 +400,6 @@ my %vNotesIntern = (
   "1.30.0" => "18.08.2024  new attribute flowGraphicShift, Forum:https://forum.fhem.de/index.php?msg=1318597 ",
   "1.29.4" => "03.08.2024  delete writeCacheToFile from _getRoofTopData, _specialActivities: avoid loop caused by \@widgetreadings ",
   "1.29.3" => "20.07.2024  eleminate hand over \$hash in _getRoofTopData routines, fix label 'gcon' to 'gcons' ",
-  "1.29.2" => "17.06.2024  ___readCandQ: improve manual setting of pvCorrectionFactor_XX ",
-  "1.29.1" => "17.06.2024  fix Warnings, Forum: https://forum.fhem.de/index.php?msg=1315283, fix roofIdentPair ",
-  "1.29.0" => "16.06.2024  _setreset: improve reset consumerMaster ".
-                           "tranformed setter moduleAzimuth to setupStringAzimuth ".
-                           "tranformed setter moduleDeclination to setupStringDeclination ".
-                           "tranformed setter moduleRoofTops to setupRoofTops ",
   "1.28.0" => "15.06.2024  new consumer key exconfc, Forum: https://forum.fhem.de/index.php?msg=1315111 ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
@@ -5341,7 +5338,6 @@ sub _getdwdCatalog {
   my $paref = shift;
   my $arg   = $paref->{arg} // 'byID';
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
 
   my ($aa,$ha) = parseParams ($arg);
 
@@ -5368,7 +5364,6 @@ sub _getdwdCatalog {
 
   if (!scalar keys %{$data{$name}{dwdcatalog}}) {                             # Katalog ist nicht geladen
       readCacheFile ({ name      => $name,
-                       type      => $type,
                        debug     => $paref->{debug},
                        file      => $dwdcatalog,
                        cachename => 'dwdcatalog',
@@ -5622,7 +5617,6 @@ sub __dwdStatCatalog_Response {
   }
   elsif ($dat ne "") {
       my @datarr = split "\n", $dat;
-      my $type   = $hash->{TYPE};
 
       for my $s (@datarr) {
           $s = encode ('utf8', $s);
@@ -5670,7 +5664,6 @@ sub __dwdStatCatalog_Response {
       }
 
       readCacheFile ({ name      => $name,
-                       type      => $type,
                        debug     => $debug,
                        file      => $dwdcatalog,
                        cachename => 'dwdcatalog',
@@ -8222,7 +8215,6 @@ return;
 sub readCacheFile {
   my $paref     = shift;
   my $name      = $paref->{name};
-  my $type      = $paref->{type};
   my $file      = $paref->{file};
   my $cachename = $paref->{cachename};
   my $title     = $paref->{title};
@@ -8231,7 +8223,7 @@ sub readCacheFile {
 
   if ($cachename eq 'aitrained') {
       my ($err, $objref) = fileRetrieve ($file);
-
+      
       if (!$err && $objref) {
           if (ref $objref ne 'ARRAY') {
               return "The file $file was restored but the content is not an ARRAY";
@@ -8239,17 +8231,10 @@ sub readCacheFile {
 
           for my $obj (@{$objref}) {
               my $class = blessed ($obj);
-              my $valid = $obj->isa('AI::DecisionTree');
-              return 'The trained object is not AI::DecisionTree' if(!$valid);
+              return 'The trained object is not AI::DecisionTree' unless $obj->isa('AI::DecisionTree');
           }
-
-          undef @{$data{$name}{aidectree}{aitrained}};
-          delete $data{$name}{aidectree}{aitrained};
-
-          push @{$data{$name}{aidectree}{aitrained}}, @{$objref};
-
-          undef @{$objref};
-
+          
+          $data{$name}{aidectree}{aitrained} = $objref;
           $data{$name}{current}{aitrainstate} = 'ok';
 
           Log3 ($name, 3, qq{$name - cached data "$title" restored});
@@ -14532,7 +14517,7 @@ sub _genSpecialReadings {
               }
               
               my $nowncon = $contoday - $csme;
-              $nowncon = max (0, $nowncon);
+              $nowncon    = max (0, $nowncon);
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $nowncon).' '.$hcsr{$kpi}{unit});
           }
@@ -14845,6 +14830,7 @@ sub entryGraphic {
       delete $paref->{maxCon};
       delete $paref->{maxDif};
       delete $paref->{minDif};
+      delete $paref->{hfcg};
 
       ## Balkengrafik Ebene 2
       #########################
@@ -14887,6 +14873,7 @@ sub entryGraphic {
           delete $paref->{maxCon};
           delete $paref->{maxDif};
           delete $paref->{minDif};
+          delete $paref->{hfcg};
       }
 
       ## Balkengrafik Ebene 3
@@ -14930,6 +14917,7 @@ sub entryGraphic {
           delete $paref->{maxCon};
           delete $paref->{maxDif};
           delete $paref->{minDif};
+          delete $paref->{hfcg};
       }
 
       $paref->{modulo}++;
@@ -14959,6 +14947,8 @@ sub entryGraphic {
       $ret .= "$cnmlegend</td>";
       $ret .= "</tr>";
   }
+  
+  undef $paref;
 
   $ret .= "</table>";
 
@@ -17631,7 +17621,7 @@ END1
 
   if (defined $car && CurrentVal ($name, 'homenodedyncol', 0)) {
       $car              = 100 - $car;
-      my $pahcol        = '#'.__dynColor ($car, 100);                                             # V 1.50.4
+      my $pahcol        = '#'.val2pahColor ($car, 100);                                           # V 1.50.4
       ($hicon, my $col) = split '@', $hicon;
       $hicon            = $hicon.'@'.$pahcol;
   }
@@ -17700,7 +17690,7 @@ END3
      my $chain_color    = "";                                                                # Farbe der Laufkette Consumer-Dummy
 
      if ($cons_dmy > 0.5 && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
-         $chain_color = 'style="stroke: #'.__dynColor ($cons_dmy, $strokeredlim).';"';
+         $chain_color = 'style="stroke: #'.val2pahColor ($cons_dmy, $strokeredlim).';"';
      }
 
      $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};  # M790,690 → Move To (Startpunkt bei x=790, y=690), L1200,690 → Line To (Zeichnet eine Linie von 790,690 nach 1200,690)
@@ -17808,7 +17798,7 @@ END3
           my $chain_color = "";                                                                    # Farbe der Laufkette des Consumers
 
           if ($cilon && CurrentVal ($name, 'strokeconsumerdyncol', 0)) {
-              $chain_color = 'style="stroke: #'.__dynColor ($cnsmrpower, $strokeredlim).';"';
+              $chain_color = 'style="stroke: #'.val2pahColor ($cnsmrpower, $strokeredlim).';"';
           }
 
           $ret             .= qq{<path id="home2consumer_${c}_$stna" class="$consumer_style" $chain_color d="M$cons_left_start,780 L$cons_left,$y_pos" />};
@@ -18186,7 +18176,7 @@ sub __substituteIcon {
   my $msg1  = $paref->{msg1};
   my $msg2  = $paref->{msg2};
   my $flag  = $paref->{flag};
-  my $soc   = $paref->{soc};
+  my $soc   = $paref->{soc} // -9999;                                                    # auf fehlenden SoC aufmerksam machen
   my $don   = $paref->{don};
   my $pcurr = $paref->{pcurr};
   my $lang  = $paref->{lang};
@@ -18222,7 +18212,7 @@ sub __substituteIcon {
       my $pretxt = '';
       my $socicon;
 
-      if (defined $soc) {
+      #if (defined $soc) {
           $soctxt  = "\n".$htitles{socbatfc}{$lang}.": ".$soc." %";                      # Text 'SoC Prognose'
 
           $socicon = $soc >= 80 ? 'measure_battery_100' :
@@ -18230,7 +18220,7 @@ sub __substituteIcon {
                      $soc >= 40 ? 'measure_battery_50'  :
                      $soc >= 20 ? 'measure_battery_25'  :
                      'measure_battery_0';
-      }
+      #}
 
       $ircmd    = $ircmd    ? $ircmd    : '';
       $inorcmd  = $inorcmd  ? $inorcmd  : '';
@@ -18304,6 +18294,10 @@ sub __substituteIcon {
 
           $txt = $pretxt.$soctxt;                                                        # resultierender Text
       }
+      
+      if ($color eq 'dyn') {
+          $color = val2dynColor ($soc, 0, $flag ? 0 : 0.4); 
+      }
   }
   elsif ($ptyp eq 'producer') {                                                          # Icon Producer
       ($icon, $color) = split '@', ProducerVal ($name, $pn, 'picon', PRODICONDEF);
@@ -18349,7 +18343,6 @@ sub __substituteIcon {
       }
   }
   elsif ($ptyp eq 'node') {                                                            # Knoten-Icon
-      #($icon, $color) = split '@', NODEICONDEF;
       ($icon, $color) = split '@', CurrentVal ($name, 'inverterNodeIcon', NODEICONDEF);
 
       $color          = !$pcurr ? INACTCOLDEF :
@@ -18382,23 +18375,6 @@ sub __groupXstart {
   }
 
 return $xstart;
-}
-
-###################################################################
-#  liefert eine dynamische Farbe abhängig von "$val" zurück
-#  https://www.w3schools.com/colors/colors_picker.asp
-#  https://wiki.fhem.de/wiki/Color#Skalenfarbe_mit_Color::pahColor
-###################################################################
-sub __dynColor {
-  my $val = shift;
-  my $end = shift // 400;
-
-  my $beg = 0;
-  my $mid = $end / 2;
-
-  my $color = substr (Color::pahColor ($beg, $mid, $end, $val, [40,198,45, 127,255,0, 251,158,4, 255,127,0, 255,0,0]), 0, 6);
-
-return $color;
 }
 
 ################################################################
@@ -18874,7 +18850,7 @@ sub fillupMessageSystem {
   for my $mfi (sort keys %{$data{$name}{filemessages}}) {
       next if($mfi >= IDXLIMIT);
       $midx++;
-      $data{$name}{messages}{$midx}{SV} = $data{$name}{filemessages}{$mfi}{SV};
+      $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
       $data{$name}{messages}{$midx}{DE} = $data{$name}{filemessages}{$mfi}{DE};
       $data{$name}{messages}{$midx}{EN} = $data{$name}{filemessages}{$mfi}{EN};
   }
@@ -18883,7 +18859,7 @@ sub fillupMessageSystem {
   for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
       next if($smi >= IDXLIMIT);
       $midx++;
-      $data{$name}{messages}{$midx}{SV} = $data{$name}{preparedmessages}{$smi}{SV};
+      $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
       $data{$name}{messages}{$midx}{DE} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{DE});
       $data{$name}{messages}{$midx}{EN} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{EN});
   }
@@ -18891,9 +18867,6 @@ sub fillupMessageSystem {
   $data{$name}{messages}{999000}{TS}     = $data{$name}{filemessages}{999000}{TS}     // 0;
   $data{$name}{messages}{999000}{TSNEXT} = $data{$name}{filemessages}{999000}{TSNEXT} // 0;
   $data{$name}{messages}{999500}{TS}     = $data{$name}{preparedmessages}{999500}{TS} // 0;
-
-  ########################################################################
-  ## Ende Messages auffüllen
 
 
   ## Vergleich auf geänderte Messages
@@ -18908,7 +18881,6 @@ sub fillupMessageSystem {
   if ($ntxt ne $otxt) {                                                                   # es gibt neue Post! bzw. Änderungen -> Read-Bit läschen
       delete $data{$name}{messages}{999999}{RD};
   }
-
 
   if ($midx && !defined $data{$name}{messages}{999999}{RD}) {                             # RD = Read-Bit (undef -> Messages nicht gelesen)
       my @aidx   = map { $_ } (1..$midx);                                                 # größte vorhandene Severity finden ...
@@ -19211,11 +19183,8 @@ sub aiTrain {
       $entities{$tn}  = $enum;
       $entities{rn}  += scalar $dtree->rule_statements();
   }
-
-  undef @{$data{$name}{aidectree}{aitrained}};
-  delete $data{$name}{aidectree}{aitrained};
-
-  push @{$data{$name}{aidectree}{aitrained}}, @ensemble;
+  
+  $data{$name}{aidectree}{aitrained} = \@ensemble;
 
   $err = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
   my $rn;
@@ -19265,7 +19234,6 @@ sub aiFinishTrain {
   my $paref = eval { thaw ($serial) };                                             # Deserialisierung
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
-  my $type  = $hash->{TYPE};
 
   my $aicanuse        = $paref->{aicanuse};
   my $aitrainstate    = $paref->{aitrainstate};
@@ -19287,7 +19255,6 @@ sub aiFinishTrain {
 
   if ($aitrainstate eq 'ok') {
       readCacheFile ({ name      => $name,
-                       type      => $type,
                        file      => $aitrained.$name,
                        cachename => 'aitrained',
                        title     => 'aiTrainedData'
@@ -21909,6 +21876,74 @@ sub azSolar2Astro {
   my ($azsolar) = @_;
 
 return ($azsolar + 180) % 360;
+}
+
+###################################################################
+#  liefert eine dynamische Farbe abhängig von "$val" und dem 
+#  Ende-Wert "$end" zurück
+#  https://www.w3schools.com/colors/colors_picker.asp
+#  https://wiki.fhem.de/wiki/Color#Skalenfarbe_mit_Color::pahColor
+###################################################################
+sub val2pahColor {
+  my $val = shift;
+  my $end = shift // 400;
+
+  my $beg = 0;
+  my $mid = $end / 2;
+
+  my $color = substr (Color::pahColor ($beg, $mid, $end, $val, [40,198,45, 127,255,0, 251,158,4, 255,127,0, 255,0,0]), 0, 6);
+
+return $color;
+}
+
+############################################################################
+#  Interpretiert einen übergebenen Wert zwischen 0..100 als Farbe
+#  zwischen Rot..Grün
+#  $satiety:  Sättigung 0.1..1, 1 oder nicht gesetzt -> volle Sättigung
+#  $opacity:  Deckkraft 0..1    1 = voll deckend, 0 = komplett transparent
+############################################################################
+sub val2dynColor {
+  my $val     = shift;                                          # Wert von 0 bis 100
+  my $satiety = shift;                                          # Sättigung 0.1 (mehr Grau) ..1 (Original)
+  my $opacity = shift;
+    
+  $val = max(0, min(100, $val));
+
+  my ($r, $g, $b, $t);
+
+  if ($val <= 50) {                                             # Übergang: Rot (#FF0000) → Orange (#FF8C00)
+      $t = $val / 50;
+      $r = 255;
+      $g = int (140 * $t);                                      # 0 → 140
+      $b = 0;
+  } 
+  else {                                                        # Übergang: Orange (#FF8C00) → Dunkelgrün (#00C000)
+      $t = ($val - 50) / 50;
+      $r = int (255 * (1 - $t));                                # 255 → 0
+      $g = int (140 + (192 - 140) * $t);                        # 140 → 192 (z.B. C0)
+      $b = 0;
+    }
+    
+  ($r, $g, $b) = _reduceSaturation ($r, $g, $b, $satiety);      # optional Sättigung bei gesetztem satiety
+    
+  if ($opacity) {                                               # Alpha-Wert: 1 = voll deckend, 0 = komplett transparent
+      return sprintf ("#%02X%02X%02X%02X", $r, $g, $b, int ($opacity * 255 + 0.5));
+  }                     
+    
+return sprintf ("#%02X%02X%02X", $r, $g, $b);
+}
+
+sub _reduceSaturation {
+  my ($r, $g, $b, $satiety) = @_;
+
+  return ($r, $g, $b) unless $satiety;
+
+  ($r, $g, $b)    = map { $_ / 255 } ($r, $g, $b);           # RGB normalisieren auf [0,1]
+  my ($h, $s, $v) = Color::rgb2hsv ($r, $g, $b);             # Umwandlung RGB → HSV
+  $s             *= $satiety;                                # Sättigung verringern → Farbe wird grauer: 0.1 -> fast ganz grau, 0.6 -> nur leicht verblasst
+  ($r, $g, $b)    = Color::hsv2rgb ($h, $s, $v);             # HSV → zurück zu RGB
+
+return map { int($_ * 255 + 0.5) } ($r, $g, $b);             # Zurück in 0–255 Bereich
 }
 
 ################################################################
@@ -26398,13 +26433,12 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
-       <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt;
-                                cap=&lt;Option&gt; [pinmax=&lt;Integer&gt] [poutmax=&lt;Integer&gt]
-                                [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
+       <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt; cap=&lt;Option&gt; <br>
+                                [pinmax=&lt;Integer&gt] [poutmax=&lt;Integer&gt] [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
                                 [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]         <br>
                                 [[icon=&lt;recomm&gt;@&lt;Color&gt;]:[&lt;charge&gt;@&lt;Color&gt;]:[&lt;discharge&gt;@&lt;Color&gt;]:[&lt;omit&gt;@&lt;Color&gt;]]  </b> <br><br>
 
-       Specifies an arbitrary Device and its Readings to deliver the battery performance data.
+       Specifies an arbitrary Device and its Readings to deliver the battery performance data. <br>
        The module assumes that the numerical value of the readings is always positive.
        It can also be a dummy device with corresponding readings.
        <br><br>
@@ -26437,11 +26471,12 @@ to ensure that the system configuration is correct.
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                             </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>icon</b>      </td><td>Icon and/or (only) color of the battery in the bar graph according to the status (optional).                  </td></tr>
-           <tr><td>                  </td><td>The colour can be specified as an identifier (e.g. blue) or HEX value (e.g. #d9d9d9).                         </td></tr>
-           <tr><td>                  </td><td><b>&lt;recomm&gt;</b> - Charging is recommended but inactive (no charging or discharging)                     </td></tr>
-           <tr><td>                  </td><td><b>&lt;charge&gt;</b> - is used when the battery is currently being charged                                   </td></tr>
-		   <tr><td>                  </td><td><b>&lt;discharge&gt;</b> - is used when the battery is currently being discharged                             </td></tr>
-           <tr><td>                  </td><td><b>&lt;omit&gt;</b> - only charge if the feed-in limit is exceeded                                            </td></tr>
+           <tr><td>                  </td><td>The identifier (e.g. blue), HEX value (e.g. #d9d9d9) or ‘dyn’ can be specified as the color.                  </td></tr>
+           <tr><td>                  </td><td>If ‘dyn’ is used, the icon is colored depending on the SoC value.                                             </td></tr>
+           <tr><td>                  </td><td><b>&lt;recomm&gt;</b> - Icon if charging is recommended but inactive (no charging / discharging)              </td></tr>
+           <tr><td>                  </td><td><b>&lt;charge&gt;</b> - Icon is used when the battery is currently being charged                              </td></tr>
+		   <tr><td>                  </td><td><b>&lt;discharge&gt;</b> - Icon is used when the battery is currently being discharged                        </td></tr>
+           <tr><td>                  </td><td><b>&lt;omit&gt;</b> - Icon if charging is only recommended if the feed-in limit is exceeded                   </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>show</b>      </td><td>Control of the battery display in the bar graph (optional)                                                    </td></tr>
            <tr><td>                  </td><td><b>0</b> - no display of the device (default)                                                                 </td></tr>
@@ -26467,7 +26502,17 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh show=2:bottom icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh show=2:bottom icon=measure_battery_50@#262626:@yellow:measure_battery_100@red  <br>
+         attr &lt;name&gt; setupBatteryDev02 MQTT2_cerboGX_c0619ab34e08_battery 
+                                             pin=BatIn:W 
+                                             pout=BatOut:W
+                                             pinmax=14402
+                                             poutmax=14402
+                                             intotal=BatInTotal:Wh outtotal=BatOutTotal:Wh 
+                                             charge=SOC_value cap=InstalledCapacity_Wh:Wh 
+                                             asynchron=0
+                                             show=1
+                                             icon=@dyn:::@dyn
        </ul>
        <br>
 
@@ -29013,13 +29058,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
-       <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;
-                                cap=&lt;Option&gt; [pinmax=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt]
-                                [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
+       <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; cap=&lt;Option&gt;  <br>
+                                [pinmax=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt] [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
                                 [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]     <br>
                                 [[icon=&lt;empfohlen&gt;@&lt;Farbe&gt;]:[&lt;aufladen&gt;@&lt;Farbe&gt;]:[&lt;entladen&gt;@&lt;Farbe&gt;]:[icon=&lt;unterlassen&gt;@&lt;Farbe&gt;]]  </b> <br><br>
 
-       Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest.
+       Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest. <br>
        Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
        Es kann auch ein Dummy Device mit entsprechenden Readings sein.
        <br><br>
@@ -29051,11 +29095,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>icon</b>      </td><td>Icon und/oder (nur) Farbe der Batterie in der Balkengrafik entsprechend des Status (optional).           </td></tr>
-           <tr><td>                  </td><td>Die Farbe kann als Bezeichner (z.B. blue) oder HEX-Wert (z.B. #d9d9d9) angegeben werden.                 </td></tr>
-           <tr><td>                  </td><td><b>&lt;empfohlen&gt;</b> - die Aufladung ist empfohlen aber inaktiv (kein Aufladen oder Entladen)        </td></tr>
-           <tr><td>                  </td><td><b>&lt;aufladen&gt;</b> - wird verwendet wenn die Batterie aktuell aufgeladen wird                       </td></tr>
-		   <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - wird verwendet wenn die Batterie aktuell entladen wird                         </td></tr>
-           <tr><td>                  </td><td><b>&lt;unterlassen&gt;</b> - nur bei Überschreitung des Einspeiselimits aufladen                         </td></tr>
+           <tr><td>                  </td><td>Als Farbe kann der Bezeichner (z.B. blue), HEX-Wert (z.B. #d9d9d9) oder 'dyn' angegeben werden.          </td></tr>
+           <tr><td>                  </td><td>Wird 'dyn' verwendet, erfolgt eine vom SoC-Wert abhängige Einfärbung des Icon.                           </td></tr>
+           <tr><td>                  </td><td><b>&lt;empfohlen&gt;</b> - Icon wenn die Aufladung empfohlen, aber inaktiv ist (kein Aufladen / Entladen)</td></tr>
+           <tr><td>                  </td><td><b>&lt;aufladen&gt;</b> - Icon wird verwendet wenn die Batterie aktuell aufgeladen wird                  </td></tr>
+		   <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - Icon wird verwendet wenn die Batterie aktuell entladen wird                    </td></tr>
+           <tr><td>                  </td><td><b>&lt;unterlassen&gt;</b> - Icon wenn Aufladen nur bei Überschreitung des Einspeiselimits empfohlen     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>show</b>      </td><td>Steuerung der Anzeige der Batterie in der Balkengrafik (optional)                                        </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Anzeige des Gerätes (default)                                                           </td></tr>
@@ -29081,7 +29126,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh show=2:bottom icon=measure_battery_50@#262626:@yellow:measure_battery_100@red
+         attr &lt;name&gt; setupBatteryDev01 BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh cap=BatCap:kWh show=2:bottom icon=measure_battery_50@#262626:@yellow:measure_battery_100@red  <br>
+         attr &lt;name&gt; setupBatteryDev02 MQTT2_cerboGX_c0619ab34e08_battery 
+                                             pin=BatIn:W 
+                                             pout=BatOut:W
+                                             pinmax=14402
+                                             poutmax=14402
+                                             intotal=BatInTotal:Wh outtotal=BatOutTotal:Wh 
+                                             charge=SOC_value cap=InstalledCapacity_Wh:Wh 
+                                             asynchron=0
+                                             show=1
+                                             icon=@dyn:::@dyn
        </ul>
        <br>
 
