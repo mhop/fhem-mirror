@@ -164,6 +164,8 @@
 # 6.04      fix: loglevel of firmwarecheck
 #           fix: model reference of Shelly3EM
 #           new: commands for PLUGS_UI implemented
+# 6.04.1    new: improved commands for PLUGS_UI
+#           fix: update interval of energy readings (Gen2 energy meter)
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -188,7 +190,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.04 16.05.2025";
+my $version = "6.04.1 16.06.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -232,7 +234,8 @@ my %attributes = (
 
 my %shelly_dropdowns = (
 #-- these we may get on request
-    "Gets"  => "status:noArg settings:noArg registers:noArg config version:noArg model:noArg actions:noArg readingsGroup:Device,Firmware,Network,Status",
+    "Gets"    => "status:noArg settings:noArg registers:noArg config version:noArg model:noArg actions:noArg readingsGroup:Device,Firmware,Network,Status",
+    "Colors"  => " colors:noArg",
 #-- these we may set
     "Shelly"  => "config interval password reboot:noArg update:noArg name clear:disconnects,error,energy,responsetimes",
     "Actions" => " actions",  # create,delete,disable,enable,update
@@ -246,7 +249,7 @@ my %shelly_dropdowns = (
     "Input"   => " input:momentary,toggle,edge,detached,activation", 
     "Input1"  => ",momentary_on_release",  # only Shelly1
     "Input2"  => ",cycle",                  # only ShellyPlus2
-    "PlugsUI" => " colorOn colorOff",       # only Shelly Plugs Gen2+
+    "PlugsUI" => " colorsOn colorsOff",       # only Shelly Plugs Gen2+
     "Therm"   => " target, thermostat_type:heating,cooling thermostat_output:straight,invert"    # Wall display thermostat target temperature °C
 );
 ## may be used for RgbwC:
@@ -2118,7 +2121,15 @@ sub Shelly_Get ($@) {
     }
     Shelly_HttpRequest($hash,"/settings",$pre.$reg,"Shelly_response","getconfig");
     return "$a[0] $a[1] $a[2] $a[3]\n\nsee reading \'config\' for result";
-    
+
+  #-- get colors of PLUG-S via PLUGS_UI
+  }elsif( $a[1] eq "colors" ){    
+      if( ReadingsVal( $name, "model_ID", "" ) !~ /^S.PL-\d\d112EU$/ ){
+              my $err = "Plug user interface not supported by this model";
+              Shelly_error_handling($hash,"PLUGS_UI_GetConfig",$err,1);
+              return $err;          
+      }
+      Shelly_HttpRequest($hash,"/rpc/PLUGS_UI.GetConfig",undef,"PLUGS_UI_GetConfig","Get" );
 
   #-- create readingsGroup device 
   }elsif( $a[1] eq "readingsGroup" ){
@@ -2194,7 +2205,9 @@ sub Shelly_Get ($@) {
 
   }elsif( $a[1] eq "?" ){
     my $newkeys = $shelly_dropdowns{Gets};   ## join(" ", sort keys %gets);
-    $newkeys    =~  s/:noArg//g
+    $newkeys .= $shelly_dropdowns{Colors}
+                                    if( $model eq "shellyplusplug" && ReadingsVal( $name, "model_ID", "" ) =~ /EU$/); ## Shelly Plug-S Gen2+ 
+    $newkeys =~  s/:noArg//g
       if( $a[1] ne "?");
     my $msg = "unknown argument ".$a[1].", choose one of $newkeys";
     Log3 $name,6,"[Shelly_Get] $name: $msg";
@@ -2267,7 +2280,7 @@ sub Shelly_Set ($@) {
       $newkeys .= $shelly_dropdowns{Scripts}
                                     if( $shelly_models{$model}[4]>=1 ); ## Gen2+
       $newkeys .= $shelly_dropdowns{PlugsUI}
-                                    if( $model eq "shellyplusplug" ); ## Shelly Plugs Gen2+                                    
+                                    if( $model eq "shellyplusplug" && ReadingsVal( $name, "model_ID", "" ) =~ /EU$/); ## Shelly Plug-S Gen2+  EU-Type                                  
       # most of devices, except roller, metering
       $newkeys .= $shelly_dropdowns{Onoff}
                                     if( ($mode ne "thermostat" && $mode ne "roller" && $shelly_models{$model}[0]>0) ||  $shelly_models{$model}[2]>0 || $shelly_models{$model}[7]>0 );
@@ -3161,12 +3174,21 @@ sub Shelly_Set ($@) {
     return;    
   ################################################################################################################
   #-- we have a Shelly Plug Gen2+ with PLUGS-UserInterface PLUGS_UI
-  # colorOn  colorOff
-  }elsif( $model eq "shellyplusplug" && $cmd =~ /color(.*)$/ ){  #
+  # colorsOn  colorsOff
+  }elsif( $model eq "shellyplusplug" && $cmd =~ /colors(.*)$/ ){  #
     my $onoff=lc($1);
-    my ($leds,$rgb);
+    my ($leds,$rgb,$err);
     my $brightness="";
-    if( $value eq "off" ){
+    if( ReadingsVal( $name, "model_ID", "" ) !~ /EU$/ ){
+              $err = "not supported by this model";
+              Shelly_error_handling($hash,"Shelly_Set:PLUG_UI",$err,1);
+              return $err;          
+    }
+    if( !$value  ){ # no value given
+              $err = "missing parameter(s)";
+              Shelly_error_handling($hash,"Shelly_Set:PLUG_UI",$err,1);
+              return $err;          
+    }elsif( $value eq "off" ){
           $leds = "\"mode\":\"off\"";
     }elsif( $value eq "power" ){
           $leds = "\"mode\":\"power\"";   
@@ -3187,14 +3209,14 @@ sub Shelly_Set ($@) {
               $brightness = "\"brightness\":$value";
               $rgb = "";
           }else{
-              my $err = "wrong value: \'$value\'";
+              $err = "wrong value: \'$value\'";
               Shelly_error_handling($hash,"Shelly_Set:PLUG_UI",$err,1);
               return $err;
           }
           if( scalar(@a) == 1 ){  # one more parameter
               $brightness = shift @a;
               if( $brightness !~ /^(100|([1-9]|)\d)$/ ){ # 0 ... 100
-                  my $err = "wrong brightness value: \'$brightness\'";
+                  $err = "wrong brightness value: \'$brightness\'";
                   Shelly_error_handling($hash,"Shelly_Set:PLUG_UI",$err,1);
                   return $err;
               }
@@ -6011,9 +6033,9 @@ sub Shelly_procEnergyData {
 
   if( $hash->{INTERVAL}>0 ){
       #-- initiate next run, adjusted to full minute plus 1 sec
-      my $perds = AttrVal($name,"Periods", "min");
+      my $perds = AttrVal($name,"Periods", "none");
       $perds=~/(\w+)$/; # \w matches all word chars, looking for last key in descending order   
-      my $timer=($periods{$1}[2]  //   60); 
+      my $timer=($periods{$1}[2]  //   maxNum($hash->{INTERVAL}-$hash->{INTERVAL}%60,60) ); # modulo ;  at least 60 sec
       my $Time=(int(time()/$timer)+1)*$timer+1; 
       Log3 $name,$V//4,"[Shelly_procEnergyData] $name: \'EM Data\' update interval is $timer sec, next update \@ ".
                         strftime("%H:%M:%S",localtime($Time) ); #4
@@ -6445,9 +6467,8 @@ if(0){
             readingsSingleUpdate($hash,"config","register \'$reg\' not found or empty $chan",1);
         }
         return undef;  # do not perform call for status
-  }elsif( $comp eq "plugsui" ){ # PLUGS_UI
-    # rpc/PLUGS_UI.GetConfig  rpc/Shelly.GetConfig
-         Shelly_HttpRequest($hash,"/rpc/PLUGS_UI.GetConfig",undef,"PLUGS_UI_config","Get" );
+  }elsif( $comp eq "plugsui" ){ 
+         Shelly_HttpRequest($hash,"/rpc/PLUGS_UI.GetConfig",undef,"PLUGS_UI_GetConfig","Get" );
   }else{
         Log3 $name,3,"[Shelly_response] called by $name for \'$comp\': not implemented";  
   }
@@ -6460,32 +6481,45 @@ if(0){
 
 ########################################################################################
 #
-# PLUGS_UI_config - process the answer of /rpc/PLUGS_UI.SetConfig
+# PLUGS_UI_GetConfig - process the answer of /rpc/PLUGS_UI.GetConfig
 #
 ########################################################################################settings2G
-sub PLUGS_UI_config{
+sub PLUGS_UI_GetConfig{
   my ($param,$jhash) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $comp = $param->{comp};
+  my $err;
   my $model= AttrVal($name,"model","generic");
   
-  Log3 $name,4,"[PLUGS_UI_config] $name: processing the answer /rpc/PLUGS_UI.GetConfig ($comp)";
-  my $mode = ($jhash->{leds}{mode})//"wrong";
-  my $colors = $mode;
-  if( $mode eq "switch" ){
-     $colors   .= " on: ".($jhash->{leds}{colors}{'switch:0'}{on}{rgb}[0])//"wrong";
-     $colors   .= ",".    ($jhash->{leds}{colors}{'switch:0'}{on}{rgb}[1])//"wrong";
-     $colors   .= ",".    ($jhash->{leds}{colors}{'switch:0'}{on}{rgb}[2])//"wrong";
-     $colors   .= ";".    ($jhash->{leds}{colors}{'switch:0'}{on}{brightness})//"wrong";
-     $colors   .= " off: ".($jhash->{leds}{colors}{'switch:0'}{off}{rgb}[0])//"wrong";
-     $colors   .= ",".    ($jhash->{leds}{colors}{'switch:0'}{off}{rgb}[1])//"wrong";
-     $colors   .= ",".    ($jhash->{leds}{colors}{'switch:0'}{off}{rgb}[2])//"wrong";
-     $colors   .= ";".    ($jhash->{leds}{colors}{'switch:0'}{off}{brightness})//"wrong";
-  }elsif( $mode eq "power" ){
-     $colors   .= " ".    ($jhash->{leds}{colors}{power}{brightness})//"wrong";
+  Log3 $name,4,"[PLUGS_UI_GetConfig] $name: processing the answer /rpc/PLUGS_UI.GetConfig ($comp)";
+  my $mode = ($jhash->{leds}{mode});
+  if( !defined($mode) ){
+      $err = "error in JSON";
+      Shelly_error_handling($hash,"PLUGS_UI_GetConfig",$err,2);
+      return $err;
   }
-  readingsSingleUpdate($hash,"color",$colors,1);  
+  my $colors = $mode;
+  my $rgb= "-";
+  if( $mode eq "switch" ){
+     my @set;
+     foreach my $onoff ( "on","off"){
+         my @cols = @{$jhash->{leds}{colors}{'switch:0'}{$onoff}{rgb}};
+         $colors   .= " $onoff: ".($cols[0]);
+         $colors   .= ",".        ($cols[1]);
+         $colors   .= ",".        ($cols[2]);
+         $colors   .= ";".$jhash->{leds}{colors}{'switch:0'}{$onoff}{brightness};
+         if( ReadingsVal($name,"state","unknown") eq $onoff ){
+             $rgb=sprintf("%02X%02X%02X",round(2.55*$cols[0],0),
+                                         round(2.55*$cols[1],0),
+                                         round(2.55*$cols[2],0));
+         }
+     }
+  }elsif( $mode eq "power" ){
+     $colors   .= " ".$jhash->{leds}{colors}{power}{brightness};
+  }
+  readingsSingleUpdate($hash,"colors",$colors,1); 
+  readingsSingleUpdate($hash,"colorsRGB",$rgb,1);  
 }
 
 ########################################################################################
@@ -7243,7 +7277,7 @@ sub Shelly_error_handling {
     }elsif( $err =~ /Auth/ ){ # Shelly is protected by User/Password
         $errE = undef;
         $errS = "Authentication required";
-    }elsif( $err =~ /wrong pct/ ){
+    }elsif( $err =~ /wrong (value|pct)/ ){
         $errE = $err;
         $errS = "Error";
     }elsif( $err =~ /wrong/ || $err =~ /401/ ){ #401 Unauthorized
@@ -7753,8 +7787,8 @@ sub Shelly_HttpResponse($){
         <br/>For Shelly Plugs Gen2+ devices (model=shellyplusplug)
         <ul>
             <li>
-                <a id="Shelly-set-colorOn"></a>
-                <code>set &lt;name&gt; colorOn|colorOff red,green,blue [brightness]</code>
+                <a id="Shelly-set-colorsOn"></a>
+                <code>set &lt;name&gt; colorsOn|colorsOff red,green,blue [brightness]</code>
                 red, green, blue and brightness are integer values 0-100
                 <br />setting the plug's color of f</li>
         </ul>
@@ -7768,6 +7802,10 @@ sub Shelly_HttpResponse($){
                 <code>get &lt;name&gt; actions</code>
                 <br/>prints a list of the actions on the screen</li>
                 <br/>Note: due to better readability, <code>%20</code> will be represented by the blank symbol <code>&blank;</code>
+            <li>
+                <a id="Shelly-get-colors"></a>
+                <code>get &lt;name&gt; colors</code>
+                <br/>write the colors of the Shelly Plug S LEDs to the reading "colorsRGB"</li>
             <li>
                 <a id="Shelly-get-config"></a>
                 <code>get &lt;name&gt; config [&lt;registername&gt;] [&lt;channel&gt;]</code>
@@ -8473,17 +8511,6 @@ sub Shelly_HttpResponse($){
                 <br/>setzt die Farbtemperatur auf einen Wert 3000...6500 K</li>
             </ul>
             
-        <br/>For Shelly Plugs Gen2+ devices (model=shellyplusplug)
-        <ul>
-            <li>
-                <a id="Shelly-set-colorOn"></a>
-                <a id="Shelly-set-colorOff"></a>
-                <code>set &lt;name&gt; colorOn|colorOff &lt;Rot&gt;,&lt;Grün&gt;,&lt;Blau&gt; [&lt;Helligkeit&gt;]</code>
-                
-                <br />Einstellen der Farbe des Leuchtrings. 
-                <br />Rot, Grün, Blau und Helligkeit: Werte 0...100</li>
-        </ul>
-
             <br/> Für Shellies Gen2:
             <ul>
                 <li>
@@ -8534,6 +8561,26 @@ sub Shelly_HttpResponse($){
                    Webhooks, welche nicht an FHEM addressiert sind, werden von diesem Mechanismus nicht verändert.</s>
             </ul>
 
+        
+        <br/>Für Shelly Plug S|UK Gen2+ Zwischenstecker (model=shellyplusplug)
+        <ul>
+            <li>
+                <a id="Shelly-set-colorsOn"></a>
+                <a id="Shelly-set-colorsOff"></a>
+                <code>set &lt;name&gt; colorsOn|colorsOff &lt;Rot&gt;,&lt;Grün&gt;,&lt;Blau&gt; [&lt;Helligkeit&gt;]</code><br/>
+                <code>set &lt;name&gt; colorsOn|colorsOff &lt;RRGGBB&gt; [&lt;Helligkeit&gt;]</code><br/>
+                <code>set &lt;name&gt; colorsOn|colorsOff &lt;Helligkeit&gt;</code><br/>
+                <code>set &lt;name&gt; colorsOn|colorsOff power [&lt;Helligkeit&gt;]</code><br/>
+                <code>set &lt;name&gt; colorsOn|colorsOff off</code>
+                
+                <br/>Einstellen der Farbe und Modus des Leuchtrings. 
+                <br/>Rot, Grün, Blau: ganzzahlige Werte 0...100
+                <br/>RRGGBB: 6-stelliger hexadezimal String für die Farben Rot, Grün und Blau, jeweils 00...FF
+                <br/>Helligkeit: Werte 0...100
+                <br/>power: Leistungsgesteuerter Modus
+                <br/>off: Leuchtring ausgeschaltet (unabhängig von Schaltzustand oder Leistung)</li> 
+                Hinweis: Hexadezimalwerte werden in Prozentwerte umgerechnet und mit drei Dezimalstellen an den Shelly übertragen.
+        </ul>
 
 
             <br/>Für Shelly Devices mit Eingängen (model=...)
@@ -8566,6 +8613,13 @@ sub Shelly_HttpResponse($){
                 <code>get &lt;name&gt; actions</code>
                 <br/>Erstellt eine Liste aller auf dem Shelly vorhandenen Actions
                 <br/>Hinweis: zur besseren Lesbarkeit wird dabei <code>%20</code> durch das Blank-Symbol <code>&blank;</code> dargestellt
+                </li>
+            <li>
+                <a id="Shelly-get-colors"></a>
+                <code>get &lt;name&gt; colors</code>  
+                <br/>nur für Shelly Plus Plug S
+                <br/>schreibt die Einstellungen für die LEDS in das Reading "colors"
+                <br/>schreibt die aktuelle Farbe der LEDS als sechstellige Hexadezimalzahl in das Reading "colorsRGB"
                 </li>
             <li>
                 <a id="Shelly-get-config"></a>
@@ -8719,7 +8773,7 @@ sub Shelly_HttpResponse($){
         </ul>
         <br/>Für Shelly Relais Devices (mode=relay für model=shelly2/2.5/plus2/pro2, Standard für alle anderen Relais Modelle)
         <ul>
-        <li>
+            <li>
                 <a id="Shelly-attr-defchannel"></a>
                 <code>attr &lt;name&gt; defchannel &lt;integer&gt; </code>
                 <br />nur für mehrkanalige Relais Modelle (z.B. model=shelly2|shelly2.5|shelly4) oder ShellyRGBW im 'white mode':
@@ -8728,13 +8782,14 @@ sub Shelly_HttpResponse($){
         </ul>
         <br/>Für Shelly Dimmer Devices oder Shelly RGBW im White-Mode
         <ul>
-        <li>
+            <li>
                 <a id="Shelly-attr-dimstep"></a>
                 <code>attr &lt;name&gt; dimstep &lt;integer&gt; </code>
                 <br />nur für dimmbare Modelle (z.B. model=shellydimmer) oder ShellyRGBW im 'white mode':
                 Festlegen der Schrittweite der Befehle dimup / dimdown. Default ist 25.
                 </li>
         </ul>
+
         <br/>Für Shelly Rollladen Aktoren (mode=roller für model=shelly2/2.5/plus2/pro2)
         <ul>
             <li>
@@ -8795,7 +8850,8 @@ sub Shelly_HttpResponse($){
             <li>
                 <a id="Shelly-attr-Periods"></a>
                 <code>attr &lt;name&gt; Periods &lt;periodes&gt; </code>
-                <br/>Komma getrennte Liste von Zeitspannen für die Berechnung von Energiedifferenzen (Energieverbrauch)
+                <br/>Komma getrennte Liste von Zeitspannen für die Berechnung von Energiedifferenzen (Energieverbrauch). 
+                Die kleinste hier definierte Zeitspanne wird anstelle von Intervall für das Update der Energy-Readings genutzt.
                 <br/>min:   Minute
                 <br/>hourT: Zwölftelstunde (5 Minuten)
                 <br/>hourQ: Viertelstunde (15 Minuten)

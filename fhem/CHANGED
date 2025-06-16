@@ -1,22 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
- - feature: 76_SolarForecast: Version 1.52.12
- - change: 49_SSCam: internal code change
- - bugfix: 57_Calendar: right treatment of colons in SUMMARY (forum #140729)
- - feature: 76_SolarForecast: Version 1.52.11
- - change: 55_DWD_OpenData: set internal version to 1.017007
- - bugfix: 93_DbRep: resolution of symbolic links in Optimize Tables for SQLite
- - bugfix: 76_SMAInverter.pm: INV_BACKRELAYRELAY to INV_BACKUPRELAY
- - bugfix: 76_SMAInverter.pm: SPOT_DC_sum bug uninitialized value 
-                               inv_SPOT_PDC_sum
- - feature: 76_SMAInverter.pm: add SPOT_DC_sum 
- - change:  76_SolarForecast: verbose 3 for consumer switch log
- - feature: 55_DWD_OpenData: check in the previous long term version from 
-                             contrib into FHEM SVN
- - feature: 76_SolarForecast: Version 1.52.5
- - feature: 76_SolarForecast: Version 1.52.4
- - feature: 98_weekprofile: attribute extraClientModules
-            to support further modules with attribute weekprofile
+ - fix: 36_Shelly: updating energy readings interval of Shelly energy meter
  - feature: 76_SolarForecast: graphicControl  keys beamPaddingBottom/Top
  - fix/new: 36_Shelly: log fw-check, model of Shelly3EM, PLUGS_UI implemented
  - fix/new: 36_Shelly: log fw-check, model of Shelly3EM, PLUGS_UI implemented
