@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.52.13"=> "16.06.2025  _genSpecialReadings: new option remainingHrsWoChargeRcmdBat_XX ",
+  "1.52.13"=> "17.06.2025  _genSpecialReadings: new option remainingHrsWoChargeRcmdBat_XX, edit comref ",
   "1.52.12"=> "15.06.2025  readCacheFile: option aitrained -> Code optimized for saving memory ".
                            "fillupMessageSystem: prevent Icon failore if SV contain spaces ".
                            "setupBatteryDevXX: 'dyn' -> Battery color can be dynamically set depending from SoC value ",
@@ -20346,7 +20346,7 @@ sub _listDataPoolCircular {
           $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl";
           $sq .= "\n      $bin";
           $sq .= "\n      $bout";
-          $sq .= "\n      confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c";
+          $sq .= "\n      confc: $confc, gcons: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c";
           $sq .= "\n      temp: $temp, wid: $wid, wtxt: $wtxt";
           $sq .= "\n      $prdl";
           $sq .= "\n      pvcorrf: $pvcf";
@@ -25184,7 +25184,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>DoN</b>            </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                                           </td></tr>
             <tr><td> <b>etotaliXX</b>      </td><td>PV meter reading “Total energy yield” (Wh) of inverter XX at the beginning of the hour                                   </td></tr>
             <tr><td> <b>etotalpXX</b>      </td><td>Meter reading “Total energy yield” (Wh) of producer XX at the beginning of the hour                                      </td></tr>
-            <tr><td> <b>gcons</b>          </td><td>real power consumption (Wh) from the electricity grid                                                                    </td></tr>
+            <tr><td> <b>gcons</b>          </td><td>real consumption (Wh) from the electricity grid                                                                          </td></tr>
             <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
             <tr><td> <b>feedprice</b>      </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the setupMeterDev.                      </td></tr>
             <tr><td> <b>hourscsmeXX</b>    </td><td>total active hours of the day from ConsumerXX                                                                            </td></tr>
@@ -25231,12 +25231,12 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batouttotXX</b>         </td><td>total energy drawn from the battery XX (Wh)                                                                           </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>current total energy charged into the battery XX (Wh)                                                                 </td></tr>
             <tr><td> <b>confc</b>               </td><td>expected energy consumption (Wh) of the house on the current day                                                      </td></tr>
-            <tr><td> <b>con_all</b>             </td><td>an array of values of the house consumption on certain days of the selected hour                                      </td></tr>
+            <tr><td> <b>con_all</b>             </td><td>an array of values of the house consumption (Wh) on certain days of the selected hour                                 </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>remaining days until the battery XX maintenance SoC (default 95%) is reached                                          </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Number of days per cloudy area over the entire term                                                                   </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>total PV energy fed into the public grid (Wh)                                                                         </td></tr>
-            <tr><td> <b>gcon</b>                </td><td>real power drawn from the electricity grid                                                                            </td></tr>
-            <tr><td> <b>gcons_a</b>             </td><td>an array of values of energy consumption from the public grid on specific days of the selected hour                   </td></tr>
+            <tr><td> <b>gcons</b>               </td><td>real energy consumption (Wh) from the electricity grid                                                                </td></tr>
+            <tr><td> <b>gcons_a</b>             </td><td>an array of values of energy consumption (Wh) from the public grid on specific days of the selected hour              </td></tr>
             <tr><td> <b>gfeedin</b>             </td><td>real power feed-in to the electricity grid                                                                            </td></tr>
             <tr><td> <b>gridcontotal</b>        </td><td>total energy drawn from the public grid (Wh)                                                                          </td></tr>
             <tr><td> <b>initdayfeedin</b>       </td><td>initial PV feed-in value at the beginning of the current day (Wh)                                                     </td></tr>
@@ -27810,7 +27810,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                               </td></tr>
             <tr><td> <b>etotaliXX</b>       </td><td>PV Zählerstand "Energieertrag total" (Wh) von Inverter XX zu Beginn der Stunde                     </td></tr>
             <tr><td> <b>etotalpXX</b>       </td><td>Zählerstand "Energieertrag total" (Wh) des Produzenten XX zu Beginn der Stunde                     </td></tr>
-            <tr><td> <b>gcons</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                                       </td></tr>
+            <tr><td> <b>gcons</b>           </td><td>realer Bezug (Wh) aus dem Stromnetz                                                                </td></tr>
             <tr><td> <b>gfeedin</b>         </td><td>reale Einspeisung (Wh) in das Stromnetz                                                            </td></tr>
             <tr><td> <b>feedprice</b>       </td><td>Vergütung für die Einpeisung einer kWh. Die Währung des Preises ist im setupMeterDev definiert.    </td></tr>
             <tr><td> <b>avgcycmntscsmXX</b> </td><td>durchschnittliche Dauer eines Einschaltzyklus des Tages von ConsumerXX in Minuten                  </td></tr>
@@ -27858,12 +27858,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batouttotXX</b>         </td><td>aktuell total aus der Batterie XX entnommene Energie (Wh)                                                                 </td></tr>
             <tr><td> <b>batintotXX</b>          </td><td>aktuell total in die Batterie XX geladene Energie (Wh)                                                                    </td></tr>
             <tr><td> <b>confc</b>               </td><td>erwarteter Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                              </td></tr>
-            <tr><td> <b>con_all</b>             </td><td>ein Array aus Werten des Hausverbrauches an bestimmten Tagen der ausgewählten Stunde                                      </td></tr>
+            <tr><td> <b>con_all</b>             </td><td>ein Array aus Werten des Hausverbrauches (Wh) an bestimmten Tagen der ausgewählten Stunde                                 </td></tr>
             <tr><td> <b>days2careXX</b>         </td><td>verbleibende Tage bis der Batterie XX Pflege-SoC (default 95%) erreicht sein soll                                         </td></tr>
             <tr><td> <b>dnumsum</b>             </td><td>Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit                                                               </td></tr>
             <tr><td> <b>feedintotal</b>         </td><td>in das öffentliche Netz total eingespeiste PV Energie (Wh)                                                                </td></tr>
-            <tr><td> <b>gcon</b>                </td><td>realer Leistungsbezug aus dem Stromnetz                                                                                   </td></tr>
-            <tr><td> <b>gcons_a</b>             </td><td>ein Array aus Werten des Energiebezuges aus dem öffentlichen Netz an bestimmten Tagen der ausgewählten Stunde             </td></tr>
+            <tr><td> <b>gcons</b>               </td><td>realer Energiebezug (Wh) aus dem Stromnetz                                                                                </td></tr>
+            <tr><td> <b>gcons_a</b>             </td><td>ein Array aus Werten des Energiebezuges (Wh) aus dem öffentlichen Netz an bestimmten Tagen der ausgewählten Stunde        </td></tr>
             <tr><td> <b>gfeedin</b>             </td><td>reale Leistungseinspeisung in das Stromnetz                                                                               </td></tr>
             <tr><td> <b>gridcontotal</b>        </td><td>vom öffentlichen Netz total bezogene Energie (Wh)                                                                         </td></tr>
             <tr><td> <b>initdayfeedin</b>       </td><td>initialer PV Einspeisewert zu Beginn des aktuellen Tages (Wh)                                                             </td></tr>
