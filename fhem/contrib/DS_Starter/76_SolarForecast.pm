@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.13"=> "16.06.2025  _genSpecialReadings: new option remainingHrsWoChargeRcmdBat_XX ",
   "1.52.12"=> "15.06.2025  readCacheFile: option aitrained -> Code optimized for saving memory ".
                            "fillupMessageSystem: prevent Icon failore if SV contain spaces ".
                            "setupBatteryDevXX: 'dyn' -> Battery color can be dynamically set depending from SoC value ",
@@ -1453,6 +1454,12 @@ my %hcsr = (                                                                    
       $hcsr{'todayBatOut_'.$bn}{par}  = 99;
       $hcsr{'todayBatOut_'.$bn}{unit} = ' Wh';
       $hcsr{'todayBatOut_'.$bn}{def}  = 0;
+      
+      $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{fnr}  = 5;
+      $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{fn}   = \&NexthoursVal;
+      $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{par}  = 'rcdchargebat'.$bn;
+      $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{unit} = '';
+      $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{def}  = '-';
   }
 
 # Funktiontemplate zur Speicherung von Werten in pvHistory
@@ -14396,6 +14403,24 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, $d2c);
           }
+          elsif ($kpi =~ /remainingHrsWoChargeRcmdBat_/xs) {
+              my $bn = (split "_", $kpi)[1];
+              my $n  = 0;
+
+              for my $idx (sort keys %{$data{$name}{nexthours}}) {
+                  my $istoday = &{$hcsr{$kpi}{fn}} ($name, $idx, 'today', 0);
+                  last if(!$istoday);
+
+                  my $rcdcharge = &{$hcsr{$kpi}{fn}} ($name, $idx, $hcsr{$kpi}{par}, $def);
+                 
+                  if (!$rcdcharge) {
+                      $n++;
+                  }
+              }
+             
+              storeReading ($prpo.'_'.$kpi, $n);      
+              
+          }
           elsif ($kpi eq 'todayGridFeedIn') {
               my $idfi = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdayfeedin', $def);         # initialer Tagesstartwert
               my $cfi  = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'feedintotal',   $def);         # aktuelles total Feed In
@@ -14710,7 +14735,7 @@ sub entryGraphic {
       lotype         => CurrentVal ($name, 'layoutType',                  'double'),
       hourstyle      => CurrentVal ($name, 'hourStyle',                         ''),
       hdrDetail      => CurrentVal ($name, 'headerDetail',                   'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-      fsize          => CurrentVal ($name, 'spaceSize',                  SPACESIZE),
+      spacesz        => CurrentVal ($name, 'spaceSize',                  SPACESIZE),
       kw             => CurrentVal ($name, 'energyUnit',                      'Wh'),
       clegendpos     => CurrentVal ($name, 'showLegend',                'icon_top'),                # Lage und Art Cunsumer Legende
       clink          => CurrentVal ($name, 'detailLink',                         1),                # Link zur Detailansicht des Verbrauchers
@@ -16682,7 +16707,7 @@ sub _beamGraphic {
   my $show_diff  = $paref->{show_diff};                      # zusätzliche Anzeige $di{} in allen Typen
   my $lotype     = $paref->{lotype};
   my $height     = $paref->{height};
-  my $fsize      = $paref->{fsize};
+  my $spacesz    = $paref->{spacesz};
   my $kw         = $paref->{kw};
   my $colorb1    = $paref->{colorb1};
   my $colorb2    = $paref->{colorb2};
@@ -16775,13 +16800,13 @@ sub _beamGraphic {
       # Berechnung der Zonen
       ########################
       if ($lotype eq 'single') {
-          $he    = int(($maxVal - $hfcg->{$i}{beam1}) / $maxVal * $height) + $fsize;                            # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins dass die Grundlinie der Balken nach unten durchbrochen wird
-          $z3    = int($height + $fsize - $he);
+          $he    = int(($maxVal - $hfcg->{$i}{beam1}) / $maxVal * $height) + $spacesz;                          # Der zusätzliche Offset durch $spacesz verhindert bei den meisten Skins dass die Grundlinie der Balken nach unten durchbrochen wird
+          $z3    = int($height + $spacesz - $he);
           $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
       }
 
       if ($lotype eq 'double') {
-          # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen
+          # he - freier der Raum über den Balken. spacesz wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen
           # z2 - primärer Balkenwert ggf. mit Icon
           # z3 - sekundärer Balkenwert, bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
           # z2 und z3 nach Bedarf tauschen, wenn sekundärer Balkenwert > primärer Balkenwert
@@ -16805,17 +16830,17 @@ sub _beamGraphic {
           $z2 = int (($z2 - $z3)   / $maxVal * $height);
           $z3 = int ($height - $he - $z2);                                                                      # was von maxVal noch übrig ist
 
-          if ($z3 < int($fsize / 2)) {                                                                          # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
+          if ($z3 < int($spacesz / 2)) {                                                                        # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
               $z2 += $z3;
               $z3  = 0;
           }
       }
 
       if ($lotype eq 'diff') {
-          # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
+          # he - freier der Raum über den Balken , Zahl positiver Wert + spacesz
           # z2 - positiver Balken inkl Icon
           # z3 - negativer Balken
-          # z4 - Zahl negativer Wert + fsize
+          # z4 - Zahl negativer Wert + spacesz
 
           my ($px_pos,$px_neg);
           my $maxValBeam = 0;                                                                                   # ToDo:  maxValBeam noch aus maxVal ableiten
@@ -16858,9 +16883,9 @@ sub _beamGraphic {
 
           $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3) / abs($minDif) * $px_neg);                  # Teilung durch 0 unbedingt vermeiden
           $z3 = ($px_neg - $z4);
-                                                                                                                # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
-          $he += $fsize;
-          $z4 += $fsize if($z3);                                                                                # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
+                                                                                                                # Beiden Zonen die Werte ausgeben könnten muß spacesz als zusätzlicher Raum zugeschlagen werden !
+          $he += $spacesz;
+          $z4 += $spacesz if($z3);                                                                              # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
       }
 
       ## Erstellung der Balken
@@ -25892,44 +25917,45 @@ to ensure that the system configuration is correct.
 
          <ul>
          <table>
-         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>BatPowerIn_Sum</b>             </td><td>the sum of the current battery charging power of all defined battery devices                                         </td></tr>
-            <tr><td> <b>BatPowerOut_Sum</b>            </td><td>the sum of the current battery discharge power of all defined battery devices                                        </td></tr>
-            <tr><td> <b>BatWeightedTotalSOC</b>        </td><td>the resulting (weighted) SOC across all installed batteries in %                                                     </td></tr>
-			<tr><td> <b>allStringsFullfilled</b>       </td><td>Fulfillment status of error-free generation of all strings                                                           </td></tr>
-            <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Consumption forecast from current hour to the coming sunrise                                                         </td></tr>
-            <tr><td> <b>currentAPIinterval</b>         </td><td>the current polling interval of the selected radiation data API in seconds                                           </td></tr>
-            <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>the running time (minutes) of the consumer "XX" since the last switch-on. (last running cycle)                       </td></tr>
-            <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>provides the forecast of PV generation for the day after tomorrow (if available) without autocorrection (raw data)   </td></tr>
-            <tr><td> <b>daysUntilBatteryCare_XX</b>    </td><td>Days until the next battery XX maintenance (reaching the charge 'maxSoC' from attribute ctrlBatSocManagementXX)      </td></tr>
-            <tr><td> <b>lastretrieval_time</b>         </td><td>the last retrieval time of the selected radiation data API                                                           </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b>    </td><td>the timestamp of the last retrieval time of the selected radiation data API                                          </td></tr>
-            <tr><td> <b>response_message</b>           </td><td>the last status message of the selected radiation data API                                                           </td></tr>
-            <tr><td> <b>runTimeAvgDayConsumer_XX</b>   </td><td>the average running time (minutes) of consumer "XX" on one day                                                       </td></tr>
-            <tr><td> <b>runTimeCentralTask</b>         </td><td>the runtime of the last SolarForecast interval (total process) in seconds                                            </td></tr>
-            <tr><td> <b>runTimeTrainAI</b>             </td><td>the runtime of the last AI training cycle in seconds                                                                 </td></tr>
-            <tr><td> <b>runTimeLastAPIAnswer</b>       </td><td>the last response time of the radiation data API retrieval to a request in seconds                                   </td></tr>
-            <tr><td> <b>runTimeLastAPIProc</b>         </td><td>the last process time for processing the received radiation data API data                                            </td></tr>
-            <tr><td> <b>SunMinutes_Remain</b>          </td><td>the remaining minutes until sunset of the current day                                                                </td></tr>
-            <tr><td> <b>SunHours_Remain</b>            </td><td>the remaining hours until sunset of the current day                                                                  </td></tr>
-            <tr><td> <b>todayConsumption</b>           </td><td>the energy consumption of the house on the current day                                                               </td></tr>
-            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>the energy consumption on the current day that cannot be allocated to the registered consumers                       </td></tr>
-            <tr><td> <b>todayConsumptionForecastDay</b></td><td>Consumption forecast for the current day                                                                             </td></tr>
-            <tr><td> <b>todayConsumptionForecast</b>   </td><td>Consumption forecast per hour of the current day (01-24)                                                             </td></tr>
-            <tr><td> <b>todayConForecastTillSunset</b> </td><td>Consumption forecast from current hour to hour before sunset                                                         </td></tr>
-            <tr><td> <b>todayDoneAPIcalls</b>          </td><td>the number of radiation data API calls executed on the current day                                                   </td></tr>
-            <tr><td> <b>todayDoneAPIrequests</b>       </td><td>the number of radiation data API requests executed on the current day                                                </td></tr>
-            <tr><td> <b>todayGridConsumption</b>       </td><td>the energy drawn from the public grid on the current day                                                             </td></tr>
-            <tr><td> <b>todayGridFeedIn</b>            </td><td>PV energy fed into the public grid on the current day                                                                </td></tr>
-            <tr><td> <b>todayMaxAPIcalls</b>           </td><td>the maximum possible number of radiation data API calls.                                                             </td></tr>
-            <tr><td>                                   </td><td>A call can contain multiple API requests.                                                                            </td></tr>
-            <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>the number of radiation data API calls still possible on the current day                                             </td></tr>
-            <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>the number of radiation data API requests still possible on the current day                                          </td></tr>
-            <tr><td> <b>todayBatIn_XX</b>              </td><td>the energy charged into the battery XX on the current day                                                            </td></tr>
-            <tr><td> <b>todayBatInSum</b>              </td><td>Total energy charged in all batteries on the current day                                                             </td></tr>
-            <tr><td> <b>todayBatOut_XX</b>             </td><td>the energy taken from the battery XX on the current day                                                              </td></tr>
-            <tr><td> <b>todayBatOutSum</b>             </td><td>Total energy drawn from all batteries on the current day                                                             </td></tr>
-			<tr><td> <b>tomorrowConsumptionForecast</b></td><td>Consumption forecast per hour of the coming day (01-24)                                                              </td></tr>
+         <colgroup> <col width="27%"> <col width="73%"> </colgroup>
+            <tr><td> <b>BatPowerIn_Sum</b>                   </td><td>the sum of the current battery charging power of all defined battery devices                                         </td></tr>
+            <tr><td> <b>BatPowerOut_Sum</b>                  </td><td>the sum of the current battery discharge power of all defined battery devices                                        </td></tr>
+            <tr><td> <b>BatWeightedTotalSOC</b>              </td><td>the resulting (weighted) SOC across all installed batteries in %                                                     </td></tr>
+			<tr><td> <b>allStringsFullfilled</b>             </td><td>Fulfillment status of error-free generation of all strings                                                           </td></tr>
+            <tr><td> <b>conForecastTillNextSunrise</b>       </td><td>Consumption forecast from current hour to the coming sunrise                                                         </td></tr>
+            <tr><td> <b>currentAPIinterval</b>               </td><td>the current polling interval of the selected radiation data API in seconds                                           </td></tr>
+            <tr><td> <b>currentRunMtsConsumer_XX</b>         </td><td>the running time (minutes) of the consumer "XX" since the last switch-on. (last running cycle)                       </td></tr>
+            <tr><td> <b>dayAfterTomorrowPVforecast</b>       </td><td>provides the forecast of PV generation for the day after tomorrow (if available) without autocorrection (raw data)   </td></tr>
+            <tr><td> <b>daysUntilBatteryCare_XX</b>          </td><td>Days until the next battery XX maintenance (reaching the charge 'maxSoC' from attribute ctrlBatSocManagementXX)      </td></tr>
+            <tr><td> <b>lastretrieval_time</b>               </td><td>the last retrieval time of the selected radiation data API                                                           </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>          </td><td>the timestamp of the last retrieval time of the selected radiation data API                                          </td></tr>
+            <tr><td> <b>response_message</b>                 </td><td>the last status message of the selected radiation data API                                                           </td></tr>
+            <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>die verbleibende Anzahl Stunden ohne Ladeempfehlung für Batterie XX am aktuellen Tag                                 </td></tr>
+            <tr><td> <b>runTimeAvgDayConsumer_XX</b>         </td><td>the average running time (minutes) of consumer "XX" on one day                                                       </td></tr>
+            <tr><td> <b>runTimeCentralTask</b>               </td><td>the runtime of the last SolarForecast interval (total process) in seconds                                            </td></tr>
+            <tr><td> <b>runTimeTrainAI</b>                   </td><td>the runtime of the last AI training cycle in seconds                                                                 </td></tr>
+            <tr><td> <b>runTimeLastAPIAnswer</b>             </td><td>the last response time of the radiation data API retrieval to a request in seconds                                   </td></tr>
+            <tr><td> <b>runTimeLastAPIProc</b>               </td><td>the last process time for processing the received radiation data API data                                            </td></tr>
+            <tr><td> <b>SunMinutes_Remain</b>                </td><td>the remaining minutes until sunset of the current day                                                                </td></tr>
+            <tr><td> <b>SunHours_Remain</b>                  </td><td>the remaining hours until sunset of the current day                                                                  </td></tr>
+            <tr><td> <b>todayConsumption</b>                 </td><td>the energy consumption of the house on the current day                                                               </td></tr>
+            <tr><td> <b>todayNotOwnerConsumption</b>         </td><td>the energy consumption on the current day that cannot be allocated to the registered consumers                       </td></tr>
+            <tr><td> <b>todayConsumptionForecastDay</b>      </td><td>Consumption forecast for the current day                                                                             </td></tr>
+            <tr><td> <b>todayConsumptionForecast</b>         </td><td>Consumption forecast per hour of the current day (01-24)                                                             </td></tr>
+            <tr><td> <b>todayConForecastTillSunset</b>       </td><td>Consumption forecast from current hour to hour before sunset                                                         </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>                </td><td>the number of radiation data API calls executed on the current day                                                   </td></tr>
+            <tr><td> <b>todayDoneAPIrequests</b>             </td><td>the number of radiation data API requests executed on the current day                                                </td></tr>
+            <tr><td> <b>todayGridConsumption</b>             </td><td>the energy drawn from the public grid on the current day                                                             </td></tr>
+            <tr><td> <b>todayGridFeedIn</b>                  </td><td>PV energy fed into the public grid on the current day                                                                </td></tr>
+            <tr><td> <b>todayMaxAPIcalls</b>                 </td><td>the maximum possible number of radiation data API calls.                                                             </td></tr>
+            <tr><td>                                         </td><td>A call can contain multiple API requests.                                                                            </td></tr>
+            <tr><td> <b>todayRemainingAPIcalls</b>           </td><td>the number of radiation data API calls still possible on the current day                                             </td></tr>
+            <tr><td> <b>todayRemainingAPIrequests</b>        </td><td>the number of radiation data API requests still possible on the current day                                          </td></tr>
+            <tr><td> <b>todayBatIn_XX</b>                    </td><td>the energy charged into the battery XX on the current day                                                            </td></tr>
+            <tr><td> <b>todayBatInSum</b>                    </td><td>Total energy charged in all batteries on the current day                                                             </td></tr>
+            <tr><td> <b>todayBatOut_XX</b>                   </td><td>the energy taken from the battery XX on the current day                                                              </td></tr>
+            <tr><td> <b>todayBatOutSum</b>                   </td><td>Total energy drawn from all batteries on the current day                                                             </td></tr>
+			<tr><td> <b>tomorrowConsumptionForecast</b>      </td><td>Consumption forecast per hour of the coming day (01-24)                                                              </td></tr>
          </table>
          </ul>
        <br>
@@ -28519,44 +28545,45 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
          <table>
-         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>BatPowerIn_Sum</b>             </td><td>die Summe der momentanen Batterieladeleistung aller definierten Batterie Geräte                                 </td></tr>
-            <tr><td> <b>BatPowerOut_Sum</b>            </td><td>die Summe der momentanen Batterieentladeleistung aller definierten Batterie Geräte                              </td></tr>
-			<tr><td> <b>BatWeightedTotalSOC</b>        </td><td>der resultierende (gewichtete) SOC über alle installierten Batterien in %                                       </td></tr>
-            <tr><td> <b>allStringsFullfilled</b>       </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
-            <tr><td> <b>conForecastTillNextSunrise</b> </td><td>Verbrauchsprognose von aktueller Stunde bis zum kommenden Sonnenaufgang                                         </td></tr>
-            <tr><td> <b>currentAPIinterval</b>         </td><td>das aktuelle Abrufintervall der gewählten Strahlungsdaten-API in Sekunden                                       </td></tr>
-            <tr><td> <b>currentRunMtsConsumer_XX</b>   </td><td>die Laufzeit (Minuten) des Verbrauchers "XX" seit dem letzten Einschalten. (letzter Laufzyklus)                 </td></tr>
-            <tr><td> <b>dayAfterTomorrowPVforecast</b> </td><td>liefert die Vorhersage der PV Erzeugung für Übermorgen (sofern verfügbar) ohne Autokorrektur (Rohdaten).        </td></tr>
-            <tr><td> <b>daysUntilBatteryCare_XX</b>    </td><td>Tage bis zur nächsten Batterie XX Pflege (Erreichen der Ladung 'maxSoC' aus Attribut ctrlBatSocManagementXX)    </td></tr>
-            <tr><td> <b>lastretrieval_time</b>         </td><td>der letzte Abrufzeitpunkt der gewählten Strahlungsdaten-API                                                     </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b>    </td><td>der Timestamp der letzen Abrufzeitpunkt der gewählten Strahlungsdaten-API                                       </td></tr>
-            <tr><td> <b>response_message</b>           </td><td>die letzte Statusmeldung der gewählten Strahlungsdaten-API                                                      </td></tr>
-            <tr><td> <b>runTimeAvgDayConsumer_XX</b>   </td><td>die durchschnittliche Laufzeit (Minuten) des Verbrauchers "XX" an einem Tag                                     </td></tr>
-            <tr><td> <b>runTimeCentralTask</b>         </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                                   </td></tr>
-            <tr><td> <b>runTimeTrainAI</b>             </td><td>die Laufzeit des letzten KI Trainingszyklus in Sekunden                                                         </td></tr>
-            <tr><td> <b>runTimeLastAPIAnswer</b>       </td><td>die letzte Antwortzeit des Strahlungsdaten-API Abrufs auf einen Request in Sekunden                             </td></tr>
-            <tr><td> <b>runTimeLastAPIProc</b>         </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen Strahlungsdaten-API Daten                               </td></tr>
-            <tr><td> <b>SunMinutes_Remain</b>          </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
-            <tr><td> <b>SunHours_Remain</b>            </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
-            <tr><td> <b>todayConsumption</b>           </td><td>der Energieverbrauch des Hauses am aktuellen Tag                                                                </td></tr>
-            <tr><td> <b>todayNotOwnerConsumption</b>   </td><td>der Energieverbrauch am aktuellen Tag, der den registrierten Verbrauchern nicht zugeordnet werden kann          </td></tr>
-            <tr><td> <b>todayConsumptionForecastDay</b></td><td>Verbrauchsprognose für den aktuellen Tag                                                                        </td></tr>
-            <tr><td> <b>todayConsumptionForecast</b>   </td><td>Verbrauchsprognose pro Stunde des aktuellen Tages (01-24)                                                       </td></tr>
-            <tr><td> <b>todayConForecastTillSunset</b> </td><td>Verbrauchsprognose von aktueller Stunde bis Stunde vor Sonnenuntergang                                          </td></tr>
-            <tr><td> <b>todayDoneAPIcalls</b>          </td><td>die Anzahl der am aktuellen Tag ausgeführten Strahlungsdaten-API Calls                                          </td></tr>
-            <tr><td> <b>todayDoneAPIrequests</b>       </td><td>die Anzahl der am aktuellen Tag ausgeführten Strahlungsdaten-API Requests                                       </td></tr>
-            <tr><td> <b>todayGridConsumption</b>       </td><td>die aus dem öffentlichen Netz bezogene Energie am aktuellen Tag                                                 </td></tr>
-            <tr><td> <b>todayGridFeedIn</b>            </td><td>die in das öffentliche Netz eingespeiste PV Energie am aktuellen Tag                                            </td></tr>
-            <tr><td> <b>todayMaxAPIcalls</b>           </td><td>die maximal mögliche Anzahl Strahlungsdaten-API Calls.                                                          </td></tr>
-            <tr><td>                                   </td><td>Ein Call kann mehrere API Requests enthalten.                                                                   </td></tr>
-            <tr><td> <b>todayRemainingAPIcalls</b>     </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Calls                                        </td></tr>
-            <tr><td> <b>todayRemainingAPIrequests</b>  </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Requests                                     </td></tr>
-            <tr><td> <b>todayBatIn_XX</b>              </td><td>die am aktuellen Tag in die Batterie XX geladene Energie                                                        </td></tr>
-            <tr><td> <b>todayBatInSum</b>              </td><td>Summe der am aktuellen Tag in alle Batterien geladene Energie                                                   </td></tr>
-            <tr><td> <b>todayBatOut_XX</b>             </td><td>die am aktuellen Tag aus der Batterie XX entnommene Energie                                                     </td></tr>
-            <tr><td> <b>todayBatOutSum</b>             </td><td>Summe der am aktuellen Tag aus allen Batterien entnommene Energie                                               </td></tr>
-			<tr><td> <b>tomorrowConsumptionForecast</b></td><td>Verbrauchsprognose pro Stunde des kommenden Tages (01-24)                                                       </td></tr>
+         <colgroup> <col width="27%"> <col width="73%"> </colgroup>
+            <tr><td> <b>BatPowerIn_Sum</b>                   </td><td>die Summe der momentanen Batterieladeleistung aller definierten Batterie Geräte                                 </td></tr>
+            <tr><td> <b>BatPowerOut_Sum</b>                  </td><td>die Summe der momentanen Batterieentladeleistung aller definierten Batterie Geräte                              </td></tr>
+			<tr><td> <b>BatWeightedTotalSOC</b>              </td><td>der resultierende (gewichtete) SOC über alle installierten Batterien in %                                       </td></tr>
+            <tr><td> <b>allStringsFullfilled</b>             </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
+            <tr><td> <b>conForecastTillNextSunrise</b>       </td><td>Verbrauchsprognose von aktueller Stunde bis zum kommenden Sonnenaufgang                                         </td></tr>
+            <tr><td> <b>currentAPIinterval</b>               </td><td>das aktuelle Abrufintervall der gewählten Strahlungsdaten-API in Sekunden                                       </td></tr>
+            <tr><td> <b>currentRunMtsConsumer_XX</b>         </td><td>die Laufzeit (Minuten) des Verbrauchers "XX" seit dem letzten Einschalten. (letzter Laufzyklus)                 </td></tr>
+            <tr><td> <b>dayAfterTomorrowPVforecast</b>       </td><td>liefert die Vorhersage der PV Erzeugung für Übermorgen (sofern verfügbar) ohne Autokorrektur (Rohdaten).        </td></tr>
+            <tr><td> <b>daysUntilBatteryCare_XX</b>          </td><td>Tage bis zur nächsten Batterie XX Pflege (Erreichen der Ladung 'maxSoC' aus Attribut ctrlBatSocManagementXX)    </td></tr>
+            <tr><td> <b>lastretrieval_time</b>               </td><td>der letzte Abrufzeitpunkt der gewählten Strahlungsdaten-API                                                     </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>          </td><td>der Timestamp der letzen Abrufzeitpunkt der gewählten Strahlungsdaten-API                                       </td></tr>
+            <tr><td> <b>response_message</b>                 </td><td>die letzte Statusmeldung der gewählten Strahlungsdaten-API                                                      </td></tr>
+            <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>die verbleibende Anzahl Stunden ohne Ladeempfehlung für Batterie XX am aktuellen Tag                            </td></tr>
+            <tr><td> <b>runTimeAvgDayConsumer_XX</b>         </td><td>die durchschnittliche Laufzeit (Minuten) des Verbrauchers "XX" an einem Tag                                     </td></tr>
+            <tr><td> <b>runTimeCentralTask</b>               </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                                   </td></tr>
+            <tr><td> <b>runTimeTrainAI</b>                   </td><td>die Laufzeit des letzten KI Trainingszyklus in Sekunden                                                         </td></tr>
+            <tr><td> <b>runTimeLastAPIAnswer</b>             </td><td>die letzte Antwortzeit des Strahlungsdaten-API Abrufs auf einen Request in Sekunden                             </td></tr>
+            <tr><td> <b>runTimeLastAPIProc</b>               </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen Strahlungsdaten-API Daten                               </td></tr>
+            <tr><td> <b>SunMinutes_Remain</b>                </td><td>die verbleibenden Minuten bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
+            <tr><td> <b>SunHours_Remain</b>                  </td><td>die verbleibenden Stunden bis Sonnenuntergang des aktuellen Tages                                               </td></tr>
+            <tr><td> <b>todayConsumption</b>                 </td><td>der Energieverbrauch des Hauses am aktuellen Tag                                                                </td></tr>
+            <tr><td> <b>todayNotOwnerConsumption</b>         </td><td>der Energieverbrauch am aktuellen Tag, der den registrierten Verbrauchern nicht zugeordnet werden kann          </td></tr>
+            <tr><td> <b>todayConsumptionForecastDay</b>      </td><td>Verbrauchsprognose für den aktuellen Tag                                                                        </td></tr>
+            <tr><td> <b>todayConsumptionForecast</b>         </td><td>Verbrauchsprognose pro Stunde des aktuellen Tages (01-24)                                                       </td></tr>
+            <tr><td> <b>todayConForecastTillSunset</b>       </td><td>Verbrauchsprognose von aktueller Stunde bis Stunde vor Sonnenuntergang                                          </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>                </td><td>die Anzahl der am aktuellen Tag ausgeführten Strahlungsdaten-API Calls                                          </td></tr>
+            <tr><td> <b>todayDoneAPIrequests</b>             </td><td>die Anzahl der am aktuellen Tag ausgeführten Strahlungsdaten-API Requests                                       </td></tr>
+            <tr><td> <b>todayGridConsumption</b>             </td><td>die aus dem öffentlichen Netz bezogene Energie am aktuellen Tag                                                 </td></tr>
+            <tr><td> <b>todayGridFeedIn</b>                  </td><td>die in das öffentliche Netz eingespeiste PV Energie am aktuellen Tag                                            </td></tr>
+            <tr><td> <b>todayMaxAPIcalls</b>                 </td><td>die maximal mögliche Anzahl Strahlungsdaten-API Calls.                                                          </td></tr>
+            <tr><td>                                         </td><td>Ein Call kann mehrere API Requests enthalten.                                                                   </td></tr>
+            <tr><td> <b>todayRemainingAPIcalls</b>           </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Calls                                        </td></tr>
+            <tr><td> <b>todayRemainingAPIrequests</b>        </td><td>die Anzahl der am aktuellen Tag noch möglichen Strahlungsdaten-API Requests                                     </td></tr>
+            <tr><td> <b>todayBatIn_XX</b>                    </td><td>die am aktuellen Tag in die Batterie XX geladene Energie                                                        </td></tr>
+            <tr><td> <b>todayBatInSum</b>                    </td><td>Summe der am aktuellen Tag in alle Batterien geladene Energie                                                   </td></tr>
+            <tr><td> <b>todayBatOut_XX</b>                   </td><td>die am aktuellen Tag aus der Batterie XX entnommene Energie                                                     </td></tr>
+            <tr><td> <b>todayBatOutSum</b>                   </td><td>Summe der am aktuellen Tag aus allen Batterien entnommene Energie                                               </td></tr>
+			<tr><td> <b>tomorrowConsumptionForecast</b>      </td><td>Verbrauchsprognose pro Stunde des kommenden Tages (01-24)                                                       </td></tr>
          </table>
          </ul>
        <br>
