@@ -16855,8 +16855,8 @@ sub _beamGraphic {
               $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
           }
           else {                                                                                                                        # tauschen, Betrag Beam1 < Betrag Beam2 
-              $z3    = $hfcg->{$i}{beam1};
               $z2    = $hfcg->{$i}{beam2};
+			  $z3    = $hfcg->{$i}{beam1};
               $titz2 = qq/title="$hfcg->{0}{beam2txt}"/;
               $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
           }
@@ -16864,13 +16864,14 @@ sub _beamGraphic {
           $he  = __normBeamHeight ( { val => $maxVal - $z2, maxVal => $maxVal, height => $height, ground => 0, scalemode => 'lin' } );
           $z2  = __normBeamHeight ( { val => $z2,           maxVal => $maxVal, height => $height, ground => 0, scalemode => $scm  } );                                                                     
           $z3  = __normBeamHeight ( { val => $z3,           maxVal => $maxVal, height => $height, ground => 0, scalemode => $scm  } );  
-		  $z2 -= $z3;                                                                                                                   # effektive Stapelhöhe, da $z2 + $z3 übereinander dargestellt wird
-          $z2 += 25 if(!$z3);                                                                                                           # Erhöhung des Balkens um die Höhe des Betragstrings um Differenz zu Balkenhöhen mit vorhandenen $z2 und $z3 
-		  
-		  #if ($z3 < int ($spacesz / 2)) {                                                                                              # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
-          #    $z2 += $z3;
-          #    $z3  = 0;
-          #}
+		  $z2 -= $z3 if($scm eq 'lin');                                                                                                                   # effektive Stapelhöhe, da $z2 + $z3 übereinander dargestellt wird
+          
+		  if ($scm eq 'log' && $z2) {
+              my $z3perc = int (100 / $z2 * $z3);
+			  $z3        = int ($z3 / 100 * $z3perc);
+              $z3       -= $height * 0.2 if($z3);
+              $z2       -= $z3;
+		  }
       }
 
       if ($lotype eq 'diff') {
