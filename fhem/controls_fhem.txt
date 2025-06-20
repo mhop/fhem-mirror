@@ -1,4 +1,4 @@
-REV 30050
+REV 30054
 DIR unused
 UPD 2025-06-17_07:45:03 444920 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -767,8 +767,8 @@ UPD 2025-06-17_07:45:10 5334284 docs/commandref.html
 UPD 2025-06-17_07:45:14 3351594 docs/commandref_DE.html
 UPD 2025-05-03_07:45:04 86553 docs/commandref_frame.html
 UPD 2025-05-03_07:45:04 97225 docs/commandref_frame_DE.html
-UPD 2025-06-19_07:45:15 325938 docs/commandref_modular.html
-UPD 2025-06-19_07:45:16 337788 docs/commandref_modular_DE.html
+UPD 2025-06-20_07:45:15 325938 docs/commandref_modular.html
+UPD 2025-06-20_07:45:16 337788 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1384,6 +1384,17 @@ UPD 2015-07-28_14:05:32 11079 www/images/fhemSVG/bag.svg
 UPD 2020-07-26_07:45:03 15078 www/images/fhemSVG/balkon_icon.svg
 UPD 2025-06-05_07:45:05 4030 www/images/fhemSVG/bargraph2.svg
 UPD 2015-07-28_14:05:32 2402 www/images/fhemSVG/batterie.svg
+UPD 2025-06-20_07:45:02 774 www/images/fhemSVG/battery_0.svg
+UPD 2025-06-20_07:45:02 878 www/images/fhemSVG/battery_10.svg
+UPD 2025-06-20_07:45:02 877 www/images/fhemSVG/battery_100.svg
+UPD 2025-06-20_07:45:02 876 www/images/fhemSVG/battery_20.svg
+UPD 2025-06-20_07:45:02 878 www/images/fhemSVG/battery_30.svg
+UPD 2025-06-20_07:45:02 877 www/images/fhemSVG/battery_40.svg
+UPD 2025-06-20_07:45:02 877 www/images/fhemSVG/battery_50.svg
+UPD 2025-06-20_07:45:02 875 www/images/fhemSVG/battery_60.svg
+UPD 2025-06-20_07:45:02 880 www/images/fhemSVG/battery_70.svg
+UPD 2025-06-20_07:45:02 877 www/images/fhemSVG/battery_80.svg
+UPD 2025-06-20_07:45:02 879 www/images/fhemSVG/battery_90.svg
 UPD 2015-07-28_14:05:32 2379 www/images/fhemSVG/bluetooth.svg
 UPD 2021-05-11_07:45:02 8960 www/images/fhemSVG/briefkasten.svg
 UPD 2017-11-14_07:45:02 5364 www/images/fhemSVG/building_carport.svg
