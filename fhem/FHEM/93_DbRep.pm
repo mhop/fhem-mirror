@@ -58,6 +58,7 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.54.18" => "21.06.2025  DbRep_reduceLog: fix bug in INCLUDE Regex, forum:#141912.0 ",
   "8.54.17" => "03.05.2025  DbRep_optimizeTables: fix resolution of symbolic links in Optimize Tables for SQLite ".
                             "DbRep_sqlCmd / DbRep_sqlCmdBlocking: add commands analyze, check ",
   "8.53.16" => "01.12.2024  fix check changeValue Forum: #139950.0, Role Agent can use executeBeforeProc, executeAfterProc ",
@@ -9708,14 +9709,14 @@ sub DbRep_reduceLog {
         return "$name|$err";
     }
 
-    BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
+    BlockingInformParent ("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
 
     shift @a;                                            # Devicenamen aus @a entfernen
-
     my @b;
+    
     for my $w (@a) {                                     # ausfiltern von optionalen Zeitangaben, z.B. 700:750
         $w = DbRep_trim ($w);
-        next if($w =~ /\d+(:\d+)?$/xs);                  # Forum: https://forum.fhem.de/index.php?topic=138082.0
+        next if($w =~ /^\d+(:\d+)?$/xs);                 # Forum: https://forum.fhem.de/index.php?topic=138082.0
         push @b, $w;
     }
 
@@ -9748,19 +9749,19 @@ sub DbRep_reduceLog {
     }
 
     my ($dbh, $dbmodel);
-    ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+    ($err,$dbh,$dbmodel) = DbRep_dbConnect ($name, 0);
     return "$name|$err" if ($err);
 
-    my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$d,$r);
+    my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql ($hash,$d,$r);
 
-    my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash);              # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
+    my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr ($hash);              # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
 
     Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
 
     my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $table where ";
     my $addon   = "ORDER BY TIMESTAMP ASC";
 
-    my $valfilter = AttrVal($name, "valueFilter", undef);                               # Wertefilter
+    my $valfilter = AttrVal ($name, "valueFilter", undef);                               # Wertefilter
 
     my $specs = {
         hash      => $hash,
@@ -9774,7 +9775,7 @@ sub DbRep_reduceLog {
 
     my $sql;
 
-    if($includes) {                                                                      # Option EX/INCLUDE wurde angegeben
+    if ($includes) {                                                                      # Option INCLUDE wurde angegeben
         $sql = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $table WHERE "
                .($includes =~ /^(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
                ."TIMESTAMP <= '$ots'"

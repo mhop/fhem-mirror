@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  93_DbRep: reduceLog fix INCLUDE filter Regex, forum:#141912.0
  - fix: 36_Shelly: updating energy readings interval of Shelly energy meter
  - feature: 76_SolarForecast: graphicControl  keys beamPaddingBottom/Top
  - fix/new: 36_Shelly: log fw-check, model of Shelly3EM, PLUGS_UI implemented

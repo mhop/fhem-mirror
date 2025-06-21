@@ -1,9 +1,9 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 28857 2024-05-08 20:29:49Z DS_Starter $
+# $Id: 93_DbRep.pm 30023 2025-06-03 20:11:46Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016-2024 by Heiko Maaz
+#       (c) 2016-2025 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -55,10 +55,16 @@ use FHEM::SynoModules::SMUtils qw( evalDecodeJSON );
 
 use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.54.18" => "21.06.2025  DbRep_reduceLog: fix bug in INCLUDE Regex, forum:#141912.0 ",
+  "8.54.17" => "03.05.2025  DbRep_optimizeTables: fix resolution of symbolic links in Optimize Tables for SQLite ".
+                            "DbRep_sqlCmd / DbRep_sqlCmdBlocking: add commands analyze, check ",
+  "8.53.16" => "01.12.2024  fix check changeValue Forum: #139950.0, Role Agent can use executeBeforeProc, executeAfterProc ",
+  "8.53.15" => "18.08.2024  DbRep_diffvalDone: change loglevel to 2, Forum:#138986 ",
+  "8.53.14" => "29.05.2024  _DbRep_avgTimeWeightMean: accept if \$val1=0 (use looks_like_number) ",
+  "8.53.13" => "25.05.2024  replace Smartmatch Forum:#137776 ",
   "8.53.12" => "09.05.2024  DbRep_dbConnect: change PRAGMA temp_store=MEMORY to FILE, Forum: https://forum.fhem.de/index.php?msg=1312722 ",
   "8.53.11" => "08.05.2024  reduceLog: fix bug if EXCL/INCL-devices end with a digit ",  
   "8.53.10" => "27.03.2024  multicmd: add attr seqDoubletsVariance ",            
@@ -76,36 +82,6 @@ my %DbRep_vNotesIntern = (
                             "Forum:https://forum.fhem.de/index.php?msg=1305266 ",
   "8.53.1"  => "16.02.2024  sqlCmd: executing ckey:latest possible ",
   "8.53.0"  => "10.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog problem Forum:#136581 ",
-  "8.52.15" => "08.12.2023  fix use fhem default variables in attr executeBeforeProc/executeAfterProc ".
-                            "forum: https://forum.fhem.de/index.php?msg=1296146 ",
-  "8.52.14" => "08.11.2023  fix period calculation when using attr timeYearPeriod ",
-  "8.52.13" => "07.11.2023  dumpMySQL clientSide: add create database to dump file ",
-  "8.52.12" => "05.11.2023  dumpMySQL clientSide: change the dump file to stricter rights ",
-  "8.52.11" => "17.09.2023  improve the markout in func DbRep_checkValidTimeSequence, Forum:#134973 ",
-  "8.52.10" => "09.07.2023  fix wrong SQL syntax for PostgreSQL -> DbRep_createSelectSql, Forum:#134170 ",
-  "8.52.9"  => "05.07.2023  fix wrong SQL syntax for PostgreSQL -> maxValue deleteOther, Forum:#134170 ",
-  "8.52.8"  => "28.06.2023  fix check of DbRep_afterproc, DbRep_beforeproc if should exec PERL code ",
-  "8.52.7"  => "16.05.2023  DbRep_afterproc, DbRep_beforeproc can execute FHEM commands as well as PERL code ",
-  "8.52.6"  => "11.04.2023  change diffValue for aggr month ",
-  "8.52.5"  => "10.04.2023  change diffValue, Forum: https://forum.fhem.de/index.php?msg=1271853 ",
-  "8.52.4"  => "10.04.2023  fix perl warning ",
-  "8.52.3"  => "04.04.2023  fix diffValue writeToDB: https://forum.fhem.de/index.php?topic=53584.msg1270905#msg1270905 ",
-  "8.52.2"  => "28.03.2023  diffValue can operate positive and negative differences, sqlCmd can execute 'describe' statement ",
-  "8.52.1"  => "19.03.2023  fix Perl Warnings ",
-  "8.52.0"  => "17.02.2023  get utf8mb4 info by connect db and set connection collation accordingly, new setter migrateCollation ",
-  "8.51.6"  => "11.02.2023  fix execute DbRep_afterproc after generating readings ".
-                            "Forum: https://forum.fhem.de/index.php/topic,53584.msg1262970.html#msg1262970 ".
-                            "fix MySQL 50mostFreqLogsLast2days ",
-  "8.51.5"  => "05.02.2023  fix Perl Warning Forum: https://forum.fhem.de/index.php/topic,53584.msg1262032.html#msg1262032 ",
-  "8.51.4"  => "01.02.2023  ignore non-numeric values in diffValue and output the erroneous record in the log ",
-  "8.51.3"  => "22.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa, Restructuring of DbRep_averval ".
-                            "DbRep_reduceLog -> Handling of field 'value' with NULL value ",
-  "8.51.2"  => "13.01.2023  rewrite sub DbRep_OutputWriteToDB, new averageValue option writeToDBSingleStart ",
-  "8.51.1"  => "11.01.2023  write TYPE uppercase with writeToDB option, Commandref edited, fix add SQL Cache History ".
-                            "set PRAGMA auto_vacuum = FULL when execute SQLite vacuum command",
-  "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
-                            "sqlCmdBlocking customized like sqlCmd, bugfix avgTimeWeightMean ",
-  "8.50.10" => "01.01.2023  Commandref edited ",
   "1.0.0"   => "19.05.2016  Initial"
 );
 
@@ -1137,7 +1113,7 @@ sub DbRep_Set {
       my $oldval = $hc->{old};
       my $newval = $hc->{new};
 
-      if (!$oldval || !$newval) {
+      if ($oldval eq '' || $newval eq '') {
           return qq{Both entries old="old string" new="new string" are needed.};
       }
 
@@ -1517,8 +1493,6 @@ sub DbRep_Attr {
                          readingPreventFromDel
                          device
                          diffAccept
-                         executeBeforeProc
-                         executeAfterProc
                          expimpfile
                          ftpUse
                          ftpUser
@@ -1762,7 +1736,7 @@ sub DbRep_Attr {
                           previous_hour_end
                          );
 
-            if ($aVal ~~ @dtas) {
+            if (grep /^$aVal$/, @dtas) {      
                 delete($attr{$name}{timeDiffToNow});
                 delete($attr{$name}{timeOlderThan});
                 delete($attr{$name}{timeYearPeriod});
@@ -3695,7 +3669,7 @@ sub _DbRep_avgTimeWeightMean {
 
       my @twm_array = map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
 
-      if ($bin_end && $val1) {                                                      # der letzte Datenwert aus dem vorherigen Bin wird dem aktuellen Bin vorangestellt,
+      if ($bin_end && looks_like_number ($val1)) {                                  # der letzte Datenwert aus dem vorherigen Bin wird dem aktuellen Bin vorangestellt, V. 8.53.14: looks_like_number
           unshift @twm_array, $bin_end.'_ESC_'.$val1;                               # wobei das vorherige $bin_end als Zeitstempel verwendet wird
       }
 
@@ -4845,7 +4819,7 @@ sub DbRep_diffvalDone {
   no warnings 'uninitialized';
 
   $rowsrej =~ s/_/ /g;
-  Log3 ($name, 3, "DbRep $name -> data ignored while calc diffValue due to threshold overrun (diffAccept = $difflimit): \n$rowsrej")
+  Log3 ($name, 2, "DbRep $name -> data ignored while calc diffValue due to threshold overrun (diffAccept = $difflimit): \n$rowsrej")
            if($rowsrej);
   $rowsrej =~ s/\n/ \|\| /g;
 
@@ -6964,11 +6938,11 @@ sub DbRep_sqlCmd {
   my (@rows,$row,@head);
   my $nrows = 0;
 
-  if($sql =~ m/^\s*(call|explain|select|pragma|show|describe)/is) {
+  if ($sql =~ m/^\s*(call|explain|select|pragma|show|describe|analyze|check)/is) {
       @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};                   # https://metacpan.org/pod/DBI#NAME1
       if (@head) {
-          $row = join("$srs", @head);
-          push(@rows, $row);
+          $row = join "$srs", @head;
+          push @rows, $row;
       }
 
       while (my @line = $sth->fetchrow_array()) {
@@ -6977,7 +6951,7 @@ sub DbRep_sqlCmd {
 
           $row =~ s/§/|°escaped°|/g;                                              # join Delimiter "§" escapen
 
-          push(@rows, $row);
+          push @rows, $row;
           $nrows++;                                                               # Anzahl der Datensätze
       }
   }
@@ -7136,11 +7110,11 @@ sub DbRep_sqlCmdBlocking {
   }
 
   my $nrows = 0;
-  if($sql =~ m/^\s*(call|explain|select|pragma|show|describe)/is) {
+  if ($sql =~ m/^\s*(call|explain|select|pragma|show|describe|analyze|check)/is) {
       while (my @line = $sth->fetchrow_array()) {
           Log3 ($name, 4, "DbRep $name - SQL result: @line");
           $ret .= "\n" if($nrows);                                              # Forum: #103295
-          $ret .= join("$srs", @line);
+          $ret .= join "$srs", @line;
           $nrows++;                                                             # Anzahl der Datensätze
       }
   }
@@ -8032,7 +8006,7 @@ sub DbRep_optimizeTables {
   my $dbname = $hash->{DATABASE};
   my $value  = 0;
 
-  my ($sth,$query,$db_MB_start,$db_MB_end);
+  my ($sth, $query, $db_MB_start, $db_MB_end);
   my (%db_tables,@tablenames);
 
   my $bst = [gettimeofday];                                                                   # Background-Startzeit
@@ -8089,10 +8063,10 @@ sub DbRep_optimizeTables {
       return "$name|$err" if ($err);
   }
 
-  if ($dbmodel =~ /SQLITE/) {
-      $db_MB_start = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);  # Anfangsgröße ermitteln
-
-      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
+  if ($dbmodel =~ /SQLITE/) {  
+      $db_MB_start = sprintf "%.3f", ((-s $hash->{DATABASE}) / 1048576);                                     # Anfangsgröße ermitteln
+      
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize: $db_MB_start MB");
 
       $query = "PRAGMA auto_vacuum = FULL;";
 
@@ -8104,22 +8078,22 @@ sub DbRep_optimizeTables {
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query, "VACUUM database $dbname....");
       return "$name|$err" if ($err);
 
-      $db_MB_end = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);    # Endgröße ermitteln
+      $db_MB_end = sprintf "%.3f", ((-s $hash->{DATABASE}) / 1048576);                                       # Endgröße ermitteln
 
-      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize: $db_MB_end MB");
   }
 
   if ($dbmodel =~ /POSTGRESQL/) {
-      $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))";                                   # Anfangsgröße ermitteln
+      $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))";                                         # Anfangsgröße ermitteln
 
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
       return "$name|$err" if ($err);
 
       $value       = $sth->fetchrow();
       $value       =~ tr/MB//d;
-      $db_MB_start = sprintf("%.2f",$value);
+      $db_MB_start = sprintf "%.3f", $value;
 
-      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize: $db_MB_start MB");
 
       $query = "vacuum history";
 
@@ -8133,9 +8107,9 @@ sub DbRep_optimizeTables {
 
       $value     = $sth->fetchrow();
       $value     =~ tr/MB//d;
-      $db_MB_end = sprintf("%.2f",$value);
+      $db_MB_end = sprintf "%.3f", $value;
 
-      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize: $db_MB_end MB");
   }
 
   DbRep_clearConn ($dbh, $sth);
@@ -8944,7 +8918,7 @@ sub DbRep_sqlite_Dump {
      $fsBytes  = _DbRep_fsizeInBytes ($dbname);
      $db_MB    = _DbRep_byteOutput   ($fsBytes);
 
-     Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB");
+     Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize: $db_MB MB");
 
      $query  ="VACUUM";
 
@@ -8956,7 +8930,7 @@ sub DbRep_sqlite_Dump {
      $fsBytes  = _DbRep_fsizeInBytes ($dbname);
      $db_MB    = _DbRep_byteOutput   ($fsBytes);
 
-     Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB");
+     Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize: $db_MB MB");
  }
 
  $dbname = (split /[\/]/, $dbname)[-1];
@@ -9735,14 +9709,14 @@ sub DbRep_reduceLog {
         return "$name|$err";
     }
 
-    BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
+    BlockingInformParent ("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
 
     shift @a;                                            # Devicenamen aus @a entfernen
-
     my @b;
+    
     for my $w (@a) {                                     # ausfiltern von optionalen Zeitangaben, z.B. 700:750
         $w = DbRep_trim ($w);
-        next if($w =~ /\d+(:\d+)?$/xs);                  # Forum: https://forum.fhem.de/index.php?topic=138082.0
+        next if($w =~ /^\d+(:\d+)?$/xs);                 # Forum: https://forum.fhem.de/index.php?topic=138082.0
         push @b, $w;
     }
 
@@ -9775,19 +9749,19 @@ sub DbRep_reduceLog {
     }
 
     my ($dbh, $dbmodel);
-    ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+    ($err,$dbh,$dbmodel) = DbRep_dbConnect ($name, 0);
     return "$name|$err" if ($err);
 
-    my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$d,$r);
+    my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql ($hash,$d,$r);
 
-    my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash);              # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
+    my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr ($hash);              # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
 
     Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
 
     my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $table where ";
     my $addon   = "ORDER BY TIMESTAMP ASC";
 
-    my $valfilter = AttrVal($name, "valueFilter", undef);                               # Wertefilter
+    my $valfilter = AttrVal ($name, "valueFilter", undef);                               # Wertefilter
 
     my $specs = {
         hash      => $hash,
@@ -9801,7 +9775,7 @@ sub DbRep_reduceLog {
 
     my $sql;
 
-    if($includes) {                                                                      # Option EX/INCLUDE wurde angegeben
+    if ($includes) {                                                                      # Option INCLUDE wurde angegeben
         $sql = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $table WHERE "
                .($includes =~ /^(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
                ."TIMESTAMP <= '$ots'"
@@ -13579,7 +13553,7 @@ sub _DbRep_fsizeInBytes {
 
   $fs //= '';
 
-return ($fs);
+return $fs;
 }
 
 ####################################################################################################
@@ -14566,12 +14540,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 28857 2024-05-08 20:29:49Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 30023 2025-06-03 20:11:46Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 28857 2024-05-08 20:29:49Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 30023 2025-06-03 20:11:46Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
