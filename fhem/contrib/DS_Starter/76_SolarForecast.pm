@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.16"=> "21.06.2025  _genSpecialReadings: new option remainingChargeHrsMinPwrBat_XX ",
+  "1.52.15"=> "20.06.2025  ctrlBatSocManagementXX->loadAbort expanded by unlock condition ",
   "1.52.14"=> "18.06.2025  _beamGraphic: rework linear and logarithmic normalization of beam height ",
   "1.52.13"=> "17.06.2025  _genSpecialReadings: new option remainingHrsWoChargeRcmdBat_XX, edit comref ",
   "1.52.12"=> "15.06.2025  readCacheFile: option aitrained -> Code optimized for saving memory ".
@@ -400,9 +402,6 @@ my %vNotesIntern = (
                            "bugfix in _calcConsumptionForecast, new ctrlDebug consumption_long ",
   "1.31.0" => "20.08.2024  rename attributes ctrlWeatherDevX to setupWeatherDevX ",
   "1.30.0" => "18.08.2024  new attribute flowGraphicShift, Forum:https://forum.fhem.de/index.php?msg=1318597 ",
-  "1.29.4" => "03.08.2024  delete writeCacheToFile from _getRoofTopData, _specialActivities: avoid loop caused by \@widgetreadings ",
-  "1.29.3" => "20.07.2024  eleminate hand over \$hash in _getRoofTopData routines, fix label 'gcon' to 'gcons' ",
-  "1.28.0" => "15.06.2024  new consumer key exconfc, Forum: https://forum.fhem.de/index.php?msg=1315111 ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -1432,12 +1431,14 @@ my %hcsr = (                                                                    
       $hcsr{'currentRunMtsConsumer_'.$csr}{fnr}  = 5;
       $hcsr{'currentRunMtsConsumer_'.$csr}{fn}   = \&ConsumerVal;
       $hcsr{'currentRunMtsConsumer_'.$csr}{par}  = 'cycleTime';
+      $hcsr{'currentRunMtsConsumer_'.$csr}{par1} = '';
       $hcsr{'currentRunMtsConsumer_'.$csr}{unit} = ' min';
       $hcsr{'currentRunMtsConsumer_'.$csr}{def}  = 0;
 
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{fnr}  = 5;
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{fn}   = \&ConsumerVal;
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{par}  = 'runtimeAvgDay';
+      $hcsr{'runTimeAvgDayConsumer_'.$csr}{par1} = '';
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{unit} = ' min';
       $hcsr{'runTimeAvgDayConsumer_'.$csr}{def}  = 0;
   }
@@ -1448,26 +1449,37 @@ my %hcsr = (                                                                    
       $hcsr{'daysUntilBatteryCare_'.$bn}{fnr}  = 5;
       $hcsr{'daysUntilBatteryCare_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'daysUntilBatteryCare_'.$bn}{par}  = 99;
+      $hcsr{'daysUntilBatteryCare_'.$bn}{par1} = '';
       $hcsr{'daysUntilBatteryCare_'.$bn}{unit} = '';
       $hcsr{'daysUntilBatteryCare_'.$bn}{def}  = '-';
 
       $hcsr{'todayBatIn_'.$bn}{fnr}  = 5;
       $hcsr{'todayBatIn_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'todayBatIn_'.$bn}{par}  = 99;
+      $hcsr{'todayBatIn_'.$bn}{par1} = '';
       $hcsr{'todayBatIn_'.$bn}{unit} = ' Wh';
       $hcsr{'todayBatIn_'.$bn}{def}  = 0;
 
       $hcsr{'todayBatOut_'.$bn}{fnr}  = 5;
       $hcsr{'todayBatOut_'.$bn}{fn}   = \&CircularVal;
       $hcsr{'todayBatOut_'.$bn}{par}  = 99;
+      $hcsr{'todayBatOut_'.$bn}{par1} = '';
       $hcsr{'todayBatOut_'.$bn}{unit} = ' Wh';
       $hcsr{'todayBatOut_'.$bn}{def}  = 0;
       
       $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{fnr}  = 5;
       $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{fn}   = \&NexthoursVal;
       $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{par}  = 'rcdchargebat'.$bn;
+      $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{par1} = '';
       $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{unit} = '';
       $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{def}  = '-';
+      
+      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{fnr}  = 5;
+      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{fn}   = \&NexthoursVal;
+      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{par}  = 'pvfc';
+      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{par1} = 'confc';
+      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{unit} = '';
+      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{def}  = '0';
   }
 
 # Funktiontemplate zur Speicherung von Werten in pvHistory
@@ -6452,19 +6464,26 @@ sub _attrcreateSpecialRdgs {             ## no critic "not used"
   my $name  = $paref->{name};
   my $aName = $paref->{aName};
   my $aVal  = $paref->{aVal};
-
-  my $te = 'currentRunMtsConsumer_|runTimeAvgDayConsumer_';
-
-  if ($aVal =~ /$te/xs && $init_done) {
-      my @aa = split ",", $aVal;
-
-      for my $arg (@aa) {
-          next if($arg !~ /$te/xs);
-
-          my $cn = (split "_", $arg)[1];                                                # Consumer Nummer extrahieren
+  
+  return if(!$init_done);
+  
+  my @klist = split ",", $aVal;
+  
+  for my $avl (@klist) {
+      if ($avl =~ /currentRunMtsConsumer_|runTimeAvgDayConsumer_/xs) {
+          my $cn = (split "_", $avl)[1];                                                # Consumer Nummer extrahieren
 
           if (!AttrVal ($name, 'consumer'.$cn, '')) {
               return qq{The consumer "consumer$cn" is currently not registered as an active consumer!};
+          }
+      }
+      elsif ($avl =~ /remainingChargeHrsMinPwrBat_/xs) {
+          my $bn        = (split "_", $avl)[1];
+          my $parsed    = __parseAttrBatSoc ($name, AttrVal ($name, 'ctrlBatSocManagement'.$bn, undef));
+          my $loadAbort = $parsed->{loadAbort}; 
+          
+          if (!$loadAbort) {
+              return qq{Set attribute "ctrlBatSocManagement${bn}->loadAbort" first. This indicator needs the <MinPwr> parameter.};
           }
       }
   }
@@ -7455,7 +7474,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
       careCycle => { comp => '\d+',                                                   must => 0, act => 0 },
       lcSlot    => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
       careCycle => { comp => '\d+',                                                   must => 0, act => 0 },
-      loadAbort => { comp => '(?:100|[1-9]?[0-9]):\d+',                               must => 0, act => 0 },
+      loadAbort => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',      must => 0, act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -8799,9 +8818,9 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ########################################################################################################################
-  for my $hodc (25..38) {
-      delete $data{$name}{circular}{$hodc};
-  }
+  #for my $hodc (25..38) {
+  #    delete $data{$name}{circular}{$hodc};
+  #}
   
   #my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
   #my $gco = AttrVal ($name, 'graphicControl', '');
@@ -8843,16 +8862,6 @@ sub centralTask {
       }
   }
 
-  if (CurrentVal ($hash, 'consumerCollected', 0)) {
-      for my $c (1..MAXCONSUMER) {                                # 19.04.2025
-          $c = sprintf "%02d", $c;
-          if (defined $data{$name}{consumers} && defined $data{$name}{consumers}{$c}) {
-              delete $data{$name}{consumers}{$c}{swoncondregex}     if(exists $data{$name}{consumers}{$c}{swoncondregex});
-              delete $data{$name}{consumers}{$c}{swoffcondregex}    if(exists $data{$name}{consumers}{$c}{swoffcondregex});
-              delete $data{$name}{consumers}{$c}{spignorecondregex} if(exists $data{$name}{consumers}{$c}{spignorecondregex});
-          }
-      }
-  }
   ##########################################################################################################################
 
   if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -11501,12 +11510,14 @@ sub _batChargeMgmt {
       ## generelle Ladeabbruchbedingung evaluieren
       ##############################################
       if ($loadAbort) {
-          my ($abortSoc, $abortpin) = split ':', $loadAbort;                                    # Ladeabbruch Forum: https://forum.fhem.de/index.php?msg=1342556      
+          my ($abortSoc, $abortpin, $releaseSoC) = split ':', $loadAbort;                       # Ladeabbruch Forum: https://forum.fhem.de/index.php?msg=1342556      
+          
+          $releaseSoC //= $abortSoc;
           
           if ($csoc >= $abortSoc && $bpowerin <= $abortpin) {
               $data{$name}{batteries}{$bn}{bloadAbortCond} = 1;
           }
-          elsif ($csoc < $abortSoc) {
+          elsif ($csoc < $releaseSoC) {
               $data{$name}{batteries}{$bn}{bloadAbortCond} = 0;
           }
       }
@@ -14426,8 +14437,35 @@ sub _genSpecialReadings {
                   }
               }
              
-              storeReading ($prpo.'_'.$kpi, $n);      
+              storeReading ($prpo.'_'.$kpi, $n);
+          }
+          elsif ($kpi =~ /remainingChargeHrsMinPwrBat_/xs) {
+              my $bn        = (split "_", $kpi)[1];
+              my $parsed    = __parseAttrBatSoc ($name, AttrVal ($name, 'ctrlBatSocManagement'.$bn, undef));
+              my $loadAbort = $parsed->{loadAbort}; 
+              my $n         = 0;
               
+              if ($loadAbort) {
+                  my (undef, $minpwr) = split ':', $loadAbort;                      
+                  $minpwr            *= 1;                                    # MinPower auf 1h normiert -> Wh 
+
+                  for my $idx (sort keys %{$data{$name}{nexthours}}) {
+                      my $istoday = &{$hcsr{$kpi}{fn}} ($name, $idx, 'today', 0);
+                      last if(!$istoday);
+
+                      my $pvfc  = &{$hcsr{$kpi}{fn}} ($name, $idx, $hcsr{$kpi}{par},  $def);
+                      my $confc = &{$hcsr{$kpi}{fn}} ($name, $idx, $hcsr{$kpi}{par1}, $def);
+                     
+                      if ($pvfc - $confc >= $minpwr) {
+                          $n++;
+                      }
+                  }
+                 
+                  storeReading ($prpo.'_'.$kpi, $n);
+              }
+              else {
+                  storeReading ($prpo.'_'.$kpi, $n. " (attribute ctrlBatSocManagement${bn}->loadAbort seems to be not set)");
+              }
           }
           elsif ($kpi eq 'todayGridFeedIn') {
               my $idfi = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdayfeedin', $def);         # initialer Tagesstartwert
@@ -25829,7 +25867,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC&gt;:&lt;PowerIn&gt;] </b> <br><br>
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] </b> <br><br>
          If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management for this
          battery device. <br>
          The <b>Battery_OptimumTargetSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
@@ -25863,10 +25901,11 @@ to ensure that the system configuration is correct.
             <tr><td>                  </td><td>at full power. The SoC management of the battery is not affected by this.                       </td></tr>
             <tr><td>                  </td><td>Value: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: all day                                     </td></tr>           
             <tr><td>                  </td><td>                                                                                                </td></tr>           
-            <tr><td> <b>loadAbort</b> </td><td>Condition for a general charging abort. The condition is fulfilled if the specified             </td></tr>
-            <tr><td>                  </td><td>SoC (%) is reached or exceeded <b>AND</b> the specified charging power (W)                      </td></tr>
-            <tr><td>                  </td><td>has been undercut -> Reading <b>Battery_ChargeAbort_XX = 1</b>.                                 </td></tr>
-            <tr><td>                  </td><td>If the current SoC falls below the specified SoC again, the <b>Battery_ChargeAbort_XX = 0</b>   </td></tr>
+            <tr><td> <b>loadAbort</b> </td><td>Condition for a general charging abort and Unlocking. The abort condition is fulfilled if the   </td></tr>
+            <tr><td>                  </td><td>specified SoC1 (%) is reached or exceeded <b>AND</b> the specified charging power               </td></tr>
+            <tr><td>                  </td><td>&lt;MinPwr&gt; (W) has been undercut -> Reading <b>Battery_ChargeAbort_XX=1</b>.                </td></tr>
+            <tr><td>                  </td><td>If the current SoC falls below the specified SoC2, the <b>Battery_ChargeAbort_XX=0</b> is set.  </td></tr>
+            <tr><td>                  </td><td>If SoC2 is not specified, SoC2=SoC1.                                                            </td></tr>            
             <tr><td>                  </td><td>                                                                                                </td></tr>            
          </table>
          </ul>
@@ -25990,9 +26029,12 @@ to ensure that the system configuration is correct.
             <tr><td> <b>dayAfterTomorrowPVforecast</b>       </td><td>provides the forecast of PV generation for the day after tomorrow (if available) without autocorrection (raw data)   </td></tr>
             <tr><td> <b>daysUntilBatteryCare_XX</b>          </td><td>Days until the next battery XX maintenance (reaching the charge 'maxSoC' from attribute ctrlBatSocManagementXX)      </td></tr>
             <tr><td> <b>lastretrieval_time</b>               </td><td>the last retrieval time of the selected radiation data API                                                           </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b>          </td><td>the timestamp of the last retrieval time of the selected radiation data API                                          </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>          </td><td>the timestamp of the last retrieval time of the selected radiation data API                                          </td></tr>         
+            <tr><td> <b>remainingChargeHrsMinPwrBat_XX</b>   </td><td>the remaining number of charging hours for battery XX on the current day if charging is carried out with the         </td></tr>
+            <tr><td>                                         </td><td>charging power <MinPwr> (W).                                                                                         </td></tr>
+            <tr><td>                                         </td><td>The &lt;MinPwr&gt; is specified in the ctrlBatSocManagementXX->loadAbort attribute.                                  </td></tr>           
+            <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>the remaining number of hours without charging recommendation for battery XX on the current day                      </td></tr>
             <tr><td> <b>response_message</b>                 </td><td>the last status message of the selected radiation data API                                                           </td></tr>
-            <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>die verbleibende Anzahl Stunden ohne Ladeempfehlung für Batterie XX am aktuellen Tag                                 </td></tr>
             <tr><td> <b>runTimeAvgDayConsumer_XX</b>         </td><td>the average running time (minutes) of consumer "XX" on one day                                                       </td></tr>
             <tr><td> <b>runTimeCentralTask</b>               </td><td>the runtime of the last SolarForecast interval (total process) in seconds                                            </td></tr>
             <tr><td> <b>runTimeTrainAI</b>                   </td><td>the runtime of the last AI training cycle in seconds                                                                 </td></tr>
@@ -28463,7 +28505,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC&gt;:&lt;PowerIn&gt;] </b> <br><br>
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] </b> <br><br>
          Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
          SoC- und Lade-Management für dieses Batteriegerät. <br>
          Das Reading <b>Battery_OptimumTargetSoC_XX</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
@@ -28498,10 +28540,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                  </td><td>Leistung freigegeben. Das SoC-Management der Batterie ist davon nicht betroffen.                </td></tr>
             <tr><td>                  </td><td>Wert: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: ganztägig                                    </td></tr>           
             <tr><td>                  </td><td>                                                                                                </td></tr>           
-            <tr><td> <b>loadAbort</b> </td><td>Bedingung für einen generellen Ladeabbruch. Die Bedingung ist erfüllt, wenn der angegebene      </td></tr>
-            <tr><td>                  </td><td>SoC (%) erreicht bzw. überschritten ist <b>UND</b> die angegebene Ladeleistung (W)              </td></tr>
-            <tr><td>                  </td><td>unterschritten wurde -> Reading <b>Battery_ChargeAbort_XX = 1</b>.                              </td></tr>
-            <tr><td>                  </td><td>Fällt der aktuelle SoC wieder unter den angegebenen SoC, wird <b>Battery_ChargeAbort_XX = 0</b> </td></tr>
+            <tr><td> <b>loadAbort</b> </td><td>Bedingung für einen generellen Ladeabbruch und Wiederfreigabe. Die Abbruchbedingung ist erfüllt,</td></tr>
+            <tr><td>                  </td><td>wenn der angegebene SoC1 (%) erreicht bzw. überschritten ist <b>UND</b> die angegebene          </td></tr>
+            <tr><td>                  </td><td>Ladeleistung &lt;MinPwr&gt; (W) unterschritten wurde -> Reading <b>Battery_ChargeAbort_XX=1</b>.</td></tr>
+            <tr><td>                  </td><td>Fällt der aktuelle SoC wieder unter den SoC2, wird <b>Battery_ChargeAbort_XX=0</b> gesetzt.     </td></tr>
+            <tr><td>                  </td><td>Ist SoC2 nicht angegeben, gilt SoC2=SoC1.                                                       </td></tr>            
             <tr><td>                  </td><td>                                                                                                </td></tr>            
          </table>
          </ul>
@@ -28626,8 +28669,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>daysUntilBatteryCare_XX</b>          </td><td>Tage bis zur nächsten Batterie XX Pflege (Erreichen der Ladung 'maxSoC' aus Attribut ctrlBatSocManagementXX)    </td></tr>
             <tr><td> <b>lastretrieval_time</b>               </td><td>der letzte Abrufzeitpunkt der gewählten Strahlungsdaten-API                                                     </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>          </td><td>der Timestamp der letzen Abrufzeitpunkt der gewählten Strahlungsdaten-API                                       </td></tr>
-            <tr><td> <b>response_message</b>                 </td><td>die letzte Statusmeldung der gewählten Strahlungsdaten-API                                                      </td></tr>
+            <tr><td> <b>remainingChargeHrsMinPwrBat_XX</b>   </td><td>die verbleibende Anzahl Ladungsstunden für Batterie XX am aktuellen Tag, wenn die Aufladung mit der             </td></tr>
+            <tr><td>                                         </td><td>Ladeleistung &lt;MinPwr&gt; (W) erfolgt.                                                                        </td></tr>
+            <tr><td>                                         </td><td>Die Angabe &lt;MinPwr&gt; erfolgt im Attribut ctrlBatSocManagementXX->loadAbort.                                </td></tr>
             <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>die verbleibende Anzahl Stunden ohne Ladeempfehlung für Batterie XX am aktuellen Tag                            </td></tr>
+            <tr><td> <b>response_message</b>                 </td><td>die letzte Statusmeldung der gewählten Strahlungsdaten-API                                                      </td></tr>
             <tr><td> <b>runTimeAvgDayConsumer_XX</b>         </td><td>die durchschnittliche Laufzeit (Minuten) des Verbrauchers "XX" an einem Tag                                     </td></tr>
             <tr><td> <b>runTimeCentralTask</b>               </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                                   </td></tr>
             <tr><td> <b>runTimeTrainAI</b>                   </td><td>die Laufzeit des letzten KI Trainingszyklus in Sekunden                                                         </td></tr>
