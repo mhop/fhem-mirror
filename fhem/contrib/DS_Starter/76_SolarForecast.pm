@@ -26030,8 +26030,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>daysUntilBatteryCare_XX</b>          </td><td>Days until the next battery XX maintenance (reaching the charge 'maxSoC' from attribute ctrlBatSocManagementXX)      </td></tr>
             <tr><td> <b>lastretrieval_time</b>               </td><td>the last retrieval time of the selected radiation data API                                                           </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>          </td><td>the timestamp of the last retrieval time of the selected radiation data API                                          </td></tr>         
-            <tr><td> <b>remainingChargeHrsMinPwrBat_XX</b>   </td><td>the remaining number of charging hours for battery XX on the current day if charging is carried out with the         </td></tr>
-            <tr><td>                                         </td><td>charging power <MinPwr> (W).                                                                                         </td></tr>
+            <tr><td> <b>remainingChargeHrsMinPwrBat_XX</b>   </td><td>the remaining number of hours on the current day in which the PV surplus (Wh) is higher than the                     </td></tr>
+            <tr><td>                                         </td><td>calculated hourly integral of a minimum charging power <MinPwr> of battery XX.                                       </td></tr>
             <tr><td>                                         </td><td>The &lt;MinPwr&gt; is specified in the ctrlBatSocManagementXX->loadAbort attribute.                                  </td></tr>           
             <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>the remaining number of hours without charging recommendation for battery XX on the current day                      </td></tr>
             <tr><td> <b>response_message</b>                 </td><td>the last status message of the selected radiation data API                                                           </td></tr>
@@ -28669,8 +28669,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>daysUntilBatteryCare_XX</b>          </td><td>Tage bis zur nächsten Batterie XX Pflege (Erreichen der Ladung 'maxSoC' aus Attribut ctrlBatSocManagementXX)    </td></tr>
             <tr><td> <b>lastretrieval_time</b>               </td><td>der letzte Abrufzeitpunkt der gewählten Strahlungsdaten-API                                                     </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>          </td><td>der Timestamp der letzen Abrufzeitpunkt der gewählten Strahlungsdaten-API                                       </td></tr>
-            <tr><td> <b>remainingChargeHrsMinPwrBat_XX</b>   </td><td>die verbleibende Anzahl Ladungsstunden für Batterie XX am aktuellen Tag, wenn die Aufladung mit der             </td></tr>
-            <tr><td>                                         </td><td>Ladeleistung &lt;MinPwr&gt; (W) erfolgt.                                                                        </td></tr>
+            <tr><td> <b>remainingChargeHrsMinPwrBat_XX</b>   </td><td>die verbleibende Anzahl Stunden am aktuellen Tag, in denen der PV-Überschuß (Wh) höher ist als das              </td></tr>
+            <tr><td>                                         </td><td>kalkulierte Stundenintegral einer minimalen Ladeleistung <MinPwr> der Batterie XX.                              </td></tr>
             <tr><td>                                         </td><td>Die Angabe &lt;MinPwr&gt; erfolgt im Attribut ctrlBatSocManagementXX->loadAbort.                                </td></tr>
             <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>die verbleibende Anzahl Stunden ohne Ladeempfehlung für Batterie XX am aktuellen Tag                            </td></tr>
             <tr><td> <b>response_message</b>                 </td><td>die letzte Statusmeldung der gewählten Strahlungsdaten-API                                                      </td></tr>
