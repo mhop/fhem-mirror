@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.52.16"=> "21.06.2025  _genSpecialReadings: new option remainingChargeHrsMinPwrBat_XX ",
+  "1.52.16"=> "21.06.2025  _genSpecialReadings: new option remainingSurplsHrsMinPwrBat_XX ",
   "1.52.15"=> "20.06.2025  ctrlBatSocManagementXX->loadAbort expanded by unlock condition ",
   "1.52.14"=> "18.06.2025  _beamGraphic: rework linear and logarithmic normalization of beam height ",
   "1.52.13"=> "17.06.2025  _genSpecialReadings: new option remainingHrsWoChargeRcmdBat_XX, edit comref ",
@@ -1474,12 +1474,12 @@ my %hcsr = (                                                                    
       $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{unit} = '';
       $hcsr{'remainingHrsWoChargeRcmdBat_'.$bn}{def}  = '-';
       
-      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{fnr}  = 5;
-      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{fn}   = \&NexthoursVal;
-      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{par}  = 'pvfc';
-      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{par1} = 'confc';
-      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{unit} = '';
-      $hcsr{'remainingChargeHrsMinPwrBat_'.$bn}{def}  = '0';
+      $hcsr{'remainingSurplsHrsMinPwrBat_'.$bn}{fnr}  = 5;
+      $hcsr{'remainingSurplsHrsMinPwrBat_'.$bn}{fn}   = \&NexthoursVal;
+      $hcsr{'remainingSurplsHrsMinPwrBat_'.$bn}{par}  = 'pvfc';
+      $hcsr{'remainingSurplsHrsMinPwrBat_'.$bn}{par1} = 'confc';
+      $hcsr{'remainingSurplsHrsMinPwrBat_'.$bn}{unit} = '';
+      $hcsr{'remainingSurplsHrsMinPwrBat_'.$bn}{def}  = '0';
   }
 
 # Funktiontemplate zur Speicherung von Werten in pvHistory
@@ -6477,7 +6477,7 @@ sub _attrcreateSpecialRdgs {             ## no critic "not used"
               return qq{The consumer "consumer$cn" is currently not registered as an active consumer!};
           }
       }
-      elsif ($avl =~ /remainingChargeHrsMinPwrBat_/xs) {
+      elsif ($avl =~ /remainingSurplsHrsMinPwrBat_/xs) {
           my $bn        = (split "_", $avl)[1];
           my $parsed    = __parseAttrBatSoc ($name, AttrVal ($name, 'ctrlBatSocManagement'.$bn, undef));
           my $loadAbort = $parsed->{loadAbort}; 
@@ -14439,7 +14439,7 @@ sub _genSpecialReadings {
              
               storeReading ($prpo.'_'.$kpi, $n);
           }
-          elsif ($kpi =~ /remainingChargeHrsMinPwrBat_/xs) {
+          elsif ($kpi =~ /remainingSurplsHrsMinPwrBat_/xs) {
               my $bn        = (split "_", $kpi)[1];
               my $parsed    = __parseAttrBatSoc ($name, AttrVal ($name, 'ctrlBatSocManagement'.$bn, undef));
               my $loadAbort = $parsed->{loadAbort}; 
@@ -26030,7 +26030,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>daysUntilBatteryCare_XX</b>          </td><td>Days until the next battery XX maintenance (reaching the charge 'maxSoC' from attribute ctrlBatSocManagementXX)      </td></tr>
             <tr><td> <b>lastretrieval_time</b>               </td><td>the last retrieval time of the selected radiation data API                                                           </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>          </td><td>the timestamp of the last retrieval time of the selected radiation data API                                          </td></tr>         
-            <tr><td> <b>remainingChargeHrsMinPwrBat_XX</b>   </td><td>the remaining number of hours on the current day in which the PV surplus (Wh) is higher than the                     </td></tr>
+            <tr><td> <b>remainingSurplsHrsMinPwrBat_XX</b>   </td><td>the remaining number of hours on the current day in which the PV surplus (Wh) is higher than the                     </td></tr>
             <tr><td>                                         </td><td>calculated hourly integral of a minimum charging power <MinPwr> of battery XX.                                       </td></tr>
             <tr><td>                                         </td><td>The &lt;MinPwr&gt; is specified in the ctrlBatSocManagementXX->loadAbort attribute.                                  </td></tr>           
             <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>the remaining number of hours without charging recommendation for battery XX on the current day                      </td></tr>
@@ -28669,7 +28669,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>daysUntilBatteryCare_XX</b>          </td><td>Tage bis zur nächsten Batterie XX Pflege (Erreichen der Ladung 'maxSoC' aus Attribut ctrlBatSocManagementXX)    </td></tr>
             <tr><td> <b>lastretrieval_time</b>               </td><td>der letzte Abrufzeitpunkt der gewählten Strahlungsdaten-API                                                     </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>          </td><td>der Timestamp der letzen Abrufzeitpunkt der gewählten Strahlungsdaten-API                                       </td></tr>
-            <tr><td> <b>remainingChargeHrsMinPwrBat_XX</b>   </td><td>die verbleibende Anzahl Stunden am aktuellen Tag, in denen der PV-Überschuß (Wh) höher ist als das              </td></tr>
+            <tr><td> <b>remainingSurplsHrsMinPwrBat_XX</b>   </td><td>die verbleibende Anzahl Stunden am aktuellen Tag, in denen der PV-Überschuß (Wh) höher ist als das              </td></tr>
             <tr><td>                                         </td><td>kalkulierte Stundenintegral einer minimalen Ladeleistung <MinPwr> der Batterie XX.                              </td></tr>
             <tr><td>                                         </td><td>Die Angabe &lt;MinPwr&gt; erfolgt im Attribut ctrlBatSocManagementXX->loadAbort.                                </td></tr>
             <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>die verbleibende Anzahl Stunden ohne Ladeempfehlung für Batterie XX am aktuellen Tag                            </td></tr>
