@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.17"=> "22.06.2025  remainingSurplsHrsMinPwrBat_: calculate with two decimal places ",
   "1.52.16"=> "21.06.2025  _genSpecialReadings: new option remainingSurplsHrsMinPwrBat_XX ",
   "1.52.15"=> "20.06.2025  ctrlBatSocManagementXX->loadAbort expanded by unlock condition ",
   "1.52.14"=> "18.06.2025  _beamGraphic: rework linear and logarithmic normalization of beam height ",
@@ -14346,10 +14347,11 @@ return;
 #    optionale "special" Readings erstellen
 ################################################################
 sub _genSpecialReadings {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $day   = $paref->{day};
-  my $t     = $paref->{t};              # aktueller UNIX Timestamp
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $day    = $paref->{day};
+  my $minute = $paref->{minute},         # aktuelle Minute (00-59)
+  my $t      = $paref->{t};              # aktueller UNIX Timestamp
 
   my $hash = $defs{$name};
   my @srd  = sort keys (%hcsr);
@@ -14459,6 +14461,12 @@ sub _genSpecialReadings {
                       if ($pvfc - $confc >= $minpwr) {
                           $n++;
                       }
+                  }
+                  
+                  if ($n) {                                            # von den volle Stunden die aktuell schon vergangenen Minuten abziehen 
+                      my $mintotal = $n * 60;
+                      $mintotal   -= int ($minute);
+                      $n           = sprintf "%.2f", ($mintotal / 60);
                   }
                  
                   storeReading ($prpo.'_'.$kpi, $n);
@@ -25914,7 +25922,7 @@ to ensure that the system configuration is correct.
          All SoC values are whole numbers in %. The following applies: 'lowSoc' &lt; 'upSoC' &lt; 'maxSoC'. <br><br>
 
          <b>Example: </b> <br>
-         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 <br>
+         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 <br>
        </li>
        <br>
 
@@ -26031,7 +26039,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>lastretrieval_time</b>               </td><td>the last retrieval time of the selected radiation data API                                                           </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>          </td><td>the timestamp of the last retrieval time of the selected radiation data API                                          </td></tr>         
             <tr><td> <b>remainingSurplsHrsMinPwrBat_XX</b>   </td><td>the remaining number of hours on the current day in which the PV surplus (Wh) is higher than the                     </td></tr>
-            <tr><td>                                         </td><td>calculated hourly integral of a minimum charging power <MinPwr> of battery XX.                                       </td></tr>
+            <tr><td>                                         </td><td>calculated hourly integral of the minimum charging power <MinPwr> of battery XX.                                     </td></tr>
             <tr><td>                                         </td><td>The &lt;MinPwr&gt; is specified in the ctrlBatSocManagementXX->loadAbort attribute.                                  </td></tr>           
             <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>the remaining number of hours without charging recommendation for battery XX on the current day                      </td></tr>
             <tr><td> <b>response_message</b>                 </td><td>the last status message of the selected radiation data API                                                           </td></tr>
@@ -28553,7 +28561,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Alle SoC-Werte sind ganze Zahlen in %. Dabei gilt: 'lowSoc' &lt; 'upSoC' &lt; 'maxSoC'. <br><br>
 
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 <br>
+         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 <br>
        </li>
        <br>
 
@@ -28670,7 +28678,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>lastretrieval_time</b>               </td><td>der letzte Abrufzeitpunkt der gewählten Strahlungsdaten-API                                                     </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>          </td><td>der Timestamp der letzen Abrufzeitpunkt der gewählten Strahlungsdaten-API                                       </td></tr>
             <tr><td> <b>remainingSurplsHrsMinPwrBat_XX</b>   </td><td>die verbleibende Anzahl Stunden am aktuellen Tag, in denen der PV-Überschuß (Wh) höher ist als das              </td></tr>
-            <tr><td>                                         </td><td>kalkulierte Stundenintegral einer minimalen Ladeleistung <MinPwr> der Batterie XX.                              </td></tr>
+            <tr><td>                                         </td><td>kalkulierte Stundenintegral der minimalen Ladeleistung <MinPwr> der Batterie XX.                                </td></tr>
             <tr><td>                                         </td><td>Die Angabe &lt;MinPwr&gt; erfolgt im Attribut ctrlBatSocManagementXX->loadAbort.                                </td></tr>
             <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>die verbleibende Anzahl Stunden ohne Ladeempfehlung für Batterie XX am aktuellen Tag                            </td></tr>
             <tr><td> <b>response_message</b>                 </td><td>die letzte Statusmeldung der gewählten Strahlungsdaten-API                                                      </td></tr>

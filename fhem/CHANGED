@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change: 76_SolarForecast: remainingSurplsHrsMinPwrBat_: calculate with two 
+                              decimal places
  - feature: 76_SolarForecast: Version 1.52.16
  - bugfix:  93_DbRep: reduceLog fix INCLUDE filter Regex, forum:#141912.0
  - fix: 36_Shelly: updating energy readings interval of Shelly energy meter
