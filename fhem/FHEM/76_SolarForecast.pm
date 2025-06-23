@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.52.18"=> "23.06.2025  ctrlSpecialReadings: new option conForecastComingNight, fix last hour of remainingSurplsHrsMinPwrBat_ ".
+                           "some more minor fixes ",
   "1.52.17"=> "22.06.2025  remainingSurplsHrsMinPwrBat_: calculate with two decimal places ",
   "1.52.16"=> "21.06.2025  _genSpecialReadings: new option remainingSurplsHrsMinPwrBat_XX ",
   "1.52.15"=> "20.06.2025  ctrlBatSocManagementXX->loadAbort expanded by unlock condition ",
@@ -1422,6 +1424,7 @@ my %hcsr = (                                                                    
   todayConsumptionForecast    => { fnr => 5, fn => \&HistoryVal,      par => '',                  par1 => 'confc',             unit => ' Wh',  def => '-'         },
   tomorrowConsumptionForecast => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => '-'         },
   conForecastTillNextSunrise  => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => 0           },
+  conForecastComingNight      => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => 0           },
   todayBatInSum               => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
   todayBatOutSum              => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
 );
@@ -9988,11 +9991,13 @@ sub __sunRS {
       }
   }
 
-  $data{$name}{current}{sunriseToday}   = $date.' '.$fc0_sr.':00';
-  $data{$name}{current}{sunriseTodayTs} = timestringToTimestamp ($date.' '.$fc0_sr.':00');
+  $data{$name}{current}{sunriseToday}      = $date.' '.$fc0_sr.':00';
+  $data{$name}{current}{sunriseTodayTs}    = timestringToTimestamp ($date.' '.$fc0_sr.':00');
+  $data{$name}{current}{sunriseTomorrowTs} = 86400 + timestringToTimestamp ($date.' '.$fc1_sr.':00');
 
-  $data{$name}{current}{sunsetToday}    = $date.' '.$fc0_ss.':00';
-  $data{$name}{current}{sunsetTodayTs}  = timestringToTimestamp ($date.' '.$fc0_ss.':00');
+  $data{$name}{current}{sunsetToday}      = $date.' '.$fc0_ss.':00';
+  $data{$name}{current}{sunsetTodayTs}    = timestringToTimestamp ($date.' '.$fc0_ss.':00');
+  $data{$name}{current}{sunsetTomorrowTs} = 86400 + timestringToTimestamp ($date.' '.$fc1_ss.':00');
 
   debugLog ($paref, 'collectData', "sunrise/sunset today: $fc0_sr / $fc0_ss, sunrise/sunset tomorrow: $fc1_sr / $fc1_ss");
 
@@ -11727,7 +11732,7 @@ sub _createSummaries {
   my $minute = $paref->{minute};                                                                      # aktuelle Minute
 
   my $hash = $defs{$name};
-  $minute  = (int $minute) + 1;                                                                       # Minute Range umsetzen auf 1 bis 60
+  $minute  = int ($minute) + 1;                                                                       # Minute Range umsetzen auf 1 bis 60
 
   ## Initialisierung
   ####################
@@ -11739,33 +11744,54 @@ sub _createSummaries {
   my $tomorrowSum   = { "PV" => 0, "Consumption" => 0 };
   my $todaySumFc    = { "PV" => 0, "Consumption" => 0 };
   my $todaySumRe    = { "PV" => 0, "Consumption" => 0 };
+  
+  my $tdaysset = CurrentVal ($name, 'sunsetTodayTs', 0);                                               # Timestamp Sonneuntergang am aktuellen Tag
+  my $dtsset   = timestringsFromOffset ($tdaysset,   0);
 
   my $tdConFcTillSunset = 0;
   my $remainminutes     = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
 
-  my $restofhourpvfc  = (NexthoursVal($hash, "NextHour00", 'pvfc',  0)) / 60 * $remainminutes;
-  my $restofhourconfc = (NexthoursVal($hash, "NextHour00", 'confc', 0)) / 60 * $remainminutes;
+  my $hour00pvfc  = NexthoursVal ($hash, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;
+  my $hour00confc = NexthoursVal ($hash, "NextHour00", 'confc', 0);
+  my $hod00       = NexthoursVal ($hash, "NextHour00", 'hourofday', 0);
+  
+  $hour00pvfc     = max (0, $hour00pvfc);                                                              # PV Prognose darf nicht negativ sein
+  $hour00confc    = max (0, $hour00confc);                                                             # Verbrauchsprognose darf nicht negativ sein
+  
+  my $hour00confcremain = $hour00confc / 60 * $remainminutes;
+  
+  if ($paref->{t} < $tdaysset) {
+      if (int ($hod00) != int ($dtsset->{hour}) + 1) {
+          $tdConFcTillSunset += $hour00confcremain;                                                    # aktuelle Minute bis volle Stunde
+      }
+      else {
+          $tdConFcTillSunset += $hour00confc / 60 * (int ($dtsset->{minute}) + 1 - $minute);           # aktuelle Minute bis Sunset
+      }
+  }
 
-  $next1HoursSum->{PV}          = $restofhourpvfc;
-  $next2HoursSum->{PV}          = $restofhourpvfc;
-  $next3HoursSum->{PV}          = $restofhourpvfc;
-  $next4HoursSum->{PV}          = $restofhourpvfc;
-  $restOfDaySum->{PV}           = $restofhourpvfc;
+  $next1HoursSum->{PV}          = $hour00pvfc;
+  $next2HoursSum->{PV}          = $hour00pvfc;
+  $next3HoursSum->{PV}          = $hour00pvfc;
+  $next4HoursSum->{PV}          = $hour00pvfc;
+  $restOfDaySum->{PV}           = $hour00pvfc;
 
-  $next1HoursSum->{Consumption} = $restofhourconfc;
-  $next2HoursSum->{Consumption} = $restofhourconfc;
-  $next3HoursSum->{Consumption} = $restofhourconfc;
-  $next4HoursSum->{Consumption} = $restofhourconfc;
-  $restOfDaySum->{Consumption}  = $restofhourconfc;
+  $next1HoursSum->{Consumption} = $hour00confcremain;
+  $next2HoursSum->{Consumption} = $hour00confcremain;
+  $next3HoursSum->{Consumption} = $hour00confcremain;
+  $next4HoursSum->{Consumption} = $hour00confcremain;
+  $restOfDaySum->{Consumption}  = $hour00confcremain;
 
   for my $h (1..47) {
-      my $pvfc  = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'pvfc',  0);
-      my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'confc', 0);
-      my $istdy = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'today', 0);
-      my $don   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), 'DoN',   0);
-      $pvfc     = 0 if($pvfc  < 0);                                                         # PV Prognose darf nicht negativ sein
-      $confc    = 0 if($confc < 0);                                                         # Verbrauchsprognose darf nicht negativ sein
-
+      my $idx   = sprintf "%02d", $h;
+      my $pvfc  = NexthoursVal ($hash, "NextHour".$idx, 'pvfc',      0);
+      my $confc = NexthoursVal ($hash, "NextHour".$idx, 'confc',     0);
+      my $istdy = NexthoursVal ($hash, "NextHour".$idx, 'today',     0);
+      my $don   = NexthoursVal ($hash, "NextHour".$idx, 'DoN',       0);
+      my $hod   = NexthoursVal ($hash, "NextHour".$idx, 'hourofday', 0);
+      
+      $pvfc     = max (0, $pvfc);                                                           # PV Prognose darf nicht negativ sein
+      $confc    = max (0, $confc);                                                          # Verbrauchsprognose darf nicht negativ sein
+      
       if ($h == 1) {
           $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;
           $next1HoursSum->{Consumption} += $confc / 60 * $minute;
@@ -11796,6 +11822,11 @@ sub _createSummaries {
           $restOfDaySum->{PV}          += $pvfc;
           $restOfDaySum->{Consumption} += $confc;
           $tdConFcTillSunset           += $confc if($don);
+          
+          if (int ($hod) == int ($dtsset->{hour}) + 1) {                              # wenn die berücksichtigte Stunde die Stunde des Sonnenuntergangs ist
+              my $diflasth        = 60 - int ($dtsset->{minute}) + 1;                 # fehlende Minuten zur vollen Stunde in der Stunde des Sunset 
+              $tdConFcTillSunset -= ($confc / 60) * $diflasth;
+          }
       }
       else {
           $tomorrowSum->{PV} += $pvfc;
@@ -11865,7 +11896,7 @@ sub _createSummaries {
   $data{$name}{current}{selfconsumption}     = $selfconsumption;
   $data{$name}{current}{selfconsumptionrate} = $selfconsumptionrate;
   $data{$name}{current}{autarkyrate}         = $autarkyrate;
-  $data{$name}{current}{tdConFcTillSunset}   = $tdConFcTillSunset;
+  $data{$name}{current}{tdConFcTillSunset}   = sprintf "%.0f", $tdConFcTillSunset;
   $data{$name}{current}{surplus}             = $surplus;
 
   push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
@@ -14349,6 +14380,7 @@ return;
 sub _genSpecialReadings {
   my $paref  = shift;
   my $name   = $paref->{name};
+  my $date   = $paref->{date};           # aktuelles Datum
   my $day    = $paref->{day};
   my $minute = $paref->{minute},         # aktuelle Minute (00-59)
   my $t      = $paref->{t};              # aktueller UNIX Timestamp
@@ -14446,10 +14478,11 @@ sub _genSpecialReadings {
               my $parsed    = __parseAttrBatSoc ($name, AttrVal ($name, 'ctrlBatSocManagement'.$bn, undef));
               my $loadAbort = $parsed->{loadAbort}; 
               my $n         = 0;
+              my $lasthod;
               
               if ($loadAbort) {
                   my (undef, $minpwr) = split ':', $loadAbort;                      
-                  $minpwr            *= 1;                                    # MinPower auf 1h normiert -> Wh 
+                  $minpwr            *= 1;                                                            # MinPower auf 1h normiert -> Wh 
 
                   for my $idx (sort keys %{$data{$name}{nexthours}}) {
                       my $istoday = &{$hcsr{$kpi}{fn}} ($name, $idx, 'today', 0);
@@ -14458,15 +14491,25 @@ sub _genSpecialReadings {
                       my $pvfc  = &{$hcsr{$kpi}{fn}} ($name, $idx, $hcsr{$kpi}{par},  $def);
                       my $confc = &{$hcsr{$kpi}{fn}} ($name, $idx, $hcsr{$kpi}{par1}, $def);
                      
-                      if ($pvfc - $confc >= $minpwr) {
+                      if (($pvfc - $confc) >= $minpwr) {
+                          $lasthod = &{$hcsr{$kpi}{fn}} ($name, $idx, 'hourofday', 0);
                           $n++;
                       }
                   }
                   
-                  if ($n) {                                            # von den volle Stunden die aktuell schon vergangenen Minuten abziehen 
+                  if ($n) {                                                                           
                       my $mintotal = $n * 60;
-                      $mintotal   -= int ($minute);
-                      $n           = sprintf "%.2f", ($mintotal / 60);
+                      $mintotal   -= int ($minute);                                                   # von den volle Stunden die aktuell schon vergangenen Minuten abziehen 
+                      
+                      my $tdaysset = CurrentVal ($name, 'sunsetTodayTs', 0);                          # Timestamp Sonnenuntergang aktueller Tag
+                      my $dtsset   = timestringsFromOffset ($tdaysset,   0);
+                      
+                      if (int ($lasthod) == int ($dtsset->{hour}) + 1) {                              # wenn die letzte berücksichtigte Stunde die Stunde des Sonnenuntergangs ist
+                          my $diflasth = 60 - $dtsset->{minute};                                      # fehlende Minuten zur vollen Stunde in der Stunde des Sunset 
+                          $mintotal   -= int ($diflasth);
+                      }
+                      
+                      $n = sprintf "%.2f", ($mintotal / 60);
                   }
                  
                   storeReading ($prpo.'_'.$kpi, $n);
@@ -14621,34 +14664,118 @@ sub _genSpecialReadings {
              }
           }
           elsif ($kpi eq 'conForecastTillNextSunrise') {
-             my $confc = 0;
-             my $dono  = 1;
-             my $hrs   = 0;
-             my $sttm  = '';
+             my ($confc, $confcs, $confcsr) = (0, 0, 0);
+             my $donl  = 1;
+             my $lap   = 1;
 
              for my $idx (sort keys %{$data{$name}{nexthours}}) {
-                 my $don = NexthoursVal ($hash, $idx, 'DoN', 2);                     # Wechsel von 0 -> 1 relevant
+                 my $don = NexthoursVal ($hash, $idx, 'DoN', 2);                                      # Wechsel von 0 -> 1 für Abbruch relevant
                  last if($don == 2);
 
-                 $confc += &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
-                 $sttm   = NexthoursVal ($hash, $idx, 'starttime', '');
-                 $hrs++;                                                             # Anzahl berücksichtigte Stunden
-
-                 if ($dono == 0 && $don == 1) {
+                 if ($donl == 0 && $don == 1) {
                      last;
                  }
-
-                 $dono = $don;
+                 
+                 $confc  += &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
+                 $confcs  = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def) if($lap == 1);   # Verbrauchsprognosewert in der aktuellen Stunde
+                 $confcsr = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);                 # letzter Verbrauchsprognosewert -> in der Stunde des Sonnenaufgang
+                 $donl    = $don;
+                 
+                 $lap++;
              }
 
-             my $sttmp = timestringToTimestamp ($sttm) // return;
-             $sttmp   += 3600;                                                       # Beginnzeitstempel auf volle Stunde ergänzen
-             my $mhrs  = $hrs * 60;                                                  # berücksichtigte volle Minuten
-             my $mtsr  = ($sttmp - $t) / 60;                                         # Minuten bis nächsten Sonnenaufgang (gerundet)
+             $confcs  = max (0, $confcs);
+             $confcsr = max (0, $confcsr);
+             $confc   = max (0, $confc);
+             
+             my $tdaysrise = CurrentVal ($name, 'sunriseTodayTs',    0);
+             my $tmorsrise = CurrentVal ($name, 'sunriseTomorrowTs', 0);
+             my $sunrise   = $t < $tdaysrise ? $tdaysrise : $tmorsrise;
 
-             $confc    = $confc / $mhrs * $mtsr;
+             if ($confc && $sunrise) { 
+                 my $dt;
+                 $confc -= $confcs;
+                 
+                 $dt           = timestringsFromOffset ($t, 0);
+                 my $curmts    = int ($dt->{minute}) + 1;                                            # vergangene Minuten in der aktuellen Stunde            
+                 my $cfcscurh  = ($confcs / 60) * (60 - $curmts);                                    # anteiler Verbrauch (Schätzung) aktuelle Zeit bis volle Stunde
+                 $confc       += $cfcscurh;
+                 
+                 $confc       -= $confcsr;
+                 my $dtrise    = timestringsFromOffset ($sunrise, 0);
+                 my $srisemts  = int ($dtrise->{minute}) + 1;                                        # vergangene Minuten in der Stunde des Sunrise     
+                 my $cfcsrish  = ($confcsr / 60) * $srisemts;                                        # anteiler Verbrauch (Schätzung) volle Stunde bis Sunrise
+                 $confc       += $cfcsrish;
+                 
+                 storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $confc).$hcsr{$kpi}{unit});
+             }
+             else {
+                 storeReading ($prpo.'_'.$kpi, $confc.$hcsr{$kpi}{unit});
+             }
+          }
+          elsif ($kpi eq 'conForecastComingNight') {
+             my ($confc, $confcss, $confcsr) = (0, 0, 0);
+             my $donl  = 1;
+             my $lap   = 1;
+             
+             my $tdaysset  = CurrentVal ($name, 'sunsetTodayTs',  0);
+             my $tdaysrise = CurrentVal ($name, 'sunriseTodayTs', 0);
+             my $dtsset    = timestringsFromOffset ($tdaysset,  0);
+             my $dtsrise   = timestringsFromOffset ($tdaysrise, 0);
 
-             storeReading ($prpo.'_'.$kpi, ($confc ? (sprintf "%.0f", $confc).$hcsr{$kpi}{unit} : '-'));
+             for my $idx (sort keys %{$data{$name}{nexthours}}) {
+                 my $don = NexthoursVal ($hash, $idx, 'DoN', 2);                                      # Wechsel von 0 -> 1 für Abbruch relevant
+                 last if($don == 2);               
+                 
+                 if ($donl == 0 && $don == 1) {
+                     last;
+                 }
+                 
+                 my $hod = NexthoursVal ($hash, $idx, 'hourofday', '01');  
+                 
+                 next if(int ($hod) > int ($dtsrise->{hour}) + 1 && int ($hod) < int ($dtsset->{hour}) + 1); 
+
+                 $confc  += &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
+                 $confcss = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def) if($lap == 1);   # Verbrauchsprognosewert in der Stunde des Sonnenuntergangs
+                 $confcsr = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);                 # letzter Verbrauchsprognosewert -> in der Stunde des Sonnenaufgang
+                 $donl    = $don;
+                 
+                 $lap++;
+             }
+
+             $confcss = max (0, $confcss);
+             $confcsr = max (0, $confcsr);
+             $confc   = max (0, $confc);
+             
+             my $tmorsrise = CurrentVal ($name, 'sunriseTomorrowTs', 0);
+             my $sunrise   = $t < $tdaysrise ? $tdaysrise : $tmorsrise; 
+
+             if ($confc && $tdaysset && $sunrise) { 
+                 my $dt;
+                 $confc -= $confcss;
+                 
+                 if ($t < $tdaysset) {                                                               # Auswertung noch vor Sonnenuntergang
+                     $dt = timestringsFromOffset ($tdaysset, 0);
+                 }
+                 else {
+                     $dt = timestringsFromOffset ($t, 0);
+                 }
+                 
+                 my $ssetmts   = int ($dt->{minute}) + 1;                                            # vergangene Minuten in der Stunde des Sunset bzw. in der aktuellen Stunde            
+                 my $cfcsseth  = ($confcss / 60) * (60 - $ssetmts);                                  # anteiler Verbrauch (Schätzung) Sunset bis volle Stunde bzw. aktuelle Zeit bis volle Stunde
+                 $confc       += $cfcsseth;
+                 
+                 $confc       -= $confcsr;
+                 my $dtrise    = timestringsFromOffset ($sunrise, 0);
+                 my $srisemts  = int ($dtrise->{minute}) + 1;                                        # vergangene Minuten in der Stunde des Sunrise     
+                 my $cfcsrish  = ($confcsr / 60) * $srisemts;                                        # anteiler Verbrauch (Schätzung) volle Stunde bis Sunrise
+                 $confc       += $cfcsrish;
+                 
+                 storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $confc).$hcsr{$kpi}{unit});
+             }
+             else {
+                 storeReading ($prpo.'_'.$kpi, $confc.$hcsr{$kpi}{unit});
+             }
           }
       }
   }
@@ -26022,7 +26149,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-ctrlSpecialReadings"></a>
        <li><b>ctrlSpecialReadings </b><br>
          Readings are created for the selected key figures and indicators with the
-         naming scheme 'special_&lt;indicator&gt;'. Selectable key figures / indicators are: <br><br>
+         naming scheme 'special_&lt;indicator&gt;'. The following list shows the selectable key figures and indicators: <br><br>
 
          <ul>
          <table>
@@ -26031,6 +26158,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>BatPowerOut_Sum</b>                  </td><td>the sum of the current battery discharge power of all defined battery devices                                        </td></tr>
             <tr><td> <b>BatWeightedTotalSOC</b>              </td><td>the resulting (weighted) SOC across all installed batteries in %                                                     </td></tr>
             <tr><td> <b>allStringsFullfilled</b>             </td><td>Fulfillment status of error-free generation of all strings                                                           </td></tr>
+            <tr><td> <b>conForecastComingNight</b>           </td><td>Consumption forecast from the coming sunset to the coming sunrise. If the sunset has already passed,                 </td></tr>
+            <tr><td>                                         </td><td>it is the consumption forecast from the current time (night) until the next sunrise.                                 </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b>       </td><td>Consumption forecast from current hour to the coming sunrise                                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>               </td><td>the current polling interval of the selected radiation data API in seconds                                           </td></tr>
             <tr><td> <b>currentRunMtsConsumer_XX</b>         </td><td>the running time (minutes) of the consumer "XX" since the last switch-on. (last running cycle)                       </td></tr>
@@ -26039,7 +26168,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>lastretrieval_time</b>               </td><td>the last retrieval time of the selected radiation data API                                                           </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>          </td><td>the timestamp of the last retrieval time of the selected radiation data API                                          </td></tr>         
             <tr><td> <b>remainingSurplsHrsMinPwrBat_XX</b>   </td><td>the remaining number of hours on the current day in which the PV surplus (Wh) is higher than the                     </td></tr>
-            <tr><td>                                         </td><td>calculated hourly integral of the minimum charging power <MinPwr> of battery XX.                                     </td></tr>
+            <tr><td>                                         </td><td>calculated hourly integral of the minimum charging power &lt;MinPwr&gt; of battery XX.                               </td></tr>
             <tr><td>                                         </td><td>The &lt;MinPwr&gt; is specified in the ctrlBatSocManagementXX->loadAbort attribute.                                  </td></tr>           
             <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>the remaining number of hours without charging recommendation for battery XX on the current day                      </td></tr>
             <tr><td> <b>response_message</b>                 </td><td>the last status message of the selected radiation data API                                                           </td></tr>
@@ -28661,7 +28790,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-ctrlSpecialReadings"></a>
        <li><b>ctrlSpecialReadings </b><br>
          Für die ausgewählten Kennzahlen und Indikatoren werden Readings mit dem
-         Namensschema 'special_&lt;Indikator&gt;' erstellt. Auswählbare Kennzahlen / Indikatoren sind: <br><br>
+         Namensschema 'special_&lt;Indikator&gt;' erstellt. Die nachfolgende Liste zeigt die auswählbaren Kennzahlen und Indikatoren: <br><br>
 
          <ul>
          <table>
@@ -28670,6 +28799,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>BatPowerOut_Sum</b>                  </td><td>die Summe der momentanen Batterieentladeleistung aller definierten Batterie Geräte                              </td></tr>
             <tr><td> <b>BatWeightedTotalSOC</b>              </td><td>der resultierende (gewichtete) SOC über alle installierten Batterien in %                                       </td></tr>
             <tr><td> <b>allStringsFullfilled</b>             </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
+            <tr><td> <b>conForecastComingNight</b>           </td><td>Verbrauchsprognose vom kommenden Sonnenuntergang bis zum kommenden Sonnenaufgang. Ist der Sonnenuntergang       </td></tr>
+            <tr><td>                                         </td><td>bereits vergangen, ist es die Verbrauchsprognose ab aktueller Zeit (Nacht) bis zum kommenden Sonnenaufgang.     </td></tr>
             <tr><td> <b>conForecastTillNextSunrise</b>       </td><td>Verbrauchsprognose von aktueller Stunde bis zum kommenden Sonnenaufgang                                         </td></tr>
             <tr><td> <b>currentAPIinterval</b>               </td><td>das aktuelle Abrufintervall der gewählten Strahlungsdaten-API in Sekunden                                       </td></tr>
             <tr><td> <b>currentRunMtsConsumer_XX</b>         </td><td>die Laufzeit (Minuten) des Verbrauchers "XX" seit dem letzten Einschalten. (letzter Laufzyklus)                 </td></tr>
@@ -28678,7 +28809,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>lastretrieval_time</b>               </td><td>der letzte Abrufzeitpunkt der gewählten Strahlungsdaten-API                                                     </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>          </td><td>der Timestamp der letzen Abrufzeitpunkt der gewählten Strahlungsdaten-API                                       </td></tr>
             <tr><td> <b>remainingSurplsHrsMinPwrBat_XX</b>   </td><td>die verbleibende Anzahl Stunden am aktuellen Tag, in denen der PV-Überschuß (Wh) höher ist als das              </td></tr>
-            <tr><td>                                         </td><td>kalkulierte Stundenintegral der minimalen Ladeleistung <MinPwr> der Batterie XX.                                </td></tr>
+            <tr><td>                                         </td><td>kalkulierte Stundenintegral der minimalen Ladeleistung &lt;MinPwr&gt; der Batterie XX.                          </td></tr>
             <tr><td>                                         </td><td>Die Angabe &lt;MinPwr&gt; erfolgt im Attribut ctrlBatSocManagementXX->loadAbort.                                </td></tr>
             <tr><td> <b>remainingHrsWoChargeRcmdBat_XX</b>   </td><td>die verbleibende Anzahl Stunden ohne Ladeempfehlung für Batterie XX am aktuellen Tag                            </td></tr>
             <tr><td> <b>response_message</b>                 </td><td>die letzte Statusmeldung der gewählten Strahlungsdaten-API                                                      </td></tr>
