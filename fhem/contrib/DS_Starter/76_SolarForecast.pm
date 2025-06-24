@@ -17498,7 +17498,7 @@ sub __batteryOnBeam {
           
           if ($image) {
               $image  = '<div class="batcontainer">'.$image;
-              $image .= '<div class="batsoc">'.int ($soc);
+              $image .= '<div class="batsoc">'.sprintf ("%.0f", $soc);
               $image .= '</div></div>';
           }
 
