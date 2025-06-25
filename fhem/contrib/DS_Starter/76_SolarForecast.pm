@@ -160,7 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.52.19"=> "24.06.2025  new battery style (batcontainer) ",
+  "1.53.0" => "25.06.2025  new battery style (batcontainer), new key setupBatteryDevXX->label, new reading Battery_ChargeUnrestricted_XX ".
+                           "attribute graphicShowDiff replaced by graphicControl->showDiff ".
+                           "check local coordinates are set in global device and fill message system if failure ",
   "1.52.18"=> "23.06.2025  ctrlSpecialReadings: new option conForecastComingNight, fix last hour of remainingSurplsHrsMinPwrBat_ ".
                            "some more minor fixes ",
   "1.52.17"=> "22.06.2025  remainingSurplsHrsMinPwrBat_: calculate with two decimal places ",
@@ -345,67 +347,6 @@ my %vNotesIntern = (
   "1.39.3" => "09.12.2024  fix mode in consumerXX-Reading if mode is device/reading combination, show Mode in ".
                            "consumer legend mouse-over ",
   "1.39.2" => "08.12.2024  rollout delHashRefDeep, extended consumer key 'mode' by device/reading combination ",
-  "1.39.1" => "07.12.2024  new control releaseCentralTask, new delHashRefDeep in some cases ".
-                           "possible asynchron mode for setupBatteryDev ",
-  "1.39.0" => "04.12.2024  possible asynchron mode for setupMeterDev, setupInverterDevXX ".
-                           "include FHEM::SynoModules::ErrCodes ",
-  "1.38.0" => "30.11.2024  optimize data handling, rename getter solApiData to radiationApiData, ".
-                           "set setupStringAzimuth, setupStringDeclination is checked due to dependencies to OpenMeteo ".
-                           "attr setupRadiationAPI and setupWeatherDev1 can be set largely independently of each other ".
-                           "rename sub SolCastAPIVal to RadiationAPIVal ",
-  "1.37.9" => "29.11.2024  activate StatusAPI-Hash, Separation of radiation API-data, API-state data, weather-API data ",
-  "1.37.8" => "28.11.2024  edit commref, func searchCacheFiles for renaming Cache files when device is renamed ".
-                           "_saveEnergyConsumption: extended for Debug collectData, preparation of weatherApiData ".
-                           "new func WeatherAPIVal, StatusAPIVal ",
-  "1.37.7" => "26.11.2024  Attr flowGraphicControl: key shift changed to shiftx, new key shifty ".
-                           "change: 'trackFlex' && \$wcc >= 70 to \$wcc >= 80 ".
-                           "obsolete Attr deleted: flowGraphicCss, flowGraphicSize, flowGraphicAnimate, flowGraphicConsumerDistance, ".
-                           "flowGraphicShowConsumer, flowGraphicShowConsumerDummy, flowGraphicShowConsumerPower, ".
-                           "flowGraphicShowConsumerRemainTime, flowGraphicShift, affect70percentRule, ctrlAutoRefresh, ctrlAutoRefreshFW ",
-  "1.37.6" => "01.11.2024  minor code change, Attr setupBatteryDev: the key 'cap' is mandatory now ",
-  "1.37.5" => "31.10.2024  attr setupInverterDevXX: new key 'limit', the key 'capacity' is now mandatory ".
-                           "Attr affect70percentRule, ctrlAutoRefresh, ctrlAutoRefreshFW deleted ",
-  "1.37.4" => "29.10.2024  both attr graphicStartHtml, graphicEndHtml removed, fix flowGraphic when device name contains '.' ",
-  "1.37.3" => "25.10.2024  _flowGraphic: grid, dummy and battery displacement by kask ".
-                           "Attr flowGraphicControl: new key h2consumerdist, animate=1 is default now ",
-  "1.37.2" => "24.10.2024  _flowGraphic: show Producer Row only if more than one Producer is defined ",
-  "1.37.1" => "23.10.2024  state: 'The setup routine is still incomplete' if setup is incomplete ".
-                           "change: 'trackFlex' && \$wcc >= 80 to \$wcc >= 70, implement Rename function ".
-                           "_flowGraphic: eliminate numbers in device name - Forum: https://forum.fhem.de/index.php?msg=1323229 ",
-  "1.37.0" => "22.10.2024  attr setupInverterDevXX up to 03 inverters with accorded strings, setupInverterDevXX: keys strings and feed ".
-                           "_flowGraphic: controlhash for producer, new attr flowGraphicControl and replace the attributes: ".
-                           "flowGraphicAnimate flowGraphicConsumerDistance flowGraphicShowConsumer flowGraphicShowConsumerDummy ".
-                           "flowGraphicShowConsumerPower flowGraphicShowConsumerRemainTime flowGraphicShift flowGraphicCss ".
-                           "flowGraphicControl: new keys strokecolina, strokecolsig, strokecolstd, strokewidth ",
-  "1.36.1" => "14.10.2024  _flowGraphic: consumer distance modified by kask, Coloring of icons corrected when creating 0 ",
-  "1.36.0" => "13.10.2024  new Getter valInverter, valStrings and valProducer, preparation for multiple inverters ".
-                           "rename setupInverterDev to setupInverterDev01, new attr affectConsForecastLastDays ".
-                           "Model DWD: dayAfterTomorrowPVforecast now available ".
-                           "delete etotal from HistoryVal, _flowGraphic: move PV Icon up to the producers row ".
-                           "change sequence of _createSummaries in centraltask - Forum: https://forum.fhem.de/index.php?msg=1322425 ",
-  "1.35.0" => "09.10.2024  _flowGraphic: replace inverter icon by FHEM SVG-Icon (sun/moon), sun or icon of moon phases according ".
-                           "day/night new optional key 'icon' in attr setupInverterDev, resize all flowgraphic icons to a standard ".
-                           "scaling, __switchConsumer: run ___setConsumerSwitchingState before switch subs ".
-                           "no Readings pvCorrectionFactor_XX_autocalc are written anymore ".
-                           "__switchConsumer: change Debug info and process, ___doPlanning: fix Log Output and use replanning or planning ",
-  "1.34.1" => "04.10.2024  _flowGraphic: replace house by FHEM SVG-Icon ",
-  "1.34.0" => "03.10.2024  implement ___areaFactorTrack for calculation of direct area factor and share of direct radiation ".
-                           "note in Reading pvCorrectionFactor_XX if AI prediction was used in relevant hour ".
-                           "AI usage depending either of available number of rules or difference to api forecast ".
-                           "minor fix in ___readCandQ, new experimental attribute ctrlAreaFactorUsage ".
-                           "optional icon in attr setupOtherProducerXX, integrate Producer to _flowGraphic (kask) ".
-                           "don't show Consumer or Producer if it isn't defined any kind of it ".
-                           "Optimization of space in the flow chart above generators and below consumers ".
-                           "_beamGraphic: implement barcount to Limit the number of bars in level 2 if the number of bars in ".
-                           "level 1 is less than graphicHourCount (fall/winter) ",
-  "1.33.1" => "27.09.2024  bugfix of 1.33.0, add aiRulesNumber to pvCircular, limits of AI trained datasets for ".
-                           "AI use (aiAccTRNMin, aiSpreadTRNMin)",
-  "1.33.0" => "26.09.2024  substitute area factor hash by ___areaFactorFix function ",
-  "1.32.0" => "02.09.2024  new attr setupOtherProducerXX, report calculation and storage of negative consumption values ".
-                           "Forum: https://forum.fhem.de/index.php?msg=1319083 ".
-                           "bugfix in _calcConsumptionForecast, new ctrlDebug consumption_long ",
-  "1.31.0" => "20.08.2024  rename attributes ctrlWeatherDevX to setupWeatherDevX ",
-  "1.30.0" => "18.08.2024  new attribute flowGraphicShift, Forum:https://forum.fhem.de/index.php?msg=1318597 ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -628,7 +569,7 @@ my @aconfigs = qw( aiControl
                    disable
                    graphicHeaderOwnspec graphicHeaderOwnspecValForm
                    graphicHistoryHour
-                   graphicSelect graphicShowDiff graphicShowNight graphicShowWeather
+                   graphicSelect graphicShowNight graphicShowWeather
                    graphicWeatherColor graphicWeatherColorNight
                    setupMeterDev setupInverterStrings setupRadiationAPI setupStringPeak setupStringAzimuth setupStringDeclination
                    setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
@@ -1694,14 +1635,11 @@ sub Initialize {
                                 "disable:1,0 ".
                                 "flowGraphicControl:textField-long ".
                                 "graphicControl:textField-long ".
-                                #"graphicBeamHeightLevel1 ".
-                                #"graphicBeamHeightLevel2 ".
-                                #"graphicBeamHeightLevel3 ".
                                 "graphicHeaderOwnspec:textField-long ".
                                 "graphicHeaderOwnspecValForm:textField-long ".
                                 "graphicHistoryHour:slider,0,1,23 ".
                                 "graphicSelect:$gol ".
-                                "graphicShowDiff:no,top,bottom ".
+                                #"graphicShowDiff:no,top,bottom ".
                                 "graphicShowNight:1,0,01 ".
                                 "graphicShowWeather:1,0 ".
                                 "graphicWeatherColor:colorpicker,RGB ".
@@ -1730,10 +1668,10 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  # my $av = 'obsolete#-#use#attr#graphicControl#instead';
+  my $av = 'obsolete#-#use#attr#graphicControl#instead';
   # my $av1 = 'obsolete#-#will#be#deleted#soon';
   # my $av2 = 'obsolete#-#use#attr#graphicSelect#instead';
-  # $hash->{AttrList} .= " graphicLayoutType:$av graphicHeaderShow:$av2 ";
+  $hash->{AttrList} .= " graphicShowDiff:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -6024,15 +5962,15 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  #if ($cmd eq 'set' && $aName =~ /^graphicLayoutType$/) {      # 28.04.
-  #    my $msg  = "The attribute $aName is replaced by 'graphicControl'.";
-  #    if (!$init_done) {
-  #        Log3 ($name, 1, "$name - $msg");
-  #    }
-  #    else {
-  #        return $msg;
-  #    }
-  #}
+  if ($cmd eq 'set' && $aName =~ /^graphicShowDiff$/) {                            # 25.06.
+      my $msg  = "The attribute $aName is replaced by 'graphicControl'.";
+      if (!$init_done) {
+          Log3 ($name, 1, "$name - $msg");
+      }
+      else {
+          return $msg;
+      }
+  }
 
   #if ($cmd eq 'set' && $aName =~ /^graphicHeaderShow$/) {                          # 15.04.
   #    my $msg  = "The attribute $aName is replaced by 'graphicSelect'.";
@@ -6543,6 +6481,7 @@ sub _attrgraphicControl {                ## no critic "not used"
       hourStyle         => { comp => ':(0{1,2})',                                        act => 0 },
       layoutType        => { comp => '(single|double|diff)',                             act => 0 },
       scaleMode         => { comp => '(?:[1-3]:(?:log|lin))(?:,(?:[1-3]:(?:log|lin)))*', act => 0 },
+      showDiff          => { comp => '(no|top|bottom)',                                  act => 0 },
       spaceSize         => { comp => '\d+',                                              act => 0 },
   };
 
@@ -7368,6 +7307,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       charge    => { comp => '.*',                                           must => 0, act => 0 },
       icon      => { comp => '.*',                                           must => 0, act => 0 },
       show      => { comp => '(?:[0-3](?::(?:top|bottom))?)',                must => 0, act => 0 },
+      label     => { comp => '(none|below|beside)',                          must => 0, act => 0 },
       asynchron => { comp => '(0|1)',                                        must => 0, act => 0 },
   };
 
@@ -7422,6 +7362,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{batteries}{$bn}{bicon};
       delete $data{$name}{batteries}{$bn}{bshowingraph};
       delete $data{$name}{batteries}{$bn}{bposingraph};
+      delete $data{$name}{batteries}{$bn}{blabel};
       delete $data{$name}{batteries}{$bn}{bpinmax}; 
       delete $data{$name}{batteries}{$bn}{bpoutmax};
   }
@@ -7430,6 +7371,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       readingsDelete    ($hash, 'Current_PowerBatOut_'.$bn);
       readingsDelete    ($hash, 'Current_BatCharge_'.$bn);
       readingsDelete    ($hash, 'Battery_ChargeRecommended_'.$bn);
+      readingsDelete    ($hash, 'Battery_ChargeUnrestricted_'.$bn);
       readingsDelete    ($hash, 'Battery_ChargeRequest_'.$bn);
       readingsDelete    ($hash, 'Battery_OptimumTargetSoC_'.$bn);
       deleteReadingspec ($hash, "NextHour.._Bat_${bn}_SoCforecast");
@@ -8865,6 +8807,15 @@ sub centralTask {
           }
           CommandAttr (undef, "$name setupInverterDev$in $new");
       }
+  }
+  
+  my $gsd = AttrVal ($name, 'graphicShowDiff ', undef);                 # 25.06.
+  my $gco = AttrVal ($name, 'graphicControl', '');
+
+  if (defined $gsd) {
+      my $newval = $gco." showDiff=$gsd";
+      CommandAttr (undef, "$name graphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name graphicShowDiff");
   }
 
   ##########################################################################################################################
@@ -10994,7 +10945,8 @@ sub _transferBatteryValues {
       my $btotin  = ReadingsNum ($badev, $bin,      0) * $binuf;                                 # totale Batterieladung (Wh)
       my $soc     = ReadingsNum ($badev, $batchr,   0);
 
-      my $show    = $h->{show} // 0;                                                             # Batterie in Balkengrafik anzeigen
+      my $show    = $h->{show}  // 0;                                                            # Batterie in Balkengrafik anzeigen
+      my $label   = $h->{label} // 'none';                                                       # Batterie SoC-Beschriftung in Balkengrafik
       my $pos     = 'top';
 
       if ($show =~ /:/xs) {
@@ -11155,8 +11107,9 @@ sub _transferBatteryValues {
       $data{$name}{batteries}{$bn}{bcharge}      = $soc;                                                 # Batterie SoC (%)
       $data{$name}{batteries}{$bn}{basynchron}   = $h->{asynchron} // 0;                                 # asynchroner Modus = X
       $data{$name}{batteries}{$bn}{bicon}        = $h->{icon} if($h->{icon});                            # Batterie Icon
-      $data{$name}{batteries}{$bn}{bshowingraph} = $show;                                                # Batterie in Balkengrafik anzeigen
+      $data{$name}{batteries}{$bn}{bshowingraph} = $show;                                                # Batterie in Balkengrafik anzeigen    
       $data{$name}{batteries}{$bn}{bposingraph}  = $pos;                                                 # Anzeigeposition in Balkengrafik
+      $data{$name}{batteries}{$bn}{blabel}       = $label;                                               # Batterie SoC-Beschriftung in Balkengrafik
       $data{$name}{batteries}{$bn}{bchargewh}    = BatteryVal ($name, $bn, 'binstcap', 0) * $soc / 100;  # Batterie SoC (Wh)
 
       $num++;
@@ -11660,8 +11613,9 @@ sub _batChargeMgmt {
               }
           }
           else {
-              storeReading ('Battery_ChargeRecommended_'.$bn,       $crel);                      # Reading nur für aktuelle Stunde
-              storeReading ('Battery_ChargeAbort_'.$bn,       $labortCond) if ($loadAbort);      # Ladeabbruchbedingung
+              storeReading ('Battery_ChargeRecommended_'.$bn,  $crel); 
+              storeReading ('Battery_ChargeUnrestricted_'.$bn, $crel);                
+              storeReading ('Battery_ChargeAbort_'.$bn,  $labortCond) if ($loadAbort);           # Ladeabbruchbedingung
           }
 
           $whneed = $batinstcap - $socwh;
@@ -14791,6 +14745,15 @@ return;
 #  0|DE|Mitteilung ....
 #  0|EN|Message...
 #  $data{$name}{preparedmessages}{999500}{TS}: Timestamp Stand prepared Messages
+#
+# if (<Bedingung>) {
+#    $midx++;
+#    $data{$name}{preparedmessages}{$midx}{SV}  = 1;
+#    $data{$name}{preparedmessages}{$midx}{DE}  = 'Mitteilung deutsch <br>';
+#    $data{$name}{preparedmessages}{$midx}{DE} .= 'weiter Mittelung deusch';
+#    $data{$name}{preparedmessages}{$midx}{EN}  = 'message english <br>';
+#    $data{$name}{preparedmessages}{$midx}{EN} .= 'continue message english';
+# }
 ###################################################################################
 sub _readSystemMessages {
   my $paref = shift;
@@ -14799,15 +14762,25 @@ sub _readSystemMessages {
   delete $data{$name}{preparedmessages};
 
   my $midx = 0;
+  
+  my ($cset, $lat, $lon, $alt) = locCoordinates();
+  my $noloc = '';
+  my @nlc; 
+  
+  push @nlc, 'altitude'  if(!$alt);
+  push @nlc, 'latitude'  if(!$lat);
+  push @nlc, 'longitude' if(!$lon);
+  
+  $noloc = join ',', @nlc if(@nlc);
 
-  #if (!ReadingsVal ($name, '.migrated', 0)) {
-  #    $midx++;
-  #    $data{$name}{preparedmessages}{$midx}{SV}  = 1;
-  #    $data{$name}{preparedmessages}{$midx}{DE}  = 'Die gespeicherten PV Daten können mit "get ... x_migrate" in ein neues Format umgesetzt werden welches den Median Ansatz bei der PV Prognose aktiviert und nutzt.';
-  #    $data{$name}{preparedmessages}{$midx}{DE} .= '<br>Mit einem späteren Update des Moduls erfolgt diese Umstellung automatisch.';
-  #    $data{$name}{preparedmessages}{$midx}{EN}  = 'The stored PV data can be converted with “get ... x_migrate” into a new format which activates and uses the median approach in the PV forecast.';
-  #    $data{$name}{preparedmessages}{$midx}{EN} .= '<br>With a later update of the module, this changeover will take place automatically.';
-  #}
+  if ($noloc) {
+      $midx++;
+      $data{$name}{preparedmessages}{$midx}{SV}  = 3;
+      $data{$name}{preparedmessages}{$midx}{DE}  = "<span style='color: red;'><b>ACHTUNG:</b></span> Im global Device sind diese wichtigen Parameter nicht vorhanden: $noloc <br>";
+      $data{$name}{preparedmessages}{$midx}{DE} .= 'Bitte diese Attribute unbedingt im global Device setzen!';
+      $data{$name}{preparedmessages}{$midx}{EN}  = "<span style='color: red;'><b>CAUTION:</b></span> These important parameters are not available in the global device: $noloc <br>";
+      $data{$name}{preparedmessages}{$midx}{EN} .= 'Please be sure to set these attributes in the global device!';
+  }
 
   $data{$name}{preparedmessages}{999500}{TS} = time;
 
@@ -14909,11 +14882,11 @@ sub entryGraphic {
       beam5cont      => AttrVal    ($name, 'graphicBeam5Content',               ''),
       beam6cont      => AttrVal    ($name, 'graphicBeam6Content',               ''),
       height         => AttrNum    ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL),
-      show_diff      => AttrVal    ($name, 'graphicShowDiff',                 'no'),                # zusätzliche Anzeige $di{} in allen Typen
       weather        => AttrNum    ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
       colorw         => AttrVal    ($name, 'graphicWeatherColor',       WTHCOLDDEF),                # Wetter Icon Farbe Tag
       colorwn        => AttrVal    ($name, 'graphicWeatherColorNight',  WTHCOLNDEF),                # Wetter Icon Farbe Nacht
       wlalias        => AttrVal    ($name, 'alias',                          $name),
+      show_diff      => CurrentVal ($name, 'showDiff',                        'no'),                # zusätzliche Anzeige $di{} in allen Typen
       lotype         => CurrentVal ($name, 'layoutType',                  'double'),
       hourstyle      => CurrentVal ($name, 'hourStyle',                         ''),
       hdrDetail      => CurrentVal ($name, 'headerDetail',                   'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
@@ -14947,13 +14920,10 @@ sub entryGraphic {
   $ret .= "<span>$dlink </span><br>"  if(CurrentVal ($name, 'showLink', 0));
   $ret .= '<style>';
   $ret .= 'TD.solarfc {text-align: center; padding-left:5px; padding-right:5px; margin:0px;}';
-  
-  $ret .= '.batcontainer {position: relative;}';         # Batterie und Beschriftung untereinander
-  $ret .= '.batsoc {position: relative;}';               # Batterie und Beschriftung untereinander
-  
-  #$ret .= '.batcontainer {position: relative; left: 20%;}';                                                      # Batterie und Beschriftung nebeneiander
-  #$ret .= '.batsoc {position: absolute; top: 50%; left: 5%; transform: translate(-50%, -50%) rotate(-90deg);}';  # Batterie und Beschriftung nebeneiander     # Bsp: z-index: '.batsoc { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-90deg); color:#000; z-index: 2; }';
-  
+  $ret .= '.batcontainer_below {position: relative;}';                                                                  # Batterie mit Beschriftung untereinander
+  $ret .= '.batsoc_below {position: relative;}';                                                                        # Batterie mit Beschriftung untereinander
+  $ret .= '.batcontainer_beside {position: relative; left: 20%;}';                                                      # Batterie mit Beschriftung nebeneiander
+  $ret .= '.batsoc_beside {position: absolute; top: 50%; left: 5%; transform: translate(-50%, -50%) rotate(-90deg);}';  # Batterie mit Beschriftung nebeneiander     # Bsp: z-index: '.batsoc { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-90deg); color:#000; z-index: 2; }';
   $ret .= '</style>';
   $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
   $ret .= "<tr><td class='solarfc'>";
@@ -17469,6 +17439,7 @@ sub __batteryOnBeam {
           my $balias    = BatteryVal ($name, $bn, 'balias', $bname);
           my $bpowerin  = BatteryVal ($name, $bn, 'bpowerin',    0);
           my $bpowerout = BatteryVal ($name, $bn, 'bpowerout',   0);
+          my $blabel    = BatteryVal ($name, $bn, 'blabel', 'none');
 
           my $day_str   = $hfcg->{$i}{day_str};
           my $time_str  = $hfcg->{$i}{time_str};
@@ -17501,9 +17472,16 @@ sub __batteryOnBeam {
           $title   .= defined $currsoc ? "\n".$htitles{socbacur}{$lang}.": ".$currsoc." %" : '';
           my $image = defined $hfcg->{$i}{'rcdchargebat'.$bn} ? FW_makeImage ($bicon) : '';
           
-          if ($image) {
-              $image  = '<div class="batcontainer">'.$image;
-              $image .= '<div class="batsoc">'.sprintf ("%.0f", $soc);
+          if ($image && $blabel ne 'none') {              
+              if ($blabel eq 'below') {
+                  $image  = '<div class="batcontainer_below">'.$image;
+                  $image .= '<div class="batsoc_below">'.sprintf ("%.0f", $soc);
+              }
+              elsif ($blabel eq 'beside') {
+                  $image  = '<div class="batcontainer_beside">'.$image;
+                  $image .= '<div class="batsoc_beside">'.sprintf ("%.0f", $soc);                  
+              }
+              
               $image .= '</div></div>';
           }
 
@@ -19141,15 +19119,6 @@ sub fillupMessageSystem {
 
   ## Messages füllen
   ########################################################################
-  # Integration File Messages
-  for my $mfi (sort keys %{$data{$name}{filemessages}}) {
-      next if($mfi >= IDXLIMIT);
-      $midx++;
-      $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
-      $data{$name}{messages}{$midx}{DE} = $data{$name}{filemessages}{$mfi}{DE};
-      $data{$name}{messages}{$midx}{EN} = $data{$name}{filemessages}{$mfi}{EN};
-  }
-
   # Integration prepared Messages
   for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
       next if($smi >= IDXLIMIT);
@@ -19157,6 +19126,15 @@ sub fillupMessageSystem {
       $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
       $data{$name}{messages}{$midx}{DE} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{DE});
       $data{$name}{messages}{$midx}{EN} = encode ("utf8", $data{$name}{preparedmessages}{$smi}{EN});
+  }
+  
+  # Integration File Messages
+  for my $mfi (sort keys %{$data{$name}{filemessages}}) {
+      next if($mfi >= IDXLIMIT);
+      $midx++;
+      $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
+      $data{$name}{messages}{$midx}{DE} = $data{$name}{filemessages}{$mfi}{DE};
+      $data{$name}{messages}{$midx}{EN} = $data{$name}{filemessages}{$mfi}{EN};
   }
 
   $data{$name}{messages}{999000}{TS}     = $data{$name}{filemessages}{999000}{TS}     // 0;
@@ -26043,7 +26021,7 @@ to ensure that the system configuration is correct.
          The <b>Battery_OptimumTargetSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
          The <b>Battery_ChargeRequest_XX</b> reading is set to '1' if the current SoC has fallen below the minimum SoC. <br>
          In this case, the battery should be forcibly charged, possibly with mains power. <br>
-         The reading <b>Battery_ChargeRecommended_XX</b> indicates whether the battery should be charged at full power (1) without restriction or not 
+         The reading <b>Battery_ChargeUnrestricted_XX</b> indicates whether the battery should be charged at full power (1) without restriction or not 
          or only with limited power if a feed-in limit is exceeded (0). <br>         
          The readings can be used to control the SoC (State of Charge) and to control the charging power used for the
          battery. <br>
@@ -26459,6 +26437,11 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td><b>&lt;Level&gt;:lin</b> - linear scaling (default)                                                                                       </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:log</b> - logarithmic scaling                                                                                            </td></tr>
 			<tr><td>                            </td><td>                                                                                                                                          </td></tr>
+            <tr><td> <b>showDiff</b>            </td><td>Additional numerical display of the difference ‘&lt;primary bar content&gt; - &lt;secondary bar content&gt;’.                             </td></tr>
+            <tr><td>                            </td><td><b>no</b>     - no difference display (default)                                                                                           </td></tr>
+            <tr><td>                            </td><td><b>top</b>    - display above the bars                                                                                                    </td></tr>
+            <tr><td>                            </td><td><b>bottom</b> - display below the bars                                                                                                    </td></tr>
+			<tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>spaceSize</b>           </td><td>Defines how much space in px is kept free above or below the bar (for display type layoutType=diff) to display the                        </td></tr>
             <tr><td>                            </td><td>values. For styles with large fonts, the default value may be too small or a bar may slide over the baseline.                             </td></tr>
             <tr><td>                            </td><td>In these cases, please increase the value.                                                                                                </td></tr>
@@ -26621,14 +26604,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicShowDiff"></a>
-       <li><b>graphicShowDiff [no | top | bottom] </b><br>
-         Additional display of the difference “&lt;primary bar content&gt; - &lt;secondary bar content&gt;” in the header or
-         footer of the bar chart. <br>
-         (default: no)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-graphicShowNight"></a>
        <li><b>graphicShowNight </b><br>
          Display or hide the night hours in the bar chart.
@@ -26742,10 +26717,10 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
-       <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt; cap=&lt;Option&gt; <br>
+       <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt; cap=&lt;Option&gt;                 <br>
                                 [pinmax=&lt;Integer&gt] [poutmax=&lt;Integer&gt] [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
-                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]         <br>
-                                [[icon=&lt;recomm&gt;@&lt;Color&gt;]:[&lt;charge&gt;@&lt;Color&gt;]:[&lt;discharge&gt;@&lt;Color&gt;]:[&lt;omit&gt;@&lt;Color&gt;]]  </b> <br><br>
+                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                                                               <br>
+                                [label=&lt;Option&gt] [[icon=&lt;recomm&gt;@&lt;Color&gt;]:[&lt;charge&gt;@&lt;Color&gt;]:[&lt;discharge&gt;@&lt;Color&gt;]:[&lt;omit&gt;@&lt;Color&gt;]]  </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data. <br>
        The module assumes that the numerical value of the readings is always positive.
@@ -26787,6 +26762,12 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td><b>&lt;discharge&gt;</b> - Icon is used when the battery is currently being discharged                        </td></tr>
            <tr><td>                  </td><td><b>&lt;omit&gt;</b> - Icon if charging is only recommended if the feed-in limit is exceeded                   </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
+           <tr><td> <b>label</b>     </td><td>If the battery is displayed in the bar graph with the 'show' key, the symbol can be labeled                   </td></tr>
+           <tr><td>                  </td><td>with the current SOC value (%).                                                                               </td></tr>
+           <tr><td>                  </td><td><b>none</b>   - no label (default)                                                                            </td></tr>
+           <tr><td>                  </td><td><b>below</b>  - Label below the battery icon                                                                  </td></tr>
+           <tr><td>                  </td><td><b>beside</b> - Label next to the battery icon                                                                </td></tr>
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>show</b>      </td><td>Control of the battery display in the bar graph (optional)                                                    </td></tr>
            <tr><td>                  </td><td><b>0</b> - no display of the device (default)                                                                 </td></tr>
            <tr><td>                  </td><td><b>1..3[:top|bottom]</b> - display of the device in level 1,2 or 3 (above|below) the bar                      </td></tr>
@@ -26821,6 +26802,7 @@ to ensure that the system configuration is correct.
                                              charge=SOC_value cap=InstalledCapacity_Wh:Wh 
                                              asynchron=0
                                              show=1
+                                             label=below
                                              icon=@dyn:::@dyn
        </ul>
        <br>
@@ -28684,7 +28666,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Das Reading <b>Battery_ChargeRequest_XX</b> wird auf '1' gesetzt, wenn der aktuelle SoC unter den Mindest-SoC gefallen
          ist. <br>
          In diesem Fall sollte die Batterie, unter Umständen mit Netzstrom, zwangsgeladen werden. <br>
-         Das Reading <b>Battery_ChargeRecommended_XX</b> gibt an, ob die Batterie uneingeschränkt mit voller Leistung (1), oder nicht 
+         Das Reading <b>Battery_ChargeUnrestricted_XX</b> gibt an, ob die Batterie uneingeschränkt mit voller Leistung (1), oder nicht 
          bzw. nur mit eingeschränkter Leistung bei Überschreitung eines Einspeiselimits geladen werden sollte (0). <br>         
          Die Readings können zur Steuerung des SoC (State of Charge) sowie zur Steuerung des verwendeten Ladeleistung
          der Batterie verwendet werden. <br>
@@ -29100,6 +29082,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td><b>&lt;Ebene&gt;:lin</b> - lineare Skalierung (default)                                                                         </td></tr>
             <tr><td>                            </td><td><b>&lt;Ebene&gt;:log</b> - logarithmische Skalierung                                                                            </td></tr>
 			<tr><td>                            </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>showDiff</b>            </td><td>Zusätzliche numerische Anzeige der Differenz '&lt;primärer Balkeninhalt&gt; - &lt;sekundärer Balkeninhalt&gt;'.                 </td></tr>
+            <tr><td>                            </td><td><b>no</b>     - keine Differenzanzeige (default)                                                                                </td></tr>
+            <tr><td>                            </td><td><b>top</b>    - Anzeige über den Balken                                                                                         </td></tr>
+            <tr><td>                            </td><td><b>bottom</b> - Anzeige unter den Balken                                                                                        </td></tr>
+			<tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>spaceSize</b>           </td><td>Legt fest, wieviel Platz in px über oder unter den Balken (bei Anzeigetyp layoutType=diff) zur Anzeige der                      </td></tr>
             <tr><td>                            </td><td>Werte freigehalten wird. Bei Styles mit großen Fonts kann der default-Wert zu klein sein bzw. rutscht ein                       </td></tr>
             <tr><td>                            </td><td>Balken u.U. über die Grundlinie. In diesen Fällen bitte den Wert erhöhen.                                                       </td></tr>
@@ -29110,7 +29097,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log
+         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=top
        </ul>
 
        </li>
@@ -29260,14 +29247,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicShowDiff"></a>
-       <li><b>graphicShowDiff [no | top | bottom] </b><br>
-         Zusätzliche Anzeige der Differenz "&lt;primärer Balkeninhalt&gt; - &lt;sekundärer Balkeninhalt&gt;" im Kopf- oder
-         Fußbereich der Balkengrafik. <br>
-         (default: no)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-graphicShowNight"></a>
        <li><b>graphicShowNight </b><br>
          Anzeigen oder Verbergen der Nachtstunden in der Balkengrafik.
@@ -29381,10 +29360,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
-       <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; cap=&lt;Option&gt;  <br>
+       <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; cap=&lt;Option&gt;                                                <br>
                                 [pinmax=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt] [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
-                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]     <br>
-                                [[icon=&lt;empfohlen&gt;@&lt;Farbe&gt;]:[&lt;aufladen&gt;@&lt;Farbe&gt;]:[&lt;entladen&gt;@&lt;Farbe&gt;]:[icon=&lt;unterlassen&gt;@&lt;Farbe&gt;]]  </b> <br><br>
+                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                                                                                                     <br>
+                                [label=&lt;Option&gt] [[icon=&lt;empfohlen&gt;@&lt;Farbe&gt;]:[&lt;aufladen&gt;@&lt;Farbe&gt;]:[&lt;entladen&gt;@&lt;Farbe&gt;]:[icon=&lt;unterlassen&gt;@&lt;Farbe&gt;]]  </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest. <br>
        Das Modul geht davon aus, dass der numerische Wert der Readings immer positiv ist.
@@ -29425,6 +29404,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - Icon wird verwendet wenn die Batterie aktuell entladen wird                    </td></tr>
            <tr><td>                  </td><td><b>&lt;unterlassen&gt;</b> - Icon wenn Aufladen nur bei Überschreitung des Einspeiselimits empfohlen     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
+           <tr><td> <b>label</b>     </td><td>Wird die Batterie in der Balkengrafik mit dem Schüssel 'show' angezeigt, kann das Symbol mit dem         </td></tr>
+           <tr><td>                  </td><td>aktuellen SOC-Wert (%) beschriftet werden.                                                               </td></tr>
+           <tr><td>                  </td><td><b>none</b>   - keine Beschriftung (default)                                                             </td></tr>
+           <tr><td>                  </td><td><b>below</b>  - Beschriftung unterhalb des Batteriesymbols                                               </td></tr>
+           <tr><td>                  </td><td><b>beside</b> - Beschriftung neben dem Batteriesymbol                                                    </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>show</b>      </td><td>Steuerung der Anzeige der Batterie in der Balkengrafik (optional)                                        </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Anzeige des Gerätes (default)                                                           </td></tr>
            <tr><td>                  </td><td><b>1..3[:top|bottom]</b> - Anzeige des Gerätes in der Ebene 1,2 oder 3 (über|unter) den Balken           </td></tr>
@@ -29459,6 +29444,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
                                              charge=SOC_value cap=InstalledCapacity_Wh:Wh 
                                              asynchron=0
                                              show=1
+                                             label=below
                                              icon=@dyn:::@dyn
        </ul>
        <br>
