@@ -14947,8 +14947,13 @@ sub entryGraphic {
   $ret .= "<span>$dlink </span><br>"  if(CurrentVal ($name, 'showLink', 0));
   $ret .= '<style>';
   $ret .= 'TD.solarfc {text-align: center; padding-left:5px; padding-right:5px; margin:0px;}';
-  $ret .= '.batcontainer {position: relative; left: 20%;}';
-  $ret .= '.batsoc {position: absolute; top: 50%; left: 5%; transform: translate(-50%, -50%) rotate(-90deg);}';      # Bsp: z-index: '.batsoc { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-90deg); color:#000; z-index: 2; }';
+  
+  $ret .= '.batcontainer {position: relative;}';         # Batterie und Beschriftung nebeneiander
+  $ret .= '.batsoc {position: relative;}';               # Batterie und Beschriftung nebeneiander
+  
+  #$ret .= '.batcontainer {position: relative; left: 20%;}';                                                      # Batterie und Beschriftung untereinander
+  #$ret .= '.batsoc {position: absolute; top: 50%; left: 5%; transform: translate(-50%, -50%) rotate(-90deg);}';  # Batterie und Beschriftung untereinander     # Bsp: z-index: '.batsoc { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-90deg); color:#000; z-index: 2; }';
+  
   $ret .= '</style>';
   $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
   $ret .= "<tr><td class='solarfc'>";
