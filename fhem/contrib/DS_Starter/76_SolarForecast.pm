@@ -162,7 +162,8 @@ BEGIN {
 my %vNotesIntern = (
   "1.53.0" => "25.06.2025  new battery style (batcontainer), new key setupBatteryDevXX->label, new reading Battery_ChargeUnrestricted_XX ".
                            "attribute graphicShowDiff replaced by graphicControl->showDiff ".
-                           "check local coordinates are set in global device and fill message system if failure ",
+                           "check local coordinates are set in global device and fill message system if failure ".
+						   "consumer Attr key noshow new possible value '9' ",
   "1.52.18"=> "23.06.2025  ctrlSpecialReadings: new option conForecastComingNight, fix last hour of remainingSurplsHrsMinPwrBat_ ".
                            "some more minor fixes ",
   "1.52.17"=> "22.06.2025  remainingSurplsHrsMinPwrBat_: calculate with two decimal places ",
@@ -14777,7 +14778,7 @@ sub _readSystemMessages {
       $midx++;
       $data{$name}{preparedmessages}{$midx}{SV}  = 3;
       $data{$name}{preparedmessages}{$midx}{DE}  = "<span style='color: red;'><b>ACHTUNG:</b></span> Im global Device sind diese wichtigen Parameter nicht vorhanden: $noloc <br>";
-      $data{$name}{preparedmessages}{$midx}{DE} .= 'Bitte diese Attribute unbedingt im global Device setzen!';
+      $data{$name}{preparedmessages}{$midx}{DE} .= 'Bitte unbedingt diese Attribute im global Device setzen!';
       $data{$name}{preparedmessages}{$midx}{EN}  = "<span style='color: red;'><b>CAUTION:</b></span> These important parameters are not available in the global device: $noloc <br>";
       $data{$name}{preparedmessages}{$midx}{EN} .= 'Please be sure to set these attributes in the global device!';
   }
@@ -16306,7 +16307,9 @@ sub _graphicConsumerLegend {
   my $tro    = 0;
 
   for my $c (@consumers) {
-      next if(isConsumerNoshow ($hash, $c) =~ /^[12]$/xs);                                          # Consumer ausblenden
+	  my $noshow = isConsumerNoshow ($hash, $c);
+	  
+      next if($noshow =~ /[12]/xs);                                                                 # Consumer ausblenden
 
       my $caicon                  = $paref->{caicon};                                               # Consumer AdviceIcon
       my ($err, $cname, $dswname) = getCDnames  ($hash, $c);                                        # Consumer und Switch Device Name
@@ -16402,27 +16405,29 @@ sub _graphicConsumerLegend {
           $auicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
       }
 
-      if (isConsumerPhysOff($hash, $c)) {                                                       # Schaltzustand des Consumerdevices off
-          if ($cmdon) {
-              $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
-              $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>";
-          }
-          else {
-              $staticon = FW_makeImage('ios_off_fill@grey', $htitles{ians}{$lang});
-              $swicon   = "<a title='$htitles{ians}{$lang}'> $staticon</a>";
-          }
-      }
+      if ($noshow !~ /[9]/xs) {                                                                     # mit $noshow '9' die Schalter im Paneel ausblenden 
+		  if (isConsumerPhysOff($hash, $c)) {                                                       # Schaltzustand des Consumerdevices off
+			  if ($cmdon) {
+				  $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
+				  $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>";
+			  }
+			  else {
+				  $staticon = FW_makeImage('ios_off_fill@grey', $htitles{ians}{$lang});
+				  $swicon   = "<a title='$htitles{ians}{$lang}'> $staticon</a>";
+			  }
+		  }
 
-      if (isConsumerPhysOn($hash, $c)) {                                                        # Schaltzustand des Consumerdevices on
-          if($cmdoff) {
-              $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});
-              $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
-          }
-          else {
-              $staticon = FW_makeImage('ios_on_fill@grey', $htitles{iens}{$lang});
-              $swicon   = "<a title='$htitles{iens}{$lang}'> $staticon</a>";
-          }
-      }
+		  if (isConsumerPhysOn($hash, $c)) {                                                        # Schaltzustand des Consumerdevices on
+			  if($cmdoff) {
+				  $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});
+				  $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
+			  }
+			  else {
+				  $staticon = FW_makeImage('ios_on_fill@grey', $htitles{iens}{$lang});
+				  $swicon   = "<a title='$htitles{iens}{$lang}'> $staticon</a>";
+			  }
+		  }
+	  }
 
       if ($clstyle eq 'icon') {
           $cicon   = FW_makeImage($cicon);
@@ -17685,7 +17690,7 @@ sub _flowGraphic {
   my $cnsmr = {};                                                                         # Hashref Consumer current power
 
   for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {                             # definierte Verbraucher ermitteln
-      next if(isConsumerNoshow ($hash, $c) =~ /^[13]$/xs);                                # auszublendende Consumer nicht berücksichtigen
+      next if(isConsumerNoshow ($hash, $c) =~ /[13]/xs);                                  # auszublendende Consumer nicht berücksichtigen
       $cnsmr->{$c}{p}    = ReadingsNum ($name, "consumer${c}_currentPower", 0);
       $cnsmr->{$c}{ptyp} = 'consumer';
   }
@@ -22662,6 +22667,7 @@ return 0;
 #  1 - ausblenden
 #  2 - nur in Consumerlegende ausblenden
 #  3 - nur in Flowgrafik ausblenden
+#  9 - Schaltersysmbol im Consumerpanel ausblenden
 ################################################################
 sub isConsumerNoshow {
   my $hash = shift;
@@ -22680,7 +22686,7 @@ sub isConsumerNoshow {
       $noshow = ReadingsNum ($dev, $rdg, 0);
   }
 
-  if ($noshow !~ /^[0123]$/xs) {                                                     # nur Ergebnisse 0..3 zulassen
+  if ($noshow !~ /[01239]/xs) {                                                      # nur Ergebnisse 0..X zulassen
       $noshow = 0;
   }
 
@@ -25980,12 +25986,13 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>The consumer is only switched again when the corresponding blocking time has elapsed.                                                             </td></tr>
             <tr><td>                       </td><td><b>Note:</b> The 'locktime' switch is only effective in automatic mode.                                                                           </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
-            <tr><td> <b>noshow</b>         </td><td>Hide or show consumers in graphic (optional).                                                                                                     </td></tr>
+            <tr><td> <b>noshow</b>         </td><td>Hide or show consumers or certain elements (optional). The values can be combined (see example).                                                  </td></tr>
             <tr><td>                       </td><td><b>0</b> - the consumer is displayed (default)                                                                                                    </td></tr>
             <tr><td>                       </td><td><b>1</b> - the consumer is hidden                                                                                                                 </td></tr>
             <tr><td>                       </td><td><b>2</b> - the consumer is hidden in the consumer legend                                                                                          </td></tr>
             <tr><td>                       </td><td><b>3</b> - the consumer is hidden in the flow chart                                                                                               </td></tr>
-            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading in the consumer or (optionally) an alternative device.                                                          </td></tr>
+            <tr><td>                       </td><td><b>9</b> - the switching element of the consumer is hidden in the consumer legend                                                                 </td></tr>
+			<tr><td>                       </td><td><b>[Device:]Reading</b> - Reading in the consumer or (optionally) an alternative device.                                                          </td></tr>
             <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                      </td></tr>
             <tr><td>                       </td><td>The effect of the possible reading values 1, 2 and 3 is as described.                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
@@ -26009,7 +26016,7 @@ to ensure that the system configuration is correct.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@ed type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2                              <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                                           <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1 spignorecond=SolCast:Current_PV:{($VALUE)=split/\s/,$VALUE;$VALUE>10?1:0;}          <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                                            <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39                                                                                                            <br>
        </ul>
        </li>
        <br>
@@ -28624,12 +28631,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>Der Verbraucher wird erst wieder geschaltet wenn die entsprechende Sperrzeit abgelaufen ist.                                                       </td></tr>
             <tr><td>                       </td><td><b>Hinweis:</b> Der Schalter 'locktime' ist nur im Automatik-Modus wirksam.                                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>noshow</b>         </td><td>Verbraucher in Grafik ausblenden oder einblenden (optional).                                                                                       </td></tr>
+            <tr><td> <b>noshow</b>         </td><td>Verbraucher bzw. bestimmte Elemente ausblenden oder einblenden (optional). Die Werte können kombiniert werden (siehe Beispiel).                    </td></tr>
             <tr><td>                       </td><td><b>0</b> - der Verbraucher wird eingeblendet (default)                                                                                             </td></tr>
             <tr><td>                       </td><td><b>1</b> - der Verbraucher wird ausgeblendet                                                                                                       </td></tr>
             <tr><td>                       </td><td><b>2</b> - der Verbraucher wird in der Verbraucherlegende ausgeblendet                                                                             </td></tr>
             <tr><td>                       </td><td><b>3</b> - der Verbraucher wird in der Flußgrafik ausgeblendet                                                                                     </td></tr>
-            <tr><td>                       </td><td><b>[Device:]Reading</b> - Reading im Verbraucher oder (optional) einem alternativen Device.                                                        </td></tr>
+            <tr><td>                       </td><td><b>9</b> - das Schaltelement des Verbrauchers wird in der Verbraucherlegende ausgeblendet                                                          </td></tr>
+			<tr><td>                       </td><td><b>[Device:]Reading</b> - Reading im Verbraucher oder (optional) einem alternativen Device.                                                        </td></tr>
             <tr><td>                       </td><td>Hat das Reading den Wert 0 oder ist nicht vorhanden, wird der Verbraucher eingeblendet.                                                            </td></tr>
             <tr><td>                       </td><td>Die Wirkung der möglichen Readingwerte 1, 2 und 3 ist wie beschrieben.                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
@@ -28653,7 +28661,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@red type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2                             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                                           <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1 spignorecond=SolCast:Current_PV:{($VALUE)=split/\s/,$VALUE;$VALUE>10?1:0;}          <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=1                                                                                                            <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39                                                                                                            <br>
        </ul>
        </li>
        <br>
