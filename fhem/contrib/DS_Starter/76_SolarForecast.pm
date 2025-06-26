@@ -163,7 +163,7 @@ my %vNotesIntern = (
   "1.53.0" => "25.06.2025  new battery style (batcontainer), new key setupBatteryDevXX->label, new reading Battery_ChargeUnrestricted_XX ".
                            "attribute graphicShowDiff replaced by graphicControl->showDiff ".
                            "check local coordinates are set in global device and fill message system if failure ".
-						   "consumer Attr key noshow new possible value '9' ",
+						   "consumer Attr key noshow new possible value '9', _beamGraphic: scaleMode log double reduce Discount of z3 ",
   "1.52.18"=> "23.06.2025  ctrlSpecialReadings: new option conForecastComingNight, fix last hour of remainingSurplsHrsMinPwrBat_ ".
                            "some more minor fixes ",
   "1.52.17"=> "22.06.2025  remainingSurplsHrsMinPwrBat_: calculate with two decimal places ",
@@ -17027,7 +17027,7 @@ sub _beamGraphic {
 		  if ($scm eq 'log' && $z2) {
               my $z3perc = int (100 / $z2 * $z3);
 			  $z3        = int ($z3 / 100 * $z3perc);
-              $z3       -= $height * 0.2 if($z3);
+              $z3       -= $height * 0.1 if($z3);
               $z2       -= $z3;
 		  }
       }
