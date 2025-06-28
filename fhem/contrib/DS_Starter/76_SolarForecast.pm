@@ -10175,7 +10175,7 @@ sub _transferInverterValues {
   my $plantdera = HistoryVal  ($name, $day, $hod, 'plantderated', 0); 
   $percdev      = sprintf "%.1f", abs (($pvapifc - $ethishoursum) / $ethishoursum * 100) if($ethishoursum);  # akt. prozentuale Abweicheichung zw. FC und real
   
-  $valid = 0  if($aln       == 0);
+  $valid = 0  if($aln == 0);
   $valid = 0  if(!$pvrlvdsav);
   $valid = 0  if($plantdera);
   $valid = 1  if(!$pvrlvdsav && $percdev <= 10);                                              # pvrl dennoch als valide ansehen wenn hinreichend kleine fc-real Differenz -> was nur kurze Abregelung / Lernunterbrechnung
@@ -21236,6 +21236,7 @@ sub checkPlantConfig {
       'FTUI Widget Files'    => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Perl Modules'         => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Data Memory'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Plant Control'        => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
 
   my $sub = sub {
@@ -21739,9 +21740,36 @@ sub checkPlantConfig {
   }
 
   if (!$result->{'Data Memory'}{info} && !$result->{'Data Memory'}{warn} && !$result->{'Data Memory'}{fault}) {
-      $result->{'Data Memory'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
-      $result->{'Data Memory'}{note}   .= qq{<br>checked Data Memory: <br>};
-      $result->{'Data Memory'}{note}   .= qq{pvHistory key 'con' <br>};
+       $result->{'Data Memory'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
+       $result->{'Data Memory'}{note}   .= qq{<br>checked Data Memory: <br>};
+       $result->{'Data Memory'}{note}   .= qq{pvHistory key 'con' <br>};
+  }
+  
+  ## Plant Control Check
+  ########################
+  my $rdcs = CurrentVal ($name, 'reductionState', ''); 
+  my $fipl = CurrentVal ($name, 'feedinPowerLimit', '');
+  
+  if (!$rdcs) {
+      $result->{'Plant Control'}{state}   = $info;
+      $result->{'Plant Control'}{result} .= qq{It may be useful setting 'plantControl->reductionState'. <br>};
+      $result->{'Plant Control'}{note}   .= qq{The 'reductionState' parameter informs $name whether the PV system is down-regulated. (see Command Reference) <br>};
+      # $result->{'Plant Control'}{note}   .= qq{(see <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast API</a>) <br>};
+      $result->{'Plant Control'}{info}    = 1;
+  }
+  
+  if (!$fipl && isBatteryUsed ($name)) {
+      $result->{'Plant Control'}{state}   = $info;
+      $result->{'Plant Control'}{result} .= qq{It may be useful setting 'plantControl->feedinPowerLimit' if Batteries are installed. <br>};
+      $result->{'Plant Control'}{note}   .= qq{The 'feedinPowerLimit' parameter is helpful in conjunction with the ‘ctrlBatSocManagementXX’ attribute to prevent a possible curtailment of the PV system and to make optimum use of the yield if battery(ies) are used. <br>};
+      $result->{'Plant Control'}{note}   .= qq{(see this <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#PV-Prognose_und_Verbrauch_optimierte_Beladungssteuerung_unter_Ber%C3%BCcksichtigung_einer_Wirkleistungsbegrenzung' target='_blank'>section</a> in the german Wiki) <br>};
+      $result->{'Plant Control'}{info}    = 1;
+  }
+
+  if (!$result->{'Plant Control'}{info} && !$result->{'Plant Control'}{warn} && !$result->{'Plant Control'}{fault}) {
+       $result->{'Plant Control'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
+       $result->{'Plant Control'}{note}   .= qq{<br>checked plantControl: <br>};
+       $result->{'Plant Control'}{note}   .= qq{keys 'reductionState', 'feedinPowerLimit' <br>};
   }
 
   ## FTUI Widget Support
