@@ -1126,7 +1126,7 @@ my %htitles = (                                                                 
   aswfc2o  => { EN => qq{The weather data is outdated.\nCheck the plant with 'set <NAME> plantConfiguration check'.},
                 DE => qq{Die Wetterdaten sind veraltet.\nPr&uuml;fen sie die Anlage mit 'set <NAME> plantConfiguration check'.}                                                         },
   rdcstat  => { EN => qq{no reduction status available\nPlease set the key ‘reductionState’ with 'attr <NAME> plantControl'},
-                DE => qq{kein Abregelungsstatus verf&uuml;gbar\nSetzen sie bitte den Sch&uuml;ssel 'reductionState' mit 'attr <NAME> plantControl'}                                     },
+                DE => qq{kein Abregelungsstatus verf&uuml;gbar\nSetzen sie bitte den Schl&uuml;ssel 'reductionState' mit 'attr <NAME> plantControl'}                                    },
 );
 
 # Wetterintertretation
@@ -28726,7 +28726,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         Dabei ist &lt;Device&gt; ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose.
         Die meisten Schlüssel sind optional, sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit
         default-Werten besetzt. <br>
-        Ist der Schüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den
+        Ist der Schlüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den
         entsprechenden Drucktasten umgeschaltet werden. Das angegebene Reading wird ggf. im Consumer Device angelegt falls
         es nicht vorhanden ist. <br><br>
 
@@ -29681,7 +29681,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - Icon wird verwendet wenn die Batterie aktuell entladen wird                    </td></tr>
            <tr><td>                  </td><td><b>&lt;unterlassen&gt;</b> - Icon wenn Aufladen nur bei Überschreitung des Einspeiselimits empfohlen     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
-           <tr><td> <b>label</b>     </td><td>Wird die Batterie in der Balkengrafik mit dem Schüssel 'show' angezeigt, kann das Symbol mit dem         </td></tr>
+           <tr><td> <b>label</b>     </td><td>Wird die Batterie in der Balkengrafik mit dem Schlüssel 'show' angezeigt, kann das Symbol mit dem        </td></tr>
            <tr><td>                  </td><td>aktuellen SOC-Wert (%) beschriftet werden.                                                               </td></tr>
            <tr><td>                  </td><td><b>none</b>   - keine Beschriftung (default)                                                             </td></tr>
            <tr><td>                  </td><td><b>below</b>  - Beschriftung unterhalb des Batteriesymbols                                               </td></tr>
