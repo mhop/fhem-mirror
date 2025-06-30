@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.53.1" => "30.06.2025  add utf8 smileys, fix Perl warning uninitialized value \$color ",
   "1.53.0" => "28.06.2025  new battery style (batcontainer), new key setupBatteryDevXX->label, new reading Battery_ChargeUnrestricted_XX ".
                            "attribute graphicShowDiff replaced by graphicControl->showDiff ".
                            "check local coordinates are set in global device and fill message system if failure ".
@@ -944,12 +945,12 @@ my %hqtxt = (                                                                # H
               DE => qq{Die FHEM Tablet UI Widget-Dateien sind nicht aktuell.}                                               },
   widerr => { EN => qq{The FHEM Tablet UI V2 is installed but the update status of widget Files can't be checked.},
               DE => qq{FTUI V2 ist installiert, der Aktualisierungsstatus der Widgets kann nicht gepr&uuml;ft werden.}      },
-  pmtp   => { EN => qq{produced more than predicted :-D},
-              DE => qq{mehr produziert als vorhergesagt :-D}                                                                },
-  petp   => { EN => qq{produced same as predicted :-)},
-              DE => qq{produziert wie vorhergesagt :-)}                                                                     },
-  pltp   => { EN => qq{produced less than predicted :-(},
-              DE => qq{weniger produziert als vorhergesagt :-(}                                                             },
+  pmtp   => { EN => qq{produced more than predicted &#128515;},
+              DE => qq{mehr produziert als vorhergesagt &#128515;}                                                          },
+  petp   => { EN => qq{produced same as predicted &#128522;},
+              DE => qq{produziert wie vorhergesagt &#128522;}                                                               },
+  pltp   => { EN => qq{produced less than predicted &#128531;},
+              DE => qq{weniger produziert als vorhergesagt &#128531;}                                                       },
   wusond => { EN => qq{wait until sunset},
               DE => qq{bis zum Sonnenuntergang warten}                                                                      },
   snbefb => { EN => qq{Should not be empty. Maybe the device has just been redefined.},
@@ -18706,7 +18707,7 @@ sub __substituteIcon {
           $txt = $pretxt.$soctxt;                                                        # resultierender Text
       }
       
-      if ($color eq 'dyn') {
+      if ($color && $color eq 'dyn') {
           $color = val2dynColor ($soc, 0, $flag ? 0 : 0.4); 
       }
   }
