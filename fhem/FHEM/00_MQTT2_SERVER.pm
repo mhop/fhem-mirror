@@ -699,6 +699,7 @@ sub
 MQTT2_SERVER_getStr($$$)
 {
   my ($hash, $in, $off) = @_;
+  return ("", "") if(length($in) < $off+2);
   my $l = unpack("n", substr($in, $off, 2));
   my $r = substr($in, $off+2, $l);
   $hash->{stringError} = 1 if(index($r, "\0") >= 0);
