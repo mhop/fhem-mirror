@@ -160,6 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
+                           "setupInverterDevXX: Check that there are no commas with spaces before and after (strings) ",
+  "1.53.1" => "30.06.2025  add utf8 smileys, fix Perl warning uninitialized value \$color ",
   "1.53.0" => "28.06.2025  new battery style (batcontainer), new key setupBatteryDevXX->label, new reading Battery_ChargeUnrestricted_XX ".
                            "attribute graphicShowDiff replaced by graphicControl->showDiff ".
                            "check local coordinates are set in global device and fill message system if failure ".
@@ -944,12 +947,12 @@ my %hqtxt = (                                                                # H
               DE => qq{Die FHEM Tablet UI Widget-Dateien sind nicht aktuell.}                                               },
   widerr => { EN => qq{The FHEM Tablet UI V2 is installed but the update status of widget Files can't be checked.},
               DE => qq{FTUI V2 ist installiert, der Aktualisierungsstatus der Widgets kann nicht gepr&uuml;ft werden.}      },
-  pmtp   => { EN => qq{produced more than predicted :-D},
-              DE => qq{mehr produziert als vorhergesagt :-D}                                                                },
-  petp   => { EN => qq{produced same as predicted :-)},
-              DE => qq{produziert wie vorhergesagt :-)}                                                                     },
-  pltp   => { EN => qq{produced less than predicted :-(},
-              DE => qq{weniger produziert als vorhergesagt :-(}                                                             },
+  pmtp   => { EN => qq{produced more than predicted &#128515;},
+              DE => qq{mehr produziert als vorhergesagt &#128515;}                                                          },
+  petp   => { EN => qq{produced same as predicted &#128522;},
+              DE => qq{produziert wie vorhergesagt &#128522;}                                                               },
+  pltp   => { EN => qq{produced less than predicted &#128531;},
+              DE => qq{weniger produziert als vorhergesagt &#128531;}                                                       },
   wusond => { EN => qq{wait until sunset},
               DE => qq{bis zum Sonnenuntergang warten}                                                                      },
   snbefb => { EN => qq{Should not be empty. Maybe the device has just been redefined.},
@@ -1126,7 +1129,7 @@ my %htitles = (                                                                 
   aswfc2o  => { EN => qq{The weather data is outdated.\nCheck the plant with 'set <NAME> plantConfiguration check'.},
                 DE => qq{Die Wetterdaten sind veraltet.\nPr&uuml;fen sie die Anlage mit 'set <NAME> plantConfiguration check'.}                                                         },
   rdcstat  => { EN => qq{no reduction status available\nPlease set the key ‘reductionState’ with 'attr <NAME> plantControl'},
-                DE => qq{kein Abregelungsstatus verf&uuml;gbar\nSetzen sie bitte den Sch&uuml;ssel 'reductionState' mit 'attr <NAME> plantControl'}                                     },
+                DE => qq{kein Abregelungsstatus verf&uuml;gbar\nSetzen sie bitte den Schl&uuml;ssel 'reductionState' mit 'attr <NAME> plantControl'}                                    },
 );
 
 # Wetterintertretation
@@ -6486,17 +6489,18 @@ sub _attrgraphicControl {                ## no critic "not used"
   my $cmd   = $paref->{cmd};
 
   my $valid = {
-      beamPaddingBottom => { comp => '\d+',                                              act => 0 },
-      beamPaddingTop    => { comp => '\d+',                                              act => 0 },
-      beamWidth         => { comp => '([2-9][0-9]|100)',                                 act => 0 },
-      energyUnit        => { comp => '(Wh|kWh)',                                         act => 0 },
-      headerDetail      => { comp => '.*',                                               act => 1 },
-      hourCount         => { comp => '([4-9]|1[0-9]|2[0-4])',                            act => 0 },
-      hourStyle         => { comp => ':(0{1,2})',                                        act => 0 },
-      layoutType        => { comp => '(single|double|diff)',                             act => 0 },
-      scaleMode         => { comp => '(?:[1-3]:(?:log|lin))(?:,(?:[1-3]:(?:log|lin)))*', act => 0 },
-      showDiff          => { comp => '(no|top|bottom)',                                  act => 0 },
-      spaceSize         => { comp => '\d+',                                              act => 0 },
+      beamPaddingBottom => { comp => '\d+',                                                    act => 0 },
+      beamPaddingTop    => { comp => '\d+',                                                    act => 0 },
+      beamWidth         => { comp => '([2-9][0-9]|100)',                                       act => 0 },
+      energyUnit        => { comp => '(Wh|kWh)',                                               act => 0 },
+      headerDetail      => { comp => '.*',                                                     act => 1 },
+      hourCount         => { comp => '([4-9]|1[0-9]|2[0-4])',                                  act => 0 },
+      hourStyle         => { comp => ':(0{1,2})',                                              act => 0 },
+      layoutType        => { comp => '(single|double|diff)',                                   act => 0 },
+      scaleMode         => { comp => '(?:[1-3]:(?:log|lin))(?:,(?:[1-3]:(?:log|lin)))*',       act => 0 },
+      #showDiff          => { comp => '(no|top|bottom)',                                  act => 0 },
+      showDiff          => { comp => '(?:[1-3]:(?:top|bottom))(?:,(?:[1-3]:(?:top|bottom)))*', act => 0 },
+      spaceSize         => { comp => '\d+',                                                    act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -6951,7 +6955,11 @@ sub _attrInverterDev {                   ## no critic "not used"
       asynchron => { comp => '(0|1)',         act => 0 },
   };
 
-  if ($paref->{cmd} eq 'set') {       
+  if ($paref->{cmd} eq 'set') {
+      if ($aVal =~ /strings=/xs && $aVal !~ /strings=(?!.*(\s,|,\s)).*$/xs) {
+          return "The key 'string' is not specified correctly. Please refer to the command reference.";
+      }
+      
       my ($err, $indev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
 
@@ -14984,7 +14992,6 @@ sub entryGraphic {
       colorw         => AttrVal    ($name, 'graphicWeatherColor',       WTHCOLDDEF),                # Wetter Icon Farbe Tag
       colorwn        => AttrVal    ($name, 'graphicWeatherColorNight',  WTHCOLNDEF),                # Wetter Icon Farbe Nacht
       wlalias        => AttrVal    ($name, 'alias',                          $name),
-      show_diff      => CurrentVal ($name, 'showDiff',                        'no'),                # zusätzliche Anzeige $di{} in allen Typen
       lotype         => CurrentVal ($name, 'layoutType',                  'double'),
       hourstyle      => CurrentVal ($name, 'hourStyle',                         ''),
       hdrDetail      => CurrentVal ($name, 'headerDetail',                   'all'),                # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
@@ -15078,7 +15085,8 @@ sub entryGraphic {
 
   ## Balkengrafiken
   ###################################################################################
-  my $scm = _parseScaleModes ($name);                                                                      # Scale Modes auflösen
+  my $scm = _parseScaleModes    ($name);                                                                   # Scale Modes auflösen
+  my $sdf = _parseShowdiffModes ($name);
   
   ## Balkengrafik Ebene 1
   #########################
@@ -15086,6 +15094,7 @@ sub entryGraphic {
       my %hfcg1;
       $paref->{chartlvl} = 1;                                                                              # Balkengrafik Ebene 1
       $paref->{scm}      = $scm->{1};                                                                      # Scale Mode Level 1
+      $paref->{showdiff} = $sdf->{1};                                                                      # show Diff Mode Level 1
       $paref->{hfcg}     = \%hfcg1;                                                                        # hfcg = hash forecast graphic
 
       ## Werte aktuelle Stunde
@@ -15124,6 +15133,7 @@ sub entryGraphic {
 
           $paref->{chartlvl}  = 2;
           $paref->{scm}       = $scm->{2};                                                                 # Scale Mode Level 2
+          $paref->{showdiff}  = $sdf->{2};                                                                 # show Diff Mode Level 2
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
           $paref->{colorb1}   = AttrVal ($name, 'graphicBeam3Color',       B3COLDEF);
@@ -15167,6 +15177,7 @@ sub entryGraphic {
 
           $paref->{chartlvl}  = 3;
           $paref->{scm}       = $scm->{3};                                                                 # Scale Mode Level 3
+          $paref->{showdiff}  = $sdf->{3};                                                                 # show Diff Mode Level 3
           $paref->{beam1cont} = $paref->{beam5cont};
           $paref->{beam2cont} = $paref->{beam6cont};
           $paref->{colorb1}   = AttrVal ($name, 'graphicBeam5Color',       B5COLDEF);
@@ -15365,7 +15376,7 @@ return;
 }
 
 ################################################################
-#  Parsed den Scale Mode für jede Balkengrafik Ebene
+#  Parse den Scale Mode für jede Balkengrafik Ebene
 #  z.B. scaleMode=1:log,2:lin,3:lin
 ################################################################
 sub _parseScaleModes {                         
@@ -15389,6 +15400,43 @@ sub _parseScaleModes {
   }
 
 return $scm;
+}
+
+################################################################
+#  Parse den Diff Mode für jede Balkengrafik Ebene
+#  z.B. showDiff=1:top,2:bottom,3:bottom
+################################################################
+sub _parseShowdiffModes {                          
+  my $name = shift;
+  my $sdf;
+  
+  for my $bl (1..MAXBEAMLEVEL) {                      # Hashref Diff Modes initial mit Standard füllen 
+      $sdf->{"$bl"} = ''; 
+  }    
+  
+  my $mo = CurrentVal ($name, 'showDiff', '');
+  
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!    03.07.
+  ###########################################################################################
+  if ($mo) {
+      $mo = $mo eq 'no'     ? qq{1:'',2:'',3:''} :
+            $mo eq 'top'    ? qq{1:top,2:top,3:top} :
+            $mo eq 'bottom' ? qq{1:bottom,2:bottom,3:bottom} :
+            $mo;
+  }
+  ##########################################################################################
+  
+  if ($mo) {
+      my @moa = split ',', $mo;
+      
+      for my $elem (@moa) {
+          my ($lvl, $mode) = split ':', $elem;
+          $sdf->{"$lvl"} = $mode; 
+      }
+      
+  }
+
+return $sdf;
 }
 
 ################################################################
@@ -16746,7 +16794,7 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{beam1}  //= 0;
   $hfcg->{0}{beam2}  //= 0;
   $hfcg->{0}{diff}     = sprintf "%.1f", ($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
-  $hfcg->{0}{diff}     = sprintf "%.0f", $hfcg->{0}{diff} if(int ($hfcg->{0}{diff}) - $hfcg->{0}{diff} == 0);
+  $hfcg->{0}{diff}     = sprintf "%.0f", $hfcg->{0}{diff} if(($hfcg->{0}{beam1} - $hfcg->{0}{beam2}) * 1 == 0);
 
   my $epc = CurrentVal ($hash, 'ePurchasePriceCcy', 0);
   my $efc = CurrentVal ($hash, 'eFeedInTariffCcy',  0);
@@ -16956,7 +17004,7 @@ sub _beamGraphicRemainingHours {
       $hfcg->{$i}{beam1} //= 0;
       $hfcg->{$i}{beam2} //= 0;
       $hfcg->{$i}{diff}    = sprintf "%.1f", ($hfcg->{$i}{beam1} - $hfcg->{$i}{beam2});
-      $hfcg->{$i}{diff}    = sprintf "%.0f", $hfcg->{$i}{diff} if(int ($hfcg->{$i}{diff}) - $hfcg->{$i}{diff} == 0);
+      $hfcg->{$i}{diff}    = sprintf "%.0f", $hfcg->{$i}{diff} if(($hfcg->{$i}{beam1} - $hfcg->{$i}{beam2}) * 1 == 0);
 
       $maxVal = $hfcg->{$i}{beam1} if($hfcg->{$i}{beam1} > $maxVal);
       $maxVal = $hfcg->{$i}{beam2} if($hfcg->{$i}{beam2} > $maxVal);
@@ -17048,7 +17096,7 @@ sub _beamGraphic {
   my $maxhours   = $paref->{maxhours};
   my $weather    = $paref->{weather};
   my $show_night = $paref->{show_night};                     # alle Balken (Spalten) anzeigen ?
-  my $show_diff  = $paref->{show_diff};                      # zusätzliche Anzeige $di{} in allen Typen
+  my $showdiff   = $paref->{showdiff};                       # zusätzliche Anzeige $di{} in allen Typen
   my $scm        = $paref->{scm};                            # Scale Mode
   my $lotype     = $paref->{lotype};
   my $height     = $paref->{height};
@@ -17102,7 +17150,7 @@ sub _beamGraphic {
   ####################################
   $ret .= __batteryOnBeam ($paref);
 
-  if ($show_diff eq 'top') {                                                                                    # Zusätzliche Zeile Ertrag - Verbrauch
+  if ($showdiff eq 'top') {                                                                                     # Zusätzliche Zeile Ertrag - Verbrauch
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
 
       my $ii = 0;
@@ -17368,7 +17416,7 @@ sub _beamGraphic {
           }
       }
 
-      if ($show_diff eq 'bottom') {                                                                                                      # zusätzliche diff Anzeige
+      if ($showdiff eq 'bottom') {                                                                                                      # zusätzliche diff Anzeige
           $val  = normBeamWidth ($paref, 'diff', $i, 'beam1');
 
           if ($val ne '&nbsp;') {                                             # negative Zahlen in Fettschrift, 0 aber ohne +
@@ -18706,7 +18754,7 @@ sub __substituteIcon {
           $txt = $pretxt.$soctxt;                                                        # resultierender Text
       }
       
-      if ($color eq 'dyn') {
+      if ($color && $color eq 'dyn') {
           $color = val2dynColor ($soc, 0, $flag ? 0 : 0.4); 
       }
   }
@@ -26697,9 +26745,9 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td><b>&lt;Level&gt;:log</b> - logarithmic scaling                                                                                            </td></tr>
 			<tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>showDiff</b>            </td><td>Additional numerical display of the difference ‘&lt;primary bar content&gt; - &lt;secondary bar content&gt;’.                             </td></tr>
-            <tr><td>                            </td><td><b>no</b>     - no difference display (default)                                                                                           </td></tr>
-            <tr><td>                            </td><td><b>top</b>    - display above the bars                                                                                                    </td></tr>
-            <tr><td>                            </td><td><b>bottom</b> - display below the bars                                                                                                    </td></tr>
+            <tr><td>                            </td><td>The specification for each level consists of the level number (1..X), a ‘:’ followed by the position ‘top’ or ‘bottom’.                   </td></tr>
+            <tr><td>                            </td><td><b>&lt;Level&gt;:top</b>    - display above the bars                                                                                      </td></tr>
+            <tr><td>                            </td><td><b>&lt;Level&gt;:bottom</b> - display below the bars                                                                                      </td></tr>
 			<tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>spaceSize</b>           </td><td>Defines how much space in px is kept free above or below the bar (for display type layoutType=diff) to display the                        </td></tr>
             <tr><td>                            </td><td>values. For styles with large fonts, the default value may be too small or a bar may slide over the baseline.                             </td></tr>
@@ -26711,7 +26759,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log
+         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=1:top,2:bottom
        </ul>
 
        </li>
@@ -28726,7 +28774,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         Dabei ist &lt;Device&gt; ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose.
         Die meisten Schlüssel sind optional, sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit
         default-Werten besetzt. <br>
-        Ist der Schüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den
+        Ist der Schlüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den
         entsprechenden Drucktasten umgeschaltet werden. Das angegebene Reading wird ggf. im Consumer Device angelegt falls
         es nicht vorhanden ist. <br><br>
 
@@ -29352,9 +29400,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td><b>&lt;Ebene&gt;:log</b> - logarithmische Skalierung                                                                            </td></tr>
 			<tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>showDiff</b>            </td><td>Zusätzliche numerische Anzeige der Differenz '&lt;primärer Balkeninhalt&gt; - &lt;sekundärer Balkeninhalt&gt;'.                 </td></tr>
-            <tr><td>                            </td><td><b>no</b>     - keine Differenzanzeige (default)                                                                                </td></tr>
-            <tr><td>                            </td><td><b>top</b>    - Anzeige über den Balken                                                                                         </td></tr>
-            <tr><td>                            </td><td><b>bottom</b> - Anzeige unter den Balken                                                                                        </td></tr>
+            <tr><td>                            </td><td>Die Angabe für jede Ebene besteht aus der Ebenen-Nummer (1..X), einem ':' gefolgt von der Position 'top' oder 'bottom'.         </td></tr>
+            <tr><td>                            </td><td><b>&lt;Ebene&gt;:top</b>    - Anzeige über den Balken                                                                           </td></tr>
+            <tr><td>                            </td><td><b>&lt;Ebene&gt;:bottom</b> - Anzeige unter den Balken                                                                          </td></tr>
 			<tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>spaceSize</b>           </td><td>Legt fest, wieviel Platz in px über oder unter den Balken (bei Anzeigetyp layoutType=diff) zur Anzeige der                      </td></tr>
             <tr><td>                            </td><td>Werte freigehalten wird. Bei Styles mit großen Fonts kann der default-Wert zu klein sein bzw. rutscht ein                       </td></tr>
@@ -29366,7 +29414,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=top
+         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=1:top,2:bottom
        </ul>
 
        </li>
@@ -29681,7 +29729,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td><b>&lt;entladen&gt;</b> - Icon wird verwendet wenn die Batterie aktuell entladen wird                    </td></tr>
            <tr><td>                  </td><td><b>&lt;unterlassen&gt;</b> - Icon wenn Aufladen nur bei Überschreitung des Einspeiselimits empfohlen     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
-           <tr><td> <b>label</b>     </td><td>Wird die Batterie in der Balkengrafik mit dem Schüssel 'show' angezeigt, kann das Symbol mit dem         </td></tr>
+           <tr><td> <b>label</b>     </td><td>Wird die Batterie in der Balkengrafik mit dem Schlüssel 'show' angezeigt, kann das Symbol mit dem        </td></tr>
            <tr><td>                  </td><td>aktuellen SOC-Wert (%) beschriftet werden.                                                               </td></tr>
            <tr><td>                  </td><td><b>none</b>   - keine Beschriftung (default)                                                             </td></tr>
            <tr><td>                  </td><td><b>below</b>  - Beschriftung unterhalb des Batteriesymbols                                               </td></tr>
