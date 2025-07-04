@@ -1,15 +1,15 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.31"
+SCRIPTVERSION="3.32"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.13.14"
+SIGNALVERSION="0.13.17"
 #Check for latest valid version at https://github.com/AsamK/signal-cli/releases
-LIBRARYVERSION="0.68.1"
+LIBRARYVERSION="0.76.0"
 #Check for latest valid version at https://github.com/exquo/signal-libs-build/releases
 #Make sure this matches the required version for signal-cli (see lib/libsignal-client-0.xx.x.jar version in signal-cli)
 LIBSIG=libsignal_jni.tgz
@@ -21,10 +21,16 @@ LOG=/tmp/signal_install.log
 TMPFILE=/tmp/signal$$.tmp
 DBVER=0.22
 OPERATION=$1
+UNATTENDED=$2
 JAVACMD=java
 JAVA_VERSION=21.0
 JDK_PACKAGE=openjdk-21-jre-headless
 JAVA_NATIVE=yes
+
+if [ "$OPERATION" = "-y" ]; then
+  OPERATION="all"
+  UNATTENDED="-y"
+fi
 
 #Check if Java 21 installation is available for this system
 JDK_VER=`apt-cache search --names-only $JDK_PACKAGE`
@@ -385,10 +391,14 @@ if [ -x "$SIGNALPATH/signal/bin/signal-cli" ]; then
 	if [ "$CHECKVER" = "signal-cli $SIGNALVERSION" ]; then
 		echo "signal-cli matches target version...ok"
 	else 
-		echo -n "Update to current version $SIGNALVERSION (y/N)? "
-		read REPLY
-		if [ "$REPLY" = "y" ]; then
+		if ! [ "$UNATTENDED" = "-y" ]; then
 			NEEDINSTALL=1
+		else
+			echo -n "Update to current version $SIGNALVERSION (y/N)? "
+			read REPLY
+			if [ "$REPLY" = "y" ]; then
+				NEEDINSTALL=1
+			fi
 		fi
 	fi
 else
@@ -662,7 +672,10 @@ else
 	echo "You chose the following option: $OPERATION"
 fi
 echo
-if [ -z "$OPERATION" ] || [ "$OPERATION" = "system" ] || [ "$OPERATION" = "install" ] || [ "$OPERATION" = "all" ]; then
+
+
+if ((( [ "$OPERATION" = "install" ] || [ "$OPERATION" = "all" ] ) && ( ! [ "$UNATTENDED" = '-y' ] )) ||
+     ( [ -z "$OPERATION" ] || [ "$OPERATION" = "system" ]  )); then
   echo -n "Proceed (Y/n)? "
   read REPLY
   if [ "$REPLY" = "n" ]; then
@@ -712,14 +725,16 @@ if [ $OPERATION = "restore" ]; then
 		echo "Make sure signal-backup.tar.gz is in current directory"
 		exit
 	fi
-	echo "Are you sure you want to restore all signal-cli configuration files?"
-	echo -n "Any existing configuration will be lost (y/N)? "
-	read REPLY
-	if ! [ "$REPLY" = "y" ]; then
+        if ! [ "$UNATTENDED" = '-y' ]; then 
+  	  echo "Are you sure you want to restore all signal-cli configuration files?"
+	  echo -n "Any existing configuration will be lost (y/N)? "
+	  read REPLY
+	  if ! [ "$REPLY" = "y" ]; then
 		echo "Aborting..."
 		exit
-	fi
-	stop_service
+	  fi
+	  stop_service
+        fi
 	echo -n "Restoring backup..."
 	tar xPf signal-backup.tar.gz
 	chown -R $SIGNALUSER: $SIGNALVAR
