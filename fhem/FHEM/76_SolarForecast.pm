@@ -28829,7 +28829,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
             <tr><td> <b>Device</b>         </td><td>Verbraucher-Gerät. Im einfachen Fall arbeitet das Gerät sowohl als Energiemesser als auch als Schalter.                                            </td></tr>
             <tr><td>                       </td><td>Im optionalen Alias sind Leerzeichen durch '+' zu ersetzen (z.B. 'Ein+toller+Alias').                                                              </td></tr>
-            <tr><td>                       </td><td>Besteht der Verbraucher aus verschiedenen Geräten/Kanäalen (z.B. Homematic), wird der Energiemesser als  &lt;Device&gt; definiert.                 </td></tr>
+            <tr><td>                       </td><td>Besteht der Verbraucher aus verschiedenen Geräten/Kanälen (z.B. Homematic), wird der Energiemesser als  &lt;Device&gt; definiert.                  </td></tr>
             <tr><td>                       </td><td>Das dazugehörige Schalt-Gerät wird mit dem Schlüssel 'switchdev' spezifiziert.                                                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                                 </td></tr>
