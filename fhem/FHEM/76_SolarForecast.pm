@@ -15777,7 +15777,9 @@ sub _graphicHeader {
                           $ydayDvtn =~ /^-?0,/  ? $hqtxt{petp}{$lang} :
                           $ydayDvtn =~ /^[1-9]/ ? $hqtxt{pltp}{$lang} :
                           $hqtxt{snbefb}{$lang};
-
+                          
+      $text_tdayDvtn = encode ('utf8', $text_tdayDvtn);
+      $text_ydayDvtn = encode ('utf8', $text_ydayDvtn);
 
       ## erste Header-Zeilen
       #######################
