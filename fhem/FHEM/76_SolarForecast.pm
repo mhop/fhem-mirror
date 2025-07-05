@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.54.0" => "05.07.2025  edit commandref, ___areaFactorTrack: important bugfix in calc of direct area factor for DWD use ",
   "1.53.3" => "04.07.2025  Change of the correction factor calculation to the ratio of real production and the API raw forecast ",
   "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
                            "setupInverterDevXX: Check that there are no commas with spaces before and after (strings) ",
@@ -3676,7 +3677,6 @@ return;
 sub __getDWDSolarData {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $date  = $paref->{date};                                                                  # aktuelles Datum "YYYY-MM-DD"
   my $day   = $paref->{day};                                                                   # aktuelles Tagesdatum 01 .. 31
   my $t     = $paref->{t}     // time;
@@ -3713,23 +3713,25 @@ sub __getDWDSolarData {
       my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # abzurufendes Datum ' ' Zeit
       my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # Stunde in 24h format (00-23), Rad1h = Absolute Globalstrahlung letzte 1 Stunde
       my $rad      = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                   # kJ/m2
+      
+      my ($ddate, $dtime) = split ' ', $dateTime;                                              # abzurufendes Datum + Zeit
+      my $dtpart          = (split ":", $dateTime)[0];
+      my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                      # abzurufende Zeit
+      my $dday            = (split '-', $ddate)[2];                                            # abzurufender Tag: 01, 02 ... 31
 
       if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
           $data{$name}{statusapi}{DWD}{'?All'}{response_message} = $ret;
 
-          debugLog ($paref, "apiCall", "DWD API - ERROR - got unusual data of starttime: $dateTime. ".$ret);
+          debugLog ($paref, "apiCall", "DWD API - ERROR - got unusual data of starttime: $dtpart. ".$ret);
       }
       else {
-          debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dateTime, reading: fc${fd}_${runh}_Rad1h, rad: $rad kJ/m2");
+          debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dtpart, reading: fc${fd}_${runh}_Rad1h, rad: $rad kJ/m2");
       }
 
       $data{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = sprintf "%.0f", $rad;
 
-      my $cafd            = 'trackFlex';                                                       # Art der Flächenfaktor Berechnung ('fix' wäre alternativ möglich = alte Methode)
-      my ($ddate, $dtime) = split ' ', $dateTime;                                              # abzurufendes Datum + Zeit
-      my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                      # abzurufende Zeit
-      my $dday            = (split '-', $ddate)[2];                                            # abzurufender Tag: 01, 02 ... 31
+      my $cafd = 'trackFlex';                                                                  # Art der Flächenfaktor Berechnung ('fix' wäre alternativ möglich = alte Methode)
 
       for my $string (@strings) {                                                              # für jeden String der Config ..
           my $ti   = StringVal ($name, $string, 'tilt',   undef);                              # Neigungswinkel Solarmodule
@@ -3755,25 +3757,19 @@ sub __getDWDSolarData {
                                                          dday   => $dday,
                                                          chour  => $paref->{chour},
                                                          hod    => $hod,
+                                                         debug  => $paref->{debug},
                                                          tilt   => $ti,
                                                          azimut => $az
                                                        }
                                                      );
 
-              $wcc = 0 if(!isNumeric($wcc));
-              $wcc = cloud2bin($wcc);
-
-              debugLog ($paref, "apiProcess", "DWD API - Value of sunaz/sunalt not stored in pvHistory, workaround using 1.00/0.75")
-                        if(!isNumeric($af));
-
-              $af  = 1.00 if(!isNumeric($af));
-              $sdr = 0.75 if(!isNumeric($sdr));
-
-              #if ($wcc >= 80 || !$af) {                                                            # V 1.47.3
+              #if ($wcc >= 80 || !$af) {                                                             
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
                   $pv = (($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF;                       # Rad wird in kW/m2 erwartet
+                  
+                  debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dtpart, rad: $rad, direct share: $dirrad, diffuse share: $difrad");
               #}
               #else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
               #    $pv = $rad * $af * KJ2KWH * $peak * PRDEF;
@@ -3789,7 +3785,7 @@ sub __getDWDSolarData {
 
           $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                        # Startzeit wird verwendet, nicht laufende Stunde
 
-          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, AF: $af, dirfac: $sdr");
+          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dtpart, $pv Wh, AF: $af, dirfac: $sdr");
       }
   }
 
@@ -3802,6 +3798,7 @@ return;
 #  Flächenfaktor Photovoltaik
 #  Prof. Dr. Peter A. Henning, September 2024
 #  ersetzt die Tabelle auf Basis http://www.ing-büro-junge.de/html/photovoltaik.html
+#  (für den Jahresertrag!)
 #  siehe Wiki: https://wiki.fhem.de/wiki/Ertragsprognose_PV
 ##################################################################################################
 sub ___areaFactorFix {
@@ -3870,9 +3867,13 @@ sub ___areaFactorTrack {
       $wcc       = NexthoursVal ($name, $nhtstr, 'wcc',        0);
   }
 
-  return ('-', '-', '-') if(!defined $sunalt || !defined $sunaz);
-
+  if (!defined $sunalt || !defined $sunaz) {
+      debugLog ($paref, "apiProcess", "DWD API - hod: $hod -> Value of sunaz/sunalt not stored in pvHistory, workaround using 1.00/0.75");
+      return (1.00, 0.75, 0);
+  }
+  
   my $pi180 = 0.0174532918889;                                                  # PI/180
+  $wcc      = cloud2bin ($wcc);  
 
   #-- Normale der Anlage (Nordrichtung = y-Achse, Ostrichtung = x-Achse)
   my $nz = cos ($tilt * $pi180);
@@ -3887,12 +3888,12 @@ sub ___areaFactorTrack {
   #-- Normale N = ($nx,$ny,$nz) Richtung Sonne S = ($sx,$sy,$sz)
   my $daf = $nx * $sx + $ny * $sy + $nz * $sz;
   $daf    = max ($daf, 0);
-  $daf   += 1 if($daf);
-
+  #$daf   += 1 if($daf);                                                                    # V 1.53.4 -> Bugfix
+  
   ## Schätzung Anteil Direktstrahlung an Globalstrahlung
   ########################################################
   my $drif = 0.0105;                                                                        # Faktor Zunahme Direktstrahlung pro Grad sunalt von 10° bis 50°
-  my $sdr  = $sunalt <= 10                  ? 0.33                             :
+  my $sdr  = $sunalt <= 10                  ? 0.33                             :            # Share of direct radiation = Faktor Anteil Direktstrahlung an Globalstrahlung (0.33 .. 0.75)
              $sunalt >  10 && $sunalt <= 50 ? (($sunalt - 10) * 0.0105) + 0.33 :
              0.75;
 
@@ -8830,14 +8831,6 @@ sub centralTask {
   #    CommandAttr (undef, "$name graphicControl $newval");
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
-
-  for my $n (1..6) {                                                     # 30.04.2025
-      my $gbc = AttrVal ($name, "graphicBeam${n}Content", 'blabla');
-      if ($gbc =~ /batsocforecast_/xs) {
-          $gbc =~ s/batsocforecast_/batsocCombi_/xs;
-          CommandAttr (undef, "$name graphicBeam${n}Content $gbc");
-      }
-  }
 
   for my $in (1..MAXINVERTER) {
       $in    = sprintf "%02d", $in;
@@ -25828,7 +25821,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvapifc</b>             </td><td>expected PV generation (Wh) of the API used incl. correction factor applied                                           </td></tr>
             <tr><td> <b>pvaifc</b>              </td><td>PV forecast (Wh) of the AI for the next 24h from the current hour of the day                                          </td></tr>
             <tr><td> <b>pvfc</b>                </td><td>PV forecast used for the next 24h from the current hour of the day                                                    </td></tr>
-            <tr><td> <b>pvfc_XX</b>             </td><td>Array of predicted PV generation values depending on a certain degree of cloud cover (XX = altitude of the sun)       </td></tr>
+            <tr><td> <b>pvfc_XX</b>             </td><td>Array of predicted PV generation (raw value in Wh) depending on the degree of cloud cover, altitude of the sun (XX)   </td></tr>
             <tr><td> <b>pvcorrf</b>             </td><td>Autocorrection factors for the hour of the day, where 'simple' is the simple correction factor.                       </td></tr>
             <tr><td> <b>pvfcsum</b>             </td><td>summary PV forecast per cloud area over the entire term                                                               </td></tr>
             <tr><td> <b>pvrl</b>                </td><td>real PV generation of the last 24h (Attention: pvforecast and pvreal do not refer to the same period!)                </td></tr>
@@ -28485,7 +28478,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvapifc</b>             </td><td>erwartete PV Erzeugung (Wh) der verwendeten API incl. angewendetem Korrekturfaktor                                        </td></tr>
             <tr><td> <b>pvaifc</b>              </td><td>PV Vorhersage (Wh) der KI für die nächsten 24h ab aktueller Stunde des Tages                                              </td></tr>
             <tr><td> <b>pvfc</b>                </td><td>verwendete PV Prognose für die nächsten 24h ab aktueller Stunde des Tages                                                 </td></tr>
-            <tr><td> <b>pvfc_XX</b>             </td><td>Array der prognostizierten PV Erzeugungswerte abhängig von einem bestimmten Bewölkungsgrad (XX = Altitude der Sonne)      </td></tr>
+            <tr><td> <b>pvfc_XX</b>             </td><td>Array der prognostizierten PV-Erzeugung (Raw-Wert in Wh) abhängig vom Bewölkungsgrad, Altitude der Sonne (XX)             </td></tr>
             <tr><td> <b>pvcorrf</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei 'simple' der einfach berechnete Korrekturfaktor ist.                </td></tr>
             <tr><td> <b>pvfcsum</b>             </td><td>Summe PV Prognose pro Bewölkungsbereich über die gesamte Laufzeit                                                         </td></tr>
             <tr><td> <b>pvrl</b>                </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>

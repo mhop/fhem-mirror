@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.54.0" => "05.07.2025  edit commandref, ___areaFactorTrack: important bugfix in calc of direct area factor for DWD use ",
+  "1.53.3" => "04.07.2025  Change of the correction factor calculation to the ratio of real production and the API raw forecast ",
   "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
                            "setupInverterDevXX: Check that there are no commas with spaces before and after (strings) ",
   "1.53.1" => "30.06.2025  add utf8 smileys, fix Perl warning uninitialized value \$color ",
@@ -3675,7 +3677,6 @@ return;
 sub __getDWDSolarData {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $date  = $paref->{date};                                                                  # aktuelles Datum "YYYY-MM-DD"
   my $day   = $paref->{day};                                                                   # aktuelles Tagesdatum 01 .. 31
   my $t     = $paref->{t}     // time;
@@ -3712,23 +3713,25 @@ sub __getDWDSolarData {
       my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # abzurufendes Datum ' ' Zeit
       my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # Stunde in 24h format (00-23), Rad1h = Absolute Globalstrahlung letzte 1 Stunde
       my $rad      = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                   # kJ/m2
+      
+      my ($ddate, $dtime) = split ' ', $dateTime;                                              # abzurufendes Datum + Zeit
+      my $dtpart          = (split ":", $dateTime)[0];
+      my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                      # abzurufende Zeit
+      my $dday            = (split '-', $ddate)[2];                                            # abzurufender Tag: 01, 02 ... 31
 
       if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
           $data{$name}{statusapi}{DWD}{'?All'}{response_message} = $ret;
 
-          debugLog ($paref, "apiCall", "DWD API - ERROR - got unusual data of starttime: $dateTime. ".$ret);
+          debugLog ($paref, "apiCall", "DWD API - ERROR - got unusual data of starttime: $dtpart. ".$ret);
       }
       else {
-          debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dateTime, reading: fc${fd}_${runh}_Rad1h, rad: $rad kJ/m2");
+          debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dtpart, reading: fc${fd}_${runh}_Rad1h, rad: $rad kJ/m2");
       }
 
       $data{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = sprintf "%.0f", $rad;
 
-      my $cafd            = 'trackFlex';                                                       # Art der Flächenfaktor Berechnung ('fix' wäre alternativ möglich = alte Methode)
-      my ($ddate, $dtime) = split ' ', $dateTime;                                              # abzurufendes Datum + Zeit
-      my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                      # abzurufende Zeit
-      my $dday            = (split '-', $ddate)[2];                                            # abzurufender Tag: 01, 02 ... 31
+      my $cafd = 'trackFlex';                                                                  # Art der Flächenfaktor Berechnung ('fix' wäre alternativ möglich = alte Methode)
 
       for my $string (@strings) {                                                              # für jeden String der Config ..
           my $ti   = StringVal ($name, $string, 'tilt',   undef);                              # Neigungswinkel Solarmodule
@@ -3754,25 +3757,19 @@ sub __getDWDSolarData {
                                                          dday   => $dday,
                                                          chour  => $paref->{chour},
                                                          hod    => $hod,
+                                                         debug  => $paref->{debug},
                                                          tilt   => $ti,
                                                          azimut => $az
                                                        }
                                                      );
 
-              $wcc = 0 if(!isNumeric($wcc));
-              $wcc = cloud2bin($wcc);
-
-              debugLog ($paref, "apiProcess", "DWD API - Value of sunaz/sunalt not stored in pvHistory, workaround using 1.00/0.75")
-                        if(!isNumeric($af));
-
-              $af  = 1.00 if(!isNumeric($af));
-              $sdr = 0.75 if(!isNumeric($sdr));
-
-              #if ($wcc >= 80 || !$af) {                                                            # V 1.47.3
+              #if ($wcc >= 80 || !$af) {                                                             
                   my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
                   my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
 
                   $pv = (($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF;                       # Rad wird in kW/m2 erwartet
+                  
+                  debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dtpart, rad: $rad, direct share: $dirrad, diffuse share: $difrad");
               #}
               #else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
               #    $pv = $rad * $af * KJ2KWH * $peak * PRDEF;
@@ -3788,7 +3785,7 @@ sub __getDWDSolarData {
 
           $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                        # Startzeit wird verwendet, nicht laufende Stunde
 
-          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dateTime, $pv Wh, AF: $af, dirfac: $sdr");
+          debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dtpart, $pv Wh, AF: $af, dirfac: $sdr");
       }
   }
 
@@ -3801,6 +3798,7 @@ return;
 #  Flächenfaktor Photovoltaik
 #  Prof. Dr. Peter A. Henning, September 2024
 #  ersetzt die Tabelle auf Basis http://www.ing-büro-junge.de/html/photovoltaik.html
+#  (für den Jahresertrag!)
 #  siehe Wiki: https://wiki.fhem.de/wiki/Ertragsprognose_PV
 ##################################################################################################
 sub ___areaFactorFix {
@@ -3869,9 +3867,13 @@ sub ___areaFactorTrack {
       $wcc       = NexthoursVal ($name, $nhtstr, 'wcc',        0);
   }
 
-  return ('-', '-', '-') if(!defined $sunalt || !defined $sunaz);
-
+  if (!defined $sunalt || !defined $sunaz) {
+      debugLog ($paref, "apiProcess", "DWD API - hod: $hod -> Value of sunaz/sunalt not stored in pvHistory, workaround using 1.00/0.75");
+      return (1.00, 0.75, 0);
+  }
+  
   my $pi180 = 0.0174532918889;                                                  # PI/180
+  $wcc      = cloud2bin ($wcc);  
 
   #-- Normale der Anlage (Nordrichtung = y-Achse, Ostrichtung = x-Achse)
   my $nz = cos ($tilt * $pi180);
@@ -3886,12 +3888,12 @@ sub ___areaFactorTrack {
   #-- Normale N = ($nx,$ny,$nz) Richtung Sonne S = ($sx,$sy,$sz)
   my $daf = $nx * $sx + $ny * $sy + $nz * $sz;
   $daf    = max ($daf, 0);
-  $daf   += 1 if($daf);
-
+  #$daf   += 1 if($daf);                                                                    # V 1.53.4 -> Bugfix
+  
   ## Schätzung Anteil Direktstrahlung an Globalstrahlung
   ########################################################
   my $drif = 0.0105;                                                                        # Faktor Zunahme Direktstrahlung pro Grad sunalt von 10° bis 50°
-  my $sdr  = $sunalt <= 10                  ? 0.33                             :
+  my $sdr  = $sunalt <= 10                  ? 0.33                             :            # Share of direct radiation = Faktor Anteil Direktstrahlung an Globalstrahlung (0.33 .. 0.75)
              $sunalt >  10 && $sunalt <= 50 ? (($sunalt - 10) * 0.0105) + 0.33 :
              0.75;
 
@@ -8830,14 +8832,6 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
 
-  for my $n (1..6) {                                                     # 30.04.2025
-      my $gbc = AttrVal ($name, "graphicBeam${n}Content", 'blabla');
-      if ($gbc =~ /batsocforecast_/xs) {
-          $gbc =~ s/batsocforecast_/batsocCombi_/xs;
-          CommandAttr (undef, "$name graphicBeam${n}Content $gbc");
-      }
-  }
-
   for my $in (1..MAXINVERTER) {
       $in    = sprintf "%02d", $in;
       my ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
@@ -10312,9 +10306,9 @@ sub _transferAPIRadiationValues {
           $sunaz  = NexthoursVal ($name, $nhtstr, 'sunaz',  0);
       }
 
-      $paref->{sabin}    = sunalt2bin ($sunalt);
-      my $pvapifc        = __calcPVestimates ($paref);                                                  # API Wert ermitteln
-      my ($msg, $pvaifc) = aiGetResult ($paref);                                                        # KI Entscheidungen abfragen
+      $paref->{sabin}            = sunalt2bin ($sunalt);
+      my ($pvapifc, $pvapifcraw) = __calcPVestimates ($paref);                         # API Wert mit Korrekturfaktor und ohne KF ermitteln
+      my ($msg, $pvaifc)         = aiGetResult ($paref);                               # KI Entscheidungen abfragen
 
       delete $paref->{fd};
       delete $paref->{fh1};
@@ -10372,18 +10366,22 @@ sub _transferAPIRadiationValues {
           debugLog ($paref, 'aiData', "use PV from API (no AI or AI result tolerance overflow) -> hod: $hod, Rad1h: ".(defined $rad1h ? $rad1h : '-').", pvfc: $pvfc Wh");
       }
 
-      $data{$name}{nexthours}{$nhtstr}{pvapifc} = $pvapifc;                                    # durch API gelieferte PV Forecast
-      $data{$name}{nexthours}{$nhtstr}{pvfc}    = $pvfc;                                       # resultierende PV Forecast zuweisen
+      $data{$name}{nexthours}{$nhtstr}{pvapifc}    = $pvapifc;                                 # durch API gelieferte PV Forecast mit Korrekturfaktor
+      $data{$name}{nexthours}{$nhtstr}{pvapifcraw} = $pvapifcraw;                              # durch API gelieferte PV Forecast Raw
+      $data{$name}{nexthours}{$nhtstr}{pvfc}       = $pvfc;                                    # resultierende PV Forecast zuweisen
 
+      my $hh1 = sprintf "%02d", $fh1;
+      
       if ($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-          $data{$name}{circular}{sprintf "%02d",$fh1}{pvapifc} = NexthoursVal ($name, $nhtstr, 'pvapifc', undef);
-          $data{$name}{circular}{sprintf "%02d",$fh1}{pvfc}    = $pvfc;
-          $data{$name}{circular}{sprintf "%02d",$fh1}{pvaifc}  = NexthoursVal ($name, $nhtstr, 'pvaifc',  undef);
-          $data{$name}{circular}{sprintf "%02d",$fh1}{aihit}   = NexthoursVal ($name, $nhtstr, 'aihit',       0);
+          $data{$name}{circular}{$hh1}{pvapifc}    = NexthoursVal ($name, $nhtstr, 'pvapifc',    undef);
+          $data{$name}{circular}{$hh1}{pvapifcraw} = NexthoursVal ($name, $nhtstr, 'pvapifcraw', undef);
+          $data{$name}{circular}{$hh1}{pvaifc}     = NexthoursVal ($name, $nhtstr, 'pvaifc',     undef);
+          $data{$name}{circular}{$hh1}{aihit}      = NexthoursVal ($name, $nhtstr, 'aihit',          0);
+          $data{$name}{circular}{$hh1}{pvfc}       = $pvfc;
       }
 
       if ($fd == 0 && int $pvfc > 0) {                                                         # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
-          storeReading ('Today_Hour'.sprintf ("%02d",$fh1).'_PVforecast', "$pvfc Wh");
+          storeReading ('Today_Hour'.$hh1.'_PVforecast', "$pvfc Wh");
       }
 
       if ($fd == 0 && $fh1) {
@@ -10392,7 +10390,7 @@ sub _transferAPIRadiationValues {
       }
   }
 
-  storeReading ('.lastupdateForecastValues', $t);                                             # Statusreading letzter update
+  storeReading ('.lastupdateForecastValues', $t);                                              # Statusreading letzter update
 
 return;
 }
@@ -10470,8 +10468,9 @@ sub __calcPVestimates {
   delete $paref->{wcc};
 
   my ($lh,$sq,$peakloss, $modtemp);
-  my $pvsum     = 0;
-  my $peaksum   = 0;
+  my $pvsum    = 0;
+  my $peaksum  = 0;
+  my $pvsumraw = 0;
   my %sum;
 
   for my $string (sort keys %{$data{$name}{strings}}) {
@@ -10499,6 +10498,7 @@ sub __calcPVestimates {
 
           if ($istrings eq 'all' || grep /^$string$/, (split ',', $istrings)) {
               $sum{$in}{pvinvsum} += $pv;
+              $sum{$in}{pvrawsum} += $pvest;                                                          # PV Prognose ohne Faktorenanwendung
               $sum{$in}{string}    = defined $sum{$in}{string} ? $sum{$in}{string}.','.$string : $string;
           }
       }
@@ -10531,6 +10531,11 @@ sub __calcPVestimates {
   for my $ins (keys %sum) {
       my $cap      = InverterVal ($name, $ins, 'invertercap', 0);                                   # Max. Leistung des Inverters
       my $pvinvsum = $sum{$ins}{pvinvsum};
+      my $pvrawsum = $sum{$ins}{pvrawsum};
+      
+      if ($pvrawsum > $cap) {
+          $pvrawsum = $cap;
+      }
 
       if ($pvinvsum > $cap) {
           $pvinvsum = $cap;                                                                         # betreffende Strings auf WR Kapazität begrenzen
@@ -10538,12 +10543,15 @@ sub __calcPVestimates {
           debugLog ($paref, "radiationProcess", "String(s) ".$sum{$ins}{string}." in total limited to $cap Wh due to inverter $ins capacity");
       }
 
-      $pvsum += $pvinvsum;
+      $pvsum    += $pvinvsum;
+      $pvsumraw += $pvrawsum;                                                                       # PV Prognose ohne Faktorenanwendung
   }
 
   $data{$name}{current}{allstringspeak} = $peaksum;                                                 # temperaturbedingte Korrektur der installierten Peakleistung in W
   $pvsum                                = $peaksum if($peaksum && $pvsum > $peaksum);               # Vorhersage nicht größer als die Summe aller PV-Strings Peak
   $pvsum                                = sprintf "%.0f", $pvsum;
+  $pvsumraw                             = $peaksum if($peaksum && $pvsumraw > $peaksum);
+  $pvsumraw                             = sprintf "%.0f", $pvsumraw;
 
   if ($debug =~ /radiationProcess/xs) {
       $lh = {                                                                                        # Log-Hash zur Ausgabe
@@ -10564,7 +10572,7 @@ sub __calcPVestimates {
       Log3 ($name, 1, "$name DEBUG> PV API estimate for $reld Hour ".sprintf ("%02d", $hod)." summary: \n$sq");
   }
 
-return $pvsum;
+return ($pvsum, $pvsumraw);
 }
 
 ######################################################################
@@ -14101,77 +14109,6 @@ return;
 
 ################################################################
 # PV Ist/Forecast ermitteln und Korrekturfaktoren, Qualität
-# in Abhängigkeit Bewölkung errechnen und speichern (komplex)
-################################################################
-sub _calcCaQcomplex {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $debug  = $paref->{debug};
-  my $acu    = $paref->{acu};
-  my $pvrlvd = $paref->{pvrlvd};                                                                       # PV-Wert valide 1/0
-  my $h      = $paref->{h};
-  my $day    = $paref->{day};                                                                          # aktueller Tag
-  my $yday   = $paref->{yday};                                                                         # vorheriger Tag (falls gesetzt)
-  my $aihit  = $paref->{aihit};
-
-  if (!$pvrlvd) {
-      debugLog ($paref, 'pvCorrectionWrite', "real PV generation is marked as invalid for hour: $h -> skip the recalculation of the complex correction factor");
-      return;
-  }
-
-  my $hh   = sprintf "%02d", $h;
-  my $pvrl = CircularVal ($name, $hh, 'pvrl',    0);                                  # real erzeugte PV Energie am Ende der vorherigen Stunde
-  my $pvfc = CircularVal ($name, $hh, 'pvapifc', 0);                                  # vorhergesagte PV Energie am Ende der vorherigen Stunde
-
-  if (!$pvrl || !$pvfc) {
-      return;
-  }
-
-  my $chwcc  = HistoryVal ($name, $day, $hh, 'wcc',    0);                            # Wolkenbedeckung heute & abgefragte Stunde
-  my $sunalt = HistoryVal ($name, $day, $hh, 'sunalt', 0);                            # Sonne Altitude
-  my $crang  = cloud2bin  ($chwcc);
-  my $sabin  = sunalt2bin ($sunalt);
-
-  ## Speicherarrays schreiben
-  #############################
-  push @{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}}, $pvrl;
-  push @{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}}, $pvfc;
-
-  removeMinMaxArray ($data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}, SPLSLIDEMAX);
-  removeMinMaxArray ($data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}, SPLSLIDEMAX);
-
-  ## neuen Korrekturfaktor berechnen
-  ####################################
-  $paref->{pvrl}   = $pvrl;
-  $paref->{pvfc}   = $pvfc;
-  $paref->{crang}  = $crang;
-  $paref->{sabin}  = $sabin;
-  $paref->{calc}   = 'Complex';
-
-  my ($oldfac, $factor, $dnum) = __calcNewFactor_migrated ($paref);                  # migrierte Daten verwenden
-
-  delete $paref->{pvrl};
-  delete $paref->{pvfc};
-  delete $paref->{crang};
-  delete $paref->{sabin};
-  delete $paref->{calc};
-
-  $aihit = $aihit ? ' AI result used,' : '';
-
-  if ($acu =~ /on_complex/xs) {
-      if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
-          storeReading ('pvCorrectionFactor_'.$hh, $factor." (automatic - old factor: $oldfac,$aihit Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
-      }
-      else {
-          storeReading ('pvCorrectionFactor_'.$hh, $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin,$aihit Cloud range: $crang, Days in range: $dnum");
-      }
-  }
-
-return;
-}
-
-################################################################
-# PV Ist/Forecast ermitteln und Korrekturfaktoren, Qualität
 # ohne Nebenfaktoren errechnen und speichern (simple)
 ################################################################
 sub _calcCaQsimple {
@@ -14190,27 +14127,30 @@ sub _calcCaQsimple {
       return;
   }
 
-  my $hh   = sprintf "%02d", $h;
-  my $pvrl = CircularVal ($name, $hh, 'pvrl',    0);
-  my $pvfc = CircularVal ($name, $hh, 'pvapifc', 0);
+  my $hh         = sprintf "%02d", $h;
+  my $pvrl       = CircularVal ($name, $hh, 'pvrl',       0);
+  my $pvapifc    = CircularVal ($name, $hh, 'pvapifc',    0);                         # vorhergesagte PV Energie incl. Korrekturfaktoren am Ende der vorherigen Stunde
+  my $pvapifcraw = CircularVal ($name, $hh, 'pvapifcraw', 0);                         # vorhergesagte PV Energie (raw) am Ende der vorherigen Stunde
 
-  if (!$pvrl || !$pvfc) {
+  if (!$pvrl || !$pvapifcraw) {
       return;
   }
 
   my $sunalt = HistoryVal ($name, $day, $hh, 'sunalt', 0);                            # Sonne Altitude
   my $sabin  = sunalt2bin ($sunalt);
 
-  $paref->{pvrl}  = $pvrl;
-  $paref->{pvfc}  = $pvfc;
-  $paref->{sabin} = $sabin;
-  $paref->{crang} = 'simple';
-  $paref->{calc}  = 'Simple';
+  $paref->{pvrl}       = $pvrl;
+  $paref->{pvapifc}    = $pvapifc;
+  $paref->{pvapifcraw} = $pvapifcraw;
+  $paref->{sabin}      = $sabin;
+  $paref->{crang}      = 'simple';
+  $paref->{calc}       = 'Simple';
 
   my ($oldfac, $factor, $dnum) = __calcNewFactor_migrated ($paref);                   # migrierte Daten verwenden
 
   delete $paref->{pvrl};
-  delete $paref->{pvfc};
+  delete $paref->{pvapifc};
+  delete $paref->{pvapifcraw};
   delete $paref->{sabin};
   delete $paref->{crang};
   delete $paref->{calc};
@@ -14223,6 +14163,80 @@ sub _calcCaQsimple {
       }
       else {
           storeReading ('pvCorrectionFactor_'.$hh, $paref->{cpcf}." / flexmatic result $factor,$aihit Days in range: $dnum");
+      }
+  }
+
+return;
+}
+
+################################################################
+# PV Ist/Forecast ermitteln und Korrekturfaktoren, Qualität
+# in Abhängigkeit Bewölkung errechnen und speichern (komplex)
+################################################################
+sub _calcCaQcomplex {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $debug  = $paref->{debug};
+  my $acu    = $paref->{acu};
+  my $pvrlvd = $paref->{pvrlvd};                                                                       # PV-Wert valide 1/0
+  my $h      = $paref->{h};
+  my $day    = $paref->{day};                                                                          # aktueller Tag
+  my $yday   = $paref->{yday};                                                                         # vorheriger Tag (falls gesetzt)
+  my $aihit  = $paref->{aihit};
+
+  if (!$pvrlvd) {
+      debugLog ($paref, 'pvCorrectionWrite', "real PV generation is marked as invalid for hour: $h -> skip the recalculation of the complex correction factor");
+      return;
+  }
+
+  my $hh         = sprintf "%02d", $h;
+  my $pvrl       = CircularVal ($name, $hh, 'pvrl',       0);                         # real erzeugte PV Energie am Ende der vorherigen Stunde
+  my $pvapifc    = CircularVal ($name, $hh, 'pvapifc',    0);                         # vorhergesagte PV Energie incl. Korrekturfaktoren am Ende der vorherigen Stunde
+  my $pvapifcraw = CircularVal ($name, $hh, 'pvapifcraw', 0);                         # vorhergesagte PV Energie (raw) am Ende der vorherigen Stunde
+ 
+  if (!$pvrl || !$pvapifcraw) {
+      return;
+  }
+
+  my $chwcc  = HistoryVal ($name, $day, $hh, 'wcc',    0);                            # Wolkenbedeckung heute & abgefragte Stunde
+  my $sunalt = HistoryVal ($name, $day, $hh, 'sunalt', 0);                            # Sonne Altitude
+  my $crang  = cloud2bin  ($chwcc);
+  my $sabin  = sunalt2bin ($sunalt);
+
+  ## Speicherarrays schreiben
+  #############################
+  push @{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}}, $pvrl;
+  push @{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}}, $pvapifcraw;
+
+  removeMinMaxArray ($data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}, SPLSLIDEMAX);
+  removeMinMaxArray ($data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}, SPLSLIDEMAX);
+
+  ## neuen Korrekturfaktor berechnen
+  ####################################
+  $paref->{pvrl}       = $pvrl;
+  $paref->{pvapifc}    = $pvapifc;
+  $paref->{pvapifcraw} = $pvapifcraw;
+  $paref->{crang}      = $crang;
+  $paref->{sabin}      = $sabin;
+  $paref->{calc}       = 'Complex';
+
+  my ($oldfac, $factor, $dnum) = __calcNewFactor_migrated ($paref);                  # migrierte Daten verwenden
+
+  delete $paref->{pvrl};
+  delete $paref->{pvapifc};
+  delete $paref->{pvapifcraw};
+  delete $paref->{crang};
+  delete $paref->{sabin};
+  delete $paref->{calc};
+
+  $aihit = $aihit ? ' AI result used,' : '';
+
+  if ($acu =~ /on_complex/xs) {
+      if ($paref->{cpcf} !~ /manual/xs) {                                                            # pcf-Reading nur überschreiben wenn nicht 'manual xxx' gesetzt
+          storeReading ('pvCorrectionFactor_'.$hh, $factor." (automatic - old factor: $oldfac,$aihit Sun Alt range: $sabin, Cloud range: $crang, Days in range: $dnum)");
+      }
+      else {
+          storeReading ('pvCorrectionFactor_'.$hh, $paref->{cpcf}." / flexmatic result $factor for Sun Alt range: $sabin,$aihit Cloud range: $crang, Days in range: $dnum");
       }
   }
 
@@ -14264,14 +14278,15 @@ return;
 #   den neuen Korrekturfaktur berechnen (neue Median Funktion)
 ################################################################
 sub __calcNewFactor_migrated {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $pvrl  = $paref->{pvrl};
-  my $pvfc  = $paref->{pvfc};
-  my $crang = $paref->{crang};
-  my $sabin = $paref->{sabin};
-  my $h     = $paref->{h};
-  my $calc  = $paref->{calc};
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $pvrl     = $paref->{pvrl};
+  my $pvapifc  = $paref->{pvapifc};
+  my $pvfcraw  = $paref->{pvapifcraw};
+  my $crang    = $paref->{crang};
+  my $sabin    = $paref->{sabin};
+  my $h        = $paref->{h};
+  my $calc     = $paref->{calc};
 
   my $hash = $defs{$name};
   my ($factor, $pvcirc, $fccirc, $pvrlsum, $pvfcsum, $dnum);
@@ -14290,30 +14305,30 @@ sub __calcNewFactor_migrated {
       if ($dnum) {                                                                                        # Werte in History vorhanden -> haben Prio !
           $dnum++;
           $pvrlsum = $pvrl + $pvcirc;
-          $pvfcsum = $pvfc + $fccirc;
+          $pvfcsum = $pvfcraw + $fccirc;
           $pvrl    = $pvrlsum / $dnum;
-          $pvfc    = $pvfcsum / $dnum;
-          $factor  = sprintf "%.2f", ($pvrl / $pvfc);                                                     # Faktorberechnung: reale PV / Prognose
+          $pvfcraw = $pvfcsum / $dnum;
+          $factor  = sprintf "%.2f", ($pvrl / $pvfcraw);                                                  # Faktorberechnung: reale PV / Prognose
       }
       elsif ($oldfac && (!$pvcirc || !$fccirc)) {                                                         # Circular Hash liefert einen vorhandenen Korrekturfaktor aber keine gespeicherten PV-Werte
           $dnum   = 1;
-          $factor = sprintf "%.2f", ($pvrl / $pvfc);
+          $factor = sprintf "%.2f", ($pvrl / $pvfcraw);
           $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
       }
       else {                                                                                              # ganz neuer Wert
           $dnum   = 1;
-          $factor = sprintf "%.2f", ($pvrl / $pvfc);
+          $factor = sprintf "%.2f", ($pvrl / $pvfcraw);
       }
   }
   else {
-     $pvrl = medianArray (\@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});                     # neuen Median berechnen
-     $pvfc = medianArray (\@{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}});                     # neuen Median berechnen
+     $pvrl    = medianArray (\@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});                  # neuen Median berechnen
+     $pvfcraw = medianArray (\@{$data{$name}{circular}{$hh}{'pvfc_'.$sabin}{"$crang"}});                  # neuen Median berechnen
 
      $factor = 0;
      $dnum   = scalar (@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});
-     $factor = sprintf "%.2f", ($pvrl / $pvfc) if($pvrl && $pvfc);                                        # devision by zero Forum: https://forum.fhem.de/index.php?msg=1341884
+     $factor = sprintf "%.2f", ($pvrl / $pvfcraw) if($pvrl && $pvfcraw);                                  # devision by zero Forum: https://forum.fhem.de/index.php?msg=1341884
 
-     debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read stored values: PVreal median: $pvrl, PVforecast median: $pvfc, days: $dnum");
+     debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read stored values: PVreal median: $pvrl, PVforecast median: $pvfcraw, days: $dnum");
   }
 
   $factor = 1.00 if(1 * $factor == 0);                                                                    # 0.00-Werte ignorieren (Schleifengefahr)
@@ -14331,7 +14346,7 @@ sub __calcNewFactor_migrated {
   ## Qualität berechnen
   #######################
   $oldfac  = sprintf "%.2f", $oldfac;
-  my $qual = __calcFcQuality ($pvfc, $pvrl);                                                             # Qualität der Vorhersage für die vergangene Stunde
+  my $qual = __calcFcQuality ($pvapifc, $pvrl);                                                          # Qualität der Vorhersage für die vergangene Stunde
 
   debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $hh, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
   debugLog ($paref, 'pvCorrectionWrite|saveData2Cache', "$calc Corrf -> write correction values into Circular - hour: $hh, Sun Altitude range: $sabin, Cloud range: $crang, factor: $factor, quality: $qual, days: $dnum");
@@ -14358,12 +14373,12 @@ return ($oldfac, $factor, $dnum);
 #            Qualität der Vorhersage berechnen
 ################################################################
 sub __calcFcQuality {
-  my $pvfc = shift;                                                        # PV Vorhersagewert
-  my $pvrl = shift;                                                        # PV reale Erzeugung
+  my $pvapifc = shift;                                                     # PV Vorhersagewert
+  my $pvrl    = shift;                                                     # PV reale Erzeugung
 
-  return if(!$pvfc || !$pvrl);
+  return if(!$pvapifc || !$pvrl);
 
-  my $diff = $pvfc - $pvrl;
+  my $diff = $pvapifc - $pvrl;
   my $hdv  = 1 - abs ($diff / $pvrl);                                      # Abweichung der Stunde, 1 = bestmöglicher Wert
 
   $hdv = $hdv < 0 ? 0 : $hdv;
@@ -20678,24 +20693,25 @@ sub _listDataPoolCircular {
   for my $idx (sort keys %{$h}) {
       next if($par && $idx ne $par);
 
-      my $pvrl     = CircularVal ($hash, $idx, 'pvrl',                '-');
-      my $pvfc     = CircularVal ($hash, $idx, 'pvfc',                '-');
-      my $pvrlsum  = CircularVal ($hash, $idx, 'pvrlsum',             '-');
-      my $pvfcsum  = CircularVal ($hash, $idx, 'pvfcsum',             '-');
-      my $dnumsum  = CircularVal ($hash, $idx, 'dnumsum',             '-');
-      my $pvaifc   = CircularVal ($hash, $idx, 'pvaifc',              '-');
-      my $pvapifc  = CircularVal ($hash, $idx, 'pvapifc',             '-');
-      my $aihit    = CircularVal ($hash, $idx, 'aihit',               '-');
-      my $confc    = CircularVal ($hash, $idx, 'confc',               '-');
-      my $gcons    = CircularVal ($hash, $idx, 'gcons',               '-');
-      my $gfeedin  = CircularVal ($hash, $idx, 'gfeedin',             '-');
-      my $wid      = CircularVal ($hash, $idx, 'weatherid',           '-');
-      my $wtxt     = CircularVal ($hash, $idx, 'weathertxt',          '-');
-      my $wccv     = CircularVal ($hash, $idx, 'wcc',                 '-');
-      my $rr1c     = CircularVal ($hash, $idx, 'rr1c',                '-');
-      my $temp     = CircularVal ($hash, $idx, 'temp',                '-');
-      my $pvcorrf  = CircularVal ($hash, $idx, 'pvcorrf',             '-');
-      my $quality  = CircularVal ($hash, $idx, 'quality',             '-');
+      my $pvrl       = CircularVal ($hash, $idx, 'pvrl',       '-');
+      my $pvfc       = CircularVal ($hash, $idx, 'pvfc',       '-');
+      my $pvrlsum    = CircularVal ($hash, $idx, 'pvrlsum',    '-');
+      my $pvfcsum    = CircularVal ($hash, $idx, 'pvfcsum',    '-');
+      my $dnumsum    = CircularVal ($hash, $idx, 'dnumsum',    '-');
+      my $pvaifc     = CircularVal ($hash, $idx, 'pvaifc',     '-');
+      my $pvapifc    = CircularVal ($hash, $idx, 'pvapifc',    '-');            # PV Forecast der API incl. angewendeten Korrekturfaktor
+      my $pvapifcraw = CircularVal ($hash, $idx, 'pvapifcraw', '-');            # PV Forecast der API Raw
+      my $aihit      = CircularVal ($hash, $idx, 'aihit',      '-');
+      my $confc      = CircularVal ($hash, $idx, 'confc',      '-');
+      my $gcons      = CircularVal ($hash, $idx, 'gcons',      '-');
+      my $gfeedin    = CircularVal ($hash, $idx, 'gfeedin',    '-');
+      my $wid        = CircularVal ($hash, $idx, 'weatherid',  '-');
+      my $wtxt       = CircularVal ($hash, $idx, 'weathertxt', '-');
+      my $wccv       = CircularVal ($hash, $idx, 'wcc',        '-');
+      my $rr1c       = CircularVal ($hash, $idx, 'rr1c',       '-');
+      my $temp       = CircularVal ($hash, $idx, 'temp',       '-');
+      my $pvcorrf    = CircularVal ($hash, $idx, 'pvcorrf',    '-');
+      my $quality    = CircularVal ($hash, $idx, 'quality',    '-');
 
       my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
       my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
@@ -20767,7 +20783,7 @@ sub _listDataPoolCircular {
                 $gconsall .= _ldchash2val ( { pool => $h, idx => $idx, key => $gcoa, cval => $gcaref } );
             }
 
-          $sq .= $idx." => pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl";
+          $sq .= $idx." => pvapifcraw: $pvapifcraw, pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit, pvrl: $pvrl";
           $sq .= "\n      $bin";
           $sq .= "\n      $bout";
           $sq .= "\n      confc: $confc, gcons: $gcons, gfeedin: $gfeedin, wcc: $wccv, rr1c: $rr1c";
@@ -20856,29 +20872,30 @@ sub _listDataPoolNextHours {
   }
 
   for my $idx (sort keys %{$h}) {
-      my $nhts    = NexthoursVal ($name, $idx, 'starttime',    '-');
-      my $day     = NexthoursVal ($name, $idx, 'day',          '-');
-      my $hod     = NexthoursVal ($name, $idx, 'hourofday',    '-');
-      my $today   = NexthoursVal ($name, $idx, 'today',        '-');
-      my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',         '-');
-      my $pvapifc = NexthoursVal ($name, $idx, 'pvapifc',      '-');       # PV Forecast der API
-      my $pvaifc  = NexthoursVal ($name, $idx, 'pvaifc',       '-');       # PV Forecast der KI
-      my $aihit   = NexthoursVal ($name, $idx, 'aihit',        '-');       # KI ForeCast Treffer Status
-      my $wid     = NexthoursVal ($name, $idx, 'weatherid',    '-');
-      my $wcc     = NexthoursVal ($name, $idx, 'wcc',          '-');
-      my $crang   = NexthoursVal ($name, $idx, 'cloudrange',   '-');
-      my $rr1c    = NexthoursVal ($name, $idx, 'rr1c',         '-');
-      my $rrange  = NexthoursVal ($name, $idx, 'rainrange',    '-');
-      my $rad1h   = NexthoursVal ($name, $idx, 'rad1h',        '-');
-      my $pvcorrf = NexthoursVal ($name, $idx, 'pvcorrf',      '-');
-      my $temp    = NexthoursVal ($name, $idx, 'temp',         '-');
-      my $confc   = NexthoursVal ($name, $idx, 'confc',        '-');
-      my $confcex = NexthoursVal ($name, $idx, 'confcEx',      '-');
-      my $don     = NexthoursVal ($name, $idx, 'DoN',          '-');
-      my $sunaz   = NexthoursVal ($name, $idx, 'sunaz',        '-');
-      my $sunalt  = NexthoursVal ($name, $idx, 'sunalt',       '-');
-      my $socprgs = NexthoursVal ($name, $idx, 'socprogwhsum', '-');
-      my $dinrang = NexthoursVal ($name, $idx, 'DaysInRange',  '-');
+      my $nhts       = NexthoursVal ($name, $idx, 'starttime',    '-');
+      my $day        = NexthoursVal ($name, $idx, 'day',          '-');
+      my $hod        = NexthoursVal ($name, $idx, 'hourofday',    '-');
+      my $today      = NexthoursVal ($name, $idx, 'today',        '-');
+      my $pvfc       = NexthoursVal ($name, $idx, 'pvfc',         '-');
+      my $pvapifc    = NexthoursVal ($name, $idx, 'pvapifc',      '-');       # PV Forecast der API incl. angewendeten Korrekturfaktor
+      my $pvapifcraw = NexthoursVal ($name, $idx, 'pvapifcraw',   '-');       # PV Forecast der API Raw
+      my $pvaifc     = NexthoursVal ($name, $idx, 'pvaifc',       '-');       # PV Forecast der KI
+      my $aihit      = NexthoursVal ($name, $idx, 'aihit',        '-');       # KI ForeCast Treffer Status
+      my $wid        = NexthoursVal ($name, $idx, 'weatherid',    '-');
+      my $wcc        = NexthoursVal ($name, $idx, 'wcc',          '-');
+      my $crang      = NexthoursVal ($name, $idx, 'cloudrange',   '-');
+      my $rr1c       = NexthoursVal ($name, $idx, 'rr1c',         '-');
+      my $rrange     = NexthoursVal ($name, $idx, 'rainrange',    '-');
+      my $rad1h      = NexthoursVal ($name, $idx, 'rad1h',        '-');
+      my $pvcorrf    = NexthoursVal ($name, $idx, 'pvcorrf',      '-');
+      my $temp       = NexthoursVal ($name, $idx, 'temp',         '-');
+      my $confc      = NexthoursVal ($name, $idx, 'confc',        '-');
+      my $confcex    = NexthoursVal ($name, $idx, 'confcEx',      '-');
+      my $don        = NexthoursVal ($name, $idx, 'DoN',          '-');
+      my $sunaz      = NexthoursVal ($name, $idx, 'sunaz',        '-');
+      my $sunalt     = NexthoursVal ($name, $idx, 'sunalt',       '-');
+      my $socprgs    = NexthoursVal ($name, $idx, 'socprogwhsum', '-');
+      my $dinrang    = NexthoursVal ($name, $idx, 'DaysInRange',  '-');
 
       my ($rcdbat, $socs, $lcintime);
       for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
@@ -20898,7 +20915,7 @@ sub _listDataPoolNextHours {
       $sq .= $idx." => ";
       $sq .= "starttime: $nhts, day: $day, hourofday: $hod, today: $today";
       $sq .= "\n              ";
-      $sq .= "pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit";
+      $sq .= "pvapifcraw: $pvapifcraw, pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit";
       $sq .= "\n              ";
       $sq .= "confc: $confc, confcEx: $confcex, weatherid: $wid, wcc: $wcc, rr1c: $rr1c, temp=$temp";
       $sq .= "\n              ";
@@ -25680,6 +25697,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>DaysInRange</b>     </td><td>previously recorded days with comparable sun position and clouds at this time          </td></tr>
             <tr><td> <b>DoN</b>             </td><td>sunrise and sunset status (0 - night, 1 - day)                                         </td></tr>
             <tr><td> <b>hourofday</b>       </td><td>current hour of the day                                                                </td></tr>
+            <tr><td> <b>pvapifcraw</b>      </td><td>expected PV generation (Wh) of the used API (raw)                                      </td></tr>
             <tr><td> <b>pvapifc</b>         </td><td>expected PV generation (Wh) of the used API incl. a possible correction                </td></tr>
             <tr><td> <b>pvaifc</b>          </td><td>expected PV generation of the AI (Wh)                                                  </td></tr>
             <tr><td> <b>pvfc</b>            </td><td>PV generation forecast used (Wh)                                                       </td></tr>
@@ -25799,10 +25817,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>initdaybatouttotXX</b>  </td><td>initial value of the total energy drawn from the battery XX at the beginning of the current day. (Wh)                 </td></tr>
             <tr><td> <b>lastTsMaxSocRchdXX</b>  </td><td>Timestamp of last achievement of battery XX SoC >= maxSoC (default 95%)                                               </td></tr>
             <tr><td> <b>nextTsMaxSocChgeXX</b>  </td><td>Timestamp by which the battery XX should reach maxSoC at least once                                                   </td></tr>
-            <tr><td> <b>pvapifc</b>             </td><td>expected PV generation (Wh) of the API used                                                                           </td></tr>
+            <tr><td> <b>pvapifcraw</b>          </td><td>expected PV generation (Wh) of the API used (raw)                                                                     </td></tr>
+            <tr><td> <b>pvapifc</b>             </td><td>expected PV generation (Wh) of the API used incl. correction factor applied                                           </td></tr>
             <tr><td> <b>pvaifc</b>              </td><td>PV forecast (Wh) of the AI for the next 24h from the current hour of the day                                          </td></tr>
             <tr><td> <b>pvfc</b>                </td><td>PV forecast used for the next 24h from the current hour of the day                                                    </td></tr>
-            <tr><td> <b>pvfc_XX</b>             </td><td>Array of predicted PV generation values depending on a certain degree of cloud cover (XX = altitude of the sun)       </td></tr>
+            <tr><td> <b>pvfc_XX</b>             </td><td>Array of predicted PV generation (raw value in Wh) depending on the degree of cloud cover, altitude of the sun (XX)   </td></tr>
             <tr><td> <b>pvcorrf</b>             </td><td>Autocorrection factors for the hour of the day, where 'simple' is the simple correction factor.                       </td></tr>
             <tr><td> <b>pvfcsum</b>             </td><td>summary PV forecast per cloud area over the entire term                                                               </td></tr>
             <tr><td> <b>pvrl</b>                </td><td>real PV generation of the last 24h (Attention: pvforecast and pvreal do not refer to the same period!)                </td></tr>
@@ -26746,6 +26765,7 @@ to ensure that the system configuration is correct.
 			<tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>showDiff</b>            </td><td>Additional numerical display of the difference ‘&lt;primary bar content&gt; - &lt;secondary bar content&gt;’.                             </td></tr>
             <tr><td>                            </td><td>The specification for each level consists of the level number (1..X), a ‘:’ followed by the position ‘top’ or ‘bottom’.                   </td></tr>
+            <tr><td>                            </td><td>The strings for each level are separated by commas (see example).                                                                         </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:top</b>    - display above the bars                                                                                      </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:bottom</b> - display below the bars                                                                                      </td></tr>
 			<tr><td>                            </td><td>                                                                                                                                          </td></tr>
@@ -28333,6 +28353,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>DaysInRange</b>     </td><td>bisher aufgezeichnete Tage mit vergleichbaren Sonnenstand und Bewölkungen zu dieser Zeit   </td></tr>
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                       </td></tr>
             <tr><td> <b>hourofday</b>       </td><td>laufende Stunde des Tages                                                                  </td></tr>
+            <tr><td> <b>pvapifcraw</b>      </td><td>erwartete PV Erzeugung (Wh) der verwendeten API (raw)                                      </td></tr>
             <tr><td> <b>pvapifc</b>         </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur          </td></tr>
             <tr><td> <b>pvaifc</b>          </td><td>erwartete PV Erzeugung der KI (Wh)                                                         </td></tr>
             <tr><td> <b>pvfc</b>            </td><td>verwendete PV Erzeugungsprognose (Wh)                                                      </td></tr>
@@ -28453,10 +28474,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>initdaybatouttotXX</b>  </td><td>initialer Wert der total aus der Batterie XX entnommenen Energie zu Beginn des aktuellen Tages (Wh)                       </td></tr>
             <tr><td> <b>lastTsMaxSocRchdXX</b>  </td><td>Timestamp des letzten Erreichens von Batterie XX SoC >= maxSoC (default 95%)                                              </td></tr>
             <tr><td> <b>nextTsMaxSocChgeXX</b>  </td><td>Timestamp bis zu dem die Batterie XX mindestens einmal maxSoC erreichen soll                                              </td></tr>
-            <tr><td> <b>pvapifc</b>             </td><td>erwartete PV Erzeugung (Wh) der verwendeten API                                                                           </td></tr>
+            <tr><td> <b>pvapifcraw</b>          </td><td>erwartete PV Erzeugung (Wh) der verwendeten API (raw)                                                                     </td></tr>
+            <tr><td> <b>pvapifc</b>             </td><td>erwartete PV Erzeugung (Wh) der verwendeten API incl. angewendetem Korrekturfaktor                                        </td></tr>
             <tr><td> <b>pvaifc</b>              </td><td>PV Vorhersage (Wh) der KI für die nächsten 24h ab aktueller Stunde des Tages                                              </td></tr>
             <tr><td> <b>pvfc</b>                </td><td>verwendete PV Prognose für die nächsten 24h ab aktueller Stunde des Tages                                                 </td></tr>
-            <tr><td> <b>pvfc_XX</b>             </td><td>Array der prognostizierten PV Erzeugungswerte abhängig von einem bestimmten Bewölkungsgrad (XX = Altitude der Sonne)      </td></tr>
+            <tr><td> <b>pvfc_XX</b>             </td><td>Array der prognostizierten PV-Erzeugung (Raw-Wert in Wh) abhängig vom Bewölkungsgrad, Altitude der Sonne (XX)             </td></tr>
             <tr><td> <b>pvcorrf</b>             </td><td>Autokorrekturfaktoren für die Stunde des Tages, wobei 'simple' der einfach berechnete Korrekturfaktor ist.                </td></tr>
             <tr><td> <b>pvfcsum</b>             </td><td>Summe PV Prognose pro Bewölkungsbereich über die gesamte Laufzeit                                                         </td></tr>
             <tr><td> <b>pvrl</b>                </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!)        </td></tr>
@@ -29401,6 +29423,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>showDiff</b>            </td><td>Zusätzliche numerische Anzeige der Differenz '&lt;primärer Balkeninhalt&gt; - &lt;sekundärer Balkeninhalt&gt;'.                 </td></tr>
             <tr><td>                            </td><td>Die Angabe für jede Ebene besteht aus der Ebenen-Nummer (1..X), einem ':' gefolgt von der Position 'top' oder 'bottom'.         </td></tr>
+            <tr><td>                            </td><td>Die Strings für jede Ebene werden durch Komma getrennt (siehe Beispiel).                                                        </td></tr>
             <tr><td>                            </td><td><b>&lt;Ebene&gt;:top</b>    - Anzeige über den Balken                                                                           </td></tr>
             <tr><td>                            </td><td><b>&lt;Ebene&gt;:bottom</b> - Anzeige unter den Balken                                                                          </td></tr>
 			<tr><td>                            </td><td>                                                                                                                                </td></tr>
