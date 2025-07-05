@@ -25157,7 +25157,7 @@ to ensure that the system configuration is correct.
       One or more key=value pairs in the collective attributes (aiControl, consumerXX, plantControl, setup.*, etc.) can be
       can be reset or changed. <br>
       If a device is mandatory, as required in the setup.* attributes, it can also be set or changed.
-      The change is saved automatically.
+      The change is saved automatically if autosave=0 is NOT set in the global device.
       <br><br>
 
       <ul>
@@ -27805,7 +27805,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Es können ein oder mehrere Schlüssel=Wert Paare in den Sammelattributen (aiControl, consumerXX, plantControl, setup.*, etc.)
       neu gesetzt oder verändert werden. <br>
       Ist ein Gerät obligatorisch, wie in den setup.*-Attributen verlangt, kann es ebenfalls gesetzt oder geändert werden.
-      Es erfolgt eine automatische Speicherung der Änderung.
+      Es erfolgt eine automatische Speicherung der Änderung sofern im global Device NICHT autosave=0 gesetzt ist.
       <br><br>
 
       <ul>
