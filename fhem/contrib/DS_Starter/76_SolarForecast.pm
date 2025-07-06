@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.54.1" => "06.07.2025  change utf8 to UTF-8, userExit: new coding ",
+  "1.54.1" => "06.07.2025  change utf8 to UTF-8, userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ",
   "1.54.0" => "05.07.2025  edit commandref, ___areaFactorTrack: important bugfix in calc of direct area factor for DWD use ",
   "1.53.3" => "04.07.2025  Change of the correction factor calculation to the ratio of real production and the API raw forecast ",
   "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
@@ -16036,15 +16036,19 @@ sub __createReduceIcon {
   my $img;
 
   if (!defined $rps) {
-      $img   = '-';
-      $title = $htitles{rdcstat}{$lang};
+      $title = encode ('UTF-8', $htitles{rdcstat}{$lang}); 
       $title =~ s/<NAME>/$name/xs;
+      $img   = '-';
   }
   elsif ($rps) {
-      $img = FW_makeImage ('10px-kreis-gelb.png', $htitles{rdcactiv}{$lang});
+      $title = encode ('UTF-8', $htitles{rdcactiv}{$lang});
+      $title =~ s/<NAME>/$name/xs;
+      $img = FW_makeImage ('10px-kreis-gelb.png', $title);
   }
   else {
-      $img = FW_makeImage ('10px-kreis-gruen.png', $htitles{rdcnoact}{$lang});
+      $title = encode ('UTF-8', $htitles{rdcnoact}{$lang});
+      $title =~ s/<NAME>/$name/xs;    
+      $img = FW_makeImage ('10px-kreis-gruen.png', $title);
   }
   
   my $rpsicon = qq{<a title="$title">$img</a>};
