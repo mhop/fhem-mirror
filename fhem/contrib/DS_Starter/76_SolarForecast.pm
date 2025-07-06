@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.54.1" => "06.07.2025   ",
   "1.54.0" => "05.07.2025  edit commandref, ___areaFactorTrack: important bugfix in calc of direct area factor for DWD use ",
   "1.53.3" => "04.07.2025  Change of the correction factor calculation to the ratio of real production and the API raw forecast ",
   "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
@@ -949,12 +950,12 @@ my %hqtxt = (                                                                # H
               DE => qq{Die FHEM Tablet UI Widget-Dateien sind nicht aktuell.}                                               },
   widerr => { EN => qq{The FHEM Tablet UI V2 is installed but the update status of widget Files can't be checked.},
               DE => qq{FTUI V2 ist installiert, der Aktualisierungsstatus der Widgets kann nicht gepr&uuml;ft werden.}      },
-  pmtp   => { EN => qq{produced more than predicted &#128515;},
-              DE => qq{mehr produziert als vorhergesagt &#128515;}                                                          },
-  petp   => { EN => qq{produced same as predicted &#128522;},
-              DE => qq{produziert wie vorhergesagt &#128522;}                                                               },
-  pltp   => { EN => qq{produced less than predicted &#128531;},
-              DE => qq{weniger produziert als vorhergesagt &#128531;}                                                       },
+  pmtp   => { EN => qq{produced more than predicted :-)},
+              DE => qq{mehr produziert als vorhergesagt :-)}                                                                },
+  petp   => { EN => qq{produced same as predicted},
+              DE => qq{produziert wie vorhergesagt}                                                                         },
+  pltp   => { EN => qq{produced less than predicted :-(},
+              DE => qq{weniger produziert als vorhergesagt :-(}                                                             },
   wusond => { EN => qq{wait until sunset},
               DE => qq{bis zum Sonnenuntergang warten}                                                                      },
   snbefb => { EN => qq{Should not be empty. Maybe the device has just been redefined.},
@@ -25157,7 +25158,7 @@ to ensure that the system configuration is correct.
       One or more key=value pairs in the collective attributes (aiControl, consumerXX, plantControl, setup.*, etc.) can be
       can be reset or changed. <br>
       If a device is mandatory, as required in the setup.* attributes, it can also be set or changed.
-      The change is saved automatically.
+      The change is saved automatically if autosave=0 is NOT set in the global device.
       <br><br>
 
       <ul>
@@ -27805,7 +27806,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Es können ein oder mehrere Schlüssel=Wert Paare in den Sammelattributen (aiControl, consumerXX, plantControl, setup.*, etc.)
       neu gesetzt oder verändert werden. <br>
       Ist ein Gerät obligatorisch, wie in den setup.*-Attributen verlangt, kann es ebenfalls gesetzt oder geändert werden.
-      Es erfolgt eine automatische Speicherung der Änderung.
+      Es erfolgt eine automatische Speicherung der Änderung sofern im global Device NICHT autosave=0 gesetzt ist.
       <br><br>
 
       <ul>
