@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.54.1" => "06.07.2025  change utf8 to UTF-8, userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ",
+  "1.54.1" => "06.07.2025  change utf8 to UTF-8, userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
+                           "_setattrKeyVal: optimize function between execute from FHEMWEB and Commandline ",
   "1.54.0" => "05.07.2025  edit commandref, ___areaFactorTrack: important bugfix in calc of direct area factor for DWD use ",
   "1.53.3" => "04.07.2025  Change of the correction factor calculation to the ratio of real production and the API raw forecast ",
   "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
@@ -2003,9 +2004,12 @@ sub _setattrKeyVal {                         ## no critic "not used"
   my $arg   = $paref->{arg} // return;
 
   return if(!$init_done);
-
-  $arg =~ s/^([^=]*?),/$1 /;
-
+  
+  $arg =~ s/^([^,]*)\s+/$1,/;                                                            # das erste auftretende Leerzeichen-Cluster durch ',' ersetzen, aber nur wenn es in dem String vor dem Leerzeichen-Cluster noch kein Komma gibt
+   #Log3 ($name, 1, "$name - Arg Orig: $arg");
+  $arg =~ s/^([^=]*?),/$1 /;                                                             
+   #Log3 ($name, 1, "$name - Arg Substitute: $arg");
+   
   my ($a, $h)    = parseParams ($arg);
   my $targetattr = $a->[0];
   my $devn       = $a->[1] // '';
@@ -2034,9 +2038,6 @@ sub _setattrKeyVal {                         ## no critic "not used"
       $dev   .= "\n" if($dev);
 
       my $new = "$name $targetattr $dev".$repl;
-
-      # Log3 ($name, 1, "$name - setze Attribut neu: $new");
-
       my $ret = CommandAttr (undef, "$new");
       return $ret if($ret);
   }
@@ -2051,10 +2052,7 @@ sub _setattrKeyVal {                         ## no critic "not used"
 
       $devn   .= "\n" if($devn);
       my $new  = "$name $targetattr $devn".$nkv;
-
-      # Log3 ($name, 1, "$name - setze Attribut neu: $new");
-
-      my $ret = CommandAttr (undef, "$new");
+      my $ret  = CommandAttr (undef, "$new");
       return $ret if($ret);
   }
 
