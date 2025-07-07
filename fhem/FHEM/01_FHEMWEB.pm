@@ -999,7 +999,8 @@ FW_answerCall($)
       FW_pO "$FW_jsonp('$FW_cmdret');";
 
     } else {
-      $FW_cmdret = FW_addLinks($FW_cmdret) if($FW_webArgs{addLinks});
+      $FW_cmdret = FW_addLinks($FW_cmdret)
+          if($FW_webArgs{addLinks} && $FW_cmdret !~ m/^<html>(.*)<\/html>$/s);
       FW_pO $FW_cmdret;
 
     }
