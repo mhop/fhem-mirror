@@ -160,14 +160,14 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.54.1" => "07.07.2025  change utf8 to UTF-8, userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
+  "1.54.1" => "07.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
                            "_setattrKeyVal: optimize function between execute from FHEMWEB and Commandline ".
                            "_beamGraphicFirstHour, _beamGraphicRemainingHours: decimal places according to the setting of the energy unit",
   "1.54.0" => "05.07.2025  edit commandref, ___areaFactorTrack: important bugfix in calc of direct area factor for DWD use ",
   "1.53.3" => "04.07.2025  Change of the correction factor calculation to the ratio of real production and the API raw forecast ",
   "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
                            "setupInverterDevXX: Check that there are no commas with spaces before and after (strings) ",
-  "1.53.1" => "30.06.2025  add UTF-8 smileys, fix Perl warning uninitialized value \$color ",
+  "1.53.1" => "30.06.2025  add utf8 smileys, fix Perl warning uninitialized value \$color ",
   "1.53.0" => "28.06.2025  new battery style (batcontainer), new key setupBatteryDevXX->label, new reading Battery_ChargeUnrestricted_XX ".
                            "attribute graphicShowDiff replaced by graphicControl->showDiff ".
                            "check local coordinates are set in global device and fill message system if failure ".
@@ -3557,7 +3557,7 @@ sub __forecastSolar_ApiResponse {
       $data{$name}{statusapi}{ForecastSolar}{'?All'}{requests_remaining}      = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
       $data{$name}{statusapi}{ForecastSolar}{'?All'}{requests_limit_period}   = $jdata->{'message'}{'ratelimit'}{'period'};             # Requests Limit Periode
       $data{$name}{statusapi}{ForecastSolar}{'?All'}{requests_limit}          = $jdata->{'message'}{'ratelimit'}{'limit'};              # Requests Limit in Periode
-      $data{$name}{statusapi}{ForecastSolar}{'?All'}{place}                   = encode ('UTF-8', $jdata->{'message'}{'info'}{'place'});
+      $data{$name}{statusapi}{ForecastSolar}{'?All'}{place}                   = encode ('utf8', $jdata->{'message'}{'info'}{'place'});
 
       if ($debug =~ /apiCall/x) {
           Log3 ($name, 1, qq{$name DEBUG> ForecastSolar API Call - server response for PV string "$string"});
@@ -5488,8 +5488,8 @@ sub __generateCatOut {
   ## Ausgabe
   ############
   my $out  = '<html>';
-  $out    .= '<b>'.encode('UTF-8', $hqtxt{dwdcat}{$lang}).'</b><br>';                             # The Deutscher Wetterdienst Station Catalog
-  $out    .= encode('UTF-8', $hqtxt{nrsele}{$lang}).' '.$noe.'<br>';                              # Selected entries
+  $out    .= '<b>'.encode('utf8', $hqtxt{dwdcat}{$lang}).'</b><br>';                             # The Deutscher Wetterdienst Station Catalog
+  $out    .= encode('utf8', $hqtxt{nrsele}{$lang}).' '.$noe.'<br>';                              # Selected entries
   $out    .= "($select) <br><br>";
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
@@ -5614,7 +5614,7 @@ sub __dwdStatCatalog_Response {
       my @datarr = split "\n", $dat;
 
       for my $s (@datarr) {
-          $s = encode ('UTF-8', $s);
+          $s = encode ('utf8', $s);
 
           my ($id, $tail) = split " ", $s, 2;
 
@@ -12643,7 +12643,7 @@ sub ___doPlanning {
               last;
           }
           else {
-              $paref->{supplement} = encode('UTF-8', $hqtxt{emsple}{$lang});                          # 'erwarteter max Überschuss weniger als'
+              $paref->{supplement} = encode('utf8', $hqtxt{emsple}{$lang});                          # 'erwarteter max Überschuss weniger als'
               $paref->{ps}         = 'suspended:';
 
               ___setConsumerPlanningState ($paref);
@@ -12677,7 +12677,7 @@ sub ___doPlanning {
       }
 
       if (!$done) {
-          $paref->{supplement} = encode('UTF-8', $hqtxt{nmspld}{$lang});                              # 'kein max Überschuss für den aktuellen Tag gefunden'
+          $paref->{supplement} = encode('utf8', $hqtxt{nmspld}{$lang});                              # 'kein max Überschuss für den aktuellen Tag gefunden'
           $paref->{ps}         = 'suspended:';
 
           ___setConsumerPlanningState ($paref);
@@ -13132,8 +13132,8 @@ sub ___switchConsumerOn {
 
   my $supplmnt         = ConsumerVal ($hash, $c, 'planSupplement', '');
   $paref->{supplement} = '' if($supplmnt =~ /swoncond\snot|swoncond\snicht/xs && $swoncond);
-  $paref->{supplement} = encode('UTF-8', $hqtxt{swonnm}{$lang}) if(!$swoncond);                   # 'swoncond not met'
-  $paref->{supplement} = encode('UTF-8', $hqtxt{swofmt}{$lang}) if($swoffcond);                   # 'swoffcond met'
+  $paref->{supplement} = encode('utf8', $hqtxt{swonnm}{$lang}) if(!$swoncond);                   # 'swoncond not met'
+  $paref->{supplement} = encode('utf8', $hqtxt{swofmt}{$lang}) if($swoffcond);                   # 'swoffcond met'
 
   if (defined $paref->{supplement}) {
       ___setConsumerPlanningState ($paref);
@@ -15782,8 +15782,8 @@ sub _graphicHeader {
                           $ydayDvtn =~ /^[1-9]/ ? $hqtxt{pltp}{$lang} :
                           $hqtxt{snbefb}{$lang};
                           
-      $text_tdayDvtn = encode ('UTF-8', $text_tdayDvtn);
-      $text_ydayDvtn = encode ('UTF-8', $text_ydayDvtn);
+      $text_tdayDvtn = encode ('utf8', $text_tdayDvtn);
+      $text_ydayDvtn = encode ('utf8', $text_ydayDvtn);
 
       ## erste Header-Zeilen
       #######################
@@ -16039,17 +16039,17 @@ sub __createReduceIcon {
   my $img;
 
   if (!defined $rps) {
-      $title = encode ('UTF-8', $htitles{rdcstat}{$lang});
+      $title = encode ('utf8', $htitles{rdcstat}{$lang});
       $title =~ s/<NAME>/$name/xs;
       $img   = '-';
   }
   elsif ($rps) {
-      $title = encode ('UTF-8', $htitles{rdcactiv}{$lang});
+      $title = encode ('utf8', $htitles{rdcactiv}{$lang});
       $title =~ s/<NAME>/$name/xs;
       $img = FW_makeImage ('10px-kreis-gelb.png', $title);
   }
   else {
-      $title = encode ('UTF-8', $htitles{rdcnoact}{$lang});
+      $title = encode ('utf8', $htitles{rdcnoact}{$lang});
       $title =~ s/<NAME>/$name/xs;    
       $img = FW_makeImage ('10px-kreis-gruen.png', $title);
   }
@@ -16818,9 +16818,11 @@ sub _beamGraphicFirstHour {
 
   $hfcg->{0}{beam1}  //= 0;
   $hfcg->{0}{beam2}  //= 0;
+  my %roundable        = map { $_ => 1 } qw(pvForecast pvReal consumptionForecast consumption);
+  my @beams            = ($beam1cont, $beam2cont);
   $hfcg->{0}{diff}     = sprintf "%.1f", ($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
-  $hfcg->{0}{diff}     = sprintf "%.0f", $hfcg->{0}{diff} if($kw eq 'Wh' && ($beam1cont eq 'pvForecast' || $beam1cont eq 'pvReal'));
-
+  $hfcg->{0}{diff}     = sprintf "%.0f", $hfcg->{0}{diff} if($kw eq 'Wh' && grep { $roundable{$_} } @beams);
+  
   my $epc = CurrentVal ($hash, 'ePurchasePriceCcy', 0);
   my $efc = CurrentVal ($hash, 'eFeedInTariffCcy',  0);
 
@@ -17029,8 +17031,10 @@ sub _beamGraphicRemainingHours {
 
       $hfcg->{$i}{beam1} //= 0;
       $hfcg->{$i}{beam2} //= 0;
+	  my %roundable        = map { $_ => 1 } qw(pvForecast pvReal consumptionForecast consumption);
+	  my @beams            = ($beam1cont, $beam2cont);
       $hfcg->{$i}{diff}    = sprintf "%.1f", ($hfcg->{$i}{beam1} - $hfcg->{$i}{beam2});
-      $hfcg->{$i}{diff}    = sprintf "%.0f", $hfcg->{$i}{diff} if($kw eq 'Wh' && ($beam1cont eq 'pvForecast' || $beam1cont eq 'pvReal'));
+      $hfcg->{$i}{diff}    = sprintf "%.0f", $hfcg->{$i}{diff} if($kw eq 'Wh' && grep { $roundable{$_} } @beams);
 
       $maxVal = $hfcg->{$i}{beam1} if($hfcg->{$i}{beam1} > $maxVal);
       $maxVal = $hfcg->{$i}{beam2} if($hfcg->{$i}{beam2} > $maxVal);
@@ -19061,7 +19065,7 @@ sub weather2icon {
   my $txt  = $lang eq "DE" ? "txtd" : "txte";
 
   if (defined $weather_ids{$id}) {
-      return $weather_ids{$id}{icon}, encode('UTF-8', $weather_ids{$id}{$txt});
+      return $weather_ids{$id}{icon}, encode('utf8', $weather_ids{$id}{$txt});
   }
 
 return ('unknown','');
@@ -19350,8 +19354,8 @@ sub fillupMessageSystem {
       next if($smi >= IDXLIMIT);
       $midx++;
       $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
-      $data{$name}{messages}{$midx}{DE} = encode ('UTF-8', $data{$name}{preparedmessages}{$smi}{DE});
-      $data{$name}{messages}{$midx}{EN} = encode ('UTF-8', $data{$name}{preparedmessages}{$smi}{EN});
+      $data{$name}{messages}{$midx}{DE} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{DE});
+      $data{$name}{messages}{$midx}{EN} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{EN});
   }
   
   # Integration File Messages
@@ -19435,7 +19439,7 @@ sub outputMessages {
       next if($key >= IDXLIMIT);
 
       $hc++;
-      #my $enmsg = encode ('UTF-8', $data{$name}{messages}{$key}{$lang});
+      #my $enmsg = encode ('utf8', $data{$name}{messages}{$key}{$lang});
       my $enmsg = $data{$name}{messages}{$key}{$lang};
 
       $out .= qq{<tr>};
@@ -21950,13 +21954,13 @@ sub checkPlantConfig {
   $out .= "<br>";
 
   if ($cf) {
-      $out .= encode ("UTF-8", $hqtxt{strnok}{$lang});
+      $out .= encode ("utf8", $hqtxt{strnok}{$lang});
   }
   elsif ($wn) {
-      $out .= encode ("UTF-8", $hqtxt{strwn}{$lang});
+      $out .= encode ("utf8", $hqtxt{strwn}{$lang});
   }
   else {
-      $out .= encode ("UTF-8", $hqtxt{strok}{$lang});
+      $out .= encode ("utf8", $hqtxt{strok}{$lang});
   }
 
   $out =~ s/ (Bitte eventuelle Hinweise|Please note any information).*// if(!$io);
