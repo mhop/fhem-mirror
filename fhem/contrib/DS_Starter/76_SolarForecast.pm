@@ -160,9 +160,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.54.1" => "07.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
+  "1.54.1" => "08.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
                            "_setattrKeyVal: optimize function between execute from FHEMWEB and Commandline ".
-                           "_beamGraphicFirstHour, _beamGraphicRemainingHours: decimal places according to the setting of the energy unit",
+                           "_beamGraphicFirstHour, _beamGraphicRemainingHours: decimal places according to the setting of the energy unit ".
+                           "___switchConsumerOn: Switch on consumers even if they are not interruptible after state interrupted|interrupting|continuing ".
+                           "increase MAXCONSUMER up to 20 ",
   "1.54.0" => "05.07.2025  edit commandref, ___areaFactorTrack: important bugfix in calc of direct area factor for DWD use ",
   "1.53.3" => "04.07.2025  Change of the correction factor calculation to the ratio of real production and the API raw forecast ",
   "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
@@ -380,7 +382,7 @@ use constant {
 
   MAXWEATHERDEV  => 3,                                                              # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
   MAXBATTERIES   => 3,                                                              # maximale Anzahl der möglichen Batterien
-  MAXCONSUMER    => 16,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
+  MAXCONSUMER    => 20,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
   MAXPRODUCER    => 3,                                                              # maximale Anzahl der möglichen anderen Produzenten (Attribut)
   MAXINVERTER    => 4,                                                              # maximale Anzahl der möglichen Inverter
   MAXBEAMLEVEL   => 3,                                                              # maximale Anzahl der Balkengrafik Ebenen 
@@ -13140,8 +13142,13 @@ sub ___switchConsumerOn {
       delete $paref->{supplement};
   }
 
-  if ($auto && $oncom && $swoncond && !$swoffcond && !$iilt &&                                    # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
-        $simpCstat =~ /planned|priority|starting/xs && $isInTime) {                               # Verbraucher Start ist geplant && Startzeit überschritten
+  if ($auto 
+      && $oncom 
+      && $swoncond 
+      && !$swoffcond                                                                              # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
+      && !$iilt 
+      && $simpCstat =~ /planned|priority|starting/xs 
+      && $isInTime) {                                                                             # Verbraucher Start ist geplant && Startzeit überschritten
       my $mode   = getConsumerPlanningMode        ($hash, $c);                                    # Planungsmode 'can' oder 'must'
       my $enable = ___enableSwitchByBatPrioCharge ($paref);                                       # Vorrangladung Batterie ?
 
@@ -13172,12 +13179,14 @@ sub ___switchConsumerOn {
 
           writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                  # Cache File Consumer schreiben
       }
-  }
-  elsif ((($isintable == 1 && $isConsRcmd)          ||                                             # unterbrochenen Consumer fortsetzen
-          ($isintable == 3 && $isConsRcmd))         &&
-         $isInTime && $auto && $oncom && !$iilt     &&
-         $simpCstat =~ /interrupted|interrupting|continuing/xs) {
-
+  }                                                                                              
+  elsif ($isConsRcmd                                                                               # unterbrochenen Consumer fortsetzen  
+         && ($isintable == 0 || $isintable == 1 || $isintable == 3)                                # $isintable == 0 -> Consumer auch einschalten wenn sie nicht unterbrechbar sind
+         && $isInTime
+         && $auto
+         && $oncom
+         && !$iilt
+         && $simpCstat =~ /interrupted|interrupting|continuing/xs) {
       my $cause = $isintable == 3 ? 'interrupt condition no longer present' : 'existing surplus';
       $state    = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom", cause: $cause};
 
