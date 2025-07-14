@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  98_vitoconnect: New api and iam URL
  - change: 76_SolarForecast: version 1.54.1
  - bugfix: 76_SolarForecast: minor release 1.54.0
  - feature: 76_SolarForecast: showDiff can be set separately for each level
