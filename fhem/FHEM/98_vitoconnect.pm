@@ -93,6 +93,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.9.0"  => "09.03.2025  New api and iam URL (viessmann-climatesolutions.com)",
   "0.8.7"  => "09.03.2025  Fix return value when using SVN or Roger",
   "0.8.6"  => "24.02.2025  Adapt schedule data before sending",
   "0.8.5"  => "24.02.2025  fix error when calling setter from FHEMWEB",
@@ -136,10 +137,13 @@ my %vNotesIntern = (
 
 my $client_secret = "2e21faa1-db2c-4d0b-a10f-575fd372bc8c-575fd372bc8c";
 my $callback_uri  = "http://localhost:4200/";
-my $apiURL        = "https://api.viessmann.com/iot/v1/equipment/";
-my $iotURL_V1     = "https://api.viessmann.com/iot/v1/equipment/";
-my $iotURL_V2     = "https://api.viessmann.com/iot/v2/features/";
-my $errorURL_V3   = "https://api.viessmann.com/service-documents/v3/error-database";
+my $apiBaseURL    = "https://api.viessmann-climatesolutions.com";
+my $iamBaseURL    = "https://iam.viessmann-climatesolutions.com";
+my $iotURL_V1     = "$apiBaseURL/iot/v1/equipment/";
+my $iotURL_V2     = "$apiBaseURL/iot/v2/features/";
+my $authorizeURL  = "$iamBaseURL/idp/v2/authorize";
+my $tokenURL      = "$iamBaseURL/idp/v2/token";
+my $errorURL_V3   = "$apiBaseURL/service-documents/v3/error-database";
 
 my $RequestListMapping; # Über das Attribut Mapping definierte Readings zum überschreiben der RequestList
 my %translations;       # Über das Attribut translations definierte Readings zum überschreiben der RequestList
@@ -2801,7 +2805,6 @@ sub vitoconnect_getCode {
         readingsSingleUpdate($hash,"state","Set apiKey to continue",1); # Reading 'state' setzen
         return;
     }
-    my $authorizeURL = 'https://iam.viessmann.com/idp/v2/authorize';
 
     my $param = {
         url => $authorizeURL
@@ -2876,7 +2879,7 @@ sub vitoconnect_getAccessToken {
     my $name      = $hash->{NAME};      # Device-Name
     my $client_id = $hash->{apiKey};    # Internal: apiKey
     my $param     = {
-        url    => "https://iam.viessmann.com/idp/v2/token",
+        url    => $tokenURL,
         hash   => $hash,
         header => "Content-Type: application/x-www-form-urlencoded",
         data   => "grant_type=authorization_code"
@@ -2947,7 +2950,7 @@ sub vitoconnect_getRefresh {
     my $name      = $hash->{NAME};
     my $client_id = $hash->{apiKey};
     my $param     = {
-        url    => "https://iam.viessmann.com/idp/v2/token",
+        url    => $tokenURL,
         hash   => $hash,
         header => "Content-Type: application/x-www-form-urlencoded",
         data   => "grant_type=refresh_token"
@@ -3016,7 +3019,6 @@ sub vitoconnect_getGw {
     my $name         = $hash->{NAME};
     my $access_token = $hash->{".access_token"};
     my $param        = {
-#       url      => $apiURL
         url      => $iotURL_V1
         ."gateways",
         hash     => $hash,
@@ -3149,7 +3151,6 @@ sub vitoconnect_getInstallation {
     my $name         = $hash->{NAME};
     my $access_token = $hash->{".access_token"};
     my $param        = {
-#       url      => $apiURL
         url      => $iotURL_V1
         ."installations",
         hash     => $hash,
@@ -3218,7 +3219,6 @@ sub vitoconnect_getInstallationFeatures {
     
     # installation features      #Fixme call only once
     my $param = {
-#       url     => $apiURL
         url     => $iotURL_V2
         ."installations/".$installation."/features",
         hash    => $hash,
@@ -3735,7 +3735,7 @@ sub vitoconnect_getErrorCode {
             }
 
             my $param = {
-                url => "https://api.viessmann.com/service-documents/v3/error-database?materialNumber=$materialNumber&errorCode=$errorCode&countryCode=${\uc($language)}&languageCode=${\lc($language)}",
+                url => "$errorURL_V3?materialNumber=$materialNumber&errorCode=$errorCode&countryCode=${\uc($language)}&languageCode=${\lc($language)}",
                 hash => $hash,
                 timeout => $hash->{timeout},  # Timeout von Internals = 15s
                 method => "GET",  # Methode auf GET ändern
