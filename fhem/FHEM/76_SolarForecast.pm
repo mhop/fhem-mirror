@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
   "1.54.1" => "08.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
                            "_setattrKeyVal: optimize function between execute from FHEMWEB and Commandline ".
                            "_beamGraphicFirstHour, _beamGraphicRemainingHours: decimal places according to the setting of the energy unit ".
@@ -11805,9 +11806,9 @@ sub _createSummaries {
   my $day    = $paref->{day};
   my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
   my $minute = $paref->{minute};                                                                      # aktuelle Minute
+  my $debug  = $paref->{debug};
 
-  my $hash = $defs{$name};
-  $minute  = int ($minute) + 1;                                                                       # Minute Range umsetzen auf 1 bis 60
+  $minute = int ($minute) + 1;                                                                        # Minute Range umsetzen auf 1 bis 60
 
   ## Initialisierung
   ####################
@@ -11826,9 +11827,9 @@ sub _createSummaries {
   my $tdConFcTillSunset = 0;
   my $remainminutes     = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
 
-  my $hour00pvfc  = NexthoursVal ($hash, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;
-  my $hour00confc = NexthoursVal ($hash, "NextHour00", 'confc', 0);
-  my $hod00       = NexthoursVal ($hash, "NextHour00", 'hourofday', 0);
+  my $hour00pvfc  = NexthoursVal ($name, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;
+  my $hour00confc = NexthoursVal ($name, "NextHour00", 'confc', 0);
+  my $hod00       = NexthoursVal ($name, "NextHour00", 'hourofday', 0);
   
   $hour00pvfc     = max (0, $hour00pvfc);                                                              # PV Prognose darf nicht negativ sein
   $hour00confc    = max (0, $hour00confc);                                                             # Verbrauchsprognose darf nicht negativ sein
@@ -11858,11 +11859,11 @@ sub _createSummaries {
 
   for my $h (1..47) {
       my $idx   = sprintf "%02d", $h;
-      my $pvfc  = NexthoursVal ($hash, "NextHour".$idx, 'pvfc',      0);
-      my $confc = NexthoursVal ($hash, "NextHour".$idx, 'confc',     0);
-      my $istdy = NexthoursVal ($hash, "NextHour".$idx, 'today',     0);
-      my $don   = NexthoursVal ($hash, "NextHour".$idx, 'DoN',       0);
-      my $hod   = NexthoursVal ($hash, "NextHour".$idx, 'hourofday', 0);
+      my $pvfc  = NexthoursVal ($name, "NextHour".$idx, 'pvfc',      0);
+      my $confc = NexthoursVal ($name, "NextHour".$idx, 'confc',     0);
+      my $istdy = NexthoursVal ($name, "NextHour".$idx, 'today',     0);
+      my $don   = NexthoursVal ($name, "NextHour".$idx, 'DoN',       0);
+      my $hod   = NexthoursVal ($name, "NextHour".$idx, 'hourofday', 0);
       
       $pvfc     = max (0, $pvfc);                                                           # PV Prognose darf nicht negativ sein
       $confc    = max (0, $confc);                                                          # Verbrauchsprognose darf nicht negativ sein
@@ -11951,7 +11952,7 @@ sub _createSummaries {
 
   for my $pn (1..MAXPRODUCER) {                                                                         # Erzeugung sonstiger Producer hinzufügen
       $pn       = sprintf "%02d", $pn;
-      $othprod += ProducerVal ($hash, $pn, 'pgeneration', 0);
+      $othprod += ProducerVal ($name, $pn, 'pgeneration', 0);
   }
 
   my $consumption         = int ($pv2node + $othprod - $gfeedin + $gcon - $batin + $batout);            # ohne PV2Grid
@@ -11960,6 +11961,11 @@ sub _createSummaries {
 
   my $surplus             = int ($pv2node - $pv2grid + $othprod - $consumption);                        # aktueller Überschuß
   $surplus                = 0 if($surplus < 0);                                                         # wegen Vergleich nompower vs. surplus
+
+  if ($debug =~ /collectData/xs) {
+      Log3 ($name, 1, "$name DEBUG> current Power values -> PV2Node: $pv2node W, PV2Grid: $pv2grid, Other: $othprod W, GridIn: $gfeedin W, GridCon: $gcon W, BatIn: $batin W, BatOut: $batout W");
+      Log3 ($name, 1, "$name DEBUG> current Consumption result -> $consumption W");
+  }
 
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
@@ -14448,7 +14454,7 @@ sub _saveEnergyConsumption {
   }
 
   if ($debug =~ /collectData/xs) {
-      Log3 ($name, 1, "$name DEBUG> EnergyConsumption input -> PV: $pvrl, PP: $ppreal, GridIn: $gfeedin, GridCon: $gcon, BatIn: $batin, BatOut: $batout");
+      Log3 ($name, 1, "$name DEBUG> EnergyConsumption input -> PV: $pvrl Wh, PP: $ppreal Wh, GridIn: $gfeedin Wh, GridCon: $gcon Wh, BatIn: $batin Wh, BatOut: $batout Wh");
       Log3 ($name, 1, "$name DEBUG> EnergyConsumption result -> $con Wh");
   }
 

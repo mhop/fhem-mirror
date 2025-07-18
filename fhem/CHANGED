@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change: 76_SolarForecast: version 1.54.2, more debug info
  - feature: 72_FRITZBOX: Vorbereitung auf Fritz!OS 8.10
             get <name> callApifromList <data.lua|query.lua|tr064|javascript> 
             enableCPUInfo <0 | (-1) | 1 | 2 ... | 24>
