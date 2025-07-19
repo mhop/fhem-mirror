@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.54.3" => "19.07.2025  ctrlDebug: add collectData_long ",
   "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
   "1.54.1" => "08.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
                            "_setattrKeyVal: optimize function between execute from FHEMWEB and Commandline ".
@@ -524,6 +525,7 @@ my @dd = qw( aiProcess
              apiProcess
              batteryManagement
              collectData
+             collectData_long
              consumerPlanning
              consumption
              consumption_long
@@ -8648,7 +8650,7 @@ sub runTask {
       if (!defined $hash->{HELPER}{S48DONE}) {
           $hash->{HELPER}{S48DONE} = 1;
 
-          if ($debug =~ /collectData/x) {
+          if ($debug =~ /collectData_long/x) {
               Log3 ($name, 1, "$name DEBUG> INFO - runTask starts data collection at the end of an hour");
           }
 
@@ -8664,7 +8666,7 @@ sub runTask {
       if (!defined $hash->{HELPER}{S03DONE}) {
           $hash->{HELPER}{S03DONE} = 1;
 
-          if ($debug =~ /collectData/x) {
+          if ($debug =~ /collectData_long/x) {
               Log3 ($name, 1, "$name DEBUG> INFO - runTask starts data collection at the beginning of an hour");
           }
 
@@ -8827,7 +8829,7 @@ sub centralTask {
   #    delete $data{$name}{circular}{$hodc};
   #}
   
-  delete $data{$name}{circular}{'00'};
+  # delete $data{$name}{circular}{'00'};
   
   #my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
   #my $gco = AttrVal ($name, 'graphicControl', '');
@@ -8837,29 +8839,6 @@ sub centralTask {
   #    CommandAttr (undef, "$name graphicControl $newval");
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
-
-  for my $in (1..MAXINVERTER) {
-      $in    = sprintf "%02d", $in;
-      my ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
-      next if($err);
-
-      delete $data{$name}{inverters}{$in}{ireverse};                      # 08.05.
-      delete $data{$name}{inverters}{$in}{igeneration};                   # 19.05.
-
-      my $sidv = AttrVal ($name, "setupInverterDev${in}", '');            # 19.05.
-      if ($sidv =~ /pv=/xs) {
-          my ($a, $h) = parseParams ($sidv);
-          my $new = $a->[0];
-
-          while (my($key, $value) = each (%$h)) {
-              if ($key eq 'pv') {
-                  $key = 'pvOut';
-              }
-              $new .= ' '.$key.'='.$value;
-          }
-          CommandAttr (undef, "$name setupInverterDev$in $new");
-      }
-  }
   
   my $gsd = AttrVal ($name, 'graphicShowDiff ', undef);                 # 25.06.
   my $gco = AttrVal ($name, 'graphicControl', '');
@@ -9722,7 +9701,7 @@ sub _transferWeatherValues {
 
       if (defined $wid && (!$wid || $wid == 100)) {
           $wcc = 0;                                                                         # V 1.47.2
-          debugLog ($paref, 'collectData', "Adjust cloud cover ratio (wcc) due to significant weather (ww) - ww: $wid -> wcc: $wcc");
+          debugLog ($paref, 'collectData_long', "Adjust cloud cover ratio (wcc) due to significant weather (ww) - ww: $wid -> wcc: $wcc");
       }
 
       my $nhtstr                                  = "NextHour".sprintf "%02d", $num;
@@ -9785,7 +9764,7 @@ sub __readDataWeather {
   my $err         = checkdwdattr ($name, $fcname, \@dweattrmust);
   $paref->{state} = $err if($err);
 
-  debugLog ($paref, 'collectData', "collect Weather data step $step - device: $fcname =>");
+  debugLog ($paref, 'collectData_long', "collect Weather data step $step - device: $fcname =>");
 
   for my $n (0..46) {
       my ($fd, $fh) = calcDayHourMove ($chour, $n);
@@ -9820,7 +9799,7 @@ sub __readDataWeather {
 
       my $rr1c = ReadingsNum ($fcname, "fc${fd1}_${fh1}_RR1c", 0);                             # Gesamtniederschlag (1-stündig) letzte 1 Stunde -> wir schuen in die Zukunft
 
-      debugLog ($paref, 'collectData', "Weather $step: fc${fd}_${fh}, don: $sunup, wid: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: ".(defined $temp ? $temp : '<undef>').", Neff: ".(defined $neff ? $neff : '<undef>'));
+      debugLog ($paref, 'collectData_long', "Weather $step: fc${fd}_${fh}, don: $sunup, wid: ".(defined $wid ? $wid : '<undef>').", RR1c: $rr1c, TTT: ".(defined $temp ? $temp : '<undef>').", Neff: ".(defined $neff ? $neff : '<undef>'));
 
       $data{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{ww}   = $wid;
       $data{$name}{weatherdata}{"fc${fd}_${fh}"}{$step}{wwd}  = $wwd;
@@ -9844,7 +9823,7 @@ sub ___readDataWeatherAPI {
   my $fcname = $paref->{fcname};
   my $hash   = $defs{$name};
 
-  debugLog ($paref, 'collectData', "collect Weather data step $step - API: $fcname =>");
+  debugLog ($paref, 'collectData_long', "collect Weather data step $step - API: $fcname =>");
 
   my ($rapi, $wapi) = getStatusApiName ($hash);
 
@@ -9872,7 +9851,7 @@ sub ___readDataWeatherAPI {
           $data{$name}{weatherdata}{$idx}{$step}{ttt}  = $ttt  if(defined $ttt);
           $data{$name}{weatherdata}{$idx}{$step}{don}  = $don  if(defined $don);
 
-          debugLog ($paref, 'collectData', "Weather $step: $idx".
+          debugLog ($paref, 'collectData_long', "Weather $step: $idx".
                                            ", don: ". (defined $don  ? $don  : '<undef>').
                                            ", wid: ". (defined $wid  ? $wid  : '<undef>').
                                            ", RR1c: ".(defined $rr1c ? $rr1c : '<undef>').
@@ -9894,7 +9873,7 @@ sub __mergeDataWeather {
   my $type  = $paref->{type};
   my $hash  = $defs{$name};
 
-  debugLog ($paref, 'collectData', "merge Weather data =>");
+  debugLog ($paref, 'collectData_long', "merge Weather data =>");
 
   my $ds = 0;
 
@@ -9937,7 +9916,7 @@ sub __mergeDataWeather {
       $data{$name}{weatherdata}{$key}{merge}{rr1c} = sprintf "%.2f", ($rr1c / $z);
       $data{$name}{weatherdata}{$key}{merge}{ttt}  = sprintf "%.2f", ($temp / $z);
 
-      debugLog ($paref, 'collectData', "Weather merged: $key, ".
+      debugLog ($paref, 'collectData_long', "Weather merged: $key, ".
                                        "don: $data{$name}{weatherdata}{$key}{merge}{don}, ".
                                        "wid: ".(defined $data{$name}{weatherdata}{$key}{1}{ww} ? $data{$name}{weatherdata}{$key}{1}{ww} : '<undef>').", ".
                                        "RR1c: $data{$name}{weatherdata}{$key}{merge}{rr1c}, ".
@@ -9945,7 +9924,7 @@ sub __mergeDataWeather {
                                        "Neff: $data{$name}{weatherdata}{$key}{merge}{neff}");
   }
 
-  debugLog ($paref, 'collectData', "Number of Weather datasets mergers - delivered: $q, merged: $m, failures: ".($q - $m));
+  debugLog ($paref, 'collectData_long', "Number of Weather datasets mergers - delivered: $q, merged: $m, failures: ".($q - $m));
 
 return;
 }
@@ -9969,7 +9948,7 @@ sub __sunRS {
 
   my ($cset, undef, undef, undef) = locCoordinates();
 
-  debugLog ($paref, 'collectData', "collect sunrise/sunset times - device: $fcname =>");
+  debugLog ($paref, 'collectData_long', "collect sunrise/sunset times - device: $fcname =>");
 
   my ($rapi, $wapi) = getStatusApiName ($hash);
 
@@ -10003,7 +9982,7 @@ sub __sunRS {
   $data{$name}{current}{sunsetTodayTs}    = timestringToTimestamp ($date.' '.$fc0_ss.':00');
   $data{$name}{current}{sunsetTomorrowTs} = 86400 + timestringToTimestamp ($date.' '.$fc1_ss.':00');
 
-  debugLog ($paref, 'collectData', "sunrise/sunset today: $fc0_sr / $fc0_ss, sunrise/sunset tomorrow: $fc1_sr / $fc1_ss");
+  debugLog ($paref, 'collectData_long', "sunrise/sunset today: $fc0_sr / $fc0_ss, sunrise/sunset tomorrow: $fc1_sr / $fc1_ss");
 
   storeReading ('Today_SunRise',    $fc0_sr);
   storeReading ('Today_SunSet',     $fc0_ss);
@@ -10158,8 +10137,8 @@ sub _transferInverterValues {
 
       writeToHistory ( { paref => $paref, key => 'pvrl'.$in, val => $ethishour, hour => $hod } );
 
-      debugLog ($paref, "collectData", "collect Inverter $in data - device: $indev, source: $source, delivery: $feed =>");
-      debugLog ($paref, "collectData", "pvOut: $pvout W, pvIn: $pvin W, AC->DC: $pac2dc W, DC->AC: $pdc2ac W, etotal: $etotal Wh");
+      debugLog ($paref, 'collectData|collectData_long', "collect Inverter $in data - device: $indev, source: $source, delivery: $feed =>");
+      debugLog ($paref, 'collectData|collectData_long', "pvOut: $pvout W, pvIn: $pvin W, AC->DC: $pac2dc W, DC->AC: $pdc2ac W, etotal: $etotal Wh");
   }
 
   storeReading ('Current_PV', $pvsum.' W');
@@ -10170,7 +10149,7 @@ sub _transferInverterValues {
   push @{$data{$name}{current}{genslidereg}}, $pvsum;                                                            # Schieberegister PV Erzeugung
   limitArray ($data{$name}{current}{genslidereg}, SLIDENUMMAX);
   
-  debugLog ($paref, "collectData", "summary data of all Inverters - pv: $pvsum W, this hour Generation: $ethishoursum Wh");
+  debugLog ($paref, 'collectData|collectData_long', "summary data of all Inverters - pv: $pvsum W, this hour Generation: $ethishoursum Wh");
    
   ## PV real valid Status bestimmen
   ###################################  
@@ -10188,8 +10167,8 @@ sub _transferInverterValues {
   $valid = 0  if($plantdera);
   $valid = 1  if(!$pvrlvdsav && $percdev <= 10);                                              # pvrl dennoch als valide ansehen wenn hinreichend kleine fc-real Differenz -> was nur kurze Abregelung / Lernunterbrechnung
   
-  debugLog ($paref, "collectData", "currently saved 'pvrlvd' value: $pvrlvdsav");
-  debugLog ($paref, "collectData", "current percentage pvrl/pvapifc deviation of hod $hod: $percdev % -> pvrlvd: $valid");
+  debugLog ($paref, 'collectData|collectData_long', "currently saved 'pvrlvd' value: $pvrlvdsav");
+  debugLog ($paref, 'collectData|collectData_long', "current percentage pvrl/pvapifc deviation of hod $hod: $percdev % -> pvrlvd: $valid");
   
   writeToHistory ( { paref => $paref, key => 'pvrl', val => $ethishoursum, hour => $hod, valid => $valid } );    # valid=1: beim Learning berücksichtigen, 0: nicht
 
@@ -10215,7 +10194,7 @@ sub __handleReductionState {
       return;
   }
 
-  debugLog ($paref, 'collectData', "State of Plant derating: $rdcstate, info: $info");
+  debugLog ($paref, 'collectData|collectData_long', "State of Plant derating: $rdcstate, info: $info");
   
   if ($info ne 'reductionState not set') {
       my $hod = sprintf "%02d", ($chour + 1);
@@ -10442,7 +10421,7 @@ sub __calcSunPosition {
   $data{$name}{nexthours}{$nhtstr}{sunaz}  = $az;
   $data{$name}{nexthours}{$nhtstr}{sunalt} = $alt;
 
-  debugLog ($paref, 'collectData', "Sun position: day: $wtday, hod: $hodn, $tstr, azimuth: $az, altitude: $alt");
+  debugLog ($paref, 'collectData_long', "Sun position: day: $wtday, hod: $hodn, $tstr, azimuth: $az, altitude: $alt");
 
   if ($fd == 0 && $hodn) {                                                                            # Sun Position für aktuellen Tag in pvHistory speichern
       writeToHistory ( { paref => $paref, key => 'sunaz',  val => $az,  hour => $hodn } );
@@ -10790,8 +10769,8 @@ sub _transferProducerValues {
 
       writeToHistory ( { paref => $paref, key => 'pprl'.$pn, val => $ethishour, hour => $nhour } );
 
-      debugLog ($paref, "collectData", "collect Producer $pn data - device: $prdev =>");
-      debugLog ($paref, "collectData", "pcurr: $p W, etotal: $etotal Wh");
+      debugLog ($paref, 'collectData|collectData_long', "collect Producer $pn data - device: $prdev =>");
+      debugLog ($paref, 'collectData|collectData_long', "pcurr: $p W, etotal: $etotal Wh");
   }
 
 return;
@@ -10917,8 +10896,8 @@ sub _transferMeterValues {
   $data{$name}{current}{gridconsumption}   = int $gco;                                               # Current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
   $data{$name}{current}{gridfeedin}        = int $gfin;                                              # Wert current grid Feed in
 
-  debugLog ($paref, "collectData", "collect Meter data - device: $medev =>");
-  debugLog ($paref, "collectData", "gcon: $gco W, gfeedin: $gfin W, contotal: $gctotal Wh, feedtotal: $fitotal Wh");
+  debugLog ($paref, 'collectData|collectData_long', "collect Meter data - device: $medev =>");
+  debugLog ($paref, 'collectData|collectData_long', "gcon: $gco W, gfeedin: $gfin W, contotal: $gctotal Wh, feedtotal: $fitotal Wh");
 
 
   ## Management aus dem Netz bezogener Energie
@@ -26442,9 +26421,9 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlDebug"></a>
        <li><b>ctrlDebug</b><br>
-         Enables/disables various debug modules. If only "none" is selected, there is no DEBUG output.
+         Enables/disables various debug modules. If only "none" is selected, there is no DEBUG output. <br>
          For the output of debug messages the verbose level of the device must be at least "1". <br>
-         The debug level can be combined with each other: <br><br>
+         The debug modules can be combined with each other: <br><br>
 
          <ul>
          <table>
@@ -26454,7 +26433,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>apiCall</b>              </td><td>Retrieval API interface without data output                                      </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>API data retrieval and processing                                                </td></tr>
             <tr><td> <b>batteryManagement</b>    </td><td>Battery management control values (SoC)                                          </td></tr>
-            <tr><td> <b>collectData</b>          </td><td>detailed data collection                                                         </td></tr>
+            <tr><td> <b>collectData</b>          </td><td>Data collection of energy and power values                                       </td></tr>
+            <tr><td> <b>collectData_long</b>     </td><td>like collectData, plus collection of weather and astro data                      </td></tr>
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer scheduling processes                                                    </td></tr>
             <tr><td> <b>consumerSwitchingXX</b>  </td><td>Operations of the internal consumer switching module of consumer XX              </td></tr>
             <tr><td> <b>consumption</b>          </td><td>Consumption calculation, consumption forecasting and utilization                 </td></tr>
@@ -29101,9 +29081,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-ctrlDebug"></a>
        <li><b>ctrlDebug</b><br>
-         Aktiviert/deaktiviert verschiedene Debug Module. Ist ausschließlich "none" selektiert erfolgt keine DEBUG-Ausgabe.
+         Aktiviert/deaktiviert verschiedene Debug Module. Ist ausschließlich "none" selektiert erfolgt keine DEBUG-Ausgabe. <br>
          Zur Ausgabe von Debug Meldungen muß der verbose Level des Device mindestens "1" sein. <br>
-         Die Debug Ebenen können miteinander kombiniert werden: <br><br>
+         Die Debug Module können miteinander kombiniert werden: <br><br>
 
          <ul>
          <table>
@@ -29113,7 +29093,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>apiCall</b>              </td><td>Abruf API Schnittstelle ohne Datenausgabe                                        </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>Abruf und Verarbeitung von API Daten                                             </td></tr>
             <tr><td> <b>batteryManagement</b>    </td><td>Steuerungswerte des Batterie Managements (SoC)                                   </td></tr>
-            <tr><td> <b>collectData</b>          </td><td>detailliierte Datensammlung                                                      </td></tr>
+            <tr><td> <b>collectData</b>          </td><td>Datensammlung von Energie- und Leistungswerten                                   </td></tr>
+            <tr><td> <b>collectData_long</b>     </td><td>wie collectData, zusätzlich Sammlung von Wetter- und Astrodaten                  </td></tr>
             <tr><td> <b>consumerPlanning</b>     </td><td>Consumer Einplanungsprozesse                                                     </td></tr>
             <tr><td> <b>consumerSwitchingXX</b>  </td><td>Operationen des internen Consumer Schaltmodul für Verbraucher XX                 </td></tr>
             <tr><td> <b>consumption</b>          </td><td>Verbrauchskalkulation, Verbrauchsvorhersage und -nutzung                         </td></tr>
