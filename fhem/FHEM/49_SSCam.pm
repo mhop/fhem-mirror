@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.10"=> "20.07.2025  remove unnecessary debugactivetoken info ",
   "9.12.9" => "20.05.2025  change cleanData ",
   "9.12.8" => "04.04.2025  set verifiedversion to 9.2.3 ",
   "9.12.7" => "27.01.2025  _setsnapGallery: limit getClHash to the calling FHEMWEB Device ",
@@ -11806,7 +11807,6 @@ sub cleanData {
       
       if (AttrVal ($name, 'debugactivetoken', 0)) {
           Log3 ($name, 1, "$name - Number of remaining entries in owndata Hash: ".scalar (keys %owndata));
-          Log3 ($name, 1, "$name - Number of remaining entries in owndata Hash: ".Dumper %owndata);
       }
   }
 
