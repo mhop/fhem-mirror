@@ -38,7 +38,7 @@ use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
 use Math::Trig;
-use List::Util qw(min max shuffle);
+use List::Util qw(sum min max shuffle);
 use Scalar::Util qw(blessed weaken);
 
 eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.54.4" => "20.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort' ",
   "1.54.3" => "19.07.2025  ctrlDebug: add collectData_long ",
   "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
   "1.54.1" => "08.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
@@ -5886,7 +5887,7 @@ sub __updPreFile {
       return $err;
   }
 
-  if ($lencheck && length $remFile ne $cmlen) {
+  if ($lencheck && length ($remFile) ne $cmlen) {
       $err = "update ERROR: length of $file is not $cmlen Bytes";
       Log3 ($name, 1, "$name - $err");
       return $err;
@@ -5947,22 +5948,18 @@ sub __updWriteFile {
   my $content = shift;
 
   my $fPath = "$root/$fName";
-  my $err;
+  
+  open my $fh, '>:raw', $fPath or return "update ERROR open $fPath failed: $!";
 
-  if (!open(FD, ">$fPath")) {
-      $err = "update ERROR open $fPath failed: $!";
-      return $err;
-  }
+  my $bytes = encode ('UTF-8', $content);
+  print {$fh} $bytes;
+  close $fh or return "update ERROR closing $fPath failed: $!";
+  
+  my $written  = -s $fPath;
+  my $expected = strlength ($bytes);
 
-  binmode(FD);
-  print FD $content;
-  close(FD);
-
-  my $written = -s "$fPath";
-
-  if ($written != length $content) {
-      $err = "update ERROR writing $fPath failed: $!";
-      return $err;
+  if ($written != $expected) {
+      return "update ERROR writing $fPath failed: $!";
   }
 
 return;
@@ -6085,6 +6082,7 @@ sub _attrconsumer {                      ## no critic "not used"
   my $hash  = $defs{$name};
 
   my $valid = {
+      aliasshort    => '',
       type          => '',
       power         => '',
       switchdev     => '',
@@ -6142,6 +6140,11 @@ sub _attrconsumer {                      ## no critic "not used"
 
       if (defined $h->{exconfc} && $h->{exconfc} !~ /^[012]$/xs) {
           return qq{The key "exconfc" is not set correct. Please consider the command reference.};
+      }
+      
+      if (exists $h->{aliasshort}) {                                                       # Kurzalias
+          return qq{The short alias "$h->{aliasshort}" longer than allowed. See command reference.} 
+                 if(strlength ($h->{aliasshort})> 10);
       }
 
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
@@ -9236,6 +9239,7 @@ sub _collectAllRegConsumers {
 
       $data{$name}{consumers}{$c}{name}              = $consumer;                                # Name des Verbrauchers (Device)
       $data{$name}{consumers}{$c}{alias}             = $alias;                                   # Alias des Verbrauchers (Device)
+      $data{$name}{consumers}{$c}{aliasshort}        = $hc->{aliasshort}   // q{};               # Kurzalias des Verbrauchers
       $data{$name}{consumers}{$c}{type}              = $hc->{type}         // DEFCTYPE;          # Typ des Verbrauchers
       $data{$name}{consumers}{$c}{power}             = $hc->{power};                             # Leistungsaufnahme des Verbrauchers in W
       $data{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
@@ -17746,7 +17750,7 @@ sub _flowGraphic {
   my $flowgxshift    = $paref->{flowgxshift};                                  # X-Verschiebung der Flußgrafikbox (muß negiert werden)
   my $flowgyshift    = $paref->{flowgyshift};                                  # Y-Verschiebung der Flußgrafikbox (muß negiert werden)
   my $flowgconsumer  = $paref->{flowgconsumer};                                # Verbraucher in der Energieflußgrafik anzeigen
-  my $flowgconsTime  = $paref->{flowgconsTime};                                # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen
+  my $flowgconsTime  = $paref->{flowgconsTime};                                # Verbraucher Restlaufzeit in der Energieflußgrafik anzeigen
   my $flowgconX      = $paref->{flowgconX};
   my $flowgconsPower = $paref->{flowgconsPower};
   my $cdist          = $paref->{flowgconsDist};                                # Abstand Consumer zueinander
@@ -17764,7 +17768,7 @@ sub _flowGraphic {
   my $stna     = $name;
   $stna       .= int (rand (1500));
 
-  my ($y_pos, $y_pos1, $err);
+  my ($y_pos, $y_pos1, $y_pos2, $err);
 
   for my $re (keys %hrepl) {                                                   # V 1.37.1 Ziffern etc. eliminieren, Forum: https://forum.fhem.de/index.php?msg=1323229
       $stna =~ s/$re/$hrepl{$re}/gxs;
@@ -17913,17 +17917,23 @@ sub _flowGraphic {
 
   ## definierte Verbraucher ermitteln
   #####################################
-  my $cnsmr = {};                                                                         # Hashref Consumer current power
+  my $cnsmr = {};                                                                         # Consumer Hilfshash Referenz
 
-  for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {                             # definierte Verbraucher ermitteln
-      next if(isConsumerNoshow ($hash, $c) =~ /[13]/xs);                                  # auszublendende Consumer nicht berücksichtigen
-      $cnsmr->{$c}{p}    = ReadingsNum ($name, "consumer${c}_currentPower", 0);
-      $cnsmr->{$c}{ptyp} = 'consumer';
+  for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {                                    # definierte Verbraucher ermitteln
+      next if(isConsumerNoshow ($hash, $c) =~ /[13]/xs);                                         # auszublendende Consumer nicht berücksichtigen
+      $cnsmr->{$c}{p}          = ReadingsNum ($name, "consumer${c}_currentPower", 0);
+      $cnsmr->{$c}{shortalias} = ConsumerVal ($name, $c, 'aliasshort', '');                      # Consumer Kurzalias
+      $cnsmr->{$c}{ptyp}       = 'consumer';
   }
 
   my $consumercount = keys %{$cnsmr};
-  $flowgconsumer    = 0 if(!$consumercount);                                              # Consumer Anzeige ausschalten wenn keine Consumer definiert
+  $flowgconsumer    = 0 if(!$consumercount);                                                     # Consumer Anzeige ausschalten wenn keine Consumer definiert
   my @consumers     = sort{$a<=>$b} keys %{$cnsmr};
+  
+  my $total_shortalias_length = sum  map { my $a = $_->{shortalias} // '';
+                                           strlength ($a);                                 # Länge in Zeichen nach Zeichen-Dekodierung
+                                         }
+                                         values %{$cnsmr};
 
 
   ## Producer / Inverter Koordinaten Steuerhash
@@ -17951,8 +17961,9 @@ sub _flowGraphic {
   $vbminy          -= 150 if($showproducers);                                              # mehr Platz oben schaffen wenn Poducerreihe angezeigt
   $vbminy          -= INPUTROWSHIFT if($showgenerators);                                   # mehr Platz oben schaffen wenn Zellen/Input-Reihe angezeigt
 
-  my $vbhight       = 610;
+  my $vbhight       = 630;
   $vbhight         -= 20  if(!$flowgconsTime);
+  $vbhight         -= 20  if(!$total_shortalias_length);
   $vbhight         -= 230 if(!$flowgconsumer);
 
   $vbhight         += PRDCRROWSHIFT if($showproducers);                                    # Höhe Box vergrößern wenn Poducerreihe angezeigt
@@ -18329,7 +18340,7 @@ END3
               $ytext    = $showproducers ? $ytext - PRDCRROWSHIFT + 5 : $ytext + PRDCRROWSHIFT - 30;      # Unterscheidung wenn ProducerZeile angezeigt werden soll
 
               my $genpow = __getGeneratorPower ( { pdcr => $pdcr, lfn => $lfn } );                        # aktuelle Generatorleistung
-              my $lpv1   = length $genpow;
+              my $lpv1   = strlength ($genpow);
 
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
               #################################################################################
@@ -18359,7 +18370,7 @@ END3
 
               $xtext     = $xtext * 2 - 70;                                                 # Korrektur Start X-Koordinate des Textes
               my $pdrpow = __getProducerPower ( { pdcr => $pdcr, lfn => $lfn } );
-              my $lpv1   = length $pdrpow;
+              my $lpv1   = strlength ($pdrpow);
 
               # Leistungszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
               ###############################################################################
@@ -18378,10 +18389,28 @@ END3
   ########################
   if ($flowgconsumer) {
       $cons_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
-      $y_pos     = 1110 + 2 * $exth2cdist;
-      $y_pos1    = 1170 + 2 * $exth2cdist;
+       
+      my %offset = (
+          0b00 =>   0,                                                                                 # weder Power noch Time
+          0b01 =>  60,                                                                                 # nur Power
+          0b10 =>  60,                                                                                 # nur Time
+          0b11 => 120,                                                                                 # beide
+      );
+
+      my $y_base = 1110 + 2 * $exth2cdist;
+      $y_pos     = $y_base;                                                                            # flowgconsPower
+      my $mask   = $flowgconsPower ? 1 : 0;
+      $y_pos1    = $y_base + $offset{$mask};                                                           # flowgconsTime
+      
+      $mask = $flowgconsPower && $flowgconsTime ? 3 :
+              $flowgconsTime                    ? 2 :      
+              $flowgconsPower                   ? 1 :
+              0;
+              
+      $y_pos2 = $y_base + $offset{$mask};                                                              # shortalias
 
       for my $c (@consumers) {
+          my $shortalias   = $cnsmr->{$c}{shortalias} // '';
           $cnsmrpower      = sprintf "%.1f", $cnsmr->{$c}{p};
           $cnsmrpower      = sprintf "%.0f", $cnsmrpower if($cnsmrpower > 10);
           my $consumerTime = ConsumerVal ($name, $c, 'remainTime', '');                               # Restlaufzeit
@@ -18391,31 +18420,54 @@ END3
               $cnsmrpower = isConsumerPhysOn($hash, $c) ? 'on' : 'off';
           }
 
-          my $lcp = length $cnsmrpower;
+          my $lcp = strlength ($cnsmrpower);
+          my $lct = strlength ($consumerTime);
+          my $lcs = strlength ($shortalias); 
 
-          #$ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="1110" style="text-anchor: start;">$cnsmrpower</text>}   if($flowgconsPower);    # Lage Consumer Consumption
-          #$ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$cons_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if($flowgconsTime);     # Lage Consumer Restlaufzeit
+          # Texte abhängig von ihrer Größe entsprechend auf der x-Achse verschieben
+          ###########################################################################
+          if ($flowgconsPower) {                                                            # Lage Consumer Consumption
+              my $lcp_cons_left = $cons_left;
+            
+              if    ($lcp >= 5) {$lcp_cons_left -= 40}
+              elsif ($lcp == 4) {$lcp_cons_left -= 25}
+              elsif ($lcp == 3) {$lcp_cons_left -= 5 }
+              elsif ($lcp == 2) {$lcp_cons_left += 7 }
+              elsif ($lcp == 1) {$lcp_cons_left += 25}
 
-          # Verbrauchszahl abhängig von der Größe entsprechend auf der x-Achse verschieben
-          ##################################################################################
-          if    ($lcp >= 5) {$cons_left -= 40}
-          elsif ($lcp == 4) {$cons_left -= 25}
-          elsif ($lcp == 3) {$cons_left -= 5 }
-          elsif ($lcp == 2) {$cons_left += 7 }
-          elsif ($lcp == 1) {$cons_left += 25}
-
-          $ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna"      x="$cons_left" y="$y_pos">$cnsmrpower</text>}    if($flowgconsPower);    # Lage Consumer Consumption
-          $ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$cons_left" y="$y_pos1">$consumerTime</text>} if($flowgconsTime);     # Lage Consumer Restlaufzeit
-
-          # Verbrauchszahl wieder zurück an den Ursprungspunkt
-          ######################################################
-          if    ($lcp >= 5) {$cons_left += 40}
-          elsif ($lcp == 4) {$cons_left += 25}
-          elsif ($lcp == 3) {$cons_left += 5 }
-          elsif ($lcp == 2) {$cons_left -= 7 }
-          elsif ($lcp == 1) {$cons_left -= 25}
-
-          $cons_left  += ($cdist * 2);
+              $ret .= qq{<text class="$stna text" id="consumertxt_${c}_$stna" x="$lcp_cons_left" y="$y_pos">$cnsmrpower</text>};
+          }
+          
+          if ($flowgconsTime) {                                                            # Lage Consumer Restlaufzeit
+              my $lct_cons_left = $cons_left;
+              
+              if    ($lct >= 5) {$lct_cons_left -= 40}
+              elsif ($lct == 4) {$lct_cons_left -= 25}
+              elsif ($lct == 3) {$lct_cons_left -= 5 }
+              elsif ($lct == 2) {$lct_cons_left += 7 }
+              elsif ($lct == 1) {$lct_cons_left += 25}          
+              
+              $ret .= qq{<text class="$stna text" id="consumertxt_time_${c}_$stna" x="$lct_cons_left" y="$y_pos1">$consumerTime</text>};
+          }
+          
+          if ($shortalias) {                                                              # Lage Consumer Kurzalias
+              my $lcs_cons_left = $cons_left;
+              
+              if    ($lcs >= 10) {$lcs_cons_left -= 85}
+              elsif ($lcs ==  9) {$lcs_cons_left -= 85}
+              elsif ($lcs ==  8) {$lcs_cons_left -= 70}
+              elsif ($lcs ==  7) {$lcs_cons_left -= 60}
+              elsif ($lcs ==  6) {$lcs_cons_left -= 35}
+              elsif ($lcs ==  5) {$lcs_cons_left -= 20}
+              elsif ($lcs ==  4) {$lcs_cons_left -= 10}
+              elsif ($lcs ==  3) {$lcs_cons_left -= 0 }
+              elsif ($lcs ==  2) {$lcs_cons_left += 7 }
+              elsif ($lcs ==  1) {$lcs_cons_left += 25}         
+              
+              $ret .= qq{<text class="$stna text" id="consumertxtalias_${c}_$stna" x="$lcs_cons_left" y="$y_pos2">$shortalias</text>};
+          }
+                    
+          $cons_left += ($cdist * 2);
       }
   }
 
@@ -21161,11 +21213,11 @@ sub _ldchash2val {
 
           if (ref $pool->{$idx}{$key}{$f} eq 'ARRAY') {
               my @sub_arrays = arraySplitBy (20, @{$pool->{$idx}{$key}{$f}});              # Array in Teil-Arrays zu je 20 Elemente aufteilen
-              my $ln0        = length $key;
+              my $ln0        = strlength ($key);
               my $blk0       = '&nbsp;' x 17;
               my $blkadd0    = '&nbsp;' x (7 - ($ln0 > 7 ? 0 : $ln0));
 
-              my $ln1        = length $f;
+              my $ln1        = strlength ($f);
               my $blkadd1    = '&nbsp;' x (3 - ($ln1 > 3 ? 0 : $ln1));
 
               for my $suaref (@sub_arrays) {                                               # für jedes Teil-Array Join ausführen
@@ -21226,7 +21278,7 @@ sub _ldpspaces {
   my $sp    = shift // q{};
   my $const = shift // 4;
 
-  my $le  = $const + length Encode::decode('UTF-8', $str);
+  my $le  = $const + strlength ($str);
   my $spn = $sp;
 
   for (my $i = 0; $i < $le; $i++) {
@@ -22194,7 +22246,7 @@ sub timestampToTimestring {
 
   return if($epoch !~ /[0-9]/xs);
 
-  if (length ($epoch) == 13) {                                                                      # Millisekunden
+  if (strlength ($epoch) == 13) {                                                                   # Millisekunden
       $epoch = $epoch / 1000;
   }
 
@@ -22286,7 +22338,7 @@ sub timestringsFromOffset {
 
   return if($epoch !~ /^-?[0-9]*(.[0-9]*)?$/xs);
 
-  if (length ($epoch) == 13) {                                                                  # Millisekunden
+  if (strlength ($epoch) == 13) {                                                               # Millisekunden
       $epoch = $epoch / 1000;
   }
 
@@ -23817,6 +23869,17 @@ return $ps;
 }
 
 ################################################################
+#        Länge eines Strings (auch mit Umlauten)
+################################################################
+sub strlength {
+  my $string = shift // return 0;
+ 
+  my $decoded = decode ('UTF-8', $string);
+
+return length ($decoded);
+}
+
+################################################################
 #  Prüfung eines übergebenen Regex
 ################################################################
 sub checkRegex {
@@ -24239,7 +24302,7 @@ sub lineFromSpaces {
   my $mlen = 1;
 
   for my $s (@sps) {
-      my $len = length ($s);
+      my $len = strlength ($s);
       $mlen   = $len if($len && $len > $mlen);
   }
 
@@ -26145,7 +26208,7 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                                  <br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
+                         [aliasshort=&lt;String&gt;] [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
                          [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                           <br>
                          [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                             <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Unit&gt;[:&lt;Threshold&gt;]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Threshold&gt;]]                         <br>
@@ -26193,6 +26256,8 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>In the optional alias, spaces must be replaced by '+' (e.g. 'Ein+toller+Alias').                                                                  </td></tr>
             <tr><td>                       </td><td>If the consumer consists of different devices/channels (e.g. Homematic), the energy meter is defined as a &lt;Device&gt;.                         </td></tr>
             <tr><td>                       </td><td>The associated switching device is specified with the key 'switchdev'.                                                                            </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>aliasshort</b>     </td><td>Short alias of the consumer for display in the flow chart. A maximum of 10 characters and no spaces are allowed.                                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>type</b>           </td><td>Type of consumer. The following types are allowed:                                                                                                </td></tr>
             <tr><td>                       </td><td><b>dishwasher</b>     - Consumer is a dishwasher                                                                                                  </td></tr>
@@ -28804,7 +28869,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                                  <br>
-                         [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
+                         [aliasshort=&lt;String&gt;] [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                         <br>
                          [notbefore=&lt;Ausdruck&gt;] [notafter=&lt;Ausdruck&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                                 <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt;]]               <br>
@@ -28851,6 +28916,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>Im optionalen Alias sind Leerzeichen durch '+' zu ersetzen (z.B. 'Ein+toller+Alias').                                                              </td></tr>
             <tr><td>                       </td><td>Besteht der Verbraucher aus verschiedenen Geräten/Kanälen (z.B. Homematic), wird der Energiemesser als  &lt;Device&gt; definiert.                  </td></tr>
             <tr><td>                       </td><td>Das dazugehörige Schalt-Gerät wird mit dem Schlüssel 'switchdev' spezifiziert.                                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>aliasshort</b>     </td><td>Kurzalias des Verbrauchers zur Anzeige in der Flußgrafik. Es sind maximal 10 Zeichen und keine Leerzeichen erlaubt.                                </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                                 </td></tr>
             <tr><td>                       </td><td><b>dishwasher</b>     - Verbraucher ist eine Spülmaschine                                                                                          </td></tr>
