@@ -12345,6 +12345,7 @@ sub EnOcean_Parse($$) {
         my @blockState = ('unlocked', 'locked', 'unknown', 'reserved');
         push @event, "1:blockState:" . $blockState[$blockState];
         my $reply = sprintf "%02X", 0x80 | (ReadingsVal($name, 'block', 'unlock') eq 'lock' ? 0 : 1);
+        #my $reply = sprintf "%02X", 0x00 | (ReadingsVal($name, 'block', 'unlock') eq 'lock' ? 0 : 1);
         # Unlock-Reply Message
         EnOcean_SndRadio(undef, $hash, $packetType, 'D2', $reply, AttrVal($name, "subDef", "0" x 8), '00', $hash->{DEF}) if ($db[0] & 1);
         # forward handle position (RPS telegam)
@@ -15701,6 +15702,12 @@ sub EnOcean_Notify(@) {
             EnOcean_Set($hash, @setCmd);
             #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
           }
+        } elsif (AttrVal($name, "subType", '') eq 'roomSensorControl.05' && AttrVal($name, "manufID", '') eq '00D') {
+          if (ReadingsVal($name, "setpointTemp", 0) != $parts[1]) {
+            my @setCmd = ($name, "setpointTemp", $parts[1]);
+            EnOcean_Set($hash, @setCmd);
+            #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
+          }
         }
       }
 
@@ -18921,6 +18928,7 @@ sub EnOcean_sec_createTeachIn($$$$$$$$$$$) {
     $pskData =~ /^(.*)(.{32})$/;
     $pKey = $2;
     $rlc = $1;
+    Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} decrypt RLC: $attr{$name}{rlcSnd} > $rlc and PK: $attr{$name}{keySnd} > $pKey";
   }
   # secure teach-in chaining, first data length max. 11 bytes
   # bisher wurden x byte rlc und fest 10 bytes pKey1 gesendet!
@@ -18944,7 +18952,7 @@ sub EnOcean_sec_createTeachIn($$$$$$$$$$$) {
   $data = "40" . $pKey2;
   EnOcean_SndCdm(undef, $hash, 1, "35", $data, $subDef, "00", $destinationID);
   #EnOcean_SndCdm <> EnOcean_SndRadio
-
+####*
   #get and update RLC
   #$rlc = EnOcean_sec_getRLC($hash, "rlcSnd", 0, undef);
   #Log3 $name, 3, "EnOcean $name EnOcean_sec_createTeachIn current rlcSnd: $rlc incremented";
@@ -20005,13 +20013,14 @@ sub EnOcean_Delete($$) {
       <li>nightReduction [t/K [lock|unlock]]<br>
           Set night reduction</li>
       <li>setpointTemp [t/&#176C [lock|unlock]]<br>
-          Set the desired temperature</li>
+          Set the desired temperature. The temperature setpoint can also be set by the
+          <a href="#EnOcean-attr-setpointTempRefDev">setpointTempRefDev</a> device if it is set.</li>
     </ul><br>
       The actual temperature will be taken from the temperature reported by
       a temperature reference device <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a>
       primarily or from the attribute <a href="#EnOcean-attr-actualTemp">actualTemp</a> if it is set.<br>
       If the attribute <a href="#EnOcean-attr-setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpointTemp
-      command is sent when the reference device is updated.<br>
+      command is sent when the reading temperature of the reference device is updated.<br>
       This profil can be used with a further Room Sensor and Control Unit Eltako FTR55*
       to control a heating/cooling relay FHK12, FHK14 or FHK61. If Fhem and FTR55*
       is teached in, the temperature control of the FTR55* can be either blocked
@@ -20048,7 +20057,7 @@ sub EnOcean_Delete($$) {
       a humidity reference device <a href="#EnOcean-attr-humidityRefDev">humidityRefDev</a>
       primarily or from the attribute <a href="#EnOcean-attr-humidity">humidity</a> if it is set.<br>
       If the attribute <a href="#EnOcean-attr-setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
-      command is sent when the reference device is updated.<br>
+      command is sent when the attribute temperature or humidity of the reference device is updated.<br>
       The scaling of the setpoint adjustment is device- and vendor-specific. Set the
       attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
       <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled setting
