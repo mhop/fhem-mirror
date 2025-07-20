@@ -5952,14 +5952,17 @@ sub __updWriteFile {
   open my $fh, '>:raw', $fPath or return "update ERROR open $fPath failed: $!";
 
   my $bytes = encode ('UTF-8', $content);
-  print {$fh} $bytes;
+  my $written = syswrite $fh, $bytes;
   close $fh or return "update ERROR closing $fPath failed: $!";
   
-  my $written  = -s $fPath;
-  my $expected = strlength ($bytes);
+  unless (defined $written) {
+      return "update ERROR writing $fPath failed: $!";
+  }
+  
+  my $expected = length $bytes;
 
   if ($written != $expected) {
-      return "update ERROR writing $fPath failed: $!";
+      return sprintf "update ERROR wrote %d of %d bytes to %s", $written, $expected, $fPath;
   }
 
 return;
