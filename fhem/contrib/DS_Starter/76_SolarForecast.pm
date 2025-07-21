@@ -162,7 +162,7 @@ BEGIN {
 my %vNotesIntern = (
   "1.54.4" => "21.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
                            "medianArray: can optional use newest 3..20 elements, avgArray: use the newest elements if num is set ".
-                           "Debug consumerSwitching: print out info message of compare operation ".
+                           "Debug consumerSwitching: print out info message of compare operation, remove attr graphicShowDiff ".
                            "store surpmeth calc result in key surpmethResult in Consumer master record ",
   "1.54.3" => "19.07.2025  ctrlDebug: add collectData_long ",
   "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
@@ -1697,10 +1697,10 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $av = 'obsolete#-#use#attr#graphicControl#instead';
+  # my $av = 'obsolete#-#use#attr#graphicControl#instead';
   # my $av1 = 'obsolete#-#will#be#deleted#soon';
   # my $av2 = 'obsolete#-#use#attr#graphicSelect#instead';
-  $hash->{AttrList} .= " graphicShowDiff:$av ";
+  # $hash->{AttrList} .= " graphicShowDiff:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -5990,15 +5990,15 @@ sub Attr {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ######################################################################################################################
-  if ($cmd eq 'set' && $aName =~ /^graphicShowDiff$/) {                            # 25.06.
-      my $msg  = "The attribute $aName is replaced by 'graphicControl'.";
-      if (!$init_done) {
-          Log3 ($name, 1, "$name - $msg");
-      }
-      else {
-          return $msg;
-      }
-  }
+  #if ($cmd eq 'set' && $aName =~ /^graphicShowDiff$/) {                            # 25.06.
+  #    my $msg  = "The attribute $aName is replaced by 'graphicControl'.";
+  #    if (!$init_done) {
+  #        Log3 ($name, 1, "$name - $msg");
+  #    }
+  #    else {
+  #        return $msg;
+  #    }
+  #}
 
   #if ($cmd eq 'set' && $aName =~ /^graphicHeaderShow$/) {                          # 15.04.
   #    my $msg  = "The attribute $aName is replaced by 'graphicSelect'.";
