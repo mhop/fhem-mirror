@@ -160,7 +160,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.54.4" => "20.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort' ",
+  "1.54.4" => "21.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
+                           "medianArray: can optional use newest 3..20 elements, avgArray: use the newest elements if num is set ".
+                           "Debug consumerSwitching: print out info message of compare operation ".
+                           "store surpmeth calc result in key surpmethResult in Consumer master record ",
   "1.54.3" => "19.07.2025  ctrlDebug: add collectData_long ",
   "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
   "1.54.1" => "08.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
@@ -6176,8 +6179,8 @@ sub _attrconsumer {                      ## no critic "not used"
                   return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid numeric value";
               }
           }
-          elsif ($h->{surpmeth} !~ /^[2-9]$|^1[0-9]$|^20$|^median$|^default$/xs) {
-              return qq{The surpmeth "$h->{surpmeth}" is wrong. It must contain a '<device>:<reading>', 'median', 'default' or an integer value of '2 .. 20'.};
+          elsif ($h->{surpmeth} !~ /^[2-9]$|^1[0-9]$|^20$|^median(?:_(?:[3-9]|1[0-9]|20))?$|^default$/xs) {
+              return qq{The surpmeth "$h->{surpmeth}" is wrong. It must contain a '<device>:<reading>', 'median[_3..20]', 'default' or an integer value of '2 .. 20'.};
           }
       }
 
@@ -12090,15 +12093,15 @@ sub _manageConsumerData {
 
       $paref->{pcurr} = $pcurr;
 
-      __getAutomaticState     ($paref);                                                                           # Automatic Status des Consumers abfragen
-      __calcEnergyPieces      ($paref);                                                                           # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
-      __planInitialSwitchTime ($paref);                                                                           # Consumer Switch Zeiten planen
-      __setTimeframeState     ($paref);                                                                           # Timeframe Status ermitteln
-      __setConsRcmdState      ($paref);                                                                           # Consumption Recommended Status setzen
-      __switchConsumer        ($paref);                                                                           # Consumer schalten
-      __getCyclesAndRuntime   ($paref);                                                                           # Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro Stunde ermitteln
-      __reviewSwitchTime      ($paref);                                                                           # Planungsdaten überprüfen und ggf. neu planen
-      __remainConsumerTime    ($paref);                                                                           # Restlaufzeit Verbraucher ermitteln
+      __getAutomaticState     ($paref);                                                                        # Automatic Status des Consumers abfragen
+      __calcEnergyPieces      ($paref);                                                                        # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
+      __planInitialSwitchTime ($paref);                                                                        # Consumer Switch Zeiten planen
+      __setTimeframeState     ($paref);                                                                        # Timeframe Status ermitteln
+      __setConsRcmdState      ($paref);                                                                        # Consumption Recommended Status setzen
+      __switchConsumer        ($paref);                                                                        # Consumer schalten
+      __getCyclesAndRuntime   ($paref);                                                                        # Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro Stunde ermitteln
+      __reviewSwitchTime      ($paref);                                                                        # Planungsdaten überprüfen und ggf. neu planen
+      __remainConsumerTime    ($paref);                                                                        # Restlaufzeit Verbraucher ermitteln
 
       delete $paref->{pcurr};
 
@@ -12994,16 +12997,24 @@ sub __setConsRcmdState {
 
   my ($method, $surplus) = determSurplus ($hash, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
 
+  $data{$name}{consumers}{$c}{surpmethResult} = $surplus;                                 # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
+
   if ($debug =~ /consumerSwitching${c}/x) {
+      my $splref = CurrentVal ($name, 'surplusslidereg', '.');
+      my $spser  = 'undef';
+      $spser     = join " ", @{$splref} if(ref $splref eq 'ARRAY');
+      
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - ConsumptionRecommended calc method: $method, surplus: }.
                          (defined $surplus ? $surplus : 'undef'));
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - method base: $spser}) if($method =~ /average|median/xs);
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - additional consumption after switching on (if currently 'off'): $rescons W});
   }
 
   my ($spignore, $info, $err) = isSurplusIgnoCond ($hash, $c, $debug);                    # PV Überschuß ignorieren?
 
   Log3 ($name, 1, "$name - $err") if($err);
+  
   if ($debug =~ /consumerSwitching${c}/x && $info) {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - IgnoreCondition - $info});
   }
@@ -13107,8 +13118,8 @@ sub ___switchConsumerOn {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Check Context 'switch on' => }.
                       qq{swoncond: $swoncond, on-command: $oncom }
            );
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon})   if($swoncond  && $infon);
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($swoffcond && $infoff);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon})   if($infon);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($infoff);
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - device '$dswname' is used as switching device});
 
       if ($simpCstat =~ /planned|priority|starting|continuing/xs && $isInTime && $iilt) {
@@ -13237,7 +13248,7 @@ sub ___switchConsumerOff {
                       qq{swoffcond: $swoffcond, off-command: $offcom}
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - is Consumption recommended: $isConsRcmd});
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($swoffcond && $infoff);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($infoff);
 
       if ($stopts && $t >= $stopts && $iilt) {
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching off postponed by >isInLocktime<});
@@ -13684,8 +13695,7 @@ sub _calcConsForecast_circular {
               @conh = splice (@conh, $acld * -1);
               $hnum = scalar @conh;
           }
- 
-          # my $hcon         = sprintf "%.0f", medianArray (\@conh);                                    
+                                    
           my $hcon         = $ncds <= $nhist ? (sprintf "%.0f", avgArray (\@conh, $hnum)) : 
                                                (sprintf "%.0f", medianArray (\@conh));                  # V 1.52.8
           $usage{$hh}{con} = $hcon;                                                                     # prognostizierter Verbrauch (Median) der Stunde hh (Hour of Day)
@@ -13698,7 +13708,6 @@ sub _calcConsForecast_circular {
               $hnumtom = scalar @conhtom;
           }
 
-          # my $hcontom       = sprintf "%.0f", medianArray (\@conhtom);
           my $hcontom       = $ncds <= $nhist ? (sprintf "%.0f", avgArray (\@conhtom, $hnumtom)) :        
                                                 (sprintf "%.0f", medianArray (\@conhtom));              # V 1.52.8
           $usage{tom}{con} += $hcontom;                                                                 # Summe prognostizierter Verbrauch (Median) des Tages
@@ -19918,7 +19927,6 @@ sub aiGetResult {
 
   if ($tprnum) {
       my $avg_prediction = sprintf '%.0f', avgArray (\@total_prediction, $tprnum);
-      # my $avg_prediction = sprintf '%.0f', medianArray (\@total_prediction);
 
       debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $avg_prediction (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)});
       return ('accurate', $avg_prediction);
@@ -22045,9 +22053,10 @@ sub determSurplus {
 
   my ($surplus, $fallback);
 
-  if ($surpmeth eq 'median') {                                            # Median der Werte in surplusslidereg, !kann UNDEF sein!
-      $surplus = medianArray ($splref);
-      $method  = 'median';
+  if ($surpmeth =~ /median/xs) {                                          # Median der Werte in surplusslidereg, !kann UNDEF sein!
+      my $num  = (split '_', $surpmeth)[1];                               # Anzahl der (letzten) Array-Elemente die für Median verwendet werden sollen
+      $surplus = medianArray ($splref, $num);
+      $method  = $num ? "median:$num" : "median:all";
   }
   elsif ($surpmeth eq 'default') {                                        # aktueller Energieüberschuß
       $surplus = CurrentVal ($hash, 'surplus', 0);
@@ -22143,12 +22152,11 @@ sub avgArray {
   my $num  = shift // SLIDENUMMAX;
 
   return undef if(ref $aref ne 'ARRAY' || scalar @{$aref} < $num);
-
+  
+  my @tail = @{$aref}[-$num .. -1];                                 # es werden die neuesten num Elemente verwendet
+  
   my $sum = 0;
-
-  for my $i (0 .. $num-1) {
-      $sum += ${$aref}[$i];
-  }
+  $sum   += $_ for @tail;
 
   my $avg = $sum / $num;
 
@@ -22160,24 +22168,28 @@ return $avg;
 #  (https://www.ionos.de/digitalguide/online-marketing/web-analyse/median-berechnen/)
 #
 #  $aref  = Referenz zum Array
+#  $num   = Anzahl der neuesten zu verwendenden Array Elemente   
 #
 ######################################################################################
 sub medianArray {
   my $aref = shift;
+  my $num  = shift;
 
-  return undef if(ref $aref ne 'ARRAY' || !scalar @{$aref});
-
-  my $enum   = scalar @{$aref};                                         # Anzahl der Elemente im Array
-  my @sorted = sort { $a <=> $b } @{$aref};                             # Numerisch aufsteigend
-
-  if ($enum % 2) {                                                      # Array enthält ungerade Anzahl Elemente
-      return $sorted[$enum/2];                                          # ungerade Elemente -> Median Element steht in der Mitte von @sorted
+  return if(ref $aref ne 'ARRAY' || !scalar @{$aref});     
+  
+  if (defined $num) {                                                   # Anzahl der (neuesten) Elemente die verwendet werden sollen
+      return unless $num =~ /^\d+$/ && $num > 0 && $num <= @$aref;
   }
-  else {
-      return ($sorted[$enum/2 - 1] + $sorted[$enum/2]) / 2;             # gerade Elemente -> Median ist der Durchschnitt der beiden mittleren Elemente
-  }
+        
+  my @tail   = defined $num ? @{$aref}[-$num .. -1] : @{$aref};     
+  my @sorted = sort { $a <=> $b } @tail;                                # Numerisch aufsteigend
+  my $n      = scalar @sorted;
+  my $mid    = int ($n/2);
 
-return;
+  my $median = $n % 2 ? $sorted[$mid] :                                 # ungerade Elemente -> Median Element steht in der Mitte von @sorted
+               ($sorted[$mid - 1] + $sorted[$mid]) / 2;                 # gerade Elemente -> Median ist der Durchschnitt der beiden mittleren Elemente
+  
+return $median;
 }
 
 ################################################################
@@ -23129,12 +23141,12 @@ sub isAddSwitchOffCond {
           }
 
           if ($true) {
-              $info   = qq{The value “$condval” resulted in 'true' after exec "$swoffcode" \n};
+              $info   = qq{The reference value “$condval” resulted in 'true' after exec "$swoffcode" \n};
               $info  .= "-> Check successful ";
               $swoff  = 1;
           }
           else {
-              $info  = qq{The value “$condval” resulted in 'false' after exec "$swoffcode" \n};
+              $info  = qq{The reference value “$condval” resulted in 'false' after exec "$swoffcode" \n};
               $swoff = 0;
           }
       }
@@ -26337,23 +26349,22 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>:&lt;Threshold&gt (Wh) - From this energy consumption per hour, the consumption is considered valid. Optional specification (default: 0)          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>swoncond</b>       </td><td>Condition that must also be fulfilled in order to switch on the consumer (optional). The scheduled cycle is started.                              </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device to supply the additional switch-on condition                                                                               </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading for delivery of the additional switch-on condition                                                                       </td></tr>
-            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                         </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be fulfilled for a 'true' condition                                                                   </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must return 'true' to fulfill the condition. It must not contain spaces.                      </td></tr>
-            <tr><td>                       </td><td>The value of Device:Reading is transferred to the code with the variable $VALUE.                                                                  </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - the device/reading combination returns the check value $VALUE (‘undef’ is ignored)                                        </td></tr>
+            <tr><td>                       </td><td>The check can be formulated as a regular expression or as Perl code enclosed in {..}:                                                             </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return ‘true’ if successful                                                      </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                </td></tr>
+            <tr><td>                       </td><td>The return value must be ‘true’ if successful.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>swoffcond</b>      </td><td>priority condition to switch off the consumer (optional). The scheduled cycle is stopped.                                                         </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device to supply the priority switch-off condition                                                                                </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading for the delivery of the priority switch-off condition                                                                    </td></tr>
-            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                         </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be fulfilled for a 'true' condition                                                                   </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must return 'true' to fulfill the condition. It must not contain spaces.                      </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - the device/reading combination returns the check value $VALUE (‘undef’ is ignored)                                        </td></tr>
+            <tr><td>                       </td><td>The check can be formulated as a regular expression or as Perl code enclosed in {..}:                                                             </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return ‘true’ if successful                                                      </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                </td></tr>
+            <tr><td>                       </td><td>The return value must be ‘true’ if successful.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>surpmeth</b>       </td><td>The possible options define the procedure for determining the PV surplus. (optional)                                                              </td></tr>
             <tr><td>                       </td><td><b>default</b> - the PV surplus is read directly from the 'Current_Surplus' reading. (default)                                                    </td></tr>
-            <tr><td>                       </td><td><b>median</b> - the median of the last PV surplus measurements (max. 20) is used.                                                                 </td></tr>
+            <tr><td>                       </td><td><b>median[_3..20]</b> - The median of the last PV surplus values is used. The optional specification ‘_XX’ uses the last XX measured values.      </td></tr>
             <tr><td>                       </td><td><b>2 .. 20</b> - the PV surplus used is calculated from the average of the specified number of measured values.                                   </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination that provides a numerical PV surplus value in Watt
                                                     determined or calculated by the user.                                                                                                             </td></tr>
@@ -26361,12 +26372,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                          </td></tr>
             <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                          </td></tr>
             <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                     </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device to deliver the condition                                                                                                   </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading which contains the condition                                                                                             </td></tr>
-            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                         </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression that must be fulfilled for a 'true' condition                                                                   </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must return 'true' to fulfill the condition. It must not contain spaces.                      </td></tr>
-            <tr><td>                       </td><td>The value of Device:Reading is transferred to the code with the variable $VALUE.                                                                  </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - the device/reading combination returns the check value $VALUE (‘undef’ is ignored)                                        </td></tr>
+            <tr><td>                       </td><td>The check can be formulated as a regular expression or as Perl code enclosed in {..}:                                                             </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return ‘true’ if successful                                                      </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                </td></tr>
+            <tr><td>                       </td><td>The return value must be ‘true’ if successful.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>defines the possible interruption options for the consumer after it has been started (optional). Options can be:                                  </td></tr>
             <tr><td>                       </td><td><b>0</b> - Load is not temporarily switched off even if the PV surplus falls below the required energy (default)                                  </td></tr>
@@ -26421,7 +26431,7 @@ to ensure that the system configuration is correct.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@ed type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2                              <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                                           <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1 spignorecond=SolCast:Current_PV:{($VALUE)=split/\s/,$VALUE;$VALUE>10?1:0;}          <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39                                                                                                            <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39 surpmeth=median_10                                                                                                      <br>
        </ul>
        </li>
        <br>
@@ -28997,24 +29007,22 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Ab diesem Energieverbrauch pro Stunde wird der Verbrauch als gültig gewertet. Optionale Angabe (default: 0)           </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>swoncond</b>       </td><td>Bedingung die zusätzlich erfüllt sein muß um den geplanten Zyklus zu starten und den Verbraucher einzuschalten (optional).                         </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                                           </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                                         </td></tr>
-            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                                  </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code muß 'wahr' liefern um die Bedingung zu erfüllen. Er darf keine Leerzeichen enthalten.   </td></tr>
-            <tr><td>                       </td><td>Der Wert von  Device:Reading wird dem Code mit der Variable $VALUE übergeben.                                                                      </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - die Device/Reading Kombination liefert den Prüfwert $VALUE ('undef' wird ignoriert)                                        </td></tr>
+            <tr><td>                       </td><td>Die Prüfung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                               </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                                     </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
+            <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                               </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                                            </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                          </td></tr>
-            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                                  </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code muß 'wahr' liefern um die Bedingung zu erfüllen. Er darf keine Leerzeichen enthalten.   </td></tr>
-            <tr><td>                       </td><td>Der Wert von  Device:Reading wird dem Code mit der Variable $VALUE übergeben.                                                                      </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - die Device/Reading Kombination liefert den Prüfwert $VALUE ('undef' wird ignoriert)                                        </td></tr>
+            <tr><td>                       </td><td>Die Prüfung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                               </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                                     </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
+            <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>surpmeth</b>       </td><td>Die möglichen Optionen legen das Verfahren zur Ermittlung des PV-Überschusses fest. (optional)                                                     </td></tr>
             <tr><td>                       </td><td><b>default</b> - der PV-Überschuß wird aus dem Reading 'Current_Surplus' direkt ausgelesen. (default)                                              </td></tr>
-            <tr><td>                       </td><td><b>median</b> - es wird der Median der letzten PV-Überschuß Messungen (max. 20) verwendet.                                                         </td></tr>
+            <tr><td>                       </td><td><b>median[_3..20]</b> - es wird der Median der letzten PV-Überschuß Werte verwendet. Die optionale Angabe '_XX' verwendet die letzten XX Meßwerte. </td></tr>
             <tr><td>                       </td><td><b>2 .. 20</b> - der verwendete PV-Überschuß wird als Durchschnitt der angegebenen Anzahl Meßwerte gebildet.                                       </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination die einen vom Nutzer bestimmten bzw. berechneten
                                                     numerischen PV-Überschuß in Watt liefert.                                                                                                          </td></tr>
@@ -29022,12 +29030,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen fehlenden PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend                      </td></tr>
             <tr><td>                       </td><td>der Planung eingeschaltet auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                                   </td></tr>
             <tr><td>                       </td><td><b>ACHTUNG:</b> Die Verwendung beider Schlüssel <I>spignorecond</I> und <I>interruptable</I> kann zu einem unerwünschten Verhalten führen!         </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der Bedingung                                                                                                 </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading welches die Bedingung enthält                                                                                             </td></tr>
-            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für eine 'wahre' Bedingung erfüllt sein muß                                                                  </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code muß 'wahr' liefern um die Bedingung zu erfüllen. Er darf keine Leerzeichen enthalten.   </td></tr>
-            <tr><td>                       </td><td>Der Wert von  Device:Reading wird dem Code mit der Variable $VALUE übergeben.                                                                      </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - die Device/Reading Kombination liefert den Prüfwert $VALUE ('undef' wird ignoriert)                                        </td></tr>
+            <tr><td>                       </td><td>Die Prüfung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                               </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                                     </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
+            <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher nachdem er gestartet wurde (optional). Optionen können sein:                    </td></tr>
             <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär ausgeschaltet auch wenn der PV Überschuß die benötigte Energie unterschreitet (default)                 </td></tr>
@@ -29082,7 +29089,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@red type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2                             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                                           <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1 spignorecond=SolCast:Current_PV:{($VALUE)=split/\s/,$VALUE;$VALUE>10?1:0;}          <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39                                                                                                            <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39 surpmeth=median_10                                                                                                         <br>
        </ul>
        </li>
        <br>
