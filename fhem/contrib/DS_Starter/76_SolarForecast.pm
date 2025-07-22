@@ -163,7 +163,7 @@ my %vNotesIntern = (
   "1.54.4" => "21.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
                            "medianArray: can optional use newest 3..20 elements, avgArray: use the newest elements if num is set ".
                            "Debug consumerSwitching: print out info message of compare operation, remove attr graphicShowDiff ".
-                           "store surpmeth calc result in key surpmethResult in Consumer master record ",
+                           "store surpmeth calc result in key surpmethResult in Consumer master record, __readFileMessages: refactored code ",
   "1.54.3" => "19.07.2025  ctrlDebug: add collectData_long ",
   "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
   "1.54.1" => "08.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
@@ -19327,26 +19327,31 @@ sub __readFileMessages {
   my $name   = $paref->{name};
   my $tsnext = $paref->{tsnext};
 
-  my $hash   = $defs{$name};
+  my $file   = "$root/FHEM/$messagefile";
 
-  open (FD, "$root/FHEM/$messagefile") or do { return $! };
+  open my $fh, '<:encoding(UTF-8)', $file or return "Cannot open $file: $!";
 
   delete $data{$name}{filemessages};
 
-  my @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
-  close (FD);
+  my $count = 0;
+  
+  while (my $line = <$fh>) {
+      chomp $line;
+      next if $line =~ /^\s*#/;                            # Kommentarzeilen überspringen
 
-  Log3 ($name, 4, "$name - Notification System - read local Message File >$messagefile< with ".scalar @locList." entries.");
+      my ($id, $lang, $msg) = split /\|/, $line, 3;
+      next if(!isNumeric ($id));                           # nur numeric IDs
+      next if($lang !~ /^(DE|EN|SV)$/xs);                  # nur gültige Sprachen            
 
-  for my $l (@locList) {
-      next if ($l =~ /^\#/xs);
-      my @l = split /\|/, $l, 3;
-      next if(!isNumeric ($l[0]));
-      next if($l[1] !~ /^(DE|EN|SV)$/xs);
-
-      $data{$name}{filemessages}{$l[0]}{$l[1]} = $l[2];
+      $data{$name}{filemessages}{$id}{$lang} = $msg;
+      $count++;
   }
 
+  close $fh;
+	
+  Log3 ($name, 4, "$name - Notification System - read local Message File >$messagefile< with $count entries.");
+	
+	
   $data{$name}{filemessages}{999000}{TS}     = time;
   $data{$name}{filemessages}{999000}{TSNEXT} = $tsnext;
 
