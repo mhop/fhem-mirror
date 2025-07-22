@@ -160,10 +160,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.54.4" => "21.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
+  "1.54.4" => "22.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
                            "medianArray: can optional use newest 3..20 elements, avgArray: use the newest elements if num is set ".
                            "Debug consumerSwitching: print out info message of compare operation, remove attr graphicShowDiff ".
-                           "store surpmeth calc result in key surpmethResult in Consumer master record, __readFileMessages: refactored code ",
+                           "store surpmeth calc result in key surpmethResult in Consumer master record, __readFileMessages: refactored code ".
+                           "surpmeth: use average[_2..20] instead of numeric values 2.20 only ",
   "1.54.3" => "19.07.2025  ctrlDebug: add collectData_long ",
   "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
   "1.54.1" => "08.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
@@ -6179,8 +6180,8 @@ sub _attrconsumer {                      ## no critic "not used"
                   return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid numeric value";
               }
           }
-          elsif ($h->{surpmeth} !~ /^[2-9]$|^1[0-9]$|^20$|^median(?:_(?:[3-9]|1[0-9]|20))?$|^default$/xs) {
-              return qq{The surpmeth "$h->{surpmeth}" is wrong. It must contain a '<device>:<reading>', 'median[_3..20]', 'default' or an integer value of '2 .. 20'.};
+          elsif ($h->{surpmeth} !~ /^(?:median|average)(?:_(?:[2-9]|1[0-9]|20))?$|^default$/xs) {
+              return qq{The surpmeth "$h->{surpmeth}" is wrong. It must contain a '<device>:<reading>', 'median[_2..20]', 'average[_2..20]' or 'default'.};
           }
       }
 
@@ -8849,15 +8850,16 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
   
-  my $gsd = AttrVal ($name, 'graphicShowDiff ', undef);                 # 25.06.
-  my $gco = AttrVal ($name, 'graphicControl', '');
-
-  if (defined $gsd) {
-      my $newval = $gco." showDiff=$gsd";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicShowDiff");
+  for my $c (1..MAXCONSUMER) {                                          # 23.07.                      
+      $c = sprintf "%02d", $c;
+      my $surpmeth = ConsumerVal ($hash, $c, 'surpmeth', '');               
+      
+      if ($surpmeth =~ /^[2-9]$|^1[0-9]$|^20$/xs) {
+          fhem ("set $name attrKeyVal consumer${c} surpmeth=average_${surpmeth}"); 
+      }
   }
-
+  
+  
   ##########################################################################################################################
 
   if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -9325,10 +9327,10 @@ sub _specialActivities {
   ##########################################################################
 
   for my $c (keys %{$data{$name}{consumers}}) {
-      next if(ConsumerVal ($hash, $c, "plandelete", "regular") eq "regular");
+      next if(ConsumerVal ($hash, $c, 'plandelete', 'regular') eq 'regular');
 
-      my $planswitchoff = ConsumerVal    ($hash, $c, "planswitchoff", $t);
-      my $simpCstat     = simplifyCstate (ConsumerVal ($hash, $c, "planstate", ""));
+      my $planswitchoff = ConsumerVal    ($hash, $c, 'planswitchoff', $t);
+      my $simpCstat     = simplifyCstate (ConsumerVal ($hash, $c, 'planstate', ''));
 
       if ($t > $planswitchoff && $simpCstat =~ /planned|finished|unknown/xs) {
           deleteConsumerPlanning ($hash, $c);
@@ -12013,8 +12015,8 @@ sub _manageConsumerData {
 
   for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {
       $paref->{consumer} = $c;
-      my $consumer       = ConsumerVal ($hash, $c, "name",  "");
-      my $alias          = ConsumerVal ($hash, $c, "alias", "");
+      my $consumer       = ConsumerVal ($hash, $c, 'name',  '');
+      my $alias          = ConsumerVal ($hash, $c, 'alias', '');
 
       ## aktuelle Leistung auslesen
       ##############################
@@ -13001,8 +13003,7 @@ sub __setConsRcmdState {
 
   if ($debug =~ /consumerSwitching${c}/x) {
       my $splref = CurrentVal ($name, 'surplusslidereg', '.');
-      my $spser  = 'undef';
-      $spser     = join " ", @{$splref} if(ref $splref eq 'ARRAY');
+      my $spser  = ref $splref eq 'ARRAY' ? join ' ', @{$splref} : undef;
       
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - ConsumptionRecommended calc method: $method, surplus: }.
@@ -22063,13 +22064,14 @@ sub determSurplus {
       $surplus = medianArray ($splref, $num);
       $method  = $num ? "median:$num" : "median:all";
   }
+  elsif ($surpmeth =~ /average/xs) {                                      # Average Ermittlung, !kann UNDEF sein!
+      my $num  = (split '_', $surpmeth)[1];                               
+      $surplus = avgArray ($splref, $num);
+      $method  = $num ? "average:$num" : "average:all";
+  }
   elsif ($surpmeth eq 'default') {                                        # aktueller Energieüberschuß
       $surplus = CurrentVal ($hash, 'surplus', 0);
       $method  = 'default';
-  }
-  elsif ($surpmeth =~ /^[2-9]$|^1[0-9]$|^20$/xs) {
-      $surplus = avgArray ($splref, $surpmeth);                           # Average Ermittlung, !kann UNDEF sein!
-      $method  = "average:$surpmeth";
   }
   elsif ($surpmeth =~ /.*:.*/xs) {
       my ($dv, $rd) = split ':', $surpmeth;
@@ -23179,7 +23181,7 @@ sub isAddSwitchOffCond {
           }
       }
 
-      $info .= qq{-> the effect depends on the switch context};
+      $info .= qq{(the effect depends on the switch context)};
   }
 
 return ($swoff, $info, $err);
@@ -26369,8 +26371,8 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>surpmeth</b>       </td><td>The possible options define the procedure for determining the PV surplus. (optional)                                                              </td></tr>
             <tr><td>                       </td><td><b>default</b> - the PV surplus is read directly from the 'Current_Surplus' reading. (default)                                                    </td></tr>
-            <tr><td>                       </td><td><b>median[_3..20]</b> - The median of the last PV surplus values is used. The optional specification ‘_XX’ uses the last XX measured values.      </td></tr>
-            <tr><td>                       </td><td><b>2 .. 20</b> - the PV surplus used is calculated from the average of the specified number of measured values.                                   </td></tr>
+            <tr><td>                       </td><td><b>median[_2..20]</b> - The median of the last PV surplus values is used. The optional specification ‘_XX’ uses the last XX measured values.      </td></tr>
+            <tr><td>                       </td><td><b>average[_2..20]</b> - is the average of 20 PV surplus values. The optional specification ‘_XX’ uses the last XX measured values.               </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination that provides a numerical PV surplus value in Watt
                                                     determined or calculated by the user.                                                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
@@ -29027,8 +29029,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>surpmeth</b>       </td><td>Die möglichen Optionen legen das Verfahren zur Ermittlung des PV-Überschusses fest. (optional)                                                     </td></tr>
             <tr><td>                       </td><td><b>default</b> - der PV-Überschuß wird aus dem Reading 'Current_Surplus' direkt ausgelesen. (default)                                              </td></tr>
-            <tr><td>                       </td><td><b>median[_3..20]</b> - es wird der Median der letzten PV-Überschuß Werte verwendet. Die optionale Angabe '_XX' verwendet die letzten XX Meßwerte. </td></tr>
-            <tr><td>                       </td><td><b>2 .. 20</b> - der verwendete PV-Überschuß wird als Durchschnitt der angegebenen Anzahl Meßwerte gebildet.                                       </td></tr>
+            <tr><td>                       </td><td><b>median[_2..20]</b> - es wird der Median der letzten PV-Überschuß Werte verwendet. Die optionale Angabe '_XX' verwendet die letzten XX Meßwerte. </td></tr>
+            <tr><td>                       </td><td><b>average[_2..20]</b> - bildet den Durchschnitt von 20 PV-Überschuß Werten. Die optionale Angabe '_XX' verwendet die letzten XX Meßwerte.         </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination die einen vom Nutzer bestimmten bzw. berechneten
                                                     numerischen PV-Überschuß in Watt liefert.                                                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
