@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.54.5" => "24.07.2025  isAddSwitchOnCond/isAddSwitchOffCond: change debug info ",
   "1.54.4" => "22.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
                            "medianArray: can optional use newest 3..20 elements, avgArray: use the newest elements if num is set ".
                            "Debug consumerSwitching: print out info message of compare operation, remove attr graphicShowDiff ".
@@ -639,6 +640,13 @@ my %svicons = (                                                               # 
   '1' => 'message_mail_open@darkorange',                                      # Standard Mitteilungs-Icon 1 - Mitteilung
   '2' => 'message_attention@darkorange',                                      # Standard Mitteilungs-Icon 2 - Warnung
   '3' => 'message_attention@red',                                             # Standard Mitteilungs-Icon 3 - Fehler / Problem
+);
+
+my %intrptcatic = (                                                               # Unterbrechungscharakteristik 
+  '0' => 'simple false',                                                          
+  '1' => 'simple true',                                      
+  '2' => 'Code return true',                                      
+  '3' => 'Code return false',                                            
 );
 
 my %hset = (                                                                # Hash der Set-Funktion
@@ -13131,7 +13139,7 @@ sub ___switchConsumerOn {
   my $isintable = isInterruptable ($hash, $c, 0, 1);                                              # mit Ausgabe Interruptable Info im Debug
 
   if ($debug =~ /consumerSwitching${c}/x) {
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable -> $intrptcatic{$isintable}});
   }
 
   my $isConsRcmd = isConsRcmd ($hash, $c);
@@ -23074,12 +23082,12 @@ sub isAddSwitchOnCond {
       }
 
       if ($true) {
-          $info  = qq{The value “$condval” resulted in 'true' after exec "$swoncode" \n};
+          $info  = qq{The return value “$true” resulted in 'true' after exec "$swoncode" \n};
           $info .= "-> Check successful ";
           $swon  = 1;
       }
       else {
-          $info = qq{The value “$condval” resulted in 'false' after exec "$swoncode" \n};
+          $info = qq{The return value “$true” resulted in 'false' after exec "$swoncode" \n};
           $swon = 0;
       }
   }
@@ -23148,12 +23156,12 @@ sub isAddSwitchOffCond {
           }
 
           if ($true) {
-              $info   = qq{The reference value “$condval” resulted in 'true' after exec "$swoffcode" \n};
+              $info   = qq{The return value “$true” resulted in 'true' after exec "$swoffcode" \n};
               $info  .= "-> Check successful ";
               $swoff  = 1;
           }
           else {
-              $info  = qq{The reference value “$condval” resulted in 'false' after exec "$swoffcode" \n};
+              $info  = qq{The return value “$true” resulted in 'false' after exec "$swoffcode" \n};
               $swoff = 0;
           }
       }
