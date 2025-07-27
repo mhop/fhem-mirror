@@ -85,7 +85,10 @@
 # 07/11/2024 replace getimeofday w. Time::HiRes::time
 #            use AttrNum instead of AttrVal where possible
 #            PBP remove postfix if
-# xx/01/2025 add a few responseIDs in readH fn.
+# 20/02/2025 add a few responseIDs in readH fn.
+# xx/06/2025 modify some Log-msgs _ReadH fn
+#            fix rollover in seqcntrRx
+#            rework _readST, _dispatch, _processFIFo, _deldupes subs
 
 
 package KNXIO; ## no critic 'package'
@@ -177,8 +180,7 @@ sub KNXIO_Define {
 	my @arg = split(/[\s\t\n]+/xms,$def);
 	my $name = $arg[0] // return 'KNXIO-define: no name specified';
 	$hash->{NAME} = $name;
-	$SVNID =~ s/.+[.]pm\s(\S+\s\S+).+/$1/ixms;
-	$hash->{'.SVN'} = $SVNID; # store svn info in dev hash
+	$hash->{'.SVN'} = $SVNID =~ s/.+[.]pm\s(\S+\s+\S+).+/$1/rxms;
 
 	if ((scalar(@arg) >= 3) && $arg[2] !~ /[HMSTX]/xms) {
 		return q{KNXIO-define: invalid mode specified, valid modes are one of: H M S T X};
@@ -263,6 +265,7 @@ sub KNXIO_Define {
 #####################################
 sub KNXIO_Attr {
 	my ($cmd,$name,$aName,$aVal) = @_;
+
 	my $hash = $defs{$name};
 	if ($aName eq 'disable') {
 		if ($cmd eq 'set' && defined($aVal) && $aVal == 1) {
@@ -322,38 +325,34 @@ sub KNXIO_Read {
 sub KNXIO_ReadST {
 	my $hash = shift;
 	my $buf  = shift;
-	my $name = $hash->{NAME};
 
+	my $name = $hash->{NAME};
 	$hash->{PARTIAL} .= $buf;
 	my $msglen = unpack('n',$hash->{PARTIAL}) + 2;
 
 	return if (length($hash->{PARTIAL}) < $msglen); # not enough data
 
 	# buf complete, continue
-	my @que = [];
-	if (defined($hash->{KNXIOhelper}->{FIFO}) && ($hash->{KNXIOhelper}->{FIFO} ne q{})) { #get que from hash
-		@que = @{$hash->{KNXIOhelper}->{FIFO}};
-	}
 	while (length($hash->{PARTIAL}) >= $msglen) {
 		$buf = substr($hash->{PARTIAL},0,$msglen); # get one msg from partial
 		$hash->{PARTIAL} = substr($hash->{PARTIAL}, $msglen); # put rest to partial
 
 		my $outbuf = KNXIO_decodeEMI($hash,$buf);
 		if ( defined($outbuf) ) {
-			push(@que,$outbuf); # only valid packets!
+			push(@{$hash->{KNXIOhelper}->{FIFO}},$outbuf); # only valid packets!
 		}
 		if (length($hash->{PARTIAL}) >= 2) {
 			$msglen = unpack('n',$hash->{PARTIAL}) + 2;
 		}
 	} # /while
-	@{$hash->{KNXIOhelper}->{FIFO}} = @que; # push que to fifo
 	return KNXIO_processFIFO($hash);
 }
 
 ### multicast read
 sub KNXIO_ReadM {
 	my $hash = shift;
-	my $buf  = shift;
+	my $buf  = shift // q{};
+
 	my $name = $hash->{NAME};
 
 	if (defined($hash->{PARTIAL})) {$buf = $hash->{PARTIAL} . $buf; }
@@ -382,14 +381,16 @@ sub KNXIO_ReadM {
 	else {
 		$hash->{PARTIAL} = substr($buf,$total_length);
 		$buf = substr($buf,0,$total_length);
+		if (length($hash->{PARTIAL}) > 0) {
+			InternalTimer(Time::HiRes::time() + 0.05, \&KNXIO_ReadM, $hash); # some msg left?
+		}
 	}
 
 	##### now, the buf is complete check if routing-Frame
 	if (($header_routing == 0x0530) && ($total_length >= 17)) {  #  6 Byte header + min 11 Byte data
 		# this is the correct frame type, process it now
 		$buf = substr($buf,6); # strip off header
-		my $cemiRes = KNXIO_decodeCEMI($hash,$buf);
-		return KNXIO_dispatch($hash,$cemiRes) if (defined($cemiRes));
+		KNXIO_dispatch($hash,$buf);
 		return;
 	}
 	elsif ($header_routing == 0x0531) { # routing Lost Message
@@ -455,7 +456,7 @@ sub KNXIO_ReadH {
 		RemoveInternalTimer($hash,\&KNXIO_keepAlive);
 		if ($errcode > 0) {
 			KNXIO_Log ($name, 3, q{ConnectResponse received } .
-				qq{CCID= $hash->{KNXIOhelper}->{CCID} Status=} . KNXIO_errCodes($errcode));
+				qq{CCID=$hash->{KNXIOhelper}->{CCID} Status=} . KNXIO_errCodes($errcode));
 			KNXIO_disconnect($hash,2);
 			return;
 		}
@@ -477,7 +478,7 @@ sub KNXIO_ReadH {
 		RemoveInternalTimer($hash,\&KNXIO_keepAliveTO); # reset timeout timer
 		if ($errcode > 0) {
 			KNXIO_Log ($name, 3, q{ConnectionStateResponse received } .
-				qq{CCID= $hash->{KNXIOhelper}->{CCID} Status= } . KNXIO_errCodes($errcode));
+				qq{CCID=$hash->{KNXIOhelper}->{CCID} Status=} . KNXIO_errCodes($errcode));
 			KNXIO_disconnect($hash,2);
 			return;
 		}
@@ -485,7 +486,7 @@ sub KNXIO_ReadH {
 		return;
 	   },
 	   0x0209 => sub { # Disconnect request
-		KNXIO_Log ($name, 4, ' DisconnectRequest received, restarting connection');
+		KNXIO_Log ($name, 4, q{DisconnectRequest received, restarting connection});
 		$ccid = unpack('x6C',$buf);
 		$msg = pack('nnnCC',(0x0610,0x020A,8,$ccid,0));
 		::DevIo_SimpleWrite($hash,$msg,0); # send disco response
@@ -493,7 +494,7 @@ sub KNXIO_ReadH {
 		return $msg;
 	   },
 	   0x020A => sub { # Disconnect response
-		 KNXIO_Log ($name, 4, 'DisconnectResponse received - sending connrequ');
+		KNXIO_Log ($name, 4, q{DisconnectResponse received - sending connrequest});
 		$msg = KNXIO_prepareConnRequ($hash);
 		return $msg;
 	   },
@@ -502,19 +503,19 @@ sub KNXIO_ReadH {
 
 		my $discardFrame = undef;
 		my $cntrdiff = $rxseqcntr - $hash->{KNXIOhelper}->{SEQUENCECNTR};
-		if ($cntrdiff == -1) {
-			KNXIO_Log ($name, 3, q{TunnelRequest duplicate message received: } .
-			        qq{(seqcntr= $rxseqcntr ) - ack it});
+		if (($cntrdiff == -1) || ($cntrdiff == 255)) { # rollover...
+			KNXIO_Log ($name, 3, q{TunnelRequest duplicate message received - ack it } .
+			        qq{seqcntrRx=$rxseqcntr });
 			$discardFrame = 1; # one packet duplicate... we ack it but do not process
 		}
 		elsif ($cntrdiff != 0) { # really out of sequence
 			KNXIO_Log ($name, 3, q{TunnelRequest messaage out of sequence received: } .
-			        qq{(seqcntrRx= $rxseqcntr seqcntrTx= $hash->{KNXIOhelper}->{SEQUENCECNTR} ) - no ack & discard});
+			        qq{(seqcntrRx=$rxseqcntr seqcntrTx=$hash->{KNXIOhelper}->{SEQUENCECNTR} ) - no ack & discard});
 			return;
 		}
 		if (! defined($discardFrame)) {
 			KNXIO_Log ($name, 4, q{TunnelRequest received - send Ack and decode. } .
-			        qq{seqcntrRx= $hash->{KNXIOhelper}->{SEQUENCECNTR}} );
+			        qq{seqcntrRx=$hash->{KNXIOhelper}->{SEQUENCECNTR}} );
 		}
 		my $tacksend = pack('nnnCCCC',0x0610,0x0421,10,4,$ccid,$rxseqcntr,0); # send ack
 		$hash->{KNXIOhelper}->{SEQUENCECNTR} =  ($rxseqcntr + 1) % 256;
@@ -523,19 +524,17 @@ sub KNXIO_ReadH {
 
 		#now decode & send to clients
 		$buf = substr($buf,10); # strip off header (10 bytes)
-		my $cemiRes = KNXIO_decodeCEMI($hash,$buf);
-		return if (! defined($cemiRes));
-		KNXIO_dispatch($hash,$cemiRes);
+		KNXIO_dispatch($hash,$buf);
 		return;
 	   },
 	   0x0421 => sub { # Tunneling Ack
 		($ccid,$txseqcntr,$errcode) = unpack('x7CCC',$buf);
 		if ($errcode > 0) {
-			KNXIO_Log ($name, 3, qq{Tunneling Ack received CCID= $ccid txseq= $txseqcntr Status= } . KNXIO_errCodes($errcode));
+			KNXIO_Log ($name, 3, qq{Tunneling Ack received CCID=$ccid seqcntrTx=$txseqcntr Status=} . KNXIO_errCodes($errcode));
 #what next ?
 		}
 		$hash->{KNXIOhelper}->{SEQUENCECNTR_W} = ($txseqcntr + 1) % 256;
-		KNXIO_Debug ($name, 1, q{Tunnel ack received } . sprintf('%02x', $txseqcntr));
+		KNXIO_Debug ($name, 1, q{Tunnel ack received seqcntrTx=} . $txseqcntr);
 		RemoveInternalTimer($hash,\&KNXIO_TunnelRequestTO); # all ok, stop timer
 		return;
 	   },
@@ -543,18 +542,18 @@ sub KNXIO_ReadH {
 
 	if (exists($resIDs{$responseID})) {
 		$msg = &{$resIDs{$responseID}} ($buf);
+		if(defined($msg)) {::DevIo_SimpleWrite($hash,$msg,0);}
 	} else {
 		KNXIO_Log ($name, 3, 'invalid response received: ' . unpack('H*',$buf));
-		return;
 	}
 
-	if(defined($msg)) {::DevIo_SimpleWrite($hash,$msg,0); } # send msg
 	return;
 }
 
 #####################################
 sub KNXIO_Ready {
 	my $hash = shift;
+
 	my $name = $hash->{NAME};
 
 	return if (! $init_done || exists($hash->{DNSWAIT}) || IsDisabled($name) == 1);
@@ -646,8 +645,8 @@ sub KNXIO_Write2 {
 	my $adddelay = 0.07;
 
 	if ($nextwrite > $timenow) {
-		if ($count % 10 == 0) {KNXIO_Log ($name, 3, qq{frequent IO-write - msg-count= $count}); }
-		KNXIO_Debug ($name, 1, qq{frequent IO-write - msg-count= $count});
+		if ($count % 10 == 0) {KNXIO_Log ($name, 3, qq{frequent IO-write - msg-count=$count}); }
+		KNXIO_Debug ($name, 1, qq{frequent IO-write - msg-count=$count});
 		InternalTimer($nextwrite + $adddelay, \&KNXIO_Write2,$hash);
 		if ($count == 1) {InternalTimer($timenow + 30.0, \&KNXIO_Flooding,$hash);}
 		return;
@@ -691,9 +690,9 @@ sub KNXIO_Write2 {
 	else {
 		RemoveInternalTimer($hash, \&KNXIO_Flooding);
 	}
-	KNXIO_Log ($name, 5, qq{Mode= $mode buf=} . unpack('H*',$msg) . qq{ rc= $ret});
-	KNXIO_Debug ($name, 1, q{IO-write processed- gad= } . KNXIO_addr2hex(unpack('n',substr($msg,$gadoffset,2)),3) .
-	                       q{ msg= } . unpack('H*',substr($msg,$dataoffset)) . qq{ msg-remain= $count});
+	KNXIO_Log ($name, 5, qq{Mode=$mode buf=} . unpack('H*',$msg) . qq{ rc=$ret});
+	KNXIO_Debug ($name, 1, q{IO-write processed- gad=} . KNXIO_addr2hex(unpack('n',substr($msg,$gadoffset,2)),3) .
+	                       q{ msg=} . unpack('H*',substr($msg,$dataoffset)) . qq{ msg-remain=$count});
 	return;
 }
 
@@ -837,7 +836,6 @@ sub KNXIO_openDev {
 	my $mode = $hash->{model};
 
 	return if (IsDisabled($name) == 1);
-
 	return KNXIO_openDevX($hash) if ($mode eq q{X});
 
 	if (exists $hash->{DNSWAIT}) {
@@ -909,7 +907,7 @@ sub KNXIO_openDev {
 		$selectlist{"$name.$param"} = $hash;
 
 		readingsSingleUpdate($hash, 'state', 'opened', 1);
-		KNXIO_Log ($name, 3, ($reopen)?'reappeared':'opened');
+		KNXIO_Log ($name, 3, ($reopen == 1)?'reappeared':'opened');
 		$ret = KNXIO_init($hash);
 	}
 
@@ -1041,19 +1039,18 @@ sub KNXIO_prepareConnRequ {
 }
 
 ### handle fifo and send to KNX-Module via dispatch
-# all decoding already done in decode_CEMI / decode_EMI
+# decoding via  decode_CEMI - put msg into FIFO
 sub KNXIO_dispatch {
 	my $hash = shift;
-	my $buf = shift;
+	my $buf  = shift;
 
-	my @que = [];
-	if (defined($hash->{KNXIOhelper}->{FIFO}) && ($hash->{KNXIOhelper}->{FIFO} ne q{})) {
-		@que = @{$hash->{KNXIOhelper}->{FIFO}};
+	my $cemiRes = KNXIO_decodeCEMI($hash,$buf);
+	if (defined($cemiRes)) {
+		push (@{$hash->{KNXIOhelper}->{FIFO}},$cemiRes);
+		KNXIO_processFIFO($hash);
 	}
-	push (@que,$buf);
-	@{$hash->{KNXIOhelper}->{FIFO}} = @que;
 
-	return KNXIO_processFIFO($hash);
+	return;
 }
 
 ### called from FIFO TIMER
@@ -1080,38 +1077,36 @@ sub KNXIO_processFIFO {
 
 	RemoveInternalTimer($hash,\&KNXIO_processFIFO);
 
-	my @que = @{$hash->{KNXIOhelper}->{FIFO}};
-	my $queentries = scalar(@que);
+	my $queentries = scalar(@{$hash->{KNXIOhelper}->{FIFO}});
 	if ($queentries > 1) { # delete any duplicates
-		my $queentriesOld = $queentries;
-		@que = KNXIO_deldupes(@que);
-		$queentries = scalar(@que);
-		my $qdiff = $queentriesOld - $queentries;
-		if ($qdiff > 0) {KNXIO_Log ($name, 3, qq{deleted $qdiff duplicate msgs from queue, $queentries remain});}
+		$queentries = KNXIO_deldupes($hash,@{$hash->{KNXIOhelper}->{FIFO}});
 	}
 
 	if ($queentries > 0) { # process timer is not running & fifo not empty
-		my $msg = shift (@que);
-		@{$hash->{KNXIOhelper}->{FIFO}} = @que;
+		my $msg = shift(@{$hash->{KNXIOhelper}->{FIFO}});
 		KNXIO_Log ($name, 4, qq{dispatching buf=$msg Nr_msgs=$queentries});
 		KNXIO_dispatch2($hash, $msg);
-		if ($queentries > 1) {
+##		if ($queentries > 1) {
 			InternalTimer(Time::HiRes::time() + 0.05, \&KNXIO_processFIFO, $hash); # allow time for new/duplicate msgs to be read
-		}
-		return;
+##		}
 	}
-	KNXIO_Log ($name, 5, q{finished});
 	return;
 }
 
 ### delete any duplicates in an array
 ### ref: https://perlmaven.com/unique-values-in-an-array-in-perl
-### input: array, return: array
+### input: array, update @{$hash->{KNXIOhelper}->{FIFO}} return: number of array entrties
 sub KNXIO_deldupes {
-	my @arr = @_;
+	my ($hash,@arr) = @_;
 
+	my $name = $hash->{NAME};
 	my %seen;
-	return grep { !$seen{substr($_,6) }++ } @arr; # ignore C<src-addr>
+
+	@{$hash->{KNXIOhelper}->{FIFO}} = grep { !$seen{substr($_,6) }++ } @arr; # ignore C<src-addr>
+	my $dupcnt = scalar(@{$hash->{KNXIOhelper}->{FIFO}});
+	my $qdiff  = scalar(@arr) - $dupcnt;
+	if ($qdiff > 0) {KNXIO_Log ($name, 3, qq{deleted $qdiff duplicate msgs from queue, $dupcnt remain});}
+	return $dupcnt;
 }
 
 ### disconnect and wait for nxt open
@@ -1135,8 +1130,8 @@ sub KNXIO_disconnect {
 
 ###
 sub KNXIO_closeDev {
-	my $hash = shift;
-	my $name = $hash->{NAME};
+	my $hash  = shift;
+	my $name  = $hash->{NAME};
 	my $param = $hash->{DeviceName};
 
 	if ($hash->{model} eq 'M') {
@@ -1282,7 +1277,7 @@ sub KNXIO_decodeCEMI {
 
 ### convert address from number to hex-string or display name ($type=2 & 3) 
 sub KNXIO_addr2hex {
-	my $adr = shift;
+	my $adr  = shift;
 	my $type = shift // 0;  # 1 & 3 if GA-address, else physical address
 
 	return sprintf('%02x%01x%02x', ($adr >> 11) & 0x1f, ($adr >> 8) & 0x7, $adr & 0xff) if ($type == 1);
@@ -1293,7 +1288,7 @@ sub KNXIO_addr2hex {
 
 ### convert address from hex-string (5 digits) to number
 sub KNXIO_hex2addr {
-	my $str = shift;
+	my $str   = shift;
 	my $isphy = shift // 0;
 
 	if ($str =~ m/([\da-f]{2})([\da-f])([\da-f]{2})/ixms) {
@@ -1310,7 +1305,7 @@ sub KNXIO_hex2addr {
 # triggered on conn-response & connstate response
 # 2nd param is undef unless called from KNXIO_keepAliveTO
 sub KNXIO_keepAlive {
-	my $hash = shift;
+	my $hash   = shift;
 	my $cntrTO = shift // 0; #retry counter
 
 	my $name = $hash->{NAME};
@@ -1462,7 +1457,7 @@ __END__
 <ul>
 <li><p>This is a IO-module for KNX-devices. It provides an interface between FHEM and a KNX-Gateway. 
    The Gateway can be either a KNX-Router/KNX-GW or the KNXD-daemon.
-   FHEM KNX-devices use this module as IO-Device. This Module does <b>NOT</b> support the deprecated EIB-Module!
+   <a href="#KNX">FHEM KNX-devices</a> use this module as IO-Device. This Module does <b>NOT</b> support the deprecated EIB-Module!
 </p>
 <p>A (german) wiki page is avaliable here&colon; <a href="https://wiki.fhem.de/wiki/KNXIO">FHEM Wiki</a></p>
 </li>
