@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 30023 2025-06-03 20:11:46Z DS_Starter $
+# $Id: 93_DbRep.pm 30057 2025-06-21 09:26:27Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,6 +58,8 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.54.19" => "27.07.2025  DbReadingsVal: Code change Forum:https://forum.fhem.de/index.php?msg=1345204, remove obsolete att allowDeletion ".
+                            "new sub DbRep_convert2oneLine: attr device/reading can now be entered in multiple lines ",
   "8.54.18" => "21.06.2025  DbRep_reduceLog: fix bug in INCLUDE Regex, forum:#141912.0 ",
   "8.54.17" => "03.05.2025  DbRep_optimizeTables: fix resolution of symbolic links in Optimize Tables for SQLite ".
                             "DbRep_sqlCmd / DbRep_sqlCmdBlocking: add commands analyze, check ",
@@ -374,13 +376,11 @@ sub DbRep_Initialize {
  $hash->{FW_deviceOverview} = 1;
 
  $hash->{AttrList} = "aggregation:minute,hour,day,week,month,year,no ".
-                     "allowDeletion:obsolete ".
                      "disable:1,0 ".
-                     "reading ".
                      "autoForward:textField-long ".
                      "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS,avgDailyMeanGWSwithGTS,avgTimeWeightMean ".
                      "countEntriesDetail:1,0 ".
-                     "device " .
+                     "device:textField-long " .
                      "dumpComment ".
                      "dumpCompress:1,0 ".
                      "dumpDirLocal ".
@@ -410,6 +410,7 @@ sub DbRep_Initialize {
                      "limit ".
                      "numDecimalPlaces:0,1,2,3,4,5,6,7 ".
                      "optimizeTablesBeforeDump:1,0 ".
+                     "reading:textField-long ".
                      "readingNameMap ".
                      "readingPreventFromDel ".
                      "role:Client,Agent ".
@@ -1468,375 +1469,364 @@ sub DbRep_Attr {
   my $dbmodel   = $dbloghash->{MODEL};
   my $do;
 
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ######################################################################################################################
-  if ($cmd eq 'set' && $aName eq 'allowDeletion') {
-      if (!$init_done) {
-          return qq{Device "$name" -> The attribute '$aName' is obsolete and will be deleted soon. Please press "save config" when FHEM start is finished.};
+  # $cmd can be "del" or "set"
+  # $name is device name
+  # aName and aVal are Attribute name and value
+
+  # nicht erlaubte / nicht setzbare Attribute wenn role = Agent
+  my @agentnoattr = qw(aggregation
+                       autoForward
+                       dumpDirLocal
+                       reading
+                       readingNameMap
+                       readingPreventFromDel
+                       device
+                       diffAccept
+                       expimpfile
+                       ftpUse
+                       ftpUser
+                       ftpUseSSL
+                       ftpDebug
+                       ftpDir
+                       ftpPassive
+                       ftpPort
+                       ftpPwd
+                       ftpServer
+                       ftpTimeout
+                       dumpMemlimit
+                       dumpComment
+                       dumpSpeed
+                       optimizeTablesBeforeDump
+                       seqDoubletsVariance
+                       sqlCmdHistoryLength
+                       timeYearPeriod
+                       timestamp_begin
+                       timestamp_end
+                       timeDiffToNow
+                       timeOlderThan
+                       sqlResultFormat
+                       useAdminCredentials
+                       );
+
+  if ($aName eq "disable") {
+      if ($cmd eq "set") {
+          $do = ($aVal) ? 1 : 0;
       }
-      else {
-          return qq{The attribute '$aName' is obsolete and will be deleted soon.};
+
+      $do     = 0 if($cmd eq "del");
+      my $val = ($do == 1 ?  "disabled" : "initialized");
+
+      ReadingsSingleUpdateValue ($hash, "state", $val, 1);
+
+      if ($do == 1) {
+          my $dbh = $hash->{DBH};
+          DbRep_clearConn ($dbh);
       }
   }
-  ######################################################################################################################
 
-    # $cmd can be "del" or "set"
-    # $name is device name
-    # aName and aVal are Attribute name and value
+  if ($cmd eq "set" && $hash->{ROLE} eq "Agent") {
+      for (@agentnoattr) {
+         return ("Attribute $aName is not usable due to role of $name is \"$hash->{ROLE}\"  ") if ($_ eq $aName);
+      }
+  }
 
-    # nicht erlaubte / nicht setzbare Attribute wenn role = Agent
-    my @agentnoattr = qw(aggregation
-                         autoForward
-                         dumpDirLocal
-                         reading
-                         readingNameMap
-                         readingPreventFromDel
-                         device
-                         diffAccept
-                         expimpfile
-                         ftpUse
-                         ftpUser
-                         ftpUseSSL
-                         ftpDebug
-                         ftpDir
-                         ftpPassive
-                         ftpPort
-                         ftpPwd
-                         ftpServer
-                         ftpTimeout
-                         dumpMemlimit
-                         dumpComment
-                         dumpSpeed
-                         optimizeTablesBeforeDump
-                         seqDoubletsVariance
-                         sqlCmdHistoryLength
-                         timeYearPeriod
-                         timestamp_begin
-                         timestamp_end
-                         timeDiffToNow
-                         timeOlderThan
-                         sqlResultFormat
-                         useAdminCredentials
-                         );
-
-    if ($aName eq "disable") {
-        if ($cmd eq "set") {
-            $do = ($aVal) ? 1 : 0;
-        }
-
-        $do     = 0 if($cmd eq "del");
-        my $val = ($do == 1 ?  "disabled" : "initialized");
-
-        ReadingsSingleUpdateValue ($hash, "state", $val, 1);
-
-        if ($do == 1) {
-            my $dbh = $hash->{DBH};
-            DbRep_clearConn ($dbh);
-        }
-    }
-
-    if ($cmd eq "set" && $hash->{ROLE} eq "Agent") {
-        foreach (@agentnoattr) {
-           return ("Attribute $aName is not usable due to role of $name is \"$hash->{ROLE}\"  ") if ($_ eq $aName);
-        }
-    }
-
-    if ($aName eq 'readingPreventFromDel' && $cmd eq 'set') {
-        if ($aVal =~ / /) {
-            return "Usage of $aName is wrong. Use a comma separated list of readings which are should prevent from deletion when a new selection starts.";
-        }
-    }
+  if ($aName eq 'readingPreventFromDel' && $cmd eq 'set') {
+      if ($aVal =~ / /) {
+          return "Usage of $aName is wrong. Use a comma separated list of readings which are should prevent from deletion when a new selection starts.";
+      }
+  }
     
-    if ($aName eq "device") {
-        my $awdev = $aVal;
-        DbRep_modAssociatedWith ($hash,$cmd,$awdev);
-    }
+  if ($aName eq "device") {
+      my $awdev = $aVal;
+      DbRep_modAssociatedWith ($hash,$cmd,$awdev);
+  }
 
-    if ($aName eq "sqlCmdHistoryLength") {
-        if ($cmd eq "set") {
-            $do = ($aVal) ? 1 : 0;
-        }
-        $do = 0 if($cmd eq "del");
-        if ($do == 0) {
-            DbRep_deleteSQLcmdCache ($name);
-        }
-    }
+  if ($aName eq "sqlCmdHistoryLength") {
+      if ($cmd eq "set") {
+          $do = ($aVal) ? 1 : 0;
+      }
+      $do = 0 if($cmd eq "del");
+      if ($do == 0) {
+          DbRep_deleteSQLcmdCache ($name);
+      }
+  }
 
-    if ($aName eq "role") {
-        if ($cmd eq "set") {
-            if ($aVal eq "Agent") {
-                foreach (devspec2array("TYPE=DbRep")) {                       # check ob bereits ein Agent für die angeschlossene Datenbank existiert -> DbRep-Device kann dann keine Agent-Rolle einnehmen
-                    my $devname = $_;
-                    next if($devname eq $name);
-                    my $devrole = $defs{$_}{ROLE};
-                    my $devdb = $defs{$_}{DATABASE};
-                    if ($devrole eq "Agent" && $devdb eq $hash->{DATABASE}) { return "There is already an Agent device: $devname defined for database $hash->{DATABASE} !"; }
-                }
+  if ($aName eq "role") {
+      if ($cmd eq "set") {
+          if ($aVal eq "Agent") {
+              foreach (devspec2array("TYPE=DbRep")) {                       # check ob bereits ein Agent für die angeschlossene Datenbank existiert -> DbRep-Device kann dann keine Agent-Rolle einnehmen
+                  my $devname = $_;
+                  next if($devname eq $name);
+                  my $devrole = $defs{$_}{ROLE};
+                  my $devdb = $defs{$_}{DATABASE};
+                  if ($devrole eq "Agent" && $devdb eq $hash->{DATABASE}) { return "There is already an Agent device: $devname defined for database $hash->{DATABASE} !"; }
+              }
 
-                foreach (@agentnoattr) {                                    # nicht erlaubte Attribute löschen falls gesetzt
-                    delete($attr{$name}{$_});
-                }
+              foreach (@agentnoattr) {                                    # nicht erlaubte Attribute löschen falls gesetzt
+                  delete($attr{$name}{$_});
+              }
 
-                $attr{$name}{icon} = "security";
-            }
-            $do = $aVal;
-        }
-        else {
-            $do = "Client";
-        }
+              $attr{$name}{icon} = "security";
+          }
+          $do = $aVal;
+      }
+      else {
+          $do = "Client";
+      }
 
-        $hash->{ROLE}  = $do;
-        $hash->{MODEL} = $hash->{ROLE};
-        delete($attr{$name}{icon}) if($do eq "Client");
-    }
+      $hash->{ROLE}  = $do;
+      $hash->{MODEL} = $hash->{ROLE};
+      delete($attr{$name}{icon}) if($do eq "Client");
+  }
 
-    if ($cmd eq 'set') {
-        if ($aName eq 'fetchValueFn' && $init_done) {
-            my $VALUE = "Hello";
-            if ( $aVal =~ m/^\s*(\{.*\})\s*$/s ) {                            # Funktion aus Attr validieren
-                $aVal = $1;
-            }
-            else {
-                $aVal = "";
-            }
+  if ($cmd eq 'set') {
+      if ($aName eq 'fetchValueFn' && $init_done) {
+          my $VALUE = "Hello";
+          if ( $aVal =~ m/^\s*(\{.*\})\s*$/s ) {                            # Funktion aus Attr validieren
+              $aVal = $1;
+          }
+          else {
+              $aVal = "";
+          }
             
-            return "Your function does not match the form \"{<function>}\"" if(!$aVal);
+          return "Your function does not match the form \"{<function>}\"" if(!$aVal);
             
-            eval $aVal;
-            return "Bad function: $@" if($@);
-        }
+          eval $aVal;
+          return "Bad function: $@" if($@);
+      }
         
-        if ($aName eq 'userExitFn' && $init_done) {
-            if (!$aVal) {
-                return "Usage of $aName is wrong. The function has to be specified as \"<UserExitFn> [reading:value]\" ";
-            }
+      if ($aName eq 'userExitFn' && $init_done) {
+          if (!$aVal) {
+              return "Usage of $aName is wrong. The function has to be specified as \"<UserExitFn> [reading:value]\" ";
+          }
             
-            if ($aVal =~ m/^\s*(\{.*\})\s*$/xs) {                             # unnamed Funktion direkt in userExitFn mit {...}
-                $aVal = $1;
-                my ($NAME,$READING,$VALUE) = ('','','');
-                eval $aVal;
-                return $@ if($@);
-            }
-        }
+          if ($aVal =~ m/^\s*(\{.*\})\s*$/xs) {                             # unnamed Funktion direkt in userExitFn mit {...}
+              $aVal = $1;
+              my ($NAME,$READING,$VALUE) = ('','','');
+              eval $aVal;
+              return $@ if($@);
+          }
+      }
         
-        if ($aName =~ /executeAfterProc|executeBeforeProc/xs && $init_done) {
-            if ($aVal =~ m/^\s*(\{.*\}|{.*|.*})\s*$/xs && $aVal !~ /{".*"}/xs) {
-                $aVal = $1;
+      if ($aName =~ /executeAfterProc|executeBeforeProc/xs && $init_done) {
+          if ($aVal =~ m/^\s*(\{.*\}|{.*|.*})\s*$/xs && $aVal !~ /{".*"}/xs) {
+              $aVal = $1;
 
-                my $fdv                   = __DbRep_fhemDefVars ();
-                my ($today, $hms, $we)    = ($fdv->{today}, $fdv->{hms},   $fdv->{we});
-                my ($sec, $min, $hour)    = ($fdv->{sec},   $fdv->{min},   $fdv->{hour});
-                my ($mday, $month, $year) = ($fdv->{mday},  $fdv->{month}, $fdv->{year});
-                my ($wday, $yday, $isdst) = ($fdv->{wday},  $fdv->{yday},  $fdv->{isdst});
+              my $fdv                   = __DbRep_fhemDefVars ();
+              my ($today, $hms, $we)    = ($fdv->{today}, $fdv->{hms},   $fdv->{we});
+              my ($sec, $min, $hour)    = ($fdv->{sec},   $fdv->{min},   $fdv->{hour});
+              my ($mday, $month, $year) = ($fdv->{mday},  $fdv->{month}, $fdv->{year});
+              my ($wday, $yday, $isdst) = ($fdv->{wday},  $fdv->{yday},  $fdv->{isdst});
 
-                eval $aVal;
-                return $@ if ($@);
-            }
-        }
+              eval $aVal;
+              return $@ if ($@);
+          }
+      }
         
-        if ($aName =~ /valueFilter/) {
-            eval { "Hallo" =~ m/$aVal/ };
-            return "Bad regexp: $@" if($@);
-        }
+      if ($aName =~ /valueFilter/) {
+          eval { "Hallo" =~ m/$aVal/ };
+          return "Bad regexp: $@" if($@);
+      }
 
-        if ($aName eq "autoForward" && $init_done) {
-            my $em = "Usage of $aName is wrong. The function has to be specified as ".
-                     "\"{ <destination-device> => \"<source-reading (Regex)> => [=> destination-reading]\" }\". ".
-                     "The specification can be made in several lines separated by comma.";
-            if ($aVal !~ m/^\{.*(=>)+?.*\}$/s) {return $em;}
-            my $av = eval $aVal;
+      if ($aName eq "autoForward" && $init_done) {
+          my $em = "Usage of $aName is wrong. The function has to be specified as ".
+                   "\"{ <destination-device> => \"<source-reading (Regex)> => [=> destination-reading]\" }\". ".
+                   "The specification can be made in several lines separated by comma.";
+          if ($aVal !~ m/^\{.*(=>)+?.*\}$/s) {return $em;}
+          my $av = eval $aVal;
 
-            if ($@) {
-                Log3($name, 2, "$name - Error while evaluate: ".$@);
-                return $@;
-            }
+          if ($@) {
+              Log3($name, 2, "$name - Error while evaluate: ".$@);
+              return $@;
+          }
 
-            if (ref($av) ne "HASH") {
-                return $em;
-            }
-        }
+          if (ref($av) ne "HASH") {
+              return $em;
+          }
+      }
 
-        if ($aName =~ /seqDoubletsVariance/) {
-            my $edge = "";
-            if ($aVal =~ /EDGE=/) {
-                ($aVal,$edge) = split("EDGE=", $aVal);
-                unless ($edge =~ /^positive$|^negative$/i) { return qq{The parameter EDGE can only be "positive" or "negative" !}; }
-            }
+      if ($aName =~ /seqDoubletsVariance/) {
+          my $edge = "";
+          if ($aVal =~ /EDGE=/) {
+              ($aVal,$edge) = split("EDGE=", $aVal);
+              unless ($edge =~ /^positive$|^negative$/i) { return qq{The parameter EDGE can only be "positive" or "negative" !}; }
+          }
 
-            my ($varpos,$varneg) = split(" ", $aVal);
-            $varpos              = DbRep_trim($varpos);
-            $varneg              = $varpos if(!$varneg);
-            $varneg              = DbRep_trim($varneg);
+          my ($varpos,$varneg) = split(" ", $aVal);
+          $varpos              = DbRep_trim($varpos);
+          $varneg              = $varpos if(!$varneg);
+          $varneg              = DbRep_trim($varneg);
 
-            unless (looks_like_number($varpos) && looks_like_number($varneg)) {
-                return " The Value of $aName is not valid. Only figures are allowed (except \"EDGE\") !";
-            }
-        }
+          unless (looks_like_number($varpos) && looks_like_number($varneg)) {
+              return " The Value of $aName is not valid. Only figures are allowed (except \"EDGE\") !";
+          }
+      }
 
-        if ($aName eq "timeYearPeriod") {                                                         # z.Bsp: 06-01 02-28
-            unless ($aVal =~ /^(\d{2})-(\d{2})\s(\d{2})-(\d{2})$/x ) {
-                return "The Value of \"$aName\" isn't valid. Set the account period as \"MM-DD MM-DD\".";
-            }
+      if ($aName eq "timeYearPeriod") {                                                         # z.Bsp: 06-01 02-28
+          unless ($aVal =~ /^(\d{2})-(\d{2})\s(\d{2})-(\d{2})$/x ) {
+              return "The Value of \"$aName\" isn't valid. Set the account period as \"MM-DD MM-DD\".";
+          }
 
-            my ($mm1, $dd1, $mm2, $dd2) = ($aVal =~ /^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/);
-            my (undef,undef,undef,$mday,$mon,$year,undef,undef,undef) = localtime (time);         # Istzeit Ableitung
-            my ($ybp, $yep);
+          my ($mm1, $dd1, $mm2, $dd2) = ($aVal =~ /^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/);
+          my (undef,undef,undef,$mday,$mon,$year,undef,undef,undef) = localtime (time);         # Istzeit Ableitung
+          my ($ybp, $yep);
 
-            $year += 1900;
-            $mon++;
+          $year += 1900;
+          $mon++;
 
-            my $bdval = $mm1 * 30 + int $dd1;
-            my $adval = $mon * 30 + int $mday;
+          my $bdval = $mm1 * 30 + int $dd1;
+          my $adval = $mon * 30 + int $mday;
 
-            if ($adval >= $bdval) {
-                $ybp = $year;
-                $yep = $year++;
-            }
-            else {
-                $ybp = $year--;
-                $yep = $year;
-            }
+          if ($adval >= $bdval) {
+              $ybp = $year;
+              $yep = $year++;
+          }
+          else {
+              $ybp = $year--;
+              $yep = $year;
+          }
 
-            eval { my $t1 = timelocal(00, 00, 00, $dd1, $mm1-1, $ybp-1900);
-                   my $t2 = timelocal(00, 00, 00, $dd2, $mm2-1, $yep-1900);
-                 }
-                 or do {
-                     return " The Value of $aName is out of range";
-                 };
+          eval { my $t1 = timelocal(00, 00, 00, $dd1, $mm1-1, $ybp-1900);
+                 my $t2 = timelocal(00, 00, 00, $dd2, $mm2-1, $yep-1900);
+               }
+               or do {
+                   return " The Value of $aName is out of range";
+               };
 
-            delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
-            delete($attr{$name}{timestamp_end})   if ($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeDiffToNow})   if ($attr{$name}{timeDiffToNow});
-            delete($attr{$name}{timeOlderThan})   if ($attr{$name}{timeOlderThan});
-            return;
-        }
+          delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
+          delete($attr{$name}{timestamp_end})   if ($attr{$name}{timestamp_end});
+          delete($attr{$name}{timeDiffToNow})   if ($attr{$name}{timeDiffToNow});
+          delete($attr{$name}{timeOlderThan})   if ($attr{$name}{timeOlderThan});
+          return;
+      }
 
-        if ($aName eq "timestamp_begin" || $aName eq "timestamp_end") {
-            my @dtas = qw(current_year_begin
-                          current_year_end
-                          previous_year_begin
-                          previous_year_end
-                          current_month_begin
-                          current_month_end
-                          previous_month_begin
-                          previous_month_end
-                          current_week_begin
-                          current_week_end
-                          previous_week_begin
-                          previous_week_end
-                          current_day_begin
-                          current_day_end
-                          previous_day_begin
-                          previous_day_end
-                          next_day_begin
-                          next_day_end
-                          current_hour_begin
-                          current_hour_end
-                          previous_hour_begin
-                          previous_hour_end
-                         );
+      if ($aName eq "timestamp_begin" || $aName eq "timestamp_end") {
+          my @dtas = qw(current_year_begin
+                        current_year_end
+                        previous_year_begin
+                        previous_year_end
+                        current_month_begin
+                        current_month_end
+                        previous_month_begin
+                        previous_month_end
+                        current_week_begin
+                        current_week_end
+                        previous_week_begin
+                        previous_week_end
+                        current_day_begin
+                        current_day_end
+                        previous_day_begin
+                        previous_day_end
+                        next_day_begin
+                        next_day_end
+                        current_hour_begin
+                        current_hour_end
+                        previous_hour_begin
+                        previous_hour_end
+                       );
 
-            if (grep /^$aVal$/, @dtas) {      
-                delete($attr{$name}{timeDiffToNow});
-                delete($attr{$name}{timeOlderThan});
-                delete($attr{$name}{timeYearPeriod});
-                return;
-            }
+          if (grep /^$aVal$/, @dtas) {      
+              delete($attr{$name}{timeDiffToNow});
+              delete($attr{$name}{timeOlderThan});
+              delete($attr{$name}{timeYearPeriod});
+              return;
+          }
 
-            $aVal = DbRep_formatpicker($aVal);
-            if ($aVal !~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/x)
-                {return "The Value of $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of:\n".
-                        "current_[year|month|day|hour]_begin, current_[year|month|day|hour]_end,\n".
-                        "previous_[year|month|day|hour]_begin, previous_[year|month|day|hour]_end,\n".
-                        "next_day_begin, next_day_end";}
+          $aVal = DbRep_formatpicker($aVal);
+          if ($aVal !~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/x) {
+              return "The Value of $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of:\n".
+                     "current_[year|month|day|hour]_begin, current_[year|month|day|hour]_end,\n".
+                     "previous_[year|month|day|hour]_begin, previous_[year|month|day|hour]_end,\n".
+                     "next_day_begin, next_day_end";
+          }
 
-            my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($aVal =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x);
+          my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($aVal =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x);
 
-            eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+          eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
 
-            if ($@) {
-                my @l = split (/at/, $@);
-                return " The Value of $aName is out of range - $l[0]";
-            }
+          if ($@) {
+              my @l = split (/at/, $@);
+              return " The Value of $aName is out of range - $l[0]";
+          }
 
-            delete($attr{$name}{timeDiffToNow});
-            delete($attr{$name}{timeOlderThan});
-            delete($attr{$name}{timeYearPeriod});
-        }
+          delete($attr{$name}{timeDiffToNow});
+          delete($attr{$name}{timeOlderThan});
+          delete($attr{$name}{timeYearPeriod});
+      }
 
-        if ($aName =~ /ftpTimeout|timeout/) {
-            unless ($aVal =~ /^[0-9]+$/) {
-                return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";
-            }
-        }
+      if ($aName =~ /ftpTimeout|timeout/) {
+          unless ($aVal =~ /^[0-9]+$/) {
+              return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";
+          }
+      }  
 
-        if ($aName =~ /diffAccept/) {
-            my ($sign, $daval) = DbRep_ExplodeDiffAcc ($aVal);
+      if ($aName =~ /diffAccept/) {
+          my ($sign, $daval) = DbRep_ExplodeDiffAcc ($aVal);
 
-            if (!$daval) {
-                return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";
-            }
-        }
+          if (!$daval) {
+              return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";
+          }
+      }
 
-        if ($aName eq "readingNameMap") {
-            unless ($aVal =~ m/^[A-Za-z\d_\.-]+$/) {
-                return " Unsupported character in $aName found. Use only A-Z a-z _ . -";
-            }
-        }
+      if ($aName eq "readingNameMap") {
+          unless ($aVal =~ m/^[A-Za-z\d_\.-]+$/) {
+              return " Unsupported character in $aName found. Use only A-Z a-z _ . -";
+          }
+      }
 
-        if ($aName eq "timeDiffToNow") {
-            unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ ) {
-                return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";
-            }
-            delete($attr{$name}{timestamp_begin});
-            delete($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeYearPeriod});
-        }
+      if ($aName eq "timeDiffToNow") {
+          unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ ) {
+              return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";
+          }
+          delete($attr{$name}{timestamp_begin});
+          delete($attr{$name}{timestamp_end});
+          delete($attr{$name}{timeYearPeriod});
+      }
 
-        if ($aName eq "timeOlderThan") {
-            unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ ) {
-                 return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";
-            }
-            delete($attr{$name}{timestamp_begin});
-            delete($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeYearPeriod});
-        }
+      if ($aName eq "timeOlderThan") {
+          unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ ) {
+               return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";
+          }
+          delete($attr{$name}{timestamp_begin});
+          delete($attr{$name}{timestamp_end});
+          delete($attr{$name}{timeYearPeriod});
+      }
 
-        if ($aName eq "dumpMemlimit" || $aName eq "dumpSpeed") {
-            unless ($aVal =~ /^[0-9]+$/) {
-                return "The Value of $aName is not valid. Use only figures 0-9 without decimal places.";
-            }
-            my $dml = AttrVal($name, "dumpMemlimit", 100000);
-            my $ds  = AttrVal($name, "dumpSpeed",     10000);
+      if ($aName eq "dumpMemlimit" || $aName eq "dumpSpeed") {
+          unless ($aVal =~ /^[0-9]+$/) {
+              return "The Value of $aName is not valid. Use only figures 0-9 without decimal places.";
+          }
+          my $dml = AttrVal($name, "dumpMemlimit", 100000);
+          my $ds  = AttrVal($name, "dumpSpeed",     10000);
 
-            if($aName eq "dumpMemlimit") {
-                unless($aVal >= (10 * $ds)) {
-                    return "The Value of $aName has to be at least '10 x dumpSpeed' ! ";
-                }
-            }
-            if($aName eq "dumpSpeed") {
-                unless($aVal <= ($dml / 10)) {
-                    return "The Value of $aName mustn't be greater than 'dumpMemlimit / 10' ! ";
-                }
-            }
-        }
+          if($aName eq "dumpMemlimit") {
+              unless($aVal >= (10 * $ds)) {
+                  return "The Value of $aName has to be at least '10 x dumpSpeed' ! ";
+              }
+          }
+          if($aName eq "dumpSpeed") {
+              unless($aVal <= ($dml / 10)) {
+                  return "The Value of $aName mustn't be greater than 'dumpMemlimit / 10' ! ";
+              }
+          }
+      }
 
-        if ($aName eq "ftpUse") {
-            delete $attr{$name}{ftpUseSSL};
-        }
+      if ($aName eq "ftpUse") {
+          delete $attr{$name}{ftpUseSSL};
+      }
 
-        if ($aName eq "ftpUseSSL") {
-            delete $attr{$name}{ftpUse};
-        }
+      if ($aName eq "ftpUseSSL") {
+          delete $attr{$name}{ftpUse};
+      }
 
-        if ($aName eq "useAdminCredentials" && $aVal) {
-            my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
-            unless ($success) {
-                return "The credentials of a database admin user couldn't be read. ".
-                       "Make shure you have set them with command \"set $name adminCredentials <user> <password>\" before.";
-            }
-        }
-    }
+      if ($aName eq "useAdminCredentials" && $aVal) {
+          my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
+          unless ($success) {
+              return "The credentials of a database admin user couldn't be read. ".
+                     "Make shure you have set them with command \"set $name adminCredentials <user> <password>\" before.";
+          }
+      }
+  }
 
 return;
 }
@@ -2337,12 +2327,14 @@ sub DbRep_Main {
  my $hash      = shift;
  my $opt       = shift;
  my $prop      = shift // q{};
+ 
  my $name      = $hash->{NAME};
- my $to        = AttrVal ($name, 'timeout', $dbrep_deftonbl);
- my $reading   = AttrVal ($name, 'reading',             '%');
- my $device    = AttrVal ($name, 'device',              '%');
  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbmodel   = $dbloghash->{MODEL};
+ 
+ my $to        = AttrVal ($name, 'timeout', $dbrep_deftonbl);
+ my $reading   = DbRep_convert2oneLine (AttrVal ($name, 'reading', '%'));
+ my $device    = DbRep_convert2oneLine (AttrVal ($name, 'device',  '%'));
 
  my $params;
 
@@ -14540,12 +14532,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 30023 2025-06-03 20:11:46Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 30057 2025-06-21 09:26:27Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 30023 2025-06-03 20:11:46Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 30057 2025-06-21 09:26:27Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -14578,7 +14570,7 @@ sub CommandDbReadingsVal {
 return $ret;
 }
 
-sub DbReadingsVal($$$$) {
+sub DbReadingsVal {
   my $name    = shift // return qq{A DbRep-device must be specified};
   my $devread = shift // return qq{"device:reading" must be specified};
   my $ts      = shift // return qq{The Command needs a timestamp defined in format "YYYY-MM-DD_hh:mm:ss"};
@@ -14589,7 +14581,7 @@ sub DbReadingsVal($$$$) {
   if(!defined($defs{$name})) {
       return qq{DbRep-device "$name" doesn't exist.};
   }
-  if(!$defs{$name}{TYPE} eq "DbRep") {
+  if ($defs{$name}{TYPE} ne "DbRep") {
       return qq{"$name" is not a DbRep-device but of type "}.$defs{$name}{TYPE}.qq{"};
   }
 
@@ -14597,12 +14589,12 @@ sub DbReadingsVal($$$$) {
   my $dbmodel = $defs{$hash->{HELPER}{DBLOGDEVICE}}{MODEL};
 
   $ts =~ s/_/ /;
-  if($ts !~ /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/x) {
+  if ($ts !~ /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/x) {
       return qq{timestamp has not the valid format. Use "YYYY-MM-DD_hh:mm:ss" as timestamp.};
   }
 
   my ($dev,$reading) = split(":",$devread);
-  if(!$dev || !$reading) {
+  if (!$dev || !$reading) {
       return qq{"device:reading" must be specified};
   }
 
@@ -14662,6 +14654,27 @@ sub browser_refresh {
 return;
 }
 
+################################################################
+#  bringt die Attribute $device/$reading in die benötigte
+#  einzeilige Form   
+################################################################
+sub DbRep_convert2oneLine {
+  my $input = shift;
+
+  $input    =~ s/\n/ /g;                                                                        # Entferne Zeilenumbrüche und wandle sie in Leerzeichen um
+  my ($include_part, $exclude_part) = split / EXCLUDE=/i, $input, 2;                            # Trenne den String an " EXCLUDE=" — wichtig: Leerzeichen vor EXCLUDE
+  my @include                       = split /[ ,]+/, $include_part;                             # Zerlege beide Teile in einzelne Strings, getrennt durch Leerzeichen oder Komma
+  my @exclude                       = $exclude_part ? split /[ ,]+/, $exclude_part : ();
+
+  my $include_str = join ",", @include;                                                         # Baue neue Strings mit Kommaseparierung
+  my $exclude_str = join ",", @exclude;
+
+  my $ret = $include_str;
+  $ret   .= ' EXCLUDE='.$exclude_str if($exclude_str);
+
+return $ret;
+}
+
 ###################################################################################
 #                     Associated Devices setzen
 ###################################################################################
@@ -14675,15 +14688,16 @@ sub DbRep_modAssociatedWith {
   my (@naw,@edvs,@edvspcs,$edevswc);
   my ($edevs,$idevice,$edevice) = ('','','');
 
-  if($cmd eq "del") {
+  if ($cmd eq "del") {
       readingsDelete($hash,".associatedWith");
       return;
   }
 
-  ($idevice,$edevice) = split(/EXCLUDE=/i,$awdev);
+  ($idevice, $edevice) = split /EXCLUDE=/i, $awdev;
 
-  if($edevice) {
-      @edvs = split(",",$edevice);
+  if ($edevice) {
+      @edvs = split ",", $edevice;
+      
       for my $e (@edvs) {
           $e       =~ s/%/\.*/g if($e !~ /^%$/);                      # SQL Wildcard % auflösen
           @edvspcs = devspec2array($e);
@@ -14700,8 +14714,8 @@ sub DbRep_modAssociatedWith {
       }
   }
 
-  if($idevice) {
-      my @nadev = split("[, ]", $idevice);
+  if ($idevice) {
+      my @nadev = split "[, ]", $idevice;
 
       for my $d (@nadev) {
           $d    =~ s/%/\.*/g if($d !~ /^%$/);                         # SQL Wildcard % in Regex
@@ -14709,13 +14723,13 @@ sub DbRep_modAssociatedWith {
 
           for (@a) {
               next if(!$defs{$_});
-              push(@naw, $_) if($_ !~ /$edevs/);
+              push @naw, $_ if($_ !~ /$edevs/);
           }
       }
   }
 
-  if(@naw) {
-      ReadingsSingleUpdateValue ($hash, ".associatedWith", join(" ",@naw), 0);
+  if (@naw) {
+      ReadingsSingleUpdateValue ($hash, ".associatedWith", join (" ",@naw), 0);
   }
   else {
       readingsDelete($hash, ".associatedWith");
