@@ -196,6 +196,7 @@
 # MH 20250201  fix dpt16 dblog-split fn
 #              feature: new attr readingNmap - modify readingnames on the fly
 #              internal code change: _define2, _attr, _set, _encodeByDpt
+# MH 202505xx  modify blink cmd logic - support widgetList
 #
 # todo-4/2024  remove support for oldsyntax cmd's: raw,value,string,rgb
 
@@ -637,11 +638,7 @@ sub KNX_Define {
 	my @a = split(/[ \t\n]+/xms, $def); #enable newline within define with \
 	my $name = $a[0];
 	$hash->{NAME} = $name;
-
-	$SVNID =~ s/.+[.]pm\s(\S+\s\S+).+/$1/ixms;
-	$hash->{'.SVN'} = $SVNID; # store svn info in dev hash
-
-	KNX_Log ($name, 5, join (q{ }, @a));
+	$hash->{'.SVN'} = $SVNID =~ s/.+[.]pm\s(\S+\s+\S+).+/$1/rxms;
 
 	#too less arguments or no valid 1st gad
 	if (int(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GAD_HEX)[:](?:dpt|$MODELERR)/ixms) { # at least the first gad must be valid
@@ -784,7 +781,6 @@ sub KNX_Define2 {
 			KNX_Log ($name, 2, $_);
 		}
 	}
-	KNX_Log ($name, 5, q{define complete});
 	return;
 }
 
@@ -830,8 +826,6 @@ sub KNX_Get {
 	return qq{get cmd ($name) not allowed during fhem-start} if (! $init_done);
 	return qq{KNX_Get ($name): is disabled} if (IsDisabled($name) == 1);
 
-	KNX_Log ($name, 5, qq{enter: CMD= $gadName});
-
 	#return, if unknown group
 	return qq{KNX_Get ($name): invalid gadName: $gadName} if(! exists($hash->{GADDETAILS}->{$gadName}));
 	#get groupCode, groupAddress, option
@@ -872,8 +866,6 @@ sub KNX_Set {
 
 	return qq{set cmd ($name) not allowed during fhem-start} if (! $init_done);
 	return qq{$name is disabled} if (IsDisabled($name) == 1);
-
-	KNX_Log ($name, 5, qq{enter: $targetGadName } . join(q{ }, @arg));
 
 	$targetGadName =~ s/^\s+|\s+$//gxms; # gad-name or cmd (in old syntax)
 	my $cmd = undef;
@@ -1053,7 +1045,6 @@ sub KNX_Set_dpt1 {
 		CommandDefMod(undef, '-silent ' . $name . qq{_TIMER_$groupCode at $hms_til set $name $targetGadName $tvalue});
 		return (undef,$value);
 	}
-
 	return KNX_set_dpt1_sp($hash, $targetGadName, $cmd, @arg);
 }
 
@@ -1092,10 +1083,13 @@ sub KNX_set_dpt1_sp {
 	}
 
 	#blink - implemented with timer & toggle
-	elsif ($cmd =~ m/$BLINK/ixms) {
-		my $count = ($arg[0])?$arg[0] * 2 -1:1;
+	elsif ($cmd =~ m/$BLINK(?:,(\d+),(\d+))?/ixms) {
+		my $count = defined($1)?$1:$arg[0]; # widgetList
+		my $dur   = defined($2)?$2:$arg[1];
+		$count =~ s/[,]//gxms; # strip any commas
+		$count = $count * 2 - 1;
+		$dur = defined($dur)?$dur:1;
 		if ($count < 1) {$count = 1;}
-		my $dur = ($arg[1])?$arg[1]:1;
 		if ($dur < 1) {$dur = 1;}
 
 		my $duration = sprintf('%02d:%02d:%02d', $dur/3600, ($dur%3600)/60, $dur%60);
@@ -1246,7 +1240,6 @@ sub KNX_DbLog_split {
 	}
 
 	my $value = join(q{ },@strings);
-#	if (!defined($unit)) {$unit = q{};}
 
 	KNX_Log ($device, 5, qq{EVENT= $event READING= $reading VALUE= $value UNIT= $unit});
 	return ($reading, $value, $unit);
@@ -2463,11 +2456,11 @@ If you want to restrict the GAD, use the options "get", "set", or "listenonly". 
  However, <strong>the new device will be disabled until you added a DPT to the definition </strong>and delete the
  <a href="#KNX-attr-disable">disable</a> attribute. The device name will be KNX_&lt;llaaddd&gt; where ll is the line-,
  aa the area- and ddd the device-address.
- No FileLog or SVG definition is created for KNX-devices by autocreate. Use for example&colon;<br/> 
- <code>define &lt;name&gt; FileLog &lt;filename&gt; KNX_.*</code><br/>
+ No FileLog or SVG definition is created for KNX-devices by autocreate. Use for example&colon; 
+ <code>   define &lt;name&gt; FileLog &lt;filename&gt; KNX_.*   </code>
  to create a single FileLog-definition for all KNX-devices created by autocreate.  
  Another option is to disable autocreate for KNX-devices in production environments (when no changes / additions are expected)
- by using&colon;  <code>attr &lt;autocreate&gt; ignoreTypes KNX_.*</code></p>
+ by using&colon; <code>   attr &lt;autocreate&gt; ignoreTypes KNX_.*</code></p>
 <pre>
 Examples&colon;
 <code>   define lamp1 KNX 0/7/11&colon;dpt1
