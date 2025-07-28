@@ -1626,12 +1626,12 @@ ZWave_thermostatSetpointParse ($$)
   my $scale = (((hex($2) & 0x18)>>3) == 1) ? "F": "C";
   my $size  = (hex($2) & 0x07);
 
-  if (length($3) != $size*2) {
+  if (length($3) < $size*2) {
     Log3 $name, 1, "$name: THERMOSTAT_SETPOINT_REPORT "
                         ."wrong number of bytes received";
     return;
   }
-  my $sp = hex($3);
+  my $sp = hex(substr($3, 0, $size*2)); # 142142
   $sp -= (2 ** ($size*8)) if $sp >= (2 ** ($size*8-1));
   $sp = $sp / (10 ** $prec);
 
