@@ -12007,16 +12007,29 @@ sub EnOcean_Parse($$) {
         RemoveInternalTimer($hash->{helper}{timer}{buttonS}) if (exists $hash->{helper}{timer}{buttonS});
         @{$hash->{helper}{timer}{buttonS}} = ($hash, 'buttonS', 'off', 1, 5);
         InternalTimer(gettimeofday() + 0.5, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{buttonS}, 0);
+        push @event, "3:event:single";
+        push @event, "3:button:pressed";
+        RemoveInternalTimer($hash->{helper}{timer}{button}) if (exists $hash->{helper}{timer}{button});
+        @{$hash->{helper}{timer}{button}} = ($hash, 'button', 'released', 1, 5);
+        InternalTimer(gettimeofday() + 0.5, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{button}, 0);
       } elsif ($db[0] == 2) {
         push @event, "3:buttonD:on";
         RemoveInternalTimer($hash->{helper}{timer}{buttonD}) if (exists $hash->{helper}{timer}{buttonD});
         @{$hash->{helper}{timer}{buttonD}} = ($hash, 'buttonD', 'off', 1, 5);
         InternalTimer(gettimeofday() + 0.5, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{buttonD}, 0);
+        push @event, "3:event:double";
+        push @event, "3:button:pressed";
+        RemoveInternalTimer($hash->{helper}{timer}{button}) if (exists $hash->{helper}{timer}{button});
+        @{$hash->{helper}{timer}{button}} = ($hash, 'button', 'released', 1, 5);
+        InternalTimer(gettimeofday() + 0.5, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{button}, 0);
       } elsif ($db[0] == 3) {
         push @event, "3:buttonL:on";
+        push @event, "3:event:long";        
+        push @event, "3:button:pressed";
         push @event, "3:state:on";
       } elsif ($db[0] == 4) {
         push @event, "3:buttonL:off";
+        push @event, "3:button:released";
         push @event, "3:state:off";
       }
 
@@ -22419,9 +22432,11 @@ sub EnOcean_Delete($$) {
          <li>on</li>
          <li>off</li>
          <li>batteryPercent: r/% (Sensor Range: r = 1 % ... 100 %)</li>
+         <li>button: pressed|released</li>
          <li>buttonD: on|off</li>
          <li>buttonL: on|off</li>
          <li>buttonS: on|off</li>
+         <li>event: double|long|single</li>
          <li>state: on|off</li>
      </ul><br>
         The attr subType must be switch.0A. This is done if the device was
