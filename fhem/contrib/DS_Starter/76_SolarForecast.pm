@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.54.6" => "29.07.2025  _graphicConsumerLegend: show surplus method and result in consumer legend hoover ",
+  "1.54.5" => "24.07.2025  isAddSwitchOnCond/isAddSwitchOffCond: change debug info ",
   "1.54.4" => "22.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
                            "medianArray: can optional use newest 3..20 elements, avgArray: use the newest elements if num is set ".
                            "Debug consumerSwitching: print out info message of compare operation, remove attr graphicShowDiff ".
@@ -639,6 +641,13 @@ my %svicons = (                                                               # 
   '1' => 'message_mail_open@darkorange',                                      # Standard Mitteilungs-Icon 1 - Mitteilung
   '2' => 'message_attention@darkorange',                                      # Standard Mitteilungs-Icon 2 - Warnung
   '3' => 'message_attention@red',                                             # Standard Mitteilungs-Icon 3 - Fehler / Problem
+);
+
+my %intrptcatic = (                                                               # Unterbrechungscharakteristik 
+  '0' => 'simple false',                                                          
+  '1' => 'simple true',                                      
+  '2' => 'Code return true',                                      
+  '3' => 'Code return false',                                            
 );
 
 my %hset = (                                                                # Hash der Set-Funktion
@@ -12993,11 +13002,11 @@ sub __setConsRcmdState {
   my $debug = $paref->{debug};
 
   my $hash       = $defs{$name};
-  my $nompower   = ConsumerVal      ($hash, $c, 'power',                  0);             # Consumer nominale Leistungsaufnahme (W)
+  my $nompower   = ConsumerVal      ($name, $c, 'power',                  0);             # Consumer nominale Leistungsaufnahme (W)
   my $ccr        = AttrVal          ($name, 'ctrlConsRecommendReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
   my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $nompower;                          # resultierender Verbauch nach Einschaltung Consumer
 
-  my ($method, $surplus) = determSurplus ($hash, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
+  my ($method, $surplus) = determSurplus ($name, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
 
   $data{$name}{consumers}{$c}{surpmethResult} = $surplus;                                 # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
 
@@ -13131,7 +13140,7 @@ sub ___switchConsumerOn {
   my $isintable = isInterruptable ($hash, $c, 0, 1);                                              # mit Ausgabe Interruptable Info im Debug
 
   if ($debug =~ /consumerSwitching${c}/x) {
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable -> $intrptcatic{$isintable}});
   }
 
   my $isConsRcmd = isConsRcmd ($hash, $c);
@@ -16551,12 +16560,12 @@ sub _graphicConsumerLegend {
 
       my $caicon                  = $paref->{caicon};                                               # Consumer AdviceIcon
       my ($err, $cname, $dswname) = getCDnames  ($hash, $c);                                        # Consumer und Switch Device Name
-      my $calias                  = ConsumerVal ($hash, $c, 'alias',   $cname);                     # Alias des Consumerdevices
-      my $cicon                   = ConsumerVal ($hash, $c, 'icon',        '');                     # Icon des Consumerdevices
-      my $oncom                   = ConsumerVal ($hash, $c, 'oncom',       '');                     # Consumer Einschaltkommando
-      my $offcom                  = ConsumerVal ($hash, $c, 'offcom',      '');                     # Consumer Ausschaltkommando
-      my $autord                  = ConsumerVal ($hash, $c, 'autoreading', '');                     # Readingname f. Automatiksteuerung
-      my $auto                    = ConsumerVal ($hash, $c, 'auto',         1);                     # Automatic Mode
+      my $calias                  = ConsumerVal ($name, $c, 'alias',   $cname);                     # Alias des Consumerdevices
+      my $cicon                   = ConsumerVal ($name, $c, 'icon',        '');                     # Icon des Consumerdevices
+      my $oncom                   = ConsumerVal ($name, $c, 'oncom',       '');                     # Consumer Einschaltkommando
+      my $offcom                  = ConsumerVal ($name, $c, 'offcom',      '');                     # Consumer Ausschaltkommando
+      my $autord                  = ConsumerVal ($name, $c, 'autoreading', '');                     # Readingname f. Automatiksteuerung
+      my $auto                    = ConsumerVal ($name, $c, 'auto',         1);                     # Automatic Mode
 
       my $cmdon      = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $dswname $oncom')"};
       my $cmdoff     = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=set $name clientAction $c 0 set $dswname $offcom')"};
@@ -16588,8 +16597,12 @@ sub _graphicConsumerLegend {
       my ($iilt,$rlt)                                = isInLocktime ($paref);                         # Sperrzeit Status ermitteln
       my $mode                                       = getConsumerPlanningMode ($hash, $c);           # Planungsmode 'can' oder 'must'
 
+      my $sm          = ConsumerVal ($name, $c, 'surpmeth', 'default');
+      $sm             = $sm eq 'default' || $sm =~ /_/ ? $sm : $sm.'_all';
+      my $smr         = ConsumerVal ($name, $c, 'surpmethResult',   0);
       my $pstate      = $caicon eq "times"    ? $hqtxt{pstate}{$lang}  : $htitles{pstate}{$lang};
       my $surplusinfo = isConsRcmd($hash, $c) ? $htitles{splus}{$lang} : $htitles{nosplus}{$lang};
+      $surplusinfo   .= " (${sm}: $smr W)";
 
       $pstate =~ s/<mode>/$mode/xs;
       $pstate =~ s/<pstate>/$planstate/xs;
@@ -22049,12 +22062,11 @@ return $out;
 #
 #####################################################################
 sub determSurplus {
-  my $hash = shift;
+  my $name = shift;
   my $c    = shift;
 
-  my $surpmeth = ConsumerVal ($hash, $c, 'surpmeth', 'default');
-  my $splref   = CurrentVal  ($hash, 'surplusslidereg',     '');
-  my $name     =  $hash->{NAME};
+  my $surpmeth = ConsumerVal ($name, $c, 'surpmeth', 'default');
+  my $splref   = CurrentVal  ($name, 'surplusslidereg',     '');
   my $method   = 'default';
 
   my ($surplus, $fallback);
@@ -22070,7 +22082,7 @@ sub determSurplus {
       $method  = $num ? "average:$num" : "average:all";
   }
   elsif ($surpmeth eq 'default') {                                        # aktueller Energieüberschuß
-      $surplus = CurrentVal ($hash, 'surplus', 0);
+      $surplus = CurrentVal ($name, 'surplus', 0);
       $method  = 'default';
   }
   elsif ($surpmeth =~ /.*:.*/xs) {
@@ -22093,7 +22105,7 @@ sub determSurplus {
   }
 
   if ($fallback) {                                                        # Fall Back
-      $surplus = CurrentVal ($hash, 'surplus', 0);
+      $surplus = CurrentVal ($name, 'surplus', 0);
       $method  = $method." but fallback to 'default'";
   }
 
@@ -23074,12 +23086,12 @@ sub isAddSwitchOnCond {
       }
 
       if ($true) {
-          $info  = qq{The value “$condval” resulted in 'true' after exec "$swoncode" \n};
+          $info  = qq{The return value “$true” resulted in 'true' after exec "$swoncode" \n};
           $info .= "-> Check successful ";
           $swon  = 1;
       }
       else {
-          $info = qq{The value “$condval” resulted in 'false' after exec "$swoncode" \n};
+          $info = qq{The return value “$true” resulted in 'false' after exec "$swoncode" \n};
           $swon = 0;
       }
   }
@@ -23148,12 +23160,12 @@ sub isAddSwitchOffCond {
           }
 
           if ($true) {
-              $info   = qq{The reference value “$condval” resulted in 'true' after exec "$swoffcode" \n};
+              $info   = qq{The return value “$true” resulted in 'true' after exec "$swoffcode" \n};
               $info  .= "-> Check successful ";
               $swoff  = 1;
           }
           else {
-              $info  = qq{The reference value “$condval” resulted in 'false' after exec "$swoffcode" \n};
+              $info  = qq{The return value “$true” resulted in 'false' after exec "$swoffcode" \n};
               $swoff = 0;
           }
       }
