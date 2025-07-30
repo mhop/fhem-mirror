@@ -13008,7 +13008,7 @@ sub __setConsRcmdState {
 
   my ($method, $surplus) = determSurplus ($name, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
 
-  $data{$name}{consumers}{$c}{surpmethResult} = $surplus;                                 # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
+  $data{$name}{consumers}{$c}{surpmethResult} = sprintf "%.0f", $surplus;                 # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
 
   if ($debug =~ /consumerSwitching${c}/x) {
       my $splref = CurrentVal ($name, 'surplusslidereg', '.');
