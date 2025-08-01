@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.54.7" => "01.08.2025  _transferAPIRadiationValues: Extension of Nexthours content up to 48 hours into the future ",
   "1.54.6" => "29.07.2025  _graphicConsumerLegend: show surplus method and result in consumer legend hoover ",
   "1.54.5" => "24.07.2025  isAddSwitchOnCond/isAddSwitchOffCond: change debug info ",
   "1.54.4" => "22.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
@@ -349,26 +350,6 @@ my %vNotesIntern = (
                            "rename ctrlStatisticReadings to ctrlSpecialReadings ",
   "1.41.3" => "01.01.2025  write/read battery values 0 .. maxbatteries to/from pvhistrory ".
                            "change ctrlBatSocManagement to ctrlBatSocManagement01 ",
-  "1.41.2" => "30.12.2024  __setConsRcmdState: more Debug Info, change Reading: Current_BatCharge -> Current_BatCharge_XX ".
-                           "Current_PowerBatOut -> Current_PowerBatOut_XX, Current_PowerBatIn -> Current_PowerBatIn_XX ".
-                           "Today_HourXX_PPrealXX -> Today_HourXX_PPreal_XX, Current_PPXX -> Current_PP_XX ".
-                           "Battery_OptimumTargetSoC -> Battery_OptimumTargetSoC_XX, Battery_ChargeRequest -> Battery_ChargeRequest_XX ".
-                           "Battery_ChargeRecommended -> Battery_ChargeRecommended_XX ".
-                           "Today_HourXX_BatIn -> Today_HourXX_BatIn_XX, Today_HourXX_BatOut -> Today_HourXX_BatOut_XX ",
-  "1.41.1" => "29.12.2024  ctrlStatisticReadings: change daysUntilBatteryCare to daysUntilBatteryCare_XX until max batteries ".
-                           "todayBatIn to todayBatIn_XX until max batteries, todayBatOut to todayBatOut_XX until max batteries ",
-  "1.41.0" => "28.12.2024  _batSocTarget: minor code change,  change setupBatteryDev to setupBatteryDev01, getter valBattery ",
-  "1.40.0" => "21.12.2024  new consumer key 'surpmeth' to calculate surplus in various variants for consumer switching ",
-  "1.39.8" => "21.12.2024  prepare of new consumer key 'surpmeth', _batSocTarget: improve care SoC management when dark doldrums ",
-  "1.39.7" => "18.12.2024  ConsumptionRecommended calc method medianArray, change local owndata to global data ",
-  "1.39.6" => "17.12.2024  replace global data-store by local owndata-store, remove sub _composeRemoteObj, delHashRefDeep removed ".
-                           "add current key (array) 'surplusslidereg' + sub avgArray, batteryManagement: fix care SoC management ",
-  "1.39.5" => "12.12.2024  __createAdditionalEvents: Warning in fhem Log if 'AllPVforecastsToEvent' events not created ".
-                           "Notify: create cetralTask Events ",
-  "1.39.4" => "10.12.2024  fix Check Rooftop and Roof Ident Pair Settings (SolCast) ",
-  "1.39.3" => "09.12.2024  fix mode in consumerXX-Reading if mode is device/reading combination, show Mode in ".
-                           "consumer legend mouse-over ",
-  "1.39.2" => "08.12.2024  rollout delHashRefDeep, extended consumer key 'mode' by device/reading combination ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -10261,10 +10242,10 @@ sub _transferAPIRadiationValues {
   for my $num (0..47) {
       my ($fd,$fh) = calcDayHourMove ($chour, $num);
 
-      if ($fd > 1) {                                                                                       # überhängende Werte löschen
-          delete $data{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
-          next;
-      }
+      #if ($fd > 1) {                                                                                       # überhängende Werte löschen
+      #    delete $data{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
+      #    next;
+      #}
 
       my $fh1              = $fh + 1;
       my $wantts           = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
@@ -10282,6 +10263,8 @@ sub _transferAPIRadiationValues {
       $paref->{num}    = $num;
       $paref->{fh1}    = $fh1;
       $paref->{fd}     = $fd;
+      
+      Log3 ($name, 1, "$name - wantdt: $wantdt");
 
       $data{$name}{nexthours}{$nhtstr}{starttime} = $wantdt;
       $data{$name}{nexthours}{$nhtstr}{day}       = $wtday;
@@ -10418,9 +10401,7 @@ sub __calcSunPosition {
   my $nhtstr = $paref->{nhtstr};
   my $hash   = $defs{$name};
 
-  my ($fd, $fh) = calcDayHourMove ($chour, $num);
-  last if($fd > 1);
-
+  my ($fd, $fh)          = calcDayHourMove ($chour, $num);
   my $tstr               = (timestampToTimestring ($t + ($num * 3600)))[3];
   my ($date, $h, $m, $s) = split /[ :]/, $tstr;
   $tstr                  = $date.' '.$h.':30:00';
@@ -12558,8 +12539,8 @@ sub ___doPlanning {
       my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierter Energieüberschuß (kann negativ sein)
 
       my ($hour)              = $idx =~ /NextHour(\d+)/xs;
-      $max{$spexp}{starttime} = NexthoursVal ($hash, $idx, "starttime", "");
-      $max{$spexp}{today}     = NexthoursVal ($hash, $idx, "today",      0);
+      $max{$spexp}{starttime} = NexthoursVal ($hash, $idx, 'starttime', '');
+      $max{$spexp}{today}     = NexthoursVal ($hash, $idx, 'today',      0);
       $max{$spexp}{nexthour}  = int ($hour);
   }
 
@@ -12630,13 +12611,12 @@ sub ___doPlanning {
       for my $ts (sort{$a<=>$b} keys %mtimes) {
           if ($mtimes{$ts}{spexp} >= $epiece1) {                                                       # die früheste Startzeit sofern Überschuß größer als Bedarf
               my $starttime       = $mtimes{$ts}{starttime};
-
               $paref->{starttime} = $starttime;
               $starttime          = ___switchonTimelimits ($paref);
+              
               delete $paref->{starttime};
 
               my $startts       = timestringToTimestamp ($starttime);                                  # Unix Timestamp für geplanten Switch on
-
               $paref->{ps}      = $paref->{replan} ? 'replanned:' : 'planned:';                        # V 1.35.0
               $paref->{startts} = $startts;
               $paref->{stopts}  = $startts + $stopdiff;
@@ -13008,7 +12988,7 @@ sub __setConsRcmdState {
 
   my ($method, $surplus) = determSurplus ($name, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
 
-  $data{$name}{consumers}{$c}{surpmethResult} = $surplus;                                 # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
+  $data{$name}{consumers}{$c}{surpmethResult} = sprintf "%.0f", $surplus;                 # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
 
   if ($debug =~ /consumerSwitching${c}/x) {
       my $splref = CurrentVal ($name, 'surplusslidereg', '.');
