@@ -10263,8 +10263,6 @@ sub _transferAPIRadiationValues {
       $paref->{num}    = $num;
       $paref->{fh1}    = $fh1;
       $paref->{fd}     = $fd;
-      
-      Log3 ($name, 1, "$name - wantdt: $wantdt");
 
       $data{$name}{nexthours}{$nhtstr}{starttime} = $wantdt;
       $data{$name}{nexthours}{$nhtstr}{day}       = $wtday;
