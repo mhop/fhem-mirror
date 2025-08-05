@@ -160,7 +160,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.54.7" => "01.08.2025  _transferAPIRadiationValues: Extension of Nexthours content up to 48 hours into the future ",
+  "1.55.0" => "04.08.2025  DWD-Weather and DWD-Radiation device new minimum value of attr 'forecastDays' is 2 ".
+                           "checkPlantConfig: check forecastDays of new minimum value ".
+                           "___createOpenMeteoURL: set forecast_hours=72 ",                           
+  "1.54.7" => "01.08.2025  _transferAPIRadiationValues: Extension of Nexthours content up to 48 hours into the future ".
+                           "attr graphicBeamHeightLevelX is obsolete -> use graphicControl instead ".
+                           "attr graphicControl new key beamHeightlevel ",
   "1.54.6" => "29.07.2025  _graphicConsumerLegend: show surplus method and result in consumer legend hoover ",
   "1.54.5" => "24.07.2025  isAddSwitchOnCond/isAddSwitchOffCond: change debug info ",
   "1.54.4" => "22.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
@@ -353,6 +358,33 @@ my %vNotesIntern = (
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
+## Standardvariablen
+######################
+my @da;                                                                             # zentraler temporärer Readings-Store
+my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
+my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
+
+my $root           = $attr{global}{modpath};                                        # Pfad zu dem Verzeichnis der FHEM Module
+my $cachedir       = $root."/FHEM/FhemUtils";                                       # Directory für Cachefiles
+my $pvhcache       = $root."/FHEM/FhemUtils/PVH_SolarForecast_";                    # Filename-Fragment für PV History (wird mit Devicename ergänzt)
+my $pvccache       = $root."/FHEM/FhemUtils/PVC_SolarForecast_";                    # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
+my $plantcfg       = $root."/FHEM/FhemUtils/PVCfg_SolarForecast_";                  # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
+my $csmcache       = $root."/FHEM/FhemUtils/PVCsm_SolarForecast_";                  # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
+my $scpicache      = $root."/FHEM/FhemUtils/ScApi_SolarForecast_";                  # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
+my $statcache      = $root."/FHEM/FhemUtils/StatApi_SolarForecast_";                # Filename-Fragment für Status-API Werte (wird mit Devicename ergänzt)
+my $weathercache   = $root."/FHEM/FhemUtils/WeatherApi_SolarForecast_";             # Filename-Fragment für Weather-API Werte (wird mit Devicename ergänzt)
+my $aitrained      = $root."/FHEM/FhemUtils/AItra_SolarForecast_";                  # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
+my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";                  # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
+my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename für DWD Stationskatalog
+my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Export Filename für DWD Stationskatalog im gpx-Format
+my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";             # Filename-Fragment für PV History Exportfile (wird mit Devicename ergänzt)
+
+my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
+my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
+my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
+                        noSchedule);                                                # erlaubte Consumer Typen
+                        
+
 ## Konstanten
 ######################
 use constant {
@@ -381,8 +413,8 @@ use constant {
   CARECYCLEDEF   => 20,                                                             # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
   BATSOCCHGDAY   => 5,                                                              # Batterie: prozentuale SoC Anpassung pro Tag
 
-  GMFBLTO        => 30,                                                             # Timeout Aholen Message File aus contrib
-  GMFILEREPEAT   => 3600,                                                           # Base Wiederholungsuntervall Abholen Message File aus contrib
+  GMFBLTO        => 30,                                                             # Timeout Aholen Message File aus GIT
+  GMFILEREPEAT   => 3600,                                                           # Base Wiederholungsuntervall Abholen Message File aus GIT
   GMFILERANDOM   => 10800,                                                          # Random AddOn zu GMFILEREPEAT
   IDXLIMIT       => 900000,                                                         # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
 
@@ -395,6 +427,7 @@ use constant {
   AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
 
+  DWDFCDAYSMIN   => 2,                                                              # Mindestwert Attr 'forecastDays' im DWD-Device
   SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
   FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
   OMETEOREPDEF   => 900,                                                            # default Abrufintervall Open-Meteo API (s)
@@ -403,7 +436,8 @@ use constant {
   OMETMAXREQ     => 8000,                                                           # Beschränkung auf max. mögliche Requests Open-Meteo API
   LEADTIME       => 3600,                                                           # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
   LAGTIME        => 1800,                                                           # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
-
+  APITIMEOUT     => 30,                                                             # default Timeout HTTP API-Call
+  
   PRDEF          => 1.0,                                                            # default Performance Ratio (PR)
   STOREFFDEF     => 0.90,                                                           # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
   TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
@@ -479,32 +513,6 @@ use constant {
   MSGFILEPROD     => 'controls_solarforecast_messages_prod.txt',                                           # PRODUKTIVES Input-File Notification System
 };
 
-## Standardvariablen
-######################
-my @da;                                                                             # zentraler temporärer Readings-Store
-my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
-my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
-
-my $root           = $attr{global}{modpath};                                        # Pfad zu dem Verzeichnis der FHEM Module
-my $cachedir       = $root."/FHEM/FhemUtils";                                       # Directory für Cachefiles
-my $pvhcache       = $root."/FHEM/FhemUtils/PVH_SolarForecast_";                    # Filename-Fragment für PV History (wird mit Devicename ergänzt)
-my $pvccache       = $root."/FHEM/FhemUtils/PVC_SolarForecast_";                    # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
-my $plantcfg       = $root."/FHEM/FhemUtils/PVCfg_SolarForecast_";                  # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
-my $csmcache       = $root."/FHEM/FhemUtils/PVCsm_SolarForecast_";                  # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
-my $scpicache      = $root."/FHEM/FhemUtils/ScApi_SolarForecast_";                  # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
-my $statcache      = $root."/FHEM/FhemUtils/StatApi_SolarForecast_";                # Filename-Fragment für Status-API Werte (wird mit Devicename ergänzt)
-my $weathercache   = $root."/FHEM/FhemUtils/WeatherApi_SolarForecast_";             # Filename-Fragment für Weather-API Werte (wird mit Devicename ergänzt)
-my $aitrained      = $root."/FHEM/FhemUtils/AItra_SolarForecast_";                  # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
-my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";                  # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
-my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename für DWD Stationskatalog
-my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Export Filename für DWD Stationskatalog im gpx-Format
-my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";             # Filename-Fragment für PV History Exportfile (wird mit Devicename ergänzt)
-
-my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
-my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
-my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
-                        noSchedule);                                                # erlaubte Consumer Typen
-
 my $messagefile = MSGFILEPROD;
                                                                                     # mögliche Debug-Module
 my @dd = qw( aiProcess
@@ -526,13 +534,13 @@ my @dd = qw( aiProcess
              radiationProcess
              saveData2Cache
            );
-                                                                                 # FTUI V2 Widget Files
+                                                                                   # FTUI V2 Widget Files
 my @fs = qw( ftui_forecast.css
              widget_forecast.js
              ftui_smaportalspg.css
              widget_smaportalspg.js
            );
-                                                                                 # Grafik Selektionsoptionen
+                                                                                   # Grafik Selektionsoptionen
 my @gsopt = qw ( both
                  both_noHead
                  both_noCons
@@ -602,14 +610,10 @@ my @aconfigs = qw( aiControl
       push @aconfigs, "setupOtherProducer${pn}";                  # Anlagenkonfiguration: add Producer Attribute
   }
   
-  for my $bl (1..MAXBEAMLEVEL*2) {
+  for my $bl (1..MAXBEAMLEVEL * 2) {                              # Beamgrafik-Attribute
       push @aconfigs, "graphicBeam${bl}Content";
       push @aconfigs, "graphicBeam${bl}Color";
       push @aconfigs, "graphicBeam${bl}FontColor";
-      
-      if ($bl <= MAXBEAMLEVEL) {
-          push @aconfigs, "graphicBeamHeightLevel".$bl;
-      }
   }
 
 my $allwidgets = 'icon|sortable|uzsu|knob|noArg|time|text|slider|multiple|select|bitfield|widgetList|colorpicker';
@@ -624,14 +628,14 @@ my %svicons = (                                                               # 
   '3' => 'message_attention@red',                                             # Standard Mitteilungs-Icon 3 - Fehler / Problem
 );
 
-my %intrptcatic = (                                                               # Unterbrechungscharakteristik 
+my %intrptcatic = (                                                           # Unterbrechungscharakteristik 
   '0' => 'simple false',                                                          
   '1' => 'simple true',                                      
   '2' => 'Code return true',                                      
   '3' => 'Code return false',                                            
 );
 
-my %hset = (                                                                # Hash der Set-Funktion
+my %hset = (                                                                  # Hash der Set-Funktion
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
   consumerNewPlanning       => { fn => \&_setconsumerNewPlanning       },
   clientAction              => { fn => \&_setclientAction              },
@@ -667,7 +671,7 @@ my %hset = (                                                                # Ha
   aiDecTree                 => { fn => \&_setaiDecTree                 },
 );
 
-my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
+my %hget = (                                                                      # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
   data               => { fn => \&_getdata,                     needcred => 0 },
   html               => { fn => \&_gethtml,                     needcred => 0 },
   ftui               => { fn => \&_getftui,                     needcred => 0 },
@@ -975,7 +979,7 @@ my %hqtxt = (                                                                # H
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
               DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                                                 },
   strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please note the warnings (<W>).},
-              DE => qq{Sieht ganz gut aus &#128528;, die Anlagenkonfiguration ist prinzipiell in Ordnung. Bitte beachten Sie die Warnungen (<W>).}                                           },
+              DE => qq{Sieht ganz gut aus &#128528;, die Anlagenkonfiguration ist prinzipiell in Ordnung. Bitte beachte die Warnungen (<W>).}                                                },
   strnok => { EN => qq{Oh no &#128577;, the system configuration is incorrect. Please check the settings and notes!},
               DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                                                     },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Mode:&nbsp;<mode><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
@@ -1595,20 +1599,14 @@ sub Initialize {
       push @allc, $c;
   }
 
-  for my $n (1..MAXBEAMLEVEL*2) {
+  for my $n (1..MAXBEAMLEVEL * 2) {
       push @gb, "graphicBeam${n}Content";
       push @gb, "graphicBeam${n}Color:colorpicker,RGB";
       push @gb, "graphicBeam${n}FontColor:colorpicker,RGB";
-      
-      if ($n <= MAXBEAMLEVEL) {
-          push @gbhl, "graphicBeamHeightLevel".$n;
-      }
   }
 
   $beam .= join ' ', sort @gb;
   $beam .= ' ';
-  
-  $beamhl .= (join ' ', sort @gbhl).' ';
 
   for my $bn (1..MAXBATTERIES) {
       $bn         = sprintf "%02d", $bn;
@@ -1676,7 +1674,6 @@ sub Initialize {
                                 "setupStringDeclination ".
                                 "setupStringPeak ".
                                 $beam.
-                                $beamhl.
                                 $setupbat.
                                 $setupinv.
                                 $setupprod.
@@ -1688,10 +1685,10 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  # my $av = 'obsolete#-#use#attr#graphicControl#instead';
+  my $av = 'obsolete#-#use#attr#graphicControl#instead';
   # my $av1 = 'obsolete#-#will#be#deleted#soon';
   # my $av2 = 'obsolete#-#use#attr#graphicSelect#instead';
-  # $hash->{AttrList} .= " graphicShowDiff:$av ";
+  $hash->{AttrList} .= " graphicBeamHeightLevel1:$av graphicBeamHeightLevel2:$av graphicBeamHeightLevel3:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -3006,7 +3003,7 @@ sub __solCast_ApiRequest {
 
   my $param = {
       url        => $url,
-      timeout    => 30,
+      timeout    => APITIMEOUT,
       name       => $name,
       type       => $paref->{type},
       debug      => $debug,
@@ -3412,7 +3409,7 @@ sub __forecastSolar_ApiRequest {
 
   my $param = {
       url        => $url,
-      timeout    => 30,
+      timeout    => APITIMEOUT,
       name       => $name,
       type       => $type,
       debug      => $debug,
@@ -3688,7 +3685,7 @@ sub __getDWDSolarData {
   my $raname = AttrVal ($name, 'setupRadiationAPI', '');                                       # Radiation Forecast API
   return if(!$raname || !$defs{$raname});
 
-  my $fcdays  = AttrVal ($raname, 'forecastDays', 1);                                          # Anzahl Forecast Days in DWD Device
+  my $fcdays  = AttrVal ($raname, 'forecastDays', 2);                                          # Anzahl Forecast Days in DWD Device
   my $stime   = $date.' 00:00:00';                                                             # Startzeit Soll Übernahmedaten
   my $sts     = timestringToTimestamp ($stime);
   my @strings = sort keys %{$data{$name}{strings}};
@@ -3705,10 +3702,10 @@ sub __getDWDSolarData {
 
   debugLog ($paref, "apiCall", "DWD API - collect DWD Radiation data with start >$stime<- device: $raname =>");
 
-  my $end = (24 + $fcdays * 24) - 1;                                                           # default 47
+  my $end = (24 + $fcdays * 24) - 1;                                                           # V 1.55.0 -> default 71
 
   for my $num (0..$end) {                                                                      # V 1.36.0
-      my ($fd,$fh) = calcDayHourMove (0, $num);
+      my ($fd, $fh) = calcDayHourMove (0, $num);
       next if($fh == 24);
 
       my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # abzurufendes Datum ' ' Zeit
@@ -3973,7 +3970,7 @@ sub __VictronVRM_ApiRequestLogin {
 
   my $param = {
       url        => $url,
-      timeout    => 30,
+      timeout    => APITIMEOUT,
       name       => $name,
       type       => $paref->{type},
       stc        => [gettimeofday],
@@ -4116,7 +4113,7 @@ sub __VictronVRM_ApiRequestForecast {
 
   my $param = {
       url     => $url,
-      timeout => 30,
+      timeout => APITIMEOUT,
       name    => $name,
       type    => $paref->{type},
       stc     => [gettimeofday],
@@ -4285,7 +4282,7 @@ sub __VictronVRM_ApiRequestLogout {
 
   my $param = {
       url        => $url,
-      timeout    => 30,
+      timeout    => APITIMEOUT,
       name       => $name,
       type       => $paref->{type},
       debug      => $debug,
@@ -4516,7 +4513,7 @@ sub __openMeteoDWD_ApiRequest {
 
   my $param = {
       url            => $url,
-      timeout        => 30,
+      timeout        => APITIMEOUT,
       name           => $name,
       debug          => $debug,
       header         => 'Accept: application/json',
@@ -4925,7 +4922,7 @@ sub ___createOpenMeteoURL {
       $url .= "&latitude=".$lat;
       $url .= "&longitude=".$lon;
       $url .= "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance,shortwave_radiation";
-      $url .= "&forecast_hours=48";
+      $url .= "&forecast_hours=72";
       $url .= "&forecast_days=2";
       $url .= "&tilt=".$tilt;
       $url .= "&azimuth=".$az;
@@ -4942,7 +4939,7 @@ sub ___createOpenMeteoURL {
       $url .= "&current=temperature_2m,weather_code,rain,cloud_cover";
       $url .= "&minutely_15=rain,global_tilted_irradiance,shortwave_radiation";
       $url .= "&daily=sunrise,sunset";
-      $url .= "&forecast_hours=48";
+      $url .= "&forecast_hours=72";
       $url .= "&forecast_days=2";
       $url .= "&tilt=".$tilt;
       $url .= "&azimuth=".$az;
@@ -5080,8 +5077,10 @@ sub _getdata {
   my $paref = shift;
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
+  
+  centralTask ($hash);
 
-return centralTask ($hash);
+return 'Data cycle triggered, watch readings';
 }
 
 ###############################################################
@@ -6497,18 +6496,18 @@ sub _attrgraphicControl {                ## no critic "not used"
   my $cmd   = $paref->{cmd};
 
   my $valid = {
-      beamPaddingBottom => { comp => '\d+',                                                    act => 0 },
-      beamPaddingTop    => { comp => '\d+',                                                    act => 0 },
-      beamWidth         => { comp => '([2-9][0-9]|100)',                                       act => 0 },
-      energyUnit        => { comp => '(Wh|kWh)',                                               act => 0 },
-      headerDetail      => { comp => '.*',                                                     act => 1 },
-      hourCount         => { comp => '([4-9]|1[0-9]|2[0-4])',                                  act => 0 },
-      hourStyle         => { comp => ':(0{1,2})',                                              act => 0 },
-      layoutType        => { comp => '(single|double|diff)',                                   act => 0 },
-      scaleMode         => { comp => '(?:[1-3]:(?:log|lin))(?:,(?:[1-3]:(?:log|lin)))*',       act => 0 },
-      #showDiff          => { comp => '(no|top|bottom)',                                  act => 0 },
-      showDiff          => { comp => '(?:[1-3]:(?:top|bottom))(?:,(?:[1-3]:(?:top|bottom)))*', act => 0 },
-      spaceSize         => { comp => '\d+',                                                    act => 0 },
+      beamPaddingBottom => { comp => '\d+',                                                      act => 0 },
+      beamPaddingTop    => { comp => '\d+',                                                      act => 0 },
+      beamWidth         => { comp => '([2-9][0-9]|100)',                                         act => 0 },
+      energyUnit        => { comp => '(Wh|kWh)',                                                 act => 0 },
+      beamHeightlevel   => { comp => '(?:[1-3]:(?:[1-9][0-9]*))(?:,(?:[1-3]:(?:[1-9][0-9]*)))*', act => 0 },
+      headerDetail      => { comp => '.*',                                                       act => 1 },
+      hourCount         => { comp => '([4-9]|1[0-9]|2[0-4])',                                    act => 0 },
+      hourStyle         => { comp => ':(0{1,2})',                                                act => 0 },
+      layoutType        => { comp => '(single|double|diff)',                                     act => 0 },
+      scaleMode         => { comp => '(?:[1-3]:(?:log|lin))(?:,(?:[1-3]:(?:log|lin)))*',         act => 0 },
+      showDiff          => { comp => '(?:[1-3]:(?:top|bottom))(?:,(?:[1-3]:(?:top|bottom)))*',   act => 0 },
+      spaceSize         => { comp => '\d+',                                                      act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -7545,7 +7544,7 @@ sub _attrWeatherDev {                    ## no critic "not used"
       }
 
       if ($aVal !~ /-API$/xs) {                                                      # Attribute des DWD-Devices prüfen
-          my $err = checkdwdattr ($name, $aVal, \@dweattrmust);
+          my ($err, $warnmsg) = checkdwdattr ($name, $aVal, \@dweattrmust);
           return $err if($err);
       }
   }
@@ -8839,6 +8838,24 @@ sub centralTask {
   #    CommandAttr (undef, "$name graphicControl $newval");
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
+         
+  my $gco  = AttrVal ($name, 'graphicControl', '');         
+  my $hgt1 = AttrNum ($name, 'graphicBeamHeightLevel1', undef);         # 02.08.
+  my $hgt2 = AttrNum ($name, 'graphicBeamHeightLevel2', undef);
+  my $hgt3 = AttrNum ($name, 'graphicBeamHeightLevel3', undef);
+  
+  my $hgt  = $hgt1 ? '1:'.$hgt1 : '';
+  $hgt    .= $hgt2 ? ($hgt ? ',' : '').'2:'.$hgt2 : '';
+  $hgt    .= $hgt3 ? ($hgt ? ',' : '').'3:'.$hgt3 : '';
+  
+  if ($hgt) {
+      my $newval = $gco." beamHeightlevel=$hgt";
+      CommandAttr (undef, "$name graphicControl $newval");
+      ::CommandDeleteAttr (undef, "$name graphicBeamHeightLevel1");
+      ::CommandDeleteAttr (undef, "$name graphicBeamHeightLevel2");
+      ::CommandDeleteAttr (undef, "$name graphicBeamHeightLevel3");
+  }
+  
   
   for my $c (1..MAXCONSUMER) {                                          # 23.07.                      
       $c = sprintf "%02d", $c;
@@ -9690,9 +9707,9 @@ sub _transferWeatherValues {
 
   __mergeDataWeather ($paref);                                                              # Wetterdaten zusammenfügen
 
-  for my $num (0..46) {
+  for my $num (0..71) {
       my ($fd, $fh) = calcDayHourMove ($chour, $num);
-      last if($fd > 1);
+      last if($fd > 2);
 
       my $wid   = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ww};                    # signifikantes Wetter = Wetter ID
       my $wwd   = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{wwd};                   # Wetter Beschreibung
@@ -9763,14 +9780,17 @@ sub __readDataWeather {
       return;
   }
 
-  my $err         = checkdwdattr ($name, $fcname, \@dweattrmust);
-  $paref->{state} = $err if($err);
-
+  my ($err, $warnmsg) = checkdwdattr ($name, $fcname, \@dweattrmust);
+  $paref->{state}     = $err if($err);
+  
+  my $fcdays = AttrVal ($fcname, 'forecastDays', 2);                                          # Anzahl Forecast Days in DWD Device
+  my $end    = (24 + $fcdays * 24) - 1;                                                       # V 1.55.0 -> default 71
+  
   debugLog ($paref, 'collectData_long', "collect Weather data step $step - device: $fcname =>");
 
-  for my $n (0..46) {
+  for my $n (0..$end) {
       my ($fd, $fh) = calcDayHourMove ($chour, $n);
-      last if($fd > 1);
+      last if($fd > 2);
 
       my $wid   = ReadingsNum ($fcname, "fc${fd}_${fh}_ww",   undef);                          # Signifikantes Wetter zum Vorhersagezeitpunkt
       my $wwd   = ReadingsVal ($fcname, "fc${fd}_${fh}_wwd",     '');                          # Wetter Beschreibung
@@ -9796,8 +9816,6 @@ sub __readDataWeather {
           $fh1 = 0;
           $fd1++;
       }
-
-      last if($fd1 > 1);
 
       my $rr1c = ReadingsNum ($fcname, "fc${fd1}_${fh1}_RR1c", 0);                             # Gesamtniederschlag (1-stündig) letzte 1 Stunde -> wir schuen in die Zukunft
 
@@ -9830,7 +9848,7 @@ sub ___readDataWeatherAPI {
   my ($rapi, $wapi) = getStatusApiName ($hash);
 
   for my $idx (sort keys %{$data{$name}{weatherapi}{$wapi}}) {
-      if ($idx =~ /^fc?([0-9]{1,2})_?([0-9]{1,2})$/xs) {                                                                    # valider Weather API Index
+      if ($idx =~ /^fc(?:[0-2])_(?:[0-9]|1[0-9]|2[0-3])$/xs) {                                                                    # valider Weather API Index
           my $rr1c = WeatherAPIVal ($hash, $wapi, $idx, 'rr1c', undef);
           my $wid  = WeatherAPIVal ($hash, $wapi, $idx, 'ww',   undef);
           my $neff = WeatherAPIVal ($hash, $wapi, $idx, 'neff', undef);
@@ -10239,14 +10257,10 @@ sub _transferAPIRadiationValues {
       $invcapsum += InverterVal ($name, $in, 'invertercap', 0);                                            # Limit Leistungssumme aller Inverters
   }
 
-  for my $num (0..47) {
-      my ($fd,$fh) = calcDayHourMove ($chour, $num);
-
-      #if ($fd > 1) {                                                                                       # überhängende Werte löschen
-      #    delete $data{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
-      #    next;
-      #}
-
+  for my $num (0..71) {
+      my ($fd,$fh)         = calcDayHourMove ($chour, $num);
+      last if($fd > 2);
+      
       my $fh1              = $fh + 1;
       my $wantts           = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
       my $wantdt           = (timestampToTimestring ($wantts, $lang))[1];
@@ -11911,20 +11925,28 @@ sub _createSummaries {
       $batout += BatteryVal ($name, $bn, 'bpowerout', 0);                                               # Summe momentane Batterieentladung
   }
 
-  my $pv2node = 0;
-  my $pv2grid = 0;                                                                                      # PV-Erzeugung zu Grid-only
-
-  for my $in (1..MAXINVERTER) {                                                                         # Summe alle Inverter
+  my $pv2node     = 0;
+  my $pv2bat      = 0;
+  my $dc2inv2node = 0;
+  my $node2inv2dc = 0;
+  my $pv2grid     = 0;                                                                                   # PV-Erzeugung zu Grid-only
+  
+  for my $in (1..MAXINVERTER) {
       $in       = sprintf "%02d", $in;
       my ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
       next if($err);
 
-      my $pvout    = InverterVal ($name, $in, 'ipvout',        0);
-      my $ifeed    = InverterVal ($name, $in, 'ifeed', 'default');
-      my $isource  = InverterVal ($name, $in, 'isource',    'pv');
-      my $pac2dc   = InverterVal ($name, $in, 'ipac2dc',       0);                                      # Rückwandlung AC->DC (Batterie-Wechselrichter)
-      $pv2node    += $pvout  if($ifeed ne 'grid' && $isource eq 'pv');                                  # nur PV Erzeugung berücksichtigen
-      $pv2grid    += $pvout  if($ifeed eq 'grid' && $isource eq 'pv');                                  # nur PV Erzeugung mit Ziel 'Grid'
+      my $pvout    = InverterVal ($name, $in, 'ipvout',  0);                                            # Erzeugung aus PV
+      my $pdc2ac   = InverterVal ($name, $in, 'ipdc2ac', 0);                                            # Wandlung DC->AC (Batterie-Wechselrichter)
+      my $pac2dc   = InverterVal ($name, $in, 'ipac2dc', 0);                                            # Rückwandlung AC->DC (Batterie-Wechselrichter)
+      my $ifeed    = InverterVal ($name, $in, 'ifeed',   'default');
+      my $isource  = InverterVal ($name, $in, 'isource',      'pv');
+
+      $pv2node     += $pvout  if($ifeed eq 'default' && $isource eq 'pv');                               # PV-Erzeugung Inverter für das Hausnetz
+      $pv2grid     += $pvout  if($ifeed eq 'grid'    && $isource eq 'pv');                               # PV nur für das öffentliche Netz
+      $pv2bat      += $pvout  if($ifeed eq 'bat'     && $isource eq 'pv');                               # Direktladen PV nur in die Batterie
+      $dc2inv2node += $pdc2ac if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));      # DC->AC / Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
+      $node2inv2dc += $pac2dc if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));      # AC->DC (Batterie- oder Hybrid-Wechselrichter)
   }
 
   my $othprod = 0;                                                                                      # Summe Otherproducer
@@ -11934,16 +11956,17 @@ sub _createSummaries {
       $othprod += ProducerVal ($name, $pn, 'pgeneration', 0);
   }
 
-  my $consumption         = int ($pv2node + $othprod - $gfeedin + $gcon - $batin + $batout);            # ohne PV2Grid
-  my $selfconsumption     = int ($pv2node - $gfeedin - $batin);
-  $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
+  my $consumption     = sprintf "%.0f", ($pv2node + $pv2bat + $othprod - $gfeedin + $gcon - $batin + $batout);    # ohne PV2Grid
+  my $selfconsumption = sprintf "%.0f", ($pv2node + $pv2bat - $gfeedin - $batin);
+  $selfconsumption    = $selfconsumption < 0 ? 0 : $selfconsumption;
 
-  my $surplus             = int ($pv2node - $pv2grid + $othprod - $consumption);                        # aktueller Überschuß
-  $surplus                = 0 if($surplus < 0);                                                         # wegen Vergleich nompower vs. surplus
+  my $surplus         = sprintf "%.0f", ($pv2node - $pv2grid + $othprod - $consumption);                # aktueller Überschuß
+  $surplus            = 0 if($surplus < 0);                                                             # wegen Vergleich nompower vs. surplus
 
   if ($debug =~ /collectData/xs) {
-      Log3 ($name, 1, "$name DEBUG> current Power values -> PV2Node: $pv2node W, PV2Grid: $pv2grid, Other: $othprod W, GridIn: $gfeedin W, GridCon: $gcon W, BatIn: $batin W, BatOut: $batout W");
+      Log3 ($name, 1, "$name DEBUG> current Power values -> PV2Node: $pv2node W, PV2Bat: $pv2bat, PV2Grid: $pv2grid W, Other: $othprod W, GridIn: $gfeedin W, GridCon: $gcon W, BatIn: $batin W, BatOut: $batout W");
       Log3 ($name, 1, "$name DEBUG> current Consumption result -> $consumption W");
+      Log3 ($name, 1, "$name DEBUG> current Power Battery Inverter -> DC2Inv2Node: $dc2inv2node W, Node2Inv2DC: $node2inv2dc W");
   }
 
   my $selfconsumptionrate = 0;
@@ -15004,7 +15027,6 @@ sub entryGraphic {
       beam4cont      => AttrVal    ($name, 'graphicBeam4Content',               ''),
       beam5cont      => AttrVal    ($name, 'graphicBeam5Content',               ''),
       beam6cont      => AttrVal    ($name, 'graphicBeam6Content',               ''),
-      height         => AttrNum    ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL),
       weather        => AttrNum    ($name, 'graphicShowWeather',                 1),                # Wetter Icons anzeigen
       colorw         => AttrVal    ($name, 'graphicWeatherColor',       WTHCOLDDEF),                # Wetter Icon Farbe Tag
       colorwn        => AttrVal    ($name, 'graphicWeatherColorNight',  WTHCOLNDEF),                # Wetter Icon Farbe Nacht
@@ -15103,6 +15125,7 @@ sub entryGraphic {
   ## Balkengrafiken
   ###################################################################################
   my $scm = _parseScaleModes    ($name);                                                                   # Scale Modes auflösen
+  my $bhl = _parseHeightLevels  ($name);                                                                   # beamHeightLevel auflösen
   my $sdf = _parseShowdiffModes ($name);
   
   ## Balkengrafik Ebene 1
@@ -15111,6 +15134,7 @@ sub entryGraphic {
       my %hfcg1;
       $paref->{chartlvl} = 1;                                                                              # Balkengrafik Ebene 1
       $paref->{scm}      = $scm->{1};                                                                      # Scale Mode Level 1
+      $paref->{height}   = $bhl->{1};                                                                      # beamHeightLevel 1
       $paref->{showdiff} = $sdf->{1};                                                                      # show Diff Mode Level 1
       $paref->{hfcg}     = \%hfcg1;                                                                        # hfcg = hash forecast graphic
 
@@ -15150,6 +15174,7 @@ sub entryGraphic {
 
           $paref->{chartlvl}  = 2;
           $paref->{scm}       = $scm->{2};                                                                 # Scale Mode Level 2
+          $paref->{height}    = $bhl->{2};                                                                 # beamHeightLevel 2
           $paref->{showdiff}  = $sdf->{2};                                                                 # show Diff Mode Level 2
           $paref->{beam1cont} = $paref->{beam3cont};
           $paref->{beam2cont} = $paref->{beam4cont};
@@ -15157,7 +15182,6 @@ sub entryGraphic {
           $paref->{colorb2}   = AttrVal ($name, 'graphicBeam4Color',       B4COLDEF);
           $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam3FontColor',   B3FONTCOLDEF);
           $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam4FontColor',   B4FONTCOLDEF);
-          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel2', BHEIGHTLEVEL);
           $paref->{weather}   = 0;
           $paref->{hfcg}      = \%hfcg2;
 
@@ -15194,6 +15218,7 @@ sub entryGraphic {
 
           $paref->{chartlvl}  = 3;
           $paref->{scm}       = $scm->{3};                                                                 # Scale Mode Level 3
+          $paref->{height}    = $bhl->{3};                                                                 # beamHeightLevel 3
           $paref->{showdiff}  = $sdf->{3};                                                                 # show Diff Mode Level 3
           $paref->{beam1cont} = $paref->{beam5cont};
           $paref->{beam2cont} = $paref->{beam6cont};
@@ -15201,7 +15226,6 @@ sub entryGraphic {
           $paref->{colorb2}   = AttrVal ($name, 'graphicBeam6Color',       B6COLDEF);
           $paref->{fcolor1}   = AttrVal ($name, 'graphicBeam5FontColor',   B5FONTCOLDEF);
           $paref->{fcolor2}   = AttrVal ($name, 'graphicBeam6FontColor',   B6FONTCOLDEF);
-          $paref->{height}    = AttrVal ($name, 'graphicBeamHeightLevel3', BHEIGHTLEVEL);
           $paref->{weather}   = 0;
           $paref->{hfcg}      = \%hfcg3;
 
@@ -15295,15 +15319,14 @@ sub _checkSetupNotComplete {
   $rip    = 1 if(exists $data{$name}{statusapi}{'?IdPair'});                                # es existiert mindestens ein Paar RoofTop-ID / API-Key
   my $pv0 = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                              # der erste PV ForeCast Wert
 
-  my $link   = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$name</a>};
-  my $height = AttrNum ($name, 'graphicBeamHeightLevel1', BHEIGHTLEVEL);
-  my $lang   = getLang ($hash);
+  my $link = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$name</a>};
+  my $lang = getLang ($hash);
 
   my (undef, $disabled, $inactive) = controller ($name);
 
   if ($disabled || $inactive) {
       $ret .= "<table class='roomoverview'>";
-      $ret .= "<tr style='height:".$height."px'>";
+      $ret .= "<tr style='height:".BHEIGHTLEVEL."px'>";
       $ret .= "<td>";
       $ret .= qq{SolarForecast device $link is disabled or inactive};
       $ret .= "</td>";
@@ -15326,7 +15349,7 @@ sub _checkSetupNotComplete {
      (isOpenMeteoUsed ($hash)     ? !$coset : '')                                                        ||
      !defined $pv0) {
       $ret .= "<table class='roomoverview'>";
-      $ret .= "<tr style='height:".$height."px'>";
+      $ret .= "<tr style='height:".BHEIGHTLEVEL."px'>";
       $ret .= "<td>";
       $ret .= $hqtxt{entry}{$lang};                                                         # Entry Text
 
@@ -15413,10 +15436,35 @@ sub _parseScaleModes {
           my ($lvl, $mode) = split ':', $elem;
           $scm->{"$lvl"} = $mode; 
       }
-      
   }
 
 return $scm;
+}
+
+################################################################
+#  Parse den Heightlevel für jede Balkengrafik Ebene
+#  z.B. beamHeightlevel=1:300,2:400,3:250
+################################################################
+sub _parseHeightLevels {                         
+  my $name = shift;
+  my $bhl;
+  
+  for my $bl (1..MAXBEAMLEVEL) {                      # Hashref beamHeightlevel initial mit Standard füllen 
+      $bhl->{"$bl"} = BHEIGHTLEVEL; 
+  }    
+  
+  my $lv = CurrentVal ($name, 'beamHeightlevel', '');
+  
+  if ($lv) {
+      my @lva = split ',', $lv;
+      
+      for my $elem (@lva) {
+          my ($lvl, $val) = split ':', $elem;
+          $bhl->{"$lvl"} = $val; 
+      }
+  }
+
+return $bhl;
 }
 
 ################################################################
@@ -17131,7 +17179,7 @@ sub _beamGraphic {
   my $showdiff   = $paref->{showdiff};                       # zusätzliche Anzeige $di{} in allen Typen
   my $scm        = $paref->{scm};                            # Scale Mode
   my $lotype     = $paref->{lotype};
-  my $height     = $paref->{height};
+  my $height     = $paref->{height} // BHEIGHTLEVEL;         # Fallback, sollte eigentlich nicht vorkommen
   my $spacesz    = $paref->{spacesz};
   my $kw         = $paref->{kw};
   my $colorb1    = $paref->{colorb1};
@@ -17160,8 +17208,7 @@ sub _beamGraphic {
 
   my $colspan = $maxhours + 2;
   my $m       = $paref->{modulo} % 2;
-  $height     = BHEIGHTLEVEL if(!$height);                                                 # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
-  $maxVal     = 1.1            if(!int $maxVal);                                           # maxVal devision by zero & log(x) Problem
+  $maxVal     = 1.1 if(!int $maxVal);                                                      # maxVal devision by zero & log(x) Problem
   
   ## zusätzlicher Abstand vor der ersten Reihe
   ##############################################
@@ -17884,16 +17931,16 @@ sub _flowGraphic {
                   $soc < 76 ? "$stna bat50" :
                   "$stna bat75";
 
-  my $node2bat = 0;                                                                       # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)
-  my $bat2home = 0;
-
   my $grid2home_style       = $gconMetered ? "$stna active_sig"    : "$stna inactive";    # GridConsumption
-  my $bat2home_style        = $bat2home    ? "$stna active_normal" : "$stna inactive";
+  my $bat2home_style        = "$stna inactive";
   my $dc2inv2node_style     = $dc2inv2node ? "$stna active_normal" : "$stna inactive";    # Batterie zu Inverter mit source=bat
   my $gconMetered_direction = "M250,515 L670,590";
   my $bat2home_direction    = "M1200,515 L730,590";
 
-   if ($batout || $batin) {                                                               # Batterie wird geladen oder entladen
+  my $node2bat = 0;                                                                       # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)
+  my $bat2home = 0;
+  
+  if ($batout || $batin) {                                                                # Batterie wird geladen oder entladen
       $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Knoten -> Bat, negativ: Richtung Bat -> Inv.Knoten
       $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
 
@@ -17917,6 +17964,7 @@ sub _flowGraphic {
 
   my $node2home = $pnodesum - $node2gridMetered - ($node2bat > 0 ? $node2bat : 0);        # Energiefluß vom Knoten zum Haus
   $node2home    = __normDecPlaces ($node2home);
+  
   $consptn      = $gconMetered + $node2home + $bat2home;                                  # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
 
   ## definierte Verbraucher ermitteln
@@ -19151,8 +19199,9 @@ sub checkdwdattr {
   my $amref  = shift;
 
   my @fcprop = map { trim($_) } split ",", AttrVal ($dwddev, "forecastProperties", "pattern");
-  my $fcr    = AttrVal ($dwddev, "forecastResolution", 3);
-  my $err;
+  my $fcr    = AttrVal ($dwddev, 'forecastResolution', 3);
+  my $fcd    = AttrVal ($dwddev, 'forecastDays',       0);
+  my ($err, $warn);
 
   my @aneeded;
   for my $am (@$amref) {
@@ -19168,10 +19217,15 @@ sub checkdwdattr {
       $err .= ", " if($err);
       $err .= qq{ERROR - device "$dwddev" -> attribute "forecastResolution" must be set to "1"};
   }
+  
+  if ($fcd < DWDFCDAYSMIN) {
+      $warn = qq{WARNING - device "$dwddev" -> attribute "forecastDays" is not set to the minimum value of: }.DWDFCDAYSMIN;
+  }
 
-  Log3 ($name, 2, "$name - $err") if($err);
+  Log3 ($name, 2, "$name - $warn") if($warn);
+  Log3 ($name, 2, "$name - $err")  if($err);
 
-return $err;
+return ($err, $warn);
 }
 
 ################################################################
@@ -20988,7 +21042,7 @@ sub _listDataPoolNextHours {
       $sq .= "\n              ";
       $sq .= "pvapifcraw: $pvapifcraw, pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit";
       $sq .= "\n              ";
-      $sq .= "confc: $confc, confcEx: $confcex, weatherid: $wid, wcc: $wcc, rr1c: $rr1c, temp=$temp";
+      $sq .= "confc: $confc, confcEx: $confcex, weatherid: $wid, wcc: $wcc, rr1c: $rr1c, temp: $temp";
       $sq .= "\n              ";
       $sq .= "rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt, DoN: $don";
       $sq .= "\n              ";
@@ -21350,7 +21404,7 @@ sub checkPlantConfig {
   my $hash = shift;
 
   my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
+  my $warnmsg;
 
   setModel ($hash);                                                                            # Model setzen
 
@@ -21443,7 +21497,7 @@ sub checkPlantConfig {
 
   for my $step (1..MAXWEATHERDEV) {
       my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$step);
-      next if(!$fcname && $step ne 1);
+      next if(!$valid && $step ne 1);
 
       if (!$valid) {
           $result->{'Weather Properties'}{state} = $nok;
@@ -21458,8 +21512,14 @@ sub checkPlantConfig {
           $result->{'Weather Properties'}{fault} = 1;
       }
       else {
-          if (!$apiu) {
-              $err = checkdwdattr ($name, $fcname, \@dweattrmust);
+          if (!$apiu) {                                                         # keine Wetter-API -> Wetterdevice
+              ($err, $warnmsg) = checkdwdattr ($name, $fcname, \@dweattrmust);
+              
+              if ($warnmsg) {
+                  $result->{'Weather Properties'}{state}   = $warn;
+                  $result->{'Weather Properties'}{result} .= $warnmsg.'<br>';
+                  $result->{'Weather Properties'}{warn}    = 1;
+              }
 
               if ($err) {
                   $result->{'Weather Properties'}{state}   = $nok;
@@ -21481,6 +21541,7 @@ sub checkPlantConfig {
               $result->{'Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
               $result->{'Weather Properties'}{note} .= 'forecastProperties -> '.join (',', @dweattrmust).'<br>';
               $result->{'Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
+              $result->{'Weather Properties'}{note} .= 'forecastDays <br>';          
           }
           else {
               $result->{'Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: setupWeatherDev$step)<br>";
@@ -21518,7 +21579,7 @@ sub checkPlantConfig {
           $result->{'DWD Radiation Properties'}{fault}   = 1;
       }
       else {
-          $err = checkdwdattr ($name, $raname, \@draattrmust);
+          ($err, $warnmsg) = checkdwdattr ($name, $raname, \@draattrmust);
 
           if ($err) {
               $result->{'DWD Radiation Properties'}{state}   = $nok;
@@ -21558,6 +21619,7 @@ sub checkPlantConfig {
       $result->{'DWD Radiation Properties'}{note} .= 'MOSMIX variant, Age of Radiation data. <br>';
       $result->{'DWD Radiation Properties'}{note} .= qq{<br>checked parameters and attributes device "$raname": <br>};
       $result->{'DWD Radiation Properties'}{note} .= 'forecastProperties -> '.join (',', @draattrmust).'<br>';
+      $result->{'DWD Radiation Properties'}{note} .= 'forecastDays <br>';
       $result->{'DWD Radiation Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
   }
 
@@ -23646,24 +23708,26 @@ return ($err, $dv, $h, $al);
 #             $apiu  -> wird ein Device oder API verwendet
 #####################################################################
 sub isWeatherDevValid {
-  my $hash = shift;
-  my $wdev = shift;
+  my $hash  = shift;
+  my $wattr = shift;
 
-  my $valid  = '';
+  my ($rapi, $wapi) = ('', '');
+  my $valid  = 0;
   my $apiu   = '';
-  my $fcname = AttrVal ($hash->{NAME}, $wdev, '');                                            # Weather Forecast Device
-
+  my $fcname = AttrVal ($hash->{NAME}, $wattr, '');                               # Weather Forecast Device/API
   return if(!$fcname);
 
-  $valid = 1;
-  if (!$defs{$fcname} || $defs{$fcname}{TYPE} ne "DWD_OpenData") { $valid = '' }
-
-  my ($rapi, $wapi) = getStatusApiName ($hash);                                              # $rapi - Radiation-API, $wapi - Weather-API
-
- if ($wapi =~ /^OpenMeteo/xs) {
-     $valid = 1;
-     $apiu  = $wapi;
- }
+  if (!$defs{$fcname}) {                                                          # kein Device -> API genutzt? 
+      if ($fcname =~ /^OpenMeteo/xs) {
+          $valid = 1;
+          $apiu  = $fcname;
+      }
+  }
+  else {                                                                          # DWD Device -> Typ Prüfung
+      if ($defs{$fcname}{TYPE} eq 'DWD_OpenData') {
+          $valid = 1;
+      }
+  }
 
 return ($valid, $fcname, $apiu);
 }
@@ -23706,16 +23770,15 @@ sub isWeatherAgeExceeded {
 
   for my $step (1..MAXWEATHERDEV) {
       my ($valid, $fcname, $apiu) = isWeatherDevValid ($hash, 'setupWeatherDev'.$step);
-      next if(!$fcname && $step ne 1);
+      next if(!$valid && $step ne 1);
 
       if (!$apiu) {
-          if (!$fcname || !$valid) {
-              if (!$fcname) {
-                  return (qq{No DWD device is defined in attribute "setupWeatherDev$step"}, $resh);
-              }
-              else {
-                  return (qq{The DWD device "$fcname" doesn't exist}, $resh);
-              }
+          if (!$fcname) {
+              return (qq{No DWD device is defined in attribute "setupWeatherDev$step"}, $resh);
+          }
+          
+          if (!$valid) {
+              return (qq{The DWD device "$fcname" doesn't exist}, $resh);
           }
 
           my $fct = ReadingsVal ($fcname, 'fc_time', '');
@@ -26792,15 +26855,6 @@ to ensure that the system configuration is correct.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeamHeightLevelX" data-pattern="graphicBeamHeightLevel.*"></a>
-       <li><b>graphicBeamHeightLevelX &lt;value&gt; </b><br>
-         Multiplier for determining the maximum bar height of the respective level. <br>
-         In conjunction with the attribute <a href=“#SolarForecast-attr-graphicControl”>graphicControl->hourCount</a>
-         this can also be used to generate very small graphic outputs. <br>
-         (default: 200)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-graphicControl"></a>
        <li><b>graphicControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
          By specifying the 'Key=Value' pairs listed below, various overarching properties of the graphic or bar graph display
@@ -26811,6 +26865,12 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>beamHeightlevel</b>     </td><td>The bar height for each level of the bar chart can be specified.                                                                          </td></tr>
+			<tr><td>                            </td><td>The specification for a layer consists of the layer number (1..X), a ‘:’ followed by a positive integer > 0.                              </td></tr>
+            <tr><td>                            </td><td>The numerical value is used as a normalization factor in the height calculation.                                                          </td></tr>
+            <tr><td>                            </td><td>Further levels are specified separated by commas (see example).                                                                           </td></tr>
+            <tr><td>                            </td><td><b>&lt;Level&gt;:&lt;Integer&gt;</b> - normalization factor (default: 200)                                                                </td></tr>
+			<tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>beamPaddingBottom</b>   </td><td>Defines the space in px in the bar chart that is inserted between the last text or icon row of the respective bar chart layer             </td></tr>
             <tr><td>                            </td><td>and the bottom edge of this layer.                                                                                                        </td></tr>
             <tr><td>                            </td><td>The value applies uniformly to all bar chart levels.                                                                                      </td></tr>
@@ -27723,7 +27783,7 @@ to ensure that the system configuration is correct.
        <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1                                                                  </td></tr>
+            <tr><td> <b>forecastDays</b>            </td><td>2                                                                  </td></tr>
             <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet                              </td></tr>
             <tr><td> <b>forecastResolution</b>      </td><td>1                                                                  </td></tr>
             <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;                  </td></tr>
@@ -29451,15 +29511,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        </li>
        <br>
 
-       <a id="SolarForecast-attr-graphicBeamHeightLevelX" data-pattern="graphicBeamHeightLevel.*"></a>
-       <li><b>graphicBeamHeightLevelX &lt;value&gt; </b><br>
-         Multiplikator zur Festlegung der maximalen Balkenhöhe der jeweiligen Ebene. <br>
-         In Verbindung mit dem Attribut <a href="#SolarForecast-attr-graphicControl">graphicControl->hourCount</a>
-         lassen sich damit auch recht kleine Grafikausgaben erzeugen. <br>
-         (default: 200)
-       </li>
-       <br>
-
        <a id="SolarForecast-attr-graphicControl"></a>
        <li><b>graphicControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
          Durch die Angabe der nachfolgend aufgeführten 'Schlüssel=Wert' Paare können verschiedene
@@ -29470,6 +29521,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+            <tr><td> <b>beamHeightlevel</b>     </td><td>Für jede Ebene der Balkengrafik kann die Balkenhöhe der jeweiligen Ebene festgelegt werden.                                     </td></tr>
+			<tr><td>                            </td><td>Die Angabe für eine Ebene besteht aus der Ebenen-Nummer (1..X), einem ':' gefolgt von einer positiven Ganzzahl > 0.             </td></tr>
+            <tr><td>                            </td><td>Der Zahlenwert wird als Normierungsfaktor bei der Höhenberechnung verwendet.                                                    </td></tr>
+            <tr><td>                            </td><td>Die Angabe für weitere Ebenen erfolgt durch Komma getrennt (siehe Beispiel).                                                    </td></tr>
+            <tr><td>                            </td><td><b>&lt;Ebene&gt;:&lt;Ganzzahl&gt;</b> - Normierungsfaktor (default: 200)                                                        </td></tr>
+			<tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>beamPaddingBottom</b>   </td><td>Legt den Platz in px im Balkendiagramm fest, der zwischen der letzten Text- oder Iconreihe der jeweiligen Balkengrafik Ebene    </td></tr>
             <tr><td>                            </td><td>und dem unteren Rand dieser Ebene eingefügt wird.                                                                               </td></tr>
             <tr><td>                            </td><td>Der Wert gilt einheitlich für alle Balkengrafik Ebenen.                                                                         </td></tr>
@@ -29532,7 +29589,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=1:top,2:bottom
+         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=1:top,2:bottom beamHeightlevel=1:260,2:80,3:400
        </ul>
 
        </li>
@@ -30219,7 +30276,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1  (auf &gt;= 2 setzen wenn eine längere Vorhersage gewünscht ist)                            </td></tr>
+            <tr><td> <b>forecastDays</b>            </td><td>2  (auf &gt; 2 setzen wenn eine längere Vorhersage gewünscht ist)                            </td></tr>
             <tr><td> <b>forecastProperties</b>      </td><td>Rad1h                                                                                         </td></tr>
             <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>
             <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;                                            </td></tr>
@@ -30382,7 +30439,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <ul>
           <table>
           <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-             <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
+             <tr><td> <b>forecastDays</b>            </td><td>2                                                   </td></tr>
              <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet               </td></tr>
              <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
              <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;  </td></tr>
