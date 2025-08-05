@@ -11623,7 +11623,7 @@ sub _batChargeMgmt {
       ## Auswertung für jede kommende Stunde
       ########################################
       for my $num (0..47) {
-          my ($fd,$fh) = calcDayHourMove ($chour, $num);
+          my ($fd, $fh) = calcDayHourMove ($chour, $num);
           next if($fd > 1);
 
           my $nhr   = sprintf "%02d", $num;
@@ -11806,6 +11806,9 @@ sub _createSummaries {
 
   my $dt     = timestringsFromOffset ($t, 86400);
   my $tmoday = $dt->{day};                                                                            # Tomorrow Day (01..31)
+  
+  $dt          = timestringsFromOffset ($t, 172800);
+  my $datmoday = $dt->{day};                                                                          # Übermorgen Day (01..31)
 
   ## Initialisierung
   ####################
@@ -11815,6 +11818,7 @@ sub _createSummaries {
   my $next4HoursSum = { "PV" => 0, "Consumption" => 0 };
   my $restOfDaySum  = { "PV" => 0, "Consumption" => 0 };
   my $tomorrowSum   = { "PV" => 0, "Consumption" => 0 };
+  my $daftertomSum  = { "PV" => 0, "Consumption" => 0 };                                               # Werte für Übermorgen 
   my $todaySumFc    = { "PV" => 0, "Consumption" => 0 };
   my $todaySumRe    = { "PV" => 0, "Consumption" => 0 };
   
@@ -11854,7 +11858,7 @@ sub _createSummaries {
   $next4HoursSum->{Consumption} = $hour00confcremain;
   $restOfDaySum->{Consumption}  = $hour00confcremain;
 
-  for my $h (1..47) {
+  for my $h (1..71) {
       my $idx   = sprintf "%02d", $h;
       my $pvfc  = NexthoursVal ($name, "NextHour".$idx, 'pvfc',      0);
       my $confc = NexthoursVal ($name, "NextHour".$idx, 'confc',     0);
@@ -11903,7 +11907,8 @@ sub _createSummaries {
           }
       }
       else {
-          $tomorrowSum->{PV} += $pvfc if(int($nhday) == int($tmoday));
+          $tomorrowSum->{PV}  += $pvfc if(int($nhday) == int($tmoday));
+          $daftertomSum->{PV} += $pvfc if(int($nhday) == int($datmoday));
       }
   }
 
@@ -12571,6 +12576,7 @@ sub ___doPlanning {
   }
 
   my $order = 1;
+  
   for my $k (reverse sort{$a<=>$b} keys %max) {
       my $ts                  = timestringToTimestamp ($max{$k}{starttime});
 
@@ -13882,7 +13888,7 @@ sub _calcConsForecast_circular {
 
       debugLog ($paref, 'saveData2Cache|consumption_long', "store '$k' hod '$nhhr' confc: $usage{$nhhr}{con}, confcEx: $usage{$nhhr}{conex}");
 
-      if (NexthoursVal ($hash, $k, 'today', 0)) {                                                      # nur Werte des aktuellen Tags speichern
+      if (NexthoursVal ($name, $k, 'today', 0)) {                                                      # nur Werte des aktuellen Tags speichern
           $data{$name}{circular}{$nhhr}{confc} = $usage{$nhhr}{con};
           writeToHistory ( { paref => $paref, key => 'confc', val => $usage{$nhhr}{con}, hour => $nhhr } );
 
@@ -14759,15 +14765,18 @@ sub _genSpecialReadings {
              }
           }
           elsif ($kpi eq 'tomorrowConsumptionForecast') {
-             for my $idx (sort keys %{$data{$name}{nexthours}}) {
-                 my $istoday = NexthoursVal ($hash, $idx, 'today', 0);
-                 next if($istoday);
+              my $dt     = timestringsFromOffset ($t, 86400);
+              my $tmoday = $dt->{day}; 
+             
+              for my $idx (sort keys %{$data{$name}{nexthours}}) {
+                  my $nhday = NexthoursVal ($hash, $idx, 'day', 0);
+                  next if(int ($nhday) != int ($tmoday));
 
-                 my $hod   = NexthoursVal ($hash, $idx, 'hourofday', '01');
-                 my $confc = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
-
-                 storeReading ($prpo.'_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
-             }
+                  my $hod   = NexthoursVal ($hash, $idx, 'hourofday', '01');
+                  my $confc = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
+#Log3 ($name, 1, "$name - tmoday: $tmoday -> $hod");
+                  storeReading ($prpo.'_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
+              }
           }
           elsif ($kpi eq 'conForecastTillNextSunrise') {
              my ($confc, $confcs, $confcsr) = (0, 0, 0);
