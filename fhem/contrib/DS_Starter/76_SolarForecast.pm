@@ -11796,12 +11796,16 @@ return;
 sub _createSummaries {
   my $paref  = shift;
   my $name   = $paref->{name};
-  my $day    = $paref->{day};
+  my $t      = $paref->{t};
+  my $day    = $paref->{day};                                                                         # aktueller Tag
   my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
   my $minute = $paref->{minute};                                                                      # aktuelle Minute
   my $debug  = $paref->{debug};
 
   $minute = int ($minute) + 1;                                                                        # Minute Range umsetzen auf 1 bis 60
+
+  my $dt     = timestringsFromOffset ($t, 86400);
+  my $tmoday = $dt->{day};                                                                            # Tomorrow Day (01..31)
 
   ## Initialisierung
   ####################
@@ -11857,6 +11861,7 @@ sub _createSummaries {
       my $istdy = NexthoursVal ($name, "NextHour".$idx, 'today',     0);
       my $don   = NexthoursVal ($name, "NextHour".$idx, 'DoN',       0);
       my $hod   = NexthoursVal ($name, "NextHour".$idx, 'hourofday', 0);
+      my $nhday = NexthoursVal ($name, "NextHour".$idx, 'day',       0);
       
       $pvfc     = max (0, $pvfc);                                                           # PV Prognose darf nicht negativ sein
       $confc    = max (0, $confc);                                                          # Verbrauchsprognose darf nicht negativ sein
@@ -11898,7 +11903,7 @@ sub _createSummaries {
           }
       }
       else {
-          $tomorrowSum->{PV} += $pvfc;
+          $tomorrowSum->{PV} += $pvfc if(int($nhday) == int($tmoday));
       }
   }
 
