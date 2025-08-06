@@ -15164,10 +15164,11 @@ sub entryGraphic {
 
       ## Werte restliche Stunden
       ############################
-      my $back         = _beamGraphicRemainingHours ($paref);
-      $paref->{maxVal} = $back->{maxVal};                                                                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
-      $paref->{maxDif} = $back->{maxDif};                                                                  # für Typ diff
-      $paref->{minDif} = $back->{minDif};                                                                  # für Typ diff
+      my $back           = _beamGraphicRemainingHours ($paref);
+      $paref->{maxVal}   = $back->{maxVal};                                                                # Startwert
+      $paref->{maxStVal} = $back->{maxStVal};                                                              # Start Staplewert
+      $paref->{maxDif}   = $back->{maxDif};                                                                # für Typ diff
+      $paref->{minDif}   = $back->{minDif};                                                                # für Typ diff
 
       ## Batteriewerte füllen
       #########################
@@ -15179,6 +15180,7 @@ sub entryGraphic {
       $ret .= _levelSeparator ($paref);
 
       delete $paref->{maxVal};                                                                             # bereinigen vor nächster Ebene
+      delete $paref->{maxStVal};
       delete $paref->{maxDif};
       delete $paref->{minDif};
       delete $paref->{hfcg};
@@ -15207,10 +15209,11 @@ sub entryGraphic {
 
           # Werte restliche Stunden
           ###########################
-          my $back         = _beamGraphicRemainingHours ($paref);
-          $paref->{maxVal} = $back->{maxVal};                                                             # Startwert wenn kein Wert bereits via attr vorgegeben ist
-          $paref->{maxDif} = $back->{maxDif};                                                             # für Typ diff
-          $paref->{minDif} = $back->{minDif};                                                             # für Typ diff
+          my $back           = _beamGraphicRemainingHours ($paref);
+          $paref->{maxVal}   = $back->{maxVal};                                                           # Startwert wenn kein Wert bereits via attr vorgegeben ist
+          $paref->{maxStVal} = $back->{maxStVal};                                                         # Start Staplewert
+          $paref->{maxDif}   = $back->{maxDif};                                                           # für Typ diff
+          $paref->{minDif}   = $back->{minDif};                                                           # für Typ diff
 
           ## Batteriewerte füllen
           #########################
@@ -15222,6 +15225,7 @@ sub entryGraphic {
           $ret .= _levelSeparator ($paref);
 
           delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
+          delete $paref->{maxStVal};
           delete $paref->{maxDif};
           delete $paref->{minDif};
           delete $paref->{hfcg};
@@ -15251,10 +15255,11 @@ sub entryGraphic {
 
           # Werte restliche Stunden
           ###########################
-          my $back         = _beamGraphicRemainingHours ($paref);
-          $paref->{maxVal} = $back->{maxVal};                                                             # Startwert wenn kein Wert bereits via attr vorgegeben ist
-          $paref->{maxDif} = $back->{maxDif};                                                             # für Typ diff
-          $paref->{minDif} = $back->{minDif};                                                             # für Typ diff
+          my $back           = _beamGraphicRemainingHours ($paref);
+          $paref->{maxVal}   = $back->{maxVal};                                                           # Startwert wenn kein Wert bereits via attr vorgegeben ist
+          $paref->{maxStVal} = $back->{maxStVal};                                                         # Start Staplewert
+          $paref->{maxDif}   = $back->{maxDif};                                                           # für Typ diff
+          $paref->{minDif}   = $back->{minDif};                                                           # für Typ diff
 
           ## Batteriewerte füllen
           #########################
@@ -15266,6 +15271,7 @@ sub entryGraphic {
           $ret .= _levelSeparator ($paref);
 
           delete $paref->{maxVal};                                                                        # bereinigen vor nächster Ebene
+          delete $paref->{maxStVal};
           delete $paref->{maxDif};
           delete $paref->{minDif};
           delete $paref->{hfcg};
@@ -16943,11 +16949,12 @@ sub _beamGraphicRemainingHours {
   my ($val1, $val2, $val3, $val4, $val5, $val6, $val7, $val8, $val9, $val10);
   my $hbsocs;
 
-  my $hash    = $defs{$name};
-  my $maxVal  = $hfcg->{0}{beam1};                                                                      # Startwert
-  my $maxDif  = $hfcg->{0}{diff};                                                                       # für Typ diff
-  my $minDif  = $hfcg->{0}{diff};                                                                       # für Typ diff
-  my $bcapsum = CurrentVal ($name, 'batcapsum', 0);                                                     # Summe installierte Batterie Kapazität in Wh
+  my $hash     = $defs{$name};
+  my $maxVal   = $hfcg->{0}{beam1};                                                                     # Startwert
+  my $maxStVal = $hfcg->{0}{beam1} + $hfcg->{0}{beam2};                                                 # Start Staplewert
+  my $maxDif   = $hfcg->{0}{diff};                                                                      # für Typ diff
+  my $minDif   = $hfcg->{0}{diff};                                                                      # für Typ diff
+  my $bcapsum  = CurrentVal ($name, 'batcapsum', 0);                                                    # Summe installierte Batterie Kapazität in Wh
 
   for my $i (1..($maxhours*2)-1) {                                                                      # doppelte Anzahl berechnen    my $val1 = 0;
       ($val1, $val2, $val3 ,$val4 ,$val5, $val6, $val7 ,$val8, $val9, $val10) = (0,0,0,0,0,0,0,0,0,0);
@@ -17102,16 +17109,18 @@ sub _beamGraphicRemainingHours {
       $hfcg->{$i}{diff}    = sprintf "%.1f", ($hfcg->{$i}{beam1} - $hfcg->{$i}{beam2});
       $hfcg->{$i}{diff}    = sprintf "%.0f", $hfcg->{$i}{diff} if($kw eq 'Wh' && grep { $roundable{$_} } @beams);
 
-      $maxVal = $hfcg->{$i}{beam1} if($hfcg->{$i}{beam1} > $maxVal);
-      $maxVal = $hfcg->{$i}{beam2} if($hfcg->{$i}{beam2} > $maxVal);
-      $maxDif = $hfcg->{$i}{diff}  if($hfcg->{$i}{diff}  > $maxDif);
-      $minDif = $hfcg->{$i}{diff}  if($hfcg->{$i}{diff}  < $minDif);
+      $maxVal   = $hfcg->{$i}{beam1}                      if($hfcg->{$i}{beam1} > $maxVal);
+      $maxVal   = $hfcg->{$i}{beam2}                      if($hfcg->{$i}{beam2} > $maxVal);
+      $maxStVal = $hfcg->{$i}{beam1} + $hfcg->{$i}{beam2} if($maxStVal          < $hfcg->{$i}{beam1} + $hfcg->{$i}{beam2});
+      $maxDif   = $hfcg->{$i}{diff}                       if($hfcg->{$i}{diff}  > $maxDif);
+      $minDif   = $hfcg->{$i}{diff}                       if($hfcg->{$i}{diff}  < $minDif);
   }
 
   my $back = {
-      maxVal => $maxVal,
-      maxDif => $maxDif,
-      minDif => $minDif,
+      maxVal   => $maxVal,
+      maxStVal => $maxStVal,
+      maxDif   => $maxDif,
+      minDif   => $minDif,
   };
 
 return $back;
@@ -17204,7 +17213,8 @@ sub _beamGraphic {
   my $fcolor2    = $paref->{fcolor2};
   my $offset     = $paref->{offset};
   my $thishour   = $paref->{thishour};
-  my $maxVal     = $paref->{maxVal};
+  my $maxVal     = $paref->{maxVal};                         # Maximalwert von beam1 ODER beam2
+  my $maxStVal   = $paref->{maxStVal};                       # Maximalwert des Stapels beam1 UND beam2
   my $maxDif     = $paref->{maxDif};
   my $minDif     = $paref->{minDif};
   my $beam1cont  = $paref->{beam1cont};
