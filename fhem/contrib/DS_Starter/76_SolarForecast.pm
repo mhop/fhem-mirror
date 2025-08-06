@@ -160,9 +160,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.55.0" => "04.08.2025  DWD-Weather and DWD-Radiation device new minimum value of attr 'forecastDays' is 2 ".
+  "1.55.0" => "06.08.2025  DWD-Weather and DWD-Radiation device new minimum value of attr 'forecastDays' is 2 ".
                            "checkPlantConfig: check forecastDays of new minimum value ".
-                           "___createOpenMeteoURL: set forecast_hours=72 ",                           
+                           "___createOpenMeteoURL: set forecast_hours=72, bugfix of V 1.54.7 ".
+                           "Nexthours: max 72 hours available but not more than 3 days ",                           
   "1.54.7" => "01.08.2025  _transferAPIRadiationValues: Extension of Nexthours content up to 48 hours into the future ".
                            "attr graphicBeamHeightLevelX is obsolete -> use graphicControl instead ".
                            "attr graphicControl new key beamHeightlevel ",
@@ -427,6 +428,8 @@ use constant {
   AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
 
+  MAXNEXTHOURS   => 71,                                                             # max. Anzahl Stunden der Wertebasis (Start mit 0 -> 72h) z.B. in Nexthours
+  MAXNEXTDAYS    => 2,                                                              # max. Anzahl volle Tage in NextHours (Start mit 0 -> 3d)                                              
   DWDFCDAYSMIN   => 2,                                                              # Mindestwert Attr 'forecastDays' im DWD-Device
   SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
   FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
@@ -1360,38 +1363,38 @@ my %hef = (                                                                     
 );
 
 my %hcsr = (                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
-  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
-  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => '-'         },
-  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => '-'         },
-  response_message            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => '-'         },
-  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 'apimaxreq' },
-  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 0           },
-  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 0           },
-  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 'apimaxreq' },
-  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                  par1 => '',                  unit => '',     def => 'apimaxreq' },
-  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => ' s',   def => '-'         },
-  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => '-'         },
-  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => '-'         },
-  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => 0           },
-  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset', par1 => '',                  unit => ' Wh',  def => 0           },
-  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' s',   def => '-'         },
-  todayConsumption            => { fnr => 3, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
-  todayConsumptionForecastDay => { fnr => 4, fn => \&HistoryVal,      par => 99,                  par1 => 'confc',             unit => ' Wh',  def => '-'         },
-  BatPowerIn_Sum              => { fnr => 5, fn => \&CurrentVal,      par => 'batpowerinsum',     par1 => '',                  unit => ' W',   def => '-'         },
-  BatPowerOut_Sum             => { fnr => 5, fn => \&CurrentVal,      par => 'batpoweroutsum',    par1 => '',                  unit => ' W',   def => '-'         },
-  BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',       par1 => '',                  unit => ' %',   def => 0           },
-  SunHours_Remain             => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
-  SunMinutes_Remain           => { fnr => 5, fn => \&CurrentVal,      par => '',                  par1 => '',                  unit => '',     def => 0           },
-  dayAfterTomorrowPVforecast  => { fnr => 5, fn => \&RadiationAPIVal, par => 'pv_estimate50',     par1 => '',                  unit => '',     def => 0           },
-  todayGridFeedIn             => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => '',     def => 0           },
-  todayGridConsumption        => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => '',     def => 0           },
-  todayNotOwnerConsumption    => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => 'todayConsumption',  unit => ' Wh',  def => 0           },
-  todayConsumptionForecast    => { fnr => 5, fn => \&HistoryVal,      par => '',                  par1 => 'confc',             unit => ' Wh',  def => '-'         },
-  tomorrowConsumptionForecast => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => '-'         },
-  conForecastTillNextSunrise  => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => 0           },
-  conForecastComingNight      => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',             par1 => '',                  unit => ' Wh',  def => 0           },
-  todayBatInSum               => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
-  todayBatOutSum              => { fnr => 5, fn => \&CircularVal,     par => 99,                  par1 => '',                  unit => ' Wh',  def => 0           },
+  currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
+  lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => '-'         },
+  lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => '-'         },
+  response_message            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => '-'         },
+  todayMaxAPIcalls            => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => 'apimaxreq' },
+  todayDoneAPIcalls           => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => 0           },
+  todayDoneAPIrequests        => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => 0           },
+  todayRemainingAPIcalls      => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => 'apimaxreq' },
+  todayRemainingAPIrequests   => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => 'apimaxreq' },
+  runTimeCentralTask          => { fnr => 2, fn => \&CurrentVal,      par => '',                     par1 => '',                  unit => ' s',   def => '-'         },
+  runTimeLastAPIAnswer        => { fnr => 2, fn => \&CurrentVal,      par => '',                     par1 => '',                  unit => '',     def => '-'         },
+  runTimeLastAPIProc          => { fnr => 2, fn => \&CurrentVal,      par => '',                     par1 => '',                  unit => '',     def => '-'         },
+  allStringsFullfilled        => { fnr => 2, fn => \&CurrentVal,      par => '',                     par1 => '',                  unit => '',     def => 0           },
+  todayConForecastTillSunset  => { fnr => 2, fn => \&CurrentVal,      par => 'tdConFcTillSunset',    par1 => '',                  unit => ' Wh',  def => 0           },
+  runTimeTrainAI              => { fnr => 3, fn => \&CircularVal,     par => 99,                     par1 => '',                  unit => ' s',   def => '-'         },
+  todayConsumption            => { fnr => 3, fn => \&CircularVal,     par => 99,                     par1 => '',                  unit => ' Wh',  def => 0           },
+  todayConsumptionForecastDay => { fnr => 4, fn => \&HistoryVal,      par => 99,                     par1 => 'confc',             unit => ' Wh',  def => '-'         },
+  BatPowerIn_Sum              => { fnr => 5, fn => \&CurrentVal,      par => 'batpowerinsum',        par1 => '',                  unit => ' W',   def => '-'         },
+  BatPowerOut_Sum             => { fnr => 5, fn => \&CurrentVal,      par => 'batpoweroutsum',       par1 => '',                  unit => ' W',   def => '-'         },
+  BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',          par1 => '',                  unit => ' %',   def => 0           },
+  SunHours_Remain             => { fnr => 5, fn => \&CurrentVal,      par => '',                     par1 => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
+  SunMinutes_Remain           => { fnr => 5, fn => \&CurrentVal,      par => '',                     par1 => '',               unit => '',     def => 0           },
+  dayAfterTomorrowPVforecast  => { fnr => 5, fn => \&CurrentVal,      par => 'dayAfterTomorrowPVfc', par1 => '',               unit => ' Wh',  def => 0           },
+  todayGridFeedIn             => { fnr => 5, fn => \&CircularVal,     par => 99,                     par1 => '',                  unit => '',     def => 0           },
+  todayGridConsumption        => { fnr => 5, fn => \&CircularVal,     par => 99,                     par1 => '',                  unit => '',     def => 0           },
+  todayNotOwnerConsumption    => { fnr => 5, fn => \&CircularVal,     par => 99,                     par1 => 'todayConsumption',  unit => ' Wh',  def => 0           },
+  todayConsumptionForecast    => { fnr => 5, fn => \&HistoryVal,      par => '',                     par1 => 'confc',             unit => ' Wh',  def => '-'         },
+  tomorrowConsumptionForecast => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',                par1 => '',                  unit => ' Wh',  def => '-'         },
+  conForecastTillNextSunrise  => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',                par1 => '',                  unit => ' Wh',  def => 0           },
+  conForecastComingNight      => { fnr => 5, fn => \&NexthoursVal,    par => 'confc',                par1 => '',                  unit => ' Wh',  def => 0           },
+  todayBatInSum               => { fnr => 5, fn => \&CircularVal,     par => 99,                     par1 => '',                  unit => ' Wh',  def => 0           },
+  todayBatOutSum              => { fnr => 5, fn => \&CircularVal,     par => 99,                     par1 => '',                  unit => ' Wh',  def => 0           },
 );
 
   for my $csr (1..MAXCONSUMER) {
@@ -8895,7 +8898,7 @@ sub centralTask {
 
   my $dt    = timestringsFromOffset ($t, 0);
   my $chour = $dt->{hour};
-
+  
   my $centpars = {
       name    => $name,
       type    => $type,
@@ -9329,10 +9332,21 @@ sub _specialActivities {
 
   $gcon = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", 0);
   storeReading ('LastHourGridconsumptionReal', "$gcon Wh", $ts1);
+  
+  ## überhängende Daten in Nexthours löschen 
+  ############################################
+  for my $num (0..MAXNEXTHOURS) {
+      my ($fd, $fh) = calcDayHourMove ($chour, $num);
+      my $nhtstr    = 'NextHour'.(sprintf "%02d", $num);
+
+	  if ($fd > 2 && exists $data{$name}{nexthours}{$nhtstr}) {
+		 delete $data{$name}{nexthours}{$nhtstr};
+		 next;
+	  }
+  }  
 
   ## Planungsdaten spezifisch löschen (Anfang und Ende nicht am selben Tag)
   ##########################################################################
-
   for my $c (keys %{$data{$name}{consumers}}) {
       next if(ConsumerVal ($hash, $c, 'plandelete', 'regular') eq 'regular');
 
@@ -9707,9 +9721,9 @@ sub _transferWeatherValues {
 
   __mergeDataWeather ($paref);                                                              # Wetterdaten zusammenfügen
 
-  for my $num (0..71) {
+  for my $num (0..MAXNEXTHOURS) {
       my ($fd, $fh) = calcDayHourMove ($chour, $num);
-      last if($fd > 2);
+      last if($fd > MAXNEXTDAYS);
 
       my $wid   = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ww};                    # signifikantes Wetter = Wetter ID
       my $wwd   = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{wwd};                   # Wetter Beschreibung
@@ -9723,7 +9737,7 @@ sub _transferWeatherValues {
           debugLog ($paref, 'collectData_long', "Adjust cloud cover ratio (wcc) due to significant weather (ww) - ww: $wid -> wcc: $wcc");
       }
 
-      my $nhtstr                                  = "NextHour".sprintf "%02d", $num;
+      my $nhtstr                                  = 'NextHour'.(sprintf "%02d", $num);
       $data{$name}{nexthours}{$nhtstr}{weatherid} = $wid;
       $data{$name}{nexthours}{$nhtstr}{wcc}       = $wcc;
       $data{$name}{nexthours}{$nhtstr}{rr1c}      = $rr1c;
@@ -9790,7 +9804,7 @@ sub __readDataWeather {
 
   for my $n (0..$end) {
       my ($fd, $fh) = calcDayHourMove ($chour, $n);
-      last if($fd > 2);
+      last if($fd > MAXNEXTDAYS);
 
       my $wid   = ReadingsNum ($fcname, "fc${fd}_${fh}_ww",   undef);                          # Signifikantes Wetter zum Vorhersagezeitpunkt
       my $wwd   = ReadingsVal ($fcname, "fc${fd}_${fh}_wwd",     '');                          # Wetter Beschreibung
@@ -10257,19 +10271,19 @@ sub _transferAPIRadiationValues {
       $invcapsum += InverterVal ($name, $in, 'invertercap', 0);                                            # Limit Leistungssumme aller Inverters
   }
 
-  for my $num (0..71) {
-      my ($fd,$fh)         = calcDayHourMove ($chour, $num);
-      last if($fd > 2);
+  for my $num (0..MAXNEXTHOURS) {
+      my ($fd, $fh)        = calcDayHourMove ($chour, $num);
+      last if($fd > MAXNEXTDAYS);
       
       my $fh1              = $fh + 1;
       my $wantts           = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
       my $wantdt           = (timestampToTimestring ($wantts, $lang))[1];
-      my $nhtstr           = 'NextHour'.sprintf "%02d", $num;
+      my $nhtstr           = 'NextHour'.(sprintf "%02d", $num);
       my ($wtday, $wthour) = $wantdt =~ /(\d{2})\s(\d{2}):/xs;
       my $hod              = sprintf "%02d", int $wthour + 1;                                              # Stunde des Tages
-      my $rad1h            = RadiationAPIVal ($name, '?All', $wantdt, 'Rad1h', undef);
-
-      $paref->{wantdt} = $wantdt;
+      my $rad1h            = RadiationAPIVal ($name, '?All', $wantdt, 'Rad1h', undef);    
+	  
+	  $paref->{wantdt} = $wantdt;
       $paref->{wantts} = $wantts;
       $paref->{wtday}  = $wtday;
       $paref->{hod}    = $hod;
@@ -10603,7 +10617,7 @@ sub ___readCandQ {
   my $crang       = 'simple';
   my $hc;
 
-  delete $data{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange};
+  delete $data{$name}{nexthours}{'NextHour'.sprintf("%02d",$num)}{cloudrange};
 
   if ($acu =~ /on_complex/xs) {                                                                       # Autokorrektur complex soll genutzt werden
       $crang     = cloud2bin ($wcc);                                                                  # Range errechnen
@@ -10611,10 +10625,10 @@ sub ___readCandQ {
       my $daref  = $data{$name}{circular}{$hod}{'pvrl_'.$sabin}{"$crang"};
 
       if (ref $daref eq 'ARRAY') {
-          $data{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{DaysInRange} = scalar (@{$daref}); # Anzahl Tage im selben Wetterbereich  speichern
+          $data{$name}{nexthours}{'NextHour'.sprintf("%02d",$num)}{DaysInRange} = scalar (@{$daref}); # Anzahl Tage im selben Wetterbereich  speichern
       }
 
-      $data{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange}  = $crang;
+      $data{$name}{nexthours}{'NextHour'.sprintf("%02d",$num)}{cloudrange}  = $crang;
   }
   elsif ($acu =~ /on_simple/xs) {
       ($hc, $hq) = CircularSunCloudkorrVal ($hash, $hod, $sabin, 'simple', undef);                    # Korrekturfaktor/Qualität der Stunde des Tages (simple)
@@ -10639,7 +10653,7 @@ sub ___readCandQ {
       debugLog ($paref, 'pvCorrectionRead', "$flex - fd: $fd, hod: $hod, Sun Altitude Bin: $sabin, Cloud range: $crang, corrf: $hc, quality: $hq");
   }
 
-  $data{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hq;
+  $data{$name}{nexthours}{'NextHour'.sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hq;
 
   if ($fd == 0 && $hod) {
       writeToHistory ( { paref => $paref, key => 'pvcorrfactor', val => $hc.'/'.$hq, hour => $hod } );
@@ -11858,7 +11872,7 @@ sub _createSummaries {
   $next4HoursSum->{Consumption} = $hour00confcremain;
   $restOfDaySum->{Consumption}  = $hour00confcremain;
 
-  for my $h (1..71) {
+  for my $h (1..MAXNEXTHOURS) {
       my $idx   = sprintf "%02d", $h;
       my $pvfc  = NexthoursVal ($name, "NextHour".$idx, 'pvfc',      0);
       my $confc = NexthoursVal ($name, "NextHour".$idx, 'confc',     0);
@@ -11974,9 +11988,9 @@ sub _createSummaries {
   $surplus            = 0 if($surplus < 0);                                                             # wegen Vergleich nompower vs. surplus
 
   if ($debug =~ /collectData/xs) {
-      Log3 ($name, 1, "$name DEBUG> current Power values -> PV2Node: $pv2node W, PV2Bat: $pv2bat, PV2Grid: $pv2grid W, Other: $othprod W, GridIn: $gfeedin W, GridCon: $gcon W, BatIn: $batin W, BatOut: $batout W");
-      Log3 ($name, 1, "$name DEBUG> current Consumption result -> $consumption W");
-      Log3 ($name, 1, "$name DEBUG> current Power Battery Inverter -> DC2Inv2Node: $dc2inv2node W, Node2Inv2DC: $node2inv2dc W");
+      Log3 ($name, 1, "$name DEBUG> current Power values -> PV2Node: $pv2node W, PV2Bat: $pv2bat, PV2Grid: $pv2grid W, Other: $othprod W, GridIn: $gfeedin W, GridCon: $gcon W");
+      Log3 ($name, 1, "$name DEBUG> current Power Battery -> BatIn: $batin W (Node2Inv2DC: $node2inv2dc W), BatOut: $batout W (DC2Inv2Node: $dc2inv2node W)");
+	  Log3 ($name, 1, "$name DEBUG> current Consumption result -> $consumption W");
   }
 
   my $selfconsumptionrate = 0;
@@ -11985,12 +11999,13 @@ sub _createSummaries {
   $selfconsumptionrate    = sprintf "%.0f", ($selfconsumption / $pv2node * 100)        if($pv2node * 1 > 0);
   $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / $divi * 100 if($divi);       # vermeide Illegal division by zero
 
-  $data{$name}{current}{consumption}         = $consumption;
-  $data{$name}{current}{selfconsumption}     = $selfconsumption;
-  $data{$name}{current}{selfconsumptionrate} = $selfconsumptionrate;
-  $data{$name}{current}{autarkyrate}         = $autarkyrate;
-  $data{$name}{current}{tdConFcTillSunset}   = sprintf "%.0f", $tdConFcTillSunset;
-  $data{$name}{current}{surplus}             = $surplus;
+  $data{$name}{current}{consumption}          = $consumption;
+  $data{$name}{current}{selfconsumption}      = $selfconsumption;
+  $data{$name}{current}{selfconsumptionrate}  = $selfconsumptionrate;
+  $data{$name}{current}{autarkyrate}          = $autarkyrate;
+  $data{$name}{current}{tdConFcTillSunset}    = sprintf "%.0f", $tdConFcTillSunset;
+  $data{$name}{current}{surplus}              = $surplus;
+  $data{$name}{current}{dayAfterTomorrowPVfc} = $daftertomSum->{PV};
 
   push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
   limitArray ($data{$name}{current}{surplusslidereg}, SPLSLIDEMAX);
@@ -14692,27 +14707,14 @@ sub _genSpecialReadings {
 
               storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbo).' '.$hcsr{$kpi}{unit});
           }
-          elsif ($kpi eq 'dayAfterTomorrowPVforecast') {                                                   # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
-              my $dayaftertomorrow = strftime "%Y-%m-%d", localtime($t + 172800);                          # Datum von Übermorgen
-              my @allstrings       = split ",", AttrVal ($name, 'setupInverterStrings', '');
-              my $fcsumdat         = 0;
+          elsif ($kpi eq 'dayAfterTomorrowPVforecast') {                                                   # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226		  
+			  my $datpvfc = &{$hcsr{$kpi}{fn}} ($name, 'dayAfterTomorrowPVfc', $def);
 
-              for my $strg (@allstrings) {
-                 for my $starttmstr (sort keys %{$data{$name}{solcastapi}{$strg}}) {
-                     next if($starttmstr !~ /$dayaftertomorrow/xs);
-
-                     my $val    = &{$hcsr{$kpi}{fn}} ($hash, $strg, $starttmstr, $hcsr{$kpi}{par}, $def);
-                     $fcsumdat += $val;
-
-                     debugLog ($paref, 'radiationProcess', "dayaftertomorrow PV forecast (raw) - $strg -> $starttmstr -> $val Wh");
-                 }
-              }
-
-              if ($fcsumdat) {
-                  storeReading ($prpo.'_'.$kpi, (int $fcsumdat). ' Wh');
+              if ($datpvfc) {
+                  storeReading ($prpo.'_'.$kpi, (sprintf "%.0f", $datpvfc).$hcsr{$kpi}{unit});
               }
               else {
-                  storeReading ($prpo.'_'.$kpi, $fcsumdat. ' (no data available)');
+                  storeReading ($prpo.'_'.$kpi, $datpvfc. ' (no data available)');
               }
           }
           elsif ($kpi =~ /currentRunMtsConsumer_/xs) {
@@ -14774,7 +14776,7 @@ sub _genSpecialReadings {
 
                   my $hod   = NexthoursVal ($hash, $idx, 'hourofday', '01');
                   my $confc = &{$hcsr{$kpi}{fn}} ($hash, $idx, $hcsr{$kpi}{par}, $def);
-#Log3 ($name, 1, "$name - tmoday: $tmoday -> $hod");
+
                   storeReading ($prpo.'_'.$kpi.'_'.$hod, $confc.$hcsr{$kpi}{unit});
               }
           }
@@ -22273,7 +22275,7 @@ sub calcDayHourMove {
   my $chour = shift;
   my $num   = shift;
 
-  my $fh = $chour + $num;
+  my $fh = int ($chour) + $num;
   my $fd = int ($fh / 24) ;
   $fh    = $fh - ($fd * 24);
 
