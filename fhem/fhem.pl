@@ -1649,7 +1649,10 @@ WriteStatefile()
     }
 
     my @arr = GetAllReadings($d);
-    print $SFH join("\n", @arr)."\n" if(@arr);
+    if(@arr) {
+      $cmdFromAnalyze = join("\n", @arr);
+      print $SFH $cmdFromAnalyze."\n";
+    }
   }
 
   return "$attr{global}{statefile}: $!" if(!close($SFH));
@@ -3647,7 +3650,10 @@ SignalHandling()
     $data{WARNING}{$msg}++;
     chomp($msg);
     Log 1, "PERL WARNING: $msg"; 
-    Log 3, "eval: $cmdFromAnalyze" if($cmdFromAnalyze);
+    if($cmdFromAnalyze) {
+      $cmdFromAnalyze =~ s/([^ -~])/"(".ord($1).")"/ge; 
+      Log 3, "eval: $cmdFromAnalyze";
+    }
     stacktrace() if($attr{global}{stacktrace} &&
                     $msg !~ m/ redefined at /);
     $inWarnSub = 0;
