@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 72_FRITZBOX: diverse Fehler behoben
+           - Datenreihen box_... zeitlich von links nach rechts geflippt
+           - falscher Log-Eintrag bei Löschen von verbose
+           - löschen der docsis Readings bei fehlender Verbindung
+ - change: 72_FRITZBOX: Readings box_ip_... und box_ppp_...
+           https://forum.fhem.de/index.php?topic=141975.msg1345773#msg1345773
  - change:  76_SolarForecast: version 1.55.0, changes and fixes of V 1.54.7
  - feature: 76_SolarForecast: Version 1.54.7
  - feature: 76_SolarForecast: show surplus method/result in clegend mouse-over
