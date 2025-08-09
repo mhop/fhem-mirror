@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.57.0" => "08.08.2025  new option attr graphicControl->scaleMode=X:staple ",
+  "1.56.0" => "07.08.2025  set MAXINVERTER to 5 ",
   "1.55.0" => "06.08.2025  DWD-Weather and DWD-Radiation device new minimum value of attr 'forecastDays' is 2 ".
                            "checkPlantConfig: check forecastDays of new minimum value ".
                            "___createOpenMeteoURL: set forecast_hours=72, bugfix of V 1.54.7 ".
@@ -407,7 +409,7 @@ use constant {
   MAXBATTERIES   => 3,                                                              # maximale Anzahl der möglichen Batterien
   MAXCONSUMER    => 20,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
   MAXPRODUCER    => 3,                                                              # maximale Anzahl der möglichen anderen Produzenten (Attribut)
-  MAXINVERTER    => 4,                                                              # maximale Anzahl der möglichen Inverter
+  MAXINVERTER    => 5,                                                              # maximale Anzahl der möglichen Inverter
   MAXBEAMLEVEL   => 3,                                                              # maximale Anzahl der Balkengrafik Ebenen 
 
   MAXSOCDEF      => 95,                                                             # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
@@ -6499,18 +6501,18 @@ sub _attrgraphicControl {                ## no critic "not used"
   my $cmd   = $paref->{cmd};
 
   my $valid = {
-      beamPaddingBottom => { comp => '\d+',                                                      act => 0 },
-      beamPaddingTop    => { comp => '\d+',                                                      act => 0 },
-      beamWidth         => { comp => '([2-9][0-9]|100)',                                         act => 0 },
-      energyUnit        => { comp => '(Wh|kWh)',                                                 act => 0 },
-      beamHeightlevel   => { comp => '(?:[1-3]:(?:[1-9][0-9]*))(?:,(?:[1-3]:(?:[1-9][0-9]*)))*', act => 0 },
-      headerDetail      => { comp => '.*',                                                       act => 1 },
-      hourCount         => { comp => '([4-9]|1[0-9]|2[0-4])',                                    act => 0 },
-      hourStyle         => { comp => ':(0{1,2})',                                                act => 0 },
-      layoutType        => { comp => '(single|double|diff)',                                     act => 0 },
-      scaleMode         => { comp => '(?:[1-3]:(?:log|lin))(?:,(?:[1-3]:(?:log|lin)))*',         act => 0 },
-      showDiff          => { comp => '(?:[1-3]:(?:top|bottom))(?:,(?:[1-3]:(?:top|bottom)))*',   act => 0 },
-      spaceSize         => { comp => '\d+',                                                      act => 0 },
+      beamPaddingBottom => { comp => '\d+',                                                            act => 0 },
+      beamPaddingTop    => { comp => '\d+',                                                            act => 0 },
+      beamWidth         => { comp => '([2-9][0-9]|100)',                                               act => 0 },
+      energyUnit        => { comp => '(Wh|kWh)',                                                       act => 0 },
+      beamHeightlevel   => { comp => '(?:[1-3]:(?:[1-9][0-9]*))(?:,(?:[1-3]:(?:[1-9][0-9]*)))*',       act => 0 },
+      headerDetail      => { comp => '.*',                                                             act => 1 },
+      hourCount         => { comp => '([4-9]|1[0-9]|2[0-4])',                                          act => 0 },
+      hourStyle         => { comp => ':(0{1,2})',                                                      act => 0 },
+      layoutType        => { comp => '(single|double|diff)',                                           act => 0 },
+      scaleMode         => { comp => '(?:[1-3]:(?:log|lin|staple))(?:,(?:[1-3]:(?:log|lin|staple)))*', act => 0 },
+      showDiff          => { comp => '(?:[1-3]:(?:top|bottom))(?:,(?:[1-3]:(?:top|bottom)))*',         act => 0 },
+      spaceSize         => { comp => '\d+',                                                            act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -11636,9 +11638,9 @@ sub _batChargeMgmt {
       
       ## Auswertung für jede kommende Stunde
       ########################################
-      for my $num (0..47) {
+      for my $num (0..71) {
           my ($fd, $fh) = calcDayHourMove ($chour, $num);
-          next if($fd > 1);
+          next if($fd > 2);
 
           my $nhr   = sprintf "%02d", $num;
           my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today',      0);
@@ -11710,11 +11712,10 @@ sub _batChargeMgmt {
                       $fceff < 0 ? ($fceff <= $bpoutmax * -1 ? $bpoutmax * -1 : $fceff) :
                       $fceff;
 
-          # debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - max. possible Charging(+) / Discharging(-) Energy: $fceff Wh");
-
           $socwh   += $crel       ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) :
-                      ($fceff > 0 ? 0                                                        :
-                      $fceff / STOREFFDEF);                                                      # PV Überschuß (d.h. Aufladung) nur einbeziehen wenn Ladefreigabe
+                      ($fceff > 0 ? 0 : $fceff / STOREFFDEF);                                    # PV Überschuß (d.h. Aufladung) nur einbeziehen wenn Ladefreigabe
+
+          # debugLog ($paref, 'batteryManagement', "Bat $bn Charge - crel: $crel, fceff: $fceff, socwh: $socwh");
 
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -17227,14 +17228,15 @@ sub _beamGraphic {
   # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
   # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
 
-  my ($val, $z2, $z3, $z4, $he, $titz2, $titz3);
+  my ($val, $z2, $z3, $z4, $z1, $titz2, $titz3);
 
   $paref->{beampos} = 'top';                                                               # Lagedefinition "über den Balken"
   my $ret           = q{};
 
   my $colspan = $maxhours + 2;
   my $m       = $paref->{modulo} % 2;
-  $maxVal     = 1.1 if(!int $maxVal);                                                      # maxVal devision by zero & log(x) Problem
+  $maxVal     = 1.1 if(!int $maxVal);                                                      # devision by zero & log(x) Problem
+  $maxStVal   = 1.1 if(!int $maxStVal);                                                    # devision by zero Problem
   
   ## zusätzlicher Abstand vor der ersten Reihe
   ##############################################
@@ -17282,7 +17284,8 @@ sub _beamGraphic {
 
   $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                                 # Neue Zeile mit freiem Platz am Anfang
 
-  my $ii = 0;
+  my $ii   = 0;
+  my $mbdf = 0;
 
   for my $i (0..($maxhours * 2) - 1) {                                                                          # gleiche Bedingung wie oben
       next if(__dontNightshowSkipSync ($name, $paref, $i));
@@ -17295,8 +17298,9 @@ sub _beamGraphic {
       # Berechnung der Zonen
       ########################
       if ($lotype eq 'single') {
-          $he = __normBeamHeight ( { val       => $maxVal - $hfcg->{$i}{beam1}, 
+          $z1 = __normBeamHeight ( { val       => $maxVal - $hfcg->{$i}{beam1}, 
                                      maxVal    => $maxVal, 
+                                     maxStVal  => $maxStVal,
                                      height    => $height, 
                                      ground    => 0,
                                      scalemode => 'lin'
@@ -17311,25 +17315,36 @@ sub _beamGraphic {
           # he - freier der Raum über den Balken. spacesz wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen
           # z2 - primärer Balkenwert ggf. mit Icon
           # z3 - sekundärer Balkenwert, bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
-          # z2 und z3 nach Bedarf tauschen, wenn sekundärer Balkenwert > primärer Balkenwert
+          # z2 und z3 nach Bedarf tauschen, wenn sekundärer Balkenwert > primärer Balkenwert (außer bei 'staple')
 
-          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                        
+          if ($scm eq 'staple') {
               $z2    = $hfcg->{$i}{beam1};
               $z3    = $hfcg->{$i}{beam2};
               $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
               $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
+              $mbdf  = $maxStVal - ($z2 + $z3);                             # Wertedifferenz abs. Maxwert und größerem Balkenwert              
           }
-          else {                                                                                                                        # tauschen, Betrag Beam1 < Betrag Beam2 
-              $z2    = $hfcg->{$i}{beam2};
-			  $z3    = $hfcg->{$i}{beam1};
-              $titz2 = qq/title="$hfcg->{0}{beam2txt}"/;
-              $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
+          else {
+              if ($hfcg->{$i}{beam1} >= $hfcg->{$i}{beam2}) {                                                        
+                  $z2    = $hfcg->{$i}{beam1};
+                  $z3    = $hfcg->{$i}{beam2};
+                  $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
+                  $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
+              }
+              else {                                                                                                                        # tauschen, Betrag Beam1 < Betrag Beam2 
+                  $z2    = $hfcg->{$i}{beam2};
+                  $z3    = $hfcg->{$i}{beam1};
+                  $titz2 = qq/title="$hfcg->{0}{beam2txt}"/;
+                  $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
+              }
+              
+              $mbdf = $maxVal - $z2;                                         # Wertedifferenz abs. Maxwert und größerem Balkenwert
           }
    
-          $he  = __normBeamHeight ( { val => $maxVal - $z2, maxVal => $maxVal, height => $height, ground => 0, scalemode => 'lin' } );
-          $z2  = __normBeamHeight ( { val => $z2,           maxVal => $maxVal, height => $height, ground => 0, scalemode => $scm  } );                                                                     
-          $z3  = __normBeamHeight ( { val => $z3,           maxVal => $maxVal, height => $height, ground => 0, scalemode => $scm  } );  
-		  $z2 -= $z3 if($scm eq 'lin');                                                                                                                   # effektive Stapelhöhe, da $z2 + $z3 übereinander dargestellt wird
+          $z1  = __normBeamHeight ( { val => $mbdf, maxVal => $maxVal, height => $height, ground => 0, scalemode => 'lin' } );
+          $z2  = __normBeamHeight ( { val => $z2,   maxVal => $maxVal, height => $height, ground => 0, scalemode => $scm  } );                                                                     
+          $z3  = __normBeamHeight ( { val => $z3,   maxVal => $maxVal, height => $height, ground => 0, scalemode => $scm  } );  
+		  $z2 -= $z3 if($scm eq 'lin');                                                                                                 # effektive Stapelhöhe, da $z2 + $z3 übereinander dargestellt wird
           
 		  if ($scm eq 'log' && $z2) {
               my $z3perc = int (100 / $z2 * $z3);
@@ -17381,13 +17396,13 @@ sub _beamGraphic {
           $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
           $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
                                                                                                                 # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
-          $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2) / $maxDif * $px_pos);                            # Teilung durch 0 vermeiden
-          $z2 = ($px_pos - $he) ;
+          $z1 = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2) / $maxDif * $px_pos);                            # Teilung durch 0 vermeiden
+          $z2 = ($px_pos - $z1) ;
 
           $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3) / abs($minDif) * $px_neg);                  # Teilung durch 0 unbedingt vermeiden
           $z3 = ($px_neg - $z4);
                                                                                                                 # Beiden Zonen die Werte ausgeben könnten muß spacesz als zusätzlicher Raum zugeschlagen werden !
-          $he += $spacesz;
+          $z1 += $spacesz;
           $z4 += $spacesz if($z3);                                                                              # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
       }
 
@@ -17399,14 +17414,14 @@ sub _beamGraphic {
 
       $ret .="<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px; vertical-align:bottom; padding-top:0px'>\n";
 
-      $he /= 10;                                                                                                    # freier der Raum über den Balken
-      $he  = $he < 20 ? 20 : $he;
+      $z1 /= 10;                                                                                                    # freier der Raum über den Balken
+      $z1  = $z1 < 20 ? 20 : $z1;
 
       if ($lotype eq 'single') {
           $val = normBeamWidth ($paref, 'beam1', $i, 'beam1');
 
           $ret .="<table width='100%' height='100%'>";                                                              # mit width=100% etwas bessere Füllung der Balken
-          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
+          $ret .="<tr class='$htr{$m}{cl}' style='height:".$z1."px'>";
           $ret .="<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;' $titz3>".$val;
           $ret .="</td></tr>";
 
@@ -17430,15 +17445,15 @@ sub _beamGraphic {
 
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
 
-          $ret .="<table width='100%' height='100%'>\n";                                                                 # mit width=100% etwas bessere Füllung der Balken
-          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>";                     # Freiraum über den Balken einfügen
+          $ret .="<table width='100%' height='100%'>\n";                                                             # mit width=100% etwas bessere Füllung der Balken
+          $ret .="<tr class='$htr{$m}{cl}' style='height:".$z1."px'><td class='solarfc'></td></tr>";                 # Freiraum über den Balken einfügen
 
-          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                                 # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
+          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2} || $scm eq 'staple') {                                         # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
               $val    = normBeamWidth ($paref, 'beam1', $i, 'beam1');
               $color1 = $colorb1;
               $style1 = $style." background-color:#$color1; color:#$fcolor1;'";
 
-              if ($z3) {                                                                                                 # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
+              if ($z3) {                                                                                             # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
                   $v      = normBeamWidth ($paref, 'beam2', $i, 'beam2');
                   $color2 = $colorb2;
                   $style2 = $style." background-color:#$color2; color:#$fcolor2;'";
@@ -17480,7 +17495,7 @@ sub _beamGraphic {
           $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if($hfcg->{$i}{diff} == 0);                                  # Sonderfall , hier wird die 0 gebraucht !
 
           if ($val) {
-              $ret .= "<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
+              $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z1."px'>";
               $ret .= "<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val;
               $ret .= "</td></tr>";
           }
@@ -17621,14 +17636,17 @@ sub __normBeamHeight {
   my $maxVal    = $paref->{maxVal};
   my $height    = $paref->{height};
   my $ground    = $paref->{ground}    // 0;             # eine minimale Balkenhöhe die immer eingehalten werden soll
-  my $scalemode = $paref->{scalemode} // 'lin';         # lin / log 
+  my $scalemode = $paref->{scalemode} // 'lin';         # lin / log / staple
   
   my $px = 0;
   
   if ($scalemode eq 'lin') {
       $px = $ground + (($val / $maxVal) * ($height - $ground));
   }
-  elsif ($val * 1 > 0) {                               # logarithmische Anzeige wenn Mode log, kein Logarithmus für negative Zahlen
+  elsif ($scalemode eq 'staple') {
+      $px = $ground + (($val / $maxVal) * ($height - $ground));
+  }
+  elsif ($scalemode eq 'log' && $val * 1 > 0) {                               # logarithmische Anzeige wenn Mode log, kein Logarithmus für negative Zahlen
       $px = $ground + ((log ($val) / log ($maxVal)) * ($height - $ground));
   }
 
@@ -26942,7 +26960,8 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td>The strings for each level are separated by commas (see example).                                                                         </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:lin</b> - linear scaling (default)                                                                                       </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:log</b> - logarithmic scaling                                                                                            </td></tr>
-			<tr><td>                            </td><td>                                                                                                                                          </td></tr>
+			<tr><td>                            </td><td><b>&lt;Ebene&gt;:staple</b> - The bars are ‘stacked’, with the secondary bar displayed above the primary bar.                             </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>showDiff</b>            </td><td>Additional numerical display of the difference '&lt;primary bar content&gt; - &lt;secondary bar content&gt;'.                             </td></tr>
             <tr><td>                            </td><td>The specification for each level consists of the level number (1..X), a ':' followed by the position 'top' or 'bottom'.                   </td></tr>
             <tr><td>                            </td><td>The strings for each level are separated by commas (see example).                                                                         </td></tr>
@@ -29598,7 +29617,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td>Die Strings für jede Ebene werden durch Komma getrennt (siehe Beispiel).                                                        </td></tr>
             <tr><td>                            </td><td><b>&lt;Ebene&gt;:lin</b> - lineare Skalierung (default)                                                                         </td></tr>
             <tr><td>                            </td><td><b>&lt;Ebene&gt;:log</b> - logarithmische Skalierung                                                                            </td></tr>
-			<tr><td>                            </td><td>                                                                                                                                </td></tr>
+			<tr><td>                            </td><td><b>&lt;Ebene&gt;:staple</b> - die Balken werden 'gestapelt', der sekundäre Balken wird über dem primären Balken dargestellt     </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>showDiff</b>            </td><td>Zusätzliche numerische Anzeige der Differenz '&lt;primärer Balkeninhalt&gt; - &lt;sekundärer Balkeninhalt&gt;'.                 </td></tr>
             <tr><td>                            </td><td>Die Angabe für jede Ebene besteht aus der Ebenen-Nummer (1..X), einem ':' gefolgt von der Position 'top' oder 'bottom'.         </td></tr>
             <tr><td>                            </td><td>Die Strings für jede Ebene werden durch Komma getrennt (siehe Beispiel).                                                        </td></tr>
