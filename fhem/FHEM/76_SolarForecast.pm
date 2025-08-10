@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
   "1.57.0" => "08.08.2025  new option attr graphicControl->scaleMode=X:staple ",
   "1.56.0" => "07.08.2025  set MAXINVERTER to 5 ",
   "1.55.0" => "06.08.2025  DWD-Weather and DWD-Radiation device new minimum value of attr 'forecastDays' is 2 ".
@@ -16648,7 +16649,7 @@ sub _graphicConsumerLegend {
 
       my $sm          = ConsumerVal ($name, $c, 'surpmeth', 'default');
       $sm             = $sm eq 'default' || $sm =~ /_/ ? $sm : $sm.'_all';
-      my $smr         = ConsumerVal ($name, $c, 'surpmethResult',   0);
+      my $smr         = ConsumerVal ($name, $c, 'surpmethResult', 0);
       my $pstate      = $caicon eq "times"    ? $hqtxt{pstate}{$lang}  : $htitles{pstate}{$lang};
       my $surplusinfo = isConsRcmd($hash, $c) ? $htitles{splus}{$lang} : $htitles{nosplus}{$lang};
       $surplusinfo   .= " (${sm}: $smr W)";
@@ -22152,8 +22153,8 @@ sub determSurplus {
   my $surpmeth = ConsumerVal ($name, $c, 'surpmeth', 'default');
   my $splref   = CurrentVal  ($name, 'surplusslidereg',     '');
   my $method   = 'default';
-
-  my ($surplus, $fallback);
+  my $surplus  = 0;
+  my $fallback;
 
   if ($surpmeth =~ /median/xs) {                                          # Median der Werte in surplusslidereg, !kann UNDEF sein!
       my $num  = (split '_', $surpmeth)[1];                               # Anzahl der (letzten) Array-Elemente die für Median verwendet werden sollen
