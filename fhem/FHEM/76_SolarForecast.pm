@@ -22153,8 +22153,7 @@ sub determSurplus {
   my $surpmeth = ConsumerVal ($name, $c, 'surpmeth', 'default');
   my $splref   = CurrentVal  ($name, 'surplusslidereg',     '');
   my $method   = 'default';
-  my $surplus  = 0;
-  my $fallback;
+  my ($surplus, $fallback);
 
   if ($surpmeth =~ /median/xs) {                                          # Median der Werte in surplusslidereg, !kann UNDEF sein!
       my $num  = (split '_', $surpmeth)[1];                               # Anzahl der (letzten) Array-Elemente die für Median verwendet werden sollen
@@ -22193,6 +22192,8 @@ sub determSurplus {
       $surplus = CurrentVal ($name, 'surplus', 0);
       $method  = $method." but fallback to 'default'";
   }
+  
+  $surplus //= 0;
 
 return ($method, $surplus);
 }
