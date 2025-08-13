@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.57.2" => "13.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ",
+  "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
   "1.57.0" => "08.08.2025  new option attr graphicControl->scaleMode=X:staple ",
   "1.56.0" => "07.08.2025  set MAXINVERTER to 5 ",
   "1.55.0" => "06.08.2025  DWD-Weather and DWD-Radiation device new minimum value of attr 'forecastDays' is 2 ".
@@ -6136,11 +6138,23 @@ sub _attrconsumer {                      ## no critic "not used"
       }
 
       if ($h->{power} !~ /^[0-9]+$/xs) {
-          return qq{The key "power" must be specified only by numbers without decimal places};
+          return qq{The key 'power' must be specified only by numbers without decimal places};
+      }
+      
+      if (exists $h->{etotal}) {
+          my ($rtot, $utot, $ethreshold) = split ":", $h->{etotal};
+          
+          if (!$utot || $utot !~ /^(Wh|kWh)$/xs) {
+              return qq{The Unit of key 'etotal' must be 'Wh' or 'kWh'};
+          }
+          
+          if (defined $ethreshold && !isNumeric ($ethreshold)) {
+              return qq{The optional 'Threshold' of key 'etotal' must be numeric if specified};
+          }
       }
 
       if (defined $h->{exconfc} && $h->{exconfc} !~ /^[012]$/xs) {
-          return qq{The key "exconfc" is not set correct. Please consider the command reference.};
+          return qq{The key 'exconfc' is not set correct. Please consider the command reference.};
       }
       
       if (exists $h->{aliasshort}) {                                                       # Kurzalias
@@ -10943,20 +10957,24 @@ sub _transferMeterValues {
 
   my $idgcon = CircularVal ($hash, 99, 'initdaygcon', undef);
 
-  if (!$gctotal) {
+  if (!$gctotal) {                                                                                      # Meter Reset!
       $data{$name}{circular}{99}{initdaygcon} = 0;
       Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy drawn from grid was reset and is registered with >0<. Check Reading '$gt'");
   }
-  elsif ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
+  elsif (!defined $idgcon) {                                                                            # Initial für den Tag noch nicht angelegt
+      $data{$name}{circular}{99}{initdaygcon} = $gctotal - $gcdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
+  }
+  elsif ($idgcon > $gctotal) {                                                                          # Tageszähler Meter zu spät zurückgesetzt
+      $data{$name}{circular}{99}{initdaygcon} = 0;
+      Log3 ($name, 2, "$name - WARNING - '$medev' - total Grid consumption '$gctotal' is lower than the day Init value '$idgcon'. The initialization for the day was performed again.");
+  }
+  elsif ($gcdaypast == 0) {                                                                             # Stundenberechnung auf Basis Totalwerte GridConsumtion
       if (defined $idgcon) {
           $docon = 1;
       }
       else {
           $data{$name}{circular}{99}{initdaygcon} = $gctotal;
       }
-  }
-  elsif (!defined $idgcon) {
-      $data{$name}{circular}{99}{initdaygcon} = $gctotal - $gcdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
       $docon = 1;
@@ -11638,9 +11656,9 @@ sub _batChargeMgmt {
       
       ## Auswertung für jede kommende Stunde
       ########################################
-      for my $num (0..47) {
+      for my $num (0..71) {
           my ($fd, $fh) = calcDayHourMove ($chour, $num);
-          next if($fd > 1);
+          next if($fd > 2);
 
           my $nhr   = sprintf "%02d", $num;
           my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today',      0);
@@ -11712,11 +11730,10 @@ sub _batChargeMgmt {
                       $fceff < 0 ? ($fceff <= $bpoutmax * -1 ? $bpoutmax * -1 : $fceff) :
                       $fceff;
 
-          # debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - max. possible Charging(+) / Discharging(-) Energy: $fceff Wh");
-
           $socwh   += $crel       ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) :
-                      ($fceff > 0 ? 0                                                        :
-                      $fceff / STOREFFDEF);                                                      # PV Überschuß (d.h. Aufladung) nur einbeziehen wenn Ladefreigabe
+                      ($fceff > 0 ? 0 : $fceff / STOREFFDEF);                                    # PV Überschuß (d.h. Aufladung) nur einbeziehen wenn Ladefreigabe
+
+          # debugLog ($paref, 'batteryManagement', "Bat $bn Charge - crel: $crel, fceff: $fceff, socwh: $socwh");
 
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -16649,7 +16666,7 @@ sub _graphicConsumerLegend {
 
       my $sm          = ConsumerVal ($name, $c, 'surpmeth', 'default');
       $sm             = $sm eq 'default' || $sm =~ /_/ ? $sm : $sm.'_all';
-      my $smr         = ConsumerVal ($name, $c, 'surpmethResult',   0);
+      my $smr         = ConsumerVal ($name, $c, 'surpmethResult', 0);
       my $pstate      = $caicon eq "times"    ? $hqtxt{pstate}{$lang}  : $htitles{pstate}{$lang};
       my $surplusinfo = isConsRcmd($hash, $c) ? $htitles{splus}{$lang} : $htitles{nosplus}{$lang};
       $surplusinfo   .= " (${sm}: $smr W)";
@@ -22153,7 +22170,6 @@ sub determSurplus {
   my $surpmeth = ConsumerVal ($name, $c, 'surpmeth', 'default');
   my $splref   = CurrentVal  ($name, 'surplusslidereg',     '');
   my $method   = 'default';
-
   my ($surplus, $fallback);
 
   if ($surpmeth =~ /median/xs) {                                          # Median der Werte in surplusslidereg, !kann UNDEF sein!
@@ -22193,6 +22209,8 @@ sub determSurplus {
       $surplus = CurrentVal ($name, 'surplus', 0);
       $method  = $method." but fallback to 'default'";
   }
+  
+  $surplus //= 0;
 
 return ($method, $surplus);
 }
