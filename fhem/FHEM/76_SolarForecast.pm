@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.57.2" => "15.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ".
+                           "_transferMeterValues: modul accept meter reset > 0 at day start ",
   "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
   "1.57.0" => "08.08.2025  new option attr graphicControl->scaleMode=X:staple ",
   "1.56.0" => "07.08.2025  set MAXINVERTER to 5 ",
@@ -6137,11 +6139,23 @@ sub _attrconsumer {                      ## no critic "not used"
       }
 
       if ($h->{power} !~ /^[0-9]+$/xs) {
-          return qq{The key "power" must be specified only by numbers without decimal places};
+          return qq{The key 'power' must be specified only by numbers without decimal places};
+      }
+      
+      if (exists $h->{etotal}) {
+          my ($rtot, $utot, $ethreshold) = split ":", $h->{etotal};
+          
+          if (!$utot || $utot !~ /^(Wh|kWh)$/xs) {
+              return qq{The Unit of key 'etotal' must be 'Wh' or 'kWh'};
+          }
+          
+          if (defined $ethreshold && !isNumeric ($ethreshold)) {
+              return qq{The optional 'Threshold' of key 'etotal' must be numeric if specified};
+          }
       }
 
       if (defined $h->{exconfc} && $h->{exconfc} !~ /^[012]$/xs) {
-          return qq{The key "exconfc" is not set correct. Please consider the command reference.};
+          return qq{The key 'exconfc' is not set correct. Please consider the command reference.};
       }
       
       if (exists $h->{aliasshort}) {                                                       # Kurzalias
@@ -10944,20 +10958,24 @@ sub _transferMeterValues {
 
   my $idgcon = CircularVal ($hash, 99, 'initdaygcon', undef);
 
-  if (!$gctotal) {
+  if (!$gctotal) {                                                                                      # Meter Reset!
       $data{$name}{circular}{99}{initdaygcon} = 0;
       Log3 ($name, 3, "$name - WARNING - '$medev' - the total energy drawn from grid was reset and is registered with >0<. Check Reading '$gt'");
   }
-  elsif ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
+  elsif (!defined $idgcon) {                                                                            # Initial für den Tag noch nicht angelegt
+      $data{$name}{circular}{99}{initdaygcon} = $gctotal - $gcdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
+  }
+  elsif ($idgcon > $gctotal) {                                                                          # Tageszähler Meter zu spät zurückgesetzt
+      $data{$name}{circular}{99}{initdaygcon} = 0;
+      Log3 ($name, 3, "$name - WARNING - '$medev' - total Grid consumption '$gctotal' is lower than the day Init value '$idgcon'. The initialization for the day was performed again.");
+  }
+  elsif ($gcdaypast == 0) {                                                                             # Stundenberechnung auf Basis Totalwerte GridConsumtion
       if (defined $idgcon) {
           $docon = 1;
       }
       else {
           $data{$name}{circular}{99}{initdaygcon} = $gctotal;
       }
-  }
-  elsif (!defined $idgcon) {
-      $data{$name}{circular}{99}{initdaygcon} = $gctotal - $gcdaypast - ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
       $docon = 1;
