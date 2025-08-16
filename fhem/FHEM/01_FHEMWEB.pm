@@ -125,6 +125,7 @@ my $FW_styleStamp=time();
 my %FW_svgData;
 my $FW_encodedByPlugin; # unicodeEncoding: data is encoded by plugin
 my $FW_needIsDay;
+my %FW_editFileToPath;
 
 
 #####################################
@@ -2267,6 +2268,7 @@ FW_fileList($;$)
                               $f eq "99_Utils.pm");
 
     push(@ret, $f);
+    $FW_editFileToPath{$f} = "$dir/$f";
   }
   closedir(DH);
   return sort { (CORE::stat("$dir/$a"))[9] <=> (CORE::stat("$dir/$b"))[9] }
@@ -2472,40 +2474,6 @@ FW_displayFileList($@)
   FW_pO "<br>";
 }
 
-##################
-sub
-FW_fileNameToPath($)
-{
-  my $name = shift;
-
-  my @f = FW_confFiles(2);
-  return "$FW_confdir/$name" if ( map { $name =~ $_ } @f );
-
-  $attr{global}{configfile} =~ m,([^/]*)$,;
-  my $cfgFileName = $1;
-  if($name eq $cfgFileName) {
-    return $attr{global}{configfile};
-
-  } elsif($name =~ m/.*(js|css|_defs.svg)$/) {
-    return "$FW_cssdir/$name";
-
-  } elsif($name =~ m/.*(png|svg)$/) {
-    my $d="";
-    map { $d = $_ if(!$d && -d "$FW_icondir/$_") } @FW_iconDirs;
-    return "$FW_icondir/$d/$name";
-
-  } elsif($name =~ m/.*gplot$/) {
-    return "$FW_gplotdir/$name";
-
-  } elsif($name =~ m/.*log$/) {
-    return Logdir()."/$name";
-
-  } else {
-    return "$MW_dir/$name";
-
-  }
-}
-
 sub FW_confFiles($) {
    my ($param) = @_;
    # create and return regexp for editFileList
@@ -2535,6 +2503,7 @@ FW_style($$)
     my $cfgFileName = $1;
     FW_displayFileList("config file", $cfgFileName)
                                 if(!configDBUsed());
+    $FW_editFileToPath{$cfgFileName} = $attr{global}{configfile};
 
     my $efl = AttrVal($FW_wname, 'editFileList',
       "Own modules and helper files:\$MW_dir:^(.*sh|[0-9][0-9].*Util.*pm|".
@@ -2593,7 +2562,7 @@ FW_style($$)
     my $cfgDB = defined($a[3]) ? $a[3] : "";
     my $forceType = ($cfgDB eq 'configDB') ? $cfgDB : "file";
     $fileName =~ s,.*/,,g;        # Little bit of security
-    my $filePath = FW_fileNameToPath($fileName);
+    my $filePath = $FW_editFileToPath{$fileName};
     my($err, @content) = FileRead({FileName=>$filePath, ForceType=>$forceType});
     if($err) {
       FW_addContent(">$err</div");
@@ -2633,7 +2602,12 @@ FW_style($$)
     $fileName = $FW_webArgs{saveName}
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
     $fileName =~ s,.*/,,g;        # Little bit of security
-    my $filePath = FW_fileNameToPath($fileName);
+    my $filePath = $FW_editFileToPath{$fileName};
+    if(!$filePath) { # save as
+      $FW_editFileToPath{$a[2]} =~ m,^(.*)/([^/]+)$,;
+      return if(!$1); # No root experiments
+      $filePath = "$1/$fileName";
+    }
     my $isImg = ($fileName =~ m,\.(svg|png)$,i);
     my $forceType = ($cfgDB eq 'configDB' && !$isImg) ? $cfgDB : "file";
 
