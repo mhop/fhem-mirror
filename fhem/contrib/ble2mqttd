@@ -12,7 +12,7 @@
 # presence state and reports it to an mqtt server.
 #
 # Copyright (C) 2015-2018 P. Reinhardt, pr-fhem (at) reinhardtweb (dot) de
-# Contributions by (in chronological order): decaflo
+# Contributions by (in chronological order): decaflo, Brause
 #
 # This script free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -72,13 +72,14 @@ Readonly my $BATTERY_INTERVAL                     => 1 * 60 * 60;
 Readonly my $INITIAL_BATTERY_INTERVAL             => 2 * 60;
 Readonly my $MQTT_MAX_CLIENTID_LENGTH             => 23;
 Readonly my $BATTERY_LEVEL_CHARACTERISTIC_UUID    => '00002a19-0000-1000-8000-00805f9b34fb';
+Readonly my @EXPECT_PROMPT_MATCH_PATTERNS         => ('>','#');
 
 Readonly my $DEFAULT_BATTERY_MAX_AGE              => 48;
 Readonly my $DEFAULT_RSSI_THRESHOLD               => 10;
 Readonly my $DEFAULT_ABSENT_INTERVAL              => 60;
 
 Readonly my $ME                                   => 'ble2mqttd';
-Readonly my $VERSION                              => '0.16';
+Readonly my $VERSION                              => '0.17';
 Readonly my $PIDFILE                              => "/var/run/$ME.pid";
 
 my ($mqtt, $bluetoothctl, $loglevel, $logtarget, $debug);
@@ -510,12 +511,12 @@ for(;;) {
     "scan on",
     "version"
   ) {
-    $bluetoothctl->expect($EXPECT_TIMEOUT, '#') or error_exit(11, "ERROR expecting bluetoothctl prompt while waiting to send '$cmd'.");
+    $bluetoothctl->expect($EXPECT_TIMEOUT, @EXPECT_PROMPT_MATCH_PATTERNS) or error_exit(11, "ERROR expecting bluetoothctl prompt while waiting to send '$cmd'.");
     syslogw(LOG_DEBUG, "Sending '%s'...", $cmd);
     $bluetoothctl->send($cmd."\n");
   }
 
-  $bluetoothctl->expect($EXPECT_TIMEOUT, '#') or error_exit(12, "ERROR expecting bluetoothctl prompt.");
+  $bluetoothctl->expect($EXPECT_TIMEOUT, @EXPECT_PROMPT_MATCH_PATTERNS) or error_exit(12, "ERROR expecting bluetoothctl prompt.");
   syslogw(LOG_INFO, "Scan started.");
 
   my $current_mac;
