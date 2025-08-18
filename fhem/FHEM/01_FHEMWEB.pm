@@ -2268,12 +2268,23 @@ FW_fileList($;$)
                               $f eq "99_Utils.pm");
 
     push(@ret, $f);
-    $FW_editFileToPath{$f} = "$dir/$f";
+    $FW_editFileToPath{$f}{path}      = "$dir/$f";
+    $FW_editFileToPath{$f}{forceType} = "file";
   }
   closedir(DH);
   return sort { (CORE::stat("$dir/$a"))[9] <=> (CORE::stat("$dir/$b"))[9] }
          @ret if($mtime);
-  @ret = cfgDB_FW_fileList($dir,$re,@ret) if (configDBUsed());
+  if (configDBUsed()) {
+    @ret = cfgDB_FW_fileList($dir,$re,@ret);
+    map { 
+          if (!defined($FW_editFileToPath{$_}{path})) {
+            my $f = $_;
+            $f =~ s/\.configDB//;
+            $FW_editFileToPath{$_}{path}      = "$dir/$f";
+            $FW_editFileToPath{$_}{forceType} = "configDB";
+          }
+        } @ret;
+  }
   return sort @ret;
 }
 
@@ -2503,7 +2514,7 @@ FW_style($$)
     my $cfgFileName = $1;
     FW_displayFileList("config file", $cfgFileName)
                                 if(!configDBUsed());
-    $FW_editFileToPath{$cfgFileName} = $attr{global}{configfile};
+    $FW_editFileToPath{$cfgFileName}{path} = $attr{global}{configfile};
 
     my $efl = AttrVal($FW_wname, 'editFileList',
       "Own modules and helper files:\$MW_dir:^(.*sh|[0-9][0-9].*Util.*pm|".
@@ -2560,14 +2571,15 @@ FW_style($$)
     my $fileName = $a[2];
     my $data = "";
     my $cfgDB = defined($a[3]) ? $a[3] : "";
-    my $forceType = ($cfgDB eq 'configDB') ? $cfgDB : "file";
     $fileName =~ s,.*/,,g;        # Little bit of security
-    my $filePath = $FW_editFileToPath{$fileName};
-    my($err, @content) = FileRead({FileName=>$filePath, ForceType=>$forceType});
+    $fileName .= ".configDB" if ($cfgDB eq 'configDB'); # add identifier if file has to be read from database
+    my $filePath = $FW_editFileToPath{$fileName}{path};
+    my($err, @content) = FileRead({FileName=>$filePath, ForceType=>$FW_editFileToPath{$fileName}{forceType}});
     if($err) {
       FW_addContent(">$err</div");
       return;
     }
+    $fileName =~ s,\.configDB,,; # remove identifier for pretty print in frontend
     $data = join("\n", @content);
 
     $data =~ s/&/&amp;/g;
@@ -2602,9 +2614,11 @@ FW_style($$)
     $fileName = $FW_webArgs{saveName}
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
     $fileName =~ s,.*/,,g;        # Little bit of security
-    my $filePath = $FW_editFileToPath{$fileName};
+    $fileName .= ".configDB" if ($cfgDB eq 'configDB'); # add identifier if file has to be read from database
+    my $filePath = $FW_editFileToPath{$fileName}{path};
+    $fileName =~ s,\.configDB,,; # remove identifier for pretty print in frontend
     if(!$filePath) { # save as
-      $FW_editFileToPath{$a[2]} =~ m,^(.*)/([^/]+)$,;
+      $FW_editFileToPath{$a[2]}{path} =~ m,^(.*)/([^/]+)$,;
       return if(!$1); # No root experiments
       $filePath = "$1/$fileName";
     }
