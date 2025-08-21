@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "08.20.00";
+my $ModulVersion = "08.20.01";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -1059,6 +1059,7 @@ sub FRITZBOX_Initialize($)
                 ."enableVPNShares:0,1 "
                 ."enableUserInfo:0,1 "
                 ."enableWLANneighbors:0,1 "
+                ."enableXtamInfo:0,1 "
 
 
                 ."enableSIP:0,1 "
@@ -1610,6 +1611,17 @@ sub FRITZBOX_Attr($@)
        my $nbhPrefix = AttrVal( $name, "wlanNeighborsPrefix",  "nbh_" );
        foreach (keys %{ $hash->{READINGS} }) {
          readingsDelete($hash, $_) if $_ =~ /^${nbhPrefix}.*/ && defined $hash->{READINGS}{$_}{VAL};
+       }
+     }
+   }
+
+   if ($aName eq "enableXtamInfo") {
+     if ($cmd eq "set") {
+       return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
+     }
+     if ($cmd eq "del" || $aVal == 0) {
+       foreach (keys %{ $hash->{READINGS} }) {
+         readingsDelete($hash, $_) if $_ =~ /^tam\d_x_.*/ && defined $hash->{READINGS}{$_}{VAL};
        }
      }
    }
@@ -3662,6 +3674,7 @@ sub FRITZBOX_Get($@)
        my $queryStr;
        for (my $i = 0; $i <= (int @val)/2 - 1; $i++) {
          $val[2*$i+1] =~ s/#x003B/;/g;
+         $val[2*$i+1] =~ s/%20/ /g;
          $val[2*$i+1] = "" if lc($val[2*$i+1]) eq "nop";
          $val[2*$i+1] =~ tr/\&/ /;
          push @webCmdArray, $val[2*$i+0] => $val[2*$i+1];
@@ -3886,7 +3899,7 @@ sub FRITZBOX_Get($@)
        $returnStr .= "----------------------------------------------------------------------\n";
        my @tr064CmdArray = ( \@val );
        my @result = FRITZBOX_call_TR064_Cmd( $hash, 1, \@tr064CmdArray, $igd );
-       my $tmp = FRITZBOX_Helper_Dumper($hash, @result);
+       my $tmp = FRITZBOX_Helper_Dumper($hash, \@result);
        $returnStr .= $tmp;
        return $returnStr;
 
@@ -5257,7 +5270,9 @@ sub FRITZBOX_Readout_Run_Web_LuaQuery($$$$) {
 #Get TAM readings
    $runNo = 1;
    foreach ( @{ $result->{tam} } ) {
-      $rName = "tam".$runNo;
+      $_->{_node} =~ m/(\d+)/;
+#      $rName = "tam" . $runNo;
+      $rName = "tam" . $1;
       if ($_->{Display} eq "1")
       {
          FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName,           $_->{Name};
@@ -5273,7 +5288,6 @@ sub FRITZBOX_Readout_Run_Web_LuaQuery($$$$) {
          FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_newMsg","";
          FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_oldMsg","";
       }
-      $runNo++;
    }
 
 #-------------------------------------------------------------------------------------
@@ -6323,6 +6337,85 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
      # page dslOv
      # xhrId all
      # xhr 1 lang de page dslOv xhrId all
+
+     #-------------------------------------------------------------------------------------
+     # extended tam information
+
+     # xhr 1 lang de page edit_tam TamNr 0
+
+     if ( ($hash->{fhem}{fwVersion} >= 700) && AttrVal($name, "enableXtamInfo", 0 ) ) {
+
+       FRITZBOX_Log $hash, 4, "xTAM Information - start getting data";
+
+       my $tamNr;
+
+
+       for ($tamNr = 0; $tamNr <= 9; $tamNr++) {
+
+         my $tam = "tam" . $tamNr;
+         if (defined $hash->{READINGS}{$tam}{VAL}) {
+
+           @webCmdArray = ();
+           push @webCmdArray, "xhr"         => "1";
+           push @webCmdArray, "lang"        => "de";
+           push @webCmdArray, "page"        => "edit_tam";
+           push @webCmdArray, "TamNr"       => $tamNr;
+
+           $resultData = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray) ;
+
+           # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
+           return FRITZBOX_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+           $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
+
+           if ($resultData->{data}->{tamoptions}->{num_selection}) {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_selection",       $resultData->{data}->{tamoptions}->{num_selection};
+             if ($resultData->{data}->{tamoptions}->{num_selection} eq "sel_nums") {
+               FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_list",          $resultData->{data}->{tamoptions}->{num_List};
+             } else {
+               FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_list",            "";
+             }
+           } else {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_selection",       "";
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_list",            "";
+           }
+
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_send",          $resultData->{data}->{tamoptions}->{email_send};
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_send_del_call", $resultData->{data}->{tamoptions}->{email_send_del_call};
+           if ($resultData->{data}->{tamoptions}->{email_addr}) {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_addr",          $resultData->{data}->{tamoptions}->{email_addr};
+           } else {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_addr",          "";
+           }
+
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_mail_type",       $resultData->{data}->{tamoptions}->{mail_type};
+
+           if ($resultData->{data}->{tamoptions}->{usb_usage} eq "on") {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage",           $resultData->{data}->{tamoptions}->{usb_usage};
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage_path",      $resultData->{data}->{tamoptions}->{usb_usage_path};
+           } else {
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage",           "";
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage_path",      "";
+           }
+
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_use_remote",          $resultData->{data}->{tamoptions}->{use_remote};
+
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_call_delay",          $resultData->{data}->{tamoptions}->{call_delay};
+
+
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_rec_len",             $resultData->{data}->{tamoptions}->{rec_len};
+
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, $tam ."_x_operation_mode",      $resultData->{data}->{tamoptions}->{operation_mode};
+
+           FRITZBOX_Log $hash, 4, "xTAM Information - end getting data";
+         }
+       }
+     } else {
+
+       FRITZBOX_Log $hash, 4, "wrong Fritz!OS for xTAM Information: $hash->{fhem}{fwVersionStr}" if AttrVal($name, "enableXtamInfo", 0);
+
+     }
+
 
      #-------------------------------------------------------------------------------------
      # USB Storage
@@ -7911,10 +8004,12 @@ sub FRITZBOX_Readout_Process($$)
                   ."enableMobileInfo:0,1 "
                   ."enablePassivLanDevices:0,1 "
                   ."enableSIP:0,1 "
-                  ."enableSmartHome:off,all,group,device "
                   ."enableUserInfo:0,1 "
                   ."enableVPNShares:0,1 "
                   ."enableWLANneighbors:0,1 "
+                  ."enableXtamInfo:0,1 "
+
+                  ."enableSmartHome:off,all,group,device "
                   ."enableReadingsFilter:multiple-strict,"
                                 ."dectID_alarmRingTone,dectID_custRingTone,dectID_device,dectID_fwVersion,dectID_intern,dectID_intRingTone,"
                                 ."dectID_manufacturer,dectID_model,dectID_NoRingWithNightSetting,dectID_radio,dectID_NoRingTime,"
@@ -14189,6 +14284,106 @@ sub FRITZBOX_call_LuaData($$$@)
 
    my $data = $response->content;
 
+   # handling TAM informations
+   ###########  HTML #################################
+   # data: <form id="main_form" method="POST" action="/fon_devices/edit_tam.lua">
+   # xhr 1 back_to_page tam TamNr 0 page edit_tam
+
+   if ( ($data =~ m/\<form id="main_form" method="POST" action="\/fon_devices\/edit_tam.lua"\>(.*?)\<\/form\>/igs) ) {
+
+     FRITZBOX_Log $hash, 4, "Response Data: \n" . $1;
+     # FRITZBOX_Log $hash, 3, "Response Content: \n" . $response->content;
+
+     my $tamCont = $1;
+     my $tmp = "";
+     my $profile_content;
+
+     $profile_content = '{"sid":"'.$result->{sid}.'","pid":"tam","data":{"tamoptions":{';
+
+     ($tmp) = ($tamCont =~ m/\<label for="uiTamName"\>Name\<\/label\>.*?value="(.*?)"\>/igs);
+     $profile_content .= '"tam_name":"'       . $tmp . '",'; #AB Wohnbereich
+
+
+     ($tmp) = ($tamCont =~ m/id="uiCallDelay1" name="call_delay".*?"(\d+)" selected\>\d+ Sekunden\<\/option\>/igs);
+     $profile_content .= '"call_delay":"'     . $tmp . '",'; # 35
+
+     ($tmp) = ( $tamCont =~ m/\<input type="radio" id="uiSelNums" name="num_selection" value="(.*?)" checked\>\<label for="uiSelNums"\>/igs );
+
+     ($tmp) = ( $tamCont =~ m/\<input type="radio" id="uiAllNums" name="num_selection" value="(.*?)" checked\>\<label for="uiAllNums"\>/igs ) if !$tmp || $tmp eq "";
+
+     if($tmp) {
+       $profile_content .= '"num_selection":"'  . $tmp . '",';
+
+       my @finding = $tamCont =~ m/name="num_(\d+)" value=/gm;
+
+       if (@finding) {
+         my $numList;
+         for ( my $i = 0; $i < @finding; $i ++) {
+           my $suchText = 'checked\>\<label for="uiNum_' .$finding[$i]. '"\>(.*?)\<\/label\>';
+           if( $tamCont =~ m/$suchText/gm) {
+             $profile_content .= '"num_' .$finding[$i]. '":"'      . $1 . '",';
+             $numList .= $1 . ',';
+           }
+         }
+         chop $numList;
+         $profile_content .= '"num_List":"' .$numList. '",';
+       }
+     }
+
+     ($tmp) = ($tamCont =~ m/name="operation_mode" value="(.*?)" id="uiOperationMode.*?" checked/gm);
+     $profile_content .= '"operation_mode":"' . $tmp . '",'; #  rec
+
+     ($tmp) = ($tamCont =~ m/id="uiRecLen" name="rec_len".*?"(\d+?)" selected\>/igs);
+     $profile_content .= '"rec_len":"'        . $tmp . '",'; #  60
+
+     $tmp = 3;
+     $profile_content .= '"graphState":"'     . $tmp . '",'; #  3
+
+     ($tmp) = ($tamCont =~ m/input type="checkbox" id="uiEmailSend" name="email_send" checked/igs);
+     $profile_content .= '"email_send":"'     . ($tmp ? "on" : "off") . '",'; #  on
+
+     ($tmp) = ($tamCont =~ m/input type="checkbox" id="uiEmailSendDelCall" name="email_send_del_call" checked/igs);
+     $profile_content .= '"email_send_del_call":"' . ($tmp ? "on" : "off") . '",'; #  on
+
+     ($tmp) = ($tamCont =~ m/\<select id="uiMailType" name="mail_type" \>.*?\<option value="default" selected \>(.*?)\<\/option\>/igs);
+     if($tmp) {
+       $profile_content .= '"mail_type":"default",';
+     } else {
+       $profile_content .= '"mail_type":"custom",';
+       ($tmp) = ($tamCont =~ m/\<input type="text" id="uiEmailAddr" name="email_addr" value="(.*?)" \>/igs);
+       $profile_content .= '"email_addr":"'     . $tmp . '",'; #  service@famwiemann.de,edith@famwiemann.de
+     }
+
+     ($tmp) = ($tamCont =~ m/input type="checkbox" id="uiUseRemote" name="use_remote" checked/igs);
+     if($tmp) {
+       $profile_content .= '"use_remote":"on",';
+       ($tmp) = ($tamCont =~ m/name="pin" data-prop-horizontal="true" data-prop-label-width="14"  onfocus="jsl.select\(id\);" value="(.*?)"/igs);
+       $profile_content .= '"pin":"'            . $tmp . '",'; #  8305
+     } else {
+       $profile_content .= '"use_remote":"off",';
+     }
+
+     ($tmp) = ($tamCont =~ m/input type="hidden" name="TamNr" value="(\d+)"/igs);
+     $profile_content .= '"TamNr":"'          . $tmp . '",'; #  0
+
+     ($tmp) = ($tamCont =~ m/input type="checkbox" id="uiUsbUseage" name="usb_usage" checked/igs);
+     if ($tmp) {
+       $profile_content .= '"usb_usage":"on",';
+       ($tmp) = ($tamCont =~ m/span class="as_label">Speicherort\<\/span><span class="fakeTextInput">Pfad: (.*?)\<\/span/igs);
+       $tmp =~ s/\\/\//g;
+       $profile_content .= '"usb_usage_path":"'          . $tmp . '",';
+     } else {
+       $profile_content .= '"usb_usage":"off",';
+     }
+
+     chop($profile_content);
+     $profile_content .= '}}}';
+
+     FRITZBOX_Log $hash, 4, "Response JSON: \n" . $profile_content;
+
+     return FRITZBOX_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+   }
+
    # handling profile informations
    ###########  HTML #################################
    # data: <input type="hidden" name="back_to_page" value="/internet/kids_profilelist.lua">
@@ -14216,7 +14411,7 @@ sub FRITZBOX_call_LuaData($$$@)
      $profile_content .= '"disallowGuest":"' . $disallowGuest . '"';
      $profile_content .= '},"sid":"' . $result->{sid} . '"}';
 
-     FRITZBOX_Log $hash, 5, "Response 1: " . $profile_content;
+     FRITZBOX_Log $hash, 4, "Response JSON: \n: " . $profile_content;
 
      return FRITZBOX_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
 
@@ -14324,7 +14519,7 @@ sub FRITZBOX_call_LuaData($$$@)
 
       $profile_content = '{"sid":"' . $result->{sid} . '","pid":"fonDevice",' . $profile_content;
 
-      FRITZBOX_Log $hash, 5, "Response JSON: " . $profile_content;
+      FRITZBOX_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
       return FRITZBOX_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
    }
@@ -14357,7 +14552,7 @@ sub FRITZBOX_call_LuaData($$$@)
  
       $profile_content .= ']}}';
  
-      FRITZBOX_Log $hash, 5, "Response JSON: " . $profile_content;
+      FRITZBOX_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
       return FRITZBOX_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
    }
@@ -14392,7 +14587,7 @@ sub FRITZBOX_call_LuaData($$$@)
 
      $profile_content .= '}},"sid":"' . $result->{sid} . '"}';
 
-     FRITZBOX_Log $hash, 5, "Response 1: " . $profile_content;
+     FRITZBOX_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
      return FRITZBOX_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
    }
@@ -14426,7 +14621,7 @@ sub FRITZBOX_call_LuaData($$$@)
      $profile_content .= '"sid":"' . $result->{sid} . '"';
      $profile_content .= '}';
 
-     FRITZBOX_Log $hash, 5, "Response 1: " . $profile_content;
+     FRITZBOX_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
      return FRITZBOX_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
 
@@ -14452,11 +14647,12 @@ sub FRITZBOX_call_LuaData($$$@)
 ############################################
 sub FRITZBOX_write_javaScript($$;@)
 {
-   my ($hash, $javaScript, $chgStr, $methode, $charSet) = @_;
+   my ($hash, $javaScript, $chgStr, $methode, $charSet, $api_path) = @_;
 
-   $charSet        = "utf-8" unless defined $charSet;
-   my $name        = $hash->{NAME};
-   my $sidNew      = 0;
+   $charSet   = "utf-8" unless defined $charSet;
+   $api_path  = "/api/v0/" unless defined $api_path;     
+   my $name   = $hash->{NAME};
+   my $sidNew = 0;
 
    my $result = FRITZBOX_open_Web_Connection( $hash );
 
@@ -14467,7 +14663,7 @@ sub FRITZBOX_write_javaScript($$;@)
    FRITZBOX_Log $hash, 4, "Request data via API javaScript: $chgStr";
    my $host = $hash->{HOST};
 
-   my $url = 'http://' . $host . '/api/v0/' . $javaScript;
+   my $url = 'http://' . $host . $api_path . $javaScript;
    my $Authorisation = 'AVM-SID ' . $result->{sid};
 
    FRITZBOX_Log $hash, 4, "URL: $url";
@@ -14510,7 +14706,7 @@ sub FRITZBOX_write_javaScript($$;@)
      );
    }
 
-   FRITZBOX_Log $hash, 5, "Response: " . FRITZBOX_Helper_Dumper($hash, $response, 5);
+   FRITZBOX_Log $hash, 4, "Response: " . FRITZBOX_Helper_Dumper($hash, $response, 5);
 
    unless ($response->{_msg} && $response->{_msg} eq "OK") {
       my %retHash = ("Error" => $response->{_msg}, "ResetSID" => "1");
@@ -15218,7 +15414,7 @@ sub FRITZBOX_Helper_Dumper($$;@) {
      }
    } else {
      $reference = defined($reference) ? $reference : "";
-     FRITZBOX_Log $hash, 3, "no Reference in $sub.$xline " . $reference;
+     FRITZBOX_Log $hash, 4, "no Reference in $sub.$xline " . $reference;
      $retValue = $reference;
    }
 
@@ -15716,7 +15912,10 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       <li><a name="luaData"></a>
          <dt><code>get &lt;name&gt; luaData [json] &lt;Command&gt;</code></dt>
          <br>
-         Evaluates commands via data.lua codes.If there is a semicolon in the parameters, replace it with #x003B.
+         Evaluates commands via data.lua codes.<br>
+         Replacements for special charactersin parameters:<br>
+         - semicolon with <code>#x003B</code><br>
+         - space with <code>%20</code><br>
          Optionally, json can be specified as the first parameter. The result is then returned as JSON for further processing.
       </li><br>
 
@@ -16022,6 +16221,13 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          <dt><code>enableWLANneighbors &lt;0 | 1&gt;</code></dt>
          <br>
          Switches the takeover of WLAN neighborhood devices as reading off / on.
+      </li><br>
+
+      <li><a name="enableXtamInfo"></a>
+         <dt><code>enableXtamInfo &lt;0 | 1&gt;</code></dt>
+         <br>
+         Turns the display of extended TAM information on/off.<br>
+         Default is off.
       </li><br>
 
       <li><a name="lanDeviceReading"></a>
@@ -16832,7 +17038,11 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       <li><a name="luaData"></a>
          <dt><code>get &lt;name&gt; luaData [json] &lt;Command&gt;</code></dt>
          <br>
-         F&uuml;hrt Komandos &uuml;ber data.lua aus. Sofern in den Parametern ein Semikolon vorkommt ist dieses durch #x003B zu ersetzen.<br>
+         Führt Komandos über data.lua aus.<br>
+         Ersetzungen für besondere Zeichen:<br>
+         - Semicolon durch <code>#x003B</code><br>
+         - Leerzeichen durch <code>%20</code><br>
+
          Optional kann als erster Parameter json angegeben werden. Es wir dann für weitere Verarbeitungen das Ergebnis als JSON zurück gegeben.
       </li><br>
 
@@ -17134,7 +17344,14 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       <li><a name="enableWLANneighbors"></a>
          <dt><code>enableWLANneighbors &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Anzeige von WLAN Nachbarschaft Ger&auml;ten als Reading aus/ein.
+         Schaltet die Anzeige von WLAN Nachbarschaft Geräten als Reading aus/ein.
+      </li><br>
+
+      <li><a name="enableXtamInfo"></a>
+         <dt><code>enableXtamInfo  &lt;0 | 1&gt;</code></dt>
+         <br>
+         Schaltet die Anzeige von erweiterten TAM Informationen aus/ein.<br>
+         Standard ist: aus.
       </li><br>
 
       <li><a name="lanDeviceReading"></a>
