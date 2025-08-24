@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.57.3" => "24.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ",
+  "1.57.3" => "24.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ".
+                           "check global attribute dnsServer in all SF Models ",
   "1.57.2" => "15.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ".
                            "_transferMeterValues: modul accept meter reset > 0 at day start ",
   "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
@@ -21765,6 +21766,7 @@ sub checkPlantConfig {
   ## Allgemeine Settings (auch API spezifisch)
   ##############################################
   my $eocr                     = AttrVal       ($name, 'event-on-change-reading', '');
+  my $gdn                      = AttrVal       ('global', 'dnsServer', '');
   my $aiprep                   = isPrepared4AI ($hash, 'full');
   my $aiusemsg                 = CurrentVal    ($hash, 'aicanuse', '');
   my ($cset, $lat, $lon, $alt) = locCoordinates();
@@ -21784,6 +21786,13 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{note}   .= qq{If the local attribute "ctrlLanguage" or the global attribute "language" is changed to "DE" most of the outputs are in German.<br>};
       $result->{'Common Settings'}{info}    = 1;
   }
+  
+  if (!$aiprep) {
+      $result->{'Common Settings'}{state}   = $info;
+      $result->{'Common Settings'}{result} .= qq{AI support for the PV forecast is not used. <br>};
+      $result->{'Common Settings'}{note}   .= qq{$aiusemsg.<br>};
+      $result->{'Common Settings'}{info}    = 1;
+  }
 
   if (!$lat) {
       $result->{'Common Settings'}{state}   = $warn;
@@ -21798,19 +21807,19 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the longitude attribute of the global device.<br>};
       $result->{'Common Settings'}{warn}    = 1;
   }
+  
+  if (!$gdn) {
+      $result->{'Common Settings'}{state}   = $nok;
+      $result->{'Common Settings'}{result} .= qq{Attribute dnsServer in global device is not set. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set global attribute dnsServer to the IP Adresse of your DNS Server.<br>};
+      $result->{'Common Settings'}{fault}   = 1;
+  }
 
   if (!$alt) {
       $result->{'Common Settings'}{state}   = $nok;
       $result->{'Common Settings'}{result} .= qq{Attribute altitude in global device is not set. <br>};
       $result->{'Common Settings'}{note}   .= qq{Set the altitude in meters above sea level in the altitude attribute of the global device.<br>};
       $result->{'Common Settings'}{fault}   = 1;
-  }
-
-  if (!$aiprep) {
-      $result->{'Common Settings'}{state}   = $info;
-      $result->{'Common Settings'}{result} .= qq{AI support for the PV forecast is not used. <br>};
-      $result->{'Common Settings'}{note}   .= qq{$aiusemsg.<br>};
-      $result->{'Common Settings'}{info}    = 1;
   }
 
   my ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVer ($name, '76_SolarForecast', 'https://fhem.de/fhemupdate/controls_fhem.txt');
@@ -21875,8 +21884,6 @@ sub checkPlantConfig {
   }
 
   if (isSolCastUsed ($hash)) {                                                               # allg. Settings bei Nutzung SolCast API
-      my $gdn = AttrVal ('global', 'dnsServer', '');
-
       my $lam = StatusAPIVal ($hash, 'SolCast', '?All', 'response_message', 'success');
 
       if ($pcf !~ /on/xs) {
@@ -21898,17 +21905,10 @@ sub checkPlantConfig {
           $result->{'API Access'}{fault}        = 1;
       }
 
-      if (!$gdn) {
-          $result->{'API Access'}{state}        = $nok;
-          $result->{'API Access'}{result}      .= qq{Attribute dnsServer in global device is not set. <br>};
-          $result->{'API Access'}{note}        .= qq{set global attribute dnsServer to the IP Adresse of your DNS Server.<br>};
-          $result->{'API Access'}{fault}        = 1;
-      }
-
       if (!$result->{'Common Settings'}{fault}) {
           $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
           $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, global->dnsServer <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
       }
   }
 
@@ -21947,7 +21947,6 @@ sub checkPlantConfig {
   }
 
   if (isVictronKiUsed ($hash)) {                                                              # allg. Settings bei Nutzung VictronKI-API
-      my $gdn   = AttrVal      ('global', 'dnsServer', '');
       my $vrmcr = StatusAPIVal ($hash, '?VRM', '?API', 'credentials', '');
 
       if ($pcf !~ /on/xs) {
@@ -21964,22 +21963,16 @@ sub checkPlantConfig {
           $result->{'API Access'}{fault}        = 1;
       }
 
-      if (!$gdn) {
-          $result->{'API Access'}{state}        = $nok;
-          $result->{'API Access'}{result}      .= qq{Attribute dnsServer in global device is not set. <br>};
-          $result->{'API Access'}{note}        .= qq{set global attribute dnsServer to the IP Adresse of your DNS Server.<br>};
-          $result->{'API Access'}{fault}        = 1;
-      }
-
       if (!$result->{'Common Settings'}{fault}) {
           $result->{'Common Settings'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
           $result->{'Common Settings'}{note}   .= qq{<br>checked parameters and attributes: <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, global->dnsServer, vrmCredentials <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, vrmCredentials <br>};
       }
   }
 
   if (!$result->{'Common Settings'}{fault}) {
-      $result->{'Common Settings'}{note}   .= qq{global->latitude, global->longitude, global->altitude, global->language <br>};
+      $result->{'Common Settings'}{note}   .= qq{global->latitude, global->longitude, global->altitude <br>};
+      $result->{'Common Settings'}{note}   .= qq{global->language, global->dnsServer <br>};
       $result->{'Common Settings'}{note}   .= qq{event-on-change-reading, ctrlLanguage <br>};
   }
 
