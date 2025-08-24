@@ -161,7 +161,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.57.3" => "24.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ".
-                           "check global attribute dnsServer in all SF Models ",
+                           "check global attribute dnsServer in all SF Models, expand plantControl->genPVdeviation for perspective change ",
   "1.57.2" => "15.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ".
                            "_transferMeterValues: modul accept meter reset > 0 at day start ",
   "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
