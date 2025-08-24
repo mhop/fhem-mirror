@@ -6770,17 +6770,17 @@ sub _attrplantControl {                  ## no critic "not used"
   my $cmd   = $paref->{cmd};
 
   my $valid = {
-      backupFilesKeep           => { comp => '\d+',                                act => 0 },
-      batteryPreferredCharge    => { comp => '([0-9]|[1-9][0-9]|100)',             act => 0 },
-      consForecastIdentWeekdays => { comp => '(0|1)',                              act => 0 },
-      consForecastLastDays      => { comp => '([1-9]|[1-9][0-9]|1[0-7][0-9]|180)', act => 0 },
-      consForecastInPlanning    => { comp => '(0|1)',                              act => 0 },
-      cycleInterval             => { comp => '\d+',                                act => 1 },
-      feedinPowerLimit          => { comp => '\d+',                                act => 0 },
-      genPVdeviation            => { comp => '(daily|continuously)',               act => 1 },
-      genPVforecastsToEvent     => { comp => '(adapt4(?:f)?Steps)',                act => 0 },
-	  reductionState            => { comp => '[^\s]+:[^\s]+:[^\s]+',               act => 1 },
-      showLink                  => { comp => '(0|1)',                              act => 0 },
+      backupFilesKeep           => { comp => '\d+',                                               act => 0 },
+      batteryPreferredCharge    => { comp => '([0-9]|[1-9][0-9]|100)',                            act => 0 },
+      consForecastIdentWeekdays => { comp => '(0|1)',                                             act => 0 },
+      consForecastLastDays      => { comp => '([1-9]|[1-9][0-9]|1[0-7][0-9]|180)',                act => 0 },
+      consForecastInPlanning    => { comp => '(0|1)',                                             act => 0 },
+      cycleInterval             => { comp => '\d+',                                               act => 1 },
+      feedinPowerLimit          => { comp => '\d+',                                               act => 0 },
+      genPVdeviation            => { comp => '^(?:daily|continuously)(?::(?:default|reverse))?$', act => 1 },
+      genPVforecastsToEvent     => { comp => '(adapt4(?:f)?Steps)',                               act => 0 },
+	  reductionState            => { comp => '[^\s]+:[^\s]+:[^\s]+',                              act => 1 },
+      showLink                  => { comp => '(0|1)',                                             act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -7755,9 +7755,10 @@ sub __attrKeyAction {
       my $lcendts           = timestringToTimestamp ("$dt->{date} ${lcend}:59");
       return qq{The value '$keyval' is not valid for key '$akey'. The slot start must be earlier than the slot end.} if($lcstartts > $lcendts); 
   }
-  elsif ($akey eq 'genPVdeviation' && $keyval eq 'daily') {
+  elsif ($init_done && $akey eq 'genPVdeviation') {
       readingsDelete ($hash, 'Today_PVdeviation');
       delete $data{$name}{circular}{99}{tdayDvtn};
+      delete $data{$name}{circular}{99}{ydayDvtn};
   }
 
 return $err;
@@ -14077,7 +14078,6 @@ return;
 sub _calcTodayPVdeviation {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $t     = $paref->{t};
   my $date  = $paref->{date};
   my $day   = $paref->{day};
@@ -14089,8 +14089,10 @@ sub _calcTodayPVdeviation {
   return if(!$pvre || !$pvfc);                                                # Illegal division by zero verhindern
 
   my $dp;
+  my ($manner, $perspective) = split ':', CurrentVal ($name, 'genPVdeviation', 'daily');
+  $perspective //= 'default';
 
-  if (CurrentVal ($name, 'genPVdeviation', 'daily') eq 'daily') {
+  if ($manner eq 'daily') {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
       return if($t < $sstime);
 
@@ -14103,6 +14105,8 @@ sub _calcTodayPVdeviation {
       $dp = sprintf "%.2f", (100 - (100 * $pvre / abs $pvfcd));               # V 1.25.0
   }
 
+  $dp *= -1 if ($perspective eq 'reverse');                                   # Perspektivänderung: Abweichung = Real - Vorhersage statt Abweichung = Vorhersage - Real
+  
   $data{$name}{circular}{99}{tdayDvtn} = $dp;
 
   storeReading ('Today_PVdeviation', $dp.' %');
@@ -15876,19 +15880,21 @@ sub _graphicHeader {
       $ydayDvtn    =~ s/,0//;
 
       my $genpvdva = $paref->{genpvdva};
+      my ($manner, $perspective) = split ':', $genpvdva;
+      $perspective //= 'default';
 
       my $dvtntxt  = $hqtxt{dvtn}{$lang}.'&nbsp;';
-      my $tdaytxt  = ($genpvdva eq 'daily' ? $hqtxt{tday}{$lang} : $hqtxt{ctnsly}{$lang}).':&nbsp;'."<b>".$tdayDvtn."</b>";
+      my $tdaytxt  = ($manner eq 'daily' ? $hqtxt{tday}{$lang} : $hqtxt{ctnsly}{$lang}).':&nbsp;'."<b>".$tdayDvtn."</b>";
       my $ydaytxt  = $hqtxt{yday}{$lang}.':&nbsp;'."<b>".$ydayDvtn."</b>";
 
-      my $text_tdayDvtn = $tdayDvtn =~ /^-[1-9]/? $hqtxt{pmtp}{$lang} :
+      my $text_tdayDvtn = $tdayDvtn =~ /^-[1-9]/? ($perspective eq 'default' ? $hqtxt{pmtp}{$lang} : $hqtxt{pltp}{$lang}) :
                           $tdayDvtn =~ /^-?0,/  ? $hqtxt{petp}{$lang} :
-                          $tdayDvtn =~ /^[1-9]/ ? $hqtxt{pltp}{$lang} :
+                          $tdayDvtn =~ /^[1-9]/ ? ($perspective eq 'default' ? $hqtxt{pltp}{$lang} : $hqtxt{pmtp}{$lang}) :
                           $hqtxt{wusond}{$lang};
 
-      my $text_ydayDvtn = $ydayDvtn =~ /^-[1-9]/? $hqtxt{pmtp}{$lang} :
+      my $text_ydayDvtn = $ydayDvtn =~ /^-[1-9]/? ($perspective eq 'default' ? $hqtxt{pmtp}{$lang} : $hqtxt{pltp}{$lang}) :
                           $ydayDvtn =~ /^-?0,/  ? $hqtxt{petp}{$lang} :
-                          $ydayDvtn =~ /^[1-9]/ ? $hqtxt{pltp}{$lang} :
+                          $ydayDvtn =~ /^[1-9]/ ? ($perspective eq 'default' ? $hqtxt{pltp}{$lang} : $hqtxt{pmtp}{$lang}) :
                           $hqtxt{snbefb}{$lang};
                           
       $text_tdayDvtn = encode ('utf8', $text_tdayDvtn);
@@ -27210,68 +27216,69 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
-            <tr><td> <b>backupFilesKeep</b>           </td><td>Defines the number of generations of backup files.                                                                                   </td></tr>
-            <tr><td>                                  </td><td>(see <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                       </td></tr>
-            <tr><td>                                  </td><td>If backupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place.                            </td></tr>
-            <tr><td>                                  </td><td>Manual execution with the aforementioned set command is still possible.                                                              </td></tr>
-            <tr><td>                                  </td><td>Value: <b>Integer</b>, default: 3                                                                                                    </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>batteryPreferredCharge</b>    </td><td>Consumers with the <b>can</b> mode are only switched on when the specified battery charge (%) is reached.                            </td></tr>
-            <tr><td>                                  </td><td>Consumers with the <b>must</b> mode do not observe the priority charging of the battery.                                             </td></tr>
-            <tr><td>                                  </td><td>Value: <b>Integer 0..100</b>, default: 0                                                                                             </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>consForecastIdentWeekdays</b> </td><td>If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast.                               </td></tr>
-            <tr><td>                                  </td><td>Otherwise, all weekdays are used equally for the calculation.                                                                        </td></tr>
-            <tr><td>                                  </td><td>Value: <b>0|1</b>, default: 0                                                                                                        </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>consForecastInPlanning</b>    </td><td>The key determines the procedure for scheduling registered consumers.                                                                </td></tr>
-            <tr><td>                                  </td><td><b>0</b> - the consumers are scheduled on the basis of the PV forecast (default)                                                     </td></tr>
-            <tr><td>                                  </td><td><b>1</b> - consumers are scheduled on the basis of the PV forecast and the consumption forecast                                      </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>consForecastLastDays</b>      </td><td>The specified number of historical days is included in the calculation of the consumption forecast.                                  </td></tr>
-            <tr><td>                                  </td><td>For example, with the attribute value “1” only the previous day is taken into account, with the value “14” the previous 14 days.     </td></tr>
-            <tr><td>                                  </td><td>The days taken into account may be fewer if there are not enough values in the internal memory.                                      </td></tr>
-            <tr><td>                                  </td><td>If the key 'consForecastIdentWeekdays' is also set, the specified number of past weekdays                                            </td></tr>
-            <tr><td>                                  </td><td>of the <b>same</b> day (Mon .. Sun) is taken into account.                                                                           </td></tr>
-            <tr><td>                                  </td><td>For example, if the value is set to '8', the same weekdays of the past 8 weeks are taken into account.                               </td></tr>
-            <tr><td>                                  </td><td>Value: <b>Integer 0..180</b>, default: 60                                                                                            </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>cycleInterval</b>             </td><td>Repetition interval of the data collection in seconds.                                                                               </td></tr>
-            <tr><td>                                  </td><td>If cycleInterval is explicitly set to '0', there is no regular data collection and must be started externally                        </td></tr>
-            <tr><td>                                  </td><td>with 'get &lt;name&gt; data'.                                                                                                        </td></tr>
-            <tr><td>                                  </td><td>Value: <b>Integer</b>, default: 70                                                                                                   </td></tr>
-            <tr><td>                                  </td><td><b>Note:</b> Regardless of the interval set (even with '0'), data is collected automatically a few seconds before the end            </td></tr>
-            <tr><td>                                  </td><td>and after the start of a full hour. Data is also collected automatically when an event from a device defined                         </td></tr>
-            <tr><td>                                  </td><td>as “asynchronous” (consumer, meter, etc.) is received and processed.                                                                 </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>feedinPowerLimit</b>          </td><td>Feed-in limit of the entire system into the public grid in watts.                                                                    </td></tr>
-            <tr><td>                                  </td><td>SolarForecast does not limit the feed-in, but uses this information                                                                  </td></tr>
-            <tr><td>                                  </td><td>within the battery charge management to avoid system curtailment.                                                                    </td></tr>
-            <tr><td>                                  </td><td>Value: <b>Integer</b>, default: unlimited                                                                                            </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>genPVdeviation</b>            </td><td>Defines the method for calculating the deviation between forecast and actual PV generation.                                          </td></tr>
-            <tr><td>                                  </td><td>The reading <b>Today_PVdeviation</b> is created depending on this setting.                                                           </td></tr>
-            <tr><td>                                  </td><td><b>daily</b>        - Calculation and creation of Today_PVdeviation takes place after sunset (default)                               </td></tr>
-            <tr><td>                                  </td><td><b>continuously</b> - Calculation and creation of Today_PVdeviation is continuous                                                    </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>genPVforecastsToEvent</b>     </td><td>The module generates daily 'AllPVforecastsToEvent' events to visualize the PV forecast.                                              </td></tr>
+            <tr><td> <b>backupFilesKeep</b>           </td><td>Defines the number of generations of backup files.                                                                                                              </td></tr>
+            <tr><td>                                  </td><td>(see <a href="#SolarForecast-set-operatingMemory">set &lt;name&gt; operatingMemory backup</a>)                                                                  </td></tr>
+            <tr><td>                                  </td><td>If backupFilesKeep explit is set to '0', no automatic generation and cleanup of backup files takes place.                                                       </td></tr>
+            <tr><td>                                  </td><td>Manual execution with the aforementioned set command is still possible.                                                                                         </td></tr>
+            <tr><td>                                  </td><td>Value: <b>Integer</b>, default: 3                                                                                                                               </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>batteryPreferredCharge</b>    </td><td>Consumers with the <b>can</b> mode are only switched on when the specified battery charge (%) is reached.                                                       </td></tr>
+            <tr><td>                                  </td><td>Consumers with the <b>must</b> mode do not observe the priority charging of the battery.                                                                        </td></tr>
+            <tr><td>                                  </td><td>Value: <b>Integer 0..100</b>, default: 0                                                                                                                        </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consForecastIdentWeekdays</b> </td><td>If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast.                                                          </td></tr>
+            <tr><td>                                  </td><td>Otherwise, all weekdays are used equally for the calculation.                                                                                                   </td></tr>
+            <tr><td>                                  </td><td>Value: <b>0|1</b>, default: 0                                                                                                                                   </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consForecastInPlanning</b>    </td><td>The key determines the procedure for scheduling registered consumers.                                                                                           </td></tr>
+            <tr><td>                                  </td><td><b>0</b> - the consumers are scheduled on the basis of the PV forecast (default)                                                                                </td></tr>
+            <tr><td>                                  </td><td><b>1</b> - consumers are scheduled on the basis of the PV forecast and the consumption forecast                                                                 </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consForecastLastDays</b>      </td><td>The specified number of historical days is included in the calculation of the consumption forecast.                                                             </td></tr>
+            <tr><td>                                  </td><td>For example, with the attribute value “1” only the previous day is taken into account, with the value “14” the previous 14 days.                                </td></tr>
+            <tr><td>                                  </td><td>The days taken into account may be fewer if there are not enough values in the internal memory.                                                                 </td></tr>
+            <tr><td>                                  </td><td>If the key 'consForecastIdentWeekdays' is also set, the specified number of past weekdays                                                                       </td></tr>
+            <tr><td>                                  </td><td>of the <b>same</b> day (Mon .. Sun) is taken into account.                                                                                                      </td></tr>
+            <tr><td>                                  </td><td>For example, if the value is set to '8', the same weekdays of the past 8 weeks are taken into account.                                                          </td></tr>
+            <tr><td>                                  </td><td>Value: <b>Integer 0..180</b>, default: 60                                                                                                                       </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>cycleInterval</b>             </td><td>Repetition interval of the data collection in seconds.                                                                                                          </td></tr>
+            <tr><td>                                  </td><td>If cycleInterval is explicitly set to '0', there is no regular data collection and must be started externally                                                   </td></tr>
+            <tr><td>                                  </td><td>with 'get &lt;name&gt; data'.                                                                                                                                   </td></tr>
+            <tr><td>                                  </td><td>Value: <b>Integer</b>, default: 70                                                                                                                              </td></tr>
+            <tr><td>                                  </td><td><b>Note:</b> Regardless of the interval set (even with '0'), data is collected automatically a few seconds before the end                                       </td></tr>
+            <tr><td>                                  </td><td>and after the start of a full hour. Data is also collected automatically when an event from a device defined                                                    </td></tr>
+            <tr><td>                                  </td><td>as “asynchronous” (consumer, meter, etc.) is received and processed.                                                                                            </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>feedinPowerLimit</b>          </td><td>Feed-in limit of the entire system into the public grid in watts.                                                                                               </td></tr>
+            <tr><td>                                  </td><td>SolarForecast does not limit the feed-in, but uses this information                                                                                             </td></tr>
+            <tr><td>                                  </td><td>within the battery charge management to avoid system curtailment.                                                                                               </td></tr>
+            <tr><td>                                  </td><td>Value: <b>Integer</b>, default: unlimited                                                                                                                       </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>genPVdeviation</b>            </td><td>Defines the method for calculating the deviation between forecast and actual PV generation.                                                                     </td></tr>
+            <tr><td>                                  </td><td>The reading <b>Today_PVdeviation</b> is created depending on this setting.                                                                                      </td></tr>
+            <tr><td>                                  </td><td>The optional addition ‘:reverse’ specifies that PV generation > forecast is displayed as a positive value instead of a negative value (change of perspective).  </td></tr>
+            <tr><td>                                  </td><td><b>daily[:reverse]</b>        - Calculation and creation of Today_PVdeviation takes place after sunset (default)                                                </td></tr>
+            <tr><td>                                  </td><td><b>continuously[:reverse]</b> - Calculation and creation of Today_PVdeviation is continuous                                                                     </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>genPVforecastsToEvent</b>     </td><td>The module generates daily 'AllPVforecastsToEvent' events to visualize the PV forecast.                                                                         </td></tr>
             <tr><td>                                  </td><td>Further explanations can be found in the <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Visualisierung_solare_Vorhersage_und_reale_Erzeugung' target='_blank'>german Wiki</a>. </td></tr>
-            <tr><td>                                  </td><td><b>Note:</b> When using the attribute, the attribute <b>event-on-update-reading=AllPVforecastsToEvent</b> must also be set.          </td></tr>
-            <tr><td>                                  </td><td>Event generation can be optimized for specific uses:                                                                                 </td></tr>
-            <tr><td>                                  </td><td><b>adapt4Steps</b> - the events are optimized for the SVG plot type 'steps'                                                          </td></tr>
-            <tr><td>                                  </td><td><b>adapt4fSteps</b> - the events are optimized for the SVG plot type 'fsteps'                                                        </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>reductionState</b>            </td><td>Delivers a status to SolarForecast when the PV system is or has been curtailed (optional).                                           </td></tr>
-            <tr><td>                                  </td><td><b>Device</b> - Device which provides the reduction status                                                                           </td></tr>
-            <tr><td>                                  </td><td><b>Reading</b> - Reading that provides the reduction status                                                                          </td></tr>
-            <tr><td>                                  </td><td>The check of the supplied value can be formulated as a regular expression or as Perl code enclosed in {..}:                          </td></tr>
-            <tr><td>                                  </td><td><b>Regex</b> - Regular expression that must be fulfilled for a reduction status (true)                                               </td></tr>
-            <tr><td>                                  </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must return 'true' for a reduction status. It must not contain spaces.           </td></tr>
-            <tr><td>                                  </td><td>The value of Device:Reading is transferred to the code with the variable $VALUE.                                                     </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
-            <tr><td> <b>showLink</b>                  </td><td>Display of a link to the detailed view of the device above the graphics area                                                         </td></tr>
-            <tr><td>                                  </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                                            </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                     </td></tr>
+            <tr><td>                                  </td><td><b>Note:</b> When using the attribute, the attribute <b>event-on-update-reading=AllPVforecastsToEvent</b> must also be set.                                     </td></tr>
+            <tr><td>                                  </td><td>Event generation can be optimized for specific uses:                                                                                                            </td></tr>
+            <tr><td>                                  </td><td><b>adapt4Steps</b> - the events are optimized for the SVG plot type 'steps'                                                                                     </td></tr>
+            <tr><td>                                  </td><td><b>adapt4fSteps</b> - the events are optimized for the SVG plot type 'fsteps'                                                                                   </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>reductionState</b>            </td><td>Delivers a status to SolarForecast when the PV system is or has been curtailed (optional).                                                                      </td></tr>
+            <tr><td>                                  </td><td><b>Device</b> - Device which provides the reduction status                                                                                                      </td></tr>
+            <tr><td>                                  </td><td><b>Reading</b> - Reading that provides the reduction status                                                                                                     </td></tr>
+            <tr><td>                                  </td><td>The check of the supplied value can be formulated as a regular expression or as Perl code enclosed in {..}:                                                     </td></tr>
+            <tr><td>                                  </td><td><b>Regex</b> - Regular expression that must be fulfilled for a reduction status (true)                                                                          </td></tr>
+            <tr><td>                                  </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must return 'true' for a reduction status. It must not contain spaces.                                      </td></tr>
+            <tr><td>                                  </td><td>The value of Device:Reading is transferred to the code with the variable $VALUE.                                                                                </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>showLink</b>                  </td><td>Display of a link to the detailed view of the device above the graphics area                                                                                    </td></tr>
+            <tr><td>                                  </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                                                                       </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
          </table>
          </ul>
 
@@ -29906,8 +29913,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>genPVdeviation</b>            </td><td>Legt die Methode zur Berechnung der Abweichung von prognostizierter und realer PV Erzeugung fest.                                                 </td></tr>
             <tr><td>                                  </td><td>Das Reading <b>Today_PVdeviation</b> wird in Abhängigkeit dieser Einstellung erstellt.                                                            </td></tr>
-            <tr><td>                                  </td><td><b>daily</b>        - Berechnung und Erstellung von Today_PVdeviation erfolgt nach Sonnenuntergang (default)                                      </td></tr>
-            <tr><td>                                  </td><td><b>continuously</b> - Berechnung und Erstellung von Today_PVdeviation erfolgt fortlaufend                                                         </td></tr>
+            <tr><td>                                  </td><td>Der optionale Zusatz ':reverse' legt fest, dass PV-Erzeugung > Prognose als positiver statt negativer Wert dargestellt wird (Perspektivwechsel).  </td></tr>
+            <tr><td>                                  </td><td><b>daily[:reverse]</b>        - Berechnung und Erstellung von Today_PVdeviation erfolgt nach Sonnenuntergang (default)                            </td></tr>
+            <tr><td>                                  </td><td><b>continuously[:reverse]</b> - Berechnung und Erstellung von Today_PVdeviation erfolgt fortlaufend                                               </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>genPVforecastsToEvent</b>     </td><td>Das Modul erzeugt täglich 'AllPVforecastsToEvent'-Events zur Visualisierung der PV Prognose.                                                      </td></tr>
             <tr><td>                                  </td><td>Nähere Erläuterungen dazu sind im <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Visualisierung_solare_Vorhersage_und_reale_Erzeugung' target='_blank'>Wiki</a> beschrieben. </td></tr>
