@@ -160,7 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.57.2" => "13.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ",
+  "1.57.3" => "24.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ",
+  "1.57.2" => "15.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ".
+                           "_transferMeterValues: modul accept meter reset > 0 at day start ",
   "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
   "1.57.0" => "08.08.2025  new option attr graphicControl->scaleMode=X:staple ",
   "1.56.0" => "07.08.2025  set MAXINVERTER to 5 ",
@@ -445,7 +447,7 @@ use constant {
   LAGTIME        => 1800,                                                           # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
   APITIMEOUT     => 30,                                                             # default Timeout HTTP API-Call
   
-  PRDEF          => 1.0,                                                            # default Performance Ratio (PR)
+  PRDEF          => 0.9,                                                            # default Performance Ratio (PR)
   STOREFFDEF     => 0.90,                                                           # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
   TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
   TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
@@ -4160,7 +4162,7 @@ sub __VictronVRM_ApiResponseForecast {
   my $msg;
   my $hash = $defs{$name};
   my $t    = time;
-  my $sta  = [gettimeofday];                                                                               # Start Response Verarbeitung
+  my $sta  = [gettimeofday];                                                                                           # Start Response Verarbeitung
 
   if ($err ne "") {
       $msg = 'Victron VRM API Forecast response: '.$err;
@@ -4168,12 +4170,12 @@ sub __VictronVRM_ApiResponseForecast {
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
-      $data{$name}{current}{runTimeLastAPIProc}                = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-      $data{$name}{current}{runTimeLastAPIAnswer}              = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+      $data{$name}{current}{runTimeLastAPIProc}                    = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+      $data{$name}{current}{runTimeLastAPIAnswer}                  = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
       return;
   }
-  elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
+  elsif ($myjson ne "") {                                                                                              # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson($hash, $myjson);
 
       if (!$success) {
@@ -4202,8 +4204,8 @@ sub __VictronVRM_ApiResponseForecast {
           $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_timestamp} = $t;
 
           if ($debug =~ /apiProcess|apiCall/x) {
-              Log3 ($name, 1, "$name DEBUG> SolCast API Call - error_code: ".$jdata->{'error_code'});
-              Log3 ($name, 1, "$name DEBUG> SolCast API Call - errors: "    .$jdata->{'errors'});
+              Log3 ($name, 1, "$name DEBUG> Victron VRM API Call - error_code: ".$jdata->{'error_code'});
+              Log3 ($name, 1, "$name DEBUG> Victron VRM API Call - errors: "    .$jdata->{'errors'});
           }
 
           return;
@@ -4211,8 +4213,27 @@ sub __VictronVRM_ApiResponseForecast {
       else {
           $data{$name}{statusapi}{VictronKi}{'?All'}{todayDoneAPIrequests} += 1;
           $data{$name}{statusapi}{VictronKi}{'?All'}{todayDoneAPIcalls}    += 1;
+                                                             
+          my $syforecast = $jdata->{records}{solar_yield_forecast} // 'undefined';                                         # Forum: https://forum.fhem.de/index.php?msg=1346820
+          
+          if (ref $syforecast ne 'ARRAY') {                                                                                
+              $msg = 'ERROR - invalid Victron VRM API Forecast response';
+              singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
+              $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+              $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
+              $data{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = $msg;
+              $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
+              $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_timestamp} = $t;
+             
+              debugLog ($paref, 'apiProcess|apiCall', 'Victron VRM API Call - ERROR - records are not an ARRAY: '.$syforecast);
+             
+              return;
+          }
+          
           my $k = 0;
+          
           while ($jdata->{'records'}{'solar_yield_forecast'}[$k]) {
               if (ref $jdata->{'records'}{'solar_yield_forecast'}[$k] ne "ARRAY") {             # Forum: https://forum.fhem.de/index.php?msg=1288637
                   $k++;
@@ -4223,7 +4244,7 @@ sub __VictronVRM_ApiResponseForecast {
               my $val        = $jdata->{'records'}{'solar_yield_forecast'}[$k][1];
               $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
 
-              debugLog ($paref, "apiProcess", "Victron VRM API - PV estimate: ".$starttmstr.' => '.$val.' Wh');
+              debugLog ($paref, 'apiProcess', 'Victron VRM API - PV estimate: '.$starttmstr.' => '.$val.' Wh');
 
               if ($val) {
                   $val = sprintf "%.0f", $val;
@@ -10966,7 +10987,7 @@ sub _transferMeterValues {
   }
   elsif ($idgcon > $gctotal) {                                                                          # Tageszähler Meter zu spät zurückgesetzt
       $data{$name}{circular}{99}{initdaygcon} = 0;
-      Log3 ($name, 2, "$name - WARNING - '$medev' - total Grid consumption '$gctotal' is lower than the day Init value '$idgcon'. The initialization for the day was performed again.");
+      Log3 ($name, 3, "$name - WARNING - '$medev' - total Grid consumption '$gctotal' is lower than the day Init value '$idgcon'. The initialization for the day was performed again.");
   }
   elsif ($gcdaypast == 0) {                                                                             # Stundenberechnung auf Basis Totalwerte GridConsumtion
       if (defined $idgcon) {
