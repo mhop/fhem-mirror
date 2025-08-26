@@ -12011,11 +12011,11 @@ sub _createSummaries {
       my $ifeed    = InverterVal ($name, $in, 'ifeed',   'default');
       my $isource  = InverterVal ($name, $in, 'isource',      'pv');
 
-      $pv2node     += $pvout  if($ifeed eq 'default' && $isource eq 'pv');                               # PV-Erzeugung Inverter für das Hausnetz
-      $pv2grid     += $pvout  if($ifeed eq 'grid'    && $isource eq 'pv');                               # PV nur für das öffentliche Netz
-      $pv2bat      += $pvout  if($ifeed eq 'bat'     && $isource eq 'pv');                               # Direktladen PV nur in die Batterie
-      $dc2inv2node += $pdc2ac if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));      # DC->AC / Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
-      $node2inv2dc += $pac2dc if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));      # AC->DC (Batterie- oder Hybrid-Wechselrichter)
+      $pv2node     += $pvout  if($ifeed eq 'default' && $isource eq 'pv');                              # PV-Erzeugung Inverter für das Hausnetz
+      $pv2grid     += $pvout  if($ifeed eq 'grid'    && $isource eq 'pv');                              # PV nur für das öffentliche Netz
+      $pv2bat      += $pvout  if($ifeed eq 'bat'     && $isource eq 'pv');                              # Direktladen PV nur in die Batterie
+      $dc2inv2node += $pdc2ac if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));     # DC->AC / Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
+      $node2inv2dc += $pac2dc if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));     # AC->DC (Batterie- oder Hybrid-Wechselrichter)
   }
 
   my $ppall = 0;                                                                                        # Summe Otherproducer
@@ -12042,8 +12042,8 @@ sub _createSummaries {
   my $selfconsumption = sprintf "%.0f", ($pv2node + $pv2bat - $gfeedin - $batin);
   $selfconsumption    = $selfconsumption < 0 ? 0 : $selfconsumption;
 
-  my $surplus         = sprintf "%.0f", ($pv2node + $pv2bat + $node2inv2dc + $ppall - $pv2grid - $consumption);     # aktueller Überschuß - fix V1.57.3
-  $surplus            = 0 if($surplus < 0);                                                                         # wegen Vergleich nompower vs. surplus
+  my $surplus         = sprintf "%.0f", ($pv2node + $pv2bat + $ppall - $pv2grid - $consumption);        # aktueller Überschuß - fix V1.57.3
+  $surplus            = 0 if($surplus < 0);                                                             # wegen Vergleich nompower vs. surplus
 
   if ($debug =~ /collectData/xs) {
       Log3 ($name, 1, "$name DEBUG> current Power values -> PV2Node: $pv2node W, PV2Bat: $pv2bat, PV2Grid: $pv2grid W, Other: $ppall W, GridIn: $gfeedin W, GridCon: $gcon W");
