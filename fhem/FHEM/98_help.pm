@@ -28,6 +28,10 @@ sub CommandHelp {
 
   my ($mod,$lang) = split(" ",$arg);
   
+  if (lc($mod) eq 'fhem.pl') {
+    return "<html><b>Module:</b> fhem.pl <b>Maintainer:</b> rudolfkoenig <b>Forum:</b> Sonstiges</html>";
+  }
+  
   $lang //= AttrVal('global','language','en');
   $lang = (lc($lang) eq 'de') ? '_DE' : '';
 
@@ -37,13 +41,13 @@ sub CommandHelp {
 
     $mod = lc($mod);
     my $modPath = AttrVal('global','modpath','.');
-	my $output = '';
+    my $output = '';
     
     my $outputInfo = cref_findInfo($modPath,$mod,$cl);
 
     if($cmds{help}{InternalCmds} !~ m/(^|\,)$mod\,/) {
       my %mods;
-	  my @modDir = ("$modPath/FHEM");
+      my @modDir = ("$modPath/FHEM");
 
       $mod = $cmds{$mod}{ModuleName} if defined($cmds{$mod}) && defined($cmds{$mod}{ModuleName});
 
