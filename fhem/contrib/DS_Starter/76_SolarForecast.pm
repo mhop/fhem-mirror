@@ -160,10 +160,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.57.3" => "25.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ".
+  "1.57.3" => "26.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ".
                            "check global attribute dnsServer in all SF Models, expand plantControl->genPVdeviation for perspective change ".
                            "Household consumption calculation uniformly converted to vector calculation ".
-                           "new ctrlSpecialReadings->dummyConsumption, _createSummaries: fix calc of surplus ",
+                           "new ctrlSpecialReadings->dummyConsumption, _createSummaries: fix calc of surplus ".
+                           "__createOwnSpec: change inputs for ___ghoValForm to prevent failures like https://forum.fhem.de/index.php?msg=1346936 ",
   "1.57.2" => "15.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ".
                            "_transferMeterValues: modul accept meter reset > 0 at day start ",
   "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
@@ -16344,13 +16345,12 @@ sub __createOwnSpec {
               next;
           }
 
-          $v->{$k} = ReadingsVal ($dev, $elm, '');
+          $v->{$k} = ReadingsVal ($dev, $elm, undef);
 
-          if ($v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
+          if (defined $v->{$k} && $v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
               ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');       # Value und Unit trennen wenn Value numerisch
           }
 
-          $v->{$k} //= q{};
           $u->{$k} //= q{};
 
           $paref->{dev}  = $dev;
@@ -16359,6 +16359,8 @@ sub __createOwnSpec {
           $paref->{unit} = $u->{$k};
 
           ($v->{$k}, $u->{$k}) = ___ghoValForm ($paref);
+          
+          $v->{$k} //= q{};          
 
           delete $paref->{dev};
           delete $paref->{rdg};
@@ -16535,7 +16537,7 @@ sub ___ghoValForm {
       my $efn = eval $fn;
 
       if ($@) {
-          Log3 ($name, 1, "$name - ERROR in execute graphicHeaderOwnspecValForm: ".$@);
+          Log3 ($name, 1, "$name - ERROR in function graphicHeaderOwnspecValForm: ".$@);
           $err = $@;
       }
       else {
@@ -16564,7 +16566,7 @@ sub ___ghoValForm {
           my $vnew = eval $fn;
 
           if ($@) {
-              Log3 ($name, 1, "$name - ERROR in execute graphicHeaderOwnspecValForm: ".$@);
+              Log3 ($name, 1, "$name - ERROR in graphicHeaderOwnspecValForm Hash resolution -> '$fn': ".$@);
               $err = $@;
           }
           else {
@@ -18069,24 +18071,24 @@ sub _flowGraphic {
       my $pvout    = __normDecPlaces (InverterVal ($name, $in, 'ipvout',  0));                    # Erzeugung aus PV
       my $pdc2ac   = __normDecPlaces (InverterVal ($name, $in, 'ipdc2ac', 0));                    # Wandlung DC->AC (Batterie-Wechselrichter)
       my $pac2dc   = __normDecPlaces (InverterVal ($name, $in, 'ipac2dc', 0));                    # Rückwandlung AC->DC (Batterie-Wechselrichter)
-      my $feed     = InverterVal ($name, $in, 'ifeed',   'default');
+      my $ifeed    = InverterVal ($name, $in, 'ifeed',   'default');
       my $isource  = InverterVal ($name, $in, 'isource',      'pv');
 
-      $pdcr->{$lfn}{pn}        = $in;                                                                         # Inverternummer
-      $pdcr->{$lfn}{feed}      = $feed;                                                                       # Eigenschaft der Energielieferung
-      $pdcr->{$lfn}{source}    = $isource;                                                                    # Art der Energiequelle
-      $pdcr->{$lfn}{generator} = InverterVal ($name, $in, 'istrings', 'none');                                # Angaben zum Generator (Namen der Strings)
-      $pdcr->{$lfn}{ptyp}      = 'inverter';                                                                  # Typ des Producers
-      $pdcr->{$lfn}{psubtyp}   = InverterVal ($name, $in, 'itype', '');                                       # SubTyp des Inverters
-      $pdcr->{$lfn}{pvin}      = $pvin;                                                                       # aktuelle DC PV-Erzeugungsleistung
-      $pdcr->{$lfn}{pgen}      = $pvout;                                                                      # aktuelleLeistung aus PV-Erzeugung
-      $pdcr->{$lfn}{pdc2ac}    = $pdc2ac;                                                                     # aktuelle Leistung DC->AC
-      $pdcr->{$lfn}{pac2dc}    = $pac2dc;                                                                     # aktuelle Leistung AC->DC
-      $pv2node                += $pvout  if($feed eq 'default' && $isource eq 'pv');                          # PV-Erzeugung Inverter für das Hausnetz
-      $pv2grid                += $pvout  if($feed eq 'grid'    && $isource eq 'pv');                          # PV nur für das öffentliche Netz
-      $pv2bat                 += $pvout  if($feed eq 'bat'     && $isource eq 'pv');                          # Direktladen PV nur in die Batterie
-      $dc2inv2node            += $pdc2ac if($feed eq 'hybrid' || ($feed eq 'default' && $isource eq 'bat'));  # DC->AC / Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
-      $node2inv2dc            += $pac2dc if($feed eq 'hybrid' || ($feed eq 'default' && $isource eq 'bat'));  # AC->DC (Batterie- oder Hybrid-Wechselrichter)
+      $pdcr->{$lfn}{pn}        = $in;                                                                           # Inverternummer
+      $pdcr->{$lfn}{feed}      = $ifeed;                                                                        # Eigenschaft der Energielieferung
+      $pdcr->{$lfn}{source}    = $isource;                                                                      # Art der Energiequelle
+      $pdcr->{$lfn}{generator} = InverterVal ($name, $in, 'istrings', 'none');                                  # Angaben zum Generator (Namen der Strings)
+      $pdcr->{$lfn}{ptyp}      = 'inverter';                                                                    # Typ des Producers
+      $pdcr->{$lfn}{psubtyp}   = InverterVal ($name, $in, 'itype', '');                                         # SubTyp des Inverters
+      $pdcr->{$lfn}{pvin}      = $pvin;                                                                         # aktuelle DC PV-Erzeugungsleistung
+      $pdcr->{$lfn}{pgen}      = $pvout;                                                                        # aktuelleLeistung aus PV-Erzeugung
+      $pdcr->{$lfn}{pdc2ac}    = $pdc2ac;                                                                       # aktuelle Leistung DC->AC
+      $pdcr->{$lfn}{pac2dc}    = $pac2dc;                                                                       # aktuelle Leistung AC->DC
+      $pv2node                += $pvout  if($ifeed eq 'default' && $isource eq 'pv');                           # PV-Erzeugung Inverter für das Hausnetz
+      $pv2grid                += $pvout  if($ifeed eq 'grid'    && $isource eq 'pv');                           # PV nur für das öffentliche Netz
+      $pv2bat                 += $pvout  if($ifeed eq 'bat'     && $isource eq 'pv');                           # Direktladen PV nur in die Batterie
+      $dc2inv2node            += $pdc2ac if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # DC->AC / Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
+      $node2inv2dc            += $pac2dc if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # AC->DC (Batterie- oder Hybrid-Wechselrichter)
 
       $lfn++;
   }
