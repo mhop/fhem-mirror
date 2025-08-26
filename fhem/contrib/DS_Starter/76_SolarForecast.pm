@@ -163,7 +163,7 @@ my %vNotesIntern = (
   "1.57.3" => "25.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ".
                            "check global attribute dnsServer in all SF Models, expand plantControl->genPVdeviation for perspective change ".
                            "Household consumption calculation uniformly converted to vector calculation ".
-                           "new ctrlSpecialReadings->dummyConsumption ",
+                           "new ctrlSpecialReadings->dummyConsumption, _createSummaries: fix calc of surplus ",
   "1.57.2" => "15.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ".
                            "_transferMeterValues: modul accept meter reset > 0 at day start ",
   "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
@@ -12042,8 +12042,8 @@ sub _createSummaries {
   my $selfconsumption = sprintf "%.0f", ($pv2node + $pv2bat - $gfeedin - $batin);
   $selfconsumption    = $selfconsumption < 0 ? 0 : $selfconsumption;
 
-  my $surplus         = sprintf "%.0f", ($pv2node - $pv2grid + $ppall - $consumption);                  # aktueller Überschuß
-  $surplus            = 0 if($surplus < 0);                                                             # wegen Vergleich nompower vs. surplus
+  my $surplus         = sprintf "%.0f", ($pv2node + $pv2bat + $node2inv2dc + $ppall - $pv2grid - $consumption);     # aktueller Überschuß - fix V1.57.3
+  $surplus            = 0 if($surplus < 0);                                                                         # wegen Vergleich nompower vs. surplus
 
   if ($debug =~ /collectData/xs) {
       Log3 ($name, 1, "$name DEBUG> current Power values -> PV2Node: $pv2node W, PV2Bat: $pv2bat, PV2Grid: $pv2grid W, Other: $ppall W, GridIn: $gfeedin W, GridCon: $gcon W");
@@ -18126,17 +18126,16 @@ sub _flowGraphic {
                                          }
                                        );
 
-  my $consptn = $vector->{vectorconsumption};
+  my $consptn   = $vector->{vectorconsumption};                                           # Hausverbrauch auf Grundlage der Leistungsflüsse
+  my $bat2home  = $vector->{bat2home};                                                    # Batterie -> Hausknoten
+  my $pnodesum  = $vector->{pnodesum};                                                    # Summe Inverterknoten
+  my $node2home = $vector->{node2home};                                                   # Inverterknoten -> Haus
+  my $node2bat  = $vector->{node2bat};                                                    # Inverterknoten -> Batterie
 
   if ($vector->{batDischarge2HomeNode}) {
       $bat2home_style     = "$stna active_normal";
       $bat2home_direction = "M1200,515 L730,590";  
   }
-
-  my $bat2home  = $vector->{bat2home};                                                    # Batterie -> Hausknoten
-  my $pnodesum  = $vector->{pnodesum};                                                    # Summe Inverterknoten
-  my $node2home = $vector->{node2home};                                                   # Inverterknoten -> Haus
-  my $node2bat  = $vector->{node2bat};                                                    # Inverterknoten -> Batterie
 
 
   ## definierte Verbraucher ermitteln
