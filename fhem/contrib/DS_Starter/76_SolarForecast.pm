@@ -11084,6 +11084,7 @@ sub _transferBatteryValues {
   delete $data{$name}{current}{batpowerinsum};
   delete $data{$name}{current}{batpoweroutsum};
   delete $data{$name}{current}{batcapsum};
+  delete $data{$name}{current}{batwhtotal};
 
   for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
@@ -11296,19 +11297,21 @@ sub _transferBatteryValues {
   }
 
   if ($num) {
-      writeToHistory ( { paref => $paref, key => 'socwhsum', val => (sprintf "%.0f", $socwhsum), hour => $nhour } );
-
       if ($bcapsum) {
           my $soctotal = sprintf "%.2f", ($socwhsum / $bcapsum * 100);                     # resultierender SoC (%) aller Batterien als "eine"
           $data{$name}{current}{batsoctotal} = $soctotal;
           push @{$data{$name}{current}{batsocslidereg}}, $soctotal;                        # Schieberegister average SOC aller Batterien
       }
 
+      $socwhsum = sprintf "%.0f", $socwhsum;
+      writeToHistory ( { paref => $paref, key => 'socwhsum', val => $socwhsum, hour => $nhour } );
+      
       limitArray ($data{$name}{current}{batsocslidereg}, SLIDENUMMAX);
 
       $data{$name}{current}{batpowerinsum}  = $pbisum;                                     # summarische laufende Batterieladung
       $data{$name}{current}{batpoweroutsum} = $pbosum;                                     # summarische laufende Batterieentladung
       $data{$name}{current}{batcapsum}      = $bcapsum;                                    # Summe installierte Batterie Kapazität in Wh
+      $data{$name}{current}{batwhtotal}     = $socwhsum;                                   # Ladung in Wh über alle Batterien
   }
 
 return;
