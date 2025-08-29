@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "08.20.01";
+my $ModulVersion = "08.20.02";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -198,12 +198,14 @@ my %IGD064   = (
         WANIPConnectionIPv6DNS     => { service => "WANIPConnection:1",
                                         control => "WANIPConn1",
                                         action  => "X_AVM_DE_GetIPv6DNSServer",
-                                        igd     => 1},
-        WANIPv6FirewallControl     => { service => "WANIPv6FirewallControl:1",
-                                        control => "Control",
-                                        action  => "GetFirewallStatus",
                                         igd     => 1}
 );
+#        WANIPv6FirewallControl     => { service => "WANIPv6FirewallControl:1",
+#                                        control => "WANIPv6Firewall1",
+#                                        action  => "GetFirewallStatus",
+#                                        igd     => 1}
+
+
 
 my %TR064   = (
         DeviceInfo                 => { service => "DeviceInfo:1",
@@ -1211,6 +1213,24 @@ sub FRITZBOX_Define($$)
      $hash->{LuaQueryCmd}{$key}{AttrVal} = 1;
    }
 
+   # $hash->{TR064control} = \%TR064;
+   foreach my $key (keys %TR064) {
+     $hash->{TR064control}{$key}{service} = $TR064{$key}{service};
+     $hash->{TR064control}{$key}{control} = $TR064{$key}{control};
+     $hash->{TR064control}{$key}{action}  = $TR064{$key}{action};
+     $hash->{TR064control}{$key}{igd}     = $TR064{$key}{igd};
+     $hash->{TR064control}{$key}{active}  = 1;
+   }
+
+   # $hash->{IGDcontrol} = \%IGD064;
+   foreach my $key (keys %IGD064) {
+     $hash->{IGDcontrol}{$key}{service} = $IGD064{$key}{service};
+     $hash->{IGDcontrol}{$key}{control} = $IGD064{$key}{control};
+     $hash->{IGDcontrol}{$key}{action}  = $IGD064{$key}{action};
+     $hash->{IGDcontrol}{$key}{igd}     = $IGD064{$key}{igd};
+     $hash->{IGDcontrol}{$key}{active}  = 1;
+   }
+
    # Check APIs after fhem.cfg is processed
    $hash->{APICHECKED}      = 0;
    $hash->{WEBCONNECT}      = 0;
@@ -1617,6 +1637,7 @@ sub FRITZBOX_Attr($@)
 
    if ($aName eq "enableXtamInfo") {
      if ($cmd eq "set") {
+       return "only available for Fritz!OS equal or greater than 7.00" if $hash->{fhem}{fwVersion} > 0 && $hash->{fhem}{fwVersion} < 700;
        return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
      }
      if ($cmd eq "del" || $aVal == 0) {
@@ -4029,24 +4050,32 @@ sub FRITZBOX_Get($@)
            $returnStr .= '<td colspan="4">API Call: ' . $val[0] . ' for TR064</td>';
            $returnStr .= "</tr>\n";
            $returnStr .= "<tr>\n";
-           $returnStr .= "<td>Alias</td><td>Service</td><td>Control</td><td>Action</td>\n";
+           $returnStr .= "<td>Alias</td><td>Service</td><td>Control</td><td>Action</td><td>Available</td>\n";
            $returnStr .= "</tr>\n";
 
            # get <name> tr064Command <service> <control> <action>
 
-           foreach my $key (sort { $a cmp $b } keys %TR064) {
+           foreach my $key (sort { $a cmp $b } keys %{ $hash->{TR064control} }) {
              if(($key !~ /WANIPConnection|WANPPPConnection/) || ($key eq "WANIPConnection" && lc($avmModel) =~ /cable|fibre|lte/) || ($key eq "WANPPPConnection" && lc($avmModel) !~ /cable|fibre|lte/)) {
 
                my $klickcmd = $command;
-                  $klickcmd =~ s/keyButton/$key/g;
-                  $klickcmd =~ s/PERLcmd/get $name tr064Command $TR064{$key}{service} $TR064{$key}{control} $TR064{$key}{action}/g;
-                  $klickcmd =~ s/quittieren/$key/g;
 
+               if ($hash->{TR064control}{$key}{active} == 1) {
+                 $klickcmd =~ s/keyButton/$key/g;
+                 $klickcmd =~ s/PERLcmd/get $name tr064Command $hash->{TR064control}{$key}{service} $hash->{TR064control}{$key}{control} $hash->{TR064control}{$key}{action}/g;
+                 $klickcmd =~ s/quittieren/$key/g;
+               } elsif($hash->{TR064control}{$key}{active} == -1) {
+                 $klickcmd = "TR064 not activated";
+               } else {
+                 $klickcmd = "not available";
+               }
+ 
                $returnStr .= "<tr>\n";
                $returnStr .= "<td>" . $klickcmd . "</td>";
-               $returnStr .= "<td>" . $TR064{$key}{service} . "</td>";
-               $returnStr .= "<td>" . $TR064{$key}{control} . "</td>";
-               $returnStr .= "<td>" . $TR064{$key}{action} . "</td>";
+               $returnStr .= "<td>" . $hash->{TR064control}{$key}{service} . "</td>";
+               $returnStr .= "<td>" . $hash->{TR064control}{$key}{control} . "</td>";
+               $returnStr .= "<td>" . $hash->{TR064control}{$key}{action}  . "</td>";
+               $returnStr .= "<td>" . ($hash->{TR064control}{$key}{active} ? "yes" : "no")  . "</td>";
                $returnStr .= "</tr>\n";
              }
            }
@@ -4058,21 +4087,29 @@ sub FRITZBOX_Get($@)
            $returnStr .= '<td colspan="4">API Call: ' . $val[0] . ' for IGD</td>';
            $returnStr .= "</tr>\n";
            $returnStr .= "<tr>\n";
-           $returnStr .= "<td>Alias</td><td>Service</td><td>Control</td><td>Action</td>\n";
+           $returnStr .= "<td>Alias</td><td>Service</td><td>Control</td><td>Action</td><td>Available</td>\n";
            $returnStr .= "</tr>\n";
 
-           foreach my $key (sort { $a cmp $b } keys %IGD064) {
+           foreach my $key (sort { $a cmp $b } keys %{ $hash->{IGDcontrol} }) {
 
              my $klickcmd = $command;
-                $klickcmd =~ s/keyButton/$key/g;
-                $klickcmd =~ s/PERLcmd/get $name tr064Command igd $IGD064{$key}{service} $IGD064{$key}{control} $IGD064{$key}{action}/g;
-                $klickcmd =~ s/quittieren/$key/g;
+
+             if ($hash->{IGDcontrol}{$key}{active} == 1) {
+               $klickcmd =~ s/keyButton/$key/g;
+               $klickcmd =~ s/PERLcmd/get $name tr064Command igd $hash->{IGDcontrol}{$key}{service} $hash->{IGDcontrol}{$key}{control} $hash->{IGDcontrol}{$key}{action}/g;
+               $klickcmd =~ s/quittieren/$key/g;
+             } elsif($hash->{IGDcontrol}{$key}{active} == -1) {
+               $klickcmd = "TR064 not activated";
+             } else {
+               $klickcmd = "not available";
+             }
 
              $returnStr .= "<tr>\n";
              $returnStr .= "<td>" . $klickcmd . "</td>";
-             $returnStr .= "<td>" . $IGD064{$key}{service} . "</td>";
-             $returnStr .= "<td>" . $IGD064{$key}{control} . "</td>";
-             $returnStr .= "<td>" . $IGD064{$key}{action} . "</td>";
+             $returnStr .= "<td>" . $hash->{IGDcontrol}{$key}{service} . "</td>";
+             $returnStr .= "<td>" . $hash->{IGDcontrol}{$key}{control} . "</td>";
+             $returnStr .= "<td>" . $hash->{IGDcontrol}{$key}{action} . "</td>";
+             $returnStr .= "<td>" . ($hash->{IGDcontrol}{$key}{active} == 1 ? "yes" : "no")  . "</td>";
              $returnStr .= "</tr>\n";
            }
 
@@ -5178,11 +5215,18 @@ sub FRITZBOX_Readout_Run_Web_LuaQuery($$$$) {
      FRITZBOX_Readout_Add_Reading $hash, $roReadings, "->TR064",   $result->{box_tr064};
    }
 
-#   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_upnp",                   $result->{box_upnp}, "onoff";
-#   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "->UPNP",                     $result->{box_upnp};
+   if($hash->{TR064control}{UPnP}{active} != 1) {
+     if ($hash->{LuaQueryCmd}{box_upnp}{active} == 1) {
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_upnp",               $result->{box_upnp}, "onoff";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "->UPNP",                 $result->{box_upnp};
+     } else {
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_upnp",               "upn state not available";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "->UPNP",                 -1;
+     }
+   }
+   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_upnp_control_activated", $result->{box_upnpCtrl}, "onoff";
 
    FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_tr069",                  $result->{box_tr069}, "onoff";
-   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_upnp_control_activated", $result->{box_upnpCtrl}, "onoff";
    FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_stdDialPort",            $result->{box_stdDialPort}, "dialport";
    FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_cpuTemp",                $result->{box_cpuTemp};
 
@@ -5268,21 +5312,22 @@ sub FRITZBOX_Readout_Run_Web_LuaQuery($$$$) {
 
 #-------------------------------------------------------------------------------------
 #Get TAM readings
-   $runNo = 1;
+   $runNo = 0;
    foreach ( @{ $result->{tam} } ) {
-      $_->{_node} =~ m/(\d+)/;
-#      $rName = "tam" . $runNo;
-      $rName = "tam" . $1;
-      if ($_->{Display} eq "1")
-      {
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName,           $_->{Name};
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_state",  $_->{Active}, "onoff";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_newMsg", $_->{NumNewMessages};
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_oldMsg", $_->{NumOldMessages};
+     if ($_->{Display} eq "1") {
+       if ($_->{_node}) {
+         $_->{_node} =~ m/(\d+)/;
+         $rName = "tam" . $1;
+       } else {
+         $rName = "tam" . $runNo;
+       }
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName,           $_->{Name};
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_state",  $_->{Active}, "onoff";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_newMsg", $_->{NumNewMessages};
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_oldMsg", $_->{NumOldMessages};
       }
 # Löchen ausgeblendeter TAMs
-      elsif (defined $hash->{READINGS}{$rName} )
-      {
+      elsif (defined $hash->{READINGS}{$rName} ) {
          FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName,"";
          FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_state", "";
          FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_newMsg","";
@@ -7168,27 +7213,29 @@ sub FRITZBOX_Readout_Run_Web_TR064($$$$)
      if ($avmModel =~ "Box") {
 
        #-------------------------------------------------------------------------------------
-       # UPNP Informationen
+       # UPNP Informationen if available
+       if ($hash->{TR064control}{UPnP}{active} == 1) {
 
-       @tr064CmdArray = (["X_AVM-DE_UPnP:1", "x_upnp", "GetInfo"]);
+         @tr064CmdArray = (["X_AVM-DE_UPnP:1", "x_upnp", "GetInfo"]);
 
-       @tr064Result = FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
+         @tr064Result = FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
 
-       if ($tr064Result[0]->{UPnPError}) {
-         $strCurl = FRITZBOX_Helper_Dumper($hash, \@tr064Result);
-         FRITZBOX_Log $hash, 2, "UPNP GetInfo -> \n" . $strCurl;
-       } else {
+         if ($tr064Result[0]->{UPnPError}) {
+           $strCurl = FRITZBOX_Helper_Dumper($hash, \@tr064Result);
+           FRITZBOX_Log $hash, 2, "UPNP GetInfo -> \n" . $strCurl;
+         } else {
 
-         FRITZBOX_Log $hash, 5, "UPNP GetInfo -> \n" . FRITZBOX_Helper_Dumper($hash, \@tr064Result, 5);
+           FRITZBOX_Log $hash, 5, "UPNP GetInfo -> \n" . FRITZBOX_Helper_Dumper($hash, \@tr064Result, 5);
 
-         if ($tr064Result[0]->{GetInfoResponse}) {
+           if ($tr064Result[0]->{GetInfoResponse}) {
 
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_upnp", $tr064Result[0]->{GetInfoResponse}->{NewEnable}, "onoff";
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "->UPNP",   $tr064Result[0]->{GetInfoResponse}->{NewEnable};
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_upnp", $tr064Result[0]->{GetInfoResponse}->{NewEnable}, "onoff";
+             FRITZBOX_Readout_Add_Reading $hash, $roReadings, "->UPNP",   $tr064Result[0]->{GetInfoResponse}->{NewEnable};
+           }
   
          }
           
-       }
+       } # end, UPNP Informationen if available
 
        #-------------------------------------------------------------------------------------
        # USB Mobilfunk-Modem Informationen
@@ -8633,11 +8680,12 @@ sub FRITZBOX_Set_check_APIs($)
       $apiError .= " luaData:" . $response->code;
 
    # Check if tr064 specification exists and determine TR064-Port
-      $response = $agent->get( "http://".$host.":49000/tr64desc.xml" );
+      $response = $agent->get( "http://" .$host. ":49000/tr64desc.xml" );
 
       if ($response->is_success) { #determine TR064-Port
          $content   = $response->content;
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
+         $hash->{TR064} = 1;
          FRITZBOX_Log $hash, 5-$myVerbose, "API TR-064 found.";
 
          #Determine TR064-Port
@@ -8654,6 +8702,7 @@ sub FRITZBOX_Set_check_APIs($)
       }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
+         $hash->{TR064} = 0;
          FRITZBOX_Log $hash, 4-$myVerbose, "API TR-064 not available: " . $response->status_line if $response->code != 500;
       }
 
@@ -8838,6 +8887,40 @@ sub FRITZBOX_Set_check_APIs($)
            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "";
          }
 
+         my $avmModel = InternalVal($name, "MODEL", $hash->{boxModel});
+         my $serviceList = FRITZBOX_get_TR064_ServiceList ($hash, undef, "tr64" . "desc.xml");
+
+         FRITZBOX_Log $hash, 4, "ApiCheck TR64 serviceList\n" . $serviceList;
+
+         foreach my $key (keys %{ $hash->{TR064control} }) {
+           if(($key !~ /WANIPConnection|WANPPPConnection/) || ($key eq "WANIPConnection" && lc($avmModel) =~ /cable|fibre|lte/) || ($key eq "WANPPPConnection" && lc($avmModel) !~ /cable|fibre|lte/)) {
+
+             my $tr64service = $hash->{TR064control}{$key}{control};
+             if ($serviceList =~ /$tr64service/) {
+               FRITZBOX_Log $hash, 4, "$key = $hash->{TR064control}{$key}{control}: Ok";
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->" . $key . "->active", 1;
+             } else {
+               FRITZBOX_Log $hash, 4, "$key = $hash->{TR064control}{$key}{control}: not Ok";
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->" . $key . "->active", ($hash->{TR064} != 1 ? -1 : 0)
+             }
+           }
+         }
+
+         $serviceList = FRITZBOX_get_TR064_ServiceList ($hash, undef, "igd" . "desc.xml");
+         FRITZBOX_Log $hash, 4, "ApiCheck IGD serviceList\n" . $serviceList;
+
+         foreach my $key (keys %{ $hash->{IGDcontrol} }) {
+
+           my $IGDcontrol = $hash->{IGDcontrol}{$key}{control};
+           if ($serviceList =~ /$IGDcontrol/) {
+             FRITZBOX_Log $hash, 4, "$key = $hash->{IGDcontrol}{$key}{control}: Ok";
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "IGDcontrol->" . $key . "->active", 1;
+           } else {
+             FRITZBOX_Log $hash, 4, "$key = $hash->{IGDcontrol}{$key}{control}: not Ok";
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "IGDcontrol->" . $key . "->active", ($hash->{TR064} != 1 ? -1 : 0)
+           }
+         }
+
          if($luaQueryOk) {
 
            my $queryStr = "";
@@ -8880,7 +8963,6 @@ sub FRITZBOX_Set_check_APIs($)
 
                } elsif ($response->{$key} eq "") {
                  FRITZBOX_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 4 not Ok";
-
                  FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 0;
 
                } else {
@@ -8893,6 +8975,7 @@ sub FRITZBOX_Set_check_APIs($)
                FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->box_cpuTemp->AttrVal", 0;
                FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp", "";
              }
+
            }
 
          } # End if($luaQueryOk)
@@ -13891,6 +13974,8 @@ sub FRITZBOX_get_TR064_ServiceList($;$$)
    my ($hash, $profService, $dslforum) = @_;
 #   my $name = $defs{NAME};
    my $name = $hash->{NAME};
+   my $port = $hash->{SECPORT};
+
    $dslforum ||= "tr64desc.xml";
 
 
@@ -13901,8 +13986,8 @@ sub FRITZBOX_get_TR064_ServiceList($;$$)
    }
 
    my $host = $hash->{HOST};
-#   my $url = 'http://'.$host.":49000/tr64desc.xml";
-   my $url = 'http://'.$host.":49000/$dslforum";
+#   my $url = 'http://' .$host. ":49000/tr64desc.xml";
+   my $url = 'http://' .$host. ":49000/$dslforum";
 
    my $returnStr = "_" x 130 ."\n\n";
    $returnStr .= " List of TR-064 services and actions that are provided by the device '$host'\n";
@@ -13916,6 +14001,9 @@ sub FRITZBOX_get_TR064_ServiceList($;$$)
    return "$url does not exist."     if $response->is_error();
 
    my $content = $response->content;
+
+   FRITZBOX_Log $hash, 4, "response service page $url\n" . $content;
+
    my @serviceArray;
 
 # {FRITZBOX_get_TR064_ServiceList($defs{"FritzBox"},undef,"igddesc.xml")}
@@ -13940,6 +14028,8 @@ sub FRITZBOX_get_TR064_ServiceList($;$$)
         $control = $1;
      } elsif ($serviceXML =~ m/<controlurl>\/igdupnp\/control\/(.*?)<\/controlurl>/is) {
         $control = $1;
+     } elsif ($serviceXML =~ m/<controlurl>\/igd\dupnp\/control\/(.*?)<\/controlurl>/is) {
+        $control = $1;
      }
 
      my $scpd = $1     if $serviceXML =~ m/<scpdurl>(.*?)<\/scpdurl>/is;
@@ -13950,9 +14040,9 @@ sub FRITZBOX_get_TR064_ServiceList($;$$)
 # Get actions of each service
    foreach (@serviceArray) {
 
-      $url = 'http://'.$host.":49000".$_->[2];
+      $url = 'http://' .$host. ":49000" . $_->[2];
 
-      FRITZBOX_Log $hash, 5, "Getting action page $url";
+      FRITZBOX_Log $hash, 4, "Getting action page $url";
       my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
       my $response = $agent->get( $url );
 
@@ -13961,14 +14051,14 @@ sub FRITZBOX_get_TR064_ServiceList($;$$)
       my $content = $response->content;
 
    # get version
-      $content =~ /<major>(.*?)<\/major>/isg;
+      $content =~ /<major>(.*?)<\/major>/;
       my $version = $1;
-      $content =~ /<minor>(.*?)<\/minor>/isg;
-      $version .= ".".$1;
+      $content =~ /<minor>(.*?)<\/minor>/;
+      $version .= "." .$1;
 
       $returnStr .= "_" x 130 ."\n\n";
-      $returnStr .= " Spec: http://".$host.":49000".$_->[2]."    Version: ".$version."\n";
-      $returnStr .= " Service: ".$_->[0]."     Control: ".$_->[1]."\n";
+      $returnStr .= " Spec: http://" .$host. ":49000" .$_->[2]. "    Version: " .$version. "\n";
+      $returnStr .= " Service: " .$_->[0]. "     Control: " .$_->[1]. "\n";
       $returnStr .= "-" x 130 ."\n";
 
    # get name and arguments of each action
@@ -16227,7 +16317,8 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          <dt><code>enableXtamInfo &lt;0 | 1&gt;</code></dt>
          <br>
          Turns the display of extended TAM information on/off.<br>
-         Default is off.
+         Default is off.<br>
+         Needs FRITZ!OS 7.00 or higher.
       </li><br>
 
       <li><a name="lanDeviceReading"></a>
@@ -17295,7 +17386,7 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          <br><br>
          Schaltet die &Uuml;bernahme von USB Mobile Ger&auml;ten als Reading aus/ein.
          <br>
-         Ben&ouml;tigt Fritz!OS 7.50 oder h&ouml;her.
+         Benötigt Fritz!OS 7.50 oder höher.
       </li><br>
 
       <li><a name="enablePassivLanDevices"></a>
@@ -17351,7 +17442,8 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          <dt><code>enableXtamInfo  &lt;0 | 1&gt;</code></dt>
          <br>
          Schaltet die Anzeige von erweiterten TAM Informationen aus/ein.<br>
-         Standard ist: aus.
+         Standard ist: aus.<br>
+         Benötigt FRITZ!OS 7.00 oder höher.
       </li><br>
 
       <li><a name="lanDeviceReading"></a>
