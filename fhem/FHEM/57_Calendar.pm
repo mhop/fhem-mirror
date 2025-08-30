@@ -1810,6 +1810,7 @@ sub Calendar_Initialize($) {
                       "onCreateEvent quirks ".
                       "defaultFormat defaultTimeFormat ".
                       "hasModeReadings:0,1 " .
+				          	  "userAgent " .
                       $readingFnAttributes;
 }
 
@@ -2695,6 +2696,8 @@ sub Calendar_GetUpdate($$$;$) {
         $SSLArgs= { SSL_verify_mode => $SSLVerifyMode };
       }
     }
+	
+	  my $userAgent = AttrVal($name, 'userAgent', 'fhem');
 
     my $timeout= AttrVal($name, "timeout", 30);
     HttpUtils_NonblockingGet({
@@ -2707,6 +2710,7 @@ sub Calendar_GetUpdate($$$;$) {
       removeall => $removeall,
       sslargs => $SSLArgs,
       t => $t,
+      header => { 'User-Agent' => $userAgent },
       callback => \&Calendar_ProcessUpdate,
     });
     Log3 $hash, 4, "Calendar $name: Getting data from URL <hidden>"; # $url
@@ -2756,38 +2760,49 @@ sub Calendar_ProcessUpdate($$$) {
       return 0;
   }
 
-  # not for the developer:
+  # note for the developer:
   # we must be sure that code that starts here ends with Calendar_CheckAndRearm()
   # no matter what branch is taken in the following
 
   delete($hash->{".fhem"}{iCalendar});
 
-  my $httpresponsecode= $param->{code};
-
+  my $httpresponsecode = $param->{code} // '-';
+  
+  readingsBeginUpdate($hash);
   if($errmsg) {
     Log3 $name, 1, "Calendar $name: retrieval failed with error message $errmsg";
-    readingsSingleUpdate($hash, "state", "error ($errmsg)", 1);
+    readingsBulkUpdate($hash, "state", "error ($errmsg)");
+	readingsBulkUpdate($hash, 'lastResponse', "$httpresponsecode $errmsg");
   } else {
     if($type eq "url") {
+      Log3 $name, 5, "Calendar $name: HTTP response code $httpresponsecode";
       if($httpresponsecode != 200) {
         $errmsg= "retrieval failed with HTTP response code $httpresponsecode";
         Log3 $name, 1, "Calendar $name: $errmsg";
-        readingsSingleUpdate($hash, "state", "error ($errmsg)", 1);
-        Log3 $name, 5, "Calendar $name: HTTP response header:\n" .
+        readingsBulkUpdate($hash, "state", "error ($errmsg)");
+		readingsBulkUpdate($hash, 'lastResponse', "$httpresponsecode Error");
+		Log3 $name, 5, "Calendar $name: HTTP response header:\n" .
           $param->{httpheader};
       } else {
-        Log3 $name, 5, "Calendar $name: HTTP response code $httpresponsecode";
-        readingsSingleUpdate($hash, "state", "retrieved", 1);
+        readingsBulkUpdate($hash, "state", "retrieved");
+		readingsBulkUpdate($hash, 'lastResponse', 'OK');
       }
     } elsif($type eq "file") {
       Log3 $name, 5, "Calendar $name: file retrieval successful";
-      readingsSingleUpdate($hash, "state", "retrieved", 1);
+      readingsBulkUpdate($hash, "state", "retrieved");
+      readingsBulkUpdate($hash, 'lastResponse', 'OK');
     } else {
       # this case never happens by virtue of _Define, so just
-      die "Software Error";
+      #die "Software Error";
+	  # Sorry, but FHEM must never die!
+	  Log3 $name, 1, "Calendar $name: Software Error!";
+	  readingsBulkUpdate($hash, 'state', 'Software Error');
+      readingsBulkUpdate($hash, 'lastResponse', 'Software Error');
+	  readingsEndUpdate($hash, 1);
+	  return 0;
     }
   }
-
+  readingsEndUpdate($hash, 1);
   $hash->{".fhem"}{t}= $t;
   if($errmsg or !defined($ics) or ("$ics" eq "") ) {
     Log3 $hash, 1, "Calendar $name: retrieved no or empty data";
@@ -2803,6 +2818,7 @@ sub Calendar_ProcessUpdate($$$) {
       Calendar_AsynchronousUpdateCalendar($hash);
     }
   }
+
 
 }
 
@@ -3905,6 +3921,11 @@ sub CalendarEventsAsHtml($;$) {
         </ul>
     </li><br><br>
 
+    <li><code>userAgent</code><br>
+        Set User-Agent in HTML request header. Needed for example with shared calendars on outlook.office365.com (error 503).
+		Set to same value as an browser does which can download ics. Example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0". You may get an error 500 if string is invalid.
+    </li><br><br>
+
 
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
@@ -4551,7 +4572,7 @@ sub CalendarEventsAsHtml($;$) {
         Weitere Informationen unter <a href="#CalendarPlugIns">Plug-ins</a> im Text.
     </li><br><br>
 
-        <li><code>SSLVerify</code><br>
+    <li><code>SSLVerify</code><br>
 
         Dieses Attribut setzt die Art der &Uuml;berpr&uuml;fung des Zertifikats des Partners
         bei mit SSL gesicherten Verbindungen. Entweder auf 0 setzen f&uuml;r
@@ -4584,6 +4605,10 @@ sub CalendarEventsAsHtml($;$) {
         </ul>
     </li><br><br>
 
+    <li><code>userAgent</code><br>
+        Wert des Feldes User-Agent im HTML Request Header. Notwendig z.B. bei Abfragen über outlook.office365.com (error 503).
+		Auf den gleichen Wert setzen, wie es ein Browser macht, mit dem der Download des ICS funktioniert. Beispiel: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0". Ist der Wert ungültig, erhält man einen error 500.
+    </li><br><br>
 
 <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
