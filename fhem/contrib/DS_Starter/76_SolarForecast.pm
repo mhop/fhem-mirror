@@ -11925,7 +11925,7 @@ sub __batChargeOptTargetPower {
           my $newshod                        = sprintf "%02d", (int $shod + 1);
           $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin} if(defined $hsurp->{$newshod});
                                                
-          storeReading ('Battery_ChargeOptTargetPower_'.$sbn,  $hsurp->{$shod}{$sbn}{pneedmin}) if($hsurp->{$shod}{nhr} eq '00');                   
+          storeReading ('Battery_ChargeOptTargetPower_'.$sbn,  $hsurp->{$shod}{$sbn}{pneedmin}.' W') if($hsurp->{$shod}{nhr} eq '00');                   
       }
   }
   
