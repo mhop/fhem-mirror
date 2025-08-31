@@ -511,7 +511,7 @@ ZWDongle_Get($@)
 
   } elsif($cmd eq "homeId") {                  ############################
     my $hi = substr($ret,4,8);
-    my $ni = substr($ret,12);
+    my $ni = substr($ret,-2);
     $msg = sprintf("HomeId:%s CtrlNodeIdHex:%s", $hi, $ni);
     $hash->{homeId} = $hi;
     $hash->{nodeIdHex} = $ni;
