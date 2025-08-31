@@ -2,6 +2,13 @@
 #
 ##############################################
 #
+# 2025.08.11 - fichtennadel v0.5.2
+# - CHANGE: 
+#          - HttpUtils_NonblockingGet parameters
+#            - new attribute httpTimeout  
+#            - noshutdown = 0
+#          - honor disable
+#
 # 2025.05.07 - fichtennadel v0.5
 # - CHANGE: 
 #          - keep (inverted) sign on PowerFlow_Site_P_Load (https://forum.fhem.de/index.php?topic=138356.msg1341014#msg1341014)
@@ -129,7 +136,7 @@ use Date::Parse;
 use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 
-my $ModulVersion        = "0.5";
+my $ModulVersion        = "0.5.2";
 
 ##############################################################################
 sub fronius_Initialize($) {
@@ -153,6 +160,7 @@ sub fronius_Initialize($) {
                           "IntervalInverterRealtimeData ".
                           "useHTTPS:0,1 ".
                           "sslargs ".
+                          "httpTimeout ".
                           "SaveDataHead:0,1 ".
                           $readingFnAttributes;
 }
@@ -208,6 +216,8 @@ sub fronius_Undefine($$) {
 sub fronius_StartUp($) {
   my ($hash)       = @_;
   my $name = $hash->{NAME};
+  
+  return if(IsDisabled($name));
   
   RemoveInternalTimer ($hash, 'fronius_StartUp');
 
@@ -316,6 +326,9 @@ sub fronius_Set($@) {
       return join(" ", sort keys %sets);
       
   } elsif ($opt eq 'RestartInterval') {
+    
+    return "$name is disabled" if(IsDisabled($name));
+
     RemoveInternalTimer($hash, "fronius_GetAPIVersionInfo");
     RemoveInternalTimer($hash, "fronius_GetActiveDeviceInfo");
     RemoveInternalTimer($hash, "fronius_GetPowerFlowRealtimeData");
@@ -330,6 +343,9 @@ sub fronius_Set($@) {
     InternalTimer(gettimeofday() + 25 + $interval, "fronius_GetInverterRealtimeData",  $hash, 0);
     
   } elsif ($interval le 0) {
+
+    return "$name is disabled" if(IsDisabled($name));
+
     if ($opt eq 'GetAllData') {
       #übergabeparameter durchsuchen auf gültigkeit und übernehmen
       my $tdelay = 0;
@@ -386,8 +402,20 @@ sub fronius_Attr($$$) {
   my $hash = $defs{$name};
   
   Log3 $name, 5, "[$name] [fronius_Attr] attrName=$attrName";
+
   
-  if ( $attrName eq "SaveDataHead" ) {
+  if ( $attrName eq "disable" ) {
+    $attrVal = "" if !defined($attrVal);
+    if ($attrVal eq "1") {
+      RemoveInternalTimer($hash);
+      $hash->{STATE} = 'disabled';
+      Log3 $name, 3, "[$name] [fronius_Attr] disabled";
+    } else {
+      InternalTimer (gettimeofday() + 2, 'fronius_StartUp', $hash, 0);
+      $hash->{STATE} = '';
+      Log3 $name, 3, "[$name] [fronius_Attr] enabled";
+    }
+  } elsif ( $attrName eq "SaveDataHead" ) {
     fronius_clearHeadData($hash);
   } elsif ($attrName eq 'useHTTPS') {
     fronius_StartUp($hash);
@@ -710,8 +738,8 @@ sub fronius_HandleCmdQueue($) {
   
     my $params =  {
                        url             => $param->{url},
-                       timeout         => 10,
-                       noshutdown      => 1,
+                       timeout         => AttrVal( $name, "httpTimeout", 10),
+                       noshutdown      => 0,
                        keepalive       => 0,
                        method          => "GET",
                        CL              => $param->{CL},
@@ -1000,6 +1028,10 @@ sub fronius_setState($$) {
 
       <li><a id="fronius-attr-sslargs">sslargs</a><br>
       sslargs to pass to HttpUtils_NonblockingGet, see <a href="https://wiki.fhem.de/wiki/HttpUtils">https://wiki.fhem.de/wiki/HttpUtils</a> / <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods">http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods</a>
+      </li>
+
+      <li><a id="fronius-attr-httpTimeout">httpTimeout</a><br>
+      timeout in seconds for https request, default 10 seconds
       </li>
 
     </ul>
