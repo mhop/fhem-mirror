@@ -510,11 +510,12 @@ ZWDongle_Get($@)
     $msg .= " ".join(" ",@list);
 
   } elsif($cmd eq "homeId") {                  ############################
-    $msg = sprintf("HomeId:%s CtrlNodeIdHex:%s",
-                substr($ret,4,8), substr($ret,12,2));
-    $hash->{homeId} = substr($ret,4,8);
-    $hash->{nodeIdHex} = substr($ret,12,2);
-    $attr{$name}{homeId} = substr($ret,4,8);
+    my $hi = substr($ret,4,8);
+    my $ni = substr($ret,12);
+    $msg = sprintf("HomeId:%s CtrlNodeIdHex:%s", $hi, $ni);
+    $hash->{homeId} = $hi;
+    $hash->{nodeIdHex} = $ni;
+    $attr{$name}{homeId} = $hi;
 
   } elsif($cmd eq "version") {                 ############################
     $msg = join("",  map { chr($_) } @r[2..13]);
