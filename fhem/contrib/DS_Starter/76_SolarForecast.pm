@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.58.0" => "29.08.2025  _batChargeMgmt: Code change ",
+  "1.58.0" => "29.08.2025  _batChargeMgmt: Code change and new loading feature with Reading Battery_ChargeOptTargetPower_XX ".
+                           "edit Comref, delete obsolete Attr graphicBeamHeightLevelX, new parameter setupBatteryDevXX->pinreduced ",
   "1.57.3" => "26.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ".
                            "check global attribute dnsServer in all SF Models, expand plantControl->genPVdeviation for perspective change ".
                            "Household consumption calculation uniformly converted to vector calculation ".
@@ -1700,10 +1701,10 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $av = 'obsolete#-#use#attr#graphicControl#instead';
+  # my $av = 'obsolete#-#use#attr#graphicControl#instead';
   # my $av1 = 'obsolete#-#will#be#deleted#soon';
   # my $av2 = 'obsolete#-#use#attr#graphicSelect#instead';
-  $hash->{AttrList} .= " graphicBeamHeightLevel1:$av graphicBeamHeightLevel2:$av graphicBeamHeightLevel3:$av ";
+  # $hash->{AttrList} .= " graphicBeamHeightLevel1:$av graphicBeamHeightLevel2:$av graphicBeamHeightLevel3:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -7373,18 +7374,19 @@ sub _attrBatteryDev {                    ## no critic "not used"
   my $bn   = (split 'setupBatteryDev', $aName)[1];
 
   my $valid = {
-      pin       => { comp => '.+',                                           must => 1, act => 0 },
-      pout      => { comp => '.+',                                           must => 1, act => 0 },
-      pinmax    => { comp => '\d+',                                          must => 0, act => 0 },
-      poutmax   => { comp => '\d+',                                          must => 0, act => 0 },
-      intotal   => { comp => '.*',                                           must => 0, act => 0 },
-      outtotal  => { comp => '.*',                                           must => 0, act => 0 },
-      cap       => { comp => '((?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh)$))', must => 1, act => 0 },
-      charge    => { comp => '.*',                                           must => 0, act => 0 },
-      icon      => { comp => '.*',                                           must => 0, act => 0 },
-      show      => { comp => '(?:[0-3](?::(?:top|bottom))?)',                must => 0, act => 0 },
-      label     => { comp => '(none|below|beside)',                          must => 0, act => 0 },
-      asynchron => { comp => '(0|1)',                                        must => 0, act => 0 },
+      pin        => { comp => '.+',                                           must => 1, act => 0 },
+      pout       => { comp => '.+',                                           must => 1, act => 0 },
+      pinmax     => { comp => '\d+',                                          must => 0, act => 0 },
+      pinreduced => { comp => '\d+',                                          must => 0, act => 0 },
+      poutmax    => { comp => '\d+',                                          must => 0, act => 0 },
+      intotal    => { comp => '.*',                                           must => 0, act => 0 },
+      outtotal   => { comp => '.*',                                           must => 0, act => 0 },
+      cap        => { comp => '((?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh)$))', must => 1, act => 0 },
+      charge     => { comp => '.*',                                           must => 0, act => 0 },
+      icon       => { comp => '.*',                                           must => 0, act => 0 },
+      show       => { comp => '(?:[0-3](?::(?:top|bottom))?)',                must => 0, act => 0 },
+      label      => { comp => '(none|below|beside)',                          must => 0, act => 0 },
+      asynchron  => { comp => '(0|1)',                                        must => 0, act => 0 },
   };
 
   if ($paref->{cmd} eq 'set') {      
@@ -7440,6 +7442,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{batteries}{$bn}{bposingraph};
       delete $data{$name}{batteries}{$bn}{blabel};
       delete $data{$name}{batteries}{$bn}{bpinmax}; 
+      delete $data{$name}{batteries}{$bn}{bpinreduced};
       delete $data{$name}{batteries}{$bn}{bpoutmax};
   }
   elsif ($paref->{cmd} eq 'del') {
@@ -8885,25 +8888,7 @@ sub centralTask {
   #    my $newval = $gco." beamWidth=$gbw";
   #    CommandAttr (undef, "$name graphicControl $newval");
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
-  #}
-         
-  my $gco  = AttrVal ($name, 'graphicControl', '');         
-  my $hgt1 = AttrNum ($name, 'graphicBeamHeightLevel1', undef);         # 02.08.
-  my $hgt2 = AttrNum ($name, 'graphicBeamHeightLevel2', undef);
-  my $hgt3 = AttrNum ($name, 'graphicBeamHeightLevel3', undef);
-  
-  my $hgt  = $hgt1 ? '1:'.$hgt1 : '';
-  $hgt    .= $hgt2 ? ($hgt ? ',' : '').'2:'.$hgt2 : '';
-  $hgt    .= $hgt3 ? ($hgt ? ',' : '').'3:'.$hgt3 : '';
-  
-  if ($hgt) {
-      my $newval = $gco." beamHeightlevel=$hgt";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicBeamHeightLevel1");
-      ::CommandDeleteAttr (undef, "$name graphicBeamHeightLevel2");
-      ::CommandDeleteAttr (undef, "$name graphicBeamHeightLevel3");
-  }
-  
+  #}  
   
   for my $c (1..MAXCONSUMER) {                                          # 23.07.                      
       $c = sprintf "%02d", $c;
@@ -11102,8 +11087,9 @@ sub _transferBatteryValues {
       my ($bout,$boutunit) = split ":", $h->{outtotal} // "-:-";                                  # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
       my $batchr           = $h->{charge} // '';                                                  # Readingname Ladezustand Batterie
       my $instcap          = $h->{cap};                                                           # numerischer Wert (Wh) oder Readingname installierte Batteriekapazität
-      my $pinmax           = $h->{pinmax}  // INFINITE;                                           # max. mögliche Ladeleistung
-      my $poutmax          = $h->{poutmax} // INFINITE;                                           # max. mögliche Entladeleistung
+      my $pinmax           = $h->{pinmax}     // INFINITE;                                        # max. mögliche Ladeleistung
+      my $pinreduced       = $h->{pinreduced} // $pinmax;                                         # reduzierte Ladeleistung (z.B. bei Ladung aus dem Grid)
+      my $poutmax          = $h->{poutmax}    // INFINITE;                                        # max. mögliche Entladeleistung     
 
       next if(!$pin || !$pou);
 
@@ -11281,6 +11267,7 @@ sub _transferBatteryValues {
       $data{$name}{batteries}{$bn}{bpowerin}     = $pbi;                                                 # momentane Batterieladung
       $data{$name}{batteries}{$bn}{bpowerout}    = $pbo;                                                 # momentane Batterieentladung
       $data{$name}{batteries}{$bn}{bpinmax}      = $pinmax;                                              # max. mögliche Ladeleistung
+      $data{$name}{batteries}{$bn}{bpinreduced}  = $pinreduced;                                          # # reduzierte Ladeleistung (z.B. bei Ladung aus dem Grid)
       $data{$name}{batteries}{$bn}{bpoutmax}     = $poutmax;                                             # max. mögliche Entladeleistung
       $data{$name}{batteries}{$bn}{bcharge}      = $soc;                                                 # Batterie SoC (%)
       $data{$name}{batteries}{$bn}{basynchron}   = $h->{asynchron} // 0;                                 # asynchroner Modus = X
@@ -11682,7 +11669,7 @@ sub _batChargeMgmt {
       my $lowSocwh    = $batinstcap * $lowSoc    / 100;                                          # lowSoC in Wh
 
       debugLog ($paref, 'batteryManagement', "Bat $bn ChargeMgmt - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
-      debugLog ($paref, 'batteryManagement', "Bat $bn ChargeMgmt - The PV generation, consumption and surplus listed below are based on the battery's share of the total capacity!");
+      debugLog ($paref, 'batteryManagement', "Bat $bn ChargeMgmt - The PV generation, consumption and surplus listed below are based on the battery's share of total installed capacity!");
 
       my $socwh  = sprintf "%.0f", ($batinstcap * $csoc / 100);                                  # aktueller SoC in Wh
       my $whneed = $batinstcap - $socwh;
@@ -11732,7 +11719,7 @@ sub _batChargeMgmt {
 
           ## (Rest) PV-Überschuß für den Tag
           ####################################
-          if ($pvfc) {
+          #if ($pvfc) {
               if ($today) {                                                                      # heutiger Tag
                   $confcss  -= $confc;                                                           # Verbrauch bis Sonnenuntergang - Verbrauch Fc aktuelle Stunde
                   $confcss   = 0 if($confcss < 0);
@@ -11746,7 +11733,7 @@ sub _batChargeMgmt {
                   $tompvfc  -= $pvfc;
                   $spday     = $tompvfc - $tomconfc;
               }
-          }
+          #}
 
           $spday       = 0 if($spday < 0);                                                       # PV Überschuß Prognose bis Sonnenuntergang
           my $sfmargin = $whneed * 0.5;                                                          # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
@@ -11794,7 +11781,7 @@ sub _batChargeMgmt {
               $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
 
               if (!$today) {
-                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
+                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, roTomPV: $tompvfc, roTomCON: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
               }
           }
           else {
@@ -11814,13 +11801,12 @@ sub _batChargeMgmt {
           ###############################################################
 		  my $spswh = max (0, sprintf ("%.0f", $fceff));                                         
           
-          if ($today && $spswh) {                                                                # nur Heute wenn Überschuß vorliegt  
+          if ($today) {                                                                # nur Heute wenn Überschuß vorliegt  
 			  $hsurp->{$hod}{hod}                = $hod;
               $hsurp->{$hod}{nhr}                = $nhr;
               $hsurp->{$hod}{fceff}              = $fceff;                                       # Überschuß in Wh der Stunde 
               $hsurp->{$hod}{spswh}              = $spswh;
               $hsurp->{$hod}{$bn}{spday}         = $spday;                                       # (Rest)PV-Überschuß am laufenden Tag
-              #$hsurp->{$hod}{$bn}{hrs2sset}      = sprintf "%.1f", ((CurrentVal ($name, 'sunsetTodayTs', $sttts) - $sttts) / 3600);
 			  $hsurp->{$hod}{$bn}{whneedmanaged} = $whneed;                                      # benötigte Ladeenergie Batterie x gemäß Ladesteuerung
               $hsurp->{$hod}{$bn}{socwh}         = $socwh;
               $hsurp->{$hod}{$bn}{batinstcap}    = $batinstcap;
@@ -11835,7 +11821,7 @@ sub _batChargeMgmt {
           
           my $stt = (split /[-:]/, $nhstt)[2];
           $stt   =~ s/\s/\//;
-          debugLog ($paref, 'batteryManagement', "Bat $bn ChgUnrestrict $stt -> $crel ($msg)");
+          debugLog ($paref, 'batteryManagement', "Bat $bn ChargeUR $stt -> $crel ($msg)");
       }
   }
   
@@ -11895,32 +11881,41 @@ sub __batChargeOptTargetPower {
   my $name  = $paref->{name};
   my $hsurp = $paref->{hsurp} // return;                # Hashref Überschußhash
 
-  my @sorted     = sort { $hsurp->{$a}{spswh} <=> $hsurp->{$b}{spswh} } keys %{$hsurp};
+  my @sorted = sort { $hsurp->{$a}{spswh} <=> $hsurp->{$b}{spswh} } keys %{$hsurp};          
   
   #for my $h (@sorted) {
   #    Log3 ($name, 1, "$name - sortierte Stunden: $h, surplus: $hsurp->{$h}{spswh}");
   #}
   
   for my $shod (@sorted) {
-      my $spls = $hsurp->{$shod}{spswh};
+      my $spls = 1 * $hsurp->{$shod}{spswh};
       
       for my $sbn (sort keys %{$hsurp->{$shod}}) {                                                               # jede Batterie
           next if($sbn =~ /hod|spswh|fceff|nhr/xs);
-          my $sbatinstcap                    = $hsurp->{$shod}{$sbn}{batinstcap};                                # Kapa dieser Batterie
+          
           my $runwh                          = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                         # Auswahl des zu verwenden Prognose-SOC (Wh)
                                                $hsurp->{$shod}{$sbn}{fcnextwh} : 
                                                $hsurp->{$shod}{$sbn}{socwh};
-                                        
+          
+          my $bpinreduced                    = BatteryVal ($name, $sbn, 'bpinreduced', 0);                       # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
+          
+          if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
+              $hsurp->{$shod}{$sbn}{pneedmin} = $bpinreduced;
+              storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W') if($hsurp->{$shod}{nhr} eq '00'); 
+              next;
+          }         
+          
+          my $sbatinstcap                    = $hsurp->{$shod}{$sbn}{batinstcap};                                # Kapa dieser Batterie          
           my $runwhneed                      = $sbatinstcap - $runwh;
           my $spday                          = $hsurp->{$shod}{$sbn}{spday};
           my $sphrs                          = $spday / $spls;                                                   # Reststunden mit Überschuß = PV-Tagesüberschuß / Stundenüberschuß
-          
           my $needraw                        = $sphrs ? $runwhneed / $sphrs : $runwhneed;
-          
-          #Log3 ($name, 1, "$name DEBUG> - Bat $sbn - hod: $shod, runwh: $runwh, runwhneed: $runwhneed, needraw: $needraw, sphrs: $sphrs"); 
-          
+          $needraw                          *= 1.2;                                                              # 20% Sicherheitsaufschlag 
+                   
           $hsurp->{$shod}{$sbn}{runwh}       = $runwh;
-          $hsurp->{$shod}{$sbn}{pneedmin}    = sprintf "%.0f", $spls > $needraw ? $needraw : $spls;              # Mindestladeleistung bzw. Energie bei 1h (Wh)
+          $hsurp->{$shod}{$sbn}{pneedmin}    = sprintf "%.0f", $spls > $needraw   ?                              # Mindestladeleistung bzw. Energie bei 1h (Wh)
+                                               $needraw ? $needraw : $bpinreduced : 
+                                               $spls;                                                             
           
           my $newshod                        = sprintf "%02d", (int $shod + 1);
           $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin} if(defined $hsurp->{$newshod});
@@ -11933,7 +11928,8 @@ sub __batChargeOptTargetPower {
       for my $k (sort { $a <=> $b } keys %{$hsurp}) {
           for my $bat (sort keys %{$hsurp->{$k}}) {
               next if($bat =~ /hod|spswh|fceff|nhr/xs);
-              Log3 ($name, 1, "$name DEBUG> - Bat $bat OptTargetPower - hod: $k, Start SoC: $hsurp->{$k}{$bat}{runwh} Wh, Surplus: $hsurp->{$k}{spswh} Wh, OptTargetPower: $hsurp->{$k}{$bat}{pneedmin} W");
+              my $ssoc = $hsurp->{$k}{$bat}{runwh} // '-';
+              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $hsurp->{$k}{spswh} Wh, OptTargetPower: $hsurp->{$k}{$bat}{pneedmin} W");
           }
       }
   }
@@ -12058,9 +12054,12 @@ sub _createSummaries {
           }
       }
       else {
-          $tomorrowSum->{PV}           += $pvfc  if(int($nhday) == int($tmoday));
-          $daftertomSum->{PV}          += $pvfc  if(int($nhday) == int($datmoday));
-          $daftertomSum->{Consumption} += $confc if(int($nhday) == int($datmoday));
+          $tomorrowSum->{PV} += $pvfc  if(int($nhday) == int($tmoday));
+          
+          if (int($nhday) == int($datmoday)) {
+              $daftertomSum->{PV}          += $pvfc;
+              $daftertomSum->{Consumption} += $confc;
+          }
       }
   }
 
@@ -26761,13 +26760,15 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
        <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] </b> <br><br>
-         If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management for this
-         battery device. <br>
+         If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management 
+         for this battery device. <br>
+         A set of control readings is generated; the module itself does not interfere with battery control. <br>
          The <b>Battery_OptimumTargetSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
          The <b>Battery_ChargeRequest_XX</b> reading is set to '1' if the current SoC has fallen below the minimum SoC. <br>
          In this case, the battery should be forcibly charged, possibly with mains power. <br>
-         The reading <b>Battery_ChargeUnrestricted_XX</b> indicates whether the battery should be charged at full power (1) without restriction or not 
-         or only with limited power if a feed-in limit is exceeded (0). <br>         
+         The reading <b>Battery_ChargeUnrestricted_XX</b> indicates whether the battery should be charged at full power without 
+         restriction (1), or not at all, or only when the <br>
+         feed-in limit (see <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>) is exceeded (0). <br>         
          The readings can be used to control the SoC (State of Charge) and to control the charging power used for the
          battery. <br>
          Detailed information on battery SoC and charging management is described in the
@@ -27473,8 +27474,8 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
        <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt; cap=&lt;Option&gt;                 <br>
-                                [pinmax=&lt;Integer&gt] [poutmax=&lt;Integer&gt] [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
-                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                                                               <br>
+                                [pinmax=&lt;Integer&gt] [pinreduced=&lt;Integer&gt] [poutmax=&lt;Integer&gt] [intotal=&lt;Readingname&gt;:&lt;Unit&gt;]                   <br>
+                                [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;] [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                   <br>
                                 [label=&lt;Option&gt] [[icon=&lt;recomm&gt;@&lt;Color&gt;]:[&lt;charge&gt;@&lt;Color&gt;]:[&lt;discharge&gt;@&lt;Color&gt;]:[&lt;omit&gt;@&lt;Color&gt;]]  </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data. <br>
@@ -27490,6 +27491,10 @@ to ensure that the system configuration is correct.
            <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                                     </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>pinmax</b>    </td><td>the maximum possible charging power in watts (optional)                                                       </td></tr>
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
+           <tr><td> <b>pinreduced</b></td><td>The reduced charging power in watts (optional). The value is set in Reading Battery_ChargeOptTargetPower_XX   </td></tr>
+           <tr><td>                  </td><td>if there is no PV surplus available to adjust the optimal charging power. This means that this                </td></tr>
+           <tr><td>                  </td><tdvalue can also be applied in the case of forced charging from the public grid.                                 </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>poutmax</b>   </td><td>the maximum possible discharge power in watts (optional)                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
@@ -29421,12 +29426,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] </b> <br><br>
          Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
          SoC- und Lade-Management für dieses Batteriegerät. <br>
+         Es wird ein Satz Steuerreadings erstellt; das Modul greift selbst <b>nicht</b> in die Batteriesteuerung ein. <br>
          Das Reading <b>Battery_OptimumTargetSoC_XX</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
          Das Reading <b>Battery_ChargeRequest_XX</b> wird auf '1' gesetzt, wenn der aktuelle SoC unter den Mindest-SoC gefallen
          ist. <br>
          In diesem Fall sollte die Batterie, unter Umständen mit Netzstrom, zwangsgeladen werden. <br>
-         Das Reading <b>Battery_ChargeUnrestricted_XX</b> gibt an, ob die Batterie uneingeschränkt mit voller Leistung (1), oder nicht 
-         bzw. nur mit eingeschränkter Leistung bei Überschreitung eines Einspeiselimits geladen werden sollte (0). <br>         
+         Das Reading <b>Battery_ChargeUnrestricted_XX</b> gibt an, ob die Batterie uneingeschränkt mit voller Leistung (1), oder 
+         nicht bzw. nur bei Überschreitung des <br> 
+         Einspeiselimits (siehe <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>) 
+         geladen werden sollte (0). <br>         
          Die Readings können zur Steuerung des SoC (State of Charge) sowie zur Steuerung des verwendeten Ladeleistung
          der Batterie verwendet werden. <br>
          Detaillierte Informationen zum Batterie SoC- und Lade-Management sind im 
@@ -30130,8 +30138,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
        <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; cap=&lt;Option&gt;                                                <br>
-                                [pinmax=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt] [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
-                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                                                                                                     <br>
+                                [pinmax=&lt;Ganzzahl&gt] [pinreduced=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt] [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;]                                                   <br>
+                                [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                                                      <br>
                                 [label=&lt;Option&gt] [[icon=&lt;empfohlen&gt;@&lt;Farbe&gt;]:[&lt;aufladen&gt;@&lt;Farbe&gt;]:[&lt;entladen&gt;@&lt;Farbe&gt;]:[icon=&lt;unterlassen&gt;@&lt;Farbe&gt;]]  </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest. <br>
@@ -30147,6 +30155,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                                             </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>pinmax</b>    </td><td>die maximal mögliche Ladeleistung in Watt (optional)                                                     </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
+           <tr><td> <b>pinreduced</b></td><td>Die reduzierte Ladeleistung in Watt (optional). Der Wert wird im Reading Battery_ChargeOptTargetPower_XX </td></tr>
+           <tr><td>                  </td><td>gesetzt wenn kein PV-Überschuß zur Anpassung der optimalen Ladeleistung vorhanden ist. Somit kann dieser </td></tr>
+           <tr><td>                  </td><td>Wert auch im Fall der Zwangsbeladung aus dem öffentlichen Netz zur Anwendung kommen.                     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>poutmax</b>   </td><td>die maximal mögliche Entladeleistung in Watt (optional)                                                  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
