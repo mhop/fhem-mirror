@@ -11909,8 +11909,15 @@ sub __batChargeOptTargetPower {
           my $runwhneed                      = $sbatinstcap - $runwh;
           my $spday                          = $hsurp->{$shod}{$sbn}{spday};
           my $sphrs                          = $spday / $spls;                                                   # Reststunden mit Überschuß = PV-Tagesüberschuß / Stundenüberschuß
-          my $needraw                        = $sphrs ? $runwhneed / $sphrs : $runwhneed;
-          $needraw                          *= 1.2;                                                              # 20% Sicherheitsaufschlag 
+          
+		  my $needraw                        = $sphrs ? $runwhneed / $sphrs : $runwhneed;                        # Ladeleistung initial
+          $needraw                          *= 1.2;                                                              # 20% Sicherheitsaufschlag
+          my $fipl                           = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
+		  $needraw                           = $spls - $needraw > $fipl                ?                         # Einspeiselimit berücksichtigen
+		                                       $needraw + (($spls - $needraw) - $fipl) : 
+											   $needraw;
+
+          $needraw                           = $needraw < 0 ? 0 : $needraw;									   
                    
           $hsurp->{$shod}{$sbn}{runwh}       = $runwh;
           $hsurp->{$shod}{$sbn}{pneedmin}    = sprintf "%.0f", $spls > $needraw   ?                              # Mindestladeleistung bzw. Energie bei 1h (Wh)
