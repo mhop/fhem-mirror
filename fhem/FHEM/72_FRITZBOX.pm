@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "08.20.02";
+my $ModulVersion = "08.20.03";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -1757,9 +1757,21 @@ sub FRITZBOX_Helper_retMsg($$;@) {
    $retType ||= "all";
    $verbose ||= 4;
 
+   my $xline       = ( caller(0) )[2];
+
+   my $xsubroutine = ( caller(1) )[3];
+   my $sub         = ( split( ':', $xsubroutine ) )[2];
+   $sub =~ s/FRITZBOX_//       if ( defined $sub );
+   $sub ||= 'no-subroutine-specified';
+
+   if (!defined $retMsg) {
+     $retMsg  = "no message given!";
+     $verbose = 2;
+   }
+
    $verbose = 2 if $retMsg =~ /ERROR/;
 
-   FRITZBOX_Log $hash, $verbose, $retMsg;
+   FRITZBOX_Log $hash, $verbose, "location: $xline | Msg: $retMsg";
 
    if ($retType eq "all") {
      return $retMsg;
@@ -2959,8 +2971,10 @@ sub FRITZBOX_Set($$@)
        }
 
        # check for command
-       $retMsg = "ERROR: wrong function: $val[0]. Requested new, chg or del." if $val[0] !~ /new|chg|del/;
-       return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       if ($val[0] !~ /new|chg|del/) {
+         $retMsg = "ERROR: wrong function: $val[0]. Requested new, chg or del.";
+         return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
 
        if ($val[0] eq "del" && int @val < 3) {
          $retMsg = "ERROR: wrong amount of parameters: " . int @val . ". Parameters are: del <PhoneBookID> <name>";
@@ -2974,25 +2988,31 @@ sub FRITZBOX_Set($$@)
        my $uniqueID = $val[1];
        my $pIDs     = ReadingsVal($name, "fon_phoneBook_IDs", undef);
 
-       if ($pIDs) {
-         $retMsg = "ERROR: wrong phonebook ID: $uniqueID in ID's $pIDs" if $uniqueID !~ /[$pIDs]/;
+       if ($pIDs &&  $uniqueID !~ /[$pIDs]/) {
+        
+         $retMsg = "ERROR: wrong phonebook ID: $uniqueID in ID's $pIDs";
          return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+
        } else {
          my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "GetPhonebookList"] );
          my @tr064Result = FRITZBOX_call_TR064_Cmd ($hash, 0, \@tr064CmdArray);
+
+         FRITZBOX_Log $hash, 5, "pBE: read Phonebooks -> \n" . FRITZBOX_Helper_Dumper($hash, \@tr064Result);
 
          if ($tr064Result[0]->{Error}) {
            $retMsg = "ERROR: identifying phonebooks via TR-064:" . FRITZBOX_Helper_Dumper($hash, \@tr064Result);
            return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          } else {
 
-           FRITZBOX_Log $hash, 5, "get Phonebooks -> \n" . FRITZBOX_Helper_Dumper($hash, \@tr064Result);
-
            if ($tr064Result[0]->{GetPhonebookListResponse}) {
              if (defined $tr064Result[0]->{GetPhonebookListResponse}->{NewPhonebookList}) {
                my $PhoneIDs = $tr064Result[0]->{GetPhonebookListResponse}->{NewPhonebookList};
-               $retMsg = "ERROR: wrong phonebook ID: $uniqueID in ID's $PhoneIDs" if $uniqueID !~ /[$PhoneIDs]/;
-               return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+
+               if( $uniqueID !~ /[$PhoneIDs]/) {
+                 $retMsg = "ERROR: wrong phonebook ID: $uniqueID in ID's $PhoneIDs";
+                 return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+               }
+
              } else {
                $retMsg = "ERROR: no phonebook result via TR-064:" . FRITZBOX_Helper_Dumper($hash, \@tr064Result);
                return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
@@ -3079,7 +3099,12 @@ sub FRITZBOX_Set($$@)
          my $cnt = 0;
 
          $typePhone .= $val[$nextParaPos];
-         return "ERROR: parameter home|mobile|work|fax_work|other:phoneNumber missing" if $typePhone !~ /home:|mobile:|work:|fax_work:|other:/;
+
+         if ($typePhone !~ /home:|mobile:|work:|fax_work:|other:/) {
+           $retMsg = "ERROR: parameter home|mobile|work|fax_work|other:phoneNumber missing";
+           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
+
          $nextParaPos++;
 
          # FRITZBOX_Phonebook_Number_normalize($hash, $2);
@@ -3130,6 +3155,8 @@ sub FRITZBOX_Set($$@)
          my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetPhonebookEntryUID", "NewPhonebookID", $uniqueID, "NewPhonebookEntryData", $para] );
          my @tr064Result = FRITZBOX_call_TR064_Cmd ($hash, 0, \@tr064CmdArray);
 
+         FRITZBOX_Log $hash, 4, "pBE: write PhonebookEntry -> \n" . FRITZBOX_Helper_Dumper($hash, \@tr064Result);
+
          if ($tr064Result[0]->{Error}) {
            $retMsg = "ERROR: identifying phonebooks via TR-064:" . FRITZBOX_Helper_Dumper($hash, \@tr064Result);
            return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
@@ -3174,7 +3201,7 @@ sub FRITZBOX_Set($$@)
          my @tr064Result = FRITZBOX_call_TR064_Cmd ($hash, 0, \@tr064CmdArray);
  
          if ($tr064Result[0]->{Error}) {
-           return "ERROR: identifying phonebooks via TR-064:" . FRITZBOX_Helper_Dumper($hash, \@tr064Result);
+           $retMsg = "ERROR: identifying phonebooks via TR-064:" . FRITZBOX_Helper_Dumper($hash, \@tr064Result);
            return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          } else {
 
