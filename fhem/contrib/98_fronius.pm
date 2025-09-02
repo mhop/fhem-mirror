@@ -2,6 +2,10 @@
 #
 ##############################################
 #
+# 2025.09.02 - fichtennadel v0.5.3
+# - CHANGE: 
+#          - rollback to HttpUtils_NonblockingGet parameter noshutdown = 1 (https://forum.fhem.de/index.php?topic=138356.msg1347245#msg1347245)
+#
 # 2025.08.11 - fichtennadel v0.5.2
 # - CHANGE: 
 #          - HttpUtils_NonblockingGet parameters
@@ -136,7 +140,7 @@ use Date::Parse;
 use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 
-my $ModulVersion        = "0.5.2";
+my $ModulVersion        = "0.5.3";
 
 ##############################################################################
 sub fronius_Initialize($) {
@@ -739,7 +743,7 @@ sub fronius_HandleCmdQueue($) {
     my $params =  {
                        url             => $param->{url},
                        timeout         => AttrVal( $name, "httpTimeout", 10),
-                       noshutdown      => 0,
+                       noshutdown      => 1,
                        keepalive       => 0,
                        method          => "GET",
                        CL              => $param->{CL},
