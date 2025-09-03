@@ -58,6 +58,7 @@ my %sets = (
   "sucRequestUpdate" => { cmd => "53%02x@"},  # ZW_REQUEST_NETWORK_UPDATE
   "sucSendNodeId"    => { cmd => "57%02x25@"}, # ZW_SEND_SUC_ID
   "timeouts"         => { cmd => "06%02x%02x" }, # SERIAL_API_SET_TIMEOUTS
+  "nodeIdBaseType"   => { cmd => "0b80%02x" }, # SERIAL_API..., #142314
 );
 
 my %gets = (
@@ -76,6 +77,7 @@ my %gets = (
   "sucNodeId"       => "56",      # ZW_GET_SUC_NODE_ID
 #  "timeouts"        => "06",     # Forum #71333
   "version"         => "15",      # ZW_GET_VERSION
+  "supportedCmds"   => "0b01",      # ZW_GET_VERSION
 );
 
 sub
@@ -396,6 +398,12 @@ ZWDongle_Set($@)
     }
   }
 
+  if($type eq "nodeIdBaseType" &&
+    ReadingsVal($name, "supportedCmds", "") !~ m/SET_NODEID_BASE_TYPE/) {
+    return "$type is unsupported by this controller";
+  }
+
+
   my $par = $sets{$type}{param};
   if($par && !$par->{noArg}) {
     return "Unknown argument for $type, choose one of ".join(" ",keys %{$par})
@@ -598,7 +606,25 @@ ZWDongle_Get($@)
                 hex(substr($ret,4,4)), hex(substr($ret,8,4)), 
                 hex(substr($ret,12,4)), hex(substr($ret,16,4)),
                 hex(substr($ret,20,4)), hex(substr($ret,24,4)));
+
+  } elsif($cmd eq "supportedCmds") {           ############################
+    my @sCmds = (
+      "GET_SUPPORTED_COMMANDS", "SET_TX_STATUS_REPORT", "SET_POWERLEVEL",
+      "GET_POWERLEVEL", "GET_MAXIMUM_PAYLOAD_SIZE", "GET_RF_REGION",
+      "SET_RF_REGION", "SET_NODEID_BASE_TYPE" );
+
+    my @list;
+    for(my $byte=0; $byte+3<@r; $byte++) {
+      my $bits = $r[$byte+3];
+      for my $bit (0..7) {
+        my $idx = $byte*8+$bit;
+        push @list, $idx >= @sCmds ? "UNKNOWN_$idx" : $sCmds[$idx]
+                if($bits & (1<<$bit));
+      }
     }
+    $msg = join(" ",@list);
+
+  }
 
   $cmd .= "_".join("_", @a) if(@a);
   readingsSingleUpdate($hash, $cmd, $msg, 0);
@@ -639,6 +665,11 @@ ZWDongle_DoInit($)
   ZWDongle_ReadAnswer($hash, "timeouts", "^0106");
   # NODEINFO_LISTENING, Generic Static controller, Specific Static Controller, 0
   ZWDongle_Set($hash, $name, ("setNIF", 1, 2, 1, 0)); # Sec relevant (?)
+
+  ZWDongle_Get($hash, $name, "supportedCmds")
+    if(ReadingsVal($name, "caps","") =~ m/SERIAL_API_SETUP/);
+  ZWDongle_Set($hash, $name, ("nodeIdBaseType", 1)) # 142314
+    if(ReadingsVal($name, "supportedCmds", "") =~ m/SET_NODEID_BASE_TYPE/);
 
   readingsSingleUpdate($hash, "state", "Initialized", 1);
   return undef;
@@ -1216,6 +1247,12 @@ ZWDongle_Ready($)
     Send SUC/SIS nodeId to the specified decimal controller nodeId.
     </li>
 
+  <li>nodeIdBaseType &lt;[1|2]&gt;<br>
+    Set the nodeId length to 8-bit (1) or 16-bit (2).
+    Note: only the 8-bit mode is interpreted correctly by this module.
+    </li>
+
+
   </ul>
   <br>
 
@@ -1276,6 +1313,10 @@ ZWDongle_Ready($)
 
   <li>sucNodeId<br>
     return the currently registered decimal SUC nodeId.
+    </li>
+
+  <li>supportedCmds<br>
+    return controller specific information.
     </li>
 
   </ul>
