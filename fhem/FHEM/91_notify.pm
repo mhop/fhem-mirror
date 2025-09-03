@@ -61,6 +61,7 @@ notify_Define($$)
     "%NAME" => $name,
     "%TYPE" => $name,
     "%EVENT" => "1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0",
+    "%MATCHED" => [0,1,2,3,4,5,6,7,8,9],
     "%SELF" => $name,
   );
   my $err = perlSyntaxCheck($command, %specials);
@@ -100,21 +101,23 @@ notify_Exec($$)
   for (my $i = 0; $i < $max; $i++) {
     my $s = $events->[$i];
     $s = "" if(!defined($s));
-    my $found = ($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/s);
-    if(!$found && AttrVal($n, "eventMap", undef)) {
+    my @matched = ($n =~ m/^$re$/g);
+    @matched = ("$n:$s" =~ m/^$re$/gs) if(!@matched);
+    if(!@matched && AttrVal($n, "eventMap", undef)) {
       my @res = ReplaceEventMap($n, [$n,$s], 0);
       shift @res;
       $s = join(" ", @res);
-      $found = ("$n:$s" =~ m/^$re$/);
+      @matched = ("$n:$s" =~ m/^$re$/g);
     }
-    if($found) {
+    if(@matched) {
       next if($iRe && ($n =~ m/^$iRe$/ || "$n:$s" =~ m/^$iRe$/));
       Log3 $ln, 5, "Triggering $ln";
       my %specials= (
                 "%NAME" => $n,
                 "%TYPE" => $t,
                 "%EVENT" => $s,
-                "%SELF" => $ln
+                "%SELF" => $ln,
+                "%MATCHED" => \@matched
       );
       my $exec = EvalSpecials($ntfy->{".COMMAND"}, %specials);
 
@@ -454,6 +457,8 @@ END
         <li>$NAME and $TYPE contain the name and type of the device triggering
           the event, e.g. myFht and FHT</li>
         <li>$SELF contains the name of the notify itself</li>
+        <li>the @MATCHED array contains the result of the regexp: the captured
+          groups if present, or the whole matched string</li>
        </ul></li>
 
       <li>Note: the following is deprecated and will be removed in a future
@@ -682,6 +687,8 @@ END
             ausl&ouml;senden Ger&auml;tes, z.B. myFht und FHT</li>
 
         <li>$SELF enthaelt den Namen dieser notify</li>
+        <li>@MATCHED enth&auml;lt das Ergebnis der Regexp-Pr&uuml;fung;:
+            die Regexp-Gruppen (fals vorhanden) oder den kompletten String</li>
        </ul></li>
 
       <li>Achtung: Folgende Vorgehensweise ist abgek&uuml;ndigt, funktioniert
