@@ -15105,7 +15105,7 @@ sub EnOcean_Attr(@) {
     } elsif ($attrVal eq 'auto') {
     
     } elsif ($attrVal eq 'on') {
-      if (AttrVal($name, 'subType', '') =~ m/^hvac\.0(1|4|6)$/ && AttrVal($name, 'summerMode', 'off') eq 'off') {
+      if (AttrVal($name, 'subType', '') =~ m/^hvac\.0(1|4|6)$/ && AttrVal($name, 'summerMode', 'off') =~ /^auto|off$/) {
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, 'waitingCmds', 'summerMode');
         readingsBulkUpdate($hash, 'operationModeRestore', ReadingsVal($name, 'operationMode', 'setpoint'));
@@ -15118,7 +15118,7 @@ sub EnOcean_Attr(@) {
 
       }
     } elsif ($attrVal eq 'off') {
-      if (AttrVal($name, 'subType', '') =~ m/^hvac\.0(1|4|6)$/ && AttrVal($name, 'summerMode', 'off') eq 'on') {
+      if (AttrVal($name, 'subType', '') =~ m/^hvac\.0(1|4|6)$/ && AttrVal($name, 'summerMode', 'off') =~ /^auto|on$/) {
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, 'waitingCmds', 'runInit');
         readingsBulkUpdate($hash, 'operationMode', ReadingsVal($name, 'operationModeRestore', 'setpoint'));
