@@ -174,15 +174,19 @@ MQTT2_DEVICE_Parse($$)
         next if(!$hash);
         my $reRepl = $re;
         map { $reRepl =~ s/\$$_/$hash->{".DT"}{$_}/g } keys %{$hash->{".DT"}};
-        next if(!("$topic:$value" =~ m/^$reRepl$/s ||
-                  "$cid:$topic:$value" =~ m/^$reRepl$/s));
+
+        my @matched = ("$topic:$value" =~ m/^$reRepl$/sg); # 143401
+        @matched = ("$cid:$topic:$value" =~ m/^$reRepl$/sg) if(!@matched);
+        next if(!@matched);
+
         next if(IsDisabled($dev));
 
         Log3 $dev, 4, "MQTT2_DEVICE_Parse: $dev $topic => $code";
 
         if($code =~ m/^{.*}$/s) {
           my %v = ("%TOPIC"=>$topic, "%EVENT"=>$value, "%NAME"=>$hash->{NAME},
-                   "%CID"=>$cid, "%JSONMAP","\$defs{\"$dev\"}{JSONMAP}");
+                   "%CID"=>$cid, "%JSONMAP","\$defs{\"$dev\"}{JSONMAP}",
+                   "%MATCHED"=>\@matched);
           map { $v{"%$_"} = $hash->{".DT"}{$_} } keys %{$hash->{".DT"}};
           $code = EvalSpecials($code, %v);
           my $ret = AnalyzePerlCommand(undef, $code);
@@ -1136,7 +1140,11 @@ zigbee2mqtt_devStateIcon255($;$$)
         <li>in the perl expression the variables $TOPIC, $NAME, $DEVICETOPIC 
           $JSONMAP and $EVENT are available (the letter containing the whole
           message), as well as $EVTPART0, $EVTPART1, ... each containing a
-          single word of the message.</li>
+          single word of the message.<br>
+          The @MATCHED array contains the result of the regexp: the captured
+          groups if present, or the whole matched string.
+          </li>
+
         <li>the helper function json2nameValue($EVENT) can be used to parse a
           json encoded value. Importing all values from a Sonoff device with a
           Tasmota firmware can be done with:
