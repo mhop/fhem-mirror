@@ -483,6 +483,7 @@ MQTT2_DEVICE_Attr($$)
       if($atype eq "reading") {
         if($par2 =~ m/^{.*}\s*$/) {
           my %v = ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
+                 "%MATCHED" => [0,1,2,3,4,5,6,7,8,9],
                  "%NAME"=>$dev, "%CID"=>"clientId", "%JSONMAP"=>"");
           map { $v{"%$_"} = $hash->{".DT"}{$_} } keys %{$hash->{".DT"}};
           my $ret = perlSyntaxCheck($par2, %v);
