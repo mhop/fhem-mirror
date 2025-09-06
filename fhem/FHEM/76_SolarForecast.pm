@@ -160,6 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.58.0" => "06.09.2025  _batChargeMgmt: Code change and new loading feature with Reading Battery_ChargeOptTargetPower_XX ".
+                           "ctrlBatSocManagementXX: new parameter safetyMargin ".
+                           "edit Comref, delete obsolete Attr graphicBeamHeightLevelX, new parameter setupBatteryDevXX->pinreduced ",
   "1.57.3" => "26.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ".
                            "check global attribute dnsServer in all SF Models, expand plantControl->genPVdeviation for perspective change ".
                            "Household consumption calculation uniformly converted to vector calculation ".
@@ -452,6 +455,8 @@ use constant {
   APITIMEOUT     => 30,                                                             # default Timeout HTTP API-Call
   
   PRDEF          => 0.9,                                                            # default Performance Ratio (PR)
+  SFTYMARGIN_20  => 20,                                                             # Sicherheitszuschlag 20%
+  SFTYMARGIN_50  => 50,                                                             # Sicherheitszuschlag 50%
   STOREFFDEF     => 0.90,                                                           # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
   TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
   TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
@@ -1699,10 +1704,10 @@ sub Initialize {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ##########################################################################################################################
-  my $av = 'obsolete#-#use#attr#graphicControl#instead';
+  # my $av = 'obsolete#-#use#attr#graphicControl#instead';
   # my $av1 = 'obsolete#-#will#be#deleted#soon';
   # my $av2 = 'obsolete#-#use#attr#graphicSelect#instead';
-  $hash->{AttrList} .= " graphicBeamHeightLevel1:$av graphicBeamHeightLevel2:$av graphicBeamHeightLevel3:$av ";
+  # $hash->{AttrList} .= " graphicBeamHeightLevel1:$av graphicBeamHeightLevel2:$av graphicBeamHeightLevel3:$av ";
   ##########################################################################################################################
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -7372,18 +7377,19 @@ sub _attrBatteryDev {                    ## no critic "not used"
   my $bn   = (split 'setupBatteryDev', $aName)[1];
 
   my $valid = {
-      pin       => { comp => '.+',                                           must => 1, act => 0 },
-      pout      => { comp => '.+',                                           must => 1, act => 0 },
-      pinmax    => { comp => '\d+',                                          must => 0, act => 0 },
-      poutmax   => { comp => '\d+',                                          must => 0, act => 0 },
-      intotal   => { comp => '.*',                                           must => 0, act => 0 },
-      outtotal  => { comp => '.*',                                           must => 0, act => 0 },
-      cap       => { comp => '((?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh)$))', must => 1, act => 0 },
-      charge    => { comp => '.*',                                           must => 0, act => 0 },
-      icon      => { comp => '.*',                                           must => 0, act => 0 },
-      show      => { comp => '(?:[0-3](?::(?:top|bottom))?)',                must => 0, act => 0 },
-      label     => { comp => '(none|below|beside)',                          must => 0, act => 0 },
-      asynchron => { comp => '(0|1)',                                        must => 0, act => 0 },
+      pin        => { comp => '.+',                                           must => 1, act => 0 },
+      pout       => { comp => '.+',                                           must => 1, act => 0 },
+      pinmax     => { comp => '\d+',                                          must => 0, act => 0 },
+      pinreduced => { comp => '\d+',                                          must => 0, act => 0 },
+      poutmax    => { comp => '\d+',                                          must => 0, act => 0 },
+      intotal    => { comp => '.*',                                           must => 0, act => 0 },
+      outtotal   => { comp => '.*',                                           must => 0, act => 0 },
+      cap        => { comp => '((?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh)$))', must => 1, act => 0 },
+      charge     => { comp => '.*',                                           must => 0, act => 0 },
+      icon       => { comp => '.*',                                           must => 0, act => 0 },
+      show       => { comp => '(?:[0-3](?::(?:top|bottom))?)',                must => 0, act => 0 },
+      label      => { comp => '(none|below|beside)',                          must => 0, act => 0 },
+      asynchron  => { comp => '(0|1)',                                        must => 0, act => 0 },
   };
 
   if ($paref->{cmd} eq 'set') {      
@@ -7439,12 +7445,14 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{batteries}{$bn}{bposingraph};
       delete $data{$name}{batteries}{$bn}{blabel};
       delete $data{$name}{batteries}{$bn}{bpinmax}; 
+      delete $data{$name}{batteries}{$bn}{bpinreduced};
       delete $data{$name}{batteries}{$bn}{bpoutmax};
   }
   elsif ($paref->{cmd} eq 'del') {
       readingsDelete    ($hash, 'Current_PowerBatIn_'.$bn);
       readingsDelete    ($hash, 'Current_PowerBatOut_'.$bn);
       readingsDelete    ($hash, 'Current_BatCharge_'.$bn);
+      readingsDelete    ($hash, 'Battery_ChargeOptTargetPower_'.$bn);
       readingsDelete    ($hash, 'Battery_ChargeRecommended_'.$bn);
       readingsDelete    ($hash, 'Battery_ChargeUnrestricted_'.$bn);
       readingsDelete    ($hash, 'Battery_ChargeRequest_'.$bn);
@@ -7490,13 +7498,14 @@ sub _attrBatSocManagement {              ## no critic "not used"
                  if(!BatteryVal ($name, $bn, 'binstcap', 0));                    # https://forum.fhem.de/index.php?msg=1310930
 
   my $valid = {
-      lowSoc    => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
-      upSoC     => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
-      maxSoC    => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
-      careCycle => { comp => '\d+',                                                   must => 0, act => 0 },
-      lcSlot    => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
-      careCycle => { comp => '\d+',                                                   must => 0, act => 0 },
-      loadAbort => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',      must => 0, act => 0 },
+      lowSoc       => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
+      upSoC        => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
+      maxSoC       => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
+      careCycle    => { comp => '\d+',                                                   must => 0, act => 0 },
+      lcSlot       => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
+      careCycle    => { comp => '\d+',                                                   must => 0, act => 0 },
+      loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',      must => 0, act => 0 },
+      safetyMargin => { comp => '(?:100|[1-9]?\d)',                                      must => 0, act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -8883,25 +8892,7 @@ sub centralTask {
   #    my $newval = $gco." beamWidth=$gbw";
   #    CommandAttr (undef, "$name graphicControl $newval");
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
-  #}
-         
-  my $gco  = AttrVal ($name, 'graphicControl', '');         
-  my $hgt1 = AttrNum ($name, 'graphicBeamHeightLevel1', undef);         # 02.08.
-  my $hgt2 = AttrNum ($name, 'graphicBeamHeightLevel2', undef);
-  my $hgt3 = AttrNum ($name, 'graphicBeamHeightLevel3', undef);
-  
-  my $hgt  = $hgt1 ? '1:'.$hgt1 : '';
-  $hgt    .= $hgt2 ? ($hgt ? ',' : '').'2:'.$hgt2 : '';
-  $hgt    .= $hgt3 ? ($hgt ? ',' : '').'3:'.$hgt3 : '';
-  
-  if ($hgt) {
-      my $newval = $gco." beamHeightlevel=$hgt";
-      CommandAttr (undef, "$name graphicControl $newval");
-      ::CommandDeleteAttr (undef, "$name graphicBeamHeightLevel1");
-      ::CommandDeleteAttr (undef, "$name graphicBeamHeightLevel2");
-      ::CommandDeleteAttr (undef, "$name graphicBeamHeightLevel3");
-  }
-  
+  #}  
   
   for my $c (1..MAXCONSUMER) {                                          # 23.07.                      
       $c = sprintf "%02d", $c;
@@ -11100,8 +11091,9 @@ sub _transferBatteryValues {
       my ($bout,$boutunit) = split ":", $h->{outtotal} // "-:-";                                  # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
       my $batchr           = $h->{charge} // '';                                                  # Readingname Ladezustand Batterie
       my $instcap          = $h->{cap};                                                           # numerischer Wert (Wh) oder Readingname installierte Batteriekapazität
-      my $pinmax           = $h->{pinmax}  // INFINITE;                                           # max. mögliche Ladeleistung
-      my $poutmax          = $h->{poutmax} // INFINITE;                                           # max. mögliche Entladeleistung
+      my $pinmax           = $h->{pinmax}     // INFINITE;                                        # max. mögliche Ladeleistung
+      my $pinreduced       = $h->{pinreduced} // $pinmax;                                         # reduzierte Ladeleistung (z.B. bei Ladung aus dem Grid)
+      my $poutmax          = $h->{poutmax}    // INFINITE;                                        # max. mögliche Entladeleistung     
 
       next if(!$pin || !$pou);
 
@@ -11279,6 +11271,7 @@ sub _transferBatteryValues {
       $data{$name}{batteries}{$bn}{bpowerin}     = $pbi;                                                 # momentane Batterieladung
       $data{$name}{batteries}{$bn}{bpowerout}    = $pbo;                                                 # momentane Batterieentladung
       $data{$name}{batteries}{$bn}{bpinmax}      = $pinmax;                                              # max. mögliche Ladeleistung
+      $data{$name}{batteries}{$bn}{bpinreduced}  = $pinreduced;                                          # # reduzierte Ladeleistung (z.B. bei Ladung aus dem Grid)
       $data{$name}{batteries}{$bn}{bpoutmax}     = $poutmax;                                             # max. mögliche Entladeleistung
       $data{$name}{batteries}{$bn}{bcharge}      = $soc;                                                 # Batterie SoC (%)
       $data{$name}{batteries}{$bn}{basynchron}   = $h->{asynchron} // 0;                                 # asynchroner Modus = X
@@ -11519,12 +11512,13 @@ sub __parseAttrBatSoc {
   my ($pa,$ph) = parseParams ($cgbt);
 
   my $parsed = {
-      lowSoc    => $ph->{lowSoc},                                               
-      upSoc     => $ph->{upSoC}, 
-      maxSoc    => $ph->{maxSoC}    // MAXSOCDEF,                                         # optional (default: MAXSOCDEF)
-      careCycle => $ph->{careCycle} // CARECYCLEDEF,                                      # Ladungszyklus (Maintenance) für maxSoC in Tagen     
-      lcslot    => $ph->{lcSlot}, 
-      loadAbort => $ph->{loadAbort},   
+      lowSoc       => $ph->{lowSoc},                                               
+      upSoc        => $ph->{upSoC}, 
+      maxSoc       => $ph->{maxSoC}    // MAXSOCDEF,                                      # optional (default: MAXSOCDEF)
+      careCycle    => $ph->{careCycle} // CARECYCLEDEF,                                   # Ladungszyklus (Maintenance) für maxSoC in Tagen     
+      lcslot       => $ph->{lcSlot}, 
+      loadAbort    => $ph->{loadAbort}, 
+      safetyMargin => $ph->{safetyMargin},       
   };
   
 return $parsed;
@@ -11600,14 +11594,15 @@ sub _batChargeMgmt {
       my $aplim = $icap * $limit / 100;
       $inplim  += $aplim;                                                                        # max. Leistung aller WR mit Berücksichtigung Wirkleistungsbegrenzung
 
-      debugLog ($paref, 'batteryManagement', "Bat XX Charge Rcmd - Inverter '$iname' cap: $icap W, Power limit: $limit % -> Pmax eff: $aplim W");
+      debugLog ($paref, 'batteryManagement', "Bat XX ChargeMgmt - Inverter '$iname' cap: $icap W, Power limit: $limit % -> Pmax eff: $aplim W");
   }
 
-  debugLog ($paref, 'batteryManagement', "Bat XX Charge Rcmd - Summary Power limit of all Inverter (except feed 'grid'): $inplim W");
+  debugLog ($paref, 'batteryManagement', "Bat XX ChargeMgmt - Summary Power limit of all Inverter (except feed 'grid'): $inplim W");
 
   ## Schleife über alle Batterien
   #################################
   my %hsoc;                                                                                      # Hilfshash
+  my $hsurp = {};                                                                                # Hashreferenz Überschuß
 
   for my $bn (1..MAXBATTERIES) {                                                                 # für jede Batterie
       $bn = sprintf "%02d", $bn;
@@ -11636,14 +11631,17 @@ sub _batChargeMgmt {
       my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $lowSoc    = 0;
       my $loadAbort = '';
-      my $lcslot;
+      my ($lcslot, $safetyMargin);
       
       if ($cgbt) {
-          my $parsed = __parseAttrBatSoc ($name, $cgbt);
-          $lowSoc    = $parsed->{lowSoc} // 0;
-          $lcslot    = $parsed->{lcslot};
-          $loadAbort = $parsed->{loadAbort}; 
+          my $parsed    = __parseAttrBatSoc ($name, $cgbt);
+          $lowSoc       = $parsed->{lowSoc} // 0;
+          $lcslot       = $parsed->{lcslot};
+          $loadAbort    = $parsed->{loadAbort};
+          $safetyMargin = $parsed->{safetyMargin};
       }
+      
+      my $margin = defined $safetyMargin ? $safetyMargin : SFTYMARGIN_50;                       # Sicherheitszuschlag (%)
 
       ## generelle Ladeabbruchbedingung evaluieren
       ##############################################
@@ -11665,50 +11663,57 @@ sub _batChargeMgmt {
       }
       
       my $labortCond = BatteryVal ($name, $bn, 'bloadAbortCond', 0);                            # Ladeabbruchbedingung gesetzt 1 oder nicht 0
-      
-      debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - General load termination condition: $labortCond");
-      
+            
       ## Zeitfenster für aktives Lademanagement ermitteln
       #####################################################
       $lcslot             //= '00:00-23:59';
       my ($lcstart, $lcend) = split "-", $lcslot;
+                
+      my $batoptsocwh = $batinstcap * $batoptsoc / 100;                                         # optimaler SoC in Wh
+      my $lowSocwh    = $batinstcap * $lowSoc    / 100;                                         # lowSoC in Wh
+      my $socwh       = sprintf "%.0f", ($batinstcap * $csoc / 100);                            # aktueller SoC in Wh
+      my $whneed      = $batinstcap - $socwh;
       
-      debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - control time Slot - Slot start: $lcstart, Slot end: $lcend");
-          
-      my $batoptsocwh = $batinstcap * $batoptsoc / 100;                                          # optimaler SoC in Wh
-      my $lowSocwh    = $batinstcap * $lowSoc    / 100;                                          # lowSoC in Wh
-
-      debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
-      debugLog ($paref, 'batteryManagement', "Bat $bn Charge Rcmd - The PV generation, consumption and surplus listed below are based on the battery's share of the total capacity!");
-
-      my $socwh  = sprintf "%.0f", ($batinstcap * $csoc / 100);                                  # aktueller SoC in Wh
-      my $whneed = $batinstcap - $socwh;
+      # Debug Log
+      #############
+      if ($paref->{debug} =~ /batteryManagement/) {
+          Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - General load termination condition: $labortCond");
+          Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - control time Slot - Slot start: $lcstart, Slot end: $lcend");
+          Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
+          Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - The PV generation, consumption and surplus listed below are based on the battery's share of total installed capacity!");
+          Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeUR - used safety margin: $margin %");
+      }
       
       ## Auswertung für jede kommende Stunde
       ########################################
-      for my $num (0..71) {
+      for my $num (0..MAXNEXTHOURS) {
           my ($fd, $fh) = calcDayHourMove ($chour, $num);
           next if($fd > 2);
 
           my $nhr   = sprintf "%02d", $num;
-          my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today',      0);
-          my $hod   = NexthoursVal ($name, 'NextHour'.$nhr, 'hourofday', '');
-          my $confc = NexthoursVal ($name, 'NextHour'.$nhr, 'confc',      0);
-          my $pvfc  = NexthoursVal ($name, 'NextHour'.$nhr, 'pvfc',       0);
-          my $nhstt = NexthoursVal ($name, 'NextHour'.$nhr, 'starttime', '');
-          my $stt   = (split /[-:]/, $nhstt)[2] if($nhstt);
+		  my $hod   = NexthoursVal ($name, 'NextHour'.$nhr, 'hourofday', undef);
+		  my $nhstt = NexthoursVal ($name, 'NextHour'.$nhr, 'starttime', undef);
+		  
+		  next if(!defined ($hod) || !defined ($nhstt));
+		  
+          my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today', 0);
+          my $confc = NexthoursVal ($name, 'NextHour'.$nhr, 'confc', 0);
+          my $pvfc  = NexthoursVal ($name, 'NextHour'.$nhr, 'pvfc',  0);
+          
+          if ($fd == 2 && $fh == 0) {
+              $tompvfc  = CurrentVal  ($name, 'dayAfterTomorrowPVfc',  0);                       # PV Prognose übernächster Tag
+              $tomconfc = CurrentVal  ($name, 'dayAfterTomorrowConfc', 0);                       # Verbrauchsprognose übernächster Tag
+          }          
           
           ## Zeitfenster für aktives Lademanagement anwenden
           #####################################################
           my $lcintime = 1;
           
-          if ($nhstt) {
-              my ($date)    = (split " ", $nhstt)[0];
-              my $sttts     = timestringToTimestamp ($nhstt);
-              my $lcstartts = timestringToTimestamp ("$date ${lcstart}:00");
-              my $lcendts   = timestringToTimestamp ("$date ${lcend}:59");
-              $lcintime     = $sttts >= $lcstartts && $sttts <= $lcendts ? 1 : 0;                # 1 wenn innerhalb Time Slot -> Lademanagement freigegeben, sonst Batterie Ladung immer freigeben
-          }
+		  my ($date)    = (split " ", $nhstt)[0];
+		  my $sttts     = timestringToTimestamp ($nhstt);
+		  my $lcstartts = timestringToTimestamp ("$date ${lcstart}:00");
+		  my $lcendts   = timestringToTimestamp ("$date ${lcend}:59");
+		  $lcintime     = $sttts >= $lcstartts && $sttts <= $lcendts ? 1 : 0;                    # 1 wenn innerhalb Time Slot -> Lademanagement freigegeben, sonst Batterie Ladung immer freigeben
           
           my $crel  = 0;                                                                         # Ladefreigabe 0 Ausgangswert
           my $spday = 0;
@@ -11723,35 +11728,32 @@ sub _batChargeMgmt {
           $tompvfc  = sprintf "%.0f", ($sf * $tompvfc);
 
           ## (Rest) PV-Überschuß für den Tag
-          ####################################
-          if ($pvfc) {
-              if ($today) {                                                                      # heutiger Tag
-                  $confcss  -= $confc;                                                           # Verbrauch bis Sonnenuntergang - Verbrauch Fc aktuelle Stunde
-                  $confcss   = 0 if($confcss < 0);
-                  $rodpvfc  -= $pvfc;
-                  $rodpvfc   = 0 if($rodpvfc < 0);
-                  $spday     = $rodpvfc - $confcss;                                              # PV-Überschußprognose (Rest) heutiger Tag
-              }
-              else {                                                                             # nächster Tag
-                  $tomconfc -= $confc;
-                  $tomconfc  = 0 if($tomconfc < 0);
-                  $tompvfc  -= $pvfc;
-                  $spday     = $tompvfc - $tomconfc;
-              }
+          ####################################     
+          if ($today) {                                                                          # heutiger Tag
+              $confcss  -= $confc;                                                               # Verbrauch bis Sonnenuntergang - Verbrauch Fc aktuelle Stunde
+              $confcss   = 0 if($confcss < 0);
+              $rodpvfc  -= $pvfc;
+              $rodpvfc   = 0 if($rodpvfc < 0);
+              $spday     = $rodpvfc - $confcss;                                                  # PV-Überschußprognose (Rest) heutiger Tag
+          }
+          else {                                                                                 # nächster Tag
+              $tomconfc -= $confc;
+              $tomconfc  = 0 if($tomconfc < 0);
+              $tompvfc  -= $pvfc;
+              $spday     = $tompvfc - $tomconfc;
           }
 
-          $spday       = 0 if($spday < 0);                                                       # PV Überschuß Prognose bis Sonnenuntergang
-          my $sfmargin = $whneed * 0.5;                                                          # Sicherheitszuschlag: X% der benötigten Ladeenergie (Wh)
-
+          $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
+          
           ## Ladefreigabe
           #################
-          if ( $whneed + $sfmargin >= $spday )            {$crel = 1}                            # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
-          if ( !$num && ($pvCu - $curcon) >= $inplim )    {$crel = 1}                            # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
-          if ( !$bpin && $gfeedin > $feedinlim )          {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
-          if ( $bpin && ($gfeedin - $bpin) > $feedinlim ) {$crel = 1}                            # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
-          if ( !$cgbt )                                   {$crel = 1}                            # Ladefreigabe wenn kein BatSoc-Management
-          if ( !$lcintime )                               {$crel = 1}                            # Ladefreigabe wenn nicht innerhalb Zeitslot für Ladesteuerung
-          if ( $labortCond )                              {$crel = 0}                            # keine Ladefreigabe bei genereller Abbruchbedingung 
+          if ( $whneed * (1 + ($margin / 100)) >= $spday ) {$crel = 1}                           # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+          if ( !$num && ($pvCu - $curcon) >= $inplim )     {$crel = 1}                           # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
+          if ( !$bpin && $gfeedin > $feedinlim )           {$crel = 1}                           # V 1.49.6 Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
+          if ( $bpin && ($gfeedin - $bpin) > $feedinlim )  {$crel = 1}                           # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
+          if ( !$cgbt )                                    {$crel = 1}                           # Ladefreigabe wenn kein BatSoc-Management
+          if ( !$lcintime )                                {$crel = 1}                           # Ladefreigabe wenn nicht innerhalb Zeitslot für Ladesteuerung
+          if ( $labortCond )                               {$crel = 0}                           # keine Ladefreigabe bei genereller Abbruchbedingung 
 
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
@@ -11762,8 +11764,6 @@ sub _batChargeMgmt {
 
           $socwh   += $crel       ? ($fceff > 0 ? $fceff * STOREFFDEF : $fceff / STOREFFDEF) :
                       ($fceff > 0 ? 0 : $fceff / STOREFFDEF);                                    # PV Überschuß (d.h. Aufladung) nur einbeziehen wenn Ladefreigabe
-
-          # debugLog ($paref, 'batteryManagement', "Bat $bn Charge - crel: $crel, fceff: $fceff, socwh: $socwh");
 
           $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :
                     $socwh < $batoptsocwh ? $batoptsocwh :                                       # SoC Prognose in Wh
@@ -11786,7 +11786,7 @@ sub _batChargeMgmt {
               $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
 
               if (!$today) {
-                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, tompvfc: $tompvfc, tomconfc: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
+                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, roTomPV: $tompvfc, roTomCON: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
               }
           }
           else {
@@ -11802,16 +11802,40 @@ sub _batChargeMgmt {
           $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);    # Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
           $hsoc{$nhr}{socprogwhsum}                                   += $socwh;                 # Hilfshash Aufsummierung SoC-Prognose (Wh) über alle Batterien
 
+          # Überschußhash für Ermittlung Mindest-Ladeleistung erstellen
+          ###############################################################
+		  my $spswh = max (0, sprintf ("%.0f", $fceff));                                         
+          
+          if ($today) {                                                                          # nur Heute wenn Überschuß vorliegt  
+			  $hsurp->{$hod}{hod}                = $hod;
+              $hsurp->{$hod}{nhr}                = $nhr;
+              $hsurp->{$hod}{fceff}              = $fceff;                                       # Überschuß in Wh der Stunde 
+              $hsurp->{$hod}{spswh}              = $spswh;
+              $hsurp->{$hod}{$bn}{spday}         = $spday;                                       # (Rest)PV-Überschuß am laufenden Tag
+			  $hsurp->{$hod}{$bn}{whneedmanaged} = $whneed;                                      # benötigte Ladeenergie Batterie x gemäß Ladesteuerung
+              $hsurp->{$hod}{$bn}{socwh}         = $socwh;
+              $hsurp->{$hod}{$bn}{batinstcap}    = $batinstcap;
+              $hsurp->{$hod}{$bn}{safetyMargin}  = $safetyMargin;                                # Sicherheitszuschlag für Berechnungen
+          }
+ 
           # prognostizierten Daten in pvHistory speichern
           #################################################
           if ($today && $hod) {                                                                                  # heutiger Tag
               writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
               writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } ) if($cgbt);
           }
-
-          debugLog ($paref, 'batteryManagement', "Bat $bn relLoad $stt -> $crel ($msg)");
+          
+          my $stt = (split /[-:]/, $nhstt)[2];
+          $stt   =~ s/\s/\//;
+          debugLog ($paref, 'batteryManagement', "Bat $bn ChargeUR $stt -> $crel ($msg)");
       }
   }
+  
+  # Erstellung Mindest Ladeleistung
+  ###################################
+  $paref->{hsurp} = $hsurp; 
+  __batChargeOptTargetPower ($paref);
+  delete $paref->{hsurp};
 
   # prognostizierten SOC über alle Batterien speichern
   ######################################################
@@ -11850,6 +11874,79 @@ sub __createNextHoursSFCReadings {
       storeReading ('Battery_NextHour'.$nhr.'_SoCforecast_'.$bn, $progsoc.' %');
   }
 
+return;
+}
+
+################################################################
+#   Erstellung Optimum Ladeleistung für jede Batterie
+#   (Erreichung des max. möglichen SoC mit möglichst geringer 
+#    Ladeleistung verteilt über die Tagstunden mit PV-Überschuß)
+################################################################       
+sub __batChargeOptTargetPower {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hsurp = $paref->{hsurp} // return;                                                                         # Hashref Überschußhash
+
+  my $fipl      = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
+  my @sorted    = sort { $hsurp->{$a}{spswh} <=> $hsurp->{$b}{spswh} } keys %{$hsurp};     
+  my @batteries = grep { !/^(?:hod|spswh|fceff|nhr)$/xs } keys %{$hsurp->{24}};
+  
+  for my $shod (@sorted) {
+      my $spls = 1 * $hsurp->{$shod}{spswh};  
+      
+      for my $sbn (sort @batteries) {                                                                            # jede Batterie
+          my $runwh                          = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                         # Auswahl des zu verwenden Prognose-SOC (Wh)
+                                               $hsurp->{$shod}{$sbn}{fcnextwh} : 
+                                               $hsurp->{$shod}{$sbn}{socwh};
+          
+          my $bpinreduced                    = BatteryVal ($name, $sbn, 'bpinreduced', 0);                       # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
+          
+          if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
+              $hsurp->{$shod}{$sbn}{pneedmin} = $bpinreduced;
+              storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W') if($hsurp->{$shod}{nhr} eq '00'); 
+              next;
+          }         
+          
+          my $sbatinstcap                    = $hsurp->{$shod}{$sbn}{batinstcap};                                # Kapa dieser Batterie          
+          my $runwhneed                      = $sbatinstcap - $runwh;
+          my $spday                          = $hsurp->{$shod}{$sbn}{spday};
+          my $sphrs                          = $spday / $spls;                                                   # Reststunden mit Überschuß = PV-Tagesüberschuß / Stundenüberschuß
+          
+		  my $needraw                        = $sphrs ? $runwhneed / $sphrs : $runwhneed;                        # Ladeleistung initial
+          
+          my $safetyMargin                   = $hsurp->{$shod}{$sbn}{safetyMargin};
+          my $margin                         = defined $safetyMargin ? $safetyMargin : SFTYMARGIN_20;
+          $needraw                          *= 1 + ($margin / 100);                                              # Sicherheitsaufschlag
+          
+          if ($spls - $needraw > $fipl) {                                                                        # Einspeiselimit berücksichtigen
+              $needraw += ($spls - $needraw) - $fipl;
+          }
+		
+          $needraw                           = 0 if($needraw < 0);          
+                   
+          $hsurp->{$shod}{$sbn}{runwh}       = $runwh;
+          $hsurp->{$shod}{$sbn}{pneedmin}    = sprintf "%.0f", $spls > $needraw   ?                              # Mindestladeleistung bzw. Energie bei 1h (Wh)
+                                               $needraw ? $needraw : $bpinreduced : 
+                                               $spls;                                                             
+          
+          my $newshod                        = sprintf "%02d", (int $shod + 1);
+          $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin} if(defined $hsurp->{$newshod});
+                                               
+          storeReading ('Battery_ChargeOptTargetPower_'.$sbn,  $hsurp->{$shod}{$sbn}{pneedmin}.' W') if($hsurp->{$shod}{nhr} eq '00');                   
+      }
+  }
+  
+  if ($paref->{debug} =~ /batteryManagement/) {
+      for my $k (sort { $a <=> $b } keys %{$hsurp}) {
+          for my $bat (sort @batteries) {
+              my $ssoc         = $hsurp->{$k}{$bat}{runwh} // '-';
+              my $safetyMargin = $hsurp->{$k}{$bat}{safetyMargin};
+              my $margin       = defined $safetyMargin ? $safetyMargin : SFTYMARGIN_20;
+              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $hsurp->{$k}{spswh} Wh, OptTargetPower: $hsurp->{$k}{$bat}{pneedmin} W, safety: $margin %");
+          }
+      }
+  }
+  
 return;
 }
 
@@ -11970,8 +12067,12 @@ sub _createSummaries {
           }
       }
       else {
-          $tomorrowSum->{PV}  += $pvfc if(int($nhday) == int($tmoday));
-          $daftertomSum->{PV} += $pvfc if(int($nhday) == int($datmoday));
+          $tomorrowSum->{PV} += $pvfc  if(int($nhday) == int($tmoday));
+          
+          if (int($nhday) == int($datmoday)) {
+              $daftertomSum->{PV}          += $pvfc;
+              $daftertomSum->{Consumption} += $confc;
+          }
       }
   }
 
@@ -12061,13 +12162,14 @@ sub _createSummaries {
   $selfconsumptionrate    = sprintf "%.0f", ($selfconsumption / $pv2node * 100)        if($pv2node * 1 > 0);
   $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / $divi * 100 if($divi);       # vermeide Illegal division by zero
 
-  $data{$name}{current}{consumption}          = $consumption;
-  $data{$name}{current}{selfconsumption}      = $selfconsumption;
-  $data{$name}{current}{selfconsumptionrate}  = $selfconsumptionrate;
-  $data{$name}{current}{autarkyrate}          = $autarkyrate;
-  $data{$name}{current}{tdConFcTillSunset}    = sprintf "%.0f", $tdConFcTillSunset;
-  $data{$name}{current}{surplus}              = $surplus;
-  $data{$name}{current}{dayAfterTomorrowPVfc} = $daftertomSum->{PV};
+  $data{$name}{current}{consumption}           = $consumption;
+  $data{$name}{current}{selfconsumption}       = $selfconsumption;
+  $data{$name}{current}{selfconsumptionrate}   = $selfconsumptionrate;
+  $data{$name}{current}{autarkyrate}           = $autarkyrate;
+  $data{$name}{current}{tdConFcTillSunset}     = sprintf "%.0f", $tdConFcTillSunset;
+  $data{$name}{current}{surplus}               = $surplus;
+  $data{$name}{current}{dayAfterTomorrowPVfc}  = $daftertomSum->{PV};
+  $data{$name}{current}{dayAfterTomorrowConfc} = $daftertomSum->{Consumption};
 
   push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
   limitArray ($data{$name}{current}{surplusslidereg}, SPLSLIDEMAX);
@@ -26670,14 +26772,21 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] </b> <br><br>
-         If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management for this
-         battery device. <br>
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] 
+                                     [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
+                                     [safetyMargin=&lt;Value&gt;] </b> <br><br>
+                                     
+         If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management 
+         for this battery device. <br>
+         A set of control readings is generated; the module itself does not interfere with battery control. <br>
          The <b>Battery_OptimumTargetSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
          The <b>Battery_ChargeRequest_XX</b> reading is set to '1' if the current SoC has fallen below the minimum SoC. <br>
          In this case, the battery should be forcibly charged, possibly with mains power. <br>
-         The reading <b>Battery_ChargeUnrestricted_XX</b> indicates whether the battery should be charged at full power (1) without restriction or not 
-         or only with limited power if a feed-in limit is exceeded (0). <br>         
+         The reading <b>Battery_ChargeUnrestricted_XX</b> indicates whether the battery should be charged at full power without 
+         restriction (1), or not at all, or only when the <br>
+         feed-in limit (see <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>) is exceeded (0). 
+         If you want to charge the battery continuously throughout the day, Reading 
+         <b>Battery_ChargeOptTargetPower_XX</b> provides optimized charging power for battery control. <br>         
          The readings can be used to control the SoC (State of Charge) and to control the charging power used for the
          battery. <br>
          Detailed information on battery SoC and charging management is described in the
@@ -26686,30 +26795,35 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>lowSoc</b>    </td><td>lower minimum SoC - The battery is not discharged lower than this value (> 0)                   </td></tr>
-            <tr><td>                  </td><td>                                                                                                </td></tr>
-            <tr><td> <b>upSoC</b>     </td><td>upper minimum SoC - The usual value of the optimum SoC tends to be                              </td></tr>
-            <tr><td>                  </td><td>between 'lowSoC' and 'upSoC' in periods with a high PV surplus                                  </td></tr>
-            <tr><td>                  </td><td>and between 'upSoC' and 'maxSoC' in periods with a low PV surplus                               </td></tr>
-            <tr><td>                  </td><td>                                                                                                </td></tr>
-            <tr><td> <b>maxSoC</b>    </td><td>Maximum minimum SoC - SoC value that must be reached at least every 'careCycle' days            </td></tr>
-            <tr><td>                  </td><td>in order to balance the charge in the storage network.                                          </td></tr>
-            <tr><td>                  </td><td>The specification is optional (&lt;= 100, default: 95)                                          </td></tr>
-            <tr><td>                  </td><td>                                                                                                </td></tr>
-            <tr><td> <b>careCycle</b> </td><td>Maximum interval in days that may occur between two states of charge                            </td></tr>
-            <tr><td>                  </td><td>of at least 'maxSoC'. The specification is optional (default: 20)                               </td></tr>
-            <tr><td>                  </td><td>                                                                                                </td></tr>
-            <tr><td> <b>lcSlot</b>    </td><td>A daily time window is defined in which the charging control of the module should be active     </td></tr>
-            <tr><td>                  </td><td>for this battery. Outside the time window, the battery charge is released                       </td></tr>
-            <tr><td>                  </td><td>at full power. The SoC management of the battery is not affected by this.                       </td></tr>
-            <tr><td>                  </td><td>Value: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: all day                                     </td></tr>           
-            <tr><td>                  </td><td>                                                                                                </td></tr>           
-            <tr><td> <b>loadAbort</b> </td><td>Condition for a general charging abort and Unlocking. The abort condition is fulfilled if the   </td></tr>
-            <tr><td>                  </td><td>specified SoC1 (%) is reached or exceeded <b>AND</b> the specified charging power               </td></tr>
-            <tr><td>                  </td><td>&lt;MinPwr&gt; (W) has been undercut -> Reading <b>Battery_ChargeAbort_XX=1</b>.                </td></tr>
-            <tr><td>                  </td><td>If the current SoC falls below the specified SoC2, the <b>Battery_ChargeAbort_XX=0</b> is set.  </td></tr>
-            <tr><td>                  </td><td>If SoC2 is not specified, SoC2=SoC1.                                                            </td></tr>            
-            <tr><td>                  </td><td>                                                                                                </td></tr>            
+            <tr><td> <b>lowSoc</b>       </td><td>lower minimum SoC - The battery is not discharged lower than this value (> 0)                   </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>upSoC</b>        </td><td>upper minimum SoC - The usual value of the optimum SoC tends to be                              </td></tr>
+            <tr><td>                     </td><td>between 'lowSoC' and 'upSoC' in periods with a high PV surplus                                  </td></tr>
+            <tr><td>                     </td><td>and between 'upSoC' and 'maxSoC' in periods with a low PV surplus                               </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>maxSoC</b>       </td><td>Maximum minimum SoC - SoC value that must be reached at least every 'careCycle' days            </td></tr>
+            <tr><td>                     </td><td>in order to balance the charge in the storage network.                                          </td></tr>
+            <tr><td>                     </td><td>The specification is optional (&lt;= 100, default: 95)                                          </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>careCycle</b>    </td><td>Maximum interval in days that may occur between two states of charge                            </td></tr>
+            <tr><td>                     </td><td>of at least 'maxSoC'. The specification is optional (default: 20)                               </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>lcSlot</b>       </td><td>A daily time window is defined in which the charging control of the module should be active     </td></tr>
+            <tr><td>                     </td><td>for this battery. Outside the time window, the battery charge is released                       </td></tr>
+            <tr><td>                     </td><td>at full power. The SoC management of the battery is not affected by this.                       </td></tr>
+            <tr><td>                     </td><td>Value: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: all day                                     </td></tr>           
+            <tr><td>                     </td><td>                                                                                                </td></tr>           
+            <tr><td> <b>loadAbort</b>    </td><td>Condition for a general charging abort and Unlocking. The abort condition is fulfilled if the   </td></tr>
+            <tr><td>                     </td><td>specified SoC1 (%) is reached or exceeded <b>AND</b> the specified charging power               </td></tr>
+            <tr><td>                     </td><td>&lt;MinPwr&gt; (W) has been undercut -> Reading <b>Battery_ChargeAbort_XX=1</b>.                </td></tr>
+            <tr><td>                     </td><td>If the current SoC falls below the specified SoC2, the <b>Battery_ChargeAbort_XX=0</b> is set.  </td></tr>
+            <tr><td>                     </td><td>If SoC2 is not specified, SoC2=SoC1.                                                            </td></tr>            
+            <tr><td>                     </td><td>                                                                                                </td></tr>            
+            <tr><td> <b>safetyMargin</b> </td><td>When calculating the load clearance and optimized load capacity, a safety margin is added       </td></tr>
+            <tr><td>                     </td><td>to the predicted load requirement.                                                              </td></tr>
+            <tr><td>                     </td><td>Not like the default, you can use this parameter to set a percentage.                           </td></tr>
+            <tr><td>                     </td><td>Value: <b>0..100</b> (Integer)                                                                  </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
          </table>
          </ul>
          <br>
@@ -26717,7 +26831,7 @@ to ensure that the system configuration is correct.
          All SoC values are whole numbers in %. The following applies: 'lowSoc' &lt; 'upSoC' &lt; 'maxSoC'. <br><br>
 
          <b>Example: </b> <br>
-         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 <br>
+         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 safetyMargin=30 <br>
        </li>
        <br>
 
@@ -27141,13 +27255,13 @@ to ensure that the system configuration is correct.
             <tr><td>                                         </td><td>current&amp;nbsp;Gridconsumption:Current_GridConsumption                                </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>#                                                                                       </td></tr>
-            <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:special_todayConForecastTillSunset                  </td></tr>
-            <tr><td>                                         </td><td>PV&amp;nbsp;Day&amp;nbsp;after&amp;nbsp;tomorrow:special_dayAfterTomorrowPVforecast   </td></tr>
+            <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:special_todayConForecastTillSunset                    </td></tr>
+            <tr><td>                                         </td><td>PV&amp;nbsp;Day&amp;nbsp;after&amp;nbsp;tomorrow:special_dayAfterTomorrowPVforecast     </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>#Battery                                                                                </td></tr>
-            <tr><td>                                         </td><td>in&amp;nbsp;today:special_todayBatIn                                                  </td></tr>
-            <tr><td>                                         </td><td>out&amp;nbsp;today:special_todayBatOut                                                </td></tr>
+            <tr><td>                                         </td><td>in&amp;nbsp;today:special_todayBatIn                                                    </td></tr>
+            <tr><td>                                         </td><td>out&amp;nbsp;today:special_todayBatOut                                                  </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>#Settings                                                                               </td></tr>
@@ -27383,8 +27497,8 @@ to ensure that the system configuration is correct.
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
        <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt; cap=&lt;Option&gt;                 <br>
-                                [pinmax=&lt;Integer&gt] [poutmax=&lt;Integer&gt] [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;]
-                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                                                               <br>
+                                [pinmax=&lt;Integer&gt] [pinreduced=&lt;Integer&gt] [poutmax=&lt;Integer&gt] [intotal=&lt;Readingname&gt;:&lt;Unit&gt;]                   <br>
+                                [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;] [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                   <br>
                                 [label=&lt;Option&gt] [[icon=&lt;recomm&gt;@&lt;Color&gt;]:[&lt;charge&gt;@&lt;Color&gt;]:[&lt;discharge&gt;@&lt;Color&gt;]:[&lt;omit&gt;@&lt;Color&gt;]]  </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data. <br>
@@ -27400,6 +27514,10 @@ to ensure that the system configuration is correct.
            <tr><td> <b>pout</b>      </td><td>Reading which provides the current battery discharge rate                                                     </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>pinmax</b>    </td><td>the maximum possible charging power in watts (optional)                                                       </td></tr>
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
+           <tr><td> <b>pinreduced</b></td><td>The reduced charging power in watts (optional). The value is set in Reading Battery_ChargeOptTargetPower_XX   </td></tr>
+           <tr><td>                  </td><td>if there is no PV surplus available to adjust the optimal charging power. This means that this                </td></tr>
+           <tr><td>                  </td><td>value can also be applied in the case of forced charging from the public grid.                                </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>poutmax</b>   </td><td>the maximum possible discharge power in watts (optional)                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
@@ -29328,15 +29446,22 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] </b> <br><br>
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] 
+                                     [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
+                                     [safetyMargin=&lt;Wert&gt;] </b> <br><br>
+         
          Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
          SoC- und Lade-Management für dieses Batteriegerät. <br>
+         Es wird ein Satz Steuerreadings erstellt; das Modul greift selbst <b>nicht</b> in die Batteriesteuerung ein. <br>
          Das Reading <b>Battery_OptimumTargetSoC_XX</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
          Das Reading <b>Battery_ChargeRequest_XX</b> wird auf '1' gesetzt, wenn der aktuelle SoC unter den Mindest-SoC gefallen
          ist. <br>
          In diesem Fall sollte die Batterie, unter Umständen mit Netzstrom, zwangsgeladen werden. <br>
-         Das Reading <b>Battery_ChargeUnrestricted_XX</b> gibt an, ob die Batterie uneingeschränkt mit voller Leistung (1), oder nicht 
-         bzw. nur mit eingeschränkter Leistung bei Überschreitung eines Einspeiselimits geladen werden sollte (0). <br>         
+         Das Reading <b>Battery_ChargeUnrestricted_XX</b> gibt an, ob die Batterie uneingeschränkt mit voller Leistung (1), oder 
+         nicht bzw. nur bei Überschreitung des <br> 
+         Einspeiselimits (siehe <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>) 
+         geladen werden sollte (0). Möchte man die Batterie kontinuierlich über den gesamten Tag aufladen, wird im Reading 
+         <b>Battery_ChargeOptTargetPower_XX</b> eine optimierte Ladeleistung zur Batteriesteuerung bereitgestellt.  <br>         
          Die Readings können zur Steuerung des SoC (State of Charge) sowie zur Steuerung des verwendeten Ladeleistung
          der Batterie verwendet werden. <br>
          Detaillierte Informationen zum Batterie SoC- und Lade-Management sind im 
@@ -29345,30 +29470,35 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>lowSoc</b>    </td><td>unterer Mindest-SoC - Die Batterie wird nicht tiefer als dieser Wert entladen (> 0)             </td></tr>
-            <tr><td>                  </td><td>                                                                                                </td></tr>
-            <tr><td> <b>upSoC</b>     </td><td>oberer Mindest-SoC - Der übliche Wert des optimalen SoC bewegt sich in Perioden mit hohen       </td></tr>
-            <tr><td>                  </td><td>PV-Überschuß tendenziell zwischen 'lowSoC' und 'upSoC', in Perioden mit geringem PV-Überschuß   </td></tr>
-            <tr><td>                  </td><td>tendenziell zwischen 'upSoC' und 'maxSoC'                                                       </td></tr>
-            <tr><td>                  </td><td>                                                                                                </td></tr>
-            <tr><td> <b>maxSoC</b>    </td><td>maximaler Mindest-SoC - SoC Wert der mindestens im Abstand von 'careCycle' Tagen erreicht       </td></tr>
-            <tr><td>                  </td><td>werden muß um den Ladungsausgleich im Speicherverbund auszuführen.                              </td></tr>
-            <tr><td>                  </td><td>Die Angabe ist optional (&lt;= 100, default: 95)                                                </td></tr>
-            <tr><td>                  </td><td>                                                                                                </td></tr>
-            <tr><td> <b>careCycle</b> </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'          </td></tr>
-            <tr><td>                  </td><td>auftreten darf. Die Angabe ist optional (default: 20)                                           </td></tr>
-            <tr><td>                  </td><td>                                                                                                </td></tr>        
-            <tr><td> <b>lcSlot</b>    </td><td>Es wird ein tägliches Zeitfenster festgelegt, in dem die Ladesteuerung des Moduls für diese     </td></tr>
-            <tr><td>                  </td><td>Batterie aktiv sein soll. Außerhalb des Zeitfensters wird die Batterieladung mit voller         </td></tr>
-            <tr><td>                  </td><td>Leistung freigegeben. Das SoC-Management der Batterie ist davon nicht betroffen.                </td></tr>
-            <tr><td>                  </td><td>Wert: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: ganztägig                                    </td></tr>           
-            <tr><td>                  </td><td>                                                                                                </td></tr>           
-            <tr><td> <b>loadAbort</b> </td><td>Bedingung für einen generellen Ladeabbruch und Wiederfreigabe. Die Abbruchbedingung ist erfüllt,</td></tr>
-            <tr><td>                  </td><td>wenn der angegebene SoC1 (%) erreicht bzw. überschritten ist <b>UND</b> die angegebene          </td></tr>
-            <tr><td>                  </td><td>Ladeleistung &lt;MinPwr&gt; (W) unterschritten wurde -> Reading <b>Battery_ChargeAbort_XX=1</b>.</td></tr>
-            <tr><td>                  </td><td>Fällt der aktuelle SoC wieder unter den SoC2, wird <b>Battery_ChargeAbort_XX=0</b> gesetzt.     </td></tr>
-            <tr><td>                  </td><td>Ist SoC2 nicht angegeben, gilt SoC2=SoC1.                                                       </td></tr>            
-            <tr><td>                  </td><td>                                                                                                </td></tr>            
+            <tr><td> <b>lowSoc</b>       </td><td>unterer Mindest-SoC - Die Batterie wird nicht tiefer als dieser Wert entladen (> 0)             </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>upSoC</b>        </td><td>oberer Mindest-SoC - Der übliche Wert des optimalen SoC bewegt sich in Perioden mit hohen       </td></tr>
+            <tr><td>                     </td><td>PV-Überschuß tendenziell zwischen 'lowSoC' und 'upSoC', in Perioden mit geringem PV-Überschuß   </td></tr>
+            <tr><td>                     </td><td>tendenziell zwischen 'upSoC' und 'maxSoC'                                                       </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>maxSoC</b>       </td><td>maximaler Mindest-SoC - SoC Wert der mindestens im Abstand von 'careCycle' Tagen erreicht       </td></tr>
+            <tr><td>                     </td><td>werden muß um den Ladungsausgleich im Speicherverbund auszuführen.                              </td></tr>
+            <tr><td>                     </td><td>Die Angabe ist optional (&lt;= 100, default: 95)                                                </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>careCycle</b>    </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'          </td></tr>
+            <tr><td>                     </td><td>auftreten darf. Die Angabe ist optional (default: 20)                                           </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>        
+            <tr><td> <b>lcSlot</b>       </td><td>Es wird ein tägliches Zeitfenster festgelegt, in dem die Ladesteuerung des Moduls für diese     </td></tr>
+            <tr><td>                     </td><td>Batterie aktiv sein soll. Außerhalb des Zeitfensters wird die Batterieladung mit voller         </td></tr>
+            <tr><td>                     </td><td>Leistung freigegeben. Das SoC-Management der Batterie ist davon nicht betroffen.                </td></tr>
+            <tr><td>                     </td><td>Wert: <b>&lt;hh:mm&gt;-&lt;hh:mm&gt;</b>, default: ganztägig                                    </td></tr>           
+            <tr><td>                     </td><td>                                                                                                </td></tr>           
+            <tr><td> <b>loadAbort</b>    </td><td>Bedingung für einen generellen Ladeabbruch und Wiederfreigabe. Die Abbruchbedingung ist erfüllt,</td></tr>
+            <tr><td>                     </td><td>wenn der angegebene SoC1 (%) erreicht bzw. überschritten ist <b>UND</b> die angegebene          </td></tr>
+            <tr><td>                     </td><td>Ladeleistung &lt;MinPwr&gt; (W) unterschritten wurde -> Reading <b>Battery_ChargeAbort_XX=1</b>.</td></tr>
+            <tr><td>                     </td><td>Fällt der aktuelle SoC wieder unter den SoC2, wird <b>Battery_ChargeAbort_XX=0</b> gesetzt.     </td></tr>
+            <tr><td>                     </td><td>Ist SoC2 nicht angegeben, gilt SoC2=SoC1.                                                       </td></tr>            
+            <tr><td>                     </td><td>                                                                                                </td></tr>            
+            <tr><td> <b>safetyMargin</b> </td><td>Bei der Berechnung der Ladefreigabe und optimierten Ladeleistung wird ein Sicherheitszuschlag   </td></tr>
+            <tr><td>                     </td><td>auf den prognostizierten Ladungsbedarf berücksichtigt.                                          </td></tr>
+            <tr><td>                     </td><td>Abweichend vom Default kann mit diesem Parameter ein Prozentwert angegeben werden.              </td></tr>
+            <tr><td>                     </td><td>Wert: <b>0..100</b> (Ganzzahl)                                                                  </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
          </table>
          </ul>
          <br>
@@ -29376,7 +29506,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Alle SoC-Werte sind ganze Zahlen in %. Dabei gilt: 'lowSoc' &lt; 'upSoC' &lt; 'maxSoC'. <br><br>
 
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 <br>
+         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 safetyMargin=30 <br>
        </li>
        <br>
 
@@ -30040,8 +30170,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
        <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; cap=&lt;Option&gt;                                                <br>
-                                [pinmax=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt] [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]
-                                [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                                                                                                     <br>
+                                [pinmax=&lt;Ganzzahl&gt] [pinreduced=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt] [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;]                                                   <br>
+                                [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                                                      <br>
                                 [label=&lt;Option&gt] [[icon=&lt;empfohlen&gt;@&lt;Farbe&gt;]:[&lt;aufladen&gt;@&lt;Farbe&gt;]:[&lt;entladen&gt;@&lt;Farbe&gt;]:[icon=&lt;unterlassen&gt;@&lt;Farbe&gt;]]  </b> <br><br>
 
        Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest. <br>
@@ -30057,6 +30187,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladeleistung liefert                                             </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>pinmax</b>    </td><td>die maximal mögliche Ladeleistung in Watt (optional)                                                     </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
+           <tr><td> <b>pinreduced</b></td><td>Die reduzierte Ladeleistung in Watt (optional). Der Wert wird im Reading Battery_ChargeOptTargetPower_XX </td></tr>
+           <tr><td>                  </td><td>gesetzt wenn kein PV-Überschuß zur Anpassung der optimalen Ladeleistung vorhanden ist. Somit kann dieser </td></tr>
+           <tr><td>                  </td><td>Wert auch im Fall der Zwangsbeladung aus dem öffentlichen Netz zur Anwendung kommen.                     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>poutmax</b>   </td><td>die maximal mögliche Entladeleistung in Watt (optional)                                                  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
