@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "08.20.03";
+my $ModulVersion = "08.20.04";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -122,6 +122,7 @@ sub FRITZBOX_Get_VPN_Shares_List($);
 sub FRITZBOX_Get_DOCSIS_Informations($);
 sub FRITZBOX_Get_WLAN_Environment($);
 sub FRITZBOX_Get_SmartHome_Devices_List($@);
+sub FRITZBOX_Get_SmartHome_Automation_List($@);
 sub FRITZBOX_Get_Lan_Devices_List($);
 sub FRITZBOX_Get_User_Info_List($);
 sub FRITZBOX_Get_Fritz_Log_Info_nonBlk($);
@@ -376,6 +377,10 @@ my %JavaScript = (
                                    810 => "generic/ctlusb"},
         ddns                  => { 800 => "generic?ui=ddns",
                                    810 => "generic/ddns"},
+        dnscfg                => { 800 => "generic?ui=dnscfg",
+                                   810 => "generic/dnscfg"},
+        dnsserver             => { 800 => "generic?ui=dnsserver",
+                                   810 => "generic/dnsserver"},
         dect                  => { 800 => "generic?ui=dect",
                                    810 => "generic/dect"},
         eventlog              => { 800 => "eventlog",
@@ -419,6 +424,7 @@ my %JavaScript = (
                                    810 => "generic/mobiled"},
         monitor_datasets      => { 800 => "monitor/datasets"},
         monitor_configuration => { 800 => "monitor/configuration"},
+        monitor_online_0000   => { 800 => "monitor/online/subsets"},
         monitor_online_0000   => { 800 => "monitor/onlinemonitor_dsl_0/subset0000"},
         monitor_online_0001   => { 800 => "monitor/onlinemonitor_dsl_0/subset0001"},
         monitor_online_0002   => { 800 => "monitor/onlinemonitor_dsl_0/subset0002"},
@@ -552,6 +558,13 @@ my %LuaData = (
         wlanmesh        => { cmd => "xhr 1 lang de page wlanmesh xhrId all"}
 );
 
+my %LuaDataSG = (
+        overview        => { cmd => "xhr 1 lang de page overview xhrId first noMenuRef 1"},
+        repModeAll      => { cmd => "xhr 1 lang de page repMode xhrId all"},
+        repModeTable    => { cmd => "xhr 1 lang de page repMode xhrId requestTable useajax 1"},
+        repNetSet       => { cmd => "xhr 1 lang de page repNetSet xhrId all"},
+);
+
 my %LuaQueryCmd = (
         box_uptimeHours        => { cmd   => "uimodlogic:status/uptime_hours"},
         box_uptimeMinutes      => { cmd   => "uimodlogic:status/uptime_minutes"},
@@ -664,85 +677,92 @@ my %LuaQueryCmd = (
 
 # https://www.pcwelt.de/article/1196302/die-neuesten-updates-fuer-fritzbox-co.html
 my %FB_Model = (
-       '7690'        => { Version => "8.02", Datum => "16.01.2025"},
-       '7682'        => { Version => "8.03", Datum => "21.01.2025"},
-       '7590 AX'     => { Version => "8.02", Datum => "09.01.2025"},
-       '7590'        => { Version => "8.02", Datum => "16.01.2025"},
-       '7583 VDSL'   => { Version => "8.03", Datum => "13.02.2025"},
-       '7583'        => { Version => "8.03", Datum => "13.02.2025"},
-       '7582'        => { Version => "7.18", Datum => "19.08.2024"},
-       '7581'        => { Version => "7.18", Datum => "19.08.2024"},
-       '7580'        => { Version => "7.30", Datum => "04.09.2023"},
-       '7560'        => { Version => "7.30", Datum => "04.09.2023"},
-       '7530'        => { Version => "8.02", Datum => "13.01.2025"},
-       '7530 AX'     => { Version => "8.02", Datum => "09.01.2025"},
-       '7520 B'      => { Version => "8.00", Datum => "17.10.2024"},
-       '7520'        => { Version => "8.00", Datum => "17.10.2024"},
-       '7510'        => { Version => "8.02", Datum => "21.01.2025"},
-       '7490'        => { Version => "7.60", Datum => "29.01.2025"},
-       '7430'        => { Version => "7.31", Datum => "04.09.2023"},
-       '7412'        => { Version => "6.88", Datum => "04.09.2023"},
-       '7390'        => { Version => "6.88", Datum => "04.09.2023"},
-       '7362 SL'     => { Version => "7.14", Datum => "04.09.2023"},
-       '7360 v2'     => { Version => "6.88", Datum => "04.09.2023"},
-       '7360 v1'     => { Version => "6.36", Datum => "06.09.2023"},
-       '7360'        => { Version => "6.85", Datum => "13.03.2017"},
-       '7360 SL'     => { Version => "6.35", Datum => "07.09.2023"},
-       '7340'        => { Version => "6.06", Datum => "24.04.2014"},
-       '7320'        => { Version => "6.35", Datum => "07.09.2023"},
-       '7312'        => { Version => "6.56", Datum => "07.09.2023"},
-       '7272'        => { Version => "6.89", Datum => "04.09.2023"},
-       '7270_v3'     => { Version => "6.06", Datum => "20.10.2015"},
-       '7270_v2'     => { Version => "6.06", Datum => "20.10.2015"},
-       '7270_v1'     => { Version => "6.06", Datum => "20.10.2015"},
-       '7270'        => { Version => "6.06", Datum => "20.10.2015"},
-       '6890 LTE'    => { Version => "7.57", Datum => "04.09.2023"},
-       '6860 5G'     => { Version => "7.61", Datum => "01.01.2025"},
-       '6850 5G'     => { Version => "8.00", Datum => "19.12.2024"},
-       '6850 LTE'    => { Version => "8.00", Datum => "19.12.2024"},
-       '6842 LTE'    => { Version => "6.35", Datum => "07.09.2023"},
-       '6840 LTE'    => { Version => "6.88", Datum => "07.09.2023"},
-       '6820 LTE v3' => { Version => "7.57", Datum => "04.09.2023"},
-       '6820 LTE v2' => { Version => "7.57", Datum => "04.09.2023"},
-       '6820 LTE'    => { Version => "7.30", Datum => "04.09.2023"},
-       '6810 LTE'    => { Version => "6.35", Datum => "07.09.2023"},
-       '6690 Cable'  => { Version => "8.02", Datum => "09.01.2025"},
-       '6670 Cable'  => { Version => "8.02", Datum => "09.01.2025"},
-       '6660 Cable'  => { Version => "8.02", Datum => "09.01.2025"},
-       '6591 Cable'  => { Version => "8.02", Datum => "09.01.2025"},
-       '6590 Cable'  => { Version => "7.57", Datum => "04.09.2023"},
-       '6490 Cable'  => { Version => "7.57", Datum => "04.09.2023"},
-       '6430 Cable'  => { Version => "7.30", Datum => "04.09.2023"},
-       '5690 Pro  '  => { Version => "8.03", Datum => "06.02.2025"},
-       '5590 Fiber'  => { Version => "8.02", Datum => "09.01.2025"},
-       '5530 Fiber'  => { Version => "8.02", Datum => "09.01.2025"},
-       '5491'        => { Version => "7.31", Datum => "04.09.2023"},
-       '5490'        => { Version => "7.31", Datum => "04.09.2023"},
-       '4060'        => { Version => "8.02", Datum => "09.01.2025"},
-       '4050'        => { Version => "8.02", Datum => "09.01.2025"},
-       '4040'        => { Version => "8.00", Datum => "16.10.2024"},
-       '4020'        => { Version => "7.04", Datum => "18.08.2024"},
-       '3490'        => { Version => "7.31", Datum => "04.09.2023"},
-       '3272'        => { Version => "6.89", Datum => "07.09.2023"}
+       '7690'        => { version => "8.10", date => "04.09.2025"},
+       '7682'        => { version => "8.03", date => "21.01.2025"},
+       '7590 AX'     => { version => "8.20", date => "28.08.2025"},
+       '7590'        => { version => "8.20", date => "27.07.2025"},
+       '7583 VDSL'   => { version => "8.20", date => "28.08.2025"},
+       '7583'        => { version => "8.20", date => "28.08.2025"},
+       '7582'        => { version => "7.18", date => "19.08.2024"},
+       '7581'        => { version => "7.18", date => "19.08.2024"},
+       '7580'        => { version => "7.30", date => "04.09.2023"},
+       '7560'        => { version => "7.30", date => "04.09.2023"},
+       '7530'        => { version => "8.10", date => "28.08.2025"},
+       '7530 AX'     => { version => "8.10", date => "28.08.2025"},
+       '7520 B'      => { version => "8.10", date => "14.08.2025"},
+       '7520'        => { version => "8.10", date => "14.08.2025"},
+       '7510'        => { version => "8.10", date => "29.08.2025"},
+       '7490'        => { version => "7.60", date => "29.01.2025"},
+       '7430'        => { version => "7.31", date => "04.09.2023"},
+       '7412'        => { version => "6.88", date => "04.09.2023"},
+       '7390'        => { version => "6.88", date => "04.09.2023"},
+       '7362 SL'     => { version => "7.14", date => "04.09.2023"},
+       '7360 v2'     => { version => "6.88", date => "04.09.2023"},
+       '7360 v1'     => { version => "6.36", date => "06.09.2023"},
+       '7360'        => { version => "6.85", date => "13.03.2017"},
+       '7360 SL'     => { version => "6.35", date => "07.09.2023"},
+       '7340'        => { version => "6.06", date => "24.04.2014"},
+       '7320'        => { version => "6.35", date => "07.09.2023"},
+       '7312'        => { version => "6.56", date => "07.09.2023"},
+       '7272'        => { version => "6.89", date => "04.09.2023"},
+       '7270_v3'     => { version => "6.06", date => "20.10.2015"},
+       '7270_v2'     => { version => "6.06", date => "20.10.2015"},
+       '7270_v1'     => { version => "6.06", date => "20.10.2015"},
+       '7270'        => { version => "6.06", date => "20.10.2015"},
+       '6890 LTE'    => { version => "7.57", date => "04.09.2023"},
+       '6860 5G'     => { version => "8.10", date => "29.08.2025"},
+       '6850 5G'     => { version => "8.10", date => "29.08.2025"},
+       '6850 LTE'    => { version => "8.10", date => "29.08.2025"},
+       '6842 LTE'    => { version => "6.35", date => "07.09.2023"},
+       '6840 LTE'    => { version => "6.88", date => "07.09.2023"},
+       '6820 LTE v3' => { version => "7.57", date => "04.09.2023"},
+       '6820 LTE v2' => { version => "7.57", date => "04.09.2023"},
+       '6820 LTE'    => { version => "7.30", date => "04.09.2023"},
+       '6810 LTE'    => { version => "6.35", date => "07.09.2023"},
+       '6690 Cable'  => { version => "8.10", date => "04.09.2025"},
+       '6670 Cable'  => { version => "8.10", date => "04.09.2025"},
+       '6660 Cable'  => { version => "8.20", date => "13.08.2025"},
+       '6591 Cable'  => { version => "8.20", date => "06.08.2025"},
+       '6590 Cable'  => { version => "7.57", date => "04.09.2023"},
+       '6490 Cable'  => { version => "7.57", date => "04.09.2023"},
+       '6430 Cable'  => { version => "7.30", date => "04.09.2023"},
+       '5690 Pro  '  => { version => "8.03", date => "06.02.2025"},
+       '5590 Fiber'  => { version => "8.10", date => "04.09.2025"},
+       '5530 Fiber'  => { version => "8.02", date => "09.01.2025"},
+       '5491'        => { version => "7.31", date => "04.09.2023"},
+       '5490'        => { version => "7.31", date => "04.09.2023"},
+       '4690'        => { version => "8.10", date => "04.09.2025"},
+       '4060'        => { version => "8.02", date => "09.01.2025"},
+       '4050'        => { version => "8.10", date => "04.09.2025"},
+       '4040'        => { version => "8.00", date => "16.10.2024"},
+       '4020'        => { version => "7.04", date => "18.08.2024"},
+       '3490'        => { version => "7.31", date => "04.09.2023"},
+       '3272'        => { version => "6.89", date => "07.09.2023"}
    );
 
 my %RP_Model = (
-        'Gateway'     => "8.01"
-      , '6000 v2'     => "7.58"
-      , '3000 AX'     => "7.58"
-      , '3000'        => "7.58"
-      , '2400'        => "7.58"
-      , 'DVB-C'       => "7.03"
-      , '1750E'       => "7.31"
-      , '1200 AX'     => "7.58"
-      , '1200'        => "7.58"
-      , '1160'        => "7.15"
-      , '600 (V2)'    => "7.58"
-      , '600'         => "7.58"
-      , '450E'        => "7.15"
-      , '310 a/b'     => "7.16"
-      , '300E'        => "6.34"
-      , 'N/G'         => "4.88"
+        'Smart Gateway'    => { version => "8.20", date => "02.09.2025"},
+      , 'Smart Energy 250' => { version => "3.70", date => "06.08.2025"},
+      , 'PowerLine 1260'   => { version => "8.10", date => "29.08.2025"},
+      , 'PowerLine 1260E'  => { version => "8.10", date => "29.08.2025"},
+      , '1200'             => { version => "8.10", date => "04.09.2025"},
+      , 'DECT 302'         => { version => "5.29", date => "25.07.2025"},
+      , 'DECT 200'         => { version => "4.27", date => "10.12.2024"},
+      , 'DECT 301'         => { version => "5.23", date => "25.07.2025"},
+      , 'DVB-C'            => { version => "7.04", date => "06.08.2024"},
+      , '6000 v2'          => { version => "7.58", date => "16.05.2024"},
+      , '3000 AX'          => { version => "7.58", date => "16.05.2024"},
+      , '3000'             => { version => "8.10", date => "29.08.2025"},
+      , '2400'             => { version => "8.10", date => "29.08.2025"},
+      , '1750E'            => { version => "7.32", date => "19.03.2024"},
+      , '1200 AX'          => { version => "8.10", date => "04.09.2025"},
+      , '1200'             => { version => "8.10", date => "04.09.2025"},
+      , '1160'             => { version => "7.15", date => "12.09.2023"},
+      , '600 (V2)'         => { version => "7.58", date => "11.03.2024"},
+      , '600'              => { version => "7.58", date => "11.03.2024"},
+      , '450E'             => { version => "7.15", date => "12.09.2023"},
+      , '310 a/b'          => { version => "7.16", date => "04.09.2023"},
+      , '300E'             => { version => "6.34", date => "13.09.2023"}
    );
 
 my %fonModel = (
@@ -1951,11 +1971,74 @@ sub FRITZBOX_Set($$@)
 
      if ( lc $cmd eq 'smarthome') {
 
-       $retMsg = "ERROR: required <deviceID> <tempOffset:value> | <tmpAdjust:value> | <tmpPerm:0|1> | <switch:0|1> | <automatic:0|1>  | <preDefSave:name> | <preDefDel:name>| <preDefLoad[:deviceID]:name[:A|:G]";
-       return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet) if (int @val < 1 || int @val > 2);
+       if (int @val < 1 || int @val > 2) {
+         $retMsg = "ERROR: required <apply> <scenario:ID | template:ID> or <routine> <enable:ID | disable:ID> or <deviceID> <tempOffset:value | tmpAdjust:value | tmpPerm:0|1 | switch:0|1 | automatic:0|1  | preDefSave:name | preDefDel:name| preDefLoad[:deviceID]:name[:A|:G]>";
+         return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
 
-       $retMsg = "ERROR: required numeric value for first parameter: $val[0]";
-       return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet) if ($val[0] =~ /\D/ && int @val == 2);
+       my @webCmdArray;
+
+       if($val[0] =~ /apply|routine/) {
+
+         if($hash->{fhem}{fwVersion} < 800) {
+           $retMsg = "ERROR: required FritzOS equa or greater than 8.00.";
+           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
+
+         if (int @val != 2) {
+           $retMsg = "ERROR: required <apply> <scenario:ID | template:ID> or <routine> <enable:ID | disable:ID>";
+           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
+
+         if( ($val[1] !~ /^template:\d+$|^scenario:\d+$/) && ($val[1] !~ /^enable:.*?$|^disable:.*?$/) ) {
+           $retMsg = "ERROR: required <apply> <scenario:ID | template:ID>  or <routine> <enable:ID | disable:ID>";
+           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
+
+         my @autoID = $val[1] =~ /^(.*?):(.*?)$/;
+
+         if($val[0] =~ /apply/) {
+           push @webCmdArray, "activateScenario" => $autoID[1] if $val[1] =~ /scenario/ ;
+           push @webCmdArray, "activateTemplate" => $autoID[1] if $val[1] =~ /template/ ;
+           push @webCmdArray, "page"             => "sh_control";
+         } else {
+           push @webCmdArray, $autoID[0]. "Routine" => $autoID[1];
+           push @webCmdArray, "page"                => "sh_control";
+         }
+
+         FRITZBOX_Log $hash, 4, "set $name $cmd \n" . join(" ", @webCmdArray);
+
+         my $result = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray);
+
+         my $analyse = FRITZBOX_Helper_analyse_Lua_Result($hash, $result);
+
+         FRITZBOX_Log $hash, 4, "SmartHome Automation " . $val[1] . " - " . $analyse;
+
+         if ( $analyse =~ /ERROR/) {
+           FRITZBOX_Log $hash, 2, "SmartHome Automation " . $val[1] . " - " . $analyse;
+           return FRITZBOX_Helper_retMsg($hash, $analyse, $retMsgbySet);
+         }
+
+         if (ref($result->{data}) eq "HASH" && defined $result->{data}->{success}) {
+           if ($result->{data}->{success} == 1) {
+             $retMsg = "ID:$autoID[1] - $autoID[0] applied";
+             return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+           } else {
+             $retMsg = "ERROR: ID:$autoID[1] - $autoID[0] not applied";
+             return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+           }
+         } else {
+           FRITZBOX_Log $hash, 4, "SmartHome Automation " . $val[1] . " - " . FRITZBOX_Helper_Dumper($hash, $result, 2);
+           $retMsg = "ERROR: ID:$autoID[1] - $autoID[0] not available";
+           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
+
+       }
+
+       if ($val[0] =~ /\D/ && int @val == 2) {
+         $retMsg = "ERROR: required 'apply' or numeric value for first parameter: $val[0]";
+         return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
 
        my $newValue     = undef;
        my $action       = "";
@@ -1964,7 +2047,6 @@ sub FRITZBOX_Set($$@)
        my $preDefDevice = "";
        my $preDefResA   = "no";
        my $preDefResG   = "no";
-       my @webCmdArray;
 
        if (int @val == 2) {
 
@@ -3863,8 +3945,11 @@ sub FRITZBOX_Get($@)
        if ( $val[0] eq "mobileInfo" && $hash->{LUADATA} == 1) {
          $returnStr = FRITZBOX_Get_MobileInfo($hash);
 
-       } elsif ( $val[0] eq "smartHome" && $hash->{LUADATA} == 1) {
-         $returnStr = FRITZBOX_Get_SmartHome_Devices_List($hash);
+       } elsif ( $val[0] eq "smartHomeDevices" && $hash->{LUADATA} == 1) {
+         $returnStr = FRITZBOX_Get_SmartHome_Device_List($hash);
+
+       } elsif ( $val[0] eq "smartHomeAutomation" && $hash->{LUADATA} == 1 && $hash->{fhem}{fwVersion} >= 800) {
+         $returnStr = FRITZBOX_Get_SmartHome_Automation_List($hash);
 
        } elsif ( $val[0] eq "lanDevices" && $hash->{LUADATA} == 1) {
          $returnStr = FRITZBOX_Get_Lan_Devices_List($hash);
@@ -4030,7 +4115,6 @@ sub FRITZBOX_Get($@)
 
          foreach my $key (sort { $a cmp $b } keys %LuaData) {
 
-
            my $klickcmd = $command;
               $klickcmd =~ s/keyButton/$key/g;
               $klickcmd =~ s/PERLcmd/get $name luaData $LuaData{$key}{cmd}/g;
@@ -4041,6 +4125,33 @@ sub FRITZBOX_Get($@)
            $returnStr .= "<td>" . $LuaData{$key}{cmd} . "</td>";
            $returnStr .= "</tr>\n";
          }
+
+         if($avmModel =~ /Smart Gateway/) {
+
+           $returnStr .= "<tr>\n";
+           $returnStr .= "</tr>\n";
+           $returnStr .= '<td colspan="2">&nbsp;</td>';
+           $returnStr .= "<tr>\n";
+           $returnStr .= '<td colspan="2">API Call: ' . $val[0] . ' for Smart Gateway</td>';
+           $returnStr .= "</tr>\n";
+           $returnStr .= "<tr>\n";
+           $returnStr .= "<td>Alias</td><td>Command</td>\n";
+           $returnStr .= "</tr>\n";
+
+           foreach my $key (sort { $a cmp $b } keys %LuaDataSG) {
+
+             my $klickcmd = $command;
+                $klickcmd =~ s/keyButton/$key/g;
+                $klickcmd =~ s/PERLcmd/get $name luaData $LuaDataSG{$key}{cmd}/g;
+                $klickcmd =~ s/quittieren/$key/g;
+
+             $returnStr .= "<tr>\n";
+             $returnStr .= "<td>" . $klickcmd . "</td>";
+             $returnStr .= "<td>" . $LuaDataSG{$key}{cmd} . "</td>";
+             $returnStr .= "</tr>\n";
+           }
+         }
+
        }
 
        if ($val[0] eq "query.lua") {
@@ -4190,6 +4301,61 @@ sub FRITZBOX_Get($@)
 
        return $returnStr;
 
+     } elsif( lc $cmd eq "showfritzos") {
+
+       FRITZBOX_Log $hash, 4, "get $name $cmd [" . int(@val) . "] " . join(" ", @val);
+
+       return "Wrong number of arguments, usage: get $name showfritzos" if int @val != 0;
+
+       my $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+       $returnStr  = '<html><table';
+       $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+       $returnStr .= ' cellspacing="20"' if $tableFormat !~ "cellspacing";
+       $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+       $returnStr .= '>';
+       $returnStr .= "<tr>\n";
+
+       $returnStr .= '<td colspan="4">Übersicht der FritzBox</td>';
+       $returnStr .= "</tr>\n";
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>Gerät</td><td>Version</td><td>Datum</td>\n";
+       $returnStr .= "</tr>\n";
+
+       foreach my $key (sort { $a cmp $b } keys %FB_Model) {
+ 
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . $key . "</td>";
+         $returnStr .= "<td>" . $FB_Model{$key}{version} . "</td>";
+         $returnStr .= "<td>" . $FB_Model{$key}{date}  . "</td>";
+         $returnStr .= "</tr>\n";
+       }
+
+       $returnStr .= "<tr>\n";
+       $returnStr .= "</tr>\n";
+       $returnStr .= '<td colspan="4">&nbsp;</td>';
+       $returnStr .= "<tr>\n";
+       $returnStr .= '<td colspan="4">Übersicht der Fritz Smart-/Repeater</td>';
+       $returnStr .= "</tr>\n";
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>Gerät</td><td>Version</td><td>Datum</td>\n";
+       $returnStr .= "</tr>\n";
+
+       foreach my $key (sort { $a cmp $b } keys %RP_Model) {
+
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . $key . "</td>";
+         $returnStr .= "<td>" . $RP_Model{$key}{version} . "</td>";
+         $returnStr .= "<td>" . $RP_Model{$key}{date}  . "</td>";
+         $returnStr .= "</tr>\n";
+       }
+
+       $returnStr .= "</table></html>\n";
+
+       FRITZBOX_Log $hash, 4, "\n$returnStr";
+
+       return $returnStr;
+
      }
 
      my $list;
@@ -4208,11 +4374,12 @@ sub FRITZBOX_Get($@)
      # luaData
      if (($hash->{LUADATA} == 1 || $hash->{LUAQUERY} == 1) && ($hash->{fhem}{fwVersion} >= 700) ){
        $list .= " luaInfo:";
-       $list .= "lanDevices,ledSettings,vpnShares,wlanNeighborhood" if $hash->{LUADATA} == 1;
-       $list .= ",mobileInfo,globalFilters" if $hash->{LUADATA} == 1 && ($avmModel =~ "Box");
-       $list .= ",smartHome" if $hash->{LUADATA} == 1 && ($avmModel =~ "Box|Smart");
-       $list .= ",kidProfiles,userInfos" if $hash->{LUAQUERY} == 1;
-       $list .= ",docsisInformation" if $hash->{LUADATA} == 1 && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]");
+         $list .= "lanDevices,ledSettings,vpnShares,wlanNeighborhood" if $hash->{LUADATA} == 1;
+         $list .= ",mobileInfo,globalFilters"                         if $hash->{LUADATA} == 1 && ($avmModel =~ "Box");
+         $list .= ",smartHomeDevices"                                 if $hash->{LUADATA} == 1 && ($avmModel =~ "Box|Smart");
+         $list .= ",smartHomeAutomation"                              if $hash->{LUADATA} == 1 && ($avmModel =~ "Box|Smart") && ($hash->{fhem}{fwVersion} >= 800);
+         $list .= ",kidProfiles,userInfos"                            if $hash->{LUAQUERY} == 1;
+         $list .= ",docsisInformation"                                if $hash->{LUADATA} == 1 && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]");
 
        $list .= " smartHomePreDef";
      }
@@ -4230,6 +4397,8 @@ sub FRITZBOX_Get($@)
        $list .= ",javascript"              if $hash->{fhem}{fwVersion} >= 800;
 
      $list =~ s/:\,/:/;
+
+     $list .= " showFritzOS:noArg";
 
 #     $list .= " soapCommand"              if defined $hash->{SECPORT};
 
@@ -5341,25 +5510,27 @@ sub FRITZBOX_Readout_Run_Web_LuaQuery($$$$) {
 #Get TAM readings
    $runNo = 0;
    foreach ( @{ $result->{tam} } ) {
+     if ($_->{_node}) {
+       $_->{_node} =~ m/(\d+)/;
+       $rName = "tam" . $1;
+     } else {
+       $rName = "tam" . $runNo;
+     }
+
      if ($_->{Display} eq "1") {
-       if ($_->{_node}) {
-         $_->{_node} =~ m/(\d+)/;
-         $rName = "tam" . $1;
-       } else {
-         $rName = "tam" . $runNo;
-       }
+
        FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName,           $_->{Name};
        FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_state",  $_->{Active}, "onoff";
        FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_newMsg", $_->{NumNewMessages};
        FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_oldMsg", $_->{NumOldMessages};
-      }
+     }
 # Löchen ausgeblendeter TAMs
-      elsif (defined $hash->{READINGS}{$rName} ) {
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName,"";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_state", "";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_newMsg","";
-         FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_oldMsg","";
-      }
+     elsif (defined $hash->{READINGS}{$rName} ) {
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName,"";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_state", "";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_newMsg","";
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, $rName."_oldMsg","";
+     }
    }
 
 #-------------------------------------------------------------------------------------
@@ -13101,9 +13272,134 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
 
    return $returnStr;
 
-} # end FRITZBOX_Get_Lan_Devices_List
+} # end FRITZBOX_Get_SmartHome_Devices_List
 
-# get list of smartHome Devices
+
+# get list of smart home automation
+############################################
+sub FRITZBOX_Get_SmartHome_Automation_List($@) {
+
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   FRITZBOX_Log $hash, 4, "FRITZBOX_SmartHome_Automation_List (Fritz!OS: $hash->{fhem}{fwVersionStr}) ";
+
+   my @webCmdArray;
+   # xhr 1 lang de page netDev xhrId cleanup useajax 1 no_sidrenew nop
+   push @webCmdArray, "xhr"         => "1";
+   push @webCmdArray, "lang"        => "de";
+   push @webCmdArray, "page"        => "sh_organize";
+   push @webCmdArray, "xhrId"       => "all";
+
+   my $returnStr;
+
+   my $result = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray) ;
+
+   my $analyse = FRITZBOX_Helper_analyse_Lua_Result($hash, $result);
+
+   if ( defined $result->{Error} ) {
+     FRITZBOX_Log $hash, 2, "evaluating user info -> " . $analyse;
+     $returnStr  = "SmartHome_Automation: Active\n";
+     $returnStr .= "------------------\n";
+     return $returnStr . $analyse;
+   } elsif ( defined $result->{AuthorizationRequired} ) {
+     FRITZBOX_Log $hash, 2, "evaluating user info -> AuthorizationRequired";
+     $returnStr  = "SmartHome_Automation: Active\n";
+     $returnStr .= "------------------\n";
+     return $returnStr . "AuthorizationRequired";
+   }
+
+   my $tableFormat = AttrVal($name, "disableTableFormat", "undef");
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
+   $returnStr .= "<tr>\n";
+   $returnStr .= '<td colspan="3">SmartHome Automation: Scenarios</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>ID</td><td>Name</td><td>Skills</td>\n";
+   $returnStr .= "</tr>\n";
+
+   my $AutoData = $result->{'data'}{'scenarios'};  # hier entsteht die Referenz auf das Array
+
+   for my $i (0 .. @{$AutoData} - 1) {
+
+     $returnStr .= "<tr>\n";
+
+     $returnStr .= "<td>" . $AutoData->[$i]->{id} . "</td>";
+     $returnStr .= "<td>" . $AutoData->[$i]->{displayName} . "</td>";
+     $returnStr .= "<td>" . ($AutoData->[$i]->{skills} ? "yes" : "no") . "</td>";
+
+     $returnStr .= "</tr>\n";
+   }
+
+   $returnStr .= "</table>\n";
+   $returnStr .= "\n";
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
+   $returnStr .= "<tr>\n";
+   $returnStr .= '<td colspan="3">SmartHome Automation: Templates</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>ID</td><td>Name</td><td>Skills</td>\n";
+   $returnStr .= "</tr>\n";
+
+   $AutoData = $result->{'data'}{'templates'};  # hier entsteht die Referenz auf das Array
+
+   for my $i (0 .. @{$AutoData} - 1) {
+
+     $returnStr .= "<tr>\n";
+
+     $returnStr .= "<td>" . $AutoData->[$i]->{id} . "</td>";
+     $returnStr .= "<td>" . $AutoData->[$i]->{displayName} . "</td>";
+     $returnStr .= "<td>" . ($AutoData->[$i]->{skills} ? "yes" : "no") . "</td>";
+
+     $returnStr .= "</tr>\n";
+   }
+
+   $returnStr .= "</table>\n";
+   $returnStr .= "\n";
+
+   $returnStr .= '<table';
+   $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+   $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+   $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+   $returnStr .= '>';
+   $returnStr .= "<tr>\n";
+   $returnStr .= '<td colspan="4">SmartHome Automation: Routines</td>';
+   $returnStr .= "</tr>\n";
+   $returnStr .= "<tr>\n";
+   $returnStr .= "<td>ID</td><td>Name</td><td>Enabled</td><td>Editable</td>\n";
+   $returnStr .= "</tr>\n";
+
+   $AutoData = $result->{'data'}{'routines'};  # hier entsteht die Referenz auf das Array
+
+   for my $i (0 .. @{$AutoData} - 1) {
+
+     $returnStr .= "<tr>\n";
+
+     $returnStr .= "<td>" . $AutoData->[$i]->{id} . "</td>";
+     $returnStr .= "<td>" . $AutoData->[$i]->{displayName} . "</td>";
+     $returnStr .= "<td>" . ($AutoData->[$i]->{isEnabled} ? "yes" : "no") . "</td>";
+     $returnStr .= "<td>" . ($AutoData->[$i]->{isEditable} ? "yes" : "no") . "</td>";
+
+     $returnStr .= "</tr>\n";
+   }
+
+   $returnStr .= "</table>\n";
+   $returnStr .= "\n";
+
+   return $returnStr;
+
+} # end FRITZBOX_Get_SmartHome_Automation_List
+
+# get list of network Devices
 ############################################
 sub FRITZBOX_Get_Lan_Devices_List($) {
 
@@ -13181,8 +13477,6 @@ sub FRITZBOX_Get_Lan_Devices_List($) {
    $returnStr .= "</table>\n";
 
    $returnStr .= "\n";
-#  border(8),cellspacing(10),cellpadding(20)
-   $tableFormat = AttrVal($name, "disableTableFormat", "undef");
 
    $returnStr .= '<table';
    $returnStr .= ' border="8"'       if $tableFormat !~ "border";
@@ -14391,7 +14685,7 @@ sub FRITZBOX_call_LuaData($$$@)
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => $hash->{AGENTTMOUT});
    my $response = $agent->post ( $url, $queryArray );
 
-   FRITZBOX_Log $hash, 5, "Response: " . $response->status_line . "\n" . $response->content;
+   FRITZBOX_Log $hash, 4, "Response: " . $response->status_line . "\n" . $response->content;
 
    unless ($response->is_success) {
       my %retHash = ("Error" => $response->status_line, "ResetSID" => "1");
@@ -14712,11 +15006,11 @@ sub FRITZBOX_call_LuaData($$$@)
    # handling non JSON returns
    ###########  HTML #################################
 
-   if ( ($data !~ m/\"pid\":/igs && $data !~ m/\"data\":/igs) || ($data =~ m/login\.init\(data\);/igs) ) {
+   if ( ($data !~ m/\"pid\":/igs && $data !~ m/\"data\":/igs) || ($data =~ m/login\.init\(data\);/igs) || ($data =~ m/\<DOCTYPE html\>\<html/igs) ) {
 
      FRITZBOX_Log $hash, 4, "Response Data: \n" . $data;
 
-     my $isHTML = ($data =~ m/\<\!DOCTYPE html\>/igs);
+     my $isHTML = ($data =~ m/\<\DOCTYPE html\>/igs);
 
      $data = "<textarea>" . $data . "</textarea>" if $isHTML;
      $data = encode_base64($data, "");
@@ -15849,8 +16143,16 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="smartHome"></a>
-         <dt><code>set &lt;name&gt; smartHome Parameters</code></dt>
-
+         <dt><code>set &lt;name&gt; smartHome &lt;apply&gt; &lt;scenario:ID|template:ID&gt; or &lt;routine&gt; &lt;enable:ID | disable:ID&gt; or &lt;deviceID&gt; &lt;tempOffset:value | tmpAdjust:value | tmpPerm:0|1 | switch:0|1 | automatic:0|1  | preDefSave:name | preDefDel:name| preDefLoad[:deviceID]:name[:A|:G]&gt;</code></dt>
+         <ul>
+         <dt><code>set &lt;name&gt; smartHome &lt;apply&gt; &lt;scenario:ID|template:ID&gt;</code></dt>
+         <dd>applies the scenario/template with the ID &lt;ID&gt;</dd>
+         </ul>
+         The ID can be obtained via <code>get &lt;name&gt; luaInfo &lt;smartHomeAutomation&gt;</code> can be determined.<br><br>
+         The result of the command is stored in the Reading retStat_smartHome.
+         <br>
+         Requires FRITZ!OS 8.00 or higher.<br>
+         or<br>
          <ul>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:value&gt;</code></dt>
          <dd>changes the temperature offset to the value for the SmartHome device with the specified ID.</dd>
@@ -15876,7 +16178,7 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          For devices of the 'socket' type, you can differentiate whether all settings or just those of the website should be loaded :A == 'Switch automatically' or :G == 'General'.
          </dd>
          </ul>
-         The ID can be obtained via <code>get &lt;name&gt; luaInfo &lt;smartHome&gt;</code> can be determined.<br><br>
+         The ID can be obtained via <code>get &lt;name&gt; luaInfo &lt;smartHomeDevices&gt;</code> can be determined.<br><br>
          The result of the command is stored in the Reading retStat_smartHome.
          <br>
          Requires FRITZ!OS 7.21 or higher.
@@ -16051,12 +16353,13 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="luaInfo"></a>
-         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|ledSettings|smartHome|vpnShares|globalFilters|kidProfiles|userInfos|wlanNeighborhood|mobileInfo|docsisInformation&gt;</code></dt>
+         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|ledSettings|smartHomeDevices|smartHomeAutomation|vpnShares|globalFilters|kidProfiles|userInfos|wlanNeighborhood|mobileInfo|docsisInformation&gt;</code></dt>
          <br>
          Needs FRITZ!OS 7.21 or higher.<br>
          lanDevices -> Shows a list of active and inactive lan devices.<br>
          ledSettings -> Generates a list of LED settings with an indication of which set ... ledSetting are possible.<br>
-         smartHome -> Generates a list of SmartHome devices.<br>
+         smartHomeDevices -> Generates a list of SmartHome devices.<br>
+         smartHomeAutomation -> Generates a list of SmartHome automations. Fritz!OS 8.00 or higher.<br>
          vpnShares -> Shows a list of active and inactive vpn shares.<br>
          kidProfiles -> Shows a list of internet access profiles.<br>
          globalFilters -> Shows the status (on|off) of the global filters: globalFilterNetbios, globalFilterSmtp, globalFilterStealth, globalFilterTeredo, globalFilterWpad<br>
@@ -16977,8 +17280,15 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="smartHome"></a>
-         <dt><code>set &lt;name&gt; smartHome Parameters</code></dt>
-
+         <dt><code>set &lt;name&gt; smartHome &lt;apply&gt; &lt;scenario:ID|template:ID&gt; or &lt;routine&gt; &lt;enable:ID | disable:ID&gt; or &lt;deviceID&gt; &lt;tempOffset:value | tmpAdjust:value | tmpPerm:0|1 | switch:0|1 | automatic:0|1  | preDefSave:name | preDefDel:name| preDefLoad[:deviceID]:name[:A|:G]&gt;</code></dt>
+         <ul>
+         <dt><code>set &lt;name&gt; smartHome &lt;apply&gt; &lt;scenario:ID|template:ID&gt;</code></dt>
+         <dd>wendet das Scenarium/Template mit der ID &lt;ID&gt; an</dd>
+         </ul>
+         Die ID kann über <code>get &lt;name&gt; luaInfo &lt;smartHomeAutomation&gt;</code> ermittelt werden.<br><br>
+         <br>
+         Benötigt FRITZ!OS 8.00 oder höher.<br>
+         oder<br>
          <ul>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:value&gt;</code></dt>
          <dd>ändert den Temperatur Offset auf den Wert:value für das SmartHome Gerät mit der angegebenen ID.</dd>
@@ -17004,7 +17314,7 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          Bei Devices vom Typ 'socket' kann noch differenziert werden, ob alle Einstellungen oder nur die der Webseite :A == 'Automatisch schalten' oder :G == 'Allgemein' geladen werden sollen.
          </dd>
          </ul>
-         Die ID kann über <code>get &lt;name&gt; luaInfo &lt;smartHome&gt;</code> ermittelt werden.<br><br>
+         Die ID kann über <code>get &lt;name&gt; luaInfo &lt;smartHomeDevices&gt;</code> ermittelt werden.<br><br>
          Das Ergebnis des Befehls wird im Reading retStat_smartHome abgelegt.
          <br>
          Benötigt FRITZ!OS 7.21 oder höher.
@@ -17179,12 +17489,13 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="luaInfo"></a>
-         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|ledSettings|smartHome|vpnShares|globalFilters|kidProfiles|userInfos|wlanNeighborhood|mobileInfo|docsisInformation&gt;</code></dt>
+         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|ledSettings|smartHomeDevices|smartHomeAutomation|vpnShares|globalFilters|kidProfiles|userInfos|wlanNeighborhood|mobileInfo|docsisInformation&gt;</code></dt>
          <br>
          Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.<br>
          lanDevices -> Generiert eine Liste der aktiven und inaktiven Netzwerkger&auml;te.<br>
          ledSettings -> Generiert eine Liste der LED Einstellungen mit einem Hinweis welche set ... ledSetting möglich sind.<br>
-         smartHome -> Generiert eine Liste SmartHome Geräte und gespeicherten Gerätedefinitionen (Zeitschaltung, Tmperaturen, ...).<br>
+         smartHomeDevices -> Generiert eine Liste SmartHome Geräte und gespeicherten Gerätedefinitionen (Zeitschaltung, Tmperaturen, ...).<br>
+         smartHomeAutomation -> Generiert eine Liste SmartHome Automatisierungen. Benötigt Fritz!OS 8.00 oder höher<br>
          vpnShares -> Generiert eine Liste der aktiven und inaktiven VPN Shares.<br>
          globalFilters -> Zeigt den Status (on|off) der globalen Filter: globalFilterNetbios, globalFilterSmtp, globalFilterStealth, globalFilterTeredo, globalFilterWpad<br>
          kidProfiles -> Generiert eine Liste der Zugangsprofile.<br>
