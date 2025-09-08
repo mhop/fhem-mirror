@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.58.1" => "08.09.2025  edit comref, ctrlBatSocManagementXX->safetyMargin: Separate specification of surcharges for calculation of load ".
+                           "clearance and performance optimization ",
   "1.58.0" => "06.09.2025  _batChargeMgmt: Code change and new loading feature with Reading Battery_ChargeOptTargetPower_XX ".
                            "ctrlBatSocManagementXX: new parameter safetyMargin ".
                            "edit Comref, delete obsolete Attr graphicBeamHeightLevelX, new parameter setupBatteryDevXX->pinreduced ",
@@ -7505,7 +7507,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
       lcSlot       => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
       careCycle    => { comp => '\d+',                                                   must => 0, act => 0 },
       loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',      must => 0, act => 0 },
-      safetyMargin => { comp => '(?:100|[1-9]?\d)',                                      must => 0, act => 0 },
+      safetyMargin => { comp => '(?:100|[1-9]?\d)(?::(?:100|[1-9]?\d))?',                must => 0, act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -11509,16 +11511,18 @@ sub __parseAttrBatSoc {
   my $name = shift;
   my $cgbt = shift // return;
 
-  my ($pa,$ph) = parseParams ($cgbt);
+  my ($pa,$ph)               = parseParams ($cgbt);
+  my ($urMargin, $otpMargin) = split ':', $ph->{safetyMargin};
 
   my $parsed = {
-      lowSoc       => $ph->{lowSoc},                                               
-      upSoc        => $ph->{upSoC}, 
-      maxSoc       => $ph->{maxSoC}    // MAXSOCDEF,                                      # optional (default: MAXSOCDEF)
-      careCycle    => $ph->{careCycle} // CARECYCLEDEF,                                   # Ladungszyklus (Maintenance) für maxSoC in Tagen     
-      lcslot       => $ph->{lcSlot}, 
-      loadAbort    => $ph->{loadAbort}, 
-      safetyMargin => $ph->{safetyMargin},       
+      lowSoc    => $ph->{lowSoc},                                               
+      upSoc     => $ph->{upSoC}, 
+      maxSoc    => $ph->{maxSoC}    // MAXSOCDEF,                                      # optional (default: MAXSOCDEF)
+      careCycle => $ph->{careCycle} // CARECYCLEDEF,                                   # Ladungszyklus (Maintenance) für maxSoC in Tagen     
+      lcslot    => $ph->{lcSlot}, 
+      loadAbort => $ph->{loadAbort}, 
+      urMargin  => $urMargin,       
+      otpMargin => $otpMargin,
   };
   
 return $parsed;
@@ -11631,22 +11635,23 @@ sub _batChargeMgmt {
       my $sf        = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $lowSoc    = 0;
       my $loadAbort = '';
-      my ($lcslot, $safetyMargin);
+      my ($lcslot, $urMargin, $otpMargin);
       
       if ($cgbt) {
           my $parsed    = __parseAttrBatSoc ($name, $cgbt);
           $lowSoc       = $parsed->{lowSoc} // 0;
           $lcslot       = $parsed->{lcslot};
           $loadAbort    = $parsed->{loadAbort};
-          $safetyMargin = $parsed->{safetyMargin};
+          $urMargin     = $parsed->{urMargin};
+          $otpMargin    = $parsed->{otpMargin};
       }
       
-      my $margin = defined $safetyMargin ? $safetyMargin : SFTYMARGIN_50;                       # Sicherheitszuschlag (%)
+      my $margin = defined $urMargin ? $urMargin : SFTYMARGIN_50;                                # Sicherheitszuschlag (%)
 
       ## generelle Ladeabbruchbedingung evaluieren
       ##############################################
       if ($loadAbort) {
-          my ($abortSoc, $abortpin, $releaseSoC) = split ':', $loadAbort;                       # Ladeabbruch Forum: https://forum.fhem.de/index.php?msg=1342556      
+          my ($abortSoc, $abortpin, $releaseSoC) = split ':', $loadAbort;                        # Ladeabbruch Forum: https://forum.fhem.de/index.php?msg=1342556      
           
           $releaseSoC //= $abortSoc;
           
@@ -11815,7 +11820,7 @@ sub _batChargeMgmt {
 			  $hsurp->{$hod}{$bn}{whneedmanaged} = $whneed;                                      # benötigte Ladeenergie Batterie x gemäß Ladesteuerung
               $hsurp->{$hod}{$bn}{socwh}         = $socwh;
               $hsurp->{$hod}{$bn}{batinstcap}    = $batinstcap;
-              $hsurp->{$hod}{$bn}{safetyMargin}  = $safetyMargin;                                # Sicherheitszuschlag für Berechnungen
+              $hsurp->{$hod}{$bn}{otpMargin}     = $otpMargin;                                # Sicherheitszuschlag für Berechnungen
           }
  
           # prognostizierten Daten in pvHistory speichern
@@ -11914,8 +11919,8 @@ sub __batChargeOptTargetPower {
           
 		  my $needraw                        = $sphrs ? $runwhneed / $sphrs : $runwhneed;                        # Ladeleistung initial
           
-          my $safetyMargin                   = $hsurp->{$shod}{$sbn}{safetyMargin};
-          my $margin                         = defined $safetyMargin ? $safetyMargin : SFTYMARGIN_20;
+          my $otpMargin                      = $hsurp->{$shod}{$sbn}{otpMargin};
+          my $margin                         = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
           $needraw                          *= 1 + ($margin / 100);                                              # Sicherheitsaufschlag
           
           if ($spls - $needraw > $fipl) {                                                                        # Einspeiselimit berücksichtigen
@@ -11939,9 +11944,9 @@ sub __batChargeOptTargetPower {
   if ($paref->{debug} =~ /batteryManagement/) {
       for my $k (sort { $a <=> $b } keys %{$hsurp}) {
           for my $bat (sort @batteries) {
-              my $ssoc         = $hsurp->{$k}{$bat}{runwh} // '-';
-              my $safetyMargin = $hsurp->{$k}{$bat}{safetyMargin};
-              my $margin       = defined $safetyMargin ? $safetyMargin : SFTYMARGIN_20;
+              my $ssoc      = $hsurp->{$k}{$bat}{runwh} // '-';
+              my $otpMargin = $hsurp->{$k}{$bat}{otpMargin};
+              my $margin    = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
               Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $hsurp->{$k}{spswh} Wh, OptTargetPower: $hsurp->{$k}{$bat}{pneedmin} W, safety: $margin %");
           }
       }
@@ -26684,34 +26689,34 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>:&lt;Threshold&gt (Wh) - From this energy consumption per hour, the consumption is considered valid. Optional specification (default: 0)          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>swoncond</b>       </td><td>Condition that must also be fulfilled in order to switch on the consumer (optional). The scheduled cycle is started.                              </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading</b> - the device/reading combination returns the check value $VALUE (‘undef’ is ignored)                                        </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - the device/reading combination returns the check value $VALUE ('undef' is ignored)                                        </td></tr>
             <tr><td>                       </td><td>The check can be formulated as a regular expression or as Perl code enclosed in {..}:                                                             </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return ‘true’ if successful                                                      </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return 'true' if successful                                                      </td></tr>
             <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                </td></tr>
-            <tr><td>                       </td><td>The return value must be ‘true’ if successful.                                                                                                    </td></tr>
+            <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>swoffcond</b>      </td><td>priority condition to switch off the consumer (optional). The scheduled cycle is stopped.                                                         </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading</b> - the device/reading combination returns the check value $VALUE (‘undef’ is ignored)                                        </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - the device/reading combination returns the check value $VALUE ('undef' is ignored)                                        </td></tr>
             <tr><td>                       </td><td>The check can be formulated as a regular expression or as Perl code enclosed in {..}:                                                             </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return ‘true’ if successful                                                      </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return 'true' if successful                                                      </td></tr>
             <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                </td></tr>
-            <tr><td>                       </td><td>The return value must be ‘true’ if successful.                                                                                                    </td></tr>
+            <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>surpmeth</b>       </td><td>The possible options define the procedure for determining the PV surplus. (optional)                                                              </td></tr>
             <tr><td>                       </td><td><b>default</b> - the PV surplus is read directly from the 'Current_Surplus' reading. (default)                                                    </td></tr>
-            <tr><td>                       </td><td><b>median[_2..20]</b> - The median of the last PV surplus values is used. The optional specification ‘_XX’ uses the last XX measured values.      </td></tr>
-            <tr><td>                       </td><td><b>average[_2..20]</b> - is the average of 20 PV surplus values. The optional specification ‘_XX’ uses the last XX measured values.               </td></tr>
+            <tr><td>                       </td><td><b>median[_2..20]</b> - The median of the last PV surplus values is used. The optional specification '_XX' uses the last XX measured values.      </td></tr>
+            <tr><td>                       </td><td><b>average[_2..20]</b> - is the average of 20 PV surplus values. The optional specification '_XX' uses the last XX measured values.               </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination that provides a numerical PV surplus value in Watt
                                                     determined or calculated by the user.                                                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                          </td></tr>
             <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                          </td></tr>
             <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                     </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading</b> - the device/reading combination returns the check value $VALUE (‘undef’ is ignored)                                        </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading</b> - the device/reading combination returns the check value $VALUE ('undef' is ignored)                                        </td></tr>
             <tr><td>                       </td><td>The check can be formulated as a regular expression or as Perl code enclosed in {..}:                                                             </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return ‘true’ if successful                                                      </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return 'true' if successful                                                      </td></tr>
             <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                </td></tr>
-            <tr><td>                       </td><td>The return value must be ‘true’ if successful.                                                                                                    </td></tr>
+            <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>defines the possible interruption options for the consumer after it has been started (optional). Options can be:                                  </td></tr>
             <tr><td>                       </td><td><b>0</b> - Load is not temporarily switched off even if the PV surplus falls below the required energy (default)                                  </td></tr>
@@ -26774,7 +26779,7 @@ to ensure that the system configuration is correct.
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
        <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] 
                                      [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
-                                     [safetyMargin=&lt;Value&gt;] </b> <br><br>
+                                     [safetyMargin=&lt;Value&gt;[:&lt;Value&gt;]] </b> <br><br>
                                      
          If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management 
          for this battery device. <br>
@@ -26782,8 +26787,8 @@ to ensure that the system configuration is correct.
          The <b>Battery_OptimumTargetSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
          The <b>Battery_ChargeRequest_XX</b> reading is set to '1' if the current SoC has fallen below the minimum SoC. <br>
          In this case, the battery should be forcibly charged, possibly with mains power. <br>
-         The reading <b>Battery_ChargeUnrestricted_XX</b> indicates whether the battery should be charged at full power without 
-         restriction (1), or not at all, or only when the <br>
+         The reading <b>Battery_ChargeUnrestricted_XX</b> contains the charging release, i.e. whether the battery should be charged at 
+         full power without restriction (1), or not at all, or only when the <br>
          feed-in limit (see <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>) is exceeded (0). 
          If you want to charge the battery continuously throughout the day, Reading 
          <b>Battery_ChargeOptTargetPower_XX</b> provides optimized charging power for battery control. <br>         
@@ -26805,8 +26810,8 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>in order to balance the charge in the storage network.                                          </td></tr>
             <tr><td>                     </td><td>The specification is optional (&lt;= 100, default: 95)                                          </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
-            <tr><td> <b>careCycle</b>    </td><td>Maximum interval in days that may occur between two states of charge                            </td></tr>
-            <tr><td>                     </td><td>of at least 'maxSoC'. The specification is optional (default: 20)                               </td></tr>
+            <tr><td> <b>careCycle</b>    </td><td>Maximum interval in days between two charge states of at least 'maxSoC' that should not be      </td></tr>
+            <tr><td>                     </td><td>exceeded if possible. The specification is optional (default: 20)                               </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>lcSlot</b>       </td><td>A daily time window is defined in which the charging control of the module should be active     </td></tr>
             <tr><td>                     </td><td>for this battery. Outside the time window, the battery charge is released                       </td></tr>
@@ -26819,10 +26824,13 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>If the current SoC falls below the specified SoC2, the <b>Battery_ChargeAbort_XX=0</b> is set.  </td></tr>
             <tr><td>                     </td><td>If SoC2 is not specified, SoC2=SoC1.                                                            </td></tr>            
             <tr><td>                     </td><td>                                                                                                </td></tr>            
-            <tr><td> <b>safetyMargin</b> </td><td>When calculating the load clearance and optimized load capacity, a safety margin is added       </td></tr>
-            <tr><td>                     </td><td>to the predicted load requirement.                                                              </td></tr>
-            <tr><td>                     </td><td>Not like the default, you can use this parameter to set a percentage.                           </td></tr>
-            <tr><td>                     </td><td>Value: <b>0..100</b> (Integer)                                                                  </td></tr>
+            <tr><td> <b>safetyMargin</b> </td><td>When calculating the load clearance and optimized load capacity, safety margins are taken       </td></tr>
+            <tr><td>                     </td><td>into account in the predicted load requirements.                                                </td></tr>
+            <tr><td>                     </td><td>Deviating from the default, this parameter can be used to specify individual safety margins     </td></tr>
+            <tr><td>                     </td><td>separately for calculating load clearance and optimized load capacity.                          </td></tr>
+            <tr><td>                     </td><td>The first value is the surcharge used to calculate the load release, the second value is the    </td></tr>
+            <tr><td>                     </td><td>surcharge used to calculate the optimized load capacity. Both values are percentages.           </td></tr>
+            <tr><td>                     </td><td>Value: <b>0..100[:0..100]</b> (integers)                                                        </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
          </table>
          </ul>
@@ -27154,7 +27162,7 @@ to ensure that the system configuration is correct.
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
             <tr><td> <b>beamHeightlevel</b>     </td><td>The bar height for each level of the bar chart can be specified.                                                                          </td></tr>
-            <tr><td>                            </td><td>The specification for a layer consists of the layer number (1..X), a ‘:’ followed by a positive integer > 0.                              </td></tr>
+            <tr><td>                            </td><td>The specification for a layer consists of the layer number (1..X), a ':' followed by a positive integer > 0.                              </td></tr>
             <tr><td>                            </td><td>The numerical value is used as a normalization factor in the height calculation.                                                          </td></tr>
             <tr><td>                            </td><td>Further levels are specified separated by commas (see example).                                                                           </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:&lt;Integer&gt;</b> - normalization factor (default: 200)                                                                </td></tr>
@@ -27204,7 +27212,7 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td>The strings for each level are separated by commas (see example).                                                                         </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:lin</b> - linear scaling (default)                                                                                       </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:log</b> - logarithmic scaling                                                                                            </td></tr>
-            <tr><td>                            </td><td><b>&lt;Ebene&gt;:staple</b> - The bars are ‘stacked’, with the secondary bar displayed above the primary bar.                             </td></tr>
+            <tr><td>                            </td><td><b>&lt;Ebene&gt;:staple</b> - The bars are 'stacked', with the secondary bar displayed above the primary bar.                             </td></tr>
             <tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>showDiff</b>            </td><td>Additional numerical display of the difference '&lt;primary bar content&gt; - &lt;secondary bar content&gt;'.                             </td></tr>
             <tr><td>                            </td><td>The specification for each level consists of the level number (1..X), a ':' followed by the position 'top' or 'bottom'.                   </td></tr>
@@ -29448,7 +29456,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
        <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] 
                                      [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
-                                     [safetyMargin=&lt;Wert&gt;] </b> <br><br>
+                                     [safetyMargin=&lt;Wert&gt;[:&lt;Wert&gt;]] </b> <br><br>
          
          Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
          SoC- und Lade-Management für dieses Batteriegerät. <br>
@@ -29457,8 +29465,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Das Reading <b>Battery_ChargeRequest_XX</b> wird auf '1' gesetzt, wenn der aktuelle SoC unter den Mindest-SoC gefallen
          ist. <br>
          In diesem Fall sollte die Batterie, unter Umständen mit Netzstrom, zwangsgeladen werden. <br>
-         Das Reading <b>Battery_ChargeUnrestricted_XX</b> gibt an, ob die Batterie uneingeschränkt mit voller Leistung (1), oder 
-         nicht bzw. nur bei Überschreitung des <br> 
+         Das Reading <b>Battery_ChargeUnrestricted_XX</b> enthält die Ladefreigabe, d.h. ob die Batterie uneingeschränkt mit voller 
+         Leistung (1), oder nicht bzw. nur bei Überschreitung des <br> 
          Einspeiselimits (siehe <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>) 
          geladen werden sollte (0). Möchte man die Batterie kontinuierlich über den gesamten Tag aufladen, wird im Reading 
          <b>Battery_ChargeOptTargetPower_XX</b> eine optimierte Ladeleistung zur Batteriesteuerung bereitgestellt.  <br>         
@@ -29481,7 +29489,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>Die Angabe ist optional (&lt;= 100, default: 95)                                                </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>careCycle</b>    </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'          </td></tr>
-            <tr><td>                     </td><td>auftreten darf. Die Angabe ist optional (default: 20)                                           </td></tr>
+            <tr><td>                     </td><td>möglichst nicht überschritten werden soll. Die Angabe ist optional (default: 20)                </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>        
             <tr><td> <b>lcSlot</b>       </td><td>Es wird ein tägliches Zeitfenster festgelegt, in dem die Ladesteuerung des Moduls für diese     </td></tr>
             <tr><td>                     </td><td>Batterie aktiv sein soll. Außerhalb des Zeitfensters wird die Batterieladung mit voller         </td></tr>
@@ -29494,10 +29502,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>Fällt der aktuelle SoC wieder unter den SoC2, wird <b>Battery_ChargeAbort_XX=0</b> gesetzt.     </td></tr>
             <tr><td>                     </td><td>Ist SoC2 nicht angegeben, gilt SoC2=SoC1.                                                       </td></tr>            
             <tr><td>                     </td><td>                                                                                                </td></tr>            
-            <tr><td> <b>safetyMargin</b> </td><td>Bei der Berechnung der Ladefreigabe und optimierten Ladeleistung wird ein Sicherheitszuschlag   </td></tr>
+            <tr><td> <b>safetyMargin</b> </td><td>Bei der Berechnung der Ladefreigabe und optimierten Ladeleistung werden Sicherheitszuschläge    </td></tr>
             <tr><td>                     </td><td>auf den prognostizierten Ladungsbedarf berücksichtigt.                                          </td></tr>
-            <tr><td>                     </td><td>Abweichend vom Default kann mit diesem Parameter ein Prozentwert angegeben werden.              </td></tr>
-            <tr><td>                     </td><td>Wert: <b>0..100</b> (Ganzzahl)                                                                  </td></tr>
+            <tr><td>                     </td><td>Abweichend vom Default können mit diesem Parameter individuelle Sicherheitszuschläge getrennt   </td></tr>
+            <tr><td>                     </td><td>für die Berechnung der Ladefreigabe und optimierten Ladeleistung angegeben werden.              </td></tr>
+            <tr><td>                     </td><td>Der erste Wert ist der Zuschlag bei der Berechnung der Ladefreigabe, der zweite Wert der        </td></tr>
+            <tr><td>                     </td><td>Zuschlag bei der Berechnung der optimierten Ladeleistung. Beide Angaben sind Prozentwerte.      </td></tr>
+            <tr><td>                     </td><td>Wert: <b>0..100[:0..100]</b> (Ganzzahlen)                                                       </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
          </table>
          </ul>
