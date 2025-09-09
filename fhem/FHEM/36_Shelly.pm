@@ -166,6 +166,7 @@
 #           new: commands for PLUGS_UI implemented
 # 6.04.1    new: improved commands for PLUGS_UI
 #           fix: update interval of energy readings (Gen2 energy meter)
+# 6.04.2    new: Shelly shutter added
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -190,7 +191,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.04.1 16.06.2025";
+my $version = "6.04.2 04.09.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -199,7 +200,7 @@ my %shelly_firmware = (  # latest known versions  # as of 29.08.2024
     # used by sub Shelly_firmwarecheck
     "gen1"        => "1.14.0",   # v1.14.1-rc1
     "shelly4"     => "1.6.6",
-    "gen2"        => "1.5.1",   # some:  1.6.0
+    "gen2"        => "1.7.0",  
     "walldisplay" => "2.3.6"
     );
 
@@ -337,6 +338,7 @@ my %shelly_vendor_ids = (
     "S3EM-003CXCEU63" => ["shelly3emG3",    "Shelly 3EM 63 Gen3",      0x1026],   # added 01/2025    
     "S3PL-10112EU"    => ["shellyplusplug", "Shelly AZ Plug",          0x1850],   # added 01/2025  amazon compatible
     "S3PL-20112EU"    => ["shellyplusplug", "Shelly Outdoor Plug S Gen3",0x1853],   # added 02/2025
+    "S3SH-0A2P4EU"    => ["shellyshutter",  "Shelly Shutter",          0x1039],   # added 09/2025
     ## Mini Gen3 Devices
     "S3SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen3",      0x1015],
     "S3SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1PM Mini Gen3",    0x1016],
@@ -400,6 +402,7 @@ my %shelly_category = (
      "EM" => "energy meter",
      "PL" => "plug",
      "PM" => "power meter",
+     "SH" => "shutter",
      "SN" => "sensor",
      "WD" => "wall display"
     );
@@ -444,15 +447,16 @@ my %shelly_models = (
     "shellyproem50" => [1,0,0, 0,1,0,  2,0,0],    # has two single-phase meter and one relay
     "shellypro3em"  => [0,0,0, 0,1,0,  3,0,2],    # has 1 three-phase meter [EM] in triphase profile or 3 meter [EM1] in monophase-profile
     "shellyprodual" => [0,2,0, 4,1,4,  0,0,0],
-    #-- 3nd generation devices (Gen3)
+    #-- 3rd generation devices (Gen3)
     "shellypmmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to ShellyPlusPM
     "shellyemG3"    => [1,0,0, 0,3,0,  2,0,0],    # similar to 'shellyproem50'
     "shelly3emG3"   => [0,0,0, 0,3,0,  3,0,2],    # similar to 'shellypro3em'
     #-- 4nd generation devices (Gen4)
     "shellyemmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to 'shellypmmini'    EM1 or PM1 ?
     #-- Android devices
-    "walldisplay1"  => [1,0,0, 0,2,1,  0,0,0]     # similar to ShellyPlus1PM
+    "walldisplay1"  => [1,0,0, 0,2,1,  0,0,0],     # similar to ShellyPlus1PM
     #-- 3rd generation devices (not covered by plus or pro devices)
+    "shellyshutter" => [0,1,0, 2,1,2,  0,0,0]     # similar to shellyPlus2PM, but without multimode
     );
 
 my %shelly_events = (	# events, that can be used by webhooks; key is mode, value is shelly-event
@@ -1010,7 +1014,7 @@ sub Shelly_Define($$) {   # use Socket;
       }else{    # password
           $pwd =$a[3];
       } 
-      Log 2,"[Shelly_define] got user=$user and password=$pwd"; #6
+      Log 6,"[Shelly_define] got user=$user and password=$pwd"; #6
       $attr{$name}{shellyuser}=$user;
       Shelly_Set($hash,$name,"password",$pwd);
       # strip off user and password from DEF:
@@ -1741,7 +1745,7 @@ sub Shelly_Attr(@) {
       Shelly_status($hash,"Shelly_Attr",1.0);
     }
   #---------------------------------------
-  }elsif( $attrName =~ /Energymeter/ ){
+  }elsif( $attrName =~ /Energymeter/ ){  # Energymeter_F  ..._P   ..._R
     if($cmd eq "set" ){
       if( $model ne "shellypro3em" ){
         $error="Setting the \"$attrName\" attribute only works for ShellyPro3EM ";
@@ -1754,7 +1758,7 @@ sub Shelly_Attr(@) {
         return $error;
       }
       # return the attribute value reduced by actual content of meter
-      $_[3] = $attrVal - $hash->{helper}{$attrName};
+      $_[3] = $attrVal - ($hash->{helper}{$attrName}//0); # helper not defined ? 
       # set the reading to the "actual meter value"
       readingsSingleUpdate($hash,"Total_$attrName",shelly_energy_fmt($hash,$attrVal,"Wh" ),1);
 
@@ -4699,8 +4703,8 @@ sub Shelly_status2G {
       #roller: check reason for moving or stopping: http, timeout *), WS_in, limit-switch,obstruction,overpower,overvoltage ...
       #  and safety_switch  (if Safety switch is enabled in Shelly -> see Cover.GetConfig)
       #timeout: either a) calculated moving-time given by target-pos  or b) configured maximum moving time
-      $rsource = $jhash->{"cover:$channel"}{source};
-      $rstate = $jhash->{"cover:$channel"}{state};     # returned values are: stopped, closed, open, closing, opening
+      $rsource = $jhash->{"cover:$channel"}{source}//"undefined";
+      $rstate = $jhash->{"cover:$channel"}{state}//"unknown";     # returned values are: stopped, closed, open, closing, opening
       if( $rstate eq "closing" ){
           $raction = "start";
           $rstate  = "drive-down";
@@ -4752,7 +4756,7 @@ sub Shelly_status2G {
           $rstate = "Error: position";
       }
 
-      Log3 $name,6,"[Shelly_status2G:cover] Roller id=$id  position is $position $pct";
+      Log3 $name,6,"[Shelly_status2G:cover] Roller id=$id  position is $position $pct"; #6
       readingsBulkUpdateMonitored($hash,"pct".$subs,$pct);
       readingsBulkUpdateMonitored($hash,"position".$subs,$position);
       readingsBulkUpdateMonitored($hash,"state".$subs,$rstate);
@@ -5219,6 +5223,7 @@ sub Shelly_settings2G {
            }elsif( $sc == 0 ){
                fhem("attr -silent $name slat_control disabled");
            }
+           Log3 $name,3,"[Shelly_settings2G:config] $name: slat control is $sc";  #3
         }else{
           ### looking for auto_on & auto_off (components: switch & light)
           my @comps= ( "switch", "cover", "light" );
@@ -5973,10 +5978,11 @@ sub Shelly_procEnergyData {
                   $value = $active_energy_i;
                }elsif( $EM eq "R" ){
                   $value = $return_energy_i;
-               }elsif( $EM eq "F" ){
+               }elsif( $EM eq "F" ){ # Energymeter_F
                   $value = $active_energy_i-$return_energy_i;
                }
                # next line we need because additon works not properly!!!
+          Log3 $name,$V//5,"[Shelly_procEnergyData:5] Energy Meter value $EM = $value in Watthours"; #5
                $value = sprintf("%7.4f",$value+AttrVal($name,"Energymeter_$EM",50000));
                Shelly_readingsBulkUpdate($hash,"Total_Energymeter_$EM",$value,"energy/Wh",undef,$TimeStamp);
             }
