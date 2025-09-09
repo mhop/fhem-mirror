@@ -41,7 +41,7 @@ use HTML::Entities;
 use URI::Escape;
 use LWP::UserAgent;
 
-my $fbtam_version = "0.4";
+my $fbtam_version = "1.0";
 
 #########################################################################################
 #
