@@ -11762,8 +11762,10 @@ sub _batChargeMgmt {
 
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
-          my $fceff = $pvfc - $confc;                                                            # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0
-          $fceff    = $fceff > 0 ? ($fceff >= $bpinmax       ? $bpinmax       : $fceff) :
+          my $surpls = $pvfc - $confc;                                                           # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0
+          my $fceff  = sprintf "%.0f", $surpls;                                                  # wichtig keine Nachkommastellen!
+		  
+		  $fceff    = $fceff > 0 ? ($fceff >= $bpinmax       ? $bpinmax       : $fceff) :
                       $fceff < 0 ? ($fceff <= $bpoutmax * -1 ? $bpoutmax * -1 : $fceff) :
                       $fceff;
 
@@ -11814,13 +11816,13 @@ sub _batChargeMgmt {
           if ($today) {                                                                          # nur Heute wenn Überschuß vorliegt  
 			  $hsurp->{$hod}{hod}                = $hod;
               $hsurp->{$hod}{nhr}                = $nhr;
-              $hsurp->{$hod}{fceff}              = $fceff;                                       # Überschuß in Wh der Stunde 
-              $hsurp->{$hod}{spswh}              = $spswh;
+              $hsurp->{$hod}{surpls}             = $surpls;                                      # Überschuß in Wh der Stunde 
+              $hsurp->{$hod}{spswh}              = $spswh.'.'.$hod;                              # mit Sortierhilfe
               $hsurp->{$hod}{$bn}{spday}         = $spday;                                       # (Rest)PV-Überschuß am laufenden Tag
 			  $hsurp->{$hod}{$bn}{whneedmanaged} = $whneed;                                      # benötigte Ladeenergie Batterie x gemäß Ladesteuerung
               $hsurp->{$hod}{$bn}{socwh}         = $socwh;
               $hsurp->{$hod}{$bn}{batinstcap}    = $batinstcap;
-              $hsurp->{$hod}{$bn}{otpMargin}     = $otpMargin;                                # Sicherheitszuschlag für Berechnungen
+              $hsurp->{$hod}{$bn}{otpMargin}     = $otpMargin;                                   # Sicherheitszuschlag für Berechnungen
           }
  
           # prognostizierten Daten in pvHistory speichern
@@ -11893,18 +11895,18 @@ sub __batChargeOptTargetPower {
   my $hsurp = $paref->{hsurp} // return;                                                                         # Hashref Überschußhash
 
   my $fipl      = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
-  my @sorted    = sort { $hsurp->{$a}{spswh} <=> $hsurp->{$b}{spswh} } keys %{$hsurp};     
-  my @batteries = grep { !/^(?:hod|spswh|fceff|nhr)$/xs } keys %{$hsurp->{24}};
+  my @sorted    = sort { $hsurp->{$a}{spswh} <=> $hsurp->{$b}{spswh} } keys %{$hsurp};    
+  my @batteries = grep { !/^(?:hod|spswh|surpls|nhr)$/xs } keys %{$hsurp->{24}};
   
   for my $shod (@sorted) {
-      my $spls = 1 * $hsurp->{$shod}{spswh};  
+      my $spls = int $hsurp->{$shod}{spswh};  
       
       for my $sbn (sort @batteries) {                                                                            # jede Batterie
-          my $runwh                          = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                         # Auswahl des zu verwenden Prognose-SOC (Wh)
-                                               $hsurp->{$shod}{$sbn}{fcnextwh} : 
-                                               $hsurp->{$shod}{$sbn}{socwh};
+          my $runwh       = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                                            # Auswahl des zu verwenden Prognose-SOC (Wh)
+                            $hsurp->{$shod}{$sbn}{fcnextwh} : 
+                            $hsurp->{$shod}{$sbn}{socwh};
           
-          my $bpinreduced                    = BatteryVal ($name, $sbn, 'bpinreduced', 0);                       # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
+          my $bpinreduced = BatteryVal ($name, $sbn, 'bpinreduced', 0);                                          # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
           
           if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
               $hsurp->{$shod}{$sbn}{pneedmin} = $bpinreduced;
@@ -11912,24 +11914,23 @@ sub __batChargeOptTargetPower {
               next;
           }         
           
-          my $sbatinstcap                    = $hsurp->{$shod}{$sbn}{batinstcap};                                # Kapa dieser Batterie          
-          my $runwhneed                      = $sbatinstcap - $runwh;
-          my $spday                          = $hsurp->{$shod}{$sbn}{spday};
-          my $sphrs                          = $spday / $spls;                                                   # Reststunden mit Überschuß = PV-Tagesüberschuß / Stundenüberschuß
+          my $sbatinstcap = $hsurp->{$shod}{$sbn}{batinstcap};                                                   # Kapa dieser Batterie          
+          my $runwhneed   = $sbatinstcap - $runwh;
+          my $spday       = $hsurp->{$shod}{$sbn}{spday};
+          my $sphrs       = $spday / $spls;                                                                      # Reststunden mit Überschuß = PV-Tagesüberschuß / Stundenüberschuß
+		  my $needraw     = $sphrs ? $runwhneed / $sphrs : $runwhneed;                                           # Ladeleistung initial
           
-		  my $needraw                        = $sphrs ? $runwhneed / $sphrs : $runwhneed;                        # Ladeleistung initial
-          
-          my $otpMargin                      = $hsurp->{$shod}{$sbn}{otpMargin};
-          my $margin                         = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
-          $needraw                          *= 1 + ($margin / 100);                                              # Sicherheitsaufschlag
+          my $otpMargin   = $hsurp->{$shod}{$sbn}{otpMargin};
+          my $margin      = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
+          $needraw       *= 1 + ($margin / 100);                                                                 # Sicherheitsaufschlag
           
           if ($spls - $needraw > $fipl) {                                                                        # Einspeiselimit berücksichtigen
               $needraw += ($spls - $needraw) - $fipl;
           }
 		
-          $needraw                           = 0 if($needraw < 0);          
-                   
+          $needraw                           = 0 if($needraw < 0);             
           $hsurp->{$shod}{$sbn}{runwh}       = $runwh;
+		  $hsurp->{$shod}{$sbn}{sphrs}       = $sphrs;                                                           # Reststunden mit Überschuß
           $hsurp->{$shod}{$sbn}{pneedmin}    = sprintf "%.0f", $spls > $needraw   ?                              # Mindestladeleistung bzw. Energie bei 1h (Wh)
                                                $needraw ? $needraw : $bpinreduced : 
                                                $spls;                                                             
@@ -11945,9 +11946,13 @@ sub __batChargeOptTargetPower {
       for my $k (sort { $a <=> $b } keys %{$hsurp}) {
           for my $bat (sort @batteries) {
               my $ssoc      = $hsurp->{$k}{$bat}{runwh} // '-';
+			  my $sphrs     = defined $hsurp->{$k}{$bat}{sphrs} ?
+			                  '('.($hsurp->{$k}{$bat}{sphrs} ? sprintf "%.1f", $hsurp->{$k}{$bat}{sphrs} : $hsurp->{$k}{$bat}{sphrs}).' hours)' :
+							  '';
               my $otpMargin = $hsurp->{$k}{$bat}{otpMargin};
               my $margin    = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
-              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $hsurp->{$k}{spswh} Wh, OptTargetPower: $hsurp->{$k}{$bat}{pneedmin} W, safety: $margin %");
+			  my $spls      = int $hsurp->{$k}{spswh}; 
+              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $spls Wh $sphrs, OptTargetPower: $hsurp->{$k}{$bat}{pneedmin} W, safety: $margin %");
           }
       }
   }
