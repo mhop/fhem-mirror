@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.58.2" => "10.09.2025  __batChargeOptTargetPower: Code change ",
+  "1.58.2" => "11.09.2025  __batChargeOptTargetPower: a lot of Code improvements, Attr flowGraphicControl->shiftx: unrestrict possible values ",
   "1.58.1" => "08.09.2025  edit comref, ctrlBatSocManagementXX->safetyMargin: Separate specification of surcharges for calculation of load ".
                            "clearance and performance optimization ",
   "1.58.0" => "06.09.2025  _batChargeMgmt: Code change and new loading feature with Reading Battery_ChargeOptTargetPower_XX ".
@@ -6633,7 +6633,7 @@ sub _attrflowGraphicControl {            ## no critic "not used"
       h2consumerdist         => { comp => '\d{1,3}',                   act => 0 },
       homenodedyncol         => { comp => '(0|1)',                     act => 0 },
       inverterNodeIcon       => { comp => '',                          act => 0 },
-      shiftx                 => { comp => '-?[0-7]\d{0,1}|-?80',       act => 0 },
+      shiftx                 => { comp => '-?\d+',                     act => 0 },
       shifty                 => { comp => '\d+',                       act => 0 },
       size                   => { comp => '\d+',                       act => 0 },
       showconsumer           => { comp => '(0|1)',                     act => 0 },
@@ -27058,7 +27058,7 @@ to ensure that the system configuration is correct.
             <tr><td>                                </td><td>Syntax: <b>&lt;Icon&gt;[@&lt;Farbe&gt;]</b>                                                                             </td></tr>
             <tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>shiftx</b>                  </td><td>Horizontal shift of the energy flow graph.                                                                              </td></tr>
-            <tr><td>                                </td><td>Value: <b>-80 ... 80</b>, default: 0                                                                                    </td></tr>
+            <tr><td>                                </td><td>Value: <b>positive or negative Integers</b>, default: 0                                                                 </td></tr>
             <tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>shifty</b>                  </td><td>Vertical shift of the energy flow chart.                                                                                </td></tr>
             <tr><td>                                </td><td>Value: <b>Integer</b>, default: 0                                                                                       </td></tr>
@@ -29736,7 +29736,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                </td><td>Syntax: <b>&lt;Icon&gt;[@&lt;Farbe&gt;]</b>                                                                             </td></tr>
             <tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>shiftx</b>                  </td><td>Horizontale Verschiebung der Energieflußgrafik.                                                                         </td></tr>
-            <tr><td>                                </td><td>Wert: <b>-80 ... 80</b>, default: 0                                                                                     </td></tr>
+            <tr><td>                                </td><td>Wert: <b>positive oder negative Ganzzahl</b>, default: 0                                                                </td></tr>
             <tr><td>                                </td><td>                                                                                                                        </td></tr>
             <tr><td> <b>shifty</b>                  </td><td>Vertikale Verschiebung der Energieflußgrafik.                                                                           </td></tr>
             <tr><td>                                </td><td>Wert: <b>Ganzzahl</b>, default: 0                                                                                       </td></tr>
