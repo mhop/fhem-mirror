@@ -11907,9 +11907,12 @@ sub __batChargeOptTargetPower {
       $sphrs-- if($spls);                                                                                        # Reststunden mit Überschuß
 
       for my $sbn (sort @batteries) {                                                                            # jede Batterie
-          my $runwh       = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                                            # Auswahl des zu verwenden Prognose-SOC (Wh)
-                            $hsurp->{$shod}{$sbn}{fcnextwh} : 
-                            $hsurp->{$shod}{$sbn}{socwh};
+          my $runwh = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                                                  # Auswahl des zu verwenden Prognose-SOC (Wh)
+                      $hsurp->{$shod}{$sbn}{fcnextwh}         : 
+                      ( $hsurp->{$shod}{nhr} eq '00' ? 
+					    BatteryVal ($name, $sbn, 'bchargewh', 0) : 
+						$hsurp->{$shod}{$sbn}{socwh}
+					  );
           
           my $bpinreduced = BatteryVal ($name, $sbn, 'bpinreduced', 0);                                          # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
           
@@ -11920,7 +11923,7 @@ sub __batChargeOptTargetPower {
           }         
           
           my $sbatinstcap = $hsurp->{$shod}{$sbn}{batinstcap};                                                   # Kapa dieser Batterie 
-          $runwh          = min ($runwh, BatteryVal ($name, $sbn, 'bchargewh', $sbatinstcap));                   # den aktuellen Ladungsstand mit der Prognose abgleichen! 
+          $runwh          = min ($runwh, $sbatinstcap);                                                          
 		  my $runwhneed   = $sbatinstcap - $runwh;
 		  my $needraw     = $sphrs ? $runwhneed / $sphrs : $runwhneed;                                           # Ladeleistung initial
           
@@ -11933,7 +11936,7 @@ sub __batChargeOptTargetPower {
           }
 		
           $needraw                           = max (0, $needraw);          
-          $hsurp->{$shod}{$sbn}{runwh}       = $runwh;
+          $hsurp->{$shod}{$sbn}{runwh}       = sprintf "%.0f", $runwh;
 		  $hsurp->{$shod}{$sbn}{sphrs}       = $sphrs;                                                           # Reststunden mit diesem Überschuß
           $hsurp->{$shod}{$sbn}{pneedmin}    = sprintf "%.0f", $spls > $needraw   ?                              # Mindestladeleistung bzw. Energie bei 1h (Wh)
                                                $needraw ? $needraw : $bpinreduced : 
