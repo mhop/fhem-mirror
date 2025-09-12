@@ -11900,6 +11900,7 @@ sub __batChargeOptTargetPower {
   my @sorted    = sort { $hsurp->{$a}{spswh} <=> $hsurp->{$b}{spswh} } keys %{$hsurp};
   my $sphrs     = scalar grep { int( $hsurp->{$_}{spswh} ) >= 1 } @sorted;                                       # Stunden mit Überschuß >= 1                
   my @batteries = grep { !/^(?:hod|spswh|surpls|nhr)$/xs } keys %{$hsurp->{24}};
+  my $otp;
 
   for my $shod (@sorted) {
       my $spls = int $hsurp->{$shod}{spswh}; 
@@ -11918,8 +11919,8 @@ sub __batChargeOptTargetPower {
               next;
           }         
           
-          my $sbatinstcap = $hsurp->{$shod}{$sbn}{batinstcap};                                                   # Kapa dieser Batterie          
-          $runwh          = min ($runwh, $sbatinstcap);
+          my $sbatinstcap = $hsurp->{$shod}{$sbn}{batinstcap};                                                   # Kapa dieser Batterie 
+          $runwh          = min ($runwh, BatteryVal ($name, $sbn, 'bchargewh', $sbatinstcap));                   # den aktuellen Ladungsstand mit der Prognose abgleichen! 
 		  my $runwhneed   = $sbatinstcap - $runwh;
 		  my $needraw     = $sphrs ? $runwhneed / $sphrs : $runwhneed;                                           # Ladeleistung initial
           
@@ -11931,7 +11932,7 @@ sub __batChargeOptTargetPower {
               $needraw += ($spls - $needraw) - $fipl;
           }
 		
-          $needraw                           = 0 if($needraw < 0);             
+          $needraw                           = max (0, $needraw);          
           $hsurp->{$shod}{$sbn}{runwh}       = $runwh;
 		  $hsurp->{$shod}{$sbn}{sphrs}       = $sphrs;                                                           # Reststunden mit diesem Überschuß
           $hsurp->{$shod}{$sbn}{pneedmin}    = sprintf "%.0f", $spls > $needraw   ?                              # Mindestladeleistung bzw. Energie bei 1h (Wh)
@@ -11940,13 +11941,24 @@ sub __batChargeOptTargetPower {
           
           my $newshod                        = sprintf "%02d", (int $shod + 1);
           $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin} if(defined $hsurp->{$newshod});
-                                               
-          storeReading ('Battery_ChargeOptTargetPower_'.$sbn,  $hsurp->{$shod}{$sbn}{pneedmin}.' W') if($hsurp->{$shod}{nhr} eq '00');                   
+          
+          $otp->{$sbn}{otp} = $hsurp->{$shod}{$sbn}{pneedmin} if($hsurp->{$shod}{nhr} eq '00');
+          
+		  if ($hsurp->{$shod}{$sbn}{pneedmin} < INFINITE) {
+			  my $maxneed           = $otp->{$sbn}{maxneed} // 0;
+		      $otp->{$sbn}{maxneed} = max ($maxneed, $hsurp->{$shod}{$sbn}{pneedmin});
+			  $otp->{$sbn}{maxvals}++ if ($hsurp->{$shod}{$sbn}{runwh} < $sbatinstcap);
+          }                   
       }
   }
   
+  for my $bn (sort keys %{$otp}) {
+	  debugLog ($paref, 'batteryManagement', "ChargeOTP - maximum OptTargetPower Bat $bn: $otp->{$bn}{maxneed} W, number relevant values: $otp->{$bn}{maxvals}");
+      storeReading ('Battery_ChargeOptTargetPower_'.$bn,  $otp->{$bn}{otp}.' W');
+  }
+  
   if ($paref->{debug} =~ /batteryManagement/) {
-	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - The limit for grid feed-in is: $fipl W");
+	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - The limit for grid feed-in is $fipl W");
 	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - NOTE: The hours printed below are the estimated number of hours on the current day with at least the respective PV surplus.");
 	  
       for my $k (sort { $a <=> $b } keys %{$hsurp}) {
