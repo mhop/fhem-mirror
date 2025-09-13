@@ -11974,12 +11974,12 @@ sub __batChargeOptTargetPower {
 	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - max OTP Bat $bn: $mn W, sum need: $sn Wh, number hrs: $mv, average: $avg W");
 	  }
 
-      storeReading ('Battery_ChargeOptTargetPower_'.$bn,  $otp.' W');
+      storeReading ('Battery_ChargeOptTargetPower_'.$bn,  $target.' W');
   }
   
   if ($paref->{debug} =~ /batteryManagement/) {
 	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - The limit for grid feed-in is $fipl W");
-	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - NOTE: The hours printed below are the estimated number of hours on the current day with at least the respective PV surplus.");
+	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - NOTE: The hours listed below are the estimated number of hours remaining on the current day with at least the respective PV surplus..");
 	  
       for my $k (sort { $a <=> $b } keys %{$hsurp}) {
           for my $bat (sort @batteries) {
