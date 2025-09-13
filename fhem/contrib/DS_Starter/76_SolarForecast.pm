@@ -11956,7 +11956,12 @@ sub __batChargeOptTargetPower {
   }
   
   for my $bn (sort keys %{$otp}) {
-	  debugLog ($paref, 'batteryManagement', "ChargeOTP - maximum OptTargetPower Bat $bn: $otp->{$bn}{maxneed} W, number relevant values: $otp->{$bn}{maxvals}");
+	  if ($paref->{debug} =~ /batteryManagement/) {
+		  my $mn = $otp->{$bn}{maxneed} // 0;
+		  my $mv = $otp->{$bn}{maxvals} // 0;
+	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - maximum OptTargetPower Bat $bn: $mn W, number relevant values: $mv");
+	  }
+
       storeReading ('Battery_ChargeOptTargetPower_'.$bn,  $otp->{$bn}{otp}.' W');
   }
   
@@ -11968,12 +11973,12 @@ sub __batChargeOptTargetPower {
           for my $bat (sort @batteries) {
               my $ssoc      = $hsurp->{$k}{$bat}{runwh} // '-';
 			  my $sphrs     = defined $hsurp->{$k}{$bat}{sphrs} ?
-			                  '('.($hsurp->{$k}{$bat}{sphrs} ? $hsurp->{$k}{$bat}{sphrs} : 1).' hours)' :
+			                  '('.($hsurp->{$k}{$bat}{sphrs} ? $hsurp->{$k}{$bat}{sphrs} : 1).' hrs)' :
 							  '';
               my $otpMargin = $hsurp->{$k}{$bat}{otpMargin};
               my $margin    = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
 			  my $spls      = int $hsurp->{$k}{spswh}; 
-              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $spls Wh $sphrs, OptTargetPower: $hsurp->{$k}{$bat}{pneedmin} W, safety: $margin %");
+              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $spls Wh $sphrs, OTP: $hsurp->{$k}{$bat}{pneedmin} W, safety: $margin %");
           }
       }
   }
