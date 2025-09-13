@@ -11512,8 +11512,9 @@ sub __parseAttrBatSoc {
   my $name = shift;
   my $cgbt = shift // return;
 
-  my ($pa,$ph)               = parseParams ($cgbt);
-  my ($urMargin, $otpMargin) = split ':', $ph->{safetyMargin};
+  my ($urMargin, $otpMargin);
+  my ($pa, $ph)           = parseParams ($cgbt);
+  ($urMargin, $otpMargin) = split ':', $ph->{safetyMargin} if(defined $ph->{safetyMargin});
 
   my $parsed = {
       lowSoc    => $ph->{lowSoc},                                               
