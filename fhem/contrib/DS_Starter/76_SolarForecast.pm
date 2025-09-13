@@ -11903,6 +11903,8 @@ sub __batChargeOptTargetPower {
   my @batteries = grep { !/^(?:hod|spswh|surpls|nhr)$/xs } keys %{$hsurp->{24}};
   my $otp;
 
+  ## Kalkulation / Logik
+  ########################
   for my $shod (@sorted) {
       my $spls = int $hsurp->{$shod}{spswh}; 
       $sphrs-- if($spls);                                                                                        # Reststunden mit Überschuß
@@ -11945,8 +11947,7 @@ sub __batChargeOptTargetPower {
           
           my $newshod                        = sprintf "%02d", (int $shod + 1);
           $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin} if(defined $hsurp->{$newshod});
-          
-          $otp->{$sbn}{otp} = $hsurp->{$shod}{$sbn}{pneedmin} if($hsurp->{$shod}{nhr} eq '00');
+          $otp->{$sbn}{target}               = $hsurp->{$shod}{$sbn}{pneedmin} if($hsurp->{$shod}{nhr} eq '00');
           
 		  if ($hsurp->{$shod}{$sbn}{pneedmin} < INFINITE) {
 			  my $maxneed           = $otp->{$sbn}{maxneed} // 0;
@@ -11960,37 +11961,49 @@ sub __batChargeOptTargetPower {
       }
   }
   
-  for my $bn (sort keys %{$otp}) {      
-      my $target = $otp->{$bn}{otp};
+  ## Auswertung und Debuglog
+  ############################
+  for my $bn (sort keys %{$otp}) {                                                                              # den aktuellen Ziel-OTP ermitteln und in Reading schreiben
+      my $target = $otp->{$bn}{target};
       next if(!defined $target);
       
       my $avg = 0;
+      my $mv  = $otp->{$bn}{maxvals} // 0;
+      my $sn  = $otp->{$bn}{sumneed} // 0;
+      $avg    = sprintf "%.0f", ($sn / $mv) if($mv);
+      $target = max ($avg, $target);
+      
+      $otp->{$bn}{target} = $target;
       
 	  if ($paref->{debug} =~ /batteryManagement/) {
 		  my $mn = $otp->{$bn}{maxneed} // 0;
-		  my $mv = $otp->{$bn}{maxvals} // 0;
-          my $sn = $otp->{$bn}{sumneed} // 0;
-          $avg   = sprintf "%.0f", ($sn / $mv) if($mv);
 	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - max OTP Bat $bn: $mn W, sum need: $sn Wh, number hrs: $mv, average: $avg W");
 	  }
 
-      storeReading ('Battery_ChargeOptTargetPower_'.$bn,  $target.' W');
+      storeReading ('Battery_ChargeOptTargetPower_'.$bn, $target.' W');
   }
   
   if ($paref->{debug} =~ /batteryManagement/) {
 	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - The limit for grid feed-in is $fipl W");
-	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - NOTE: The hours listed below are the estimated number of hours remaining on the current day with at least the respective PV surplus..");
+	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - NOTE: The hours listed below are the estimated number of hours remaining on the current day with at least the respective PV surplus.");
 	  
       for my $k (sort { $a <=> $b } keys %{$hsurp}) {
           for my $bat (sort @batteries) {
-              my $ssoc      = $hsurp->{$k}{$bat}{runwh} // '-';
 			  my $sphrs     = defined $hsurp->{$k}{$bat}{sphrs} ?
 			                  '('.($hsurp->{$k}{$bat}{sphrs} ? $hsurp->{$k}{$bat}{sphrs} : 1).' hrs)' :
 							  '';
+                              
+              my $ssoc      = $hsurp->{$k}{$bat}{runwh} // '-';
               my $otpMargin = $hsurp->{$k}{$bat}{otpMargin};
               my $margin    = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
 			  my $spls      = int $hsurp->{$k}{spswh}; 
-              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $spls Wh $sphrs, OTP: $hsurp->{$k}{$bat}{pneedmin} W, safety: $margin %");
+              my $needmin   = $hsurp->{$k}{$bat}{pneedmin}; 
+              
+              if ($hsurp->{$k}{nhr} eq '00') {                                                           # Target für aktuelle Stunde
+                  $needmin = max ($needmin, $otp->{$bat}{target});
+              }
+              
+              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $spls Wh $sphrs, OTP: $needmin W, safety: $margin %");
           }
       }
   }
