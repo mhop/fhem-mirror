@@ -11964,11 +11964,14 @@ sub __batChargeOptTargetPower {
       my $target = $otp->{$bn}{otp};
       next if(!defined $target);
       
+      my $avg = 0;
+      
 	  if ($paref->{debug} =~ /batteryManagement/) {
 		  my $mn = $otp->{$bn}{maxneed} // 0;
 		  my $mv = $otp->{$bn}{maxvals} // 0;
           my $sn = $otp->{$bn}{sumneed} // 0;
-	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - maximum OptTargetPower Bat $bn: $mn W, sum need: $sn Wh, number relevant values: $mv");
+          $avg   = sprintf "%.0f", ($sn / $mv) if($mv);
+	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - max OTP Bat $bn: $mn W, sum need: $sn Wh, number hrs: $mv, average: $avg W");
 	  }
 
       storeReading ('Battery_ChargeOptTargetPower_'.$bn,  $otp.' W');
