@@ -11951,19 +11951,24 @@ sub __batChargeOptTargetPower {
 		  if ($hsurp->{$shod}{$sbn}{pneedmin} < INFINITE) {
 			  my $maxneed           = $otp->{$sbn}{maxneed} // 0;
 		      $otp->{$sbn}{maxneed} = max ($maxneed, $hsurp->{$shod}{$sbn}{pneedmin});
-			  $otp->{$sbn}{maxvals}++ if ($hsurp->{$shod}{$sbn}{runwh} < $sbatinstcap);
+              
+              if ($hsurp->{$shod}{$sbn}{runwh} < $sbatinstcap) {
+			      $otp->{$sbn}{maxvals}++;
+                  $otp->{$sbn}{sumneed} += $otp->{$sbn}{maxneed};
+              }
           }                   
       }
   }
   
-  for my $bn (sort keys %{$otp}) {
-      my $otp = $otp->{$bn}{otp};
-      next if(!defined $otp);
+  for my $bn (sort keys %{$otp}) {      
+      my $target = $otp->{$bn}{otp};
+      next if(!defined $target);
       
 	  if ($paref->{debug} =~ /batteryManagement/) {
 		  my $mn = $otp->{$bn}{maxneed} // 0;
 		  my $mv = $otp->{$bn}{maxvals} // 0;
-	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - maximum OptTargetPower Bat $bn: $mn W, number relevant values: $mv");
+          my $sn = $otp->{$bn}{sumneed} // 0;
+	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - maximum OptTargetPower Bat $bn: $mn W, sum need: $sn Wh, number relevant values: $mv");
 	  }
 
       storeReading ('Battery_ChargeOptTargetPower_'.$bn,  $otp.' W');
