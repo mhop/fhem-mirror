@@ -93,6 +93,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.9.1"  => "11.09.2025  In case of set action when token is expired get new token and try again",
   "0.9.0"  => "09.03.2025  New api and iam URL (viessmann-climatesolutions.com)",
   "0.8.7"  => "09.03.2025  Fix return value when using SVN or Roger",
   "0.8.6"  => "24.02.2025  Adapt schedule data before sending",
@@ -2946,7 +2947,7 @@ sub vitoconnect_getAccessTokenCallback {
 # neuen Access-Token anfragen
 #####################################################################################################################
 sub vitoconnect_getRefresh {
-    my ($hash)    = @_;
+    my ($hash, $caller) = @_;
     my $name      = $hash->{NAME};
     my $client_id = $hash->{apiKey};
     my $param     = {
@@ -2960,6 +2961,7 @@ sub vitoconnect_getRefresh {
         sslargs  => { SSL_verify_mode => 0 },
         method   => "POST",
         timeout  => $hash->{timeout},
+        caller  => $caller,  # <–– Kontext hier speichern!
         callback => \&vitoconnect_getRefreshCallback
     };
 
@@ -2976,6 +2978,7 @@ sub vitoconnect_getRefreshCallback {
     my ($param,$err,$response_body) = @_;   # Übergabe-Parameter
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
+    my $caller = $param->{caller} // 'update';  # Default: update
 
     if ($err eq "")                 {
         Log3($name,4,$name.". - getRefreshCallback went ok");
@@ -2983,7 +2986,9 @@ sub vitoconnect_getRefreshCallback {
         my $decode_json = eval {decode_json($response_body)};
         if ($@)                     {   # Fehler aufgetreten
             Log3($name,1,$name.", vitoconnect_getRefreshCallback: JSON error while request: ".$@);
+            if ($caller ne 'action') {
             InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+            }
             return;
         }
         my $access_token = $decode_json->{"access_token"};
@@ -2992,18 +2997,34 @@ sub vitoconnect_getRefreshCallback {
             Log3($name,4,$name." - Access Token: ".substr($access_token,0,20)."...");
             #vitoconnect_getGw($hash);  # Abfrage Gateway-Serial
             # directly call get resource to save API calls
-            vitoconnect_getResource($hash);
+             if ($caller eq 'action') {
+                vitoconnect_action(
+                    $hash,
+                    $hash->{".retry_feature"},
+                    $hash->{".retry_data"},
+                    $name,
+                    $hash->{".retry_opt"},
+                    @{ $hash->{".retry_args"} }
+                );
+            } else {
+                vitoconnect_getResource($hash);
+            }
         }
         else {
             Log3 $name, 1, "$name - Access Token: nicht definiert";
             Log3 $name, 5, "$name - Received response: $response_body\n";
-            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);    # zurück zu getCode?
+            # zurück zu getCode?
+            if ($caller ne 'action') {
+                InternalTimer(gettimeofday() + $hash->{intervall}, "vitoconnect_GetUpdate", $hash);
+            }
             return;
         }
     }
     else {
         Log3 $name, 1, "$name - getRefresh: An error occured: $err";
-        InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+        if ($caller ne 'action') {
+            InternalTimer(gettimeofday() + $hash->{intervall}, "vitoconnect_GetUpdate", $hash);
+        }
         return;
     }
     return;
@@ -3791,37 +3812,62 @@ sub vitoconnect_getErrorCode {
 # Setzen von Daten
 #####################################################################################################################
 sub vitoconnect_action {
-    my ($hash,$feature,$data,$name,$opt,@args ) = @_;   # Übergabe-Parameter
-    my $access_token = $hash->{".access_token"};        # Internal: .access_token
-    my $installation = AttrVal( $name, 'vitoconnect_installationID', 0 );
-    my $gw           = AttrVal( $name, 'vitoconnect_serial', 0 );
-    my $dev          = AttrVal($name,'vitoconnect_device',0);
-    
-    my $param        = {
-        url => $iotURL_V2
-        ."installations/".$installation."/gateways/".$gw."/"
-        ."devices/".$dev."/features/".$feature,
+    my ($hash, $feature, $data, $name, $opt, @args) = @_;
+    return delete $hash->{".action_retry_count"} if IsDisabled($name);  # Modul deaktiviert → abbrechen
+
+    my $access_token = $hash->{".access_token"};
+    my $installation = AttrVal($name, 'vitoconnect_installationID', 0);
+    my $gw           = AttrVal($name, 'vitoconnect_serial', 0);
+    my $dev          = AttrVal($name, 'vitoconnect_device', 0);
+    my $Text         = join(' ', @args);
+    my $retry_count = $hash->{".action_retry_count"} // 0;
+
+    my $param = {
+        url => $iotURL_V2."installations/$installation/gateways/$gw/devices/$dev/features/$feature",
         hash   => $hash,
-        header => "Authorization: Bearer ".$access_token."\r\n"
-        . "Content-Type: application/json",
+        header => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
         data    => $data,
-        timeout => $hash->{timeout},            # Timeout von Internals = 15s
+        timeout => $hash->{timeout},
         method  => "POST",
         sslargs => { SSL_verify_mode => 0 },
     };
+
     Log3($name,3,$name.", vitoconnect_action url=" .$param->{url}); # change back to 3
     Log3($name,3,$name.", vitoconnect_action data=".$param->{data}); # change back to 3
 #   https://wiki.fhem.de/wiki/HttpUtils#HttpUtils_BlockingGet
-    (my $err,my $msg) = HttpUtils_BlockingGet($param);
-    my $decode_json = eval {decode_json($msg)};
+    my ($err, $msg) = HttpUtils_BlockingGet($param);
+    my $decode_json = eval { decode_json($msg) };
 
-    Log3($name,3,$name.", vitoconnect_action call finished, err:" .$err);
-    my $Text = join(' ',@args); # Befehlsparameter in Text
-    if ( (defined($err) && $err ne "") || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "") )                   {   # Fehler bei Befehlsausführung
-        readingsSingleUpdate($hash,"Aktion_Status","Fehler: ".$opt." ".$Text,1);    # Reading 'Aktion_Status' setzen
-        Log3($name,1,$name.",vitoconnect_action: set ".$name." ".$opt." ".@args.", Fehler bei Befehlsausfuehrung: ".$err." :: ".$msg);
+    if ((defined($err) && $err ne "") || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "")) {
+        $retry_count++;
+        $hash->{".action_retry_count"} = $retry_count;
+        readingsSingleUpdate($hash, "Aktion_Status", "Fehler ($retry_count/20): $opt $Text", 1);
+        # Log3($name, 2, "$name - RetryLoop Fehler: $err :: $msg");
+        Log3($name,1,$name.",vitoconnect_action: set ".$name." ".$opt." ".@args.", Fehler bei Befehlsausfuehrung ($retry_count/20): ".$err." :: ".$msg);
+
+        # Token abgelaufen?
+        if ($decode_json->{statusCode} eq "401" && $decode_json->{error} eq "EXPIRED TOKEN") {
+            # Token erneuern, aber ohne getResource
+            $hash->{".retry_feature"} = $feature;
+            $hash->{".retry_data"}    = $data;
+            $hash->{".retry_opt"}     = $opt;
+            $hash->{".retry_args"}    = [@args];
+            $hash->{".action_retry_count"} = $retry_count;
+            vitoconnect_getRefresh($hash, 'action');  # Kontext 'action' → kein getResource
+            return;
+        }
+
+        # Wiederholen in 10 Sekunden
+        if ($retry_count < 20) {
+          InternalTimer(gettimeofday() + 10, "vitoconnect_action", [$hash, $feature, $data, $name, $opt, @args]);
+        } else {
+            Log3($name, 1, "$name - vitoconnect_action: Abbruch nach 20 Fehlversuchen");
+            readingsSingleUpdate($hash, "Aktion_Status", "Fehlgeschlagen: $opt $Text (nach 20 Versuchen)", 1);
+            delete $hash->{".action_retry_count"};
+        }
+        return;
     }
-    else                                                                {   # Befehl korrekt ausgeführt
+
         readingsSingleUpdate($hash,"Aktion_Status","OK: ".$opt." ".$Text,1);    # Reading 'Aktion_Status' setzen
         #Log3($name,1,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt: ".$err." :: ".$msg); # TODO: Wieder weg machen $err
         Log3($name,3,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt"); 
@@ -3849,7 +3895,7 @@ sub vitoconnect_action {
         
         
         Log3($name,4,$name.",vitoconnect_action: set feature:".$feature." data:".$data.", korrekt ausgefuehrt"); #4
-    }
+
     return;
 }
 
@@ -3883,7 +3929,7 @@ sub vitoconnect_errorHandling {
             );
             if ( $items->{statusCode} eq "401" ) {
                 #  EXPIRED TOKEN
-                vitoconnect_getRefresh($hash);    # neuen Access-Token anfragen
+                vitoconnect_getRefresh($hash,'update');    # neuen Access-Token anfragen
                 return(1);
             }
             elsif ( $items->{statusCode} eq "404" ) {
