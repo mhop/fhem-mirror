@@ -12,10 +12,10 @@ attr MHI_Heavy get01-7Name info_operatorId
 attr MHI_Heavy get01-8Name contents_apMode
 attr MHI_Heavy get01-9Name info_timestamp
 attr MHI_Heavy get01CheckAllReadings 1
-attr MHI_Heavy get01Data {"apiVer":"1.0","command":"getDeviceInfo","deviceId":"e81656185d42","operatorId":"b4220891-e32a-4252-b448-cf3ab2172944","timestamp":1722259820}
+attr MHI_Heavy get01Data {"apiVer":"1.0","command":"getDeviceInfo","deviceId":"%deviceId%","operatorId":"%operatorId%","timestamp":%TIME%}
 attr MHI_Heavy get01JSON .
 attr MHI_Heavy get01Name 01_getDeviceInfo
-attr MHI_Heavy get01URL http://< IP-Adresse >:51443/beaver/command
+attr MHI_Heavy get01URL http://%IP-MHI_Heavy%:51443/beaver/command
 attr MHI_Heavy get02-10Name contents_logStat
 attr MHI_Heavy get02-11Name contents_lowTemp
 attr MHI_Heavy get02-12Name contents_wireless_firmVer
@@ -41,23 +41,32 @@ attr MHI_Heavy get02-7Name contents_firmType
 attr MHI_Heavy get02-8Name contents_highTemp
 attr MHI_Heavy get02-9Name info_result
 attr MHI_Heavy get02CheckAllReadings 1
-attr MHI_Heavy get02Data {"apiVer":"1.0","command":"getAirconStat","deviceId":"e81656185d42","operatorId":"b4220891-e32a-4252-b448-cf3ab2172944","timestamp":1722259820}
+attr MHI_Heavy get02Data {"apiVer":"1.0","command":"getAirconStat","deviceId":"%deviceId%","operatorId":"%operatorId%","timestamp":%TIME%}
 attr MHI_Heavy get02JSON .
 attr MHI_Heavy get02Name 02_getAirconStat
-attr MHI_Heavy get02URL http://< IP-Adresse >:51443/beaver/command
+attr MHI_Heavy get02URL http://%IP-MHI_Heavy%:51443/beaver/command
 attr MHI_Heavy get03CheckAllReadings 1
-attr MHI_Heavy get03Data {"apiVer":"1.0","command":"getAccountInfo","deviceId":"e81656185d42","operatorId":"b4220891-e32a-4252-b448-cf3ab2172944","timestamp":1722259820}
+attr MHI_Heavy get03Data {"apiVer":"1.0","command":"getAccountInfo","deviceId":"%deviceId%","operatorId":"%operatorId%","timestamp":%TIME%}
 attr MHI_Heavy get03JSON .
 attr MHI_Heavy get03Name 03_getAccountInfo
-attr MHI_Heavy get03URL http://< IP-Adresse >:51443/beaver/command
+attr MHI_Heavy get03URL http://%IP-MHI_Heavy%:51443/beaver/command
 attr MHI_Heavy group PV Eigenverbrauch
 attr MHI_Heavy icon sani_solar
-attr MHI_Heavy replacement01Mode expression
-attr MHI_Heavy replacement01Regex %TIME%
-attr MHI_Heavy replacement01Value {round(time(),0)}
-attr MHI_Heavy replacement02Mode reading
-attr MHI_Heavy replacement02Regex %AIRCONSTAT%
-attr MHI_Heavy replacement02Value contents_airconStat
+attr MHI_Heavy replacement01Mode text
+attr MHI_Heavy replacement01Regex %IP-MHI_Heavy%
+attr MHI_Heavy replacement01Value 192.168.178.32
+attr MHI_Heavy replacement02Mode text
+attr MHI_Heavy replacement02Regex %deviceId%
+attr MHI_Heavy replacement02Value e81656185d42
+attr MHI_Heavy replacement03Mode text
+attr MHI_Heavy replacement03Regex %operatorId%
+attr MHI_Heavy replacement03Value b4220891-e32a-4252-b448-cf3ab2172944
+attr MHI_Heavy replacement04Mode expression
+attr MHI_Heavy replacement04Regex %TIME%
+attr MHI_Heavy replacement04Value {round(time(),0)}
+attr MHI_Heavy replacement05Mode reading
+attr MHI_Heavy replacement05Regex %AIRCONSTAT%
+attr MHI_Heavy replacement05Value contents_airconStat
 attr MHI_Heavy room Neu
 attr MHI_Heavy set02-10Name contents_logStat
 attr MHI_Heavy set02-11Name contents_lowTemp
@@ -84,12 +93,12 @@ attr MHI_Heavy set02-7Name contents_firmType
 attr MHI_Heavy set02-8Name contents_highTemp
 attr MHI_Heavy set02-9Name info_result
 attr MHI_Heavy set02CheckAllReadings 1
-attr MHI_Heavy set02Data {"apiVer":"1.0","command":"setAirconStat","operatorId":"b4220891-e32a-4252-b448-cf3ab2172944","deviceId":"e81656185d42","timestamp":%TIME%,"contents":{"airconId":"e81656185d42","airconStat":"%AIRCONSTAT%"}}
+attr MHI_Heavy set02Data {"apiVer":"1.0","command":"setAirconStat","operatorId":"%operatorId%","deviceId":"%deviceId%","timestamp":%TIME%,"contents":{"airconId":"%operatorId%","airconStat":"%AIRCONSTAT%"}}
 attr MHI_Heavy set02JSON .
 attr MHI_Heavy set02Name 02_setAirconStat
 attr MHI_Heavy set02NoArg 1
 attr MHI_Heavy set02ParseResponse 1
-attr MHI_Heavy set02URL http://< IP-Adresse >:51443/beaver/command
+attr MHI_Heavy set02URL http://%IP-MHI_Heavy%:51443/beaver/command
 attr MHI_Heavy set03-1Name info_apiVer
 attr MHI_Heavy set03-2Name info_command
 attr MHI_Heavy set03-3Name info_deviceId
@@ -97,13 +106,13 @@ attr MHI_Heavy set03-4Name info_operatorId
 attr MHI_Heavy set03-5Name info_result
 attr MHI_Heavy set03-6Name info_timestamp
 attr MHI_Heavy set03CheckAllReadings 1
-attr MHI_Heavy set03Data {"apiVer":"1.0","command":"updateAccountInfo","deviceId":"e81656185d42","operatorId":"b4220891-e32a-4252-b448-cf3ab2172944","timestamp":%TIME%}
+attr MHI_Heavy set03Data {"apiVer":"1.0","command":"updateAccountInfo","deviceId":"%deviceId%","operatorId":"%operatorId%","timestamp":%TIME%}
 attr MHI_Heavy set03JSON .
 attr MHI_Heavy set03Method PUT
 attr MHI_Heavy set03Name 03_updateAccountInfo
 attr MHI_Heavy set03NoArg 1
 attr MHI_Heavy set03ParseResponse 1
-attr MHI_Heavy set03URL http://< IP-Adresse >:51443/beaver/command
+attr MHI_Heavy set03URL http://%IP-MHI_Heavy%:51443/beaver/command
 attr MHI_Heavy showBody 1
 attr MHI_Heavy showError 1
 attr MHI_Heavy sortby 212
