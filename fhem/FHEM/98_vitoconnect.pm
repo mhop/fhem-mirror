@@ -64,6 +64,7 @@ sub vitoconnect_getResource;            # API call for all Gateways
 sub vitoconnect_getResourceCallback;    # Get all API readings
 sub vitoconnect_getPowerLast;           # Write the power reading of the full last day to the DB
 
+sub vitoconnect_actionTimerWrapper;     # Send call to API with timer
 sub vitoconnect_action;                 # Send call to API
 
 sub vitoconnect_getErrorCode;           # Resolve Error code 
@@ -93,6 +94,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.9.2"  => "15.09.2025  Fix Not a HASH reference at ./FHEM/98_vitoconnect.pm line 3818 when set action error",
   "0.9.1"  => "11.09.2025  In case of set action when token is expired get new token and try again",
   "0.9.0"  => "09.03.2025  New api and iam URL (viessmann-climatesolutions.com)",
   "0.8.7"  => "09.03.2025  Fix return value when using SVN or Roger",
@@ -3809,6 +3811,23 @@ sub vitoconnect_getErrorCode {
 
 
 #####################################################################################################################
+# Setzen von Daten über Timer
+#####################################################################################################################
+sub vitoconnect_actionTimerWrapper {
+    my ($argRef) = @_;
+    
+    unless (ref($argRef) eq 'ARRAY') {
+        my $type = ref($argRef) // 'undef';
+        my $name = ref($argRef) eq 'HASH' ? $argRef->{NAME} // 'unknown' : 'unknown';
+        Log3($name, 1, "$name - vitoconnect_actionTimerWrapper: Fehlerhafte Argumentübergabe (Typ: $type), erwartet ARRAY-Referenz");
+        return;
+    }
+
+    vitoconnect_action(@$argRef);
+}
+
+
+#####################################################################################################################
 # Setzen von Daten
 #####################################################################################################################
 sub vitoconnect_action {
@@ -3859,11 +3878,16 @@ sub vitoconnect_action {
 
         # Wiederholen in 10 Sekunden
         if ($retry_count < 20) {
-          InternalTimer(gettimeofday() + 10, "vitoconnect_action", [$hash, $feature, $data, $name, $opt, @args]);
+          InternalTimer(gettimeofday() + 10, "vitoconnect_actionTimerWrapper", [$hash, $feature, $data, $name, $opt, @args]);
         } else {
             Log3($name, 1, "$name - vitoconnect_action: Abbruch nach 20 Fehlversuchen");
             readingsSingleUpdate($hash, "Aktion_Status", "Fehlgeschlagen: $opt $Text (nach 20 Versuchen)", 1);
+			# Abbruch nach 20 versuchen → Retry-Zähler und Daten zurücksetzen
             delete $hash->{".action_retry_count"};
+            delete $hash->{".retry_feature"};
+            delete $hash->{".retry_data"};
+            delete $hash->{".retry_opt"};
+            delete $hash->{".retry_args"};
         }
         return;
     }
@@ -3895,6 +3919,13 @@ sub vitoconnect_action {
         
         
         Log3($name,4,$name.",vitoconnect_action: set feature:".$feature." data:".$data.", korrekt ausgefuehrt"); #4
+		
+		# Erfolg → Retry-Zähler und Daten zurücksetzen
+		delete $hash->{".action_retry_count"};
+		delete $hash->{".retry_feature"};
+		delete $hash->{".retry_data"};
+		delete $hash->{".retry_opt"};
+		delete $hash->{".retry_args"};
 
     return;
 }
