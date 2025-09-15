@@ -54,13 +54,13 @@ attr MHI_Heavy group PV Eigenverbrauch
 attr MHI_Heavy icon sani_solar
 attr MHI_Heavy replacement01Mode text
 attr MHI_Heavy replacement01Regex %IP-MHI_Heavy%
-attr MHI_Heavy replacement01Value 192.168.178.32
+attr MHI_Heavy replacement01Value < MHI_Heavy IP-Address >
 attr MHI_Heavy replacement02Mode text
 attr MHI_Heavy replacement02Regex %deviceId%
-attr MHI_Heavy replacement02Value e81656185d42
+attr MHI_Heavy replacement02Value <deviceId>
 attr MHI_Heavy replacement03Mode text
 attr MHI_Heavy replacement03Regex %operatorId%
-attr MHI_Heavy replacement03Value b4220891-e32a-4252-b448-cf3ab2172944
+attr MHI_Heavy replacement03Value <operatorId>
 attr MHI_Heavy replacement04Mode expression
 attr MHI_Heavy replacement04Regex %TIME%
 attr MHI_Heavy replacement04Value {round(time(),0)}
