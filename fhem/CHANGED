@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 98_vitoconnect: Not a HASH reference in vitoconnect_action
  - feature: 98_vitoconnect: Refresh expired token in set action
  - bugfix: 76_SolarForecast: Version 1.58.2
  - feature: 49_SSCam: set compatibility to 9.2.4
