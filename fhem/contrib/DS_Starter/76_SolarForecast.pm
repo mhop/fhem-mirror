@@ -11929,7 +11929,7 @@ sub __batChargeOptTargetPower {
           
 		  if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
               $hsurp->{$shod}{$sbn}{pneedmin} = $bpinreduced;
-              #storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W') if($hsurp->{$shod}{nhr} eq '00'); 
+              storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W') if($hsurp->{$shod}{nhr} eq '00'); 
               next;
           }         
           
@@ -11977,7 +11977,7 @@ sub __batChargeOptTargetPower {
       my $sn      = $otp->{$bn}{sumneed} // 0;
       $avg        = sprintf "%.0f", ($sn / $mv) if($mv);
       $target     = max ($avg, $target);
-      
+       
       my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                                     # aktuelle Netzeinspeisung
       my $bpin    = CurrentVal ($name, 'batpowerinsum', 0);                                                     # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
       my $inc     = 0;
