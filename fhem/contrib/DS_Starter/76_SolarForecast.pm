@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.58.3" => "16.09.2025  __batChargeOptTargetPower: minor code change, consider bpinmax ",
+  "1.58.3" => "16.09.2025  __batChargeOptTargetPower: minor code change, consider bpinmax & lcintime ",
   "1.58.2" => "11.09.2025  __batChargeOptTargetPower: a lot of Code improvements, Attr flowGraphicControl->shiftx: unrestrict possible values ",
   "1.58.1" => "08.09.2025  edit comref, ctrlBatSocManagementXX->safetyMargin: Separate specification of surcharges for calculation of load ".
                            "clearance and performance optimization ",
@@ -11828,6 +11828,7 @@ sub _batChargeMgmt {
               $hsurp->{$hod}{$bn}{batinstcap}    = $batinstcap;
 			  $hsurp->{$hod}{$bn}{bpinmax}       = $bpinmax;                                     # max. mögliche Ladeleistung
               $hsurp->{$hod}{$bn}{otpMargin}     = $otpMargin;                                   # Sicherheitszuschlag für Berechnungen
+			  $hsurp->{$hod}{$bn}{lcintime}      = $lcintime;                                    # Ladesteuerung "In Time" oder "nicht In Time"
           }
  
           # prognostizierten Daten in pvHistory speichern
@@ -11912,7 +11913,12 @@ sub __batChargeOptTargetPower {
       $sphrs-- if($spls);                                                                                        # Reststunden mit Überschuß
 
       for my $sbn (sort @batteries) {                                                                            # jede Batterie
-          my $runwh = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                                                  # Auswahl des zu verwenden Prognose-SOC (Wh)
+		  if (!$hsurp->{$shod}{$sbn}{lcintime}) {                                                                # Ladesteuerung nicht "In Time"
+		      $hsurp->{$shod}{$sbn}{pneedmin} = $hsurp->{$shod}{$sbn}{bpinmax};
+			  next;
+		  }
+		  
+		  my $runwh = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                                                  # Auswahl des zu verwendenden Prognose-SOC (Wh)
                       $hsurp->{$shod}{$sbn}{fcnextwh}         : 
                       ( $hsurp->{$shod}{nhr} eq '00' ? 
 					    BatteryVal ($name, $sbn, 'bchargewh', 0) : 
@@ -11923,7 +11929,7 @@ sub __batChargeOptTargetPower {
           
 		  if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
               $hsurp->{$shod}{$sbn}{pneedmin} = $bpinreduced;
-              storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W') if($hsurp->{$shod}{nhr} eq '00'); 
+              #storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W') if($hsurp->{$shod}{nhr} eq '00'); 
               next;
           }         
           
@@ -11972,8 +11978,8 @@ sub __batChargeOptTargetPower {
       $avg        = sprintf "%.0f", ($sn / $mv) if($mv);
       $target     = max ($avg, $target);
       
-      my $gfeedin = CurrentVal ($name, 'gridfeedin',     0);                                                    # aktuelle Netzeinspeisung
-      my $bpin    = CurrentVal  ($name, 'batpowerinsum', 0);                                                    # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
+      my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                                     # aktuelle Netzeinspeisung
+      my $bpin    = CurrentVal ($name, 'batpowerinsum', 0);                                                     # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
       my $inc     = 0;
       
       if ( !$bpin && $gfeedin > $fipl )           {$inc = $gfeedin - $fipl}                                     # Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
