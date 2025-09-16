@@ -11817,7 +11817,7 @@ sub _batChargeMgmt {
           ###############################################################
 		  my $spswh = max (0, sprintf ("%.0f", $fceff));                                         
           
-          if ($today) {                                                                          # nur Heute wenn Überschuß vorliegt  
+          if ($today) {                                                                          # nur Heute
 			  $hsurp->{$hod}{hod}                = $hod;
               $hsurp->{$hod}{nhr}                = $nhr;
               $hsurp->{$hod}{surpls}             = $surpls;                                      # Überschuß in Wh der Stunde 
@@ -11935,10 +11935,6 @@ sub __batChargeOptTargetPower {
           my $otpMargin   = $hsurp->{$shod}{$sbn}{otpMargin};
           my $margin      = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
           $needraw       *= 1 + ($margin / 100);                                                                 # Sicherheitsaufschlag
-          
-          #if ($spls - $needraw > $fipl) {                                                                        # Einspeiselimit berücksichtigen
-          #    $needraw += ($spls - $needraw) - $fipl;
-          #}
 		
           $needraw                           = max (0, $needraw);          
           $hsurp->{$shod}{$sbn}{runwh}       = sprintf "%.0f", $runwh;
@@ -11946,9 +11942,7 @@ sub __batChargeOptTargetPower {
           my $pneedmin                       = sprintf "%.0f", $spls > $needraw   ?                              # Mindestladeleistung bzw. Energie bei 1h (Wh)
                                                $needraw ? $needraw : $bpinreduced : 
                                                $spls;  
-          $hsurp->{$shod}{$sbn}{pneedmin}    = min ($pneedmin, $hsurp->{$shod}{$sbn}{bpinmax});                   # Begrenzung auf max. mögliche Batterieleistung
-		  
-		  #$hsurp->{$shod}{$sbn}{pneedmin}    = sprintf "%.0f", ($needraw ? $needraw : $bpinreduced);             # Mindestladeleistung bzw. Energie bei 1h (Wh)                                    
+          $hsurp->{$shod}{$sbn}{pneedmin}    = min ($pneedmin, $hsurp->{$shod}{$sbn}{bpinmax});                  # Begrenzung auf max. mögliche Batterieleistung                                    
           
           my $newshod                        = sprintf "%02d", (int $shod + 1);
           $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin} if(defined $hsurp->{$newshod});      
@@ -11995,7 +11989,7 @@ sub __batChargeOptTargetPower {
       
 	  if ($paref->{debug} =~ /batteryManagement/) {
 		  my $mn = $otp->{$bn}{maxneed} // 0;
-	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - max OTP Bat $bn: $mn W, sum need: $sn Wh, number hrs: $mv, average: $avg W");
+	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - max OTP Bat $bn: $mn W, sum need: $sn Wh, number hrs: $mv, OTP-average: $avg W");
 	  }
   }
   
