@@ -11844,8 +11844,8 @@ sub _batChargeMgmt {
       }
   }
   
-  # Erstellung Mindest Ladeleistung
-  ###################################
+  # leistungsoptimierte Beladungssteuerung
+  ##########################################
   $paref->{hsurp} = $hsurp; 
   __batChargeOptTargetPower ($paref);
   delete $paref->{hsurp};
@@ -11918,18 +11918,20 @@ sub __batChargeOptTargetPower {
 			  next;
 		  }
 		  
+		  my $crgwh = BatteryVal ($name, $sbn, 'bchargewh', 0);                                                  # aktueller Ladezustand Batterie
 		  my $runwh = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                                                  # Auswahl des zu verwendenden Prognose-SOC (Wh)
                       $hsurp->{$shod}{$sbn}{fcnextwh}         : 
                       ( $hsurp->{$shod}{nhr} eq '00' ? 
-					    BatteryVal ($name, $sbn, 'bchargewh', 0) : 
+					    $crgwh : 
 						$hsurp->{$shod}{$sbn}{socwh}
 					  );
           
           my $bpinreduced = BatteryVal ($name, $sbn, 'bpinreduced', 0);                                          # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
           
 		  if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
-              $hsurp->{$shod}{$sbn}{pneedmin} = $bpinreduced;
-              storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W') if($hsurp->{$shod}{nhr} eq '00'); 
+              #$hsurp->{$shod}{$sbn}{pneedmin} = $bpinreduced;
+              $otp->{$sbn}{target} = $bpinreduced;
+              #storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W') if($hsurp->{$shod}{nhr} eq '00'); 
               next;
           }         
           
@@ -11960,7 +11962,8 @@ sub __batChargeOptTargetPower {
               
               if ($hsurp->{$shod}{$sbn}{runwh} < $sbatinstcap) {
 			      $otp->{$sbn}{maxvals}++;
-                  $otp->{$sbn}{sumneed} += $otp->{$sbn}{maxneed};
+                  # $otp->{$sbn}{sumneed} += $otp->{$sbn}{maxneed};
+				  $otp->{$sbn}{sumneed} = $sbatinstcap - $crgwh;
               }
           }                   
       }
@@ -11973,7 +11976,7 @@ sub __batChargeOptTargetPower {
       next if(!defined $target);
       
       my $avg     = 0;
-      my $mv      = $otp->{$bn}{maxvals} // 0;
+      my $mv      = $otp->{$bn}{maxvals};
       my $sn      = $otp->{$bn}{sumneed} // 0;
       $avg        = sprintf "%.0f", ($sn / $mv) if($mv);
       $target     = max ($avg, $target);
@@ -11995,7 +11998,7 @@ sub __batChargeOptTargetPower {
       
 	  if ($paref->{debug} =~ /batteryManagement/) {
 		  my $mn = $otp->{$bn}{maxneed} // 0;
-	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - max OTP Bat $bn: $mn W, sum need: $sn Wh, number hrs: $mv, OTP-average: $avg W");
+	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - max OTP Bat $bn: $mn W, sum need: $sn Wh, number hrs: $mv, Average for remaining hours: $avg W");
 	  }
   }
   
@@ -12013,7 +12016,7 @@ sub __batChargeOptTargetPower {
               my $otpMargin = $hsurp->{$k}{$bat}{otpMargin};
               my $margin    = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
 			  my $spls      = int $hsurp->{$k}{spswh}; 
-              my $needmin   = $hsurp->{$k}{$bat}{pneedmin} // 0; 
+              my $needmin   = $hsurp->{$k}{$bat}{pneedmin} // BatteryVal ($name, $bat, 'bpinreduced', 0); 
               
               if ($hsurp->{$k}{nhr} eq '00') {                                                                # Target für aktuelle Stunde
                   my $target = $otp->{$bat}{target} // 0;
