@@ -2528,8 +2528,16 @@ FW_style($$)
       my @fList;
       if($v eq $FW_gplotdir && AttrVal($FW_wname,'showUsedFiles',0)) {
         @fList = defInfo('TYPE=SVG','GPLOTFILE');
-        @fList = map { "$_.gplot" } @fList;
-        @fList = map { "$_.configDB" } @fList if configDBUsed();
+        @fList = map { 
+                my $f = "$_.gplot";
+                $FW_editFileToPath{$f}{path} = "$FW_gplotdir/$_.gplot";
+                $FW_editFileToPath{$f}{forceType} = "file";
+                $f } @fList;
+        @fList = map {
+                my $f = "$_.configDB";
+                $FW_editFileToPath{$f}{forceType} = "configDB";
+                $f } @fList if configDBUsed();
+
         my %fListUnique = map { $_, 1 } @fList;
         @fList = sort keys %fListUnique;
       } else {
