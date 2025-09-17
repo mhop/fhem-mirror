@@ -2572,14 +2572,27 @@ FW_style($$)
     my $data = "";
     my $cfgDB = defined($a[3]) ? $a[3] : "";
     $fileName =~ s,.*/,,g;        # Little bit of security
-    $fileName .= ".configDB" if ($cfgDB eq 'configDB'); # add identifier if file has to be read from database
+    # add identifier if file has to be read from database
+    $fileName .= ".configDB" if ($cfgDB eq 'configDB');
+
+    if(!%FW_editFileToPath) { # no edit was called yet
+      my $old=$FW_RET;
+      FW_style("style list",undef);
+      $FW_RET=$old
+    }
+
     my $filePath = $FW_editFileToPath{$fileName}{path};
-    my($err, @content) = FileRead({FileName=>$filePath, ForceType=>$FW_editFileToPath{$fileName}{forceType}});
+    if(!$filePath) {
+      FW_addContent(">$fileName is not in the editFileList</div");
+      return;
+    }
+    my($err, @content) = FileRead({FileName=>$filePath,
+                        ForceType=>$FW_editFileToPath{$fileName}{forceType}});
     if($err) {
       FW_addContent(">$err</div");
       return;
     }
-    $fileName =~ s,\.configDB,,; # remove identifier for pretty print in frontend
+    $fileName =~ s,\.configDB,,; #remove identifier for pretty print in frontend
     $data = join("\n", @content);
 
     $data =~ s/&/&amp;/g;
