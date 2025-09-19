@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.58.3" => "16.09.2025  __batChargeOptTargetPower: minor code change, consider bpinmax & lcintime ",
+  "1.58.4" => "19.09.2025  __batChargeOptTargetPower: user a better surplus value ",
+  "1.58.3" => "17.09.2025  __batChargeOptTargetPower: minor code change, consider bpinmax & lcintime ",
   "1.58.2" => "11.09.2025  __batChargeOptTargetPower: a lot of Code improvements, Attr flowGraphicControl->shiftx: unrestrict possible values ",
   "1.58.1" => "08.09.2025  edit comref, ctrlBatSocManagementXX->safetyMargin: Separate specification of surcharges for calculation of load ".
                            "clearance and performance optimization ",
@@ -11766,8 +11767,8 @@ sub _batChargeMgmt {
 
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
-          my $surpls = $pvfc - $confc;                                                           # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0
-          my $fceff  = sprintf "%.0f", $surpls;                                                  # wichtig keine Nachkommastellen!
+          my $surpls = sprintf "%.0f", ($pvfc - $confc);                                         # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0
+          my $fceff  = $surpls;                                                                  # wichtig keine Nachkommastellen!
 		  
 		  $fceff    = $fceff > 0 ? ($fceff >= $bpinmax       ? $bpinmax       : $fceff) :
                       $fceff < 0 ? ($fceff <= $bpoutmax * -1 ? $bpoutmax * -1 : $fceff) :
@@ -11815,12 +11816,13 @@ sub _batChargeMgmt {
 
           # Überschußhash für Ermittlung Mindest-Ladeleistung erstellen
           ###############################################################
-		  my $spswh = max (0, sprintf ("%.0f", $fceff));                                         
+		  my $spswh    = max (0, sprintf ("%.0f", $fceff));
+          my $surplswh = max (0, $surpls);     
           
           if ($today) {                                                                          # nur Heute
 			  $hsurp->{$hod}{hod}                = $hod;
               $hsurp->{$hod}{nhr}                = $nhr;
-              $hsurp->{$hod}{surpls}             = $surpls;                                      # Überschuß in Wh der Stunde 
+              $hsurp->{$hod}{surpls}             = $surplswh.'.'.$hod;                           # Überschuß in Wh der Stunde mit Sortierhilfe 
               $hsurp->{$hod}{spswh}              = $spswh.'.'.$hod;                              # mit Sortierhilfe
               $hsurp->{$hod}{$bn}{spday}         = $spday;                                       # (Rest)PV-Überschuß am laufenden Tag
 			  $hsurp->{$hod}{$bn}{whneedmanaged} = $whneed;                                      # benötigte Ladeenergie Batterie x gemäß Ladesteuerung
@@ -11901,15 +11903,15 @@ sub __batChargeOptTargetPower {
   my $hsurp = $paref->{hsurp} // return;                                                                         # Hashref Überschußhash
 
   my $fipl      = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
-  my @sorted    = sort { $hsurp->{$a}{spswh} <=> $hsurp->{$b}{spswh} } keys %{$hsurp};
-  my $sphrs     = scalar grep { int( $hsurp->{$_}{spswh} ) >= 1 } @sorted;                                       # Stunden mit Überschuß >= 1                
+  my @sorted    = sort { $hsurp->{$a}{surpls} <=> $hsurp->{$b}{surpls} } keys %{$hsurp};
+  my $sphrs     = scalar grep { int( $hsurp->{$_}{surpls} ) >= 1 } @sorted;                                      # Stunden mit Überschuß >= 1                
   my @batteries = grep { !/^(?:hod|spswh|surpls|nhr)$/xs } keys %{$hsurp->{24}};
   my $otp;
 
   ## Kalkulation / Logik
   ########################
   for my $shod (@sorted) {
-      my $spls = int $hsurp->{$shod}{spswh}; 
+      my $spls = int $hsurp->{$shod}{surpls};  
       $sphrs-- if($spls);                                                                                        # Reststunden mit Überschuß
 
       for my $sbn (sort @batteries) {                                                                            # jede Batterie
@@ -11929,9 +11931,7 @@ sub __batChargeOptTargetPower {
           my $bpinreduced = BatteryVal ($name, $sbn, 'bpinreduced', 0);                                          # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
           
 		  if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
-              #$hsurp->{$shod}{$sbn}{pneedmin} = $bpinreduced;
               $otp->{$sbn}{target} = $bpinreduced;
-              #storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W') if($hsurp->{$shod}{nhr} eq '00'); 
               next;
           }         
           
@@ -11962,7 +11962,6 @@ sub __batChargeOptTargetPower {
               
               if ($hsurp->{$shod}{$sbn}{runwh} < $sbatinstcap) {
 			      $otp->{$sbn}{maxvals}++;
-                  # $otp->{$sbn}{sumneed} += $otp->{$sbn}{maxneed};
 				  $otp->{$sbn}{sumneed} = $sbatinstcap - $crgwh;
               }
           }                   
@@ -12015,8 +12014,8 @@ sub __batChargeOptTargetPower {
               my $ssoc      = $hsurp->{$k}{$bat}{runwh} // '-';
               my $otpMargin = $hsurp->{$k}{$bat}{otpMargin};
               my $margin    = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
-			  my $spls      = int $hsurp->{$k}{spswh}; 
-              my $needmin   = $hsurp->{$k}{$bat}{pneedmin} // BatteryVal ($name, $bat, 'bpinreduced', 0); 
+			  my $spls      = int $hsurp->{$k}{surpls}; 
+              my $needmin   = max (BatteryVal ($name, $bat, 'bpinreduced', 0), $hsurp->{$k}{$bat}{pneedmin} // 0); 
               
               if ($hsurp->{$k}{nhr} eq '00') {                                                                # Target für aktuelle Stunde
                   my $target = $otp->{$bat}{target} // 0;
@@ -27600,8 +27599,8 @@ to ensure that the system configuration is correct.
            <tr><td> <b>pinmax</b>    </td><td>the maximum possible charging power in watts (optional)                                                       </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>pinreduced</b></td><td>The reduced charging power in watts (optional). The value is set in Reading Battery_ChargeOptTargetPower_XX   </td></tr>
-           <tr><td>                  </td><td>if there is no PV surplus available to adjust the optimal charging power. This means that this                </td></tr>
-           <tr><td>                  </td><td>value can also be applied in the case of forced charging from the public grid.                                </td></tr>
+           <tr><td>                  </td><td>if there is no PV surplus or if the calculated charging power falls below this value.                         </td></tr>
+           <tr><td>                  </td><td>This means that the value can also be applied in the case of demand charging from the public grid.            </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>poutmax</b>   </td><td>the maximum possible discharge power in watts (optional)                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
@@ -30276,8 +30275,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>pinmax</b>    </td><td>die maximal mögliche Ladeleistung in Watt (optional)                                                     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>pinreduced</b></td><td>Die reduzierte Ladeleistung in Watt (optional). Der Wert wird im Reading Battery_ChargeOptTargetPower_XX </td></tr>
-           <tr><td>                  </td><td>gesetzt wenn kein PV-Überschuß zur Anpassung der optimalen Ladeleistung vorhanden ist. Somit kann dieser </td></tr>
-           <tr><td>                  </td><td>Wert auch im Fall der Zwangsbeladung aus dem öffentlichen Netz zur Anwendung kommen.                     </td></tr>
+           <tr><td>                  </td><td>gesetzt wenn kein PV-Überschuß vorhanden ist oder die kalkulierte Ladeleistung unter diesen Wert fällt.  </td></tr>
+           <tr><td>                  </td><td>Somit kann der Wert auch im Fall der Anforderungsladung aus dem öffentlichen Netz zur Anwendung kommen.  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>poutmax</b>   </td><td>die maximal mögliche Entladeleistung in Watt (optional)                                                  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
