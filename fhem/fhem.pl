@@ -5783,6 +5783,7 @@ FileRead($)
       close($FH);
       chomp(@ret);
     } else {
+      $fileName = "'undefined'" if(!defined($fileName));
       $err = "Can't open $fileName: $!";
     }
 
