@@ -2268,22 +2268,19 @@ FW_fileList($;$)
                               $f eq "99_Utils.pm");
 
     push(@ret, $f);
-    $FW_editFileToPath{$f}{path}      = "$dir/$f";
-    $FW_editFileToPath{$f}{forceType} = "file";
+    $FW_editFileToPath{$f} = "$dir/$f";
   }
   closedir(DH);
   return sort { (CORE::stat("$dir/$a"))[9] <=> (CORE::stat("$dir/$b"))[9] }
          @ret if($mtime);
-  if (configDBUsed()) {
-    @ret = cfgDB_FW_fileList($dir,$re,@ret);
-    map { 
-          if (!defined($FW_editFileToPath{$_}{path})) {
-            my $f = $_;
-            $f =~ s/\.configDB//;
-            $FW_editFileToPath{$_}{path}      = "$dir/$f";
-            $FW_editFileToPath{$_}{forceType} = "configDB";
-          }
-        } @ret;
+  if(configDBUsed()) {
+    my @cfgRet;
+    map {
+      my $f = $_;
+      $f =~ s/\.configDB//; # configDB adds the fileName with suffix
+      $FW_editFileToPath{$_} = "$dir/$f";
+      push(@ret, $f) if(!defined($FW_editFileToPath{$f}));
+    } cfgDB_FW_fileList($dir,$re,@cfgRet);
   }
   return sort @ret;
 }
@@ -2471,13 +2468,10 @@ FW_displayFileList($@)
   $hid =~ s/[^A-Za-z]/_/g;
   FW_pO "<div class=\"fileList $hid\">$heading</div>";
   FW_pO "<table class=\"block wide fileList\">";
-  my $cfgDB = "";
   my $row = 0;
   foreach my $f (@files) {
-    $cfgDB = ($f =~ s,\.configDB$,,);
-    $cfgDB = ($cfgDB) ? "configDB" : "";
     FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-    FW_pH "cmd=style edit $f $cfgDB", $f, 1;
+    FW_pH "cmd=style edit $f", $f, 1;
     FW_pO "</tr>";
     $row = ($row+1)%2;
   }
@@ -2500,6 +2494,7 @@ FW_style($$)
 {
   my ($cmd, $msg) = @_;
   my @a = split(" ", $cmd);
+  my $db = configDBUsed();
 
   return if(!Authorized($FW_chash, "cmd", $a[0]));
 
@@ -2512,9 +2507,8 @@ FW_style($$)
 
     $attr{global}{configfile} =~ m,([^/]*)$,;
     my $cfgFileName = $1;
-    FW_displayFileList("config file", $cfgFileName)
-                                if(!configDBUsed());
-    $FW_editFileToPath{$cfgFileName}{path} = $attr{global}{configfile};
+    FW_displayFileList("config file", $cfgFileName) if(!$db);
+    $FW_editFileToPath{$cfgFileName} = $attr{global}{configfile};
 
     my $efl = AttrVal($FW_wname, 'editFileList',
       "Own modules and helper files:\$MW_dir:^(.*sh|[0-9][0-9].*Util.*pm|".
@@ -2525,23 +2519,10 @@ FW_style($$)
     foreach my $l (split(/[\r\n]/, $efl)) {
       my ($t, $v, $re) = split(":", $l, 3);
       $v = eval $v;
-      my @fList;
+      my @fList = FW_fileList("$v/$re"); # Beware of the side-effect
       if($v eq $FW_gplotdir && AttrVal($FW_wname,'showUsedFiles',0)) {
-        @fList = defInfo('TYPE=SVG','GPLOTFILE');
-        @fList = map { 
-                my $f = "$_.gplot";
-                $FW_editFileToPath{$f}{path} = "$FW_gplotdir/$_.gplot";
-                $FW_editFileToPath{$f}{forceType} = "file";
-                $f } @fList;
-        @fList = map {
-                my $f = "$_.configDB";
-                $FW_editFileToPath{$f}{forceType} = "configDB";
-                $f } @fList if configDBUsed();
-
-        my %fListUnique = map { $_, 1 } @fList;
+        my %fListUnique = map { $_.".gplot",1 } defInfo('TYPE=SVG','GPLOTFILE');
         @fList = sort keys %fListUnique;
-      } else {
-        @fList = FW_fileList("$v/$re");
       }
       FW_displayFileList($t, @fList);
     }
@@ -2576,31 +2557,28 @@ FW_style($$)
     FW_pO "Reload the page in the browser.$end";
 
   } elsif($a[1] eq "edit") {
-    my $fileName = $a[2];
-    my $data = "";
-    my $cfgDB = defined($a[3]) ? $a[3] : "";
-    $fileName =~ s,.*/,,g;        # Little bit of security
-    # add identifier if file has to be read from database
-    $fileName .= ".configDB" if ($cfgDB eq 'configDB');
-
     if(!%FW_editFileToPath) { # no edit was called yet
       my $old=$FW_RET;
       FW_style("style list",undef);
       $FW_RET=$old
     }
+    my $fileName = $a[2];
+    my $data = "";
+    $fileName =~ s,.*/,,g;        # Little bit of security
+    my $idx = $FW_editFileToPath{"$fileName.configDB"} ? 
+              "$fileName.configDB" : $fileName;
+    my $forceType = $idx =~ m/.configDB$/ ? "configDB" : "file";
 
-    my $filePath = $FW_editFileToPath{$fileName}{path};
+    my $filePath = $FW_editFileToPath{$idx};
     if(!$filePath) {
       FW_addContent(">$fileName is not in the editFileList</div");
       return;
     }
-    my($err, @content) = FileRead({FileName=>$filePath,
-                        ForceType=>$FW_editFileToPath{$fileName}{forceType}});
+    my($err, @content) = FileRead({FileName=>$filePath, ForceType=>$forceType});
     if($err) {
       FW_addContent(">$err</div");
       return;
     }
-    $fileName =~ s,\.configDB,,; #remove identifier for pretty print in frontend
     $data = join("\n", @content);
 
     $data =~ s/&/&amp;/g;
@@ -2623,7 +2601,7 @@ FW_style($$)
       FW_pO FW_textfieldv("saveName", 30, "saveName", $fileName);
       FW_pO "<br><br>";
     }
-    FW_pO FW_hidden("cmd", "style save $fileName $cfgDB");
+    FW_pO FW_hidden("cmd", "style save $fileName");
     FW_pO "<textarea $readOnly name=\"data\" cols=\"$ncols\" rows=\"30\">" .
             "$data</textarea>";
     FW_pO "</form>";
@@ -2631,24 +2609,24 @@ FW_style($$)
 
   } elsif($a[1] eq "save") {
     my $fileName = $a[2];
-    my $cfgDB = defined($a[3]) ? $a[3] : "";
-    $fileName = $FW_webArgs{saveName}
-        if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
-    $fileName =~ s,.*/,,g;        # Little bit of security
-    $fileName .= ".configDB" if ($cfgDB eq 'configDB'); # add identifier if file has to be read from database
-    my $filePath = $FW_editFileToPath{$fileName}{path};
-    $fileName =~ s,\.configDB,,; # remove identifier for pretty print in frontend
-    if(!$filePath) { # save as
-      $FW_editFileToPath{$a[2]}{path} =~ m,^(.*)/([^/]+)$,;
-      return if(!$1); # No root experiments
+    my $idx = $FW_editFileToPath{"$fileName.configDB"} ? 
+              "$fileName.configDB" : $fileName;
+    my $forceType = $idx =~ m/.configDB$/ ? "configDB" : "file";
+    my $filePath = $FW_editFileToPath{$idx};
+
+    if($FW_webArgs{saveAs}) { # get the path from the original
+      $fileName = $FW_webArgs{saveName}
+                    if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
+      $FW_editFileToPath{$idx} =~ m,^(.*)/([^/]+)$,;
+      return if(!$1); # No experiments
       $filePath = "$1/$fileName";
     }
     my $isImg = ($fileName =~ m,\.(svg|png)$,i);
-    my $forceType = ($cfgDB eq 'configDB' && !$isImg) ? $cfgDB : "file";
+    $forceType = "file" if($isImg);
 
     $FW_data =~ s/\r//g if(!$isImg);
     my $err;
-    if($fileName =~ m,\.png$,) {
+    if($fileName =~ m,\.png$,) { #??
       $err = FileWrite({FileName=>$filePath,ForceType=>$forceType,NoNL=>1},
                        $FW_data);
     } else {
