@@ -1001,7 +1001,8 @@ FW_answerCall($)
 
     } else {
       $FW_cmdret = FW_addLinks($FW_cmdret)
-          if($FW_webArgs{addLinks} && $FW_cmdret !~ m/^<html>(.*)<\/html>$/s);
+          if($FW_webArgs{addLinks} &&
+             defined($FW_cmdret) && $FW_cmdret !~ m/^<html>(.*)<\/html>$/s);
       FW_pO $FW_cmdret;
 
     }
