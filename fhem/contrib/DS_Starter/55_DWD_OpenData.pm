@@ -1,5 +1,5 @@
 ﻿# -----------------------------------------------------------------------------
-# $Id: 55_DWD_OpenData.pm 28556 2024-03-02 19:09:00Z jensb $
+# $Id: 55_DWD_OpenData.pm 30026 2025-06-04 08:44:48Z DS_Starter $
 # -----------------------------------------------------------------------------
 
 =encoding UTF-8
@@ -629,7 +629,7 @@ use constant PROCESSING_TIMEOUT       => DOWNLOAD_TIMEOUT_MAX + 60; # [s]
 use constant SCHEDULING_RANGE         => 15*60 - PROCESSING_TIMEOUT - 60; # [s]
 
 require Exporter;
-our $VERSION   = '1.017005';
+our $VERSION   = '1.017008';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -910,7 +910,7 @@ sub Attr {
   my ($command, $name, $attribute, $value) = @_;
   my $hash = $::defs{$name};
 
-    if ($command eq 'set') {                                       # V 1.17.7: change "when" to "if" - https://forum.fhem.de/index.php?msg=1319475
+    if ($command eq 'set') {                                                                                   # V 1.17.7: change "when" to "if" - https://forum.fhem.de/index.php?msg=1319475
         if ($attribute eq "disable") {
           # enable/disable polling
           if ($::init_done) {
@@ -926,8 +926,7 @@ sub Attr {
         elsif ($attribute eq "forecastRefresh") {
           if (!(defined($value) && looks_like_number($value) && $value >= 1 && $value <= 6)) {
             my $oldRefresh = ::AttrVal($name, 'forecastRefresh', 6);
-            if ($::init_done && (($oldRefresh < 6 && $value >= 6) || ($oldRefresh >= 6 && $value < 6))) {
-              # delete readings when switching between MOSMIX S and L
+            if ($::init_done && (($oldRefresh < 6 && $value >= 6) || ($oldRefresh >= 6 && $value < 6))) {      # delete readings when switching between MOSMIX S and L
               ::CommandDeleteReading(undef, "$name ^fc.*");
             }
           }
@@ -1016,75 +1015,69 @@ sub Get {
 
   my $result = undef;
   my $command = lc($a[1]);
-  for ($command) {
-    when ("alerts") {
-      my $warncellId = $a[2];
-      $warncellId = ::AttrVal($name, 'alertArea', undef) if (!defined($warncellId));
-      if (defined($warncellId)) {
-        my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-        if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {
-          # abort if update is in progress
-          $result = "alerts cache update in progress, please wait and try again";
-        } elsif (defined($alertsReceived[$communeUnion]) && (time() - $alertsReceived[$communeUnion] < 900)) {
-          # use cache if not older than 15 minutes
-          $result = UpdateAlerts($hash, $warncellId);
-        } else {
-          # update cache if older than 15 minutes
-          $result = GetAlerts($hash, $warncellId);
-        }
-      } else {
-        $result = "warncell id required for $name get $command";
-      }
-    }
-
-    when ("forecast") {
-      my $station = $a[2];
-      $station = ::AttrVal($name, 'forecastStation', undef) if (!defined($station));
-      if (defined($station)) {
-        if (defined($hash->{forecastUpdating}) && (time() - $hash->{forecastUpdating} < PROCESSING_TIMEOUT)) {
-          # abort if update is in progress
-          $result = "forecast update in progress, please wait and try again";
-        } else {
-          # force forecast update
-          ::readingsSingleUpdate($hash, 'fc_dwdDocSize', 0, 0);
-          delete $hash->{".fetchAlerts"};
-          $result = GetForecast($hash, $station);
-        }
-      } else {
-        $result = "station code required for $name get $command";
-      }
-    }
-
-    when ("updatealertscache") {
-      my $updateMode = undef;
-      my $option = lc($a[2]);
-      for ($option) {
-        when ("communeunions") {
-          $updateMode = UPDATE_COMMUNEUNIONS;
-        }
-        when ("districts") {
-          $updateMode = UPDATE_DISTRICTS;
-        }
-        when ("all") {
-          $updateMode = UPDATE_ALL;
-        }
-        default {
-          return "update mode 'communeUnions', 'districts' or 'all' required for $name get $command";
-        }
-      }
-      my $communeUnion = IsCommuneUnionWarncellId($updateMode);
-      if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {
-        # abort if update is in progress
+  
+  if ($command  eq 'alerts') {
+    my $warncellId = $a[2];
+    $warncellId = ::AttrVal($name, 'alertArea', undef) if (!defined($warncellId));
+    if (defined($warncellId)) {
+      my $communeUnion = IsCommuneUnionWarncellId($warncellId);
+      if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {    # abort if update is in progress
         $result = "alerts cache update in progress, please wait and try again";
-      } else {
-        # update cache if older than 15 minutes
-        $result = GetAlerts($hash, $updateMode);
+      } 
+      elsif (defined($alertsReceived[$communeUnion]) && (time() - $alertsReceived[$communeUnion] < 900)) {                # use cache if not older than 15 minutes
+        $result = UpdateAlerts($hash, $warncellId);
+      } 
+      else {                                                                                                              # update cache if older than 15 minutes
+        $result = GetAlerts($hash, $warncellId);
       }
+    } else {
+      $result = "warncell id required for $name get $command";
     }
+  }
+  elsif ($command  eq 'forecast') {
+    my $station = $a[2];
+    $station = ::AttrVal($name, 'forecastStation', undef) if (!defined($station));
+    
+    if (defined($station)) {
+      if (defined($hash->{forecastUpdating}) && (time() - $hash->{forecastUpdating} < PROCESSING_TIMEOUT)) {            # abort if update is in progress
+        $result = "forecast update in progress, please wait and try again";
+      } 
+      else {                                                                                                            # force forecast update
+        ::readingsSingleUpdate($hash, 'fc_dwdDocSize', 0, 0);
+        delete $hash->{".fetchAlerts"};
+        $result = GetForecast($hash, $station);
+      }
+    } else {
+      $result = "station code required for $name get $command";
+    }
+  }
+  elsif ($command  eq 'updatealertscache') {
+    my $updateMode = undef;
+    my $option = lc($a[2]);
 
-    default {
-      $result = "unknown get command $command, choose one of alerts forecast updateAlertsCache:communeUnions,districts,all";
+    if ($option eq 'communeunions') {
+      $updateMode = UPDATE_COMMUNEUNIONS;
     }
+    elsif ($option eq 'districts') {
+      $updateMode = UPDATE_DISTRICTS;
+    }
+    elsif ($option eq 'all') {
+      $updateMode = UPDATE_ALL;
+    }
+    else {
+      return "update mode 'communeUnions', 'districts' or 'all' required for $name get $command";
+    }
+    my $communeUnion = IsCommuneUnionWarncellId($updateMode);
+    
+    if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {    # abort if update is in progress
+      $result = "alerts cache update in progress, please wait and try again";
+    } 
+    else {                                                                                                              # update cache if older than 15 minutes
+      $result = GetAlerts($hash, $updateMode);
+    }
+  }
+  else {
+    $result = "unknown get command $command, choose one of alerts forecast updateAlertsCache:communeUnions,districts,all";
   }
 
   return $result;
@@ -3150,6 +3143,12 @@ sub DWD_OpenData_Initialize {
 #
 # CHANGES
 #
+# 23.09.2025 (version 1.17.8) DS_Starter
+# replace for..when structures
+#
+# 25.05.2025 (version 1.17.7) DS_Starter
+# check in the previous contrib version into FHEM SVN
+# 
 # 18.10.2024 (version 1.17.7) DS_Starter
 # 1.17.7: bugfix: change attr "when" to "if" - https://forum.fhem.de/index.php?msg=1319475
 #
@@ -3392,10 +3391,12 @@ sub DWD_OpenData_Initialize {
       <li>disable {0|1}, default: 0<br>
           Disable fetching data.
       </li><br>
+      
       <a id="DWD_OpenData-attr-downloadTimeout"></a>
       <li>downloadTimeout &lt;n&gt;, 30 .. 60 s, default: 30 s<br>
           Timeout for downloading data (alerts, forecasts) from DWD server.
       </li><br>
+      
       <a id="DWD_OpenData-attr-timezone"></a>
       <li>timezone &lt;tz&gt;, default: OS dependent<br>
           <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">IANA TZ string</a> for date and time readings (e.g. "Europe/Berlin"), can be used to assume the perspective of a station that is in a different timezone or if your OS timezone settings do not match your local timezone. Alternatively you may use <code>tzselect</code> on the Linux command line to find a valid timezone string.
@@ -3411,15 +3412,18 @@ sub DWD_OpenData_Initialize {
           <a href="https://www.dwd.de/DE/leistungen/met_verfahren_mosmix/mosmix_stationskatalog.pdf">MOSMIX station catalogue</a>.<br>
           Note: When value is changed all existing forecast readings will be deleted.
       </li><br>
+      
       <a id="DWD_OpenData-attr-forecastDays"></a>
       <li>forecastDays &lt;n&gt;, default: 6 d<br>
           Limits number of forecast days. Setting 0 will still provide forecast data for today. The maximum value is 9 (for today and 9 future days).
       </li><br>
+      
       <a id="DWD_OpenData-attr-forecastResolution"></a>
       <li>forecastResolution {1|3|6}, default: 6 h<br>
           Time resolution (number of hours between 2 samples).<br>
           Note: When value is changed all existing forecast readings will be deleted.
       </li><br>
+      
       <a id="DWD_OpenData-attr-forecastRefresh"></a>
       <li>forecastRefresh &lt;n&gt;, 1 .. 6 h, default: 6 h<br>
           The DWD distinguishes between MOSMIX S and L reports, which differ in terms of update frequency and available data elements:<br>
@@ -3433,15 +3437,14 @@ sub DWD_OpenData_Initialize {
           for more details.<br><br>
 
           Notes for using MOSMIX S:<br>
-          - MOSMIX S is an EXPERIMENTAL feature and may cause system instability.<br>
-          - MOSMIX S requires more than 10000 times the recources of MOSMIX L.<br>
-          - Consider dynamically adapting forecastRefresh to your requirements to save recources, e.g. slower refresh at night if you focus is sun related.<br>
+          - MOSMIX S requires more ressources than the recources of MOSMIX L.<br>
           - Minimum hardware recommendations: CPU with 2 cores, 2 GB RAM, 1 GB tmpfs for /tmp or magnetic disk.<br>
-          - When using an SD card for /tmp its lifetime will be reduced significantly due to the write rate of ~700 MB/h.<br>
-          - Processing time dependes on download bandwidth and hardware performance and may take half a minute or more.<br>
+          - When using an SD card for /tmp its lifetime could be reduced due to the write rate of ~700 MB/h.<br>
+          - Processing time dependes on download bandwidth and hardware performance.<br>
           - Depending on the available download bandwidth the attribute downloadTimeout must be adjusted.<br>
           - When switching between MOSMIX S and L all existing forecast readings will be deleted.
       </li><br>
+      
       <a id="DWD_OpenData-attr-forecastProperties"></a>
       <li>forecastProperties [&lt;p1&gt;[,&lt;p2&gt;]...], default: Tx, Tn, Tg, TTT, DD, FX1, Neff, RR6c, RRhc, Rh00, ww<br>
           See the <a href="https://opendata.dwd.de/weather/lib/MetElementDefinition.xml">DWD forecast property defintions</a> for more details.<br>
@@ -3449,10 +3452,12 @@ sub DWD_OpenData_Initialize {
           - Not all properties are available for all stations and for all hours.<br>
           - If you remove a property from the list then already existing readings must be deleted manually in continuous mode.<br>
       </li><br>
+      
       <a id="DWD_OpenData-attr-forecastWW2Text"></a>
       <li>forecastWW2Text {0|1}, default: 0<br>
           Create additional wwd readings containing the weather code as a descriptive text in German language.
       </li><br>
+      
       <a id="DWD_OpenData-attr-forecastPruning"></a>
       <li>forecastPruning {0|1}, default: 0<br>
           Search for and delete forecast readings that are more then one day older then other forecast readings of the same day. Pruning will be performed after a successful forecast update.<br>
@@ -3469,10 +3474,12 @@ sub DWD_OpenData_Initialize {
           Setting alertArea enables automatic updates of the alerts cache every 15 minutes.<br>
           A warncell id is a 9 digit numeric value from the <a href="https://www.dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.csv">Warncell-IDs for CAP alerts catalogue</a>. Supported ids start with 7 and 8 (communeunion), 1 and 9 (district) or 5 (coast). To verify that alerts are provided for the warncell id you selected you should consult another source, wait for an alert situation and compare.
       </li>
+      
       <a id="DWD_OpenData-attr-alertLanguage"></a>
       <li>alertLanguage [DE|EN], default: DE<br>
           Language of descriptive alert properties.
       </li>
+      
       <a id="DWD_OpenData-attr-alertExcludeEvents"></a>
       <li>alertExcludeEvents &lt;event code&gt;, default: none<br>
           Comma separated list of numeric events codes for which no alerts should be created.<br>

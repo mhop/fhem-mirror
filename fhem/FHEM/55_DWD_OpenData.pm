@@ -629,7 +629,7 @@ use constant PROCESSING_TIMEOUT       => DOWNLOAD_TIMEOUT_MAX + 60; # [s]
 use constant SCHEDULING_RANGE         => 15*60 - PROCESSING_TIMEOUT - 60; # [s]
 
 require Exporter;
-our $VERSION   = '1.017007';
+our $VERSION   = '1.017008';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -910,7 +910,7 @@ sub Attr {
   my ($command, $name, $attribute, $value) = @_;
   my $hash = $::defs{$name};
 
-    if ($command eq 'set') {                                       # V 1.17.7: change "when" to "if" - https://forum.fhem.de/index.php?msg=1319475
+    if ($command eq 'set') {                                                                                   # V 1.17.7: change "when" to "if" - https://forum.fhem.de/index.php?msg=1319475
         if ($attribute eq "disable") {
           # enable/disable polling
           if ($::init_done) {
@@ -926,8 +926,7 @@ sub Attr {
         elsif ($attribute eq "forecastRefresh") {
           if (!(defined($value) && looks_like_number($value) && $value >= 1 && $value <= 6)) {
             my $oldRefresh = ::AttrVal($name, 'forecastRefresh', 6);
-            if ($::init_done && (($oldRefresh < 6 && $value >= 6) || ($oldRefresh >= 6 && $value < 6))) {
-              # delete readings when switching between MOSMIX S and L
+            if ($::init_done && (($oldRefresh < 6 && $value >= 6) || ($oldRefresh >= 6 && $value < 6))) {      # delete readings when switching between MOSMIX S and L
               ::CommandDeleteReading(undef, "$name ^fc.*");
             }
           }
@@ -1016,75 +1015,69 @@ sub Get {
 
   my $result = undef;
   my $command = lc($a[1]);
-  for ($command) {
-    when ("alerts") {
-      my $warncellId = $a[2];
-      $warncellId = ::AttrVal($name, 'alertArea', undef) if (!defined($warncellId));
-      if (defined($warncellId)) {
-        my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-        if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {
-          # abort if update is in progress
-          $result = "alerts cache update in progress, please wait and try again";
-        } elsif (defined($alertsReceived[$communeUnion]) && (time() - $alertsReceived[$communeUnion] < 900)) {
-          # use cache if not older than 15 minutes
-          $result = UpdateAlerts($hash, $warncellId);
-        } else {
-          # update cache if older than 15 minutes
-          $result = GetAlerts($hash, $warncellId);
-        }
-      } else {
-        $result = "warncell id required for $name get $command";
-      }
-    }
-
-    when ("forecast") {
-      my $station = $a[2];
-      $station = ::AttrVal($name, 'forecastStation', undef) if (!defined($station));
-      if (defined($station)) {
-        if (defined($hash->{forecastUpdating}) && (time() - $hash->{forecastUpdating} < PROCESSING_TIMEOUT)) {
-          # abort if update is in progress
-          $result = "forecast update in progress, please wait and try again";
-        } else {
-          # force forecast update
-          ::readingsSingleUpdate($hash, 'fc_dwdDocSize', 0, 0);
-          delete $hash->{".fetchAlerts"};
-          $result = GetForecast($hash, $station);
-        }
-      } else {
-        $result = "station code required for $name get $command";
-      }
-    }
-
-    when ("updatealertscache") {
-      my $updateMode = undef;
-      my $option = lc($a[2]);
-      for ($option) {
-        when ("communeunions") {
-          $updateMode = UPDATE_COMMUNEUNIONS;
-        }
-        when ("districts") {
-          $updateMode = UPDATE_DISTRICTS;
-        }
-        when ("all") {
-          $updateMode = UPDATE_ALL;
-        }
-        default {
-          return "update mode 'communeUnions', 'districts' or 'all' required for $name get $command";
-        }
-      }
-      my $communeUnion = IsCommuneUnionWarncellId($updateMode);
-      if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {
-        # abort if update is in progress
+  
+  if ($command  eq 'alerts') {
+    my $warncellId = $a[2];
+    $warncellId = ::AttrVal($name, 'alertArea', undef) if (!defined($warncellId));
+    if (defined($warncellId)) {
+      my $communeUnion = IsCommuneUnionWarncellId($warncellId);
+      if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {    # abort if update is in progress
         $result = "alerts cache update in progress, please wait and try again";
-      } else {
-        # update cache if older than 15 minutes
-        $result = GetAlerts($hash, $updateMode);
+      } 
+      elsif (defined($alertsReceived[$communeUnion]) && (time() - $alertsReceived[$communeUnion] < 900)) {                # use cache if not older than 15 minutes
+        $result = UpdateAlerts($hash, $warncellId);
+      } 
+      else {                                                                                                              # update cache if older than 15 minutes
+        $result = GetAlerts($hash, $warncellId);
       }
+    } else {
+      $result = "warncell id required for $name get $command";
     }
+  }
+  elsif ($command  eq 'forecast') {
+    my $station = $a[2];
+    $station = ::AttrVal($name, 'forecastStation', undef) if (!defined($station));
+    
+    if (defined($station)) {
+      if (defined($hash->{forecastUpdating}) && (time() - $hash->{forecastUpdating} < PROCESSING_TIMEOUT)) {            # abort if update is in progress
+        $result = "forecast update in progress, please wait and try again";
+      } 
+      else {                                                                                                            # force forecast update
+        ::readingsSingleUpdate($hash, 'fc_dwdDocSize', 0, 0);
+        delete $hash->{".fetchAlerts"};
+        $result = GetForecast($hash, $station);
+      }
+    } else {
+      $result = "station code required for $name get $command";
+    }
+  }
+  elsif ($command  eq 'updatealertscache') {
+    my $updateMode = undef;
+    my $option = lc($a[2]);
 
-    default {
-      $result = "unknown get command $command, choose one of alerts forecast updateAlertsCache:communeUnions,districts,all";
+    if ($option eq 'communeunions') {
+      $updateMode = UPDATE_COMMUNEUNIONS;
     }
+    elsif ($option eq 'districts') {
+      $updateMode = UPDATE_DISTRICTS;
+    }
+    elsif ($option eq 'all') {
+      $updateMode = UPDATE_ALL;
+    }
+    else {
+      return "update mode 'communeUnions', 'districts' or 'all' required for $name get $command";
+    }
+    my $communeUnion = IsCommuneUnionWarncellId($updateMode);
+    
+    if (defined($alertsUpdating[$communeUnion]) && (time() - $alertsUpdating[$communeUnion] < PROCESSING_TIMEOUT)) {    # abort if update is in progress
+      $result = "alerts cache update in progress, please wait and try again";
+    } 
+    else {                                                                                                              # update cache if older than 15 minutes
+      $result = GetAlerts($hash, $updateMode);
+    }
+  }
+  else {
+    $result = "unknown get command $command, choose one of alerts forecast updateAlertsCache:communeUnions,districts,all";
   }
 
   return $result;
@@ -3149,6 +3142,9 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 23.09.2025 (version 1.17.8) DS_Starter
+# replace for..when structures
 #
 # 25.05.2025 (version 1.17.7) DS_Starter
 # check in the previous contrib version into FHEM SVN
