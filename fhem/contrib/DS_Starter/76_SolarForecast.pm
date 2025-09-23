@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.58.4" => "19.09.2025  __batChargeOptTargetPower: user a better surplus value ",
+  "1.58.4" => "23.09.2025  __batChargeOptTargetPower: user a better surplus value, excess based on average removed & some other code optimization ",
   "1.58.3" => "17.09.2025  __batChargeOptTargetPower: minor code change, consider bpinmax & lcintime ",
   "1.58.2" => "11.09.2025  __batChargeOptTargetPower: a lot of Code improvements, Attr flowGraphicControl->shiftx: unrestrict possible values ",
   "1.58.1" => "08.09.2025  edit comref, ctrlBatSocManagementXX->safetyMargin: Separate specification of surcharges for calculation of load ".
@@ -1094,6 +1094,10 @@ my %htitles = (                                                                 
                 DE => qq{Lademanagement bereit}                                                                    },
   ldstratg => { EN => qq{Loading strategy},
                 DE => qq{Ladestrategie}                                                                            },
+  ldreleas => { EN => qq{load release},
+                DE => qq{Ladefreigabe}                                                                             }, 
+  optchpow => { EN => qq{optimized charging power},
+                DE => qq{optimierte Ladeleistung}                                                                  },                
   bcharrel => { EN => qq{Charging release (activate release for charging the battery if necessary)},
                 DE => qq{Ladefreigabe (evtl. Freigabe zum Laden der Batterie aktivieren)}                          },
   bncharel => { EN => qq{only charge if the feed-in limit is exceeded},
@@ -11920,20 +11924,21 @@ sub __batChargeOptTargetPower {
 			  next;
 		  }
 		  
-		  my $crgwh = BatteryVal ($name, $sbn, 'bchargewh', 0);                                                  # aktueller Ladezustand Batterie
-		  my $runwh = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                                                  # Auswahl des zu verwendenden Prognose-SOC (Wh)
-                      $hsurp->{$shod}{$sbn}{fcnextwh}         : 
-                      ( $hsurp->{$shod}{nhr} eq '00' ? 
-					    $crgwh : 
-						$hsurp->{$shod}{$sbn}{socwh}
-					  );                      
-          
           my $bpinreduced = BatteryVal ($name, $sbn, 'bpinreduced', 0);                                          # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
+		  my $crgwh       = BatteryVal ($name, $sbn, 'bchargewh',   0);                                          # aktueller Ladezustand Batterie
+		  my $runwh       = defined $hsurp->{$shod}{$sbn}{fcnextwh} ?                                            # Auswahl des zu verwendenden Prognose-SOC (Wh)
+                            $hsurp->{$shod}{$sbn}{fcnextwh}         : 
+                            ( $hsurp->{$shod}{nhr} eq '00' ? 
+					          $crgwh : 
+						      $hsurp->{$shod}{$sbn}{socwh}
+					        );                      
+          
           my $otpMargin   = $hsurp->{$shod}{$sbn}{otpMargin};
           my $margin      = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
           
 		  if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
               $otp->{$sbn}{target} = $bpinreduced;
+              storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W');
               next;
           }         
           
@@ -11973,7 +11978,6 @@ sub __batChargeOptTargetPower {
               $otp->{$sbn}{target} = $target;
               
               storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $target.' W');
-              
           }                 
       }
   }
@@ -18090,6 +18094,7 @@ sub __batteryOnBeam {
                                                      flag  => $hfcg->{$i}{'rcdchargebat'.$bn},
                                                      msg1  => $balias,
                                                      msg2  => $lcintime,
+                                                     msg3  => $htitles{ldreleas}{$lang},
                                                      soc   => $soc,
                                                      pcurr => $bpower,
                                                      lang  => $lang
@@ -19092,6 +19097,7 @@ return $ret;
 #       flag    - ein beliebiges Statusflag zur Auswertung
 #       msg1    - zur freien Verwendung
 #       msg2    - zur freien Verwendung
+#       msg3    - zur freien Verwendung
 #       soc     - der SOC bei Batterien
 #       $don    - Day or Night
 #       $pcurr  - aktuelle Leistung / Verbrauch
@@ -19104,6 +19110,7 @@ sub __substituteIcon {
   my $pn    = $paref->{pn};
   my $msg1  = $paref->{msg1};
   my $msg2  = $paref->{msg2};
+  my $msg3  = $paref->{msg3};
   my $flag  = $paref->{flag};
   my $soc   = $paref->{soc} // -9999;                                                    # auf fehlenden SoC aufmerksam machen
   my $don   = $paref->{don};
@@ -19178,7 +19185,7 @@ sub __substituteIcon {
       }
       
       $pretxt .= "\n".$htitles{lcready}{$lang}.": ".(defined $msg2 ? ($msg2 == 1 ? $htitles{simplyes}{$lang} : $htitles{simpleno}{$lang}) : '-');
-      $pretxt .= "\n".$htitles{ldstratg}{$lang}.": Load Release";
+      $pretxt .= "\n".$htitles{ldstratg}{$lang}.": ".(defined $msg2 ? $msg3 : '-');
 
       if (defined $pcurr) {                                                              # aktueller Zustand
            if ($pcurr > 0) {                                                             # Batterie wird aufgeladen
