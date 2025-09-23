@@ -11960,7 +11960,7 @@ sub __batChargeOptTargetPower {
           $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin} if(defined $hsurp->{$newshod});      
           
           if ($hsurp->{$shod}{nhr} eq '00') {
-              my $target = max (BatteryVal ($name, $sbn, 'bpinreduced', 0), $hsurp->{$shod}{$sbn}{pneedmin});
+              my $target = max ($bpinreduced, $hsurp->{$shod}{$sbn}{pneedmin});
               
               if (NexthoursVal ($name, 'NextHour00', 'DoN', 0)) {
                   $target *= 1 + ($margin / 100);                                                                # 2. Sicherheitsaufschlag
