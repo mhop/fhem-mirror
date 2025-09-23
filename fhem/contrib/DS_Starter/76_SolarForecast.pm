@@ -1092,6 +1092,8 @@ my %htitles = (                                                                 
                 DE => qq{SoC am Ende der Stunde}                                                                   },
   lcready  => { EN => qq{Charge management ready},
                 DE => qq{Lademanagement bereit}                                                                    },
+  ldstratg => { EN => qq{Loading strategy},
+                DE => qq{Ladestrategie}                                                                            },
   bcharrel => { EN => qq{Charging release (activate release for charging the battery if necessary)},
                 DE => qq{Ladefreigabe (evtl. Freigabe zum Laden der Batterie aktivieren)}                          },
   bncharel => { EN => qq{only charge if the feed-in limit is exceeded},
@@ -11816,14 +11818,12 @@ sub _batChargeMgmt {
 
           # Überschußhash für Ermittlung Mindest-Ladeleistung erstellen
           ###############################################################
-		  my $spswh    = max (0, sprintf ("%.0f", $fceff));
           my $surplswh = max (0, $surpls);     
           
           if ($today) {                                                                          # nur Heute
 			  $hsurp->{$hod}{hod}                = $hod;
               $hsurp->{$hod}{nhr}                = $nhr;
               $hsurp->{$hod}{surpls}             = $surplswh.'.'.$hod;                           # Überschuß in Wh der Stunde mit Sortierhilfe 
-              $hsurp->{$hod}{spswh}              = $spswh.'.'.$hod;                              # mit Sortierhilfe
               $hsurp->{$hod}{$bn}{spday}         = $spday;                                       # (Rest)PV-Überschuß am laufenden Tag
 			  $hsurp->{$hod}{$bn}{whneedmanaged} = $whneed;                                      # benötigte Ladeenergie Batterie x gemäß Ladesteuerung
               $hsurp->{$hod}{$bn}{socwh}         = $socwh;
@@ -11905,7 +11905,7 @@ sub __batChargeOptTargetPower {
   my $fipl      = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
   my @sorted    = sort { $hsurp->{$a}{surpls} <=> $hsurp->{$b}{surpls} } keys %{$hsurp};
   my $sphrs     = scalar grep { int( $hsurp->{$_}{surpls} ) >= 1 } @sorted;                                      # Stunden mit Überschuß >= 1                
-  my @batteries = grep { !/^(?:hod|spswh|surpls|nhr)$/xs } keys %{$hsurp->{24}};
+  my @batteries = grep { !/^(?:hod|surpls|nhr)$/xs } keys %{$hsurp->{24}};
   my $otp;
 
   ## Kalkulation / Logik
@@ -11926,9 +11926,11 @@ sub __batChargeOptTargetPower {
                       ( $hsurp->{$shod}{nhr} eq '00' ? 
 					    $crgwh : 
 						$hsurp->{$shod}{$sbn}{socwh}
-					  );
+					  );                      
           
           my $bpinreduced = BatteryVal ($name, $sbn, 'bpinreduced', 0);                                          # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
+          my $otpMargin   = $hsurp->{$shod}{$sbn}{otpMargin};
+          my $margin      = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
           
 		  if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
               $otp->{$sbn}{target} = $bpinreduced;
@@ -11939,9 +11941,6 @@ sub __batChargeOptTargetPower {
           $runwh          = min ($runwh, $sbatinstcap);                                                          
 		  my $runwhneed   = $sbatinstcap - $runwh;
 		  my $needraw     = $sphrs ? $runwhneed / $sphrs : $runwhneed;                                           # Ladeleistung initial
-          
-          my $otpMargin   = $hsurp->{$shod}{$sbn}{otpMargin};
-          my $margin      = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
           $needraw       *= 1 + ($margin / 100);                                                                 # Sicherheitsaufschlag
 		
           $needraw                           = max (0, $needraw);          
@@ -11954,53 +11953,33 @@ sub __batChargeOptTargetPower {
           
           my $newshod                        = sprintf "%02d", (int $shod + 1);
           $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin} if(defined $hsurp->{$newshod});      
-          $otp->{$sbn}{target}               = $hsurp->{$shod}{$sbn}{pneedmin}          if($hsurp->{$shod}{nhr} eq '00');
           
-		  if ($hsurp->{$shod}{$sbn}{pneedmin} < INFINITE) {
-			  my $maxneed           = $otp->{$sbn}{maxneed} // 0;
-		      $otp->{$sbn}{maxneed} = max ($maxneed, $hsurp->{$shod}{$sbn}{pneedmin});
+          if ($hsurp->{$shod}{nhr} eq '00') {
+              my $target = max (BatteryVal ($name, $sbn, 'bpinreduced', 0), $hsurp->{$shod}{$sbn}{pneedmin});
               
-              if ($hsurp->{$shod}{$sbn}{runwh} < $sbatinstcap) {
-			      $otp->{$sbn}{maxvals}++;
-				  $otp->{$sbn}{sumneed} = $sbatinstcap - $crgwh;
+              if (NexthoursVal ($name, 'NextHour00', 'DoN', 0)) {
+                  $target *= 1 + ($margin / 100);                                                                # 2. Sicherheitsaufschlag
               }
-          }                   
+              
+              my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
+              my $bpin    = CurrentVal ($name, 'batpowerinsum', 0);                                              # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
+              my $inc     = 0;
+              
+              if ( !$bpin && $gfeedin > $fipl )           {$inc = $gfeedin - $fipl}                              # Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
+              if (  $bpin && ($gfeedin - $bpin) > $fipl ) {$inc = $bpin + (($gfeedin - $bpin) - $fipl)}          # Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
+
+                                                                                     
+              $target              = sprintf "%.0f", max ($target, $inc);                                        # Einspeiselimit berücksichtigen
+              $otp->{$sbn}{target} = $target;
+              
+              storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $target.' W');
+              
+          }                 
       }
   }
   
-  ## Auswertung und Debuglog
-  ############################
-  for my $bn (sort keys %{$otp}) {                                                                              # den aktuellen Ziel-OTP ermitteln und in Reading schreiben
-      my $target = $otp->{$bn}{target};
-      next if(!defined $target);
-      
-      my $avg     = 0;
-      my $mv      = $otp->{$bn}{maxvals};
-      my $sn      = $otp->{$bn}{sumneed} // 0;
-      $avg        = sprintf "%.0f", ($sn / $mv) if($mv);
-      $target     = max ($avg, $target);
-       
-      my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                                     # aktuelle Netzeinspeisung
-      my $bpin    = CurrentVal ($name, 'batpowerinsum', 0);                                                     # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
-      my $inc     = 0;
-      
-      if ( !$bpin && $gfeedin > $fipl )           {$inc = $gfeedin - $fipl}                                     # Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
-      if (  $bpin && ($gfeedin - $bpin) > $fipl ) {$inc = $bpin + (($gfeedin - $bpin) - $fipl)}                 # Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
-
-      if ($inc) {                                                                                               # Einspeiselimit berücksichtigen
-          $target = max ($target, $inc);
-      }      
-      
-      $otp->{$bn}{target} = $target;
-      
-      storeReading ('Battery_ChargeOptTargetPower_'.$bn, $target.' W');
-      
-	  if ($paref->{debug} =~ /batteryManagement/) {
-		  my $mn = $otp->{$bn}{maxneed} // 0;
-	      Log3 ($name, 1, "$name DEBUG> ChargeOTP - max OTP Bat $bn: $mn W, sum need: $sn Wh, number hrs: $mv, Average for remaining hours: $avg W");
-	  }
-  }
-  
+  ## Debuglog
+  #############  
   if ($paref->{debug} =~ /batteryManagement/) {
 	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - The limit for grid feed-in is $fipl W");
 	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - NOTE: The hours listed below are the estimated number of hours remaining on the current day with at least the respective PV surplus.");
@@ -12018,8 +11997,7 @@ sub __batChargeOptTargetPower {
               my $needmin   = max (BatteryVal ($name, $bat, 'bpinreduced', 0), $hsurp->{$k}{$bat}{pneedmin} // 0); 
               
               if ($hsurp->{$k}{nhr} eq '00') {                                                                # Target für aktuelle Stunde
-                  my $target = $otp->{$bat}{target} // 0;
-                  $needmin   = max ($needmin, $target);
+                  $needmin = $otp->{$bat}{target} // 0;
               }
               
               Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $spls Wh $sphrs, OTP: $needmin W, safety: $margin %");
@@ -19164,12 +19142,6 @@ sub __substituteIcon {
 
       $soctxt     = "\n".$htitles{socbatfc}{$lang}.": ".$soc." %";                       # Text 'SoC Prognose'
       my $socicon = batSoc2icon ($soc);
-      
-      #$socicon = $soc >= 80 ? 'measure_battery_100' :
-      #           $soc >= 60 ? 'measure_battery_75'  :
-      #           $soc >= 40 ? 'measure_battery_50'  :
-      #           $soc >= 20 ? 'measure_battery_25'  :
-      #           'measure_battery_0';
                  
       $ircmd    = $ircmd    ? $ircmd    : '';
       $inorcmd  = $inorcmd  ? $inorcmd  : '';
@@ -19206,6 +19178,7 @@ sub __substituteIcon {
       }
       
       $pretxt .= "\n".$htitles{lcready}{$lang}.": ".(defined $msg2 ? ($msg2 == 1 ? $htitles{simplyes}{$lang} : $htitles{simpleno}{$lang}) : '-');
+      $pretxt .= "\n".$htitles{ldstratg}{$lang}.": Load Release";
 
       if (defined $pcurr) {                                                              # aktueller Zustand
            if ($pcurr > 0) {                                                             # Batterie wird aufgeladen
