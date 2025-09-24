@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.58.5" => "24.09.2025  __batChargeOptTargetPower: fix if battery load control is deactivated ",
   "1.58.4" => "23.09.2025  __batChargeOptTargetPower: user a better surplus value, excess based on average removed & some other code optimization ",
   "1.58.3" => "17.09.2025  __batChargeOptTargetPower: minor code change, consider bpinmax & lcintime ",
   "1.58.2" => "11.09.2025  __batChargeOptTargetPower: a lot of Code improvements, Attr flowGraphicControl->shiftx: unrestrict possible values ",
@@ -1090,8 +1091,8 @@ my %htitles = (                                                                 
                 DE => qq{SoC Prognose}                                                                             },
   socbaths => { EN => qq{SoC at the end of the hour},
                 DE => qq{SoC am Ende der Stunde}                                                                   },
-  lcready  => { EN => qq{Charge management ready},
-                DE => qq{Lademanagement bereit}                                                                    },
+  lcenable => { EN => qq{Charge management enabled},
+                DE => qq{Lademanagement aktiviert}                                                                 },
   ldstratg => { EN => qq{Loading strategy},
                 DE => qq{Ladestrategie}                                                                            },
   ldreleas => { EN => qq{load release},
@@ -11921,7 +11922,13 @@ sub __batChargeOptTargetPower {
       for my $sbn (sort @batteries) {                                                                            # jede Batterie
 		  if (!$hsurp->{$shod}{$sbn}{lcintime}) {                                                                # Ladesteuerung nicht "In Time"
 		      $hsurp->{$shod}{$sbn}{pneedmin} = $hsurp->{$shod}{$sbn}{bpinmax};
-			  next;
+              
+              if ($hsurp->{$shod}{nhr} eq '00') {
+                  $otp->{$sbn}{target} = $hsurp->{$shod}{$sbn}{bpinmax};
+                  storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $hsurp->{$shod}{$sbn}{bpinmax}.' W');
+              }			  
+              
+              next;
 		  }
 		  
           my $bpinreduced = BatteryVal ($name, $sbn, 'bpinreduced', 0);                                          # Standardwert wenn z.B. kein Überschuß oder Zwangsladung vom Grid 
@@ -11937,8 +11944,13 @@ sub __batChargeOptTargetPower {
           my $margin      = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
           
 		  if (!$spls) {                                                                                          # auf kleine Sollladeleistung setzen wenn kein Überschuß
-              $otp->{$sbn}{target} = $bpinreduced;
-              storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W');
+              $hsurp->{$shod}{$sbn}{pneedmin} = $bpinreduced;
+              
+              if ($hsurp->{$shod}{nhr} eq '00') {
+                  $otp->{$sbn}{target} = $bpinreduced;
+                  storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinreduced.' W');
+              }
+              
               next;
           }         
           
@@ -19184,7 +19196,7 @@ sub __substituteIcon {
           }
       }
       
-      $pretxt .= "\n".$htitles{lcready}{$lang}.": ".(defined $msg2 ? ($msg2 == 1 ? $htitles{simplyes}{$lang} : $htitles{simpleno}{$lang}) : '-');
+      $pretxt .= "\n".$htitles{lcenable}{$lang}.": ".(defined $msg2 ? ($msg2 == 1 ? $htitles{simplyes}{$lang} : $htitles{simpleno}{$lang}) : '-');
       $pretxt .= "\n".$htitles{ldstratg}{$lang}.": ".(defined $msg2 ? $msg3 : '-');
 
       if (defined $pcurr) {                                                              # aktueller Zustand
