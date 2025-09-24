@@ -11698,7 +11698,7 @@ sub _batChargeMgmt {
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - control time Slot - Slot start: $lcstart, Slot end: $lcend");
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - The PV generation, consumption and surplus listed below are based on the battery's share of total installed capacity!");
-          Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeUR - used safety margin: $margin %");
+          Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeLR - used safety margin: $margin %");
       }
       
       ## Auswertung für jede kommende Stunde
@@ -11744,8 +11744,8 @@ sub _batChargeMgmt {
           $tomconfc = sprintf "%.0f", ($sf * $tomconfc);
           $tompvfc  = sprintf "%.0f", ($sf * $tompvfc);
 
-          ## (Rest) PV-Überschuß für den Tag
-          ####################################     
+          ## PV-Überschuß und (Rest)Tagesüberschuß
+          ##########################################     
           if ($today) {                                                                          # heutiger Tag
               $confcss  -= $confc;                                                               # Verbrauch bis Sonnenuntergang - Verbrauch Fc aktuelle Stunde
               $confcss   = 0 if($confcss < 0);
@@ -11760,10 +11760,11 @@ sub _batChargeMgmt {
               $spday     = $tompvfc - $tomconfc;
           }
 
-          $spday = 0 if($spday < 0);                                                             # PV Überschuß Prognose bis Sonnenuntergang
+          $spday     = 0 if($spday < 0);                                                         # PV Überschuß Prognose bis Sonnenuntergang
+          my $surpls = sprintf "%.0f", ($pvfc - $confc);                                         # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0
           
-          ## Ladefreigabe
-          #################
+          ## Steuerung nach Ladefreigabe
+          ################################
           if ( $whneed * (1 + ($margin / 100)) >= $spday ) {$crel = 1}                           # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
           if ( !$num && ($pvCu - $curcon) >= $inplim )     {$crel = 1}                           # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
           if ( !$bpin && $gfeedin > $feedinlim )           {$crel = 1}                           # V 1.49.6 Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
@@ -11772,9 +11773,24 @@ sub _batChargeMgmt {
           if ( !$lcintime )                                {$crel = 1}                           # Ladefreigabe wenn nicht innerhalb Zeitslot für Ladesteuerung
           if ( $labortCond )                               {$crel = 0}                           # keine Ladefreigabe bei genereller Abbruchbedingung 
 
+          # Steuerhash für optimimierte Ladeleistung erstellen
+          ######################################################
+          my $surplswh = max (0, $surpls);     
+          
+          if ($today) {                                                                          # nur Heute
+			  $hsurp->{$hod}{hod}                = $hod;
+              $hsurp->{$hod}{nhr}                = $nhr;
+              $hsurp->{$hod}{surpls}             = $lcintime ? $surplswh.'.'.$hod : 0;           # Überschuß in Wh der Stunde mit Sortierhilfe 
+              $hsurp->{$hod}{$bn}{spday}         = $spday;                                       # (Rest)PV-Überschuß am laufenden Tag
+              $hsurp->{$hod}{$bn}{initsocwh}     = $socwh;
+              $hsurp->{$hod}{$bn}{batinstcap}    = $batinstcap;
+			  $hsurp->{$hod}{$bn}{bpinmax}       = $bpinmax;                                     # max. mögliche Ladeleistung
+              $hsurp->{$hod}{$bn}{otpMargin}     = $otpMargin;                                   # Sicherheitszuschlag für Berechnungen
+			  $hsurp->{$hod}{$bn}{lcintime}      = $lcintime;                                    # Ladesteuerung "In Time" oder "nicht In Time"
+          }
+          
           ## SOC-Prognose
           #################                                                                      # change V 1.47.0
-          my $surpls = sprintf "%.0f", ($pvfc - $confc);                                         # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0
           my $fceff  = $surpls;                                                                  # wichtig keine Nachkommastellen!
 		  
 		  $fceff    = $fceff > 0 ? ($fceff >= $bpinmax       ? $bpinmax       : $fceff) :
@@ -11789,7 +11805,7 @@ sub _batChargeMgmt {
                     $socwh > $batinstcap  ? $batinstcap  :
                     $socwh;
 
-          $socwh      = sprintf "%.0f", $socwh;
+          $socwh      = sprintf "%.0f", $socwh;     
           my $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                            # Prognose SoC in %
 
           __createNextHoursSFCReadings ( {name    => $name,
@@ -11820,24 +11836,7 @@ sub _batChargeMgmt {
           $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
           $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);    # Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
           $hsoc{$nhr}{socprogwhsum}                                   += $socwh;                 # Hilfshash Aufsummierung SoC-Prognose (Wh) über alle Batterien
-
-          # Überschußhash für Ermittlung Mindest-Ladeleistung erstellen
-          ###############################################################
-          my $surplswh = max (0, $surpls);     
           
-          if ($today) {                                                                          # nur Heute
-			  $hsurp->{$hod}{hod}                = $hod;
-              $hsurp->{$hod}{nhr}                = $nhr;
-              $hsurp->{$hod}{surpls}             = $lcintime ? $surplswh.'.'.$hod : 0;           # Überschuß in Wh der Stunde mit Sortierhilfe 
-              $hsurp->{$hod}{$bn}{spday}         = $spday;                                       # (Rest)PV-Überschuß am laufenden Tag
-			  $hsurp->{$hod}{$bn}{whneedmanaged} = $whneed;                                      # benötigte Ladeenergie Batterie x gemäß Ladesteuerung
-              $hsurp->{$hod}{$bn}{socwh}         = $socwh;
-              $hsurp->{$hod}{$bn}{batinstcap}    = $batinstcap;
-			  $hsurp->{$hod}{$bn}{bpinmax}       = $bpinmax;                                     # max. mögliche Ladeleistung
-              $hsurp->{$hod}{$bn}{otpMargin}     = $otpMargin;                                   # Sicherheitszuschlag für Berechnungen
-			  $hsurp->{$hod}{$bn}{lcintime}      = $lcintime;                                    # Ladesteuerung "In Time" oder "nicht In Time"
-          }
- 
           # prognostizierten Daten in pvHistory speichern
           #################################################
           if ($today && $hod) {                                                                                  # heutiger Tag
@@ -11847,14 +11846,15 @@ sub _batChargeMgmt {
           
           my $stt = (split /[-:]/, $nhstt)[2];
           $stt   =~ s/\s/\//;
-          debugLog ($paref, 'batteryManagement', "Bat $bn ChargeUR $stt -> $crel ($msg)");
+          
+          debugLog ($paref, 'batteryManagement', "Bat $bn ChargeLR $stt -> $crel ($msg)");
       }
   }
   
   # leistungsoptimierte Beladungssteuerung
   ##########################################
   $paref->{hsurp} = $hsurp; 
-  __batChargeOptTargetPower ($paref);
+  my $hopt = __batChargeOptTargetPower ($paref);
   delete $paref->{hsurp};
 
   # prognostizierten SOC über alle Batterien speichern
@@ -11916,7 +11916,8 @@ sub __batChargeOptTargetPower {
   ## Kalkulation / Logik
   ########################
   for my $shod (@sorted) {
-      my $spls = int $hsurp->{$shod}{surpls};
+      my $spls    = int $hsurp->{$shod}{surpls};
+      my $newshod = sprintf "%02d", (int $shod + 1);
       
       for my $sbn (sort @batteries) {                                                                            # jede Batterie
 		  my $bpinmax = $hsurp->{$shod}{$sbn}{bpinmax};                                                          # Bat max. mögliche Ladelesitung
@@ -11938,8 +11939,8 @@ sub __batChargeOptTargetPower {
                             $hsurp->{$shod}{$sbn}{fcnextwh}         : 
                             ( $hsurp->{$shod}{nhr} eq '00' ? 
 					          $crgwh : 
-						      $hsurp->{$shod}{$sbn}{socwh}
-					        );                      
+						      $hsurp->{$shod}{$sbn}{initsocwh}
+					        );                           
           
           my $otpMargin   = $hsurp->{$shod}{$sbn}{otpMargin};
           my $margin      = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
@@ -11968,11 +11969,9 @@ sub __batChargeOptTargetPower {
                                                $needraw ? $needraw : $bpinreduced : 
                                                $spls;  
           $hsurp->{$shod}{$sbn}{pneedmin}    = min ($pneedmin, $hsurp->{$shod}{$sbn}{bpinmax});                  # Begrenzung auf max. mögliche Batterieleistung                                    
-          
-          my $newshod                        = sprintf "%02d", (int $shod + 1);
-          
+                    
           if (defined $hsurp->{$newshod}) {
-              $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin}; 
+              $hsurp->{$newshod}{$sbn}{fcnextwh} = min ($sbatinstcap, $runwh + $hsurp->{$shod}{$sbn}{pneedmin});      
           }          
           
           if ($hsurp->{$shod}{nhr} eq '00') {
@@ -12013,7 +12012,7 @@ sub __batChargeOptTargetPower {
 			                  '('.($hsurp->{$k}{$bat}{sphrs} ? $hsurp->{$k}{$bat}{sphrs} : 1).' hrs)' :
 							  '';
                               
-              my $ssoc      = $hsurp->{$k}{$bat}{runwh} // '-';
+              my $ssocwh    = $hsurp->{$k}{$bat}{runwh} // '-';
               my $otpMargin = $hsurp->{$k}{$bat}{otpMargin};
               my $margin    = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
 			  my $spls      = int $hsurp->{$k}{surpls}; 
@@ -12023,12 +12022,12 @@ sub __batChargeOptTargetPower {
                   $needmin = $otp->{$bat}{target} // 0;
               }
               
-              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssoc Wh, Surplus: $spls Wh $sphrs, OTP: $needmin W, safety: $margin %");
+              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssocwh Wh, Surplus: $spls Wh $sphrs, OTP: $needmin W, safety: $margin %");
           }
       }
   }
   
-return;
+return $hsurp;
 }
 
 ################################################################
