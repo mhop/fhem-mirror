@@ -11828,7 +11828,7 @@ sub _batChargeMgmt {
           if ($today) {                                                                          # nur Heute
 			  $hsurp->{$hod}{hod}                = $hod;
               $hsurp->{$hod}{nhr}                = $nhr;
-              $hsurp->{$hod}{surpls}             = $surplswh.'.'.$hod;                           # Überschuß in Wh der Stunde mit Sortierhilfe 
+              $hsurp->{$hod}{surpls}             = $lcintime ? $surplswh.'.'.$hod : 0;           # Überschuß in Wh der Stunde mit Sortierhilfe 
               $hsurp->{$hod}{$bn}{spday}         = $spday;                                       # (Rest)PV-Überschuß am laufenden Tag
 			  $hsurp->{$hod}{$bn}{whneedmanaged} = $whneed;                                      # benötigte Ladeenergie Batterie x gemäß Ladesteuerung
               $hsurp->{$hod}{$bn}{socwh}         = $socwh;
@@ -11916,16 +11916,17 @@ sub __batChargeOptTargetPower {
   ## Kalkulation / Logik
   ########################
   for my $shod (@sorted) {
-      my $spls = int $hsurp->{$shod}{surpls};  
-      $sphrs-- if($spls);                                                                                        # Reststunden mit Überschuß
-
+      my $spls = int $hsurp->{$shod}{surpls};
+      
       for my $sbn (sort @batteries) {                                                                            # jede Batterie
-		  if (!$hsurp->{$shod}{$sbn}{lcintime}) {                                                                # Ladesteuerung nicht "In Time"
-		      $hsurp->{$shod}{$sbn}{pneedmin} = $hsurp->{$shod}{$sbn}{bpinmax};
+		  my $bpinmax = $hsurp->{$shod}{$sbn}{bpinmax};                                                          # Bat max. mögliche Ladelesitung
+           
+          if (!$hsurp->{$shod}{$sbn}{lcintime}) {                                                                # Ladesteuerung nicht "In Time"
+		      $hsurp->{$shod}{$sbn}{pneedmin} = $bpinmax;
               
               if ($hsurp->{$shod}{nhr} eq '00') {
-                  $otp->{$sbn}{target} = $hsurp->{$shod}{$sbn}{bpinmax};
-                  storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $hsurp->{$shod}{$sbn}{bpinmax}.' W');
+                  $otp->{$sbn}{target} = $bpinmax;
+                  storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $bpinmax.' W');
               }			  
               
               next;
@@ -11969,7 +11970,10 @@ sub __batChargeOptTargetPower {
           $hsurp->{$shod}{$sbn}{pneedmin}    = min ($pneedmin, $hsurp->{$shod}{$sbn}{bpinmax});                  # Begrenzung auf max. mögliche Batterieleistung                                    
           
           my $newshod                        = sprintf "%02d", (int $shod + 1);
-          $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin} if(defined $hsurp->{$newshod});      
+          
+          if (defined $hsurp->{$newshod}) {
+              $hsurp->{$newshod}{$sbn}{fcnextwh} = $runwh + $hsurp->{$shod}{$sbn}{pneedmin}; 
+          }          
           
           if ($hsurp->{$shod}{nhr} eq '00') {
               my $target = max ($bpinreduced, $hsurp->{$shod}{$sbn}{pneedmin});
@@ -11987,11 +11991,14 @@ sub __batChargeOptTargetPower {
 
                                                                                      
               $target              = sprintf "%.0f", max ($target, $inc);                                        # Einspeiselimit berücksichtigen
+              $target              = min ($bpinmax, $target);                                                    # 2. Begrenzung auf max. mögliche Batterieleistung
               $otp->{$sbn}{target} = $target;
               
               storeReading ('Battery_ChargeOptTargetPower_'.$sbn, $target.' W');
           }                 
       }
+      
+      $sphrs-- if($spls);                                                                                        # Reststunden mit Überschuß
   }
   
   ## Debuglog
