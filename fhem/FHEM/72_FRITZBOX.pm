@@ -45,7 +45,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "08.20.04";
+my $ModulVersion = "08.20.05";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -688,10 +688,10 @@ my %FB_Model = (
        '7580'        => { version => "7.30", date => "04.09.2023"},
        '7560'        => { version => "7.30", date => "04.09.2023"},
        '7530'        => { version => "8.10", date => "28.08.2025"},
-       '7530 AX'     => { version => "8.10", date => "28.08.2025"},
+       '7530 AX'     => { version => "8.20", date => "08.09.2025"},
        '7520 B'      => { version => "8.10", date => "14.08.2025"},
        '7520'        => { version => "8.10", date => "14.08.2025"},
-       '7510'        => { version => "8.10", date => "29.08.2025"},
+       '7510'        => { version => "8.20", date => "23.09.2025"},
        '7490'        => { version => "7.60", date => "29.01.2025"},
        '7430'        => { version => "7.31", date => "04.09.2023"},
        '7412'        => { version => "6.88", date => "04.09.2023"},
@@ -728,7 +728,7 @@ my %FB_Model = (
        '6430 Cable'  => { version => "7.30", date => "04.09.2023"},
        '5690 Pro  '  => { version => "8.03", date => "06.02.2025"},
        '5590 Fiber'  => { version => "8.10", date => "04.09.2025"},
-       '5530 Fiber'  => { version => "8.02", date => "09.01.2025"},
+       '5530 Fiber'  => { version => "8.20", date => "03.09.2025"},
        '5491'        => { version => "7.31", date => "04.09.2023"},
        '5490'        => { version => "7.31", date => "04.09.2023"},
        '4690'        => { version => "8.10", date => "04.09.2025"},
@@ -751,10 +751,12 @@ my %RP_Model = (
       , 'DECT 301'         => { version => "5.23", date => "25.07.2025"},
       , 'DVB-C'            => { version => "7.04", date => "06.08.2024"},
       , '6000 v2'          => { version => "7.58", date => "16.05.2024"},
-      , '3000 AX'          => { version => "7.58", date => "16.05.2024"},
+      , '3000 AX'          => { version => "8.03", date => "27.03.2025"},
       , '3000'             => { version => "8.10", date => "29.08.2025"},
+      , '2600'             => { version => "8.06", date => "23.09.2025"},
       , '2400'             => { version => "8.10", date => "29.08.2025"},
       , '1750E'            => { version => "7.32", date => "19.03.2024"},
+      , '1700'             => { version => "8.06", date => "23.09.2025"},
       , '1200 AX'          => { version => "8.10", date => "04.09.2025"},
       , '1200'             => { version => "8.10", date => "04.09.2025"},
       , '1160'             => { version => "7.15", date => "12.09.2023"},
@@ -1304,15 +1306,51 @@ sub FRITZBOX_Delete ($$)
 ###############################################################################
 sub FRITZBOX_Rename($$)
 {
-    my ($new, $old) = @_;
+  my ($new, $old) = @_;
 
-    my $old_index = "FRITZBOX_".$old."_passwd";
-    my $new_index = "FRITZBOX_".$new."_passwd";
+  my $hash = $defs{$new};
 
-    my ($err, $old_pwd) = getKeyValue($old_index);
+  my $old_index = "FRITZBOX_".$old."_passwd";
+  my $new_index = "FRITZBOX_".$new."_passwd";
 
-    setKeyValue($new_index, $old_pwd);
-    setKeyValue($old_index, undef);
+  $hash->{NAME} = $old;
+  my $tCred = FRITZBOX_Helper_read_Password($hash);
+
+  $hash->{NAME} = $new;
+  FRITZBOX_Helper_store_Password($hash, $tCred);
+
+  $tCred = undef;
+
+  my $err = setKeyValue($old_index, undef);
+  if(defined($err)) {
+    FRITZBOX_Log $hash, 2, "unable to delete $old_index password from file: $err";
+  }
+
+  RemoveInternalTimer($hash->{helper}{TimerReadout});
+  RemoveInternalTimer($hash->{helper}{TimerCmd});
+
+  BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} )
+     if exists $hash->{helper}{READOUT_RUNNING_PID};
+
+  BlockingKill( $hash->{helper}{CMD_RUNNING_PID} )
+     if exists $hash->{helper}{CMD_RUNNING_PID};
+
+  $hash->{helper}{TimerReadout}  = $new . ".Readout";
+  $hash->{helper}{TimerCmd}      = $new . ".Cmd";
+
+  FRITZBOX_Log $hash, 3, "rename $old to $new  -> Neustart internal Timer - APICHECKED = $hash->{APICHECKED}";
+  $hash->{APICHECKED}         = 0;
+  $hash->{WEBCONNECT}         = 0;
+  $hash->{APICHECK_RET_CODES} = "-";
+  $hash->{fhem}{sidTime}      = 0;
+  $hash->{fhem}{sidErrCount}  = 0;
+  $hash->{fhem}{sidNewCount}  = 0;
+  $hash->{fhem}{LOCAL}        = 1;
+  $hash->{SID_RENEW_ERR_CNT}  = 0;
+  $hash->{SID_RENEW_CNT}      = 0;
+  FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
+  $hash->{fhem}{LOCAL} = 0;
+
 }
 
 ###############################################################################
@@ -4499,6 +4537,10 @@ sub FRITZBOX_SetGet_Proof_Params($@) {
 sub FRITZBOX_Readout_Start($)
 {
    my ($timerpara) = @_;
+
+   if (!defined $timerpara) {
+     return "ERROR: no data available for readout data";
+   }
 
    # my ( $name, $func ) = split( /\./, $timerpara );
    my $index = rindex( $timerpara, "." );    # rechter Punkt
@@ -15678,7 +15720,7 @@ sub FRITZBOX_Helper_read_Password($)
    $sub =~ s/FRITZBOX_//       if ( defined $sub );
    $sub ||= 'no-subroutine-specified';
 
-   if ($sub !~ /open_Web_Connection|call_TR064_Cmd|Set_check_APIs/) {
+   if ($sub !~ /open_Web_Connection|call_TR064_Cmd|Set_check_APIs|Rename/) {
      FRITZBOX_Log $hash, 2, "EMERGENCY: unauthorized call for reading password from: [$sub]";
      $hash->{EMERGENCY} = "Unauthorized call for reading password from: [$sub]";
      return undef;
@@ -15706,9 +15748,9 @@ sub FRITZBOX_Helper_read_Password($)
       my $dec_pwd = '';
 
       for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g)) {
-         my $decode=chop($key);
-         $dec_pwd.=chr(ord($char)^ord($decode));
-         $key=$decode.$key;
+         my $decode = chop($key);
+         $dec_pwd  .= chr(ord($char)^ord($decode));
+         $key       = $decode.$key;
       }
       
       return $dec_pwd;
