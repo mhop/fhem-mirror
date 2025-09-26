@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 72_FRITZBOX: Fehler bei rename von Devices
  - bugfix: 76_SolarForecast: opt load if battery load control is deactivated
  - change: 76_SolarForecast: Version 1.58.4
  - bugfix: 55_DWD_OpenData: replace for..when structures
