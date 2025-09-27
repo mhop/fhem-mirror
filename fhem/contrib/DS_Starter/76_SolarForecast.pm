@@ -11840,7 +11840,7 @@ sub _batChargeMgmt {
           ## Speicherung und Readings erstellen
           #######################################
           $values = { hsoc       => $hsoc,
-                      strategy   => 'loadRelease',
+                      loop       => 'LR',
                       num        => $num,
                       crel       => $crel,
                       bn         => $bn,
@@ -12045,33 +12045,40 @@ sub ___batChargeSaveResults {
   my $values = shift;
   
   my $name       = $paref->{name};
-  my $hsoc       = $values->{hsoc};
-  my $strategy   = $values->{strategy};
-  my $num        = $values->{num};
-  my $crel       = $values->{crel};
-  my $bn         = $values->{bn};
-  my $labortCond = $values->{labortCond};
-  my $loadAbort  = $values->{loadAbort};
-  my $nhr        = $values->{nhr};
-  my $progsoc    = $values->{progsoc};
-  my $lcintime   = $values->{lcintime};
-  my $cgbt       = $values->{cgbt};                                      # nur einmal bei 'loadRelease' mitgeben!
-  my $socwh      = $values->{socwh};
-  my $today      = $values->{today};
-  my $hod        = $values->{hod};
+  my $hsoc       = $values->{hsoc};                                          # Referenz SoC-Hash
+  my $bn         = $values->{bn};                                            # Batterie Nummer 
+  my $num        = $values->{num};                                           # Nexthours Schleife (0..MAXNEXTHOURS)
+  my $nhr        = $values->{nhr};                                           # zweistellige lfd. Nexthour
+  my $progsoc    = $values->{progsoc};                                       # Prognose-SoC in % 
+  my $socwh      = $values->{socwh};                                         # Prognose-SoC in Wh                                    
+  my $today      = $values->{today};                                         # Statusbit aktueller Tag
+  my $hod        = $values->{hod};                                           # Stunde des Tages
+  my $loop       = $values->{loop};                                          # in welcher Loop gestartet?
+  my $crel       = $values->{crel};                                          # nur in Schleife 'loadRelease' mitgeben
+  my $labortCond = $values->{labortCond};                                    # nur in Schleife 'loadRelease' mitgeben
+  my $loadAbort  = $values->{loadAbort};                                     # nur in Schleife 'loadRelease' mitgeben
+  my $cgbt       = $values->{cgbt};                                          # nur in Schleife 'loadRelease' mitgeben
+  my $lcintime   = $values->{lcintime};                                      # nur in Schleife 'loadRelease' mitgeben
 
-  if ($strategy eq 'loadRelease') {                                                                                  # nur in Schleife 'loadRelease' setzen
+  ## in Schleife 'loadRelease' setzen
+  #####################################  
+  if ($loop eq 'LR') {                                                                                                 # nur in Schleife 'loadRelease' setzen
       $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
+      $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);                              # nur einmal bei 'loadRelease' setzen  -> Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
       
       if (!$num) { 
           storeReading ('Battery_ChargeUnrestricted_'.$bn, $crel);                
-          storeReading ('Battery_ChargeAbort_'.$bn,  $labortCond) if ($loadAbort);                                   # Ladeabbruchbedingung
+          storeReading ('Battery_ChargeAbort_'.$bn,  $labortCond) if ($loadAbort);                                     # Ladeabbruchbedingung
+      }
+      
+      if ($today && $hod) {                                                                                      
+          writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } ) if($cgbt);  # nur einmal bei 'loadRelease' setzen 
       }
   }
   
+  
   if ($today && $hod) {                                                                                      
       writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
-      writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } ) if($cgbt);    # nur einmal bei 'loadRelease' setzen 
   }
   
   __createNextHoursSFCReadings ( {name    => $name,
@@ -12079,12 +12086,11 @@ sub ___batChargeSaveResults {
                                   bn      => $bn,
                                   progsoc => $progsoc
                                  }
-                               );                                                                                    # Readings NextHourXX_Bat_XX_ChargeForecast erstellen
+                               );                                                                                      # Readings NextHourXX_Bat_XX_ChargeForecast erstellen
 
-  $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);                                # nur einmal bei 'loadRelease' setzen  -> Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
-  $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
+  $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn} = $progsoc;
   
-  $hsoc->{$nhr}{socprogwhsum} += $socwh;                                                                             # Hilfshash Aufsummierung SoC-Prognose (Wh) über alle Batterien
+  $hsoc->{$nhr}{socprogwhsum} += $socwh;                                                                               # Hilfshash Aufsummierung SoC-Prognose (Wh) über alle Batterien
     
 return;
 }
