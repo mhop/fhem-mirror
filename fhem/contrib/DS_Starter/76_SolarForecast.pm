@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.58.6" => "25.09.2025  __batChargeMgmt code changed, new sub ___batChargeSaveResults, remove reading Battery_ChargeRecommended_XX ".
+                           "_calcReadingsTomorrowPVFc: bugfix generating readings of tomorrow ",
   "1.58.5" => "24.09.2025  __batChargeOptTargetPower: fix if battery load control is deactivated ",
   "1.58.4" => "23.09.2025  __batChargeOptTargetPower: user a better surplus value, excess based on average removed & some other code optimization ",
   "1.58.3" => "17.09.2025  __batChargeOptTargetPower: minor code change, consider bpinmax & lcintime ",
@@ -7465,7 +7467,6 @@ sub _attrBatteryDev {                    ## no critic "not used"
       readingsDelete    ($hash, 'Current_PowerBatOut_'.$bn);
       readingsDelete    ($hash, 'Current_BatCharge_'.$bn);
       readingsDelete    ($hash, 'Battery_ChargeOptTargetPower_'.$bn);
-      readingsDelete    ($hash, 'Battery_ChargeRecommended_'.$bn);
       readingsDelete    ($hash, 'Battery_ChargeUnrestricted_'.$bn);
       readingsDelete    ($hash, 'Battery_ChargeRequest_'.$bn);
       readingsDelete    ($hash, 'Battery_OptimumTargetSoC_'.$bn);
@@ -8913,6 +8914,11 @@ sub centralTask {
       if ($surpmeth =~ /^[2-9]$|^1[0-9]$|^20$/xs) {
           fhem ("set $name attrKeyVal consumer${c} surpmeth=average_${surpmeth}"); 
       }
+  }
+  
+  for my $bn (1..MAXBATTERIES) {                                        # 02.10.
+      $bn = sprintf "%02d", $bn;
+      readingsDelete ($hash, 'Battery_ChargeRecommended_'.$bn);
   }
   
   
@@ -11593,6 +11599,10 @@ sub _batChargeMgmt {
   my $bpin      = CurrentVal  ($name, 'batpowerinsum',            0);                            # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
   my $gfeedin   = CurrentVal  ($name, 'gridfeedin',               0);                            # aktuelle Netzeinspeisung
   my $inplim    = 0;
+  
+  my $hsurp  = {};                                                                               # Hashreferenz Überschuß
+  my $hsoc   = {};                                                                               # Hashreferenz 
+  my $values = {};                                                                               # Hashreferenz
 
   ## Inverter Limits ermitteln
   ##############################
@@ -11616,10 +11626,7 @@ sub _batChargeMgmt {
   debugLog ($paref, 'batteryManagement', "ChargeMgmt - The limit for grid feed-in is: $feedinlim W");
 
   ## Schleife über alle Batterien
-  #################################
-  my %hsoc;                                                                                      # Hilfshash
-  my $hsurp = {};                                                                                # Hashreferenz Überschuß
-
+  #################################  
   for my $bn (1..MAXBATTERIES) {                                                                 # für jede Batterie
       $bn = sprintf "%02d", $bn;
       
@@ -11691,8 +11698,8 @@ sub _batChargeMgmt {
       my $socwh       = sprintf "%.0f", ($batinstcap * $csoc / 100);                            # aktueller SoC in Wh
       my $whneed      = $batinstcap - $socwh;
       
-      # Debug Log
-      #############
+      # Debuglog
+      ############
       if ($paref->{debug} =~ /batteryManagement/) {
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - General load termination condition: $labortCond");
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - control time Slot - Slot start: $lcstart, Slot end: $lcend");
@@ -11744,8 +11751,8 @@ sub _batChargeMgmt {
           $tomconfc = sprintf "%.0f", ($sf * $tomconfc);
           $tompvfc  = sprintf "%.0f", ($sf * $tompvfc);
 
-          ## PV-Überschuß und (Rest)Tagesüberschuß
-          ##########################################     
+          ## PV-Überschuß und (Rest)Tagesüberschuß heute/morgen
+          #######################################################    
           if ($today) {                                                                          # heutiger Tag
               $confcss  -= $confc;                                                               # Verbrauch bis Sonnenuntergang - Verbrauch Fc aktuelle Stunde
               $confcss   = 0 if($confcss < 0);
@@ -11761,7 +11768,7 @@ sub _batChargeMgmt {
           }
 
           $spday     = 0 if($spday < 0);                                                         # PV Überschuß Prognose bis Sonnenuntergang
-          my $surpls = sprintf "%.0f", ($pvfc - $confc);                                         # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0
+          my $surpls = sprintf "%.0f", ($pvfc - $confc);                                         # PV-Überschuß der Stunde, wichtig keine Nachkommastellen!
           
           ## Steuerung nach Ladefreigabe
           ################################
@@ -11790,8 +11797,8 @@ sub _batChargeMgmt {
           }
           
           ## SOC-Prognose
-          #################                                                                      # change V 1.47.0
-          my $fceff  = $surpls;                                                                  # wichtig keine Nachkommastellen!
+          #################                                                                      
+          my $fceff  = $surpls;                                                                  # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0                                                             
 		  
 		  $fceff    = $fceff > 0 ? ($fceff >= $bpinmax       ? $bpinmax       : $fceff) :
                       $fceff < 0 ? ($fceff <= $bpoutmax * -1 ? $bpoutmax * -1 : $fceff) :
@@ -11807,13 +11814,12 @@ sub _batChargeMgmt {
 
           $socwh      = sprintf "%.0f", $socwh;     
           my $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                            # Prognose SoC in %
-
-          __createNextHoursSFCReadings ( {name    => $name,
-                                          nhr     => $nhr,
-                                          bn      => $bn,
-                                          progsoc => $progsoc
-                                         }
-                                       );                                                        # Readings NextHourXX_Bat_XX_ChargeForecast erstellen
+          
+          
+          ## Debuglog LR
+          ################
+          my $stt = (split /[-:]/, $nhstt)[2];
+          $stt   =~ s/\s/\//;
 
           my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W, inTime: ".($cgbt ? $lcintime : '-');
 
@@ -11824,50 +11830,80 @@ sub _batChargeMgmt {
                   $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, roTomPV: $tompvfc, roTomCON: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
               }
           }
-          else {
-              storeReading ('Battery_ChargeRecommended_'.$bn,  $crel); 
-              storeReading ('Battery_ChargeUnrestricted_'.$bn, $crel);                
-              storeReading ('Battery_ChargeAbort_'.$bn,  $labortCond) if ($loadAbort);           # Ladeabbruchbedingung
-          }
-
-          $whneed = $batinstcap - $socwh;
-
-          $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
-          $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
-          $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);    # Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
-          $hsoc{$nhr}{socprogwhsum}                                   += $socwh;                 # Hilfshash Aufsummierung SoC-Prognose (Wh) über alle Batterien
-          
-          # prognostizierten Daten in pvHistory speichern
-          #################################################
-          if ($today && $hod) {                                                                                  # heutiger Tag
-              writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
-              writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } ) if($cgbt);
-          }
-          
-          my $stt = (split /[-:]/, $nhstt)[2];
-          $stt   =~ s/\s/\//;
           
           debugLog ($paref, 'batteryManagement', "Bat $bn ChargeLR $stt -> $crel ($msg)");
+
+          ## Fortschreibung
+          ###################
+          $whneed = $batinstcap - $socwh;
+          
+          ## Speicherung und Readings erstellen
+          #######################################
+          $values = { hsoc       => $hsoc,
+                      strategy   => 'loadRelease',
+                      num        => $num,
+                      crel       => $crel,
+                      bn         => $bn,
+                      labortCond => $labortCond,
+                      loadAbort  => $loadAbort,
+                      nhr        => $nhr,
+                      progsoc    => $progsoc,
+                      lcintime   => $lcintime,
+                      cgbt       => $cgbt,
+                      socwh      => $socwh,
+                      today      => $today,
+                      hod        => $hod,
+                   };
+
+          ___batChargeSaveResults ($paref, $values);
       }
   }
   
   # leistungsoptimierte Beladungssteuerung
   ##########################################
   $paref->{hsurp} = $hsurp; 
-  my $hopt = __batChargeOptTargetPower ($paref);
+  my ($hopt, $otp) = __batChargeOptTargetPower ($paref);
   delete $paref->{hsurp};
+  
+  ## Debuglog OTP
+  #################
+  if ($paref->{debug} =~ /batteryManagement/) {
+	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - The limit for grid feed-in is $feedinlim W");
+	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - NOTE: The hours listed below are the estimated number of hours remaining on the current day with at least the respective PV surplus.");
+	  
+      for my $k (sort { $a <=> $b } keys %{$hopt}) {
+          my @batteries = grep { !/^(?:hod|surpls|nhr)$/xs } keys %{$hsurp->{24}};
+          for my $bat (sort @batteries) {
+			  my $sphrs     = defined $hopt->{$k}{$bat}{sphrs} ?
+			                  '('.($hopt->{$k}{$bat}{sphrs} ? $hopt->{$k}{$bat}{sphrs} : 1).' hrs)' :
+							  '';
+                              
+              my $ssocwh    = $hopt->{$k}{$bat}{runwh} // '-';
+              my $otpMargin = $hopt->{$k}{$bat}{otpMargin};
+              my $margin    = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
+			  my $spls      = int $hopt->{$k}{surpls}; 
+              my $needmin   = max (BatteryVal ($name, $bat, 'bpinreduced', 0), $hopt->{$k}{$bat}{pneedmin} // 0); 
+              
+              if ($hopt->{$k}{nhr} eq '00') {                                                                # Target für aktuelle Stunde
+                  $needmin = $otp->{$bat}{target} // 0;
+              }
+              
+              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssocwh Wh, Surplus: $spls Wh $sphrs, OTP: $needmin W, safety: $margin %");
+          }
+      }
+  }
 
   # prognostizierten SOC über alle Batterien speichern
   ######################################################
-  for my $nhr (keys %hsoc) {
-      if (defined $hsoc{$nhr}{socprogwhsum}) {
-          $data{$name}{nexthours}{'NextHour'.$nhr}{socprogwhsum} = $hsoc{$nhr}{socprogwhsum};
+  for my $nhr (keys %{$hsoc}) {
+      if (defined $hsoc->{$nhr}{socprogwhsum}) {
+          $data{$name}{nexthours}{'NextHour'.$nhr}{socprogwhsum} = $hsoc->{$nhr}{socprogwhsum};
 
           my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today',      0);
           my $hod   = NexthoursVal ($name, 'NextHour'.$nhr, 'hourofday', '');
 
           if ($today && $hod) {                                                                                  # heutiger Tag
-              writeToHistory ( { paref => $paref, key => 'socprogwhsum', val => $hsoc{$nhr}{socprogwhsum}, hour => $hod } );
+              writeToHistory ( { paref => $paref, key => 'socprogwhsum', val => $hsoc->{$nhr}{socprogwhsum}, hour => $hod } );
           }
       }
   }
@@ -11913,8 +11949,6 @@ sub __batChargeOptTargetPower {
   my @batteries = grep { !/^(?:hod|surpls|nhr)$/xs } keys %{$hsurp->{24}};
   my $otp;
 
-  ## Kalkulation / Logik
-  ########################
   for my $shod (@sorted) {
       my $spls    = int $hsurp->{$shod}{surpls};
       my $newshod = sprintf "%02d", (int $shod + 1);
@@ -12000,34 +12034,59 @@ sub __batChargeOptTargetPower {
       $sphrs-- if($spls);                                                                                        # Reststunden mit Überschuß
   }
   
-  ## Debuglog
-  #############  
-  if ($paref->{debug} =~ /batteryManagement/) {
-	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - The limit for grid feed-in is $fipl W");
-	  Log3 ($name, 1, "$name DEBUG> ChargeOTP - NOTE: The hours listed below are the estimated number of hours remaining on the current day with at least the respective PV surplus.");
-	  
-      for my $k (sort { $a <=> $b } keys %{$hsurp}) {
-          for my $bat (sort @batteries) {
-			  my $sphrs     = defined $hsurp->{$k}{$bat}{sphrs} ?
-			                  '('.($hsurp->{$k}{$bat}{sphrs} ? $hsurp->{$k}{$bat}{sphrs} : 1).' hrs)' :
-							  '';
-                              
-              my $ssocwh    = $hsurp->{$k}{$bat}{runwh} // '-';
-              my $otpMargin = $hsurp->{$k}{$bat}{otpMargin};
-              my $margin    = defined $otpMargin ? $otpMargin : SFTYMARGIN_20;
-			  my $spls      = int $hsurp->{$k}{surpls}; 
-              my $needmin   = max (BatteryVal ($name, $bat, 'bpinreduced', 0), $hsurp->{$k}{$bat}{pneedmin} // 0); 
-              
-              if ($hsurp->{$k}{nhr} eq '00') {                                                                # Target für aktuelle Stunde
-                  $needmin = $otp->{$bat}{target} // 0;
-              }
-              
-              Log3 ($name, 1, "$name DEBUG> Bat $bat ChargeOTP - hod: $k, Start SoC: $ssocwh Wh, Surplus: $spls Wh $sphrs, OTP: $needmin W, safety: $margin %");
-          }
+return ($hsurp, $otp);
+}
+
+################################################################
+#   Speicherung Ergebnisse aus Batterie Lademanagement
+################################################################       
+sub ___batChargeSaveResults {
+  my $paref  = shift;
+  my $values = shift;
+  
+  my $name       = $paref->{name};
+  my $hsoc       = $values->{hsoc};
+  my $strategy   = $values->{strategy};
+  my $num        = $values->{num};
+  my $crel       = $values->{crel};
+  my $bn         = $values->{bn};
+  my $labortCond = $values->{labortCond};
+  my $loadAbort  = $values->{loadAbort};
+  my $nhr        = $values->{nhr};
+  my $progsoc    = $values->{progsoc};
+  my $lcintime   = $values->{lcintime};
+  my $cgbt       = $values->{cgbt};                                      # nur einmal bei 'loadRelease' mitgeben!
+  my $socwh      = $values->{socwh};
+  my $today      = $values->{today};
+  my $hod        = $values->{hod};
+
+  if ($strategy eq 'loadRelease') {                                                                                  # nur in Schleife 'loadRelease' setzen
+      $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
+      
+      if (!$num) { 
+          storeReading ('Battery_ChargeUnrestricted_'.$bn, $crel);                
+          storeReading ('Battery_ChargeAbort_'.$bn,  $labortCond) if ($loadAbort);                                   # Ladeabbruchbedingung
       }
   }
   
-return $hsurp;
+  if ($today && $hod) {                                                                                      
+      writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
+      writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } ) if($cgbt);    # nur einmal bei 'loadRelease' setzen 
+  }
+  
+  __createNextHoursSFCReadings ( {name    => $name,
+                                  nhr     => $nhr,
+                                  bn      => $bn,
+                                  progsoc => $progsoc
+                                 }
+                               );                                                                                    # Readings NextHourXX_Bat_XX_ChargeForecast erstellen
+
+  $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);                                # nur einmal bei 'loadRelease' setzen  -> Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
+  $data{$name}{nexthours}{'NextHour'.$nhr}{'soc'.$bn}          = $progsoc;
+  
+  $hsoc->{$nhr}{socprogwhsum} += $socwh;                                                                             # Hilfshash Aufsummierung SoC-Prognose (Wh) über alle Batterien
+    
+return;
 }
 
 ################################################################
@@ -14316,23 +14375,25 @@ return;
 #      erstellen
 ################################################################
 sub _calcReadingsTomorrowPVFc {
-  my $paref  = shift;
-  my $name   = $paref->{name};
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};
 
   my $hash = $defs{$name};
   my $h    = $data{$name}{nexthours};
   my $hods = AttrVal ($name, 'ctrlNextDayForecastReadings', '');
 
   return if(!keys %{$h} || !$hods);
+  
+  my $dt     = timestringsFromOffset ($t, 86400);
+  my $tmoday = $dt->{day};                                                                            # Tomorrow Day (01..31)
 
   for my $idx (sort keys %{$h}) {
-      my $today = NexthoursVal ($hash, $idx, 'today', 1);
-      next if($today);                                                               # aktueller Tag wird nicht benötigt
+      my $day = NexthoursVal ($hash, $idx, 'day', 'dd');
+      next if($day ne $tmoday);                                                                       # aktueller Tag wird nicht benötigt
 
       my $hod = NexthoursVal ($hash, $idx, 'hourofday', '');
-      next if(!$hod);
-
-      next if($hods !~ /$hod/xs);                                                    # diese Stunde des Tages soll nicht erzeugt werden
+      next if(!$hod || $hods !~ /$hod/xs);                                                            # diese Stunde des Tages soll nicht erzeugt werden
 
       my $pvfc = NexthoursVal ($hash, $idx, 'pvfc', 0);
 
