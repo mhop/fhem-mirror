@@ -14380,15 +14380,14 @@ sub _calcReadingsTomorrowPVFc {
   my $t     = $paref->{t};
 
   my $hash = $defs{$name};
-  my $h    = $data{$name}{nexthours};
   my $hods = AttrVal ($name, 'ctrlNextDayForecastReadings', '');
 
-  return if(!keys %{$h} || !$hods);
+  return if(!$hods || !keys %{$data{$name}{nexthours}});
   
   my $dt     = timestringsFromOffset ($t, 86400);
   my $tmoday = $dt->{day};                                                                            # Tomorrow Day (01..31)
 
-  for my $idx (sort keys %{$h}) {
+  for my $idx (sort keys %{$data{$name}{nexthours}}) {
       my $day = NexthoursVal ($hash, $idx, 'day', 'dd');
       next if($day ne $tmoday);                                                                       # aktueller Tag wird nicht benötigt
 
