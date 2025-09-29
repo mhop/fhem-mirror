@@ -5166,6 +5166,31 @@ sub get_color {
   return(int($color),$minColor,$maxColor);
 }
 
+sub nice_scale {
+    my ($data_min, $data_max, $ticks) = @_;
+    my $span = $data_max - $data_min;
+    return ($data_min,$data_max, $ticks) if ($span==0);
+    my $raw_step = $span / ($ticks - 1);
+        my $mag  = 10 **  POSIX::floor(log($raw_step)/log(10));
+    my $norm = $raw_step / $mag;
+
+    my $nice_norm;
+    if    ($norm < 1.5) { $nice_norm = 1; }
+    elsif ($norm < 3)   { $nice_norm = 2; }
+    elsif ($norm < 7)   { $nice_norm = 5; }
+    else                { $nice_norm = 10; }
+
+    my $step = $nice_norm * $mag;
+
+    my $nice_min = POSIX::floor($data_min / $step) * $step;
+    my $nice_max = POSIX::ceil($data_max / $step) * $step;
+    
+    my $lines = int(($nice_max-$nice_min)/$step+0.5);
+    
+    return ($nice_min, $nice_max, $lines);
+}
+
+
 
 sub plot {
   
@@ -5176,6 +5201,7 @@ sub plot {
   my $points="";
   my $v;
   my $last;
+  my $outDescript="";
   my $out="";
   my $yNull;
   my $nullColor;
@@ -5187,7 +5213,6 @@ sub plot {
   my $nullOpacity;
   my $minPlot;
   my $maxPlot;
-  my $scaling=0;
   $unit="" if (!defined $unit);
 
   my $val=${$collect}{value};
@@ -5228,12 +5253,11 @@ sub plot {
 
   $minVal=$value if (!defined $minVal);
   $maxVal=$value if (!defined $maxVal);
-
- ##my ($maxValColor)=get_color($maxVal,$min,$max,$minColor,$maxColor,$func);
- ##my ($minValColor)=get_color($minVal,$min,$max,$minColor,$maxColor,$func); 
+  
+  my $autoScaling = ($plot ne "1");
   
   if ($plot ne "1" and $minVal ne $maxVal) {
-    $scaling=1;
+    $autoScaling=1;
     if ($val ne "N/A") {
       $minPlot=($value < $minVal ? $value : $minVal);
       $maxPlot=($value > $maxVal ? $value : $maxVal);
@@ -5242,20 +5266,29 @@ sub plot {
       $maxPlot=$maxVal;
     }
   } else {
-    my $minimum;
-    my $maximum;
+    my $minimum = ($min<$minVal) ? $min:$minVal;
+    my $maximum = ($max>$maxVal) ? $max:$maxVal;
     if ($val ne "N/A") {
-      $minimum=(($value<$min and $value<$minVal) ? $value:($min<$minVal) ? $min:$minVal);
-      $maximum=(($value>$max and $value>$maxVal) ? $value:($max>$maxVal) ? $max:$maxVal);
-    } else {
-      $minimum=(($min<$minVal) ? $min:$minVal);
-      $maximum=(($max>$maxVal) ? $max:$maxVal);
+       if ($value < $minimum) {
+         $minimum=$value;
+         $autoScaling=1;
+       }
+       if ($value > $maximum) {
+         $maximum=$value; 
+         $autoScaling=1;
+       }
     }
     $minPlot=(($min < 0 and $minVal > 0) ? 0 : $minimum);
     $maxPlot=(($max > 0 and $maxVal < 0) ? 0 : $maximum);
-  }
+    if ($minVal < $min or $maxVal > $max) {
+      $autoScaling=1;  
+    }      
+ }
+ 
+  my $lines=5;
+  ($minPlot,$maxPlot,$lines)=nice_scale($minPlot,$maxPlot,5) if ($autoScaling);
+  my ($m,$n)=m_n($minPlot,0,$maxPlot,50); 
   
-  my ($m,$n)=m_n($minPlot,0,$maxPlot,50);
   my $currColor;
   ($currColor,$minColor,$maxColor)=get_color($value,$min,$max,$minColor,$maxColor,$func);
  
@@ -5322,12 +5355,18 @@ sub plot {
   }
   $out.= '</defs>';
   
+
+  for (my $i=0;$i<=$lines;$i++) {
+    my $y=$i*int((50/$lines)*3)/3;
+    $outDescript.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1"/>',$y,$chart_dim,$y);
+  }
+ 
   if ($noColor ne "-1") {
-    for (my $i=0;$i<=5;$i++) {
-      my $v=($maxPlot-$minPlot)*(1-$i*0.2)+$minPlot;
-      my ($color)= get_color($v,$min,$max,$minColor,$maxColor,$func); 
-      $out.= sprintf('<text text-anchor="%s" x="%s" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$anchor,$pos,$i*10+2,$noColor eq "1" ? "#CCCCCC":color($color,$lmm),"",sprintf($decform,$v)); 
-    } 
+     for (my $i=0;$i<=$lines;$i++) {
+       my $v=($maxPlot-$minPlot)*(1-$i*(1/$lines))+$minPlot;
+       my ($color)= get_color($v,$min,$max,$minColor,$maxColor,$func); 
+       $outDescript.= sprintf('<text text-anchor="%s" x="%s" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$anchor,$pos,int(($i*(50/$lines)+2)*3)/3,$noColor eq "1" ? "#CCCCCC":color($color,$lmm),"",sprintf($decform,$v)); 
+     } 
   }
   
   my $footer="";
@@ -5368,7 +5407,6 @@ sub plot {
       for (my $j=0; $j < $dim; $j++) {
         my $num;
         if ($numOrig == 1) {
-          ##if ($j < $period1 or $j == $period1 and defined ${$a}[($i)*$dim+$j]) {
           if (defined ${$a}[($i)*$dim+$j]) {
             $num = 1;
           } else {
@@ -5386,8 +5424,8 @@ sub plot {
             $out.= sprintf('<rect x="%s" y="%s" width="%s" height="%s" rx="0.5" ry="0.5" style="fill:%s" opacity="1"/>',$x,$yNull-$y_pos,$barWide,$y_pos,defined $unitColor ? $unitColor:color($color));
             $out.= sprintf('<rect x="%s" y="%s" width="%s" height="%s" rx="0.5" ry="0.5" style="fill:url(#grad%s)"/>',$x,$yNull-$y_pos+0.1,$barWide,$y_pos-0.1,($i==$num-1 ? "bright" : "dark"));
           } else {
-             $out.= sprintf('<rect x="%s" y="%s" width="%s" height="%s" rx="0.5" ry="0.5" style="fill:%s" opacity="1"/>',$x,$yNull,$barWide,-$y_pos,defined $unitColor ? $unitColor:color($color));
-             $out.= sprintf('<rect x="%s" y="%s" width="%s" height="%s" rx="0.5" ry="0.5" style="fill:url(#grad%s)"/>',$x,$yNull,$barWide,-$y_pos-0.1,($i==$num-1 ? "bright" : "dark"));
+            $out.= sprintf('<rect x="%s" y="%s" width="%s" height="%s" rx="0.5" ry="0.5" style="fill:%s" opacity="1"/>',$x,$yNull,$barWide,-$y_pos,defined $unitColor ? $unitColor:color($color));
+            $out.= sprintf('<rect x="%s" y="%s" width="%s" height="%s" rx="0.5" ry="0.5" style="fill:url(#grad%s)"/>',$x,$yNull,$barWide,-$y_pos-0.1,($i==$num-1 ? "bright" : "dark"));
           }
         }
       }
@@ -5397,10 +5435,8 @@ sub plot {
 
     my ($x1,$y1);
     if (defined $maxValSlot) {
-    # ($x1,$y1)=(int(($xOffset+($maxValSlot % $dim)*$wide+($numOrig-1-int ($maxValSlot / $dim))*$xBar+$barWide/2)*10)/10 ,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10)-2.3);
       ($x1,$y1)=(int(($xOffset+($maxValSlot % $dim)*$wide+($numOrig-1-($numOrig == 1 ?  0: int ($maxValSlot / $dim)))*$xBar+$barWide/2)*10)/10 ,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10)-2.3);
       $out.=sprintf('<path d="M%s %s L%s %s L%s %s Z" fill="%s" opacity="0.5"/>',$x1,$y1,$x1+2.4,$y1+4.3,$x1-2.4,$y1+4.3, defined $unitColor ? $unitColor:color($maxValColor,$ln));
-    #  ($x1,$y1)=(int(($xOffset+($minValSlot % $dim)*$wide+($numOrig-1-int($minValSlot / $dim))*$xBar+$barWide/2)*10)/10,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10)+2.3);
       ($x1,$y1)=(int(($xOffset+($minValSlot % $dim)*$wide+($numOrig-1-($numOrig == 1 ?  0: int ($minValSlot / $dim)))*$xBar+$barWide/2)*10)/10,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10)+2.3);
       $out.=sprintf('<path d="M%s %s L%s %s L%s %s Z" fill="%s" opacity="0.5"/>',$x1,$y1,$x1+2.4,$y1-4.3,$x1-2.4,$y1-4.3, defined $unitColor ? $unitColor:color($minValColor,$ln)) if (defined $minValSlot);
     }
@@ -5495,7 +5531,7 @@ sub plot {
       }
     }
   } # col
-  return($out,$footer);
+  return($outDescript,$out,$footer);
 }
 
 
@@ -5872,12 +5908,8 @@ $out.= sprintf ('<svg class="DOIF_card" id="%d %d" xmlns="http://www.w3.org/2000
 
   $out.= '<rect x="-2" y="-3" width="'.($chart_dim+4).'" height="56" rx="1" ry="1" fill="url(#gradcardback)"/>';
 
-  for (my $i=1;$i<5;$i++) {
-    my $y=$i*10;
-    $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1"/>',$y,$chart_dim,$y);
-  }
-
-  my ($outplot,$outfooter);
+ 
+  my ($outDescript,$outplot,$outfooter);
   my @outfooter;
 
   if ($type eq "bar") {
@@ -5937,14 +5969,18 @@ $out.= sprintf ('<svg class="DOIF_card" id="%d %d" xmlns="http://www.w3.org/2000
     }
     
     my $j=0;
+    my $outD="";
+    my $outP="";
     for (my $i=0;$i<@value1;$i++) {
       if (defined $value1[$i]{dim}) {
-        ($outplot,$outfooter) = plot ($value1[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $noColor,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$j*10,undef,-2.5,"end",(defined $unit1[$i]?(split(",",$unit1[$i]))[1] : undef),(defined $unit1[$i] ? ( split(",",$unit1[$i]))[0] : undef));
+        ($outDescript,$outplot,$outfooter) = plot ($value1[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $noColor,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$j*10,undef,-2.5,"end",(defined $unit1[$i]?(split(",",$unit1[$i]))[1] : undef),(defined $unit1[$i] ? ( split(",",$unit1[$i]))[0] : undef));
         $j++;
-        $out.=$outplot;
+        $outD.=$outDescript if ($outD eq "");
+        $outP.=$outplot;
         push (@outfooter,$outfooter);
       }
     }
+    $out.=$outD.$outP;
     $out.= '</g>';
     $out.= '</svg>';
   } else { ## col   
@@ -6026,11 +6062,14 @@ $out.= sprintf ('<svg class="DOIF_card" id="%d %d" xmlns="http://www.w3.org/2000
       }
     }
     my $j=0;
+    my $outD="";
+    my $outP="";
     for (my $i=0;$i<@value1;$i++) {
       if (defined $value1[$i]{dim}) {
-        ($outplot,$outfooter) = plot ($value1[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$j*10,undef,-2.5,"end",(defined $unit1[$i]?(split(",",$unit1[$i]))[1] : undef),(defined $unit1[$i] ? ( split(",",$unit1[$i]))[0] : undef));
+        ($outDescript,$outplot,$outfooter) = plot ($value1[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$j*10,undef,-2.5,"end",(defined $unit1[$i]?(split(",",$unit1[$i]))[1] : undef),(defined $unit1[$i] ? ( split(",",$unit1[$i]))[0] : undef));
         $j++;
-        $out.=$outplot;
+        $outD.=$outDescript if ($outD eq "");
+        $outP.=$outplot;
         push (@outfooter,$outfooter);
       }
     }
@@ -6047,15 +6086,19 @@ $out.= sprintf ('<svg class="DOIF_card" id="%d %d" xmlns="http://www.w3.org/2000
       }
       my $offset=@outfooter*10;
       my $j=0;
+      my $outD2="";
       for (my $i=0;$i<@value2;$i++) {
         if (defined $value2[$i]{dim}) {
-          ($outplot,$outfooter) = plot ($value2[$i],[$min2,$minVal2],[$max2,$maxVal2],$minColor2,$maxColor2,$dec2,$func2,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$offset+$j*10,undef,$chart_dim+3,"start",(defined $unit2[$i]?(split(",",$unit2[$i]))[1] : undef),(defined $unit2[$i] ? ( split(",",$unit2[$i]))[0] : undef));
+          ($outDescript,$outplot,$outfooter) = plot ($value2[$i],[$min2,$minVal2],[$max2,$maxVal2],$minColor2,$maxColor2,$dec2,$func2,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$offset+$j*10,undef,$chart_dim+3,"start",(defined $unit2[$i]?(split(",",$unit2[$i]))[1] : undef),(defined $unit2[$i] ? ( split(",",$unit2[$i]))[0] : undef));
           $j++;
-          $out.=$outplot;
+          $outD2.=$outDescript if ($outD2 eq "");
+          $outP.=$outplot;
           push (@outfooter,$outfooter);
         }
       }
+      $outD.=$outD2;
     }
+    $out.=$outD.$outP;
     $out.= '</g>';
     $out.= '</svg>';
 
