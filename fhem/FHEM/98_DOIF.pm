@@ -5286,12 +5286,7 @@ sub plot {
  }
  
   my $lines=5;
-  if ($autoScaling) {
-    ($minPlot,$maxPlot,$lines)=nice_scale($minPlot,$maxPlot,6);
-    if ($lines >= 7) {
-      ($minPlot,$maxPlot,$lines)=nice_scale($minPlot,$maxPlot,5);
-    }
-  }
+  ($minPlot,$maxPlot,$lines)=nice_scale($minPlot,$maxPlot,5) if ($autoScaling);
   my ($m,$n)=m_n($minPlot,0,$maxPlot,50); 
   
   my $currColor;
