@@ -21,7 +21,7 @@
 #       You should have received a copy of the GNU General Public License
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#       This copyright notice MUST APPEAR in all copies of the script!
+#       This copyright notice MUST APPEAR in all copies of the script! 
 #
 #########################################################################################################################
 #
