@@ -5356,16 +5356,13 @@ sub plot {
   $out.= '</defs>';
   
 
-  for (my $i=0;$i<=$lines;$i++) {
-    my $y=$i*int((50/$lines)*3)/3;
-    $outDescript.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1"/>',$y,$chart_dim,$y);
-  }
- 
   if ($noColor ne "-1") {
      for (my $i=0;$i<=$lines;$i++) {
+       my $y=$i*int((50/$lines)*10)/10;
        my $v=($maxPlot-$minPlot)*(1-$i*(1/$lines))+$minPlot;
+       $outDescript.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1"/>',$y,$chart_dim,$y);
        my ($color)= get_color($v,$min,$max,$minColor,$maxColor,$func); 
-       $outDescript.= sprintf('<text text-anchor="%s" x="%s" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$anchor,$pos,int(($i*(50/$lines)+2)*3)/3,$noColor eq "1" ? "#CCCCCC":color($color,$lmm),"",sprintf($decform,$v)); 
+       $outDescript.= sprintf('<text text-anchor="%s" x="%s" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$anchor,$pos,$y+2.4,$noColor eq "1" ? "#CCCCCC":color($color,$lmm),"",sprintf($decform,$v)); 
      } 
   }
   
@@ -7403,7 +7400,7 @@ Syntax FHEM-Modus:<br>
 <br>
 Die Angaben werden immer von links nach rechts abgearbeitet. Logische Abfragen werden in DOIF/DOELSEIF-Bedingungen vornehmlich mit Hilfe von and/or-Operatoren erstellt. 
 Zu beachten ist, dass nur die Bedingungen überprüft werden,
-die zum ausgelösten Event das dazughörige Device bzw. die dazugehörige Triggerzeit beinhalten.
+die zum ausgelösten Event das dazughörige Device bzw. die dazugehörige Triggerzeit beinhalten. Dieses Verhalten kann mit Hilfe des Attributes checkall geändert werden.
 Kommt ein Device in mehreren Bedingungen vor, so wird immer nur ein Kommando ausgeführt, und zwar das erste,
 für das die dazugehörige Bedingung in der abgearbeiteten Reihenfolge wahr ist.<br><br>
 Das DOIF-Modul arbeitet mit Zuständen. Jeder Ausführungszweig DOIF/DOELSEIF..DOELSEIF/DOELSE stellt einen eigenen Zustand dar (cmd_1, cmd_2, usw.).
