@@ -162,7 +162,8 @@ BEGIN {
 my %vNotesIntern = (
   "1.58.6" => "03.10.2025  __batChargeMgmt code changed, new sub ___batChargeSaveResults, remove reading Battery_ChargeRecommended_XX ".
                            "_calcReadingsTomorrowPVFc: bugfix generating readings of tomorrow ".
-                           "__batChargeOptTargetPower: complete rework, Attr ctrlBatSocManagementXX new keys 'loadStrategy', 'weightOwnUse' ",
+                           "__batChargeOptTargetPower: complete rework, Attr ctrlBatSocManagementXX new keys 'loadStrategy', 'weightOwnUse' ".
+                           "new battery key setupBatteryDevXX->efficiency ",
   "1.58.5" => "24.09.2025  __batChargeOptTargetPower: fix if battery load control is deactivated ",
   "1.58.4" => "23.09.2025  __batChargeOptTargetPower: user a better surplus value, excess based on average removed & some other code optimization ",
   "1.58.3" => "17.09.2025  __batChargeOptTargetPower: minor code change, consider bpinmax & lcintime ",
@@ -466,7 +467,7 @@ use constant {
   PRDEF          => 0.9,                                                            # default Performance Ratio (PR)
   SFTYMARGIN_20  => 20,                                                             # Sicherheitszuschlag 20%
   SFTYMARGIN_50  => 50,                                                             # Sicherheitszuschlag 50%
-  STOREFFDEF     => 0.90,                                                           # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
+  STOREFFDEF     => 87,                                                             # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
   TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
   TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
   TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
@@ -7410,6 +7411,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       show       => { comp => '(?:[0-3](?::(?:top|bottom))?)',                must => 0, act => 0 },
       label      => { comp => '(none|below|beside)',                          must => 0, act => 0 },
       asynchron  => { comp => '(0|1)',                                        must => 0, act => 0 },
+      efficiency => { comp => '(100|[1-9]?[0-9])',                            must => 0, act => 0 },
   };
 
   if ($paref->{cmd} eq 'set') {      
@@ -7467,6 +7469,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{batteries}{$bn}{bpinmax}; 
       delete $data{$name}{batteries}{$bn}{bpinreduced};
       delete $data{$name}{batteries}{$bn}{bpoutmax};
+      delete $data{$name}{batteries}{$bn}{befficiency};
   }
   elsif ($paref->{cmd} eq 'del') {
       readingsDelete    ($hash, 'Current_PowerBatIn_'.$bn);
@@ -7526,7 +7529,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
       loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',      must => 0, act => 0 },
       safetyMargin => { comp => '(?:100|[1-9]?\d)(?::(?:100|[1-9]?\d))?',                must => 0, act => 0 },
       loadStrategy => { comp => '(loadRelease|optPower)',                                must => 0, act => 0 },
-      weightOwnUse => { comp => '(?:100|[1-9]?\d)(?::(?:100|[1-9]?\d))?',                must => 0, act => 0 },
+      weightOwnUse => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -11119,7 +11122,7 @@ sub _transferBatteryValues {
       my $instcap          = $h->{cap};                                                           # numerischer Wert (Wh) oder Readingname installierte Batteriekapazität
       my $pinmax           = $h->{pinmax}     // INFINITE;                                        # max. mögliche Ladeleistung
       my $pinreduced       = $h->{pinreduced} // $pinmax;                                         # reduzierte Ladeleistung (z.B. bei Ladung aus dem Grid)
-      my $poutmax          = $h->{poutmax}    // INFINITE;                                        # max. mögliche Entladeleistung     
+      my $poutmax          = $h->{poutmax}    // INFINITE;                                        # max. mögliche Entladeleistung 
 
       next if(!$pin || !$pou);
 
@@ -11306,6 +11309,7 @@ sub _transferBatteryValues {
       $data{$name}{batteries}{$bn}{bposingraph}  = $pos;                                                 # Anzeigeposition in Balkengrafik
       $data{$name}{batteries}{$bn}{blabel}       = $label;                                               # Batterie SoC-Beschriftung in Balkengrafik
       $data{$name}{batteries}{$bn}{bchargewh}    = BatteryVal ($name, $bn, 'binstcap', 0) * $soc / 100;  # Batterie SoC (Wh)
+      $data{$name}{batteries}{$bn}{befficiency}  = $h->{efficiency};                                     # Speicherwirkungsgrad
 
       $num++;
       $socsum   += $soc;
@@ -11663,6 +11667,7 @@ sub _batChargeMgmt {
       my $bpoutmax    = BatteryVal  ($name, $bn, 'bpoutmax',          INFINITE);                   # max. mögliche Entladeleistung W
       my $bpowerin    = BatteryVal  ($name, $bn, 'bpowerin',          INFINITE);                   # aktuelle Ladeleistung W
       my $bpinreduced = BatteryVal  ($name, $bn, 'bpinreduced',              0);                   # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid 
+      my $befficiency = BatteryVal  ($name, $bn, 'befficiency', STOREFFDEF) / 100;                 # Speicherwirkungsgrad
       my $cgbt        = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
       my $sf          = __batCapShareFactor ($hash, $bn);                                          # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $strategy    = 'loadRelease';                                                             # 'loadRelease' oder 'optPower'
@@ -11670,7 +11675,7 @@ sub _batChargeMgmt {
       my $lowSoc      = 0;
       my $loadAbort   = '';
       my $lrMargin    = SFTYMARGIN_50;
-      my $otpMargin   = SFTYMARGIN_20;
+      my $otpMargin   = SFTYMARGIN_20;                                                               
       my $lcslot;
       
       if ($cgbt) {
@@ -11721,6 +11726,7 @@ sub _batChargeMgmt {
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - General load termination condition: $labortCond");
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - control time Slot - Slot start: $lcstart, Slot end: $lcend");
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
+          Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - Battery efficiency used: ".($befficiency * 100)." %");
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeMgmt - The PV generation, consumption and surplus listed below are based on the battery's share of total installed capacity!");
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeLR - used safety margin: $lrMargin %");
           Log3 ($name, 1, "$name DEBUG> Bat $bn ChargeLR - weighted self-consumption: $wou %");
@@ -11823,6 +11829,7 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{$bn}{stt}          = $stt;                                     # Day/Time für Debuglog 
               $hsurp->{$fd}{$hod}{$bn}{strategy}     = $strategy;                                # Ladestrategie
               $hsurp->{$fd}{$hod}{$bn}{weightOwnUse} = $wou;                                     # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)
+              $hsurp->{$fd}{$hod}{$bn}{befficiency}  = $befficiency;                             # Speicherwirkungsgrad
           }
           
           ## SOC-Prognose LR
@@ -11833,8 +11840,8 @@ sub _batChargeMgmt {
                       $speff < 0 ? ($speff <= -$bpoutmax ? -$bpoutmax : $speff) :
                       $speff;                                
         
-          my $delta = $speff > 0 ? ($crel ? $speff * STOREFFDEF : 0) :                           # PV Überschuß (d.h. Aufladung) nur einbeziehen wenn Ladefreigabe
-                      $speff < 0 ? $speff / STOREFFDEF               :                           # Verbrauch einbeziehen
+          my $delta = $speff > 0 ? ($crel ? $speff * $befficiency : 0) :                         # PV Überschuß (d.h. Aufladung) nur einbeziehen wenn Ladefreigabe
+                      $speff < 0 ? $speff / $befficiency               :                         # Verbrauch einbeziehen
                       0;
 
           $socwh += $delta;
@@ -12025,7 +12032,8 @@ sub __batChargeOptTargetPower {
           my $lowSocwh    = $hsurp->{$hod}{$sbn}{lowSocwh};                                                      # eingestellter lowSoc in Wh
           my $csocwh      = $hsurp->{$hod}{$sbn}{csocwh};                                                        # aktueller SoC in Wh
           my $bpinreduced = $hsurp->{$hod}{$sbn}{bpinreduced};                                                   # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
-		  
+		  my $befficiency = $hsurp->{$hod}{$sbn}{befficiency};                                                   # Speicherwirkungsgrad
+          
           my $runwh       = defined $hsurp->{$hod}{$sbn}{fcnextwh} ?                                             # Auswahl des zu verwendenden Prognose-SOC (Wh)
                             $hsurp->{$hod}{$sbn}{fcnextwh}         : 
                             ( $nhr eq '00' ? 
@@ -12040,7 +12048,7 @@ sub __batChargeOptTargetPower {
 		      $hsurp->{$hod}{$sbn}{achievable} = 'undetermined, calculation is starting with next hour with surplus';
               $hsurp->{$hod}{$sbn}{pneedmin}   = $bpinmax;
               
-              $runwh += $hsurp->{$hod}{speff} / STOREFFDEF;                                                      # um Verbrauch reduzieren
+              $runwh += $hsurp->{$hod}{speff} / $befficiency;                                                    # um Verbrauch reduzieren
               $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", $runwh;          
               
               if ($nhr eq '00') {
@@ -12053,7 +12061,7 @@ sub __batChargeOptTargetPower {
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};
 		  my $runwhneed = $sbatinstcap - $runwh;                                
           
-          my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed);
+          my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed, $befficiency);
           my $needraw   = min ($fref->{ph}, $spls);                                                              # Ladeleistung auf Surplus begrenzen
                    
           $needraw     *= 1 + ($otpMargin / 100);                                                                # 1. Sicherheitsaufschlag
@@ -12069,7 +12077,7 @@ sub __batChargeOptTargetPower {
           ## NextHour 00 bearbeiten
           ###########################
           if ($nhr eq '00') {
-              my $target = max ($bpinreduced, $hsurp->{$hod}{$sbn}{pneedmin});
+              my $target = $hsurp->{$hod}{$sbn}{pneedmin};
               $target   *= 1 + ($otpMargin / 100);                                                               # 2. Sicherheitsaufschlag
               
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
@@ -12086,10 +12094,13 @@ sub __batChargeOptTargetPower {
 
 
 
-          $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", min ($sbatinstcap, $runwh + ($nhr eq '00'         ?    # Endwert Prognose aktuelle Stunde
-                                                                                       $otp->{$sbn}{target} :
-                                                                                       $hsurp->{$hod}{$sbn}{pneedmin}
-                                                                                      ));                        
+          $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", min ($sbatinstcap, $runwh                              # Endwert Prognose aktuelle Stunde
+                                                               + $befficiency 
+                                                                 * ($nhr eq '00'           
+                                                                     ? $otp->{$sbn}{target} 
+                                                                     : $hsurp->{$hod}{$sbn}{pneedmin}
+                                                                   )
+                                                              );                        
           
           $hsurp->{$newshod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh};                                    # Startwert kommende Stunde  
       }
@@ -12123,7 +12134,7 @@ return;
 #   die vollständige Ausnutzung der vorhandenen Kapazität.
 ###############################################################################################
 sub ___batFindMinPhWh {
-    my ($hsurp, $aref, $runwhneed) = @_;
+    my ($hsurp, $aref, $runwhneed, $befficiency) = @_;
     my @hods = @$aref;
 
     my $Ereq       = $runwhneed;                                      # 1. Benötigte Energie (Wh) bestimmen
@@ -12131,7 +12142,7 @@ sub ___batFindMinPhWh {
     my $total      = 0;                                               # 2. Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
     $total   += $hsurp->{$_}{surplswh} for @hods;
     
-    if ($total < $Ereq) {
+    if ($total * $befficiency < $Ereq) {
         $achievable = 0;        
         #$Ereq = $total;                                              # 3. Wenn Ziel nicht erreichbar: Ereq auf Maximum setzen
     }
@@ -26656,9 +26667,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>basynchron </b>     </td><td>Mode of processing received battery events             </td></tr>
             <tr><td> <b>bcharge </b>        </td><td>current SoC (State of Charge) of the battery (%)       </td></tr>
             <tr><td> <b>bchargewh </b>      </td><td>current SoC (State of Charge) of the battery (Wh)      </td></tr>
+            <tr><td> <b>befficiency </b>    </td><td>Storage efficiency (%)                                 </td></tr>
             <tr><td> <b>binstcap </b>       </td><td>installed battery capacity (Wh)                        </td></tr>
             <tr><td> <b>bpowerin </b>       </td><td>current charging power (W)                             </td></tr>
             <tr><td> <b>bpinmax </b>        </td><td>maximum possible charging power (W)                    </td></tr>
+            <tr><td> <b>bpinreduced </b>    </td><td>reduced charging power (W), e.g. when SoC <= lowSoC    </td></tr>
             <tr><td> <b>bpowerout </b>      </td><td>current discharge power (W)                            </td></tr>
             <tr><td> <b>bpoutmax </b>       </td><td>maximum possible discharging power (W)                 </td></tr>
             <tr><td> <b>bloadAbortCond </b> </td><td>general load termination condition (boolean)           </td></tr>
@@ -27816,9 +27829,9 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
-       <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt; cap=&lt;Option&gt;                 <br>
-                                [pinmax=&lt;Integer&gt] [pinreduced=&lt;Integer&gt] [poutmax=&lt;Integer&gt] [intotal=&lt;Readingname&gt;:&lt;Unit&gt;]                   <br>
-                                [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;] [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                   <br>
+       <li><b>setupBatteryDevXX &lt;Battery Device Name&gt; pin=&lt;Readingname&gt;:&lt;Unit&gt; pout=&lt;Readingname&gt;:&lt;Unit&gt; cap=&lt;Option&gt;                         <br>
+                                [pinmax=&lt;Integer&gt] [pinreduced=&lt;Integer&gt] [poutmax=&lt;Integer&gt] [intotal=&lt;Readingname&gt;:&lt;Unit&gt;] [efficiency=&lt;Value&gt] <br>
+                                [outtotal=&lt;Readingname&gt;:&lt;Unit&gt;] [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                           <br>
                                 [label=&lt;Option&gt] [[icon=&lt;recomm&gt;@&lt;Color&gt;]:[&lt;charge&gt;@&lt;Color&gt;]:[&lt;discharge&gt;@&lt;Color&gt;]:[&lt;omit&gt;@&lt;Color&gt;]]  </b> <br><br>
 
        Specifies an arbitrary Device and its Readings to deliver the battery performance data. <br>
@@ -27856,6 +27869,11 @@ to ensure that the system configuration is correct.
            <tr><td> <b>charge</b>    </td><td>Reading which provides the current state of charge (SOC in percent) (optional)                                </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>Unit</b>      </td><td>the respective unit (W,Wh,kW,kWh)                                                                             </td></tr>
+           <tr><td>                  </td><td>                                                                                                              </td></tr>
+           <tr><td><b>efficiency</b> </td><td>Optional specification of the energy storage efficiency in %. This efficiency describes not                   </td></tr>
+           <tr><td>                  </td><td>only the battery itself, but also the chain of effects, including the inverters involved.                     </td></tr>
+           <tr><td>                  </td><td>Depending on the type of coupling and other factors, the typical efficiency is between 75 and 90%.            </td></tr>
+           <tr><td>                  </td><td>Value: <b>0..100</b> default: 87                                                                              </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>icon</b>      </td><td>Icon and/or (only) color of the battery in the bar graph according to the status (optional).                  </td></tr>
            <tr><td>                  </td><td>The identifier (e.g. blue), HEX value (e.g. #d9d9d9) or 'dyn' can be specified as the color.                  </td></tr>
@@ -29346,9 +29364,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>basynchron </b>     </td><td>Modus der Verarbeitung empfangener Batterie-Events     </td></tr>
             <tr><td> <b>bcharge </b>        </td><td>aktueller SoC (State of Charge) der Batterie (%)       </td></tr>
             <tr><td> <b>bchargewh </b>      </td><td>aktueller SoC (State of Charge) der Batterie (Wh)      </td></tr>
+            <tr><td> <b>befficiency </b>    </td><td>Wirkungsgrad des Speichers (%)                         </td></tr>
             <tr><td> <b>binstcap </b>       </td><td>installierte Batteriekapazität (Wh)                    </td></tr>
             <tr><td> <b>bpowerin </b>       </td><td>momentane Ladeleistung (W)                             </td></tr>
             <tr><td> <b>bpinmax </b>        </td><td>maximal mögliche Ladeleistung (W)                      </td></tr>
+            <tr><td> <b>bpinreduced </b>    </td><td>reduzierte Ladeleistung (W) z.B. wenn SoC <= lowSoC    </td></tr>
             <tr><td> <b>bpowerout </b>      </td><td>momentane Entladeleistung (W)                          </td></tr>
             <tr><td> <b>bpoutmax </b>       </td><td>maximal mögliche Entladeleistung (W)                   </td></tr>
             <tr><td> <b>bloadAbortCond </b> </td><td>generelle Ladeabbruchbedingung                         </td></tr>
@@ -30505,7 +30525,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <a id="SolarForecast-attr-setupBatteryDev" data-pattern="setupBatteryDev.*"></a>
        <li><b>setupBatteryDevXX &lt;Batterie Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; cap=&lt;Option&gt;                                                <br>
-                                [pinmax=&lt;Ganzzahl&gt] [pinreduced=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt] [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;]                                                   <br>
+                                [pinmax=&lt;Ganzzahl&gt] [pinreduced=&lt;Ganzzahl&gt] [poutmax=&lt;Ganzzahl&gt] [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [efficiency=&lt;Wert&gt]                          <br>
                                 [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [charge=&lt;Readingname&gt;] [asynchron=&lt;Option&gt] [show=&lt;Option&gt]                                                      <br>
                                 [label=&lt;Option&gt] [[icon=&lt;empfohlen&gt;@&lt;Farbe&gt;]:[&lt;aufladen&gt;@&lt;Farbe&gt;]:[&lt;entladen&gt;@&lt;Farbe&gt;]:[icon=&lt;unterlassen&gt;@&lt;Farbe&gt;]]  </b> <br><br>
 
@@ -30544,6 +30564,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                                                      </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
+           <tr><td><b>efficiency</b> </td><td>Optionale Angabe des Wirkungsgrades der Energiespeicherung in %. Dieser Wirkungsgrad beschreibt nicht    </td></tr>
+           <tr><td>                  </td><td>nur die Batterie selbst, sondern die Wirkkette inkl. der betroffenen Wechselrichter.                     </td></tr>
+           <tr><td>                  </td><td>Je nach Koppelart und anderen Faktoren liegt der typische Wirkungsgrad zwischen 75 - 90 %.               </td></tr>
+           <tr><td>                  </td><td>Wert: <b>0..100</b> default: 87                                                                          </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>icon</b>      </td><td>Icon und/oder (nur) Farbe der Batterie in der Balkengrafik entsprechend des Status (optional).           </td></tr>
            <tr><td>                  </td><td>Als Farbe kann der Bezeichner (z.B. blue), HEX-Wert (z.B. #d9d9d9) oder 'dyn' angegeben werden.          </td></tr>
            <tr><td>                  </td><td>Wird 'dyn' verwendet, erfolgt eine vom SoC-Wert abhängige Einfärbung des Icon.                           </td></tr>
@@ -30566,6 +30591,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>zusätzlich durch Eventverarbeitung (asynchron).                                                          </td></tr>
            <tr><td>                  </td><td><b>0</b> - keine Datensammlung nach Empfang eines Events des Gerätes (default)                           </td></tr>
            <tr><td>                  </td><td><b>1</b> - auslösen einer Datensammlung bei Empfang eines Events des Gerätes                             </td></tr>
+           <tr><td>                  </td><td>                                                                                                         </td></tr>
          </table>
        </ul>
        <br>
