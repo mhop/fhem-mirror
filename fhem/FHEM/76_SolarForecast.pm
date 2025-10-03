@@ -27849,7 +27849,7 @@ to ensure that the system configuration is correct.
            <tr><td> <b>pinmax</b>    </td><td>the maximum possible charging power in watts (optional)                                                       </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>pinreduced</b></td><td>The reduced charging power in watts (optional). The value is set in Reading Battery_ChargeOptTargetPower_XX   </td></tr>
-           <tr><td>                  </td><td>if there is no PV surplus or if the calculated charging power falls below this value.                         </td></tr>
+           <tr><td>                  </td><td>if the calculated charging power falls below this value or the SoC <= lowSoC.                                 </td></tr>
            <tr><td>                  </td><td>This means that the value can also be applied in the case of demand charging from the public grid.            </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>poutmax</b>   </td><td>the maximum possible discharge power in watts (optional)                                                      </td></tr>
@@ -30544,7 +30544,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>pinmax</b>    </td><td>die maximal mögliche Ladeleistung in Watt (optional)                                                     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>pinreduced</b></td><td>Die reduzierte Ladeleistung in Watt (optional). Der Wert wird im Reading Battery_ChargeOptTargetPower_XX </td></tr>
-           <tr><td>                  </td><td>gesetzt wenn kein PV-Überschuß vorhanden ist oder die kalkulierte Ladeleistung unter diesen Wert fällt.  </td></tr>
+           <tr><td>                  </td><td>gesetzt wenn die kalkulierte Ladeleistung unter diesen Wert fällt oder der SoC <= lowSoC beträgt.        </td></tr>
            <tr><td>                  </td><td>Somit kann der Wert auch im Fall der Anforderungsladung aus dem öffentlichen Netz zur Anwendung kommen.  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>poutmax</b>   </td><td>die maximal mögliche Entladeleistung in Watt (optional)                                                  </td></tr>
