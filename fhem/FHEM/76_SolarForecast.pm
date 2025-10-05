@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.58.7" => "05.10.2025  fix negative SoC forecast when using optPower Forum: https://forum.fhem.de/index.php?msg=1348954 ",
   "1.58.6" => "03.10.2025  __batChargeMgmt code changed, new sub ___batChargeSaveResults, remove reading Battery_ChargeRecommended_XX ".
                            "_calcReadingsTomorrowPVFc: bugfix generating readings of tomorrow ".
                            "__batChargeOptTargetPower: complete rework, Attr ctrlBatSocManagementXX new keys 'loadStrategy', 'weightOwnUse' ".
@@ -12049,7 +12050,7 @@ sub __batChargeOptTargetPower {
               $hsurp->{$hod}{$sbn}{pneedmin}   = $bpinmax;
               
               $runwh += $hsurp->{$hod}{speff} / $befficiency;                                                    # um Verbrauch reduzieren
-              $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", $runwh;          
+              $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", max (0, $runwh);          
               
               if ($nhr eq '00') {
                   $otp->{$sbn}{target} = $csocwh <= $lowSocwh ? $bpinreduced : $bpinmax;
