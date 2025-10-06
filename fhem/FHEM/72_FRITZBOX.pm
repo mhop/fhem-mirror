@@ -44,8 +44,9 @@ use strict;
 use warnings;
 use Blocking;
 use HttpUtils;
+use feature 'state';
 
-my $ModulVersion = "08.20.05";
+my $ModulVersion = "08.20.06";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -306,11 +307,15 @@ my %TR064   = (
                                         action  => "GetInfo",
                                         igd     => 0},
         WLANConfiguration2         => { service => "WLANConfiguration:2",
-                                        control => "wlanconfig1",
+                                        control => "wlanconfig2",
                                         action  => "GetInfo",
                                         igd     => 0},
         WLANConfiguration3         => { service => "WLANConfiguration:3",
-                                        control => "wlanconfig1",
+                                        control => "wlanconfig3",
+                                        action  => "GetInfo",
+                                        igd     => 0},
+        WLANConfiguration4         => { service => "WLANConfiguration:4",
+                                        control => "wlanconfig4",
                                         action  => "GetInfo",
                                         igd     => 0},
         WMCGetInfo                 => { service => "X_AVM-DE_WANMobileConnection:1",
@@ -508,7 +513,6 @@ my %LuaData = (
         alarm           => { cmd => "xhr 1 lang de page alarm xhrId all"},
         boxname         => { cmd => "xhr 1 lang de page boxname xhrId all"},
         callLock        => { cmd => "xhr 1 lang de page callLock xhrId all"},
-        chan            => { cmd => "xhr 1 lang de page chan xhrId all"},
         dnsSrv          => { cmd => "xhr 1 lang de page dnsSrv xhrId all"},
         docInfo         => { cmd => "xhr 1 lang de page docInfo xhrId all"},
         dslGraph2       => { cmd => "xhr 1 lang de page dslGraph2 xhrId all"},
@@ -555,6 +559,8 @@ my %LuaData = (
         wps             => { cmd => "xhr 1 lang de page wps xhrId all"},
         wSet            => { cmd => "xhr 1 lang de page wSet xhrId all"},
         wTime           => { cmd => "xhr 1 lang de page wTime xhrId all"},
+        wlanChannels    => { cmd => "xhr 1 lang de page chan xhrId all"},
+        wlanEnvironment => { cmd => "xhr 1 lang de page chan xhrId environment"},
         wlanmesh        => { cmd => "xhr 1 lang de page wlanmesh xhrId all"}
 );
 
@@ -1071,7 +1077,7 @@ sub FRITZBOX_Initialize($)
                                 ."box_macFilter_active,"
                                 ."box_moh,box_rateDown,box_rateUp,box_stdDialPort,box_tr064,box_tr069,"
                                 ."box_upnp,box_upnp_control_activated,box_uptime,"
-                                ."box_wlan_Count,box_wlan_2.4GHz,box_wlan_5GHz,box_wlan_Active,box_wlan_LogExtended "
+                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_Active,box_wlan_LogExtended "
 
                 ."enableAlarmInfo:0,1 "
                 ."enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 "
@@ -1208,16 +1214,18 @@ sub FRITZBOX_Define($$)
    readingsSingleUpdate( $hash, "state", "initializing", 1 );
 
    # INTERNALS
-   $hash->{INTERVAL}              = 300;
-   $hash->{TIMEOUT}               = 55;
-   $hash->{SID_RENEW_ERR_CNT}     = 0;
-   $hash->{SID_RENEW_CNT}         = 0;
-   $hash->{STATUS}                = "active";
+   $hash->{INTERVAL}               = 300;
+   $hash->{TIMEOUT}                = 55;
+   $hash->{SID_RENEW_ERR_CNT}      = 0;
+   $hash->{SID_RENEW_CNT}          = 0;
+   $hash->{STATUS}                 = "active";
 
-   $hash->{fhem}{LOCAL}           = 0;
-   $hash->{fhem}{is_double_wlan}  = -1;
-   $hash->{fhem}{fwVersion}       = 0;
-   $hash->{fhem}{fwVersionStr}    = 0.0;
+   $hash->{fhem}{LOCAL}            = 0;
+   $hash->{fhem}{fwVersion}        = 0;
+   $hash->{fhem}{fwVersionStr}     = 0.0;
+
+   $hash->{fhem}{multiple_wlan}{cnt} = 1;
+   $hash->{fhem}{multiple_wlan}{names} = "wlan2.4";
 
    $hash->{helper}{TimerReadout}  = $name . ".Readout";
    $hash->{helper}{TimerCmd}      = $name . ".Cmd";
@@ -1967,9 +1975,15 @@ sub FRITZBOX_Set($$@)
               .  " guestWlan:on,off"
               if $hash->{TR064} == 1 && $hash->{SECPORT} && $hash->{LUAQUERY} == 1;
 
-     $list    .= " wlan2.4:on,off"
-              .  " wlan5:on,off"
-              if $hash->{fhem}{is_double_wlan} == 1 && $hash->{TR064} == 1 && $hash->{SECPORT} && $hash->{LUAQUERY} == 1;
+     my $wlanNames = "(" . $hash->{fhem}{multiple_wlan}{names} . ")";
+     $wlanNames =~ s/ /\|/;
+
+     if($hash->{TR064} == 1 && $hash->{SECPORT} && $hash->{LUAQUERY} == 1) {
+       my @wNames = split(" ", $hash->{fhem}{multiple_wlan}{names});
+       for( my $i = 0; $i < @wNames; $i++) {
+         $list    .=  " " .$wNames[$i]. ":on,off";
+       }
+     }
 
      # set abhängig von TR064 und data.lua
      $list    .= " macFilter:on,off"
@@ -2080,53 +2094,117 @@ sub FRITZBOX_Set($$@)
 
        my $newValue     = undef;
        my $action       = "";
+       my $actionVal    = "";
        my $preDefName   = "";
        my $preDefWeb    = "all";
        my $preDefDevice = "";
        my $preDefResA   = "no";
        my $preDefResG   = "no";
+       my $paraError     = 1;
 
        if (int @val == 2) {
 
-         if( $val[1] !~ /^tempOffset:-?\d+(\.[05])?$|^tmpAdjust:([8-9]|1[0-9]|2[2-8])(\.[05])?$
-                                                  |^tmpPerm:[01]$|^switch:[01]$|^automatic:[01]$
-                                                  |^preDefSave:[-\w]+$|^preDefDel:[-\w]+$||^preDefLoad:[-\w]+(:A|:G)?$|^preDefLoad:[\d]+:[-\w]+(:A|:G)?$/ ) {
+         if ($val[1] =~ /^(.*?):(.*?)$/ ) {
+           $action   = $1;
+           $actionVal = $2;
 
-           $retMsg = "ERROR: second parameter not valid. Value steps 0.5: <tempOffset:value>"
-                                   . " or <tmpAdjust:[8..28]>" 
-                                   . " or <tmpPerm:0|1>"
-                                   . " or <switch:0|1>"
-                                   . " or <automatic:0|1>"
-                                   . " or <preDefSave:name>"
-                                   . " or <preDefDel:name>"
-                                   . " or <preDefLoad:[id:]name[:A|:G]>";
+           if($hash->{fhem}{fwVersion} < 820) {
+              unless(    ($action =~ /tempOffset/ && $actionVal =~ /^-?\d+(\.[05])?$/ )
+                      || ($action =~ /tmpAdjust/  && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$/ )
+                      || ($action =~ /tmpAdjust/  && $actionVal =~ /^(([8-9]|1[0-9]|2[0-7])(\.[05]))$/ )
+                      || ($action =~ /tmpPerm/    && $actionVal =~ /^[01]$/ )
+                      || ($action =~ /switch/     && $actionVal =~ /^[01]$/ )
+                      || ($action =~ /automatic/  && $actionVal =~ /^[01]$/ )
+                      || ($action =~ /preDefSave/ && $actionVal =~ /^[-\w]+$/ )
+                      || ($action =~ /preDefDel/  && $actionVal =~ /^[-\w]+$/ )
+                      || ($action =~ /preDefLoad/ && $actionVal =~ /^[-\w]+(:A|:G)?$|^preDefLoad:[\d]+:[-\w]+(:A|:G)?$/ )
+                    ) {
 
-           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
+                 $retMsg = "ERROR: second parameter not valid:\n"
+                                   . "    <tempOffset:value> Value steps 0.5\n"
+                                   . " or <tmpAdjust:[8 .. 28]> Value steps 0.5\n" 
+                                   . " or <tmpPerm:0|1>\n"
+                                   . " or <switch:0|1>\n"
+                                   . " or <automatic:0|1>\n"
+                                   . " or <preDefSave:name>\n"
+                                   . " or <preDefDel:name>\n"
+                                   . " or <preDefLoad:[id:]name[:A|:G]>\n";
+
+               return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
+             }
+           } else {
+
+              unless(    ($action =~ /tempOffset/ && $actionVal =~ /^-?\d+(\.[05])?$/ )
+                      || ($action =~ /tmpAdjust/  && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$/ )
+                      || ($action =~ /tmpAdjust/  && $actionVal =~ /^(([8-9]|1[0-9]|2[0-7])(\.[05]))$/ )
+                      || ($action =~ /tmpPerm/    && $actionVal =~ /^[01]$/ )
+                      || ($action =~ /switch/     && $actionVal =~ /^[01]$/ )
+                      || ($action =~ /automatic/  && $actionVal =~ /^[01]$/ )
+                      || ($action =~ /preDefSave/ && $actionVal =~ /^[-\w]+$/ )
+                      || ($action =~ /preDefDel/  && $actionVal =~ /^[-\w]+$/ )
+                      || ($action =~ /preDefLoad/ && $actionVal =~ /^[-\w]+(:A|:G)?$|^preDefLoad:[\d]+:[-\w]+(:A|:G)?$/ )
+                      || ($action =~ /minTemp/    && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$|^(7\.5)|([8-9]|1[0-9]|2[0-7])(\.[05])|(28\.5)$/ )
+                      || ($action =~ /maxTemp/    && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$|^(7\.5)|([8-9]|1[0-9]|2[0-7])(\.[05])|(28\.5)$/ )
+                      || ($action =~ /mimaRange/  && $actionVal =~ /^[01]$/ )
+                    ) {
+
+                 $retMsg = "ERROR: second parameter not valid:\n"
+                                   . "    <tempOffset:value> Value steps 0.5\n"
+                                   . " or <tmpAdjust:[8 .. 28]> Value steps 0.5\n" 
+                                   . " or <tmpPerm:0|1>\n"
+                                   . " or <switch:0|1>\n"
+                                   . " or <automatic:0|1>\n"
+                                   . " or <preDefSave:name>\n"
+                                   . " or <preDefDel:name>\n"
+                                   . " or <preDefLoad:[id:]name[:A|:G]>\n"
+                                   . " or <minTemp:[7.5 .. 28.5]> Value steps 0.5\n"
+                                   . " or <maxTemp:[7.5 .. 28.5]> Value steps 0.5\n"
+                                   . " or <mimaRange:0|1>\n";
+
+               return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
+             }
+           }
          }
+
+         # set FritzBox smartHome 18 minTemp:7.5
+         # return "Testausgabe1: $val[0] - $val[1]";
 
          $preDefDevice = $val[0];
 
-         if ($val[1] =~ /^tempOffset:(-?\d+(\.[05])?)$/ ) {
+         if (      $action =~ /tempOffset/ && $actionVal =~ /^(-?\d+(\.\d+)?)$/ ) {
+           $preDefName = "Offset";
            $newValue = $1;
-         } elsif ( $val[1] =~ /^tmpAdjust:(([8-9]|1[0-9]|2[2-8])(\.[05])?)$/ ) {
+         } elsif ( $action =~ /tmpAdjust/  && $actionVal =~ /^(-?\d+(\.\d+)?)$/ ) {
            $newValue = $1;
-         } elsif ( $val[1] =~ /^tmpPerm:([01])$/ ) {
+         } elsif ( $action =~ /tmpPerm/    && $actionVal =~ /^([01])$/ ) {
            $newValue = "ALWAYS_ON"  if $1 == 1;
            $newValue = "ALWAYS_OFF" if $1 == 0;
-         } elsif ( $val[1] =~ /^switch:([01])$/ ) {
+
+         } elsif ( $action =~ /minTemp/    && $actionVal =~ /^(-?\d+(\.\d+)?)$/ ) {
+           $preDefName = "Mintemp";
+           $newValue = $1;
+         } elsif ( $action =~ /maxTemp/    && $actionVal =~ /^(-?\d+(\.\d+)?)$/ ) {
+           $preDefName = "Maxtemp";
+           $newValue = $1;
+         } elsif ( $action =~ /mimaRange/  && $actionVal =~ /^([01])$/ ) {
+           $preDefName = "TemperatureRangeLockEnabled";
+           $newValue = $1;
+
+         } elsif ( $action =~ /switch/     && $actionVal =~ /^switch:([01])$/ ) {
            $newValue = "ON"  if $1 == 1;
            $newValue = "OFF" if $1 == 0;
-         } elsif ( $val[1] =~ /^automatic:([01])$/ ) {
+         } elsif ( $action =~ /automatic/  && $actionVal =~ /^([01])$/ ) {
            $newValue = "ON"  if $1 == 1;
            $newValue = "OFF" if $1 == 0;
-         } elsif ( $val[1] =~ /^preDefSave:([-\w]+)$/ ) {
+
+         } elsif ( $action =~ /preDefSave/ && $actionVal =~ /^([-\w]+)$/ ) {
            $preDefName = $1;
-         } elsif ( $val[1] =~ /^preDefDel:([-\w]+)$/ ) {
+         } elsif ( $action =~ /preDefDel/  && $actionVal =~ /^([-\w]+)$/ ) {
            $preDefName = $1;
-         } elsif ( $val[1] =~ /^preDefLoad:([-\w]+)(:A|:G)?$/ ) {
+         } elsif ( $action =~ /preDefLoad/ && $actionVal =~ /^([-\w]+)(:A|:G)?$/ ) {
            $preDefName = $1;
            $preDefWeb  = $2 if $2;
-         } elsif ( $val[1] =~ /^preDefLoad:([\d]+):([-\w]+)(:A|:G)?$/ ) {
+         } elsif ( $action =~ /preDefLoad/ && $actionVal =~ /^([\d]+):([-\w]+)(:A|:G)?$/ ) {
            $preDefDevice = $1;
            $preDefName   = $2;
            $preDefWeb    = $3 if $3;
@@ -2134,7 +2212,7 @@ sub FRITZBOX_Set($$@)
 
          $preDefWeb =~ s/\://gs;
 
-         # return "$val[0] : $preDefDevice : $preDefName : $preDefWeb";
+         # return "Testausgabe2: $val[0] - $preDefDevice - $preDefName - $preDefWeb - $newValue";
 
          if (!defined $newValue && $preDefName eq "") {
            $retMsg = "ERROR: no valid second Paramter: $preDefName : $preDefWeb";
@@ -2379,7 +2457,7 @@ sub FRITZBOX_Set($$@)
          $retMsg = "ERROR: Unexpected result: " . FRITZBOX_Helper_Dumper($hash, $result);
          return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
 
-       } elsif ($action eq "tempOffset") {
+       } elsif ($action =~ /tempOffset|minTemp|maxTemp|mimaRange/) {
 
          $returnData = FRITZBOX_Get_SmartHome_Devices_List($hash, $val[0]);
 
@@ -2388,13 +2466,25 @@ sub FRITZBOX_Set($$@)
            return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
-         unless (exists $returnData->{Offset}) {
+         $returnData->{ule_device_name} = encode("ISO-8859-1", $returnData->{ule_device_name});
+
+         unless (exists $returnData->{$preDefName}) {
            $retMsg = "ERROR: Offset not available for device $val[0]";
            return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
-         $returnData->{ule_device_name} = encode("ISO-8859-1", $returnData->{ule_device_name});
-         $returnData->{Offset} = $newValue;
+         $returnData->{$preDefName} = $newValue;
+
+         if ($hash->{fhem}{fwVersion} >= 820 && $returnData->{device_name_category} eq "THERMOSTAT") {
+           delete $returnData->{device_web_site};
+           delete $returnData->{device_name_category};
+           delete $returnData->{view};
+
+           delete $returnData->{$preDefName} if $action =~ /mimaRange/ && $newValue == 0;
+
+           $returnData->{Absenktemp} = $newValue if $action =~ /minTemp/ && $newValue > $returnData->{Absenktemp};
+           $returnData->{Heiztemp}   = $newValue if $action =~ /maxTemp/ && $newValue < $returnData->{Heiztemp};
+         }
 
          @webCmdArray = %$returnData;
 
@@ -3489,19 +3579,37 @@ sub FRITZBOX_Set($$@)
 
      } # end switchipv4dns
 
-     elsif ( lc $cmd eq 'tam' && $mesh eq "master") {
+     elsif ( lc $cmd eq 'tam') {
+        
+       unless ($mesh eq "master") {
+         $retMsg = "ERROR: TAM not availabe for Repeater.";
+         return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
+
        if ( int @val == 2 && defined( $hash->{READINGS}{"tam".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) {
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
 
          if ($hash->{SECPORT}) { #TR-064
-           my @tr064CmdArray = (["X_AVM-DE_TAM:1", "x_tam", "SetEnable", "NewIndex", $val[0] - 1 , "NewEnable", $state]);
-           FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-         }
+           my @tr064CmdArray = (["X_AVM-DE_TAM:1", "x_tam", "SetEnable", "NewIndex", $val[0] , "NewEnable", $state]);
+           my @tr064Result = FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
 
-         readingsSingleUpdate($hash,"tam".$val[0]."_state",$val[1], 1);
-         return undef;
+           if ($tr064Result[0]->{Error}) {
+             $retMsg = "ERROR: identifying phonebooks via TR-064:" . FRITZBOX_Helper_Dumper($hash, \@tr064Result);
+             return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+           } else {
+
+             readingsSingleUpdate($hash, "tam" .$val[0]. "_state", $val[1], 1);
+
+             $retMsg = "TAM $val[0] set to $state";
+             return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+           }
+
+         } else {
+           $retMsg = "ERROR: TR064 not enabled";
+           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
        }
      } # end tam
 
@@ -3630,7 +3738,7 @@ sub FRITZBOX_Set($$@)
        }
      } # end wlan
 
-     elsif ( lc $cmd =~ /^wlan(2\.4|5)$/ && $hash->{fhem}{is_double_wlan} == 1 ) {
+     elsif ( $cmd =~ m/^$wlanNames$/ && $hash->{fhem}{multiple_wlan}{cnt} > 1 ) {
        if ( int @val == 1 && $val[0] =~ /^(on|off)$/ ) {
          push @cmdBuffer, lc ($cmd) . " " . join(" ", @val);
          $retMsg = FRITZBOX_Readout_SetGet_Start($hash->{helper}{TimerCmd});
@@ -3702,6 +3810,11 @@ sub FRITZBOX_Set($$@)
 
 } # end FRITZBOX_Set
 
+sub FRITZBOX_encode_json {
+  use JSON::PP 'encode_json'; # no encode_json
+  state $encoder = JSON::PP->new->utf8->canonical->pretty;
+  return $encoder->encode($_[0]);
+}
 ###############################################################################
 sub FRITZBOX_Get($@)
 {
@@ -3831,7 +3944,7 @@ sub FRITZBOX_Get($@)
 
        my $mode = "";
 
-       if ($val[0] =~ /json/) {
+       if ($val[0] =~ /json|pretty/) {
          return "Wrong number of arguments, usage: get $name json argName1 argValue1 [argName2 argValue2] ..." if int @val < 3 || (int(@val) - 1) %2 == 1;
          $mode = shift (@val); # remove 1st element and store it.
        } else {
@@ -3853,7 +3966,9 @@ sub FRITZBOX_Get($@)
 
        FRITZBOX_Log $hash, 4, "get $name $cmd " . $queryStr;
 
-       my $result = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray) ;
+       my $result = FRITZBOX_call_LuaData($hash, "fnget", \@webCmdArray) ;
+
+       my $toJSON = to_json( $result, { pretty => 0 } );
 
        if ($mode eq "json") {
          return to_json( $result, { pretty => 0 } );
@@ -3862,7 +3977,11 @@ sub FRITZBOX_Get($@)
        $returnStr  = "Result of data = " . $queryStr . "\n";
        $returnStr .= "----------------------------------------------------------------------\n";
 
-       my $flag = 1;
+       if ($mode eq "pretty") {
+         my $printJSON = FRITZBOX_encode_json($result);
+         return $returnStr . $printJSON;
+       }
+
        my $tmp = FRITZBOX_Helper_analyse_Lua_Result($hash, $result, 1);
 
        return $returnStr . $tmp;
@@ -3890,7 +4009,6 @@ sub FRITZBOX_Get($@)
        $returnStr  = "Result of data = " . $val[0] . "\n";
        $returnStr .= "----------------------------------------------------------------------\n";
 
-       my $flag = 1;
        my $tmp = FRITZBOX_Helper_analyse_Lua_Result($hash, $result, 1);
 
 #       my $tmp = FRITZBOX_Helper_Dumper($hash, $result);
@@ -3920,7 +4038,6 @@ sub FRITZBOX_Get($@)
 
        my $result = FRITZBOX_call_LuaData($hash, "fon_devices\/edit_dect_ring_tone", \@webCmdArray) ;
 
-       my $flag = 1;
        my $tmp = FRITZBOX_Helper_analyse_Lua_Result($hash, $result, 1);
 
        return $returnStr . $tmp;
@@ -3984,7 +4101,7 @@ sub FRITZBOX_Get($@)
          $returnStr = FRITZBOX_Get_MobileInfo($hash);
 
        } elsif ( $val[0] eq "smartHomeDevices" && $hash->{LUADATA} == 1) {
-         $returnStr = FRITZBOX_Get_SmartHome_Device_List($hash);
+         $returnStr = FRITZBOX_Get_SmartHome_Devices_List($hash);
 
        } elsif ( $val[0] eq "smartHomeAutomation" && $hash->{LUADATA} == 1 && $hash->{fhem}{fwVersion} >= 800) {
          $returnStr = FRITZBOX_Get_SmartHome_Automation_List($hash);
@@ -4155,7 +4272,7 @@ sub FRITZBOX_Get($@)
 
            my $klickcmd = $command;
               $klickcmd =~ s/keyButton/$key/g;
-              $klickcmd =~ s/PERLcmd/get $name luaData $LuaData{$key}{cmd}/g;
+              $klickcmd =~ s/PERLcmd/get $name luaData pretty $LuaData{$key}{cmd}/g;
               $klickcmd =~ s/quittieren/$key/g;
 
            $returnStr .= "<tr>\n";
@@ -4180,7 +4297,7 @@ sub FRITZBOX_Get($@)
 
              my $klickcmd = $command;
                 $klickcmd =~ s/keyButton/$key/g;
-                $klickcmd =~ s/PERLcmd/get $name luaData $LuaDataSG{$key}{cmd}/g;
+                $klickcmd =~ s/PERLcmd/get $name luaData pretty $LuaDataSG{$key}{cmd}/g;
                 $klickcmd =~ s/quittieren/$key/g;
 
              $returnStr .= "<tr>\n";
@@ -5393,8 +5510,13 @@ sub FRITZBOX_Readout_Run_Web_LuaQuery($$$$) {
 
 #-------------------------------------------------------------------------------------
 # WLANs
-   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
-   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlan_5GHz", $result->{box_wlan_5GHz}, "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlan_2.4GHz", "";
+   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlan_5GHz", "";
+
+   if ($hash->{fhem}{fwVersion} < 750) {
+     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
+     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_5GHz", $result->{box_wlan_5GHz}, "onoff";
+   }
    FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff";
    FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain};
    FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff";
@@ -5413,7 +5535,15 @@ sub FRITZBOX_Readout_Run_Web_LuaQuery($$$$) {
 
 #-------------------------------------------------------------------------------------
 # Box Features
-   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "fhem->is_double_wlan", $result->{box_is_double_wlan}, "01" if $result->{box_is_double_wlan};
+   if ($hash->{fhem}{fwVersion} < 750) {
+     if ($result->{box_is_double_wlan}) {
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", 2;
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", "wlan2.4 wlan5";
+     } else {
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", 1;
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", "wlan2.4";
+     }
+   }
 
 #-------------------------------------------------------------------------------------
 # Box model, firmware and uptimes
@@ -6050,6 +6180,63 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
    FRITZBOX_Log $hash, 4, "WakeUpCall - end getting data";
  
    #-------------------------------------------------------------------------------------
+   # WLAN channels
+
+   # xhr 1 lang de page chan xhrId all
+
+   if ($hash->{fhem}{fwVersion} >= 750) {
+     FRITZBOX_Log $hash, 4, "wlanChannels - start getting data";
+
+     @webCmdArray = ();
+     push @webCmdArray, "xhr"         => "1";
+     push @webCmdArray, "lang"        => "de";
+     push @webCmdArray, "page"        => "chan";
+     push @webCmdArray, "xhrId"       => "all";
+
+     $resultData = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray) ;
+
+     # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
+     return FRITZBOX_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+     $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
+
+     FRITZBOX_Log $hash, 5, "\n" . FRITZBOX_Helper_Dumper($hash, $resultData->{data}, 5);
+
+     $nbViews = 0;
+     if (defined $resultData->{data}->{bands}) {
+       $views = $resultData->{data}->{bands};
+       $nbViews = scalar @$views;
+     }
+
+     if ($nbViews > 0) {
+       my $wNames = "";
+       eval {
+         for(my $i = 0; $i <= $nbViews - 1; $i++) {
+
+           my $bandOrg  = $resultData->{data}->{bands}->[$i];
+           my $bandName = $bandOrg;
+           $bandName    =~ s/24/2.4/;
+           $bandName    =~ s/ghz/GHz/;
+           $wNames .= "wlan" . $bandName . " ";
+           $bandName = "box_wlanBand_" . $bandName; 
+
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{$bandOrg}->{active}, "onoff";
+           FRITZBOX_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{$bandOrg}->{useable}, "yesno";
+         }
+       };
+
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_cnt", $nbViews;
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", $nbViews;
+
+       chop ($wNames);
+       $wNames =~ s/GHz//g;
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
+     }
+
+     FRITZBOX_Log $hash, 4, "wlanChannels - end getting data";
+   }
+
+   #-------------------------------------------------------------------------------------
    # WLAN neighbors
 
    # xhr 1 lang de page chan xhrId environment useajax 1
@@ -6097,6 +6284,7 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
              $dName   .= ", Band: " . $resultData->{data}->{scanlist}->[$i]->{bandId};
              $dName   =~ s/24ghz/2.4 GHz/;
              $dName   =~ s/5ghz/5 GHz/;
+             $dName   =~ s/5ghz_scnd/5 GHz 2nd/;
            }
            $dName  .= ")";
 
@@ -8282,7 +8470,7 @@ sub FRITZBOX_Readout_Process($$)
                                 ."box_macFilter_active,"
                                 ."box_moh,box_rateDown,box_rateUp,box_stdDialPort,box_tr064,box_tr069,"
                                 ."box_upnp,box_upnp_control_activated,box_uptime,box_uptimeConnect,"
-                                ."box_wlan_Count,box_wlan_2.4GHz,box_wlan_5GHz,box_wlan_Active,box_wlan_LogExtended "
+                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_Active,box_wlan_LogExtended "
 
                   ."enableAlarmInfo:0,1 "
                   ."enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 "
@@ -8344,27 +8532,24 @@ sub FRITZBOX_Readout_Process($$)
      }
    }
 
-   # Create state with wlan states
-   if ( defined $values{"box_wlan_2.4GHz"} ) {
-     my $newState = "WLAN: ";
-     if ( $values{"box_wlan_2.4GHz"} eq "on" ) {
-       $newState .= "on";
-     }
-     elsif ( $values{box_wlan_5GHz} ) {
-       if ( $values{box_wlan_5GHz} eq "on") {
-         $newState .= "on";
-       } else {
-         $newState .= "off";
-       }
-     }
-     else {
-       $newState .= "off";
-     }
+   my @wNames = split(" ", $hash->{fhem}{multiple_wlan}{names});
+   my $newState = "WLAN: off";
+   for( my $i = 0; $i < @wNames; $i++) {
 
-     $newState .=" gWLAN: ".$values{box_guestWlan} ;
-     $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)" if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} > 0;
-     readingsBulkUpdate( $hash, "state", $newState);
-     FRITZBOX_Log $hash, 4, "SET state = '$newState'";
+     $wNames[$i]  = "box_wlanBand_" . substr($wNames[$i], 4) . "GHz";
+     $wNames[$i] .= "_active" if ($hash->{fhem}{fwVersion} >= 750);
+
+     if ( defined $values{"$wNames[$i]"} && $values{"$wNames[$i]"} eq "on" ) {
+       $newState = "WLAN: on";
+
+       $newState .=" gWLAN: " .$values{box_guestWlan} ;
+       $newState .=" (Remain: " .$values{box_guestWlanRemain}. " min)" if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} > 0;
+
+       readingsBulkUpdate( $hash, "state", $newState);
+       FRITZBOX_Log $hash, 4, "SET state = '$newState'";
+
+       last;
+     }
    }
 
    # adapt TR064-Mode
@@ -8492,6 +8677,12 @@ sub FRITZBOX_Readout_Format($$$)
       $readout =~ s/no-emu//;
       $readout =~ s/^0*$/off/;
       $readout =~ s/^1*$/on/;
+   }
+   elsif ($format eq "yesno") {
+      $readout =~ s/er//;
+      $readout =~ s/no-emu//;
+      $readout =~ s/^0*$/no/;
+      $readout =~ s/^1*$/yes/;
    }
    elsif ($format eq "radio") {
       if (defined $hash->{fhem}{radio}{$readout}) {
@@ -10978,16 +11169,16 @@ sub FRITZBOX_Set_GuestWlan_OnOff($)
 
    # Set guestWLAN, if necessary set also WLAN
    if ( $hash->{SECPORT} ) { #TR-064
-     if ($state == 1) { # WLAN on when Guest WLAN on
-        push @tr064CmdArray, ["WLANConfiguration:2", "wlanconfig2", "SetEnable", "NewEnable", "1"]
-                 if $hash->{fhem}{is_double_wlan} == 1;
 
-        push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", "1"];
+     if ($state == 1) { # WLAN has to be on when Guest WLAN on
+       for (my $i = 0; $i < $hash->{fhem}{multiple_wlan}{cnt}; $i++) {;
+         my $b = $i + 1;
+         push @tr064CmdArray, ["WLANConfiguration:". $b, "wlanconfig". $b, "SetEnable", "NewEnable", "1"];
+       }
      }
 
-     my $gWlanNo = 2;
-     $gWlanNo = 3 if $hash->{fhem}{is_double_wlan} == 1;
-     push @tr064CmdArray, ["WLANConfiguration:".$gWlanNo, "wlanconfig".$gWlanNo, "SetEnable", "NewEnable", $state];
+     my $gWlanNo = $hash->{fhem}{multiple_wlan}{cnt} + 1; # + 1 is the quest wlan. See also TR064 reference
+     push @tr064CmdArray, ["WLANConfiguration:" . $gWlanNo, "wlanconfig" . $gWlanNo, "SetEnable", "NewEnable", $state];
 
      my @tr064Result = FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
 
@@ -10999,7 +11190,7 @@ sub FRITZBOX_Set_GuestWlan_OnOff($)
 
        FRITZBOX_Log $hash, 4, "switch GuestWLAN: " . $tr064Result[0];
 
-       # Read WLAN-Status
+       # reread WLAN-Status
        my $queryStr = "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
        $queryStr   .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
        $queryStr   .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # GÃ¤ste WLAN
@@ -11016,8 +11207,12 @@ sub FRITZBOX_Set_GuestWlan_OnOff($)
 
        } else {
 
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz",      $result->{box_wlan_24GHz}, "onoff";
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_5GHz",        $result->{box_wlan_5GHz}, "onoff";
+         if ($hash->{fhem}{fwVersion} < 750) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_5GHz", $result->{box_wlan_5GHz}, "onoff";
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_cnt", ($result->{box_wlan_5GHz} ? 2 : 1);
+         }
+
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan",        $result->{box_guestWlan}, "onoff";
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain",  $result->{box_guestWlanRemain};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff";
@@ -11030,6 +11225,53 @@ sub FRITZBOX_Set_GuestWlan_OnOff($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
        }
      }
+
+     if ($hash->{fhem}{fwVersion} >= 750) {
+
+       @webCmdArray = ();
+       push @webCmdArray, "xhr"         => "1";
+       push @webCmdArray, "lang"        => "de";
+       push @webCmdArray, "page"        => "chan";
+       push @webCmdArray, "xhrId"       => "all";
+
+       $result = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray) ;
+
+       # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
+       if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
+         my $msg = "set guestWlan: Lua_Data error verifying guestWlan: $val[0]";
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
+         FRITZBOX_Log $hash, 2, $msg . " - " . $result->{Error};
+
+       } else {
+
+         FRITZBOX_Log $hash, 5, "\n" . FRITZBOX_Helper_Dumper($hash, $result->{data}, 5);
+
+         my $nbViews = 0;
+
+         if (defined $result->{data}->{bands}) {
+           my $views = $result->{data}->{bands};
+           $nbViews = scalar @$views;
+         }
+
+         if ($nbViews > 0) {
+
+           eval {
+             for(my $i = 0; $i <= $nbViews - 1; $i++) {
+
+               my $bandOrg  = $result->{data}->{bands}->[$i];
+               my $bandName = "box_wlanBand_" . $bandOrg;
+               $bandName    =~ s/24/2.4/;
+               $bandName    =~ s/ghz/GHz/;
+
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $bandName . "_active", $result->{data}->{$bandOrg}->{active}, "onoff";
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $bandName . "_useable", $result->{data}->{$bandOrg}->{useable}, "yesno";
+
+             }
+           };
+         }
+       }
+     }
+
    } else { #no API
      my $msg = "set guestWlan: TR064 SECPORT not available to switch WLAN.";
      FRITZBOX_Log $hash, 2, $msg;
@@ -11061,11 +11303,13 @@ sub FRITZBOX_Set_Wlan_OnOff($)
 # Set WLAN
    if ($hash->{SECPORT}) { #TR-064
 
-     push @tr064CmdArray, ["WLANConfiguration:2", "wlanconfig2", "SetEnable", "NewEnable", $state]
-               if $hash->{fhem}{is_double_wlan} == 1 && $cmd ne "wlan2.4";
-
-     push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", $state]
-               if $cmd =~ /^(wlan|wlan2\.4)$/;
+     my @wNames = split(" ", $hash->{fhem}{multiple_wlan}{names});
+     for( my $i = 0; $i < @wNames; $i++) {
+       if ( $cmd eq $wNames[$i] || $cmd eq "wlan" ) {
+         my $b = $i + 1;
+         push @tr064CmdArray, ["WLANConfiguration:". $b, "wlanconfig". $b, "SetEnable", "NewEnable", $state]
+       }
+     }
 
      FRITZBOX_Log $hash, 4, "TR-064 Command";
      my @tr064Result = FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
@@ -11094,8 +11338,12 @@ sub FRITZBOX_Set_Wlan_OnOff($)
 
        } else {
 
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_5GHz", $result->{box_wlan_5GHz}, "onoff";
+         if ($hash->{fhem}{fwVersion} < 750) {
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_5GHz", $result->{box_wlan_5GHz}, "onoff";
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_cnt", ($result->{box_wlan_5GHz} ? 2 : 1);
+         }
+
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff";
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff";
@@ -11108,6 +11356,53 @@ sub FRITZBOX_Set_Wlan_OnOff($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
        }
      }
+
+     if ($hash->{fhem}{fwVersion} >= 750) {
+
+       @webCmdArray = ();
+       push @webCmdArray, "xhr"         => "1";
+       push @webCmdArray, "lang"        => "de";
+       push @webCmdArray, "page"        => "chan";
+       push @webCmdArray, "xhrId"       => "all";
+
+       $result = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray) ;
+
+       # Abbruch wenn Fehler beim Lesen der Fritzbox-Antwort
+       if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
+         my $msg = "set guestWlan: Lua_Data error verifying guestWlan: $val[0]";
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
+         FRITZBOX_Log $hash, 2, $msg . " - " . $result->{Error};
+
+       } else {
+
+         FRITZBOX_Log $hash, 5, "\n" . FRITZBOX_Helper_Dumper($hash, $result->{data}, 5);
+
+         my $nbViews = 0;
+
+         if (defined $result->{data}->{bands}) {
+           my $views = $result->{data}->{bands};
+           $nbViews = scalar @$views;
+         }
+
+         if ($nbViews > 0) {
+
+           eval {
+             for(my $i = 0; $i <= $nbViews - 1; $i++) {
+
+               my $bandOrg  = $result->{data}->{bands}->[$i];
+               my $bandName = "box_wlanBand_" . $bandOrg;
+               $bandName    =~ s/24/2.4/;
+               $bandName    =~ s/ghz/GHz/;
+
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $bandName . "_active", $result->{data}->{$bandOrg}->{active}, "onoff";
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $bandName . "_useable", $result->{data}->{$bandOrg}->{useable}, "yesno";
+
+             }
+           };
+         }
+       }
+     }
+
    } else { #no API
      my $msg = "set $cmd: TR064 SECPORT not available to switch WLAN.";
      FRITZBOX_Log $hash, 2, $msg;
@@ -12150,14 +12445,15 @@ sub FRITZBOX_Get_WLAN_Environment($) {
 
 # get list of SmartHome Devices
 ############################################
-# Test: { FRITZBOX_Helper_Dumper($hash, FRITZBOX_Get_SmartHome_Devices_List($defs{"FritzBox"}, "17", "test"))}
+# Test: { FRITZBOX_Helper_Dumper($defs{"FritzBox"}, FRITZBOX_Get_SmartHome_Devices_List($defs{"FritzBox"}, "17", "test"))}
 # Save: { FRITZBOX_Get_SmartHome_Devices_List($defs{"FritzBox"}, "17", "save")}
 # Read: { FRITZBOX_Get_SmartHome_Devices_List($defs{"FritzBox"}, "17", "read")}
 #
 # Test: { FRITZBOX_Get_SmartHome_Devices_List($defs{"FB6660"}, "16", "test")}
 #
 # xhr 1 lang de page sh_dev xhrId all
-# { FRITZBOX_Get_SmartHome_Devices_List($defs{"FritzBox"}, "17")}
+# { FRITZBOX_Helper_Dumper($defs{"FritzBox"},FRITZBOX_Get_SmartHome_Devices_List($defs{"FritzBox"}, "17"))}
+# { FRITZBOX_Helper_Dumper($defs{"FritzBox"},FRITZBOX_Get_SmartHome_Devices_List($defs{"FritzBox"}, "18"))}
 
 sub FRITZBOX_Get_SmartHome_Devices_List($@) {
 
@@ -12171,7 +12467,7 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
    my $views;
    my $nbViews = 0;
    
-   FRITZBOX_Log $hash, 4, "FRITZBOX_SmartHome_Device_List (Fritz!OS: $hash->{fhem}{fwVersionStr}) ";
+   FRITZBOX_Log $hash, 3, "FRITZBOX_SmartHome_Device_List (Fritz!OS: $hash->{fhem}{fwVersionStr}) ";
 
    my @webCmdArray;
    # xhr 1 lang de page sh_dev xhrId all
@@ -12187,6 +12483,8 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
    my $analyse = FRITZBOX_Helper_analyse_Lua_Result($hash, $result);
 
    if ($devID && $command =~ /read|save|test/) {
+
+     FRITZBOX_Log $hash, 3, "Processing SmartHome_Device_List: read|save|test";
 
      if ( $analyse =~ /ERROR/) {
        FRITZBOX_Log $hash, 2, "getting smart home info -> " . $analyse;
@@ -12208,26 +12506,64 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
      for my $i (0 .. @{$devData} - 1) {
 
        if( $devData->[$i]{'id'} eq $devID ) {
+         FRITZBOX_Log $hash, 3, "Processing SmartHome_Device_List: $devData->[$i]{'id'}";
 
          $ret{device_name_category} = $devData->[$i]{'category'}; # if $command =~ /test/;
          $ret{device_web_site}      = "GENERAL";
          $ret{device}               = $devID;
 
-         my $isSocket               = $devData->[$i]{'category'} eq "SOCKET";
+         my $isSocket               = $ret{device_name_category} eq "SOCKET";
 
-         unless ( $isSocket) {
+         FRITZBOX_Log $hash, 5, "getting smart home info -> " . FRITZBOX_Helper_Dumper($hash, $devData->[$i], 5);
 
-           $ret{ule_device_name} = $devData->[$i]{'displayName'};
+         if (!$isSocket) {
 
-           if( $devData->[$i]{'pushService'}{'isEnabled'} ) {
-             $ret{enabled}   = "on";
-             $ret{mailto}    = $devData->[$i]{'pushService'}{'mailAddress'};
-             $ret{mail_type} = $ret{mailto} eq "default" ? "custom" : "";
+           @webCmdArray = ();
+
+           if($hash->{fhem}{fwVersion} >= 820 && $ret{device_name_category} eq "THERMOSTAT") {
+
+             # xhr 1 lang de page sh_dev xhrId all
+             # xhr 1 master 18 device 18 page home_auto_hkr_edit
+
+             push @webCmdArray, "xhr"         => "1";
+             push @webCmdArray, "lang"        => "de";
+             push @webCmdArray, "master"      => $devID;
+             push @webCmdArray, "device"      => $devID;
+             push @webCmdArray, "page"        => "home_auto_hkr_edit";
+
+             my $result1 = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray) ;
+
+             FRITZBOX_Log $hash, 5, "getting smart home info -> " . FRITZBOX_Helper_Dumper($hash, $result1, 5);
+ 
+             my $analyse1 = FRITZBOX_Helper_analyse_Lua_Result($hash, $result);
+
+             if ( $analyse1 =~ /ERROR/) {
+               FRITZBOX_Log $hash, 2, "getting smart home info -> " . $analyse1;
+               my %retHash = ("Error" => $returnStr, "Info" => $analyse1);
+               return \%retHash;
+             }
+
+             foreach (keys %{ $result1->{'data'}{'smartoptions'} }) {
+               $ret{$_} = $result1->{'data'}{'smartoptions'}{$_};
+             }           
+             my @sortRet = sort (keys %ret);
+             FRITZBOX_Log $hash, 5, "SmartHome Device info HKR\n" . FRITZBOX_Helper_Dumper($hash, \@sortRet, 5) if keys(%ret);
+
+           } else {
+
+             $ret{ule_device_name} = $devData->[$i]{'displayName'};
+
+             if( $devData->[$i]{'pushService'}{'isEnabled'} ) {
+               $ret{enabled}   = "on";
+               $ret{mailto}    = $devData->[$i]{'pushService'}{'mailAddress'};
+               $ret{mail_type} = $ret{mailto} eq "default" ? "custom" : "";
+             }
            }
 
          } else {
 
            @webCmdArray = ();
+
            # xhr 1 lang de page sh_dev xhrId all
            # xhr 1 master 17 device 17 page home_auto_edit_view
 
@@ -12255,27 +12591,6 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
 
            $ret1{device_name_category}        = "SOCKET";
            $ret1{device_web_site}             = "GENERAL";
-
-#           $ret1{ule_device_name}             = $result1->{'data'}{'smartoptions'}{'ule_device_name'};
-#           $ret1{led_active}                  = $result1->{'data'}{'smartoptions'}{'led_active'};
-#           $ret1{ule_device_acdc_rate}        = $result1->{'data'}{'smartoptions'}{'ule_device_acdc_rate'};
-#           $ret1{ule_device_co2_emission}     = $result1->{'data'}{'smartoptions'}{'ule_device_co2_emission'};
-#           $ret1{ShowEnergyStat}              = $result1->{'data'}{'smartoptions'}{'ShowEnergyStat'};
-#           $ret1{switch_default_state}        = $result1->{'data'}{'smartoptions'}{'switch_default_state'};
-#           $ret1{manuell_switch_active_local} = $result1->{'data'}{'smartoptions'}{'manuell_switch_active_local'};
-#           $ret1{manuell_switch_active_uiapp} = $result1->{'data'}{'smartoptions'}{'manuell_switch_active_uiapp'};
-#           $ret1{mail_type}                   = $result1->{'data'}{'smartoptions'}{'mail_type'};
-#           $ret1{interval}                    = $result1->{'data'}{'smartoptions'}{'interval'};
-
-#           $ret1{Offset}                      = $result1->{'data'}{'smartoptions'}{'Offset'} if exists $result1->{'data'}{'smartoptions'}{'Offset'};
-
-#           if( exists $result1->{'data'}{'smartoptions'}{'enabled'} && $result1->{'data'}{'smartoptions'}{'enabled'} ) {
-#             $ret1{enabled}             = "on";
-#             $ret1{mailto}              = $result1->{'data'}{'smartoptions'}{'mailto'};
-#             $ret1{ShowEnergyStat}      = $result1->{'data'}{'smartoptions'}{'ShowEnergyStat'};
-#             $ret1{periodic}            = $result1->{'data'}{'smartoptions'}{'periodic'};
-#             $ret1{TriggerSwitchChange} = $result1->{'data'}{'smartoptions'}{'TriggerSwitchChange'} if $result1->{'data'}{'smartoptions'}{'TriggerSwitchChange'};
-#           }
 
          }
      
@@ -14720,7 +15035,7 @@ sub FRITZBOX_call_LuaData($$$@)
 
    FRITZBOX_Log $hash, 4, "Request data via API dataQuery.";
    my $host = $hash->{HOST};
-   my $url = 'http://' . $host . '/' . $luaFunction . '.lua?sid=' . $result->{sid};
+   my $url = 'http://' . $host . '/' . ($luaFunction eq "fnget" ? "data" : $luaFunction) . '.lua?sid=' . $result->{sid};
 
    FRITZBOX_Log $hash, 4, "URL: $url";
 
@@ -14874,6 +15189,176 @@ sub FRITZBOX_call_LuaData($$$@)
    ###########  HTML #################################
    # xhr 1 lang de page sh_dev xhrId all
    # xhr 1 master 17 device 17 page home_auto_edit_view
+   # xhr 1 master 18 device 18 page home_auto_hkr_edit
+   # xhr 1 device Z0CEFF6FFFE49AD6E01 master Z0CEFF6FFFE49AD6E01 page home_auto_temp_view
+   # xhr 1 device 18 page home_auto_temp_view
+
+   if ($queryStr =~ /home_auto_temp_view/) {
+     FRITZBOX_Log $hash, 4, "Response Data - page home_auto_edit_view: \n" . $data;
+   }
+
+   if ($queryStr =~ /home_auto_hkr_edit/) {
+
+     if ( $data =~ m/\<form name="mainform" method="POST" action="\/net\/home_auto_hkr_edit.lua"\>(.*?)\<div id="domReady" style="display:none"\>\<\/div\>/igs ) {
+
+       FRITZBOX_Log $hash, 5, "Response Data: \n" . $1;
+
+       my $profile_content;
+
+       my $tmp = "";
+       my $smartCont = $1;
+
+       $profile_content = '{"sid":"'.$result->{sid}.'","pid":"SmartHomeDevice","data":{"smartoptions":{';
+
+       $profile_content .= '"view":"",';
+
+       $profile_content .= '"back_to_page":"/smarthome/devices.lua",';
+
+       ($tmp) = ($smartCont =~ m/\<input type="hidden" name="device" value="(.*?)"\>/igs);
+       $profile_content .= '"device":"' . $tmp . '",';
+
+       ($tmp) = ($smartCont =~ m/name="ule_device_name" id="uiULEDeviceName" maxlength="[\d]+" value="(.*?)"\>\<\/div\>\<div class="formular widetext"\>/igs);
+       $profile_content .= '"ule_device_name":"' . $tmp . '",';
+
+       ($tmp) = ($smartCont =~ m/id="uiWindowOpenTimer" name="WindowOpenTimer" value="(.*?)"/igs);
+       $tmp =~ s/,/\./;
+       $profile_content .= '"WindowOpenTimer":' . $tmp . ',' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/\<input id="uiWindowOpenTrigger" type="hidden" name="WindowOpenTrigger" value="(\d+)"\>/igs);
+       $tmp =~ s/,/\./;
+       $profile_content .= '"WindowOpenTrigger":' . $tmp . ',' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/(checked) id="uiView_HKRTemperatureRangeLockEnabled" value="1" name="TemperatureRangeLockEnabled"\>/igs);
+       $profile_content .= '"TemperatureRangeLockEnabled":1,' if $tmp && $tmp eq "checked";
+
+       ($tmp) = ($smartCont =~ m/id="uiNumDisplay:Mintemp"\>(.*?)\<\/span\>\<span id="uiNumUnit:Mintemp"\>/igs);
+       $tmp =~ s/,/\./;
+       $profile_content .= '"Mintemp":' . $tmp . ',' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/id="uiNumDisplay:Maxtemp"\>(.*?)\<\/span\>\<span id="uiNumUnit:Maxtemp"\>/igs);
+       $tmp =~ s/,/\./;
+       $profile_content .= '"Maxtemp":' . $tmp . ',' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/checked id="uiView_HKRTimerActive" value="(\d)" name/igs);
+       $profile_content .= '"hkr_timer_active":' . $tmp . ',' if $tmp;
+       #$profile_content .= ($tmp ? '"hkr_timer_active":1' : '"hkr_timer_active":0') . ',' ;
+
+       ($tmp) = ($smartCont =~ m/checked id="uiView_HKRAdaptHeat" value="(\d)" name/igs);
+       $profile_content .= '"hkr_adaptheat":' . $tmp . ',' if $tmp;
+       #$profile_content .= ($tmp ? '"hkr_adaptheat":1' : '"hkr_adaptheat":0') . ',' ;
+
+       ($tmp) = ($smartCont =~ m/id="uiNumDisplay:Heiztemp"\>(.*?)\<\/span\>\<span id="uiNumUnit:Heiztemp"\>/igs);
+       $tmp =~ s/,/\./;
+       $profile_content .= '"Heiztemp":' . $tmp . ',' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/id="uiNumDisplay:Absenktemp"\>(.*?)\<\/span\>\<span id="uiNumUnit:Absenktemp"\>/igs);
+       $tmp =~ s/,/\./;
+       $profile_content .= '"Absenktemp":' . $tmp . ',' if $tmp;
+
+       $profile_content .= '"graphState":' . "1" . ','; #if $tmp;
+
+       for (my $i = 1; $i <= 4; $i++) {
+
+         my $holiday = 'id="uiHoliday_' .$i. 'StartDay" name="Holiday' .$i. 'StartDay" value="(.*?)"\>';
+         ($tmp) = ($smartCont =~ m/$holiday/igs);
+         $profile_content .= '"Holiday1StartDay":"' . $tmp . '",' if $tmp;
+
+         $holiday = 'id="uiHoliday_' .$i. 'StartMonth" name="Holiday' .$i. 'StartMonth" value="(.*?)"\>';
+         ($tmp) = ($smartCont =~ m/$holiday/igs);
+         $profile_content .= '"Holiday' .$i. 'StartMonth":"' . $tmp . '",' if $tmp;
+
+         $holiday = 'id="uiHoliday_' .$i. 'StartHour" name="Holiday' .$i. 'StartHour" value="(.*?)"\>';
+         ($tmp) = ($smartCont =~ m/$holiday/igs);
+         $profile_content .= '"Holiday' .$i. 'StartHour":"' . $tmp . '",' if $tmp;
+
+         $holiday = 'id="uiHoliday_' .$i. 'EndDay" name="Holiday' .$i. 'EndDay" value="(.*?)"\>';
+         ($tmp) = ($smartCont =~ m/$holiday/igs);
+         $profile_content .= '"Holiday' .$i. 'EndDay":"' . $tmp . '",' if $tmp;
+
+         $holiday = 'id="uiHoliday_' .$i. 'EndMonth" name="Holiday' .$i. 'EndMonth" value="(.*?)"\>';
+         ($tmp) = ($smartCont =~ m/$holiday/igs);
+         $profile_content .= '"Holiday' .$i. 'EndMonth":"' . $tmp . '",' if $tmp;
+
+         $holiday = 'id="uiHoliday_' .$i. 'EndHour" name="Holiday' .$i. 'EndHour" value="(.*?)"\>';
+         ($tmp) = ($smartCont =~ m/$holiday/igs);
+         $profile_content .= '"Holiday' .$i. 'EndHour":"' . $tmp . '",' if $tmp;
+
+         $holiday = 'id="uiHoliday_' .$i. 'Enabled" name="Holiday' .$i. 'Enabled" value="(.*?)"\>';
+         ($tmp) = ($smartCont =~ m/$holiday/igs);
+         $profile_content .= '"Holiday' .$i. 'Enabled":"' . $tmp . '",' if $tmp;
+
+         $holiday = 'id="uiHoliday_' .$i. 'ID" name="Holiday' .$i. 'ID" value="(.*?)"\>';
+         ($tmp) = ($smartCont =~ m/$holiday/igs);
+         $profile_content .= '"Holiday' .$i. 'ID":"' . $tmp . '",' if $tmp;
+       }
+
+       ($tmp) = ($smartCont =~ m/id="uiHolidayEnabledCount" name="HolidayEnabledCount" value="(.*?)"\>/igs);
+       $profile_content .= '"HolidayEnabledCount":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/id="uiSummerStartDay" name="SummerStartDay" value="(.*?)"\>/igs);
+       $profile_content .= '"SummerStartDay":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/id="uiSummerStartMonth" name="SummerStartMonth" value="(.*?)"\>/igs);
+       $profile_content .= '"SummerStartMonth":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/id="uiSummerEndDay" name="SummerEndDay" value="(.*?)"\>/igs);
+       $profile_content .= '"SummerEndDay":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/id="uiSummerEndMonth" name="SummerEndMonth" value="(.*?)"\>/igs);
+       $profile_content .= '"SummerEndMonth":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/id="uiSummerEnabled" name="SummerEnabled" value="(.*?)"\>/igs);
+       $profile_content .= '"SummerEnabled":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/id="uiWindowOpenTrigger" name="WindowOpenTrigger" value="(.*?)"\>/igs);
+       $profile_content .= '"WindowOpenTrigger":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/\<input type="radio" checked value="(.*?)" id="uiTempsensorOwn" name="tempsensor"\>/igs);
+       $profile_content .= '"tempsensor":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/\<input type="hidden" name="Roomtemp" value="(.*?)" id="uiNum:Roomtemp"\>/igs);
+       $profile_content .= '"Roomtemp":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/var cfg = \{"offset":.*?,"hkr_temp":.*?,"ExtTempsensorID":(\d+),"room_temp":\}/igs);
+       $profile_content .= '"ExtTempsensorID":"' . ($tmp == 0 ? "tochoose" : $tmp) . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/var cfg = \{"offset":(.*?),"hkr_temp":.*?,"ExtTempsensorID":\d+,"room_temp":\}/igs);
+       $profile_content .= '"Offset":"' . $tmp . '",' if $tmp;
+
+       ($tmp) = ($smartCont =~ m/\<input id="uiEnabled" type="checkbox" name="enabled" (checked)\>\<label for/igs);
+       if($tmp && $tmp eq "checked") {
+         $profile_content .= '"enabled":"on",';
+
+         ($tmp) = ($smartCont =~ m/name="mail_type"\>\<option value=("default" selected)\>/igs);
+         if($tmp && $tmp eq '"default" selected') {
+           $profile_content .= '"mail_type":"default",';
+           $profile_content .= '"mailto":"apply",';
+         }
+
+         ($tmp) = ($smartCont =~ m/name="mail_type"\>\<option value="default"\>.*?\<\/option>\<option value=("custom" selected)\>/igs);
+         if($tmp && $tmp eq '"custom" selected') {
+           $profile_content .= '"mail_type":"custom",';
+           ($tmp) = ($smartCont =~ m/name="mailto" value="(.*?)"\>/igs);
+           $profile_content .= '"mailto":"' . $tmp . '",' if $tmp;
+         }
+       }
+
+       $profile_content .= '"lang":"de",';
+       $profile_content .= '"page":"home_auto_hkr_edit",';
+
+       chop($profile_content);
+       $profile_content .= '}}}';
+
+       FRITZBOX_Log $hash, 4, "Response JSON: \n" . $profile_content;
+
+       return FRITZBOX_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+
+     } else {
+
+#       return FRITZBOX_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+
+     }
+   }
 
    if ($queryStr =~ /home_auto_edit_view/) {
 
@@ -14945,7 +15430,7 @@ sub FRITZBOX_call_LuaData($$$@)
 
      } else {
 
-       return FRITZBOX_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+#       return FRITZBOX_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
 
      }
    }
@@ -15048,7 +15533,9 @@ sub FRITZBOX_call_LuaData($$$@)
    # handling non JSON returns
    ###########  HTML #################################
 
-   if ( ($data !~ m/\"pid\":/igs && $data !~ m/\"data\":/igs) || ($data =~ m/login\.init\(data\);/igs) || ($data =~ m/\<DOCTYPE html\>\<html/igs) ) {
+   my $resultJSON = FRITZBOX_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+
+   if (defined $resultJSON->{Error} && $resultJSON->{Error} =~ /no HASH\/ARRAY from JSON returned/ ) {
 
      FRITZBOX_Log $hash, 4, "Response Data: \n" . $data;
 
@@ -15061,6 +15548,9 @@ sub FRITZBOX_call_LuaData($$$@)
 
      $profile_content  = '{';
      $profile_content .= '"pid":"nonJSON",';
+     
+     $profile_content .= '"Error":"' . $result->{Error} . '",' if $luaFunction ne "fnget";
+
      $profile_content .= '"data":{';
      $profile_content .= '"noJSONinfo":"no JSON-Data in data.lua request",';
      if( $isHTML) {
@@ -15079,7 +15569,9 @@ sub FRITZBOX_call_LuaData($$$@)
      return FRITZBOX_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
 
    }
-   return FRITZBOX_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+
+#   return FRITZBOX_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+   return $resultJSON;
 
 } # end FRITZBOX_Lua_Data
 
@@ -15322,13 +15814,13 @@ sub FRITZBOX_Helper_process_JSON($$$@) {
    if ($charSet eq "UTF-8") {
       $jsonResult = eval { JSON->new->utf8->decode( $jsonText ) };
       if ($@) {
-        FRITZBOX_Log $hash, 3, "Decode JSON string: decode_json failed, invalid json. error:$@";
+        FRITZBOX_Log $hash, 4, "Decode JSON string: decode_json failed, invalid json. error:$@";
       }
    }
    else {
       $jsonResult = eval { JSON->new->latin1->decode( $jsonText ) };
       if ($@) {
-        FRITZBOX_Log $hash, 3, "Decode JSON string: decode_json failed, invalid json. error:$@";
+        FRITZBOX_Log $hash, 4, "Decode JSON string: decode_json failed, invalid json. error:$@";
       }
    }
 
@@ -15435,7 +15927,6 @@ sub FRITZBOX_Helper_analyse_Lua_Result($$;@)
        $hash->{SID_RENEW_CNT}     += $result->{sidNew};
      }
    }
-
 
    if (ref ($result->{result}) eq "ARRAY" || ref ($result->{data}) eq "HASH" ){
      $result->{data}->{noJSONdocument} = decode_base64($result->{data}->{noJSONdocument}) if defined ($result->{data}->{noJSONdocument});
@@ -16193,14 +16684,26 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          The ID can be obtained via <code>get &lt;name&gt; luaInfo &lt;smartHomeAutomation&gt;</code> can be determined.<br><br>
          The result of the command is stored in the Reading retStat_smartHome.
          <br>
-         Requires FRITZ!OS 8.00 or higher.<br>
-         or<br>
+
+         Requires FRITZ!OS 8.20 or higher.<br>
          <ul>
-         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:value&gt;</code></dt>
-         <dd>changes the temperature offset to the value for the SmartHome device with the specified ID.</dd>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;minTemp:7.5..28.5 steps 0.5&gt;</code></dt>
+         <dd>Limits the minimum temperature on the radiator control to &lt;7.5..28.5&gt; degrees.</dd>
          <br>
-         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpAdjust:value&gt;</code></dt>
-         <dd>sets the radiator controller temporarily to the temperature: value.</dd>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;maxTemp:7.5..28.5 steps 0.5&gt;</code></dt>
+         <dd>Limits the maximum temperature on the radiator control to &lt;7.5..28.5&gt; degrees.</dd>
+         <br>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; <mimaRange:0|1></code></dt>
+         <dd>Turns the temperature limit on|off.</dd>
+         </ul>
+
+         Requires FRITZ!OS 8.00 or higher.<br>
+         <ul>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:8..28 steps 0.5&gt;</code></dt>
+         <dd>changes the temperature offset to the value: &lt;8..28&gt; degrees for the SmartHome device with the specified ID.</dd>
+         <br>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpAdjust:8..28 steps 0.5&gt;</code></dt>
+         <dd>sets the radiator controller temporarily to the temperature: &lt;8..28&gt; degrees.</dd>
          <br>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpPerm:0|1&gt;</code></dt>
          <dd>sets the radiator controller to permanently off or on.</dd>
@@ -16371,13 +16874,17 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="luaData"></a>
-         <dt><code>get &lt;name&gt; luaData [json] &lt;Command&gt;</code></dt>
+         <dt><code>get &lt;name&gt; luaData [json|pretty] &lt;Command&gt;</code></dt>
          <br>
-         Evaluates commands via data.lua codes.<br>
+         Evalutes commands/queries via data.lua.<br>
+         <br>
+         If json is specified as an optional parameter, a JSON-formatted string is returned for further processing.<br>
+         If pretty is specified as an optional parameter, a prepared, readable JSON format is returned.<br>
+         By default, a simple prepared JSON is returned.<br>
+         <br>
          Replacements for special charactersin parameters:<br>
          - semicolon with <code>#x003B</code><br>
          - space with <code>%20</code><br>
-         Optionally, json can be specified as the first parameter. The result is then returned as JSON for further processing.
       </li><br>
 
       <li><a name="luaDectRingTone"></a>
@@ -16761,8 +17268,11 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       <li><b>box_tr069</b> - Provider remote maintenance TR-069 (security-relevant!)</li>
       <li><b>box_wlan_Count</b> - Number of devices using WLAN connected</li>
       <li><b>box_wlan_Active</b> - Current WLAN status</li>
-      <li><b>box_wlan_2.4GHz</b> - Current 2.4 GHz WLAN status</li>
-      <li><b>box_wlan_5GHz</b> - Current 5 GHz WLAN status</li>
+      <li><b>box_wlanBand_cnt</b> - Number of Wi-Fi bands</li>
+      <li><b>box_wlanBand_2.4GHz</b> - Current status of the 2.4 GHz Wi-Fi. Lower Fritz!OS 7.50</li>
+      <li><b>box_wlanBand_5GHz</b> - Current status of the 5 GHz Wi-Fi. Lower Fritz!OS 7.50</li>
+      <li><b>box_wlanBand_</b><i>n</i><b>GHz_active</b> - Active status of the GHz Wi-Fi. Greater than or equal to Fritz!OS 7.50</li>
+      <li><b>box_wlanBand_</b><i>n</i><b>GHz_usable</b> - Availability status of the GHz Wi-Fi. Greater than or equal to Fritz!OS 7.50</li>
       <li><b>box_wlan_lastScanTime</b> - Last scan of the WLAN environment. Only available if the enableWLANneighbors attribute is set.</li>
       <li><b>box_wlan_LogExtended</b> - Status -> "Also log logins and logouts and extended WLAN information."</li>
       <li><b>box_wlan_LogNewest</b> - Most recent WLAN event: ID Date Time </li>
@@ -17328,21 +17838,32 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          <dd>wendet das Scenarium/Template mit der ID &lt;ID&gt; an</dd>
          </ul>
          Die ID kann über <code>get &lt;name&gt; luaInfo &lt;smartHomeAutomation&gt;</code> ermittelt werden.<br><br>
-         <br>
-         Benötigt FRITZ!OS 8.00 oder höher.<br>
-         oder<br>
+
+         Benötigt FRITZ!OS 8.20 oder höher.<br>
          <ul>
-         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:value&gt;</code></dt>
-         <dd>ändert den Temperatur Offset auf den Wert:value für das SmartHome Gerät mit der angegebenen ID.</dd>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;minTemp:7.5..28.5 steps 0.5&gt;</code></dt>
+         <dd>begrenzt die minimale Temperatur am Heizköperregeler auf &lt;7.5..28.5&gt; Grad.</dd>
          <br>
-         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpAdjust:value&gt;</code></dt>
-         <dd>setzt den Heizköperregeler temporär auf die Temperatur: value.</dd>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;maxTemp:7.5..28.5 steps 0.5&gt;</code></dt>
+         <dd>begrenzt die maxmale Temperatur am Heizköperregeler auf &lt;7.5..28.5&gt; Grad.</dd>
+         <br>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;mimaRange:0|1&gt;</code></dt>
+         <dd>schaltet die Temperaturbegrenzung aus|an.</dd>
+         </ul>
+
+         Benötigt FRITZ!OS 8.00 oder höher.<br>
+         <ul>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:8..28 steps 0.5&gt;</code></dt>
+         <dd>ändert den Temperatur Offset auf den Wert: 8..28 Grad für das SmartHome Gerät mit der angegebenen ID.</dd>
+         <br>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpAdjust:8..28 steps 0.5&gt;</code></dt>
+         <dd>setzt den Heizköperregeler temporär auf die Temperatur: 8..28 Grad.</dd>
          <br>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpPerm:0|1&gt;</code></dt>
-         <dd>setzt den Heizköperregeler auf permanent aus oder an.</dd>
+         <dd>setzt den Heizköperregeler auf permanent aus|an.</dd>
          <br>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;switch:0|1&gt;</code></dt>
-         <dd>schaltet den Steckdosenadapter aus oder an.</dd>
+         <dd>schaltet den Steckdosenadapter aus|an.</dd>
          <br>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;preDefSave:nameEinstellung&gt;</code></dt>
          <dd>speichert die Einstellungen für das Device unter dem angegeben Namen.</dd>
@@ -17359,8 +17880,6 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          Die ID kann über <code>get &lt;name&gt; luaInfo &lt;smartHomeDevices&gt;</code> ermittelt werden.<br><br>
          Das Ergebnis des Befehls wird im Reading retStat_smartHome abgelegt.
          <br>
-         Benötigt FRITZ!OS 7.21 oder höher.
-
       </li><br>
 
       <li><a name="switchIPv4DNS"></a>
@@ -17506,14 +18025,17 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="luaData"></a>
-         <dt><code>get &lt;name&gt; luaData [json] &lt;Command&gt;</code></dt>
+         <dt><code>get &lt;name&gt; luaData [json|pretty] &lt;Command&gt;</code></dt>
          <br>
-         Führt Komandos über data.lua aus.<br>
+         Führt Komandos/Abfragen über data.lua aus.<br>
+         <br>
+         Wird als optionaler Parameter json angegeben, so wird eine JSON formtierte Zeichenkette für weitere Verarbeitungen zurück gegeben.<br>
+         Wird als optionaler Parameter pretty angegeben, so wird ein aufbereitetes lesbares JSON Format zurückgegeben.<br>
+         Standardmäßig wird ein einfaches aufbereitetes JSON zurückgegeben.<br>
+         <br>
          Ersetzungen für besondere Zeichen:<br>
          - Semicolon durch <code>#x003B</code><br>
          - Leerzeichen durch <code>%20</code><br>
-
-         Optional kann als erster Parameter json angegeben werden. Es wir dann für weitere Verarbeitungen das Ergebnis als JSON zurück gegeben.
       </li><br>
 
       <li><a name="luaDectRingTone"></a>
@@ -17894,8 +18416,11 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
       <li><b>box_wlan_Count</b> - Anzahl der Ger&auml;te die &uuml;ber WLAN verbunden sind</li>
       <li><b>box_wlan_Active</b> - Akteuller Status des WLAN</li>
-      <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
-      <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
+      <li><b>box_wlanBand_cnt</b> - Anzahl der Wlan Bänder</li>
+      <li><b>box_wlanBand_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN. Kleiner Fritz!OS 7.50</li>
+      <li><b>box_wlanBand_5GHz</b> - Aktueller Status des 5-GHz-WLAN. Kleiner Fritz!OS 7.50</li>
+      <li><b>box_wlanBand_</b><i>n</i><b>GHz_active</b> - Aktiv-Status des GHz-WLAN. Größer/Gleich Fritz!OS 7.50</li>
+      <li><b>box_wlanBand_</b><i>n</i><b>GHz_usable</b> - Verfügbarkeits-Status des GHz-WLAN. Größer/Gleich Fritz!OS 7.50</li>
       <li><b>box_wlan_lastScanTime</b> - Letzter Scan der WLAN Umgebung. Ist nur vorhanden, wenn das Attribut enableWLANneighbors gesetzt ist.</li>
       <li><b>box_wlan_LogExtended</b> - Status -> "Auch An- und Abmeldungen und erweiterte WLAN-Informationen protokollieren".</li>
       <li><b>box_wlan_LogNewest</b> - aktuellstes WLAN-Ereignis: ID Datum Zeit </li>
