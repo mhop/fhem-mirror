@@ -5800,6 +5800,7 @@ sub card
     $rotate=0 if (!defined $rotate);
     $iscale=1 if (!defined $iscale);
     $ic="" if (!defined($ic));
+    $iscale/=2;
   }
    
   my $svg_width=int($size/100*$bwidth);
@@ -5864,13 +5865,13 @@ $out.= sprintf ('<svg class="DOIF_card" id="%d %d" xmlns="http://www.w3.org/2000
     $out.= sprintf('<text text-anchor="start" x="%s" y="19" style="fill:#CCCCCC; font-size:12.5px;%s">%s</text>',defined $ic ? 34:14,$header_style,$header_txt) if (defined $header); 
     if (defined $icon and $icon ne "" and  $icon ne " ") {
       my $svg_icon=::FW_makeImage($ic);
-      if (!($svg_icon =~ s/\sheight="[^"]*"/ height="18"/)) {
-          $svg_icon =~ s/svg/svg height="18"/ 
+      if (!($svg_icon =~ s/\sheight="[^"]*"/ height="34"/)) {
+          $svg_icon =~ s/svg/svg height="34"/ 
       }
-      if (!($svg_icon =~ s/\swidth="[^"]*"/ width="18"/)) {
-          $svg_icon =~ s/svg/svg width="18"/ 
+      if (!($svg_icon =~ s/\swidth="[^"]*"/ width="34"/)) {
+          $svg_icon =~ s/svg/svg width="34"/ 
       }
-      $out.='<g transform="translate(14,2) scale('.$iscale.') rotate('.$rotate.',9,9) ">';
+      $out.='<g transform="translate(14,3) scale('.$iscale.') rotate('.$rotate.',9,9) ">';
       $out.= $svg_icon;
       $out.='</g>';
     }
@@ -5900,9 +5901,10 @@ $out.= sprintf ('<svg class="DOIF_card" id="%d %d" xmlns="http://www.w3.org/2000
   
   $out.= sprintf('<g transform="translate(0,%d)">',$htrans);
   $out.='<polyline points="11,73 '.($bwidth+9).',73"  style="stroke:gray; stroke-width:0.7" />' if (!$noFooter);
-  $out.= sprintf('<svg width="%s" height="72">',$chart_dim+84);
+  my $plot_width=$chart_dim+84;
+  $out.= sprintf ('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" style="width:%dpx; height:%dpx;">',$plot_width,73,$plot_width,73);
   $out.= sprintf('<g transform="translate(%s,8) scale(1) ">', scalar @colcount ? 35:17);
-
+  
   $out.= '<rect x="-2" y="-3" width="'.($chart_dim+4).'" height="56" rx="1" ry="1" fill="url(#gradcardback)"/>';
 
  
@@ -6236,6 +6238,7 @@ sub bar
     $rotate=0 if (!defined $rotate);
     $iscale=1 if (!defined $iscale);
     $ic="" if (!defined($ic));
+    $iscale/=2;
   }
 
    
@@ -6277,13 +6280,13 @@ sub bar
 
   if (defined $icon and $icon ne "" and  $icon ne " ") {
     my $svg_icon=::FW_makeImage($ic);
-    if(!($svg_icon =~ s/\sheight="[^"]*"/ height="22"/)) {
-        $svg_icon =~ s/svg/svg height="22"/ 
+    if(!($svg_icon =~ s/\sheight="[^"]*"/ height="34"/)) {
+        $svg_icon =~ s/svg/svg height="34"/ 
     }
-    if(!($svg_icon =~ s/\swidth="[^"]*"/ width="22"/)) {
-        $svg_icon =~ s/svg/svg width="22"/ 
+    if(!($svg_icon =~ s/\swidth="[^"]*"/ width="34"/)) {
+       $svg_icon =~ s/svg/svg width="34"/ 
     }
-    $out.='<g transform="translate('.$ix.', '.$iy.') translate(11, 11) scale('.$iscale.') translate(-11, -11) rotate('.$rotate.',11,11) ">';
+    $out.='<g transform="translate('.$ix.', '.$iy.') translate(9, 11) scale('.$iscale.') translate(-11, -11) rotate('.$rotate.',11,11) ">';
     $out.= $svg_icon;
     $out.='</g>';
   }
@@ -6828,6 +6831,7 @@ sub ring
     $rotate=0 if (!defined $rotate);
     $iscale=1 if (!defined $iscale);
     $ic="" if (!defined($ic));
+    $iscale/=2;
   }
   
   if (defined $icon and $icon ne "") {
@@ -6888,11 +6892,11 @@ sub ring
  
   if (defined $icon and $icon ne "" and  $icon ne " ") {
     my $svg_icon=::FW_makeImage($ic);
-    if(!($svg_icon =~ s/\sheight="[^"]*"/ height="18"/)) {
-        $svg_icon =~ s/svg/svg height="18"/ }
-    if(!($svg_icon =~ s/\swidth="[^"]*"/ width="18"/)) {
-        $svg_icon =~ s/svg/svg width="18"/ }
-    $out.='<g transform="translate('.$ix.', '.$iy.') translate(9, 9) scale('.$iscale.') translate(-9, -9) rotate('.$rotate.',9,9) ">';
+    if(!($svg_icon =~ s/\sheight="[^"]*"/ height="34"/)) {
+        $svg_icon =~ s/svg/svg height="34"/ }
+    if(!($svg_icon =~ s/\swidth="[^"]*"/ width="34"/)) {
+        $svg_icon =~ s/svg/svg width="34"/ }
+    $out.='<g transform="translate('.$ix.', '.$iy.') translate(5.5, 6) scale('.$iscale.') translate(-9, -9) rotate('.$rotate.',9,9) ">';
     $out.= $svg_icon;
     $out.='</g>';
   }
@@ -6970,6 +6974,7 @@ sub ring2
     $rotate=0 if (!defined $rotate);
     $iscale=1 if (!defined $iscale);
     $ic="" if (!defined($ic));
+    $iscale/=2;
   }
   
   if (defined $icon and $icon ne "") {
@@ -7047,11 +7052,11 @@ sub ring2
   
   if (defined $icon and $icon ne "" and  $icon ne " ") {
     my $svg_icon=::FW_makeImage($ic);
-    if(!($svg_icon =~ s/\sheight="[^"]*"/ height="15"/)) {
-        $svg_icon =~ s/svg/svg height="15"/ }
-    if(!($svg_icon =~ s/\swidth="[^"]*"/ width="15"/)) {
-        $svg_icon =~ s/svg/svg width="15"/ }
-    $out.='<g transform="translate('.$ix.', '.$iy.') translate(7.5, 7.5) scale('.$iscale.') translate(-7.5, -7.5) rotate('.$rotate.',7.5,7.5)">';
+    if(!($svg_icon =~ s/\sheight="[^"]*"/ height="30"/)) {
+        $svg_icon =~ s/svg/svg height="30"/ }
+    if(!($svg_icon =~ s/\swidth="[^"]*"/ width="30"/)) {
+        $svg_icon =~ s/svg/svg width="30"/ }
+    $out.='<g transform="translate('.$ix.', '.$iy.') translate(3, 3) scale('.$iscale.') translate(-7.5, -7.5) rotate('.$rotate.',7.5,7.5)">';
     $out.= $svg_icon;
     $out.='</g>';
  }
