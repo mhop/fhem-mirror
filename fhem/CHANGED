@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 72_FRITZBOX: guestWlan on|off bei mehr als zwei Kanälen
+ - feature: 72_FRITZBOX: set <name> smartHome
+                         - auf Fritz!OS 8.20 angepasst
+                         - Parameterprüfung überarbeitet
+                         - neue Parameter minTemp, maxTemp, mimaRange
+                         get <name> luaData neuer Parameter pretty
  - bugfix: 76_SolarForecast: negative SoC forecast when using optPower
  - feature: 76_SolarForecast: Version 1.58.6
  - bugfix: 72_FRITZBOX: Fehler bei rename von Devices
@@ -13,7 +19,7 @@
  - feature: 49_SSCam: set compatibility to 9.2.4
  - feature: 36_Shelly: Shelly Shutter hinzugefügt
  - bugfix: 72_FRITZBOX: Fehler bei tam0 Ermittlung
- - feature: 72_FRITZBOX: Erweiterung set <name> samrtHome
+ - feature: 72_FRITZBOX: Erweiterung set <name> smartHome
  - feature: 76_SolarForecast: Version 1.58.0
  - bugfix: 72_FRITZBOX: Fehler bei set <name> phoneBookEntry
  - feature: 57_Calendar: new attribute userAgent (forum #142335)
