@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.1" => "07.10.2025   ",
+  "1.59.1" => "07.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ",
   "1.59.0" => "06.10.2025  new sub __normIconInnerScale to fix problem with chromium engine > 140.x, Forum: https://forum.fhem.de/index.php?msg=1349058 ",
   "1.58.8" => "06.10.2025  __batChargeOptTargetPower: minor Code change ",
   "1.58.7" => "05.10.2025  fix negative SoC forecast when using optPower Forum: https://forum.fhem.de/index.php?msg=1348954 ",
@@ -11602,10 +11602,11 @@ return $sf;
 #       Erstellung Batterie Ladefreigabe + SoC Prognose
 ################################################################
 sub _batChargeMgmt {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $chour = $paref->{chour};
-  my $t     = $paref->{t};
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $chour  = $paref->{chour};
+  my $minute = $paref->{minute};                                                                 # aktuelle Minute (00-59)
+  my $t      = $paref->{t};
 
   return if(!isBatteryUsed ($name));
 
@@ -11800,7 +11801,7 @@ sub _batChargeMgmt {
 
           $spday     = 0 if($spday < 0);                                                         # PV Überschuß Prognose bis Sonnenuntergang
           $confc    *= (100 - $wou) / 100 if($pvfc > 0);                                         # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)
-          my $surpls = sprintf "%.0f", ($pvfc - $confc);                                         # PV-Überschuß der Stunde, wichtig keine Nachkommastellen!
+          my $surpls = $pvfc - $confc;                                              
           
           ## Steuerung nach Ladefreigabe
           ################################
@@ -11814,14 +11815,14 @@ sub _batChargeMgmt {
           
           # Steuerhash für optimimierte Ladeleistung erstellen
           ######################################################
-          my $surplswh = max (0, $surpls);     
+          my $surplswh = max (0, (sprintf "%.0f", $surpls));                                     # wichtig keine Nachkommastellen!
           
           if ($strategy eq 'optPower' || $strategy eq 'loadRelease' && $today) {                 # bei loadRelease' nur den aktuellen Tag betrachten
               $hsurp->{$fd}{$hod}{nhr}               = $nhr;
               $hsurp->{$fd}{$hod}{speff}             = $surpls;                                  # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0  
               $hsurp->{$fd}{$hod}{surplswh}          = $surplswh.'.'.$hod;                       # absoluter Überschuß in Wh der Stunde mit Sortierhilfe 
               $hsurp->{$fd}{$hod}{$bn}{spday}        = $spday;                                   # (Rest)PV-Überschuß am laufenden Tag
-              $hsurp->{$fd}{$hod}{$bn}{initsocwh}    = $socwh;
+              $hsurp->{$fd}{$hod}{$bn}{initsocwh}    = $socwh;                                   # durch LR fortgeschriebener SoC
               $hsurp->{$fd}{$hod}{$bn}{batinstcap}   = $batinstcap;                              # installierte Batteriekapazität (Wh)
               $hsurp->{$fd}{$hod}{$bn}{goalwh}       = $goalwh;                                  # Ladeziel
               $hsurp->{$fd}{$hod}{$bn}{bpinmax}      = $bpinmax;                                 # max. mögliche Ladeleistung
@@ -11837,6 +11838,9 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{$bn}{weightOwnUse} = $wou;                                     # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)
               $hsurp->{$fd}{$hod}{$bn}{befficiency}  = $befficiency;                             # Speicherwirkungsgrad
           }
+          
+          $surpls = $surpls / 60 * (60 - int $minute) if(!$num);                                 # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß
+          $surpls = sprintf "%.0f", $surpls;                                                     # wichtig keine Nachkommastellen!
           
           ## SOC-Prognose LR
           ####################                                                                      
@@ -11904,9 +11908,11 @@ sub _batChargeMgmt {
   
   # leistungsoptimierte (optPower) Beladungssteuerung
   #####################################################
+  my $trans = {};                                                                                           # Übertrags-Hash Referenz
+  
   for my $lfd (0..max (0, keys %{$hsurp})) {
       $paref->{hsurp} = $hsurp->{$lfd}; 
-      my ($hopt, $otp) = __batChargeOptTargetPower ($paref);
+      my ($hopt, $otp) = __batChargeOptTargetPower ($paref, $lfd, $trans);
       delete $paref->{hsurp};
       
       ## Debuglog OTP
@@ -11923,7 +11929,7 @@ sub _batChargeMgmt {
           
           for my $bat (sort @batteries) {
               next if(!defined $hopt->{$shod}{$bat}{batinstcap});			  
-              my $ssocwh  = $hopt->{$shod}{$bat}{runwh} // '-';
+              my $ssocwh = $hopt->{$shod}{$bat}{runwh} // '-';
               
               ## SOC-Prognose OTP
               #####################
@@ -12018,6 +12024,9 @@ return;
 ################################################################       
 sub __batChargeOptTargetPower {
   my $paref = shift;
+  my $lfd   = shift;                                                                                             # laufender Tag (1..X)
+  my $trans = shift;                                                                                             # Übertrags-Hash Referenz
+  
   my $name  = $paref->{name};
   my $hsurp = $paref->{hsurp};                                                                                   # Hashref Überschußhash
 
@@ -12025,6 +12034,7 @@ sub __batChargeOptTargetPower {
   my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert
   my @batteries  = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hsurp->{24}};
   my $otp;
+  my $fcendwh;
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
 	  my $nhr     = $hsurp->{$hod}{nhr};
@@ -12034,22 +12044,29 @@ sub __batChargeOptTargetPower {
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
 
-      for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie
-          my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
-          my $sbatinstcap = $hsurp->{$hod}{$sbn}{batinstcap};                                                    # Kapa dieser Batterie 
+      for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie		  
+		  my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
+          my $batinstcap  = $hsurp->{$hod}{$sbn}{batinstcap};                                                    # Kapa dieser Batterie 
           my $lowSocwh    = $hsurp->{$hod}{$sbn}{lowSocwh};                                                      # eingestellter lowSoc in Wh
+          my $batoptsocwh = $hsurp->{$hod}{$sbn}{batoptsocwh};                                                   # optimaler SoC in Wh
           my $csocwh      = $hsurp->{$hod}{$sbn}{csocwh};                                                        # aktueller SoC in Wh
           my $bpinreduced = $hsurp->{$hod}{$sbn}{bpinreduced};                                                   # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
           my $befficiency = $hsurp->{$hod}{$sbn}{befficiency};                                                   # Speicherwirkungsgrad
           
-          my $runwh       = defined $hsurp->{$hod}{$sbn}{fcnextwh} ?                                             # Auswahl des zu verwendenden Prognose-SOC (Wh)
-                            $hsurp->{$hod}{$sbn}{fcnextwh}         : 
-                            ( $nhr eq '00' ? 
-                              $csocwh      : 
-                              $hsurp->{$hod}{$sbn}{initsocwh}
-                            ); 
+          # Initialisierung / Fortschreibung Prognose-SOC (Wh)
+          ######################################################
+          my $fc_next_wh  = $hsurp->{$hod}{$sbn}{fcnextwh};
+          my $init_soc_wh = $hsurp->{$hod}{$sbn}{initsocwh};
+          my $transfer    = $trans->{$sbn}{$lfd}{transfer};
           
-          $runwh                      = min ($runwh, $sbatinstcap);                            
+          my $runwh = do {
+              if (defined $fc_next_wh)   { $fc_next_wh }
+              elsif ($nhr eq '00')       { $csocwh }
+              elsif (defined $transfer)  { delete $trans->{$sbn}{$lfd}{transfer} }
+              else                       { $init_soc_wh }
+          };
+          
+          $runwh                      = min ($runwh, $batinstcap);                            
           $hsurp->{$hod}{$sbn}{runwh} = sprintf "%.0f", $runwh;                                                  # Startwert für DebugLog
 
           ## Ziel und dessen Erreichbarkeit
@@ -12072,7 +12089,13 @@ sub __batChargeOptTargetPower {
               $hsurp->{$hod}{$sbn}{pneedmin} = $bpinmax;
               
               $runwh += $hsurp->{$hod}{speff} / $befficiency;                                                    # um Verbrauch reduzieren
-              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", max ($lowSocwh, $runwh);                      # untere Begrenzung auf lowSoC			  
+              
+              $fcendwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                  # fcendwh begrenzen
+                         $runwh < $batoptsocwh ? $batoptsocwh :                                       
+                         $runwh > $batinstcap  ? $batinstcap  :
+                         $runwh;              
+              
+              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $fcendwh;                	  
 			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			  
               
               if ($nhr eq '00') {
@@ -12120,18 +12143,26 @@ sub __batChargeOptTargetPower {
               $otp->{$sbn}{target} = $target;
           }
 
-
-
-          $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", min ($goalwh, $runwh                                    # Endwert Prognose aktuelle Stunde
-                                                               + $befficiency 
-                                                                 * ($nhr eq '00'           
-                                                                     ? $otp->{$sbn}{target}
-                                                                     : $spls
-                                                                   )
-                                                              );
+          $fcendwh = min ($goalwh, $runwh                                                                        # Endwert Prognose aktuelle Stunde
+                                    + $befficiency 
+                                       * ($nhr eq '00'           
+                                          ? $otp->{$sbn}{target}
+                                          : $spls
+                                         )
+                         );
+                                                              
+          $fcendwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                      # fcendwh begrenzen
+                     $runwh < $batoptsocwh ? $batoptsocwh :                                       
+                     $runwh > $batinstcap  ? $batinstcap  :
+                     $runwh;
 		  
-          $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);                # Startwert kommende Stunde  
+          $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $fcendwh;
+          $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);               # Startwert kommende Stunde  
       }
+  }
+  
+  for my $bat (sort { $a <=> $b } @batteries) {
+      $trans->{$bat}{$lfd + 1}{transfer} = $hsurp->{24}{$bat}{fcendwh};                                          # Übertrag SoC-Prognose für kommenden Tag                              
   }
   
 return ($hsurp, $otp);
