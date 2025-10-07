@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.0" => "06.10.2025  new sub __normIconBoxScale to fix problem with chromium engine > 140.x, Forum: https://forum.fhem.de/index.php?msg=1349058 ",
+  "1.59.1" => "07.10.2025   ",
+  "1.59.0" => "06.10.2025  new sub __normIconInnerScale to fix problem with chromium engine > 140.x, Forum: https://forum.fhem.de/index.php?msg=1349058 ",
   "1.58.8" => "06.10.2025  __batChargeOptTargetPower: minor Code change ",
   "1.58.7" => "05.10.2025  fix negative SoC forecast when using optPower Forum: https://forum.fhem.de/index.php?msg=1348954 ",
   "1.58.6" => "03.10.2025  __batChargeMgmt code changed, new sub ___batChargeSaveResults, remove reading Battery_ChargeRecommended_XX ".
@@ -11920,12 +11921,13 @@ sub _batChargeMgmt {
           my $nhr       = $hopt->{$shod}{nhr};
           my @batteries = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hopt->{24}};
           
-          for my $bat (sort @batteries) {                          
+          for my $bat (sort @batteries) {
+              next if(!defined $hopt->{$shod}{$bat}{batinstcap});			  
               my $ssocwh  = $hopt->{$shod}{$bat}{runwh} // '-';
               
               ## SOC-Prognose OTP
               #####################
-              my $fcendwh = $hopt->{$shod}{$bat}{fcendwh} // 0;                    
+              my $fcendwh = $hopt->{$shod}{$bat}{fcendwh} // 0;  
               $progsoc    = sprintf "%.1f", (100 * $fcendwh / $hopt->{$shod}{$bat}{batinstcap});            # Prognose SoC in %
                         
               ## Speicherung und Readings erstellen OTP
@@ -12025,9 +12027,10 @@ sub __batChargeOptTargetPower {
   my $otp;
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
-      my $spls    = int $hsurp->{$hod}{surplswh};
-      my $newshod = sprintf "%02d", (int $hod + 1);
-      my $nhr     = $hsurp->{$hod}{nhr};
+	  my $nhr     = $hsurp->{$hod}{nhr};
+      my $spls    = int ($hsurp->{$hod}{surplswh} // 0);	  
+	  my $nexthod = sprintf "%02d", (int $hod + 1);
+	  my $nextnhr = $hsurp->{$nexthod}{nhr};
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
 
@@ -12055,7 +12058,7 @@ sub __batChargeOptTargetPower {
           my $runwhneed  = $goalwh - $runwh; 
           my $achievable = 1;
           my $total      = 0;                                               
-          $total   += $hsurp->{$_}{surplswh} for @remaining_hods;                                                # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
+          $total        += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
             
           if ($total * $befficiency < $goalwh) {                                                                 # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
@@ -12069,7 +12072,8 @@ sub __batChargeOptTargetPower {
               $hsurp->{$hod}{$sbn}{pneedmin} = $bpinmax;
               
               $runwh += $hsurp->{$hod}{speff} / $befficiency;                                                    # um Verbrauch reduzieren
-              $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", max ($lowSocwh, $runwh);                           # untere Begrenzung auf lowSoC       
+              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", max ($lowSocwh, $runwh);                      # untere Begrenzung auf lowSoC			  
+			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			  
               
               if ($nhr eq '00') {
                   $otp->{$sbn}{target} = $csocwh <= $lowSocwh ? $bpinreduced : $bpinmax;
@@ -12118,15 +12122,15 @@ sub __batChargeOptTargetPower {
 
 
 
-          $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", min ($goalwh, $runwh                                     # Endwert Prognose aktuelle Stunde
+          $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", min ($goalwh, $runwh                                    # Endwert Prognose aktuelle Stunde
                                                                + $befficiency 
                                                                  * ($nhr eq '00'           
                                                                      ? $otp->{$sbn}{target}
                                                                      : $spls
                                                                    )
-                                                              );                        
-          
-          $hsurp->{$newshod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh};                                    # Startwert kommende Stunde  
+                                                              );
+		  
+          $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);                # Startwert kommende Stunde  
       }
   }
   
@@ -18725,9 +18729,9 @@ END0
                                            }
                                          );
 
-          $cicon = FW_makeImage       ($cicon, ''); 
-          $cicon = __normIconBoxScale ($cicon);       
-        
+          $cicon = FW_makeImage         ($cicon, ''); 
+          $cicon = __normIconInnerScale ($cicon);       
+  
           $ret .= qq{<g id="consumer_${c}_$stna" transform="translate($cons_left $y_pos)">};
           $ret .= "<title>$calias</title>".$cicon;
           $ret .= '</g> ';
@@ -18766,8 +18770,8 @@ END1
       $hicon            = $hicon.'@'.$pahcol;
   }
 
-  $hicon = FW_makeImage       ($hicon, '');
-  $hicon = __normIconBoxScale ($hicon);
+  $hicon = FW_makeImage         ($hicon, '');
+  $hicon = __normIconInnerScale ($hicon);
   
   $ret .= qq{<g id="home_$stna" transform="translate(368 360)">};                                 # translate(X-Koordinate,Y-Koordinate)
   $ret .= "<title>$hmtxt</title>".$hicon;
@@ -18788,8 +18792,8 @@ END1
                                      );
 
 
-      $dicon = FW_makeImage       ($dicon, '');
-	  $dicon = __normIconBoxScale ($dicon); 
+      $dicon = FW_makeImage         ($dicon, '');
+	  $dicon = __normIconInnerScale ($dicon); 
 
       $ret .= qq{<g id="dummy_$stna" transform="translate(660 360)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
@@ -19268,8 +19272,8 @@ sub __addInputProducerIcon {
                                                                   }
                                                                 );
 
-                  $genericon = FW_makeImage       ($genericon, '');
-				  $genericon = __normIconBoxScale ($genericon);
+                  $genericon = FW_makeImage         ($genericon, '');
+				  $genericon = __normIconInnerScale ($genericon);
 				  
 				  $ret .= qq{<g id="generator_${pn}_$stna" fill="grey" transform="translate($xstart $ystart)">};
                   $ret .= "<title>$genertxt</title>".$genericon;
@@ -19287,8 +19291,8 @@ sub __addInputProducerIcon {
                                                   }
                                                 );
 
-          $picon = FW_makeImage       ($picon, '');
-		  $picon = __normIconBoxScale ($picon); 
+          $picon = FW_makeImage         ($picon, '');
+		  $picon = __normIconInnerScale ($picon); 
 		  
           $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($xstart $y_coord)">};
           $ret .= "<title>$ptxt</title>".$picon;
@@ -19323,8 +19327,8 @@ sub __addNodeIcon {
                                            }
                                          );
 
-  $nicon = FW_makeImage       ($nicon, '');
-  $nicon = __normIconBoxScale ($nicon);
+  $nicon = FW_makeImage         ($nicon, '');
+  $nicon = __normIconInnerScale ($nicon);
 		  
   my $ret = qq{<g id="node_$stna" transform="translate($x_coord $y_coord)">};     # translate(X-Koordinate,Y-Koordinate)
   $ret   .= "<title>$ntxt</title>".$nicon;
@@ -19569,9 +19573,9 @@ return $p;
 ################################################################
 #    liefere skaliertes Icon in einer normierten Viewbox
 ################################################################
-sub __normIconBoxScale {
+sub __normIconInnerScale {
   my $icon = shift;
-  my $size = shift // 72;
+  my $size = shift // 70;
   my $pad  = shift // 0;
 
   return $icon unless $icon =~ m{<svg\b([^>]*)>(.*?)</svg>}si;
@@ -19594,7 +19598,7 @@ sub __normIconBoxScale {
   $ox += $pad;                                                                                 # fügt $pad ViewBox-Einheiten Rand links bzw. oben hinzu.
   $oy += $pad;
 
-  my $inner = qq{<g transform="translate($ox $oy) scale($scale)">}.$inner.'</g>';  # gib Inner-Content zurück, umgeben von der Transform-Gruppe
+  my $inner = qq{<g transform="translate($ox $oy) scale($scale)">}.$inner.'</g>';              # gib Inner-Content zurück, umgeben von der Transform-Gruppe
 
 return $inner;
 }
