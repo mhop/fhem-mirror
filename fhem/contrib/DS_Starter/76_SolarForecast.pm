@@ -11856,10 +11856,12 @@ sub _batChargeMgmt {
 
           $socwh += $delta;
 
-          $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :                                       # SoC begrenzen
-                    $socwh < $batoptsocwh ? $batoptsocwh :                                       
-                    $socwh > $batinstcap  ? $batinstcap  :
-                    $socwh;
+          #$socwh  = $socwh < $lowSocwh    ? $lowSocwh    :                                       # SoC begrenzen
+          #          $socwh < $batoptsocwh ? $batoptsocwh :                                       
+          #          $socwh > $batinstcap  ? $batinstcap  :
+          #          $socwh;
+                    
+          $socwh = ___batClampValue ($socwh, $lowSocwh, $batoptsocwh, $batinstcap);              # SoC begrenzen
 
           $socwh   = sprintf "%.0f", $socwh;                                                     # SoC Prognose in Wh
           $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                               # Prognose SoC in %
@@ -12090,10 +12092,12 @@ sub __batChargeOptTargetPower {
               
               $runwh += $hsurp->{$hod}{speff} / $befficiency;                                                    # um Verbrauch reduzieren
               
-              $runwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                    # runwh begrenzen
-                       $runwh < $batoptsocwh ? $batoptsocwh :                                       
-                       $runwh > $batinstcap  ? $batinstcap  :
-                       $runwh;              
+              #$runwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                    # runwh begrenzen
+              #         $runwh < $batoptsocwh ? $batoptsocwh :                                       
+              #         $runwh > $batinstcap  ? $batinstcap  :
+              #         $runwh; 
+
+              $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                          # runwh begrenzen                  
               
               $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;                	  
 			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			  
@@ -12151,10 +12155,12 @@ sub __batChargeOptTargetPower {
                                          )
                          );
                                                               
-          $runwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                        # fcendwh begrenzen
-                   $runwh < $batoptsocwh ? $batoptsocwh :                                       
-                   $runwh > $batinstcap  ? $batinstcap  :
-                   $runwh;
+          #$runwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                        # fcendwh begrenzen
+          #         $runwh < $batoptsocwh ? $batoptsocwh :                                       
+          #         $runwh > $batinstcap  ? $batinstcap  :
+          #         $runwh;
+                   
+          $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # fcendwh begrenzen
 		  
           $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;
           $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);               # Startwert kommende Stunde  
@@ -12166,6 +12172,22 @@ sub __batChargeOptTargetPower {
   }
   
 return ($hsurp, $otp);
+}
+
+################################################################
+#   Begrenzungen einhalten zwischen low, mid und high Grenze 
+#
+#   $x = ___batClampValue ($value, $low, $mid, $high);
+################################################################
+sub ___batClampValue {
+  my ($value, $low, $mid, $high) = @_;
+
+  $value = $value < $low  ? $low  :                                                  
+           $value < $mid  ? $mid  :                                       
+           $value > $high ? $high :
+           $value; 
+
+return $value;
 }
 
 ###############################################################################################
