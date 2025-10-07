@@ -1833,16 +1833,16 @@ sub Set {
   $coms    = @condevs ? join ",", @condevs : 'noArg';
   my $ipai = isPrepared4AI ($hash);
 
-  opendir (DIR, $cachedir);
+  opendir (my $dh, $cachedir);
 
-  while (my $file = readdir (DIR)) {
+  while (my $file = readdir $dh) {
       next unless (-f "$cachedir/$file");
       next unless ($file =~ /_${name}_/);
       next unless ($file =~ /_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}$/);
       push @bkps, 'recover-'.$file;
   }
 
-  closedir (DIR);
+  closedir $dh;
   my $rf = @bkps ? ','.join ",", reverse sort @bkps : '';
 
   my $cakeys = join ',', @hcompoattrkeys;
@@ -12090,12 +12090,12 @@ sub __batChargeOptTargetPower {
               
               $runwh += $hsurp->{$hod}{speff} / $befficiency;                                                    # um Verbrauch reduzieren
               
-              $fcendwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                  # fcendwh begrenzen
-                         $runwh < $batoptsocwh ? $batoptsocwh :                                       
-                         $runwh > $batinstcap  ? $batinstcap  :
-                         $runwh;              
+              $runwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                    # runwh begrenzen
+                       $runwh < $batoptsocwh ? $batoptsocwh :                                       
+                       $runwh > $batinstcap  ? $batinstcap  :
+                       $runwh;              
               
-              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $fcendwh;                	  
+              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;                	  
 			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			  
               
               if ($nhr eq '00') {
@@ -12143,7 +12143,7 @@ sub __batChargeOptTargetPower {
               $otp->{$sbn}{target} = $target;
           }
 
-          $fcendwh = min ($goalwh, $runwh                                                                        # Endwert Prognose aktuelle Stunde
+          $runwh = min ($goalwh, $runwh                                                                          # Endwert Prognose aktuelle Stunde
                                     + $befficiency 
                                        * ($nhr eq '00'           
                                           ? $otp->{$sbn}{target}
@@ -12151,12 +12151,12 @@ sub __batChargeOptTargetPower {
                                          )
                          );
                                                               
-          $fcendwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                      # fcendwh begrenzen
-                     $runwh < $batoptsocwh ? $batoptsocwh :                                       
-                     $runwh > $batinstcap  ? $batinstcap  :
-                     $runwh;
+          $runwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                        # fcendwh begrenzen
+                   $runwh < $batoptsocwh ? $batoptsocwh :                                       
+                   $runwh > $batinstcap  ? $batinstcap  :
+                   $runwh;
 		  
-          $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $fcendwh;
+          $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;
           $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);               # Startwert kommende Stunde  
       }
   }
