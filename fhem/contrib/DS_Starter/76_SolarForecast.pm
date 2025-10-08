@@ -161,7 +161,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
-                           "__normIconInnerScale: add path color filling ",
+                           "__normIconInnerScale: add path color filling, Calculation of time-weighted consumption or PV generation ".
+                           "in the current hour ",
   "1.59.0" => "06.10.2025  new sub __normIconInnerScale to fix problem with chromium engine > 140.x, Forum: https://forum.fhem.de/index.php?msg=1349058 ",
   "1.58.8" => "06.10.2025  __batChargeOptTargetPower: minor Code change ",
   "1.58.7" => "05.10.2025  fix negative SoC forecast when using optPower Forum: https://forum.fhem.de/index.php?msg=1348954 ",
@@ -11908,7 +11909,7 @@ sub _batChargeMgmt {
   ######################################################  
   for my $lfd (0..max (0, keys %{$hsurp})) {
       $paref->{hsurp} = $hsurp->{$lfd}; 
-      my ($hopt, $otp) = __batChargeOptTargetPower ($paref, $lfd, $trans);
+      my ($hopt, $otp) = __batChargeOptTargetPower ($paref, $lfd, $minute, $trans);
       delete $paref->{hsurp};
       
       ## Debuglog OTP
@@ -12019,9 +12020,10 @@ return;
 #   Ladeleistung verteilt über die Tagstunden mit PV-Überschuß)
 ################################################################       
 sub __batChargeOptTargetPower {
-  my $paref = shift;
-  my $lfd   = shift;                                                                                             # laufender Tag (1..X)
-  my $trans = shift;                                                                                             # Übertrags-Hash Referenz
+  my $paref   = shift;
+  my $lfd     = shift;                                                                                           # laufender Tag (1..X)
+  my  $minute = shift;
+  my $trans   = shift;                                                                                           # Übertrags-Hash Referenz
   
   my $name  = $paref->{name};
   my $hsurp = $paref->{hsurp};                                                                                   # Hashref Überschußhash
@@ -12029,8 +12031,9 @@ sub __batChargeOptTargetPower {
   my $fipl       = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
   my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert
   my @batteries  = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hsurp->{24}};
+  
+  my ($fcendwh, $diff);
   my $otp;
-  my $fcendwh;
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
 	  my $nhr     = $hsurp->{$hod}{nhr};
@@ -12084,15 +12087,18 @@ sub __batChargeOptTargetPower {
           if (!$spls) {                                                                                          # Ladesteuerung nicht "In Time"
               $hsurp->{$hod}{$sbn}{pneedmin} = $bpinmax;
               
-              $runwh += $hsurp->{$hod}{speff} / $befficiency;                                                    # um Verbrauch reduzieren
+              $diff = $hsurp->{$hod}{speff};                                                                     # Verbrauch
+              
+              if ($nhr eq '00') {
+                  $diff                = $diff / 60 * (60 - int $minute);                                        # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungsabfluß
+                  $otp->{$sbn}{target} = $csocwh <= $lowSocwh ? $bpinreduced : $bpinmax;
+              }
+              
+              $runwh += $diff / $befficiency;                                                                    # um Verbrauch reduzieren
               $runwh  = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                         # runwh begrenzen                  
               
               $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;                	  
-			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			  
-              
-              if ($nhr eq '00') {
-                  $otp->{$sbn}{target} = $csocwh <= $lowSocwh ? $bpinreduced : $bpinmax;
-              }           
+			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			            
               
               next;
           }                                   
@@ -12135,15 +12141,14 @@ sub __batChargeOptTargetPower {
               $otp->{$sbn}{target} = $target;
           }
 
-          $runwh = min ($goalwh, $runwh                                                                          # Endwert Prognose aktuelle Stunde
-                                    + $befficiency 
-                                       * ($nhr eq '00'           
-                                          ? $otp->{$sbn}{target}
-                                          : $spls
-                                         )
-                         );
-        
-          $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # fcendwh begrenzen
+          $diff = $spls;                                                                                         # PV-Überschuß
+          
+          if ($nhr eq '00') {                                                                                    # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
+              $diff = $spls / 60 * (60 - int $minute);                                                  
+          }
+          
+          $runwh = min ($goalwh, $runwh + $diff * $befficiency);                                                 # Endwert Prognose        
+          $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen
 		  
           $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;
           $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);               # Startwert kommende Stunde  

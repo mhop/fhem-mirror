@@ -160,7 +160,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.0" => "06.10.2025  new sub __normIconBoxScale to fix problem with chromium engine > 140.x, Forum: https://forum.fhem.de/index.php?msg=1349058 ",
+  "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
+                           "__normIconInnerScale: add path color filling, Calculation of time-weighted consumption or PV generation ".
+                           "in the current hour ",
+  "1.59.0" => "06.10.2025  new sub __normIconInnerScale to fix problem with chromium engine > 140.x, Forum: https://forum.fhem.de/index.php?msg=1349058 ",
   "1.58.8" => "06.10.2025  __batChargeOptTargetPower: minor Code change ",
   "1.58.7" => "05.10.2025  fix negative SoC forecast when using optPower Forum: https://forum.fhem.de/index.php?msg=1348954 ",
   "1.58.6" => "03.10.2025  __batChargeMgmt code changed, new sub ___batChargeSaveResults, remove reading Battery_ChargeRecommended_XX ".
@@ -1832,16 +1835,16 @@ sub Set {
   $coms    = @condevs ? join ",", @condevs : 'noArg';
   my $ipai = isPrepared4AI ($hash);
 
-  opendir (DIR, $cachedir);
+  opendir (my $dh, $cachedir);
 
-  while (my $file = readdir (DIR)) {
+  while (my $file = readdir $dh) {
       next unless (-f "$cachedir/$file");
       next unless ($file =~ /_${name}_/);
       next unless ($file =~ /_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}$/);
       push @bkps, 'recover-'.$file;
   }
 
-  closedir (DIR);
+  closedir $dh;
   my $rf = @bkps ? ','.join ",", reverse sort @bkps : '';
 
   my $cakeys = join ',', @hcompoattrkeys;
@@ -11601,10 +11604,11 @@ return $sf;
 #       Erstellung Batterie Ladefreigabe + SoC Prognose
 ################################################################
 sub _batChargeMgmt {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $chour = $paref->{chour};
-  my $t     = $paref->{t};
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $chour  = $paref->{chour};
+  my $minute = $paref->{minute};                                                                 # aktuelle Minute (00-59)
+  my $t      = $paref->{t};
 
   return if(!isBatteryUsed ($name));
 
@@ -11617,7 +11621,8 @@ sub _batChargeMgmt {
   my $inplim    = 0;
   
   my $hsurp  = {};                                                                               # Hashreferenz Überschuß
-  my $hsoc   = {};                                                                               # Hashreferenz 
+  my $hsoc   = {};                                                                               # Hashreferenz Prognose-SOC über alle Batterien
+  my $trans  = {};                                                                               # Referenz Übertrags-Hash 
   my $values = {};                                                                               # Hashreferenz
   my $progsoc;
   
@@ -11799,7 +11804,7 @@ sub _batChargeMgmt {
 
           $spday     = 0 if($spday < 0);                                                         # PV Überschuß Prognose bis Sonnenuntergang
           $confc    *= (100 - $wou) / 100 if($pvfc > 0);                                         # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)
-          my $surpls = sprintf "%.0f", ($pvfc - $confc);                                         # PV-Überschuß der Stunde, wichtig keine Nachkommastellen!
+          my $surpls = $pvfc - $confc;                                              
           
           ## Steuerung nach Ladefreigabe
           ################################
@@ -11813,14 +11818,14 @@ sub _batChargeMgmt {
           
           # Steuerhash für optimimierte Ladeleistung erstellen
           ######################################################
-          my $surplswh = max (0, $surpls);     
+          my $surplswh = max (0, (sprintf "%.0f", $surpls));                                     # wichtig keine Nachkommastellen!
           
           if ($strategy eq 'optPower' || $strategy eq 'loadRelease' && $today) {                 # bei loadRelease' nur den aktuellen Tag betrachten
               $hsurp->{$fd}{$hod}{nhr}               = $nhr;
               $hsurp->{$fd}{$hod}{speff}             = $surpls;                                  # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0  
               $hsurp->{$fd}{$hod}{surplswh}          = $surplswh.'.'.$hod;                       # absoluter Überschuß in Wh der Stunde mit Sortierhilfe 
               $hsurp->{$fd}{$hod}{$bn}{spday}        = $spday;                                   # (Rest)PV-Überschuß am laufenden Tag
-              $hsurp->{$fd}{$hod}{$bn}{initsocwh}    = $socwh;
+              $hsurp->{$fd}{$hod}{$bn}{initsocwh}    = $socwh;                                   # durch LR fortgeschriebener SoC
               $hsurp->{$fd}{$hod}{$bn}{batinstcap}   = $batinstcap;                              # installierte Batteriekapazität (Wh)
               $hsurp->{$fd}{$hod}{$bn}{goalwh}       = $goalwh;                                  # Ladeziel
               $hsurp->{$fd}{$hod}{$bn}{bpinmax}      = $bpinmax;                                 # max. mögliche Ladeleistung
@@ -11837,6 +11842,9 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{$bn}{befficiency}  = $befficiency;                             # Speicherwirkungsgrad
           }
           
+          $surpls = $surpls / 60 * (60 - int $minute) if(!$num);                                 # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß
+          $surpls = sprintf "%.0f", $surpls;                                                     # wichtig keine Nachkommastellen!
+          
           ## SOC-Prognose LR
           ####################                                                                      
           my $speff = $surpls;                                                                   # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0                                                             
@@ -11849,12 +11857,8 @@ sub _batChargeMgmt {
                       $speff < 0 ? $speff / $befficiency               :                         # Verbrauch einbeziehen
                       0;
 
-          $socwh += $delta;
-
-          $socwh  = $socwh < $lowSocwh    ? $lowSocwh    :                                       # SoC begrenzen
-                    $socwh < $batoptsocwh ? $batoptsocwh :                                       
-                    $socwh > $batinstcap  ? $batinstcap  :
-                    $socwh;
+          $socwh += $delta;         
+          $socwh  = ___batClampValue ($socwh, $lowSocwh, $batoptsocwh, $batinstcap);             # SoC begrenzen
 
           $socwh   = sprintf "%.0f", $socwh;                                                     # SoC Prognose in Wh
           $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                               # Prognose SoC in %
@@ -11901,11 +11905,11 @@ sub _batChargeMgmt {
       }
   }
   
-  # leistungsoptimierte (optPower) Beladungssteuerung
-  #####################################################
+  ## leistungsoptimierte (optPower) Beladungssteuerung
+  ######################################################  
   for my $lfd (0..max (0, keys %{$hsurp})) {
       $paref->{hsurp} = $hsurp->{$lfd}; 
-      my ($hopt, $otp) = __batChargeOptTargetPower ($paref);
+      my ($hopt, $otp) = __batChargeOptTargetPower ($paref, $lfd, $minute, $trans);
       delete $paref->{hsurp};
       
       ## Debuglog OTP
@@ -11920,12 +11924,13 @@ sub _batChargeMgmt {
           my $nhr       = $hopt->{$shod}{nhr};
           my @batteries = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hopt->{24}};
           
-          for my $bat (sort @batteries) {                          
-              my $ssocwh  = $hopt->{$shod}{$bat}{runwh} // '-';
+          for my $bat (sort @batteries) {
+              next if(!defined $hopt->{$shod}{$bat}{batinstcap});			  
+              my $ssocwh = $hopt->{$shod}{$bat}{runwh} // '-';
               
               ## SOC-Prognose OTP
               #####################
-              my $fcendwh = $hopt->{$shod}{$bat}{fcendwh} // 0;                    
+              my $fcendwh = $hopt->{$shod}{$bat}{fcendwh} // 0;  
               $progsoc    = sprintf "%.1f", (100 * $fcendwh / $hopt->{$shod}{$bat}{batinstcap});            # Prognose SoC in %
                         
               ## Speicherung und Readings erstellen OTP
@@ -12015,38 +12020,52 @@ return;
 #   Ladeleistung verteilt über die Tagstunden mit PV-Überschuß)
 ################################################################       
 sub __batChargeOptTargetPower {
-  my $paref = shift;
+  my $paref   = shift;
+  my $lfd     = shift;                                                                                           # laufender Tag (1..X)
+  my  $minute = shift;
+  my $trans   = shift;                                                                                           # Übertrags-Hash Referenz
+  
   my $name  = $paref->{name};
   my $hsurp = $paref->{hsurp};                                                                                   # Hashref Überschußhash
 
   my $fipl       = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
   my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert
   my @batteries  = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hsurp->{24}};
+  
+  my ($fcendwh, $diff);
   my $otp;
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
-      my $spls    = int $hsurp->{$hod}{surplswh};
-      my $newshod = sprintf "%02d", (int $hod + 1);
-      my $nhr     = $hsurp->{$hod}{nhr};
+	  my $nhr     = $hsurp->{$hod}{nhr};
+      my $spls    = int ($hsurp->{$hod}{surplswh} // 0);	  
+	  my $nexthod = sprintf "%02d", (int $hod + 1);
+	  my $nextnhr = $hsurp->{$nexthod}{nhr};
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
 
-      for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie
-          my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
-          my $sbatinstcap = $hsurp->{$hod}{$sbn}{batinstcap};                                                    # Kapa dieser Batterie 
+      for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie		  
+		  my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
+          my $batinstcap  = $hsurp->{$hod}{$sbn}{batinstcap};                                                    # Kapa dieser Batterie 
           my $lowSocwh    = $hsurp->{$hod}{$sbn}{lowSocwh};                                                      # eingestellter lowSoc in Wh
+          my $batoptsocwh = $hsurp->{$hod}{$sbn}{batoptsocwh};                                                   # optimaler SoC in Wh
           my $csocwh      = $hsurp->{$hod}{$sbn}{csocwh};                                                        # aktueller SoC in Wh
           my $bpinreduced = $hsurp->{$hod}{$sbn}{bpinreduced};                                                   # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
           my $befficiency = $hsurp->{$hod}{$sbn}{befficiency};                                                   # Speicherwirkungsgrad
           
-          my $runwh       = defined $hsurp->{$hod}{$sbn}{fcnextwh} ?                                             # Auswahl des zu verwendenden Prognose-SOC (Wh)
-                            $hsurp->{$hod}{$sbn}{fcnextwh}         : 
-                            ( $nhr eq '00' ? 
-                              $csocwh      : 
-                              $hsurp->{$hod}{$sbn}{initsocwh}
-                            ); 
+          # Initialisierung / Fortschreibung Prognose-SOC (Wh)
+          ######################################################
+          my $fc_next_wh  = $hsurp->{$hod}{$sbn}{fcnextwh};
+          my $init_soc_wh = $hsurp->{$hod}{$sbn}{initsocwh};
+          my $transfer    = $trans->{$sbn}{$lfd}{transfer};
           
-          $runwh                      = min ($runwh, $sbatinstcap);                            
+          my $runwh = do {
+              if (defined $fc_next_wh)   { $fc_next_wh }
+              elsif ($nhr eq '00')       { $csocwh }
+              elsif (defined $transfer)  { delete $trans->{$sbn}{$lfd}{transfer} }
+              else                       { $init_soc_wh }
+          };
+          
+          $runwh                      = min ($runwh, $batinstcap);                            
           $hsurp->{$hod}{$sbn}{runwh} = sprintf "%.0f", $runwh;                                                  # Startwert für DebugLog
 
           ## Ziel und dessen Erreichbarkeit
@@ -12055,7 +12074,7 @@ sub __batChargeOptTargetPower {
           my $runwhneed  = $goalwh - $runwh; 
           my $achievable = 1;
           my $total      = 0;                                               
-          $total   += $hsurp->{$_}{surplswh} for @remaining_hods;                                                # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
+          $total        += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
             
           if ($total * $befficiency < $goalwh) {                                                                 # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
@@ -12068,12 +12087,18 @@ sub __batChargeOptTargetPower {
           if (!$spls) {                                                                                          # Ladesteuerung nicht "In Time"
               $hsurp->{$hod}{$sbn}{pneedmin} = $bpinmax;
               
-              $runwh += $hsurp->{$hod}{speff} / $befficiency;                                                    # um Verbrauch reduzieren
-              $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", max ($lowSocwh, $runwh);                           # untere Begrenzung auf lowSoC       
+              $diff = $hsurp->{$hod}{speff};                                                                     # Verbrauch
               
               if ($nhr eq '00') {
+                  $diff                = $diff / 60 * (60 - int $minute);                                        # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungsabfluß
                   $otp->{$sbn}{target} = $csocwh <= $lowSocwh ? $bpinreduced : $bpinmax;
-              }           
+              }
+              
+              $runwh += $diff / $befficiency;                                                                    # um Verbrauch reduzieren
+              $runwh  = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                         # runwh begrenzen                  
+              
+              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;                	  
+			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			            
               
               next;
           }                                   
@@ -12116,21 +12141,41 @@ sub __batChargeOptTargetPower {
               $otp->{$sbn}{target} = $target;
           }
 
-
-
-          $hsurp->{$hod}{$sbn}{fcendwh} = sprintf "%.0f", min ($goalwh, $runwh                                     # Endwert Prognose aktuelle Stunde
-                                                               + $befficiency 
-                                                                 * ($nhr eq '00'           
-                                                                     ? $otp->{$sbn}{target}
-                                                                     : $spls
-                                                                   )
-                                                              );                        
+          $diff = $spls;                                                                                         # PV-Überschuß
           
-          $hsurp->{$newshod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh};                                    # Startwert kommende Stunde  
+          if ($nhr eq '00') {                                                                                    # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
+              $diff = $spls / 60 * (60 - int $minute);                                                  
+          }
+          
+          $runwh = min ($goalwh, $runwh + $diff * $befficiency);                                                 # Endwert Prognose        
+          $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen
+		  
+          $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;
+          $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);               # Startwert kommende Stunde  
       }
   }
   
+  for my $bat (sort { $a <=> $b } @batteries) {
+      $trans->{$bat}{$lfd + 1}{transfer} = $hsurp->{24}{$bat}{fcendwh};                                          # Übertrag SoC-Prognose für kommenden Tag                              
+  }
+  
 return ($hsurp, $otp);
+}
+
+################################################################
+#   Begrenzungen einhalten zwischen low, mid und high Grenze 
+#
+#   $x = ___batClampValue ($value, $low, $mid, $high);
+################################################################
+sub ___batClampValue {
+  my ($value, $low, $mid, $high) = @_;
+
+  $value = $value < $low  ? $low  :                                                  
+           $value < $mid  ? $mid  :                                       
+           $value > $high ? $high :
+           $value; 
+
+return $value;
 }
 
 ###############################################################################################
@@ -18724,9 +18769,10 @@ END0
                                              lang  => $lang
                                            }
                                          );
-
-          $cicon = FW_makeImage       ($cicon, ''); 
-          $cicon = __normIconBoxScale ($cicon);       
+          
+		  my $ccicon = (split '@', $cicon)[1];
+          $cicon     = FW_makeImage         ($cicon, ''); 
+          $cicon     = __normIconInnerScale ($cicon, $ccicon);       
   
           $ret .= qq{<g id="consumer_${c}_$stna" transform="translate($cons_left $y_pos)">};
           $ret .= "<title>$calias</title>".$cicon;
@@ -18766,8 +18812,9 @@ END1
       $hicon            = $hicon.'@'.$pahcol;
   }
 
-  $hicon = FW_makeImage       ($hicon, '');
-  $hicon = __normIconBoxScale ($hicon);
+  my $chicon = (split '@', $hicon)[1];
+  $hicon     = FW_makeImage         ($hicon, '');
+  $hicon     = __normIconInnerScale ($hicon, $chicon);
   
   $ret .= qq{<g id="home_$stna" transform="translate(368 360)">};                                 # translate(X-Koordinate,Y-Koordinate)
   $ret .= "<title>$hmtxt</title>".$hicon;
@@ -18787,9 +18834,9 @@ END1
                                        }
                                      );
 
-
-      $dicon = FW_makeImage       ($dicon, '');
-	  $dicon = __normIconBoxScale ($dicon); 
+      my $cdicon = (split '@', $dicon)[1];
+      $dicon     = FW_makeImage         ($dicon, '');
+	  $dicon     = __normIconInnerScale ($dicon, $cdicon); 
 
       $ret .= qq{<g id="dummy_$stna" transform="translate(660 360)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
@@ -19267,9 +19314,10 @@ sub __addInputProducerIcon {
                                                                     lang  => $lang
                                                                   }
                                                                 );
-
-                  $genericon = FW_makeImage       ($genericon, '');
-				  $genericon = __normIconBoxScale ($genericon);
+                  
+				  my $gcolor = (split '@', $genericon)[1];
+                  $genericon = FW_makeImage         ($genericon, '');
+				  $genericon = __normIconInnerScale ($genericon, $gcolor);
 				  
 				  $ret .= qq{<g id="generator_${pn}_$stna" fill="grey" transform="translate($xstart $ystart)">};
                   $ret .= "<title>$genertxt</title>".$genericon;
@@ -19287,8 +19335,9 @@ sub __addInputProducerIcon {
                                                   }
                                                 );
 
-          $picon = FW_makeImage       ($picon, '');
-		  $picon = __normIconBoxScale ($picon); 
+          my $cpicon = (split '@', $picon)[1];
+          $picon     = FW_makeImage         ($picon, '');
+		  $picon     = __normIconInnerScale ($picon, $cpicon); 
 		  
           $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($xstart $y_coord)">};
           $ret .= "<title>$ptxt</title>".$picon;
@@ -19322,9 +19371,10 @@ sub __addNodeIcon {
                                             lang  => $lang
                                            }
                                          );
-
-  $nicon = FW_makeImage       ($nicon, '');
-  $nicon = __normIconBoxScale ($nicon);
+  
+  my $cnicon = (split '@', $nicon)[1];
+  $nicon     = FW_makeImage         ($nicon, '');
+  $nicon     = __normIconInnerScale ($nicon, $cnicon);
 		  
   my $ret = qq{<g id="node_$stna" transform="translate($x_coord $y_coord)">};     # translate(X-Koordinate,Y-Koordinate)
   $ret   .= "<title>$ntxt</title>".$nicon;
@@ -19569,9 +19619,10 @@ return $p;
 ################################################################
 #    liefere skaliertes Icon in einer normierten Viewbox
 ################################################################
-sub __normIconBoxScale {
+sub __normIconInnerScale {
   my $icon = shift;
-  my $size = shift // 72;
+  my $fill = shift;                                                                            # Füll-Frbe
+  my $size = shift // 70;
   my $pad  = shift // 0;
 
   return $icon unless $icon =~ m{<svg\b([^>]*)>(.*?)</svg>}si;
@@ -19594,7 +19645,12 @@ sub __normIconBoxScale {
   $ox += $pad;                                                                                 # fügt $pad ViewBox-Einheiten Rand links bzw. oben hinzu.
   $oy += $pad;
 
-  my $inner = qq{<g transform="translate($ox $oy) scale($scale)">}.$inner.'</g>';  # gib Inner-Content zurück, umgeben von der Transform-Gruppe
+  if ($fill) {
+	  $inner =~ s{<path(?![^>]*\bfill)}{<path fill="$fill"}g;
+	  $inner =~ s{<path(?![^>]*\bstroke)}{<path stroke="$fill"}g;
+  }
+  
+  $inner = qq{<g transform="translate($ox $oy) scale($scale)">}.$inner.'</g>';                 # gib Inner-Content zurück, umgeben von der Transform-Gruppe
 
 return $inner;
 }
