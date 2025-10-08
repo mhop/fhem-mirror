@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.1" => "07.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ",
+  "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
+                           "__normIconInnerScale: add path color filling ",
   "1.59.0" => "06.10.2025  new sub __normIconInnerScale to fix problem with chromium engine > 140.x, Forum: https://forum.fhem.de/index.php?msg=1349058 ",
   "1.58.8" => "06.10.2025  __batChargeOptTargetPower: minor Code change ",
   "1.58.7" => "05.10.2025  fix negative SoC forecast when using optPower Forum: https://forum.fhem.de/index.php?msg=1348954 ",
@@ -11619,7 +11620,8 @@ sub _batChargeMgmt {
   my $inplim    = 0;
   
   my $hsurp  = {};                                                                               # Hashreferenz Überschuß
-  my $hsoc   = {};                                                                               # Hashreferenz 
+  my $hsoc   = {};                                                                               # Hashreferenz Prognose-SOC über alle Batterien
+  my $trans  = {};                                                                               # Referenz Übertrags-Hash 
   my $values = {};                                                                               # Hashreferenz
   my $progsoc;
   
@@ -11854,14 +11856,8 @@ sub _batChargeMgmt {
                       $speff < 0 ? $speff / $befficiency               :                         # Verbrauch einbeziehen
                       0;
 
-          $socwh += $delta;
-
-          #$socwh  = $socwh < $lowSocwh    ? $lowSocwh    :                                       # SoC begrenzen
-          #          $socwh < $batoptsocwh ? $batoptsocwh :                                       
-          #          $socwh > $batinstcap  ? $batinstcap  :
-          #          $socwh;
-                    
-          $socwh = ___batClampValue ($socwh, $lowSocwh, $batoptsocwh, $batinstcap);              # SoC begrenzen
+          $socwh += $delta;         
+          $socwh  = ___batClampValue ($socwh, $lowSocwh, $batoptsocwh, $batinstcap);             # SoC begrenzen
 
           $socwh   = sprintf "%.0f", $socwh;                                                     # SoC Prognose in Wh
           $progsoc = sprintf "%.1f", (100 * $socwh / $batinstcap);                               # Prognose SoC in %
@@ -11908,10 +11904,8 @@ sub _batChargeMgmt {
       }
   }
   
-  # leistungsoptimierte (optPower) Beladungssteuerung
-  #####################################################
-  my $trans = {};                                                                                           # Übertrags-Hash Referenz
-  
+  ## leistungsoptimierte (optPower) Beladungssteuerung
+  ######################################################  
   for my $lfd (0..max (0, keys %{$hsurp})) {
       $paref->{hsurp} = $hsurp->{$lfd}; 
       my ($hopt, $otp) = __batChargeOptTargetPower ($paref, $lfd, $trans);
@@ -12091,13 +12085,7 @@ sub __batChargeOptTargetPower {
               $hsurp->{$hod}{$sbn}{pneedmin} = $bpinmax;
               
               $runwh += $hsurp->{$hod}{speff} / $befficiency;                                                    # um Verbrauch reduzieren
-              
-              #$runwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                    # runwh begrenzen
-              #         $runwh < $batoptsocwh ? $batoptsocwh :                                       
-              #         $runwh > $batinstcap  ? $batinstcap  :
-              #         $runwh; 
-
-              $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                          # runwh begrenzen                  
+              $runwh  = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                         # runwh begrenzen                  
               
               $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;                	  
 			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			  
@@ -12154,12 +12142,7 @@ sub __batChargeOptTargetPower {
                                           : $spls
                                          )
                          );
-                                                              
-          #$runwh = $runwh < $lowSocwh    ? $lowSocwh    :                                                        # fcendwh begrenzen
-          #         $runwh < $batoptsocwh ? $batoptsocwh :                                       
-          #         $runwh > $batinstcap  ? $batinstcap  :
-          #         $runwh;
-                   
+        
           $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # fcendwh begrenzen
 		  
           $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;
@@ -18781,9 +18764,10 @@ END0
                                              lang  => $lang
                                            }
                                          );
-
-          $cicon = FW_makeImage         ($cicon, ''); 
-          $cicon = __normIconInnerScale ($cicon);       
+          
+		  my $ccicon = (split '@', $cicon)[1];
+          $cicon     = FW_makeImage         ($cicon, ''); 
+          $cicon     = __normIconInnerScale ($cicon, $ccicon);       
   
           $ret .= qq{<g id="consumer_${c}_$stna" transform="translate($cons_left $y_pos)">};
           $ret .= "<title>$calias</title>".$cicon;
@@ -18823,8 +18807,9 @@ END1
       $hicon            = $hicon.'@'.$pahcol;
   }
 
-  $hicon = FW_makeImage         ($hicon, '');
-  $hicon = __normIconInnerScale ($hicon);
+  my $chicon = (split '@', $hicon)[1];
+  $hicon     = FW_makeImage         ($hicon, '');
+  $hicon     = __normIconInnerScale ($hicon, $chicon);
   
   $ret .= qq{<g id="home_$stna" transform="translate(368 360)">};                                 # translate(X-Koordinate,Y-Koordinate)
   $ret .= "<title>$hmtxt</title>".$hicon;
@@ -18844,9 +18829,9 @@ END1
                                        }
                                      );
 
-
-      $dicon = FW_makeImage         ($dicon, '');
-	  $dicon = __normIconInnerScale ($dicon); 
+      my $cdicon = (split '@', $dicon)[1];
+      $dicon     = FW_makeImage         ($dicon, '');
+	  $dicon     = __normIconInnerScale ($dicon, $cdicon); 
 
       $ret .= qq{<g id="dummy_$stna" transform="translate(660 360)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
@@ -19324,9 +19309,10 @@ sub __addInputProducerIcon {
                                                                     lang  => $lang
                                                                   }
                                                                 );
-
+                  
+				  my $gcolor = (split '@', $genericon)[1];
                   $genericon = FW_makeImage         ($genericon, '');
-				  $genericon = __normIconInnerScale ($genericon);
+				  $genericon = __normIconInnerScale ($genericon, $gcolor);
 				  
 				  $ret .= qq{<g id="generator_${pn}_$stna" fill="grey" transform="translate($xstart $ystart)">};
                   $ret .= "<title>$genertxt</title>".$genericon;
@@ -19344,8 +19330,9 @@ sub __addInputProducerIcon {
                                                   }
                                                 );
 
-          $picon = FW_makeImage         ($picon, '');
-		  $picon = __normIconInnerScale ($picon); 
+          my $cpicon = (split '@', $picon)[1];
+          $picon     = FW_makeImage         ($picon, '');
+		  $picon     = __normIconInnerScale ($picon, $cpicon); 
 		  
           $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($xstart $y_coord)">};
           $ret .= "<title>$ptxt</title>".$picon;
@@ -19379,9 +19366,10 @@ sub __addNodeIcon {
                                             lang  => $lang
                                            }
                                          );
-
-  $nicon = FW_makeImage         ($nicon, '');
-  $nicon = __normIconInnerScale ($nicon);
+  
+  my $cnicon = (split '@', $nicon)[1];
+  $nicon     = FW_makeImage         ($nicon, '');
+  $nicon     = __normIconInnerScale ($nicon, $cnicon);
 		  
   my $ret = qq{<g id="node_$stna" transform="translate($x_coord $y_coord)">};     # translate(X-Koordinate,Y-Koordinate)
   $ret   .= "<title>$ntxt</title>".$nicon;
@@ -19628,6 +19616,7 @@ return $p;
 ################################################################
 sub __normIconInnerScale {
   my $icon = shift;
+  my $fill = shift;                                                                            # Füll-Frbe
   my $size = shift // 70;
   my $pad  = shift // 0;
 
@@ -19651,7 +19640,12 @@ sub __normIconInnerScale {
   $ox += $pad;                                                                                 # fügt $pad ViewBox-Einheiten Rand links bzw. oben hinzu.
   $oy += $pad;
 
-  my $inner = qq{<g transform="translate($ox $oy) scale($scale)">}.$inner.'</g>';              # gib Inner-Content zurück, umgeben von der Transform-Gruppe
+  if ($fill) {
+	  $inner =~ s{<path(?![^>]*\bfill)}{<path fill="$fill"}g;
+	  $inner =~ s{<path(?![^>]*\bstroke)}{<path stroke="$fill"}g;
+  }
+  
+  $inner = qq{<g transform="translate($ox $oy) scale($scale)">}.$inner.'</g>';                 # gib Inner-Content zurück, umgeben von der Transform-Gruppe
 
 return $inner;
 }
