@@ -11165,7 +11165,7 @@ sub _transferBatteryValues {
           }
 
           $bcapsum += $instcap;                                                                  # Summe installierte Bat Kapazität
-          $data{$name}{batteries}{$bn}{binstcap} = $instcap;                                     # Summe installierte Batterie Kapazität
+          $data{$name}{batteries}{$bn}{binstcap} = $instcap;                                     # installierte Batterie Kapazität
       }
       else {
           delete $data{$name}{batteries}{$bn}{binstcap};
@@ -11337,10 +11337,11 @@ sub _transferBatteryValues {
       
       limitArray ($data{$name}{current}{batsocslidereg}, SLIDENUMMAX);
 
-      $data{$name}{current}{batpowerinsum}  = $pbisum;                                     # summarische laufende Batterieladung
-      $data{$name}{current}{batpoweroutsum} = $pbosum;                                     # summarische laufende Batterieentladung
-      $data{$name}{current}{batcapsum}      = $bcapsum;                                    # Summe installierte Batterie Kapazität in Wh
-      $data{$name}{current}{batwhtotal}     = $socwhsum;                                   # Ladung in Wh über alle Batterien
+      $data{$name}{current}{batpowerinsum}   = $pbisum;                                    # summarische laufende Batterieladung
+      $data{$name}{current}{batpoweroutsum}  = $pbosum;                                    # summarische laufende Batterieentladung
+      $data{$name}{current}{batcapsum}       = $bcapsum;                                   # Summe installierte Batterie Kapazität in Wh
+      $data{$name}{current}{batwhtotal}      = $socwhsum;                                  # Ladung in Wh über alle Batterien
+      $data{$name}{current}{batwhdeficitsum} = $bcapsum - $socwhsum;                       # Fehlbetrag bis volle Ladung über alle Batterien 
   }
 
 return;
@@ -19648,7 +19649,7 @@ sub __normIconInnerScale {
 
   if ($fill) {     
       $inner =~ s/\bfill="[^"]*"/fill="$fill"/gi;
-      for my $tag (qw(path rect circle ellipse polygon polyline line)) {
+      for my $tag (qw(path rect circle ellipse polygon polyline line stroke)) {
           $inner =~ s{<$tag(?![^>]*\bfill=)}{<$tag fill="$fill"}gi;
       }
   }
