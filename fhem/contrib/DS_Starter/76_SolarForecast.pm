@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.59.2" => "09.10.2025  one more fix of color filling of svg icon ",
   "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
                            "__normIconInnerScale: add path color filling, Calculation of time-weighted consumption or PV generation ".
                            "in the current hour ",
@@ -19645,9 +19646,11 @@ sub __normIconInnerScale {
   $ox += $pad;                                                                                 # fügt $pad ViewBox-Einheiten Rand links bzw. oben hinzu.
   $oy += $pad;
 
-  if ($fill) {
-	  $inner =~ s{<path(?![^>]*\bfill)}{<path fill="$fill"}g;
-	  $inner =~ s{<path(?![^>]*\bstroke)}{<path stroke="$fill"}g;
+  if ($fill) {     
+      $inner =~ s/\bfill="[^"]*"/fill="$fill"/gi;
+      for my $tag (qw(path rect circle ellipse polygon polyline line)) {
+          $inner =~ s{<$tag(?![^>]*\bfill=)}{<$tag fill="$fill"}gi;
+      }
   }
   
   $inner = qq{<g transform="translate($ox $oy) scale($scale)">}.$inner.'</g>';                 # gib Inner-Content zurück, umgeben von der Transform-Gruppe
