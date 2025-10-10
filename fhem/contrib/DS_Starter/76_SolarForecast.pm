@@ -11165,7 +11165,7 @@ sub _transferBatteryValues {
           }
 
           $bcapsum += $instcap;                                                                  # Summe installierte Bat Kapazität
-          $data{$name}{batteries}{$bn}{binstcap} = $instcap;                                     # Summe installierte Batterie Kapazität
+          $data{$name}{batteries}{$bn}{binstcap} = $instcap;                                     # installierte Batterie Kapazität
       }
       else {
           delete $data{$name}{batteries}{$bn}{binstcap};
@@ -11337,10 +11337,11 @@ sub _transferBatteryValues {
       
       limitArray ($data{$name}{current}{batsocslidereg}, SLIDENUMMAX);
 
-      $data{$name}{current}{batpowerinsum}  = $pbisum;                                     # summarische laufende Batterieladung
-      $data{$name}{current}{batpoweroutsum} = $pbosum;                                     # summarische laufende Batterieentladung
-      $data{$name}{current}{batcapsum}      = $bcapsum;                                    # Summe installierte Batterie Kapazität in Wh
-      $data{$name}{current}{batwhtotal}     = $socwhsum;                                   # Ladung in Wh über alle Batterien
+      $data{$name}{current}{batpowerinsum}   = $pbisum;                                    # summarische laufende Batterieladung
+      $data{$name}{current}{batpoweroutsum}  = $pbosum;                                    # summarische laufende Batterieentladung
+      $data{$name}{current}{batcapsum}       = $bcapsum;                                   # Summe installierte Batterie Kapazität in Wh
+      $data{$name}{current}{batwhtotal}      = $socwhsum;                                  # Ladung in Wh über alle Batterien
+      $data{$name}{current}{batwhdeficitsum} = $bcapsum - $socwhsum;                       # Fehlbetrag bis volle Ladung über alle Batterien 
   }
 
 return;
@@ -11945,7 +11946,7 @@ sub _batChargeMgmt {
                           hod      => $shod,
                           loopid   => 'OTP',
                           strategy => $hopt->{$shod}{$bat}{strategy},
-                          crel     => 1,
+                          crel     => 1,                                                                   # immer Freigabe bei optPower (für Anzeige)
                        };
 
               ___batChargeSaveResults ($paref, $values);
@@ -12249,9 +12250,8 @@ sub ___batChargeSaveResults {
   ## in Schleife 'loadRelease' setzen
   #####################################  
   if ($loopid eq 'LR') {                                                                                              
-      $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
-      $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);                              # nur einmal bei 'loadRelease' setzen  -> Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
-      $data{$name}{nexthours}{'NextHour'.$nhr}{'strategybat'.$bn}  = $strategy;                                        
+      $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn} = $lcintime if($cgbt);                               # nur einmal bei 'loadRelease' setzen  -> Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
+      $data{$name}{nexthours}{'NextHour'.$nhr}{'strategybat'.$bn} = $strategy;                                        
       
       if ($nhr eq '00') { 
           storeReading ('Battery_ChargeUnrestricted_'.$bn, $crel);                
@@ -12267,8 +12267,6 @@ sub ___batChargeSaveResults {
   ## in Schleife 'optPower' setzen
   ##################################
   if ($loopid eq 'OTP') {
-      $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;                          # immer Freigabe bei optPower (für Anzeige)
-      
       if ($nhr eq '00') {                                                                            # Target für aktuelle Stunde
           my $needmin = $otp->{$bn}{target} // 0;
           storeReading ('Battery_ChargeOptTargetPower_'.$bn, $needmin.' W');
@@ -12278,6 +12276,8 @@ sub ___batChargeSaveResults {
   ## abhängig von Strategie in entsprechender Schleife setzen 
   #############################################################
   if (($loopid eq 'LR' && $strategy eq 'loadRelease') || ($loopid eq 'OTP' && $strategy eq 'optPower')) {
+	  $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
+	  
       if ($today && $hod) {                                                                                      
           writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
       }
@@ -19648,7 +19648,7 @@ sub __normIconInnerScale {
 
   if ($fill) {     
       $inner =~ s/\bfill="[^"]*"/fill="$fill"/gi;
-      for my $tag (qw(path rect circle ellipse polygon polyline line)) {
+      for my $tag (qw(path rect circle ellipse polygon polyline line stroke)) {
           $inner =~ s{<$tag(?![^>]*\bfill=)}{<$tag fill="$fill"}gi;
       }
   }
