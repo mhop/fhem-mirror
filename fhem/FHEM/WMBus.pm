@@ -2318,136 +2318,61 @@ sub decodeLinkLayer($$)
       return 0;
     }    
     
+    # first block
     
-    my $length = 129;
-    if ($self->{lfield} < $length) {
-      $length = $self->{lfield};
-    }
-    if ($self->{crc_size} > 0) {
-      $length -= $self->{crc_size};
-      $length++; # for L field
-      #print "length: $length\n";
-      $self->{crc0} = unpack('n', substr($self->{msg}, $length, $self->{crc_size}));
+    my $length = $self->{lfield} + 1; # 1 for lfield itself
       
-      #printf "crc in msg %x crc calculated %x\n", $self->{crc0}, $self->calcCRC(substr($self->{msg}, 0, $length));
-      if ($self->{crc0} != $self->calcCRC(substr($self->{msg}, 0, $length))) {
+      
+    if ($self->{crc_size} > 0) {
+      my $lengthOfFirstBlock = $length;
+      my $crcoffset = $length - $self->{crc_size};
+      #print "length: $length crcoffset $crcoffset\n";
+      
+      my $maxLengthOfFirstBlock = TL_BLOCK_SIZE + 1 + 115 + $self->{crc_size};
+      
+      if ($length > $maxLengthOfFirstBlock) {
+        $crcoffset = $maxLengthOfFirstBlock - $self->{crc_size};
+        $lengthOfFirstBlock = $maxLengthOfFirstBlock;
+      } else {
+        $lengthOfFirstBlock = $self->{lfield};
+      }
+      #print "length first block: $lengthOfFirstBlock crcoffset first block $crcoffset\n";
+      $self->{crc0} = unpack('n', substr($self->{msg}, $crcoffset, $self->{crc_size}));
+      
+      #printf "crc in msg %x crc calculated %x\n", $self->{crc0}, $self->calcCRC(substr($self->{msg}, 0, $crcoffset));
+      if ($self->{crc0} != $self->calcCRC(substr($self->{msg}, 0, $crcoffset))) {
         $self->{errormsg} = "CRC check failed on block 1";
         $self->{errorcode} = ERR_CRC_FAILED;
         return 0;
       }
+      $self->{msglen} = $self->{lfield} + 1 - $self->{crc_size};
+
+      $self->{applicationlayer} = substr($self->{msg}, TL_BLOCK_SIZE, $length - TL_BLOCK_SIZE - $self->{crc_size});
+
+      if ($length > 128) {
+        #print "block 2\n";
+        $crcoffset = $length - $self->{crc_size};
+        $length -= 128;
+        #print "length second block: $length crcoffset second block $crcoffset\n";
+        $self->{crc0} = unpack('n', substr($self->{msg}, $crcoffset, $self->{crc_size}));
+        #printf "crc in msg %x crc calculated %x\n", $self->{crc0}, $self->calcCRC(substr($self->{msg}, 128, $length-2));
+        if ($self->{crc0} != $self->calcCRC(substr($self->{msg}, 128, $length - $self->{crc_size}))) {
+          $self->{errormsg} = "CRC check failed on block 2";
+          $self->{errorcode} = ERR_CRC_FAILED;
+          return 0;
+        }
+        
+        $self->{applicationlayer} .= substr($self->{msg}, 128, $length - $self->{crc_size} );
+      }
+    } else {
+      # no CRC
+      $self->{applicationlayer} = substr($self->{msg}, TL_BLOCK_SIZE);
     }
     
-    $self->{datablocks} = int($self->{lfield} / 129);
-    $self->{datablocks}++ if $self->{lfield} % 129 != 0;
-    # header block is 10 bytes, following block 
-    $self->{datalen} = $self->{lfield} - (TL_BLOCK_SIZE - 1) - ($self->{datablocks} * $self->{crc_size}) ; # this is with CRCs but without the lfield itself
-    $self->{msglen} = $self->{lfield};
-
-    if ($self->{datablocks} == 2) {
-      # TODO
-    } else {
-      $self->{applicationlayer} = substr($self->{msg}, TL_BLOCK_SIZE, $length - TL_BLOCK_SIZE); # - $self->{crc_size});
-    }
   }
 
   if (length($self->{msg}) > $self->{msglen}) {
     $self->{remainingData} = substr($self->{msg},$self->{msglen});
-  }
-  
-  
-  # according to the MBus spec only upper case letters are allowed.
-  # some devices send lower case letters none the less
-  # convert to upper case to make them spec conformant
-  $self->{manufacturer} = uc($self->manId2ascii($self->{mfield}));
-  $self->{typestring} =  $validDeviceTypes{$self->{afield_type}} || 'unknown';
-  return 1;
-}
-
-sub encodeLinkLayer($)
-{
-  my $self = shift;
-
-  my $linklayer = pack('CCv', $self->{lfield}, $self->{cfield}, $self->{mfield});
-  ($self->{lfield}, $self->{cfield}, $self->{mfield}) = unpack('CCv', $linklayer);
-  $self->{afield} = substr($linklayer,4,6);
-  $self->{afield_id} = sprintf("%08d", $self->decodeBCD(8,substr($linklayer,4,4)));
-  ($self->{afield_ver}, $self->{afield_type}) = unpack('CC', substr($linklayer,8,2));
-  
-  #printf("lfield %d\n", $self->{lfield});
-
-  if ($self->{frame_type} eq FRAME_TYPE_A) {
-    if ($self->{crc_size} > 0) {
-      $self->{crc0} = unpack('n', substr($linklayer,TL_BLOCK_SIZE, $self->{crc_size}));
-    
-      #printf("crc0 %x calc %x\n", $self->{crc0}, $self->calcCRC(substr($linklayer,0,10)));
-    
-      if ($self->{crc0} != $self->calcCRC(substr($linklayer,0,TL_BLOCK_SIZE))) {
-        $self->{errormsg} = "CRC check failed on link layer";
-        $self->{errorcode} = ERR_CRC_FAILED;
-        #print "CRC check failed on link layer\n";
-        return 0;
-      }
-    }
-
-    # header block is 10 bytes + 2 bytes CRC, each following block is 16 bytes + 2 bytes CRC, the last block may be smaller
-    $self->{datalen} = $self->{lfield} - (TL_BLOCK_SIZE - 1); # this is without CRCs and the lfield itself
-    $self->{datablocks} = int($self->{datalen} / LL_BLOCK_SIZE);
-    $self->{datablocks}++ if $self->{datalen} % LL_BLOCK_SIZE != 0;
-    $self->{msglen} = TL_BLOCK_SIZE + $self->{crc_size} + $self->{datalen} + $self->{datablocks} * $self->{crc_size};
-      
-    #printf("calc len %d, actual %d\n", $self->{msglen}, length($self->{msg}));
-    $self->{applicationlayer} = $self->removeCRC(substr($self->{msg},TL_BLOCK_SIZE + $self->{crc_size}));
-  
-  } else {
-    # FRAME TYPE B
-    # each block is at most 129 bytes long.
-    # first contains the header (TL_BLOCK), L field and trailing crc
-    # L field is included in crc calculation
-    # each following block contains only data and trailing crc
-    if (length($self->{msg}) < $self->{lfield}) {
-      $self->{errormsg} = "message too short, expected " . $self->{lfield} . ", got " . length($self->{msg}) . " bytes";
-      $self->{errorcode} = ERR_MSG_TOO_SHORT;
-      return 0;
-    }    
-    
-    
-    my $length = 129;
-    if ($self->{lfield} < $length) {
-      $length = $self->{lfield};
-    }
-    if ($self->{crc_size} > 0) {
-      $length -= $self->{crc_size};
-      $length++; # for L field
-      #print "length: $length\n";
-      $self->{crc0} = unpack('n', substr($self->{msg}, $length, $self->{crc_size}));
-      
-      #printf "crc in msg %x crc calculated %x\n", $self->{crc0}, $self->calcCRC(substr($self->{msg}, 0, $length));
-      if ($self->{crc0} != $self->calcCRC(substr($self->{msg}, 0, $length))) {
-        $self->{errormsg} = "CRC check failed on block 1";
-        $self->{errorcode} = ERR_CRC_FAILED;
-        return 0;
-      }
-    }
-    
-    $self->{datablocks} = int($self->{lfield} / 129);
-    $self->{datablocks}++ if $self->{lfield} % 129 != 0;
-    # header block is 10 bytes, following block 
-    $self->{datalen} = $self->{lfield} - (TL_BLOCK_SIZE - 1) - ($self->{datablocks} * $self->{crc_size}) ; # this is with CRCs but without the lfield itself
-    $self->{msglen} = $self->{lfield};
-
-    if ($self->{datablocks} == 2) {
-      # TODO
-    } else {
-      $self->{applicationlayer} = substr($self->{msg}, TL_BLOCK_SIZE, $length - TL_BLOCK_SIZE); # - $self->{crc_size});
-    }
-  }
-
-  if (length($self->{msg}) > $self->{msglen}) {
-    $self->{remainingData} = substr($self->{msg},$self->{msglen});
-  } elsif (length($self->{msg}) < $self->{msglen}) {
-    $self->{errormsg} = "message too short, expected " . $self->{msglen} . ", got " . length($self->{msg}) . " bytes";
-    $self->{errorcode} = ERR_MSG_TOO_SHORT;
-    return 0;
   }
   
   
