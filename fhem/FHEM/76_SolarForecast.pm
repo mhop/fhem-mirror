@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.59.3" => "10.10.2025  ___batChargeSaveResults: fix writing 'rcdchargebatXX' ",
   "1.59.2" => "09.10.2025  one more fix of color filling of svg icon ",
   "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
                            "__normIconInnerScale: add path color filling, Calculation of time-weighted consumption or PV generation ".
@@ -11946,7 +11947,7 @@ sub _batChargeMgmt {
                           hod      => $shod,
                           loopid   => 'OTP',
                           strategy => $hopt->{$shod}{$bat}{strategy},
-                          crel     => 1,
+                          crel     => 1,                                                                   # immer Freigabe bei optPower (für Anzeige)
                        };
 
               ___batChargeSaveResults ($paref, $values);
@@ -12250,9 +12251,8 @@ sub ___batChargeSaveResults {
   ## in Schleife 'loadRelease' setzen
   #####################################  
   if ($loopid eq 'LR') {                                                                                              
-      $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
-      $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn}  = $lcintime if($cgbt);                              # nur einmal bei 'loadRelease' setzen  -> Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
-      $data{$name}{nexthours}{'NextHour'.$nhr}{'strategybat'.$bn}  = $strategy;                                        
+      $data{$name}{nexthours}{'NextHour'.$nhr}{'lcintimebat'.$bn} = $lcintime if($cgbt);                               # nur einmal bei 'loadRelease' setzen  -> Ladesteuerung "In Time", "nicht In Time" oder nicht verwendet
+      $data{$name}{nexthours}{'NextHour'.$nhr}{'strategybat'.$bn} = $strategy;                                        
       
       if ($nhr eq '00') { 
           storeReading ('Battery_ChargeUnrestricted_'.$bn, $crel);                
@@ -12268,8 +12268,6 @@ sub ___batChargeSaveResults {
   ## in Schleife 'optPower' setzen
   ##################################
   if ($loopid eq 'OTP') {
-      $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;                          # immer Freigabe bei optPower (für Anzeige)
-      
       if ($nhr eq '00') {                                                                            # Target für aktuelle Stunde
           my $needmin = $otp->{$bn}{target} // 0;
           storeReading ('Battery_ChargeOptTargetPower_'.$bn, $needmin.' W');
@@ -12279,6 +12277,8 @@ sub ___batChargeSaveResults {
   ## abhängig von Strategie in entsprechender Schleife setzen 
   #############################################################
   if (($loopid eq 'LR' && $strategy eq 'loadRelease') || ($loopid eq 'OTP' && $strategy eq 'optPower')) {
+	  $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
+	  
       if ($today && $hod) {                                                                                      
           writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
       }
