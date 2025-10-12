@@ -5871,7 +5871,7 @@ $out.= sprintf ('<svg class="DOIF_card" id="%d %d" xmlns="http://www.w3.org/2000
       if (!($svg_icon =~ s/\swidth="[^"]*"/ width="34"/)) {
           $svg_icon =~ s/svg/svg width="34"/ 
       }
-      $out.='<g transform="translate(14,3) scale('.$iscale.') rotate('.$rotate.',9,9) ">';
+      $out.='<g transform="translate(14,3) scale('.$iscale.') rotate('.$rotate.',17,17) ">';
       $out.= $svg_icon;
       $out.='</g>';
     }
@@ -6226,14 +6226,14 @@ sub bar
   if (defined ($icon)) {
     ($ic,$iscale,$ix,$iy,$rotate)=split(",",$icon);
     if (defined ($ix)) {
-      $ix+=$bwidth/2+3;
+      $ix+=$bwidth/2+6;
     } else {
-      $ix=$bwidth/2+3;
+      $ix=$bwidth/2+6;
     };
     if (defined ($iy)) {
-      $iy+=($ypos-14);
+      $iy+=($ypos-10);
     } else {
-      $iy=($ypos-14);
+      $iy=($ypos-10);
     };
     $rotate=0 if (!defined $rotate);
     $iscale=1 if (!defined $iscale);
@@ -6286,7 +6286,7 @@ sub bar
     if(!($svg_icon =~ s/\swidth="[^"]*"/ width="34"/)) {
        $svg_icon =~ s/svg/svg width="34"/ 
     }
-    $out.='<g transform="translate('.$ix.', '.$iy.') translate(9, 11) scale('.$iscale.') translate(-11, -11) rotate('.$rotate.',11,11) ">';
+    $out.='<g transform="translate('.$ix.', '.$iy.') scale('.$iscale.') rotate('.$rotate.',17,17) ">';
     $out.= $svg_icon;
     $out.='</g>';
   }
@@ -6824,9 +6824,9 @@ sub ring
       $ix=32;
     };
     if (defined ($iy)) {
-      $iy+=8.5;
+      $iy+=11.5;
     } else {
-      $iy=8.5;
+      $iy=11.5;
     };
     $rotate=0 if (!defined $rotate);
     $iscale=1 if (!defined $iscale);
@@ -6896,7 +6896,7 @@ sub ring
         $svg_icon =~ s/svg/svg height="34"/ }
     if(!($svg_icon =~ s/\swidth="[^"]*"/ width="34"/)) {
         $svg_icon =~ s/svg/svg width="34"/ }
-    $out.='<g transform="translate('.$ix.', '.$iy.') translate(5.5, 6) scale('.$iscale.') translate(-9, -9) rotate('.$rotate.',9,9) ">';
+    $out.='<g transform="translate('.$ix.', '.$iy.')  scale('.$iscale.') rotate('.$rotate.',17,17) ">';
     $out.= $svg_icon;
     $out.='</g>';
   }
@@ -7056,7 +7056,7 @@ sub ring2
         $svg_icon =~ s/svg/svg height="30"/ }
     if(!($svg_icon =~ s/\swidth="[^"]*"/ width="30"/)) {
         $svg_icon =~ s/svg/svg width="30"/ }
-    $out.='<g transform="translate('.$ix.', '.$iy.') translate(3, 3) scale('.$iscale.') translate(-7.5, -7.5) rotate('.$rotate.',7.5,7.5)">';
+    $out.='<g transform="translate('.$ix.', '.$iy.') scale('.$iscale.') rotate('.$rotate.',15,15)">';
     $out.= $svg_icon;
     $out.='</g>';
  }
