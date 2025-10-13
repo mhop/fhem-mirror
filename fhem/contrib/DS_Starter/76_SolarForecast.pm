@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.4" => "13.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ",
+  "1.59.4" => "13.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
+                           "__batChargeOptTargetPower: use pinmax if achievable==0 ",
   "1.59.3" => "10.10.2025  ___batChargeSaveResults: fix writing 'rcdchargebatXX' ",
   "1.59.2" => "09.10.2025  one more fix of color filling of svg icon ",
   "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
@@ -11420,7 +11421,7 @@ sub _batSocTarget {
       my $sf       = __batDeficitShareFactor ($name, $bn);
 	  my $pvexpect = $sf * $pvexpraw;
 
-      if ($debug eq 'batteryManagement') {
+      if ($debug =~ /batteryManagement/xs) {
           Log3 ($name, 1, "$name DEBUG> Bat $bn SoC Step1 - basics -> Battery share factor of total capacity: $sf");
           Log3 ($name, 1, "$name DEBUG> Bat $bn SoC Step1 - basics -> Expected energy for charging raw: $pvexpraw Wh");
           Log3 ($name, 1, "$name DEBUG> Bat $bn SoC Step1 - basics -> Expected energy for charging after application Share factor: $pvexpect Wh");
@@ -11607,7 +11608,7 @@ sub __batDeficitShareFactor {
   my $sf = 0;
   $sf    = (100 * $bdeficit / $batwhdeficitsum) / 100 if($batwhdeficitsum);                   # Anteilsfaktor Defizit Batt XX an Gesamtdefizit
 
-return $sf;
+return sprintf "%.2f", $sf;
 }
 
 ################################################################
@@ -11624,7 +11625,7 @@ sub __batLoadShareFactor {
 
   my $sf = (100 * $csocwh / $loadsum) / 100;                                                  # Anteilsfaktor Ladung Batt XX an Gesamtladung
 
-return $sf;
+return sprintf "%.2f", $sf;
 }
 
 ################################################################
@@ -11639,7 +11640,7 @@ sub __batCapShareFactor {
 
   my $sf = (100 * $binstcap / $batcapsum) / 100;                             # Anteilsfaktor der Batt XX Kapazität an Gesamtkapazität
 
-return $sf;
+return sprintf "%.2f", $sf;
 }
 
 ################################################################
@@ -12094,8 +12095,8 @@ sub __batChargeOptTargetPower {
 	  my $nextnhr = $hsurp->{$nexthod}{nhr};
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
-	  my $total = 0;                                               
-	  $total   += $hsurp->{$_}{surplswh} for @remaining_hods;                                                    # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
+	  my $total          = 0;                                               
+	  $total            += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
 
       for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie		  
 		  my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
