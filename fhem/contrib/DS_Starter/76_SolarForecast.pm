@@ -12127,7 +12127,7 @@ sub __batChargeOptTargetPower {
           my $total      = 0;                                               
           $total        += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
             
-          if ($runwhneed > 0 && $total * $befficiency < $goalwh) {                                               # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
+          if ($runwhneed > 0 && $total * $befficiency < $runwhneed) {                                            # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
           }
           
