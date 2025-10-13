@@ -11604,7 +11604,8 @@ sub __batDeficitShareFactor {
   my $bdeficit        = $binstcap - $csocwh;
   my $batwhdeficitsum = CurrentVal ($name, 'batwhdeficitsum', $binstcap);                     # Summe Ladungsdefizit
 
-  my $sf = (100 * $bdeficit / $batwhdeficitsum) / 100;                                        # Anteilsfaktor Defizit Batt XX an Gesamtdefizit
+  my $sf = 0;
+  $sf    = (100 * $bdeficit / $batwhdeficitsum) / 100 if($batwhdeficitsum);                   # Anteilsfaktor Defizit Batt XX an Gesamtdefizit
 
 return $sf;
 }
@@ -12093,6 +12094,8 @@ sub __batChargeOptTargetPower {
 	  my $nextnhr = $hsurp->{$nexthod}{nhr};
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
+	  my $total = 0;                                               
+	  $total   += $hsurp->{$_}{surplswh} for @remaining_hods;                                                    # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
 
       for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie		  
 		  my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
@@ -12124,8 +12127,8 @@ sub __batChargeOptTargetPower {
           my $goalwh     = $hsurp->{$hod}{$sbn}{goalwh};                                                         # Ladeziel 
           my $runwhneed  = $goalwh - $runwh; 
           my $achievable = 1;
-          my $total      = 0;                                               
-          $total        += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
+          #my $total      = 0;                                               
+          #$total        += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
             
           if ($runwhneed > 0 && $total * $befficiency < $runwhneed) {                                            # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
@@ -12165,7 +12168,7 @@ sub __batChargeOptTargetPower {
           $needraw      = max ($needraw, $bpinreduced);                                                          # Mindestladeleistung bpinreduced sicherstellen                  
           $needraw     *= 1 + ($otpMargin / 100);                                                                # 1. Sicherheitsaufschlag
           $needraw      = sprintf "%.0f", $needraw;
-          $needraw      = min ($needraw, $bpinmax);                                                              # Begrenzung auf max. mögliche Batterieleistung
+          $needraw      = min ($needraw, $bpinmax);                                                              # Begrenzung auf max. mögliche Batterieladeleistung
           
           $hsurp->{$hod}{$sbn}{pneedmin} = $runwhneed > 0 ? $needraw : 0;                                        # Ladeleistung abhängig von Ziel-SoC Erfüllung        
            
@@ -12186,8 +12189,9 @@ sub __batChargeOptTargetPower {
               my $inc     = 0;
               
               if ( !$bpin && $gfeedin > $fipl )           {$inc = $gfeedin - $fipl}                              # Ladeleistung wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
-              if (  $bpin && ($gfeedin - $bpin) > $fipl ) {$inc = $bpin + (($gfeedin - $bpin) - $fipl)}          # Ladeleistung wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
-                                                                
+              if (  $bpin && ($gfeedin - $bpin) > $fipl ) {$inc = $bpin + (($gfeedin - $bpin) - $fipl)}          # Ladeleistung wenn akt. Bat-Ladung UND Einspeisung - Bat-Ladung > Einspeiselimit der Anlage
+                       
+              $target              = $bpinmax if(!$achievable);                                                  # maximale Ladeleistung solange Ladeziel nicht erreichbar				   
               $target              = sprintf "%.0f", max ($target, $inc);                                        # Einspeiselimit berücksichtigen
               $target              = min (($csocwh <= $lowSocwh ? $bpinreduced : $bpinmax), $target);            # 2. Begrenzung auf max. mögliche Batterieleistung bzw. bpinreduced bei Unterschreitung lowSoc
               $otp->{$sbn}{target} = $target;
