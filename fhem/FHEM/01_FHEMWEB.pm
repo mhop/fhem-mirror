@@ -2558,11 +2558,10 @@ FW_style($$)
     FW_pO "Reload the page in the browser.$end";
 
   } elsif($a[1] eq "edit") {
-    if(!%FW_editFileToPath) { # no edit was called yet
-      my $old=$FW_RET;
-      FW_style("style list",undef);
-      $FW_RET=$old
-    }
+    my $old=$FW_RET; 
+    FW_style("style list",undef); # Make sure FW_editFileToPath is current
+    $FW_RET=$old;
+  
     my $fileName = $a[2];
     my $data = "";
     $fileName =~ s,.*/,,g;        # Little bit of security
