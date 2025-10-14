@@ -16,7 +16,7 @@ set grid xtics ytics
 set ylabel "t/C"
 set y2label "PID values"
 set yrange [10:30]
-set y2range [-30:150]
+set y2range [-150:150]
 
 #FileLog 4:temperature\x3a:0:
 #FileLog 4:setpointTemp\x3a:0:
