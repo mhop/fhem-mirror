@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change: 59_Weather: Improved the language initialization logic by replacing
+                       the experimental `given/when` construct with a more
+                       standard `if/elsif` structure.
  - change: 77_UWZ: Refactor language handling,perl-experimental and cleanup
  - bugfix: WMBus: support for frame type B with more than one block
  - bugfix: 76_SolarForecast: V 1.59.3, minor fix in bat graphic

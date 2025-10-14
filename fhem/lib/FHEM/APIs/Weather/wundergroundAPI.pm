@@ -6,7 +6,6 @@ use FHEM::Meta;
 
 use POSIX;
 use HttpUtils;
-use experimental qw /switch/;
 use Encode;
 
 my $META = {};

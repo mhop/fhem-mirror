@@ -78,7 +78,6 @@ __END__
 
   The Weather module works with various weather APIs:
   <ul>
-    <li>DarkSky (<a href="https://darksky.net">web site</a>, standard)</li>
     <li>OpenWeatherMap (<a href="https://openweathermap.org/">web site)</a></li>
     <li>Wunderground (<a href="https://www.wunderground.com/member/api-keys">web site)</a></li>
   </ul>
@@ -96,7 +95,7 @@ __END__
        The parameters have the following meanings:<br>
 
        <table>
-       <tr><td><code>API</code></td><td>name of the weather API, e.g. <code>DarkSkyAPI</code></td></tr>
+       <tr><td><code>API</code></td><td>name of the weather API, e.g. <code>OpenWeatherMapAPI</code></td></tr>
        <tr><td><code>apioptions</code></td><td>indivual options for the chosen API</td></tr>
        <tr><td><code>apikey</code></td><td>key for the chosen API</td></tr>
        <tr><td><code>location</code></td><td>location for the weather forecast;
@@ -108,7 +107,7 @@ __END__
        <p></p>
 
     A very simple definition is:<br><br>
-    <code>define &lt;name&gt; Weather apikey=&lt;DarkSkyAPISecretKey&gt;</code><br><br>
+    <code>define &lt;name&gt; Weather apikey=&lt;OpenWeatherMapAPISecretKey&gt;</code><br><br>
     This uses the Dark Sky API with an individual key that you need to
     retrieve from the Dark Sky web site.<p></p>
 
@@ -121,19 +120,6 @@ __END__
 
 
     API-specific documentation follows.<p></p>
-
-        <h4>Dark Sky</h4><p></p>
-
-        <table>
-        <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
-        <tr><td>apioptions</td><td><code>cachemaxage:&lt;cachemaxage&gt;</code><br>duration
-          in seconds to retrieve the forecast from the cache instead from the API</td></tr>
-        <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br>
-          geographic coordinates in degrees of the location for which the
-          weather is forecast; if missing, the values of the attributes
-          of the <code>global</code> device are taken, if these exist.</td></tr>
-        </table>
-        <p></p>
 
         <h4>OpenWeatherMap</h4><p></p>
 
@@ -324,7 +310,7 @@ __END__
     Die Parameter haben die folgende Bedeutung:<br>
 
     <table>
-    <tr><td><code>API</code></td><td>Name des Wetter-APIs, z.B. <code>DarkSkyAPI</code></td></tr>
+    <tr><td><code>API</code></td><td>Name des Wetter-APIs, z.B. <code>OpenWeatherMapAPI</code></td></tr>
     <tr><td><code>apioptions</code></td><td>Individuelle Optionen f&uuml;r das gew&auml;hlte API</td></tr>
     <tr><td><code>apikey</code></td><td>Schl&uuml;ssel f&uuml;r das gew&auml;hlte API</td></tr>
     <tr><td><code>location</code></td><td>Ort, f&uuml;r den das Wetter vorhergesagt wird.
@@ -338,7 +324,7 @@ __END__
 
 
     Eine ganz einfache Definition ist:<br><br>
-    <code>define &lt;name&gt; Weather apikey=&lt;DarkSkyAPISecretKey&gt;</code><br><br>
+    <code>define &lt;name&gt; Weather apikey=&lt;OpenWeatherMapAPISecretKey&gt;</code><br><br>
 
     Bei dieser Definition wird die API von Dark Sky verwendet mit einem
     individuellen Schl&uuml;ssel, den man sich auf der Webseite von Dark Sky
@@ -352,20 +338,6 @@ __END__
     </pre>
 
     Es folgt die API-spezifische Dokumentation.<p></p>
-
-    <h4>Dark Sky</h4><p></p>
-
-    <table>
-    <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
-    <tr><td>apioptions</td><td><code>cachemaxage:&lt;cachemaxage&gt;</code><br>Zeitdauer in
-      Sekunden, innerhalb derer die Wettervorhersage nicht neu abgerufen
-      sondern aus dem Cache zur&uuml;ck geliefert wird.</td></tr>
-    <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br> Geographische Breite
-      und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
-      Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
-      des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
-    </table>
-    <p></p>
 
     <h4>OpenWeatherMap</h4><p></p>
 
@@ -539,13 +511,12 @@ __END__
     "fhem-mod-device",
     "fhem-core",
     "Weather",
-    "DarkSky",
     "OpenWeatherMap",
     "Underground"
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.2.35",
+  "version": "v2.3.0",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
@@ -574,4 +545,3 @@ __END__
 =end :application/json;q=META.json
 
 =cut
-

@@ -41,7 +41,8 @@ use FHEM::Meta;
 
 use POSIX;
 use HttpUtils;
-use experimental qw /switch/;
+
+#use experimental qw /switch/;
 
 my $META = {};
 my $ret  = FHEM::Meta::getMetadata( __FILE__, $META );
@@ -466,67 +467,59 @@ sub _FillSelfHashWithWeatherResponse {
     $self->{cached}->{city}          = encode_utf8( $data->{name} );
     $self->{cached}->{license}{text} = 'none';
 
-    given ( $self->{endpoint} ) {
-        when ('onecall') {
-            ## löschen des alten current Datensatzes
-            delete $self->{cached}->{current};
+    if ( $self->{endpoint} eq 'onecall' ) {
+        ## löschen des alten current Datensatzes
+        delete $self->{cached}->{current};
 
-            ## löschen des alten forecast Datensatzes
-            delete $self->{cached}->{forecast};
+        ## löschen des alten forecast Datensatzes
+        delete $self->{cached}->{forecast};
 
-            ## löschen des alten Alerts Datensatzes
-            delete $self->{cached}->{alerts};
+        ## löschen des alten Alerts Datensatzes
+        delete $self->{cached}->{alerts};
 
+        $self =
+          _FillSelfHashWithWeatherResponseForOnecallCurrent( $self, $data );
+
+        if ( ref( $data->{hourly} ) eq "ARRAY"
+            && scalar( @{ $data->{hourly} } ) > 0 )
+        {
             $self =
-              _FillSelfHashWithWeatherResponseForOnecallCurrent( $self, $data );
-
-            if ( ref( $data->{hourly} ) eq "ARRAY"
-                && scalar( @{ $data->{hourly} } ) > 0 )
-            {
-                $self =
-                  _FillSelfHashWithWeatherResponseForOnecallHourly( $self,
-                    $data );
-            }
-
-            if ( ref( $data->{daily} ) eq "ARRAY"
-                && scalar( @{ $data->{daily} } ) > 0 )
-            {
-                $self =
-                  _FillSelfHashWithWeatherResponseForOnecallDaily( $self,
-                    $data );
-            }
-
-            if ( ref( $data->{alerts} ) eq "ARRAY"
-                && scalar( @{ $data->{alerts} } ) > 0 )
-            {
-                $self =
-                  _FillSelfHashWithWeatherResponseForOnecallAlerts( $self,
-                    $data );
-            }
+              _FillSelfHashWithWeatherResponseForOnecallHourly( $self, $data );
         }
 
-        when ('weather') {
-            ## löschen des alten current Datensatzes
-            delete $self->{cached}->{current};
-
-            ## löschen des alten Alerts Datensatzes
-            delete $self->{cached}->{alerts};
-
+        if ( ref( $data->{daily} ) eq "ARRAY"
+            && scalar( @{ $data->{daily} } ) > 0 )
+        {
             $self =
-              _FillSelfHashWithWeatherResponseForWeatherCurrent( $self, $data );
+              _FillSelfHashWithWeatherResponseForOnecallDaily( $self, $data );
         }
 
-        when ('forecast') {
-            ## löschen des alten forecast Datensatzes
-            delete $self->{cached}->{forecast};
+        if ( ref( $data->{alerts} ) eq "ARRAY"
+            && scalar( @{ $data->{alerts} } ) > 0 )
+        {
+            $self =
+              _FillSelfHashWithWeatherResponseForOnecallAlerts( $self, $data );
+        }
+    }
+    elsif ( $self->{endpoint} eq 'weather' ) {
+        ## löschen des alten current Datensatzes
+        delete $self->{cached}->{current};
 
-            if ( ref( $data->{list} ) eq "ARRAY"
-                and scalar( @{ $data->{list} } ) > 0 )
-            {
-                $self =
-                  _FillSelfHashWithWeatherResponseForForecastHourly( $self,
-                    $data );
-            }
+        ## löschen des alten Alerts Datensatzes
+        delete $self->{cached}->{alerts};
+
+        $self =
+          _FillSelfHashWithWeatherResponseForWeatherCurrent( $self, $data );
+    }
+    elsif ( $self->{endpoint} eq 'forecast' ) {
+        ## löschen des alten forecast Datensatzes
+        delete $self->{cached}->{forecast};
+
+        if ( ref( $data->{list} ) eq "ARRAY"
+            and scalar( @{ $data->{list} } ) > 0 )
+        {
+            $self =
+              _FillSelfHashWithWeatherResponseForForecastHourly( $self, $data );
         }
     }
 
@@ -1036,7 +1029,7 @@ sub _strftimeWrapper {
 	  ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.2.7",
+  "version": "v3.2.8",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],

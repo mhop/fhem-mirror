@@ -41,10 +41,7 @@ eval { use Time::HiRes qw /gettimeofday/; 1 }
 eval { use Readonly; 1 }
   or $missingModul .= "libreadonly-perl ";
 
-#use Time::HiRes  qw(gettimeofday);
-use experimental qw /switch/;
-
-#use Readonly;
+#use experimental qw /switch/;
 
 use FHEM::Meta;
 
@@ -224,48 +221,48 @@ sub _LanguageInitialize {
 
     my $lang = shift;
 
-    given ($lang) {
-        when ('de') {
-            %wdays_txt_i18n          = %wdays_txt_de;
-            @directions_txt_i18n     = @directions_txt_de;
-            %pressure_trend_txt_i18n = %pressure_trend_txt_de;
-            %status_items_txt_i18n   = %status_items_txt_de;
-        }
+    if ( $lang eq 'de' ) {
+        %wdays_txt_i18n          = %wdays_txt_de;
+        @directions_txt_i18n     = @directions_txt_de;
+        %pressure_trend_txt_i18n = %pressure_trend_txt_de;
+        %status_items_txt_i18n   = %status_items_txt_de;
+    }
+    elsif ( $lang eq 'nl' ) {
+        %wdays_txt_i18n          = %wdays_txt_nl;
+        @directions_txt_i18n     = @directions_txt_nl;
+        %pressure_trend_txt_i18n = %pressure_trend_txt_nl;
+        %status_items_txt_i18n   = %status_items_txt_nl;
+    }
+    elsif ( $lang eq 'fr' ) {
 
-        when ('nl') {
-            %wdays_txt_i18n          = %wdays_txt_nl;
-            @directions_txt_i18n     = @directions_txt_nl;
-            %pressure_trend_txt_i18n = %pressure_trend_txt_nl;
-            %status_items_txt_i18n   = %status_items_txt_nl;
-        }
+    }
+    elsif ( $lang eq 'fr' ) {
+        %wdays_txt_i18n          = %wdays_txt_fr;
+        @directions_txt_i18n     = @directions_txt_fr;
+        %pressure_trend_txt_i18n = %pressure_trend_txt_fr;
+        %status_items_txt_i18n   = %status_items_txt_fr;
 
-        when ('fr') {
-            %wdays_txt_i18n          = %wdays_txt_fr;
-            @directions_txt_i18n     = @directions_txt_fr;
-            %pressure_trend_txt_i18n = %pressure_trend_txt_fr;
-            %status_items_txt_i18n   = %status_items_txt_fr;
-        }
+    }
+    elsif ( $lang eq 'pl' ) {
+        %wdays_txt_i18n          = %wdays_txt_pl;
+        @directions_txt_i18n     = @directions_txt_pl;
+        %pressure_trend_txt_i18n = %pressure_trend_txt_pl;
+        %status_items_txt_i18n   = %status_items_txt_pl;
 
-        when ('pl') {
-            %wdays_txt_i18n          = %wdays_txt_pl;
-            @directions_txt_i18n     = @directions_txt_pl;
-            %pressure_trend_txt_i18n = %pressure_trend_txt_pl;
-            %status_items_txt_i18n   = %status_items_txt_pl;
-        }
+    }
+    elsif ( $lang eq 'it' ) {
+        %wdays_txt_i18n          = %wdays_txt_it;
+        @directions_txt_i18n     = @directions_txt_it;
+        %pressure_trend_txt_i18n = %pressure_trend_txt_it;
+        %status_items_txt_i18n   = %status_items_txt_it;
 
-        when ('it') {
-            %wdays_txt_i18n          = %wdays_txt_it;
-            @directions_txt_i18n     = @directions_txt_it;
-            %pressure_trend_txt_i18n = %pressure_trend_txt_it;
-            %status_items_txt_i18n   = %status_items_txt_it;
-        }
+    }
+    else {
+        %wdays_txt_i18n          = %wdays_txt_en;
+        @directions_txt_i18n     = @directions_txt_en;
+        %pressure_trend_txt_i18n = %pressure_trend_txt_en;
+        %status_items_txt_i18n   = %status_items_txt_en;
 
-        default {
-            %wdays_txt_i18n          = %wdays_txt_en;
-            @directions_txt_i18n     = @directions_txt_en;
-            %pressure_trend_txt_i18n = %pressure_trend_txt_en;
-            %status_items_txt_i18n   = %status_items_txt_en;
-        }
     }
 
     return;
@@ -862,35 +859,31 @@ sub Attr {
     my ( $cmd, $name, $attrName, $AttrVal ) = @_;
     my $hash = $::defs{$name};
 
-    given ($attrName) {
-        when ('forecast') {
-            if ( $cmd eq 'set' ) {
-                $hash->{fhem}->{api}->setForecast($AttrVal);
-            }
-            elsif ( $cmd eq 'del' ) {
-                $hash->{fhem}->{api}->setForecast();
-            }
-
-            ::InternalTimer( gettimeofday() + 0.5,
-                \&FHEM::Core::Weather::DeleteForecastreadings, $hash );
+    if ( $attrName eq 'forecast' ) {
+        if ( $cmd eq 'set' ) {
+            $hash->{fhem}->{api}->setForecast($AttrVal);
+        }
+        elsif ( $cmd eq 'del' ) {
+            $hash->{fhem}->{api}->setForecast();
         }
 
-        when ('forecastLimit') {
-            ::InternalTimer( gettimeofday() + 0.5,
-                \&FHEM::Core::Weather::DeleteForecastreadings, $hash );
+        ::InternalTimer( gettimeofday() + 0.5,
+            \&FHEM::Core::Weather::DeleteForecastreadings, $hash );
+    }
+    elsif ('forecastLimit') {
+        ::InternalTimer( gettimeofday() + 0.5,
+            \&FHEM::Core::Weather::DeleteForecastreadings, $hash );
+    }
+    elsif ('alerts') {
+        if ( $cmd eq 'set' ) {
+            $hash->{fhem}->{api}->setAlerts($AttrVal);
+        }
+        elsif ( $cmd eq 'del' ) {
+            $hash->{fhem}->{api}->setAlerts();
         }
 
-        when ('alerts') {
-            if ( $cmd eq 'set' ) {
-                $hash->{fhem}->{api}->setAlerts($AttrVal);
-            }
-            elsif ( $cmd eq 'del' ) {
-                $hash->{fhem}->{api}->setAlerts();
-            }
-
-            ::InternalTimer( gettimeofday() + 0.5,
-                \&FHEM::Core::Weather::DeleteAlertsreadings, $hash );
-        }
+        ::InternalTimer( gettimeofday() + 0.5,
+            \&FHEM::Core::Weather::DeleteAlertsreadings, $hash );
     }
 
     return;
