@@ -161,7 +161,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.59.4" => "13.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
-                           "__batChargeOptTargetPower: use pinmax if achievable==0 ",
+                           "__batChargeOptTargetPower: use pinmax if achievable==0, new ctrlBatSocManagementXX->stepSoC key ",
   "1.59.3" => "10.10.2025  ___batChargeSaveResults: fix writing 'rcdchargebatXX' ",
   "1.59.2" => "09.10.2025  one more fix of color filling of svg icon ",
   "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
@@ -7532,6 +7532,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
       lowSoc       => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
       upSoC        => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
       maxSoC       => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
+      stepSoC      => { comp => '[0-5]',                                                 must => 0, act => 0 },
       careCycle    => { comp => '\d+',                                                   must => 0, act => 0 },
       lcSlot       => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
       careCycle    => { comp => '\d+',                                                   must => 0, act => 0 },
@@ -11372,10 +11373,7 @@ sub _batSocTarget {
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
-      my $oldd2care  = CircularVal ($name, 99, 'days2care'.$bn,            0);
-      my $ltsmsr     = CircularVal ($name, 99, 'lastTsMaxSocRchd'.$bn, undef);
-      my $soc        = BatteryVal  ($name, $bn, 'bcharge',                 0);                   # aktuelle Ladung in %
-      my $batinstcap = BatteryVal  ($name, $bn, 'binstcap',                0);                   # installierte Batteriekapazität Wh
+      my $batinstcap = BatteryVal  ($name, $bn, 'binstcap', 0);                                   # installierte Batteriekapazität Wh
       
       if (!$batinstcap) {
           Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement${bn} is active, but required key 'cap' is not set. Go to Next...");
@@ -11386,17 +11384,37 @@ sub _batSocTarget {
       my $lowSoc    = $parsed->{lowSoc};
       my $upSoc     = $parsed->{upSoc};
       my $maxSoc    = $parsed->{maxSoc};
+      my $stepSoc   = $parsed->{stepSoc};
       my $careCycle = $parsed->{careCycle};
       
       if (!$lowSoc || !$upSoc) {
           Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement${bn} is active, but required keys 'lowSoc' and 'upSoC' are not set. Go to Next...");
           next;          
       }
+	  
+	  if (!$stepSoc) {
+		  debugLog ($paref, 'batteryManagement', "Bat $bn SoC Step1 - The SoC-Management is switched off. Battery_OptimumTargetSoC_$bn is set to lowSoC and Battery_ChargeRequest_$bn to '0'.");
+		  
+		  ## pvHistory/Readings schreiben
+		  #################################
+		  writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, hour => 99 } );
+		  storeReading   ('Battery_OptimumTargetSoC_'.$bn, $lowSoc.' %');
+		  storeReading   ('Battery_ChargeRequest_'.$bn, 0);
+
+          next;		  
+	  }
+      
+      my $oldd2care = CircularVal ($name, 99, 'days2care'.$bn,            0);
+      my $ltsmsr    = CircularVal ($name, 99, 'lastTsMaxSocRchd'.$bn, undef);
+      my $soc       = BatteryVal  ($name, $bn, 'bcharge',                 0);                   # aktuelle Ladung in %
 
       $paref->{batnmb}    = $bn;
       $paref->{careCycle} = $careCycle;
 
       __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $soc >= $maxSoc || $soc >= MAXSOCDEF || $oldd2care < 0);
+      
+      delete $paref->{batnmb};
+      delete $paref->{careCycle};
 
       my $nt         = '';
       my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
@@ -11406,8 +11424,8 @@ sub _batSocTarget {
       my $batymaxsoc = HistoryVal ($name, $yday, 99, 'batmaxsoc'.$bn,       0);                 # gespeicherter max. SOC des Vortages
       my $batysetsoc = HistoryVal ($name, $yday, 99, 'batsetsoc'.$bn, $lowSoc);                 # gespeicherter SOC Sollwert des Vortages
 
-      $target = $batymaxsoc <  $maxSoc ? $batysetsoc + BATSOCCHGDAY :
-                $batymaxsoc >= $maxSoc ? $batysetsoc - BATSOCCHGDAY :
+      $target = $batymaxsoc <  $maxSoc ? $batysetsoc + $stepSoc :
+                $batymaxsoc >= $maxSoc ? $batysetsoc - $stepSoc :
                 $batysetsoc;                                                                    # neuer Min SOC für den laufenden Tag
 
       ## erwartete PV ermitteln & Anteilsfaktor Bat anwenden
@@ -11422,14 +11440,14 @@ sub _batSocTarget {
 	  my $pvexpect = $sf * $pvexpraw;
 
       if ($debug =~ /batteryManagement/xs) {
-          Log3 ($name, 1, "$name DEBUG> Bat $bn SoC Step1 - basics -> Battery share factor of total capacity: $sf");
+          Log3 ($name, 1, "$name DEBUG> Bat $bn SoC Step1 - basics -> Battery share factor of total required load: $sf");
           Log3 ($name, 1, "$name DEBUG> Bat $bn SoC Step1 - basics -> Expected energy for charging raw: $pvexpraw Wh");
           Log3 ($name, 1, "$name DEBUG> Bat $bn SoC Step1 - basics -> Expected energy for charging after application Share factor: $pvexpect Wh");
           Log3 ($name, 1, "$name DEBUG> Bat $bn SoC Step1 - compare with SoC history -> preliminary new Target: $target %");
       }
 
-      ## Pflege-SoC (Soll SoC MAXSOCDEF bei BATSOCCHGDAY % Steigerung p. Tag)
-      ###########################################################################
+      ## Pflege-SoC (Soll SoC MAXSOCDEF bei $stepSoc % Steigerung p. Tag)
+      #####################################################################
       my $sunset  = CurrentVal ($name, 'sunsetTodayTs', $t);
       my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
       my $la      = '';
@@ -11444,11 +11462,15 @@ sub _batSocTarget {
       $whneed       = sprintf "%.0f", $whneed;
 
       if ($t > $delayts || $pvexpect < $whneed || !$days2care) {
+          $paref->{batnmb}    = $bn;
           $paref->{days2care} = $days2care;
+          
           __batSaveSocKeyFigures ($paref);
+          
           delete $paref->{days2care};
+          delete $paref->{batnmb};
 
-          $careSoc = $maxSoc - ($days2care * BATSOCCHGDAY);                                    # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei BATSOCCHGDAY % Steigerung pro Tag
+          $careSoc = $maxSoc - ($days2care * $stepSoc);                                        # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei $stepSoc % Steigerung pro Tag
           $careSoc = $careSoc < $lowSoc ? $lowSoc : $careSoc;
 
           if ($careSoc >= $target) {
@@ -11513,14 +11535,14 @@ sub _batSocTarget {
       debugLog ($paref, 'batteryManagement', "Bat $bn SoC Step4 - basics -> docare: $docare, lowSoc: $lowSoc %, upSoc: $upSoc %");
       debugLog ($paref, 'batteryManagement', "Bat $bn SoC Step4 - observe low/up limits -> Target: $target %");
 
-      ## auf BATSOCCHGDAY Schritte anpassen (40,45,50,...)
-      ######################################################
-      my $flo = floor ($target / BATSOCCHGDAY);
-      my $rmn = $target - ($flo * BATSOCCHGDAY);
-      my $add = $rmn <= 2.5 ? 0 : BATSOCCHGDAY;
-      $target = ($flo * BATSOCCHGDAY) + $add;
+      ## auf $stepSoc Schritte anpassen (40,45,50,...)
+      ##################################################
+      my $flo = floor ($target / $stepSoc);
+      my $rmn = $target - ($flo * $stepSoc);
+      my $add = $rmn <= 2.5 ? 0 : $stepSoc;
+      $target = ($flo * $stepSoc) + $add;
 
-      debugLog ($paref, 'batteryManagement', "Bat $bn SoC Step5 - rounding the SoC to steps of ".BATSOCCHGDAY." % -> Target: $target %");
+      debugLog ($paref, 'batteryManagement', "Bat $bn SoC Step5 - rounding the SoC to steps of ".$stepSoc." % -> Target: $target %");
 
       ## Ladeanforderung
       ####################
@@ -11536,9 +11558,6 @@ sub _batSocTarget {
       writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $target, hour => 99 } );
       storeReading   ('Battery_OptimumTargetSoC_'.$bn, $target.' %');
       storeReading   ('Battery_ChargeRequest_'.$bn,      $chargereq);
-
-      delete $paref->{batnmb};
-      delete $paref->{careCycle};
   }
 
 return;
@@ -11559,6 +11578,7 @@ sub __parseAttrBatSoc {
       lowSoc       => $ph->{lowSoc},                                               
       upSoc        => $ph->{upSoC}, 
       maxSoc       => $ph->{maxSoC}    // MAXSOCDEF,                                      # optional (default: MAXSOCDEF)
+      stepSoc      => $ph->{stepSoC}   // BATSOCCHGDAY,                                   # mögliche SoC-Änderung pro Tag
       careCycle    => $ph->{careCycle} // CARECYCLEDEF,                                   # Ladungszyklus (Maintenance) für maxSoC in Tagen     
       lcslot       => $ph->{lcSlot}, 
       loadAbort    => $ph->{loadAbort},
@@ -27212,7 +27232,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] 
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [stepSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] 
                                      [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
                                      [safetyMargin=&lt;Value&gt;[:&lt;Value&gt;]] [loadStrategy=&lt;Value&gt;] [loadTarget=&lt;Wert&gt;] 
                                      [weightOwnUse=&lt;Wert&gt;] </b> <br><br>
@@ -27246,6 +27266,11 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>in order to balance the charge in the storage network.                                          </td></tr>
             <tr><td>                     </td><td>The specification is optional (&lt;= 100, default: 95)                                          </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
+            <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
+			<tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr> 
+            <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>          
             <tr><td> <b>careCycle</b>    </td><td>Maximum interval in days between two charge states of at least 'maxSoC' that should not be      </td></tr>
             <tr><td>                     </td><td>exceeded if possible. The specification is optional (default: 20)                               </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
@@ -29915,7 +29940,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] 
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [stepSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] 
                                      [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
                                      [safetyMargin=&lt;Wert&gt;[:&lt;Wert&gt;]] [loadStrategy=&lt;Wert&gt;] [loadTarget=&lt;Wert&gt;] 
                                      [weightOwnUse=&lt;Wert&gt;] </b> <br><br>
@@ -29950,6 +29975,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>werden muß um den Ladungsausgleich im Speicherverbund auszuführen.                              </td></tr>
             <tr><td>                     </td><td>Die Angabe ist optional (&lt;= 100, default: 95)                                                </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
+            <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
+			<tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr> 
+            <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>          
             <tr><td> <b>careCycle</b>    </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'          </td></tr>
             <tr><td>                     </td><td>möglichst nicht überschritten werden soll. Die Angabe ist optional (default: 20)                </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>        
