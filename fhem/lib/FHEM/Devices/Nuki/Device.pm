@@ -28,7 +28,8 @@ package FHEM::Devices::Nuki::Device;
 
 use strict;
 use warnings;
-use experimental qw( switch );
+
+#use experimental qw( switch );
 
 use FHEM::Meta;
 
@@ -41,7 +42,7 @@ BEGIN {
         qw( init_done
           defs
           modules
-          )
+        )
     );
 }
 
@@ -355,7 +356,7 @@ sub Set {
         GetUpdate($hash);
         return;
     }
-    elsif ($cmd eq 'lock'
+    elsif ( $cmd eq 'lock'
         || lc($cmd) eq 'deactivaterto'
         || $cmd eq 'unlock'
         || lc($cmd) eq 'activaterto'
@@ -534,20 +535,21 @@ sub WriteReadings {
 
     ::readingsBeginUpdate($hash);
 
-    my $t;
-    my $v;
+    my ( $t, $v );
 
-    if ( defined( $decode_json->{lastKnownState} )
+    # falls lastKnownState als Hash vorliegt, direkt integrieren
+    if ( defined $decode_json->{lastKnownState}
         && ref( $decode_json->{lastKnownState} ) eq 'HASH' )
     {
         while ( ( $t, $v ) = each %{ $decode_json->{lastKnownState} } ) {
             $decode_json->{$t} = $v;
         }
-
         delete $decode_json->{lastKnownState};
     }
 
     while ( ( $t, $v ) = each %{$decode_json} ) {
+
+        # generische readings (alles außer spezielle Felder)
         ::readingsBulkUpdate( $hash, $t, $v )
           if ( $t ne 'state'
             && $t ne 'mode'
@@ -560,42 +562,48 @@ sub WriteReadings {
             && $t ne 'doorsensorState'
             && $t ne 'doorsensorStateName' );
 
-        given ($t) {
-            when ('state') {
-                ::readingsBulkUpdate(
-                    $hash, $t,
-                    (
-                          $v =~ m{\A[0-9]\z}xms
-                        ? $lockStates{$v}->{ $hash->{DEVICETYPEID} }
-                        : $v
-                    )
-                );
-            }
-            when ('mode') {
-                ::readingsBulkUpdate( $hash, $t,
+        # Dispatch-Tabelle für Spezialfälle
+        my %handlers = (
+            state => sub {
+                my $val =
+                  ( $v =~ m{\A[0-9]\z}xms )
+                  ? $lockStates{$v}->{ $hash->{DEVICETYPEID} }
+                  : $v;
+                ::readingsBulkUpdate( $hash, 'state', $val );
+            },
+            mode => sub {
+                ::readingsBulkUpdate( $hash, 'mode',
                     $modes{$v}{ $hash->{DEVICETYPEID} } );
-            }
-            when ('deviceType') {
-                ::readingsBulkUpdate( $hash, $t, $deviceTypes{$v} );
-            }
-            when ('doorsensorState') {
-                ::readingsBulkUpdate( $hash, $t, $doorsensorStates{$v} );
-            }
-            when ('paired') {
-                ::readingsBulkUpdate( $hash, $t,
+            },
+            devicetype => sub {
+                ::readingsBulkUpdate( $hash, 'deviceType', $deviceTypes{$v} );
+            },
+            doorsensorstate => sub {
+                ::readingsBulkUpdate( $hash, 'doorsensorState',
+                    $doorsensorStates{$v} );
+            },
+            paired => sub {
+                ::readingsBulkUpdate( $hash, 'paired',
                     ( $v == 1 ? 'true' : 'false' ) );
-            }
-            when ('batteryCharging') {
-                ::readingsBulkUpdate( $hash, $t,
+            },
+            batterycharging => sub {
+                ::readingsBulkUpdate( $hash, 'batteryCharging',
                     ( $v == 1 ? 'true' : 'false' ) );
-            }
-            when ('batteryCritical') {
+            },
+            batterycritical => sub {
                 ::readingsBulkUpdate( $hash, 'batteryState',
                     ( $v == 1 ? 'low' : 'ok' ) );
-            }
-            when ('batteryChargeState') {
-                ::readingsBulkUpdate( $hash, 'batteryPercent', $v )
-            }
+            },
+            batterychargestate => sub {
+                ::readingsBulkUpdate( $hash, 'batteryPercent', $v );
+            },
+        );
+
+        my $key =
+          lc $t;    # damit Vergleiche robust gegen Groß-/Kleinschreibung sind
+
+        if ( exists $handlers{$key} ) {
+            $handlers{$key}->();
         }
     }
 

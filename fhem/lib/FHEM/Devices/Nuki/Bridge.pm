@@ -39,7 +39,8 @@ package FHEM::Devices::Nuki::Bridge;
 
 use strict;
 use warnings;
-use experimental qw( switch );
+
+#use experimental qw( switch );
 
 use FHEM::Meta;
 use HttpUtils;
@@ -54,7 +55,7 @@ BEGIN {
           defs
           modules
           data
-          )
+        )
     );
 }
 
@@ -422,59 +423,59 @@ sub Set {
     my $endpoint;
     my $param;
 
-    $cmd = lc($cmd);
+    $cmd = lc $cmd;
 
-    given ($cmd) {
-        when ('getdevicelist') {
-            return 'usage: getDeviceList' if ($arg);
+    my %handlers = (
+        getdevicelist => sub {
+            return 'usage: getDeviceList' if $arg;
             $endpoint = 'list';
-        }
-        when ('info') {
-            return 'usage: info' if ($arg);
+        },
+        info => sub {
+            return 'usage: info' if $arg;
             $endpoint = 'info';
-        }
-        when ('fwupdate') {
-            return 'usage: fwUpdate' if ($arg);
+        },
+        fwupdate => sub {
+            return 'usage: fwUpdate' if $arg;
             $endpoint = 'fwupdate';
-        }
-        when ('reboot') {
-            return 'usage: freboot' if ($arg);
+        },
+        reboot => sub {
+            return 'usage: reboot' if $arg;
             $endpoint = 'reboot';
-        }
-        when ('clearlog') {
-            return 'usage: clearLog' if ($arg);
+        },
+        clearlog => sub {
+            return 'usage: clearLog' if $arg;
             $endpoint = 'clearlog';
-        }
-        when ('factoryreset') {
-            return 'usage: factoryReset' if ($arg);
+        },
+        factoryreset => sub {
+            return 'usage: factoryReset' if $arg;
             $endpoint = 'factoryreset';
-        }
-
-        when ('callbackremove') {
+        },
+        callbackremove => sub {
             return 'usage: callbackRemove'
               if ( split( m{\s+}xms, $arg ) > 1 );
-            my $id = ( defined($arg) ? $arg : 0 );
+            my $id = defined $arg ? $arg : 0;
             $endpoint = 'callback/remove';
             $param    = '{"param":"' . $id . '"}';
-        }
-
-        when ('configauth') {
-            return 'usage: configAuth' if ( split( m{\s+}xms, $arg ) > 1 );
-            $endpoint = 'clearlog';
+        },
+        configauth => sub {
+            return 'usage: configAuth'
+              if ( split( m{\s+}xms, $arg ) > 1 );
             my $configAuth = 'enable=' . ( $arg eq 'enable' ? 1 : 0 );
             $endpoint = 'configAuth';
             $param    = '{"param":"' . $configAuth . '"}';
-        }
+        },
+    );
 
-        default {
-            my $list = '';
-            $list .= 'info:noArg getDeviceList:noArg ';
-            $list .=
+    if ( exists $handlers{$cmd} ) {
+        my $result = $handlers{$cmd}->();
+        return $result if defined $result && length $result;
+    }
+    else {
+        my $list = 'info:noArg getDeviceList:noArg ';
+        $list .=
 'clearLog:noArg fwUpdate:noArg reboot:noArg factoryReset:noArg configAuth:enable,disable'
-              if ( ::ReadingsVal( $name, 'bridgeType', 'Software' ) eq
-                'Hardware' );
-            return ( 'Unknown argument ' . $cmd . ', choose one of ' . $list );
-        }
+          if ( ::ReadingsVal( $name, 'bridgeType', 'Software' ) eq 'Hardware' );
+        return "Unknown argument $cmd, choose one of $list";
     }
 
     Write( $hash, $endpoint, $param )
@@ -486,30 +487,34 @@ sub Set {
 sub Get {
     my $hash = shift;
     my $name = shift;
-    my $cmd  = shift // return "set $name needs at least one argument !";
+    my $cmd  = shift // return "get $name needs at least one argument !";
     my $arg  = shift;
 
     my $endpoint;
 
-    $cmd = lc($cmd);
-    given ($cmd) {
-        when ( $cmd eq 'logfile' ) {
-            return 'usage: logFile' if ( defined($arg) );
-            $endpoint = 'log';
-        }
-        when ( $cmd eq 'callbacklist' ) {
-            return 'usage: callbackList' if ( defined($arg) );
-            $endpoint = 'callback/list';
-        }
-        default {
-            my $list = '';
-            $list .= 'callbackList:noArg ';
-            $list .= 'logFile:noArg'
-              if ( ::ReadingsVal( $name, 'bridgeType', 'Software' ) eq
-                'Hardware' );
+    $cmd = lc $cmd;
 
-            return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
-        }
+    my %handlers = (
+        logfile => sub {
+            return 'usage: logFile' if defined $arg;
+            $endpoint = 'log';
+        },
+        callbacklist => sub {
+            return 'usage: callbackList' if defined $arg;
+            $endpoint = 'callback/list';
+        },
+    );
+
+    if ( exists $handlers{$cmd} ) {
+        my $result = $handlers{$cmd}->();
+        return $result if defined $result && length $result;
+    }
+    else {
+        my $list = 'callbackList:noArg ';
+        $list .= 'logFile:noArg'
+          if ( ::ReadingsVal( $name, 'bridgeType', 'Software' ) eq 'Hardware' );
+
+        return "Unknown argument $cmd, choose one of $list";
     }
 
     return Write( $hash, $endpoint, undef );
@@ -765,7 +770,7 @@ sub DistributionErrHandle2 {
         ::asyncOutput( $param->{cl}, "Request Error: $err\r\n" )
           if ( $param->{cl} && $param->{cl}{canAsyncOutput} );
 
-        return ('received http code '
+        return ( 'received http code '
               . $param->{code}
               . ' without any data after requesting' );
     }
