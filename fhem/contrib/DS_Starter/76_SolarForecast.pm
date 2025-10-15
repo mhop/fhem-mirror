@@ -160,7 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ",
+  "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
+                           "new Reading Battery_TargetAchievable_XX ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
                            "__batChargeOptTargetPower: use pinmax if achievable==0, new ctrlBatSocManagementXX->stepSoC key ".
 						   "loadStrategy: possible value smartPower ", 
@@ -7485,14 +7486,29 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{batteries}{$bn}{befficiency};
   }
   elsif ($paref->{cmd} eq 'del') {
-      readingsDelete    ($hash, 'Current_PowerBatIn_'.$bn);
-      readingsDelete    ($hash, 'Current_PowerBatOut_'.$bn);
-      readingsDelete    ($hash, 'Current_BatCharge_'.$bn);
-      readingsDelete    ($hash, 'Battery_ChargeOptTargetPower_'.$bn);
-      readingsDelete    ($hash, 'Battery_ChargeUnrestricted_'.$bn);
-      readingsDelete    ($hash, 'Battery_ChargeRequest_'.$bn);
-      readingsDelete    ($hash, 'Battery_OptimumTargetSoC_'.$bn);
-      deleteReadingspec ($hash, "NextHour.._Bat_${bn}_SoCforecast");
+      #readingsDelete    ($hash, 'Current_PowerBatIn_'.$bn);
+      #readingsDelete    ($hash, 'Current_PowerBatOut_'.$bn);
+      #readingsDelete    ($hash, 'Current_BatCharge_'.$bn);
+      #readingsDelete    ($hash, 'Battery_ChargeOptTargetPower_'.$bn);
+      #readingsDelete    ($hash, 'Battery_ChargeUnrestricted_'.$bn);
+      #readingsDelete    ($hash, 'Battery_ChargeRequest_'.$bn);
+      #readingsDelete    ($hash, 'Battery_OptimumTargetSoC_'.$bn);
+      #readingsDelete    ($hash, 'Battery_TargetAchievable_'.$bn);
+                                                                                     # Liste der lesbaren Namen ohne Suffix und $bn
+      my @fields = qw(                                                                
+          Current_PowerBatIn
+          Current_PowerBatOut
+          Current_BatCharge
+          Battery_ChargeOptTargetPower
+          Battery_ChargeUnrestricted
+          Battery_ChargeRequest
+          Battery_OptimumTargetSoC
+          Battery_TargetAchievable
+      );
+      
+      map { readingsDelete ($hash, "${_}_$bn") } @fields;
+
+      deleteReadingspec ($hash, "Battery_NextHour.._SoCforecast_".$bn);   
 
       undef @{$data{$name}{current}{batsocslidereg}};
 
@@ -12157,6 +12173,8 @@ sub __batChargeOptTargetPower {
           if ($runwhneed > 0 && $total * $befficiency < $runwhneed) {                                            # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
           }
+          
+          storeReading ('Battery_TargetAchievable_'.$sbn, $achievable) if($nhr eq '00');
           
           $hsurp->{$hod}{$sbn}{loadrel}    = $runwhneed > 0 ? 1 : 0;                                             # Ladefreigabe abhängig von Ziel-SoC Erfüllung
           $hsurp->{$hod}{$sbn}{achievelog} = "charging target: $goalwh Wh, remaining: ".(sprintf "%.0f", $runwhneed).' Wh -> target likely achievable? '.($achievable ? 'yes' : 'no'); 
