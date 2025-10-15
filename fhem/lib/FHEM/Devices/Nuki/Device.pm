@@ -30,7 +30,7 @@ use strict;
 use warnings;
 
 #use experimental qw( switch );
-
+use Encode;
 use FHEM::Meta;
 
 use GPUtils qw(GP_Import);
@@ -550,7 +550,8 @@ sub WriteReadings {
     while ( ( $t, $v ) = each %{$decode_json} ) {
 
         # generische readings (alles außer spezielle Felder)
-        ::readingsBulkUpdate( $hash, $t, $v )
+        ::readingsBulkUpdate( $hash, $t,
+            Encode::is_utf8($v) ? Encode::encode( "UTF-8", $v ) : $v )
           if ( $t ne 'state'
             && $t ne 'mode'
             && $t ne 'deviceType'
