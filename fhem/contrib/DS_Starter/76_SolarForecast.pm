@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
                            "__batChargeOptTargetPower: use pinmax if achievable==0, new ctrlBatSocManagementXX->stepSoC key ".
 						   "loadStrategy: possible value smartPower ", 
@@ -11365,8 +11366,6 @@ sub _batSocTarget {
   my $debug = $paref->{debug};
 
   return if(!isBatteryUsed ($name));
-
-  #my $hash = $defs{$name};
   
   debugLog ($paref, 'batteryManagement', "######################### Start Battery Management DebugLog #########################");
 
@@ -12051,7 +12050,6 @@ sub _batChargeMgmt {
           }
       }
   }
-  
 
   # prognostizierten SOC über alle Batterien speichern
   ######################################################
@@ -12155,8 +12153,6 @@ sub __batChargeOptTargetPower {
           my $goalwh     = $hsurp->{$hod}{$sbn}{goalwh};                                                         # Ladeziel 
           my $runwhneed  = $goalwh - $runwh; 
           my $achievable = 1;
-          #my $total      = 0;                                               
-          #$total        += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
             
           if ($runwhneed > 0 && $total * $befficiency < $runwhneed) {                                            # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
@@ -12186,32 +12182,45 @@ sub __batChargeOptTargetPower {
               next;
           }                                   
           
-          ## weiter mit Überschuß
-          #########################
+          ## weiter mit Überschuß (Prognose)
+          ####################################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
           my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed, $befficiency);
           my $needraw   = min ($fref->{ph}, $spls);                                                              # Ladeleistung auf Surplus begrenzen
-                   
+          
           $needraw      = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
           $needraw      = max ($needraw, $bpinreduced);                                                          # Mindestladeleistung bpinreduced sicherstellen                  
-          $needraw     *= 1 + ($otpMargin / 100);                                                                # 1. Sicherheitsaufschlag
-          $needraw      = sprintf "%.0f", $needraw;
-          $needraw      = min ($needraw, $bpinmax);                                                              # Begrenzung auf max. mögliche Batterieladeleistung
+          my $pneedmin  = $needraw * (1 + $otpMargin / 100);                                                     # initialer Sicherheitsaufschlag
           
-          $hsurp->{$hod}{$sbn}{pneedmin} = $runwhneed > 0 ? $needraw : 0;                                        # Ladeleistung abhängig von Ziel-SoC Erfüllung        
-           
+          if ($strategy eq 'smartPower') {
+              $pneedmin = ___batAdjustPowerByMargin ($name, $needraw, $bpinmax, $runwhneed, $otpMargin);         # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+          }
+          
+          $pneedmin = sprintf "%.0f", $pneedmin;
+          $pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
+          
+          $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin > 0 ? $pneedmin : 0;                                        # Ladeleistung abhängig von Ziel-SoC Erfüllung        
+               
           ## NextHour 00 bearbeiten
           ###########################
           if ($nhr eq '00') {
-              my $target = $hsurp->{$hod}{$sbn}{pneedmin};
-              
-              if ($achievable) {          
-                  $target *= 1 + ($otpMargin / 100);                                                             # 2. Sicherheitsaufschlag
-              }                                                             
-              else { 
-                  $target *= (1 + $otpMargin / 100) ** 2;                                                        # potenzierter Sicherheitsaufschlag wenn Tagesziel nicht erreichbar
-              }                                         
-              
+              my $target = $needraw > 0 ? $needraw : 0;           
+
+              if ($achievable) {                                                                                 # Tagesziel erreichbar: Basisziel um otpMargin% erhöhen
+                  $target *= 1 + ($otpMargin / 100);
+                    
+                  if ($strategy eq 'smartPower') {                                                               # smartPower: Sicherheitsaufschlag linear absenkend
+                      $target = ___batAdjustPowerByMargin ($name, $target, $bpinmax, $runwhneed, $otpMargin);
+                  }
+              }
+              else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)
+                  $target *= (1 + $otpMargin / 100) ** 2;
+
+                  if ($strategy eq 'smartPower') {                                                               # smartPower: maximale Ladeleistung erzwingen
+                      $target = $bpinmax;
+                  }
+              }
+
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
               my $bpin    = CurrentVal ($name, 'batpowerinsum', 0);                                              # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
               my $inc     = 0;
@@ -12219,7 +12228,6 @@ sub __batChargeOptTargetPower {
               if ( !$bpin && $gfeedin > $fipl )           {$inc = $gfeedin - $fipl}                              # Ladeleistung wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
               if (  $bpin && ($gfeedin - $bpin) > $fipl ) {$inc = $bpin + (($gfeedin - $bpin) - $fipl)}          # Ladeleistung wenn akt. Bat-Ladung UND Einspeisung - Bat-Ladung > Einspeiselimit der Anlage
                        
-              $target              = $bpinmax if(!$achievable && $strategy eq 'smartPower');                     # smartPower: max. Ladeleistung wenn Ladeziel nicht erreichbar				   
               $target              = sprintf "%.0f", max ($target, $inc);                                        # Einspeiselimit berücksichtigen
               $target              = min (($csocwh <= $lowSocwh ? $bpinreduced : $bpinmax), $target);            # 2. Begrenzung auf max. mögliche Batterieleistung bzw. bpinreduced bei Unterschreitung lowSoc
               $otp->{$sbn}{target} = $target;
@@ -12244,6 +12252,25 @@ sub __batChargeOptTargetPower {
   }
   
 return ($hsurp, $otp);
+}
+
+################################################################
+#  Zielleistung mit Sicherheitszuschlag behandeln  
+#  abfallend proportional zum linearen Rest-Überschuss des Tages
+################################################################       
+sub ___batAdjustPowerByMargin {
+  my ($name, $target, $pinmax, $runwhneed, $otpMargin) = @_;
+
+  my $ratio   = 0;
+  my $rodpvfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);                     # PV Prognose Rest des Tages
+  $ratio      = $rodpvfc * 100 / $runwhneed if($runwhneed);
+  
+  return $pinmax if($target == $pinmax || $ratio <= 100);
+  return $target * (1 + $otpMargin / 100) if($target == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
+  
+  my $pow = $pinmax - ($pinmax - $target) * ($ratio - 100) / $otpMargin;
+
+return $pow;
 }
 
 ################################################################
