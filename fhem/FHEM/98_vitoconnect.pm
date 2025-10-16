@@ -94,6 +94,9 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "0.9.5"  => "15.10.2025  Fix duplicate timer in case of password update (getCode)",
+  "0.9.4"  => "15.10.2025  More logging for timers",
+  "0.9.3"  => "15.10.2025  URL to dev portal updated",
   "0.9.2"  => "15.09.2025  Fix Not a HASH reference at ./FHEM/98_vitoconnect.pm line 3818 when set action error",
   "0.9.1"  => "11.09.2025  In case of set action when token is expired get new token and try again",
   "0.9.0"  => "09.03.2025  New api and iam URL (viessmann-climatesolutions.com)",
@@ -1381,7 +1384,7 @@ sub vitoconnect_Set {
     Log(5,$name.", -vitoconnect_Set started: ". $opt); #debug
     
     # Setter für die Geräteauswahl dynamisch erstellen  
-    Log3($name,4,$name." - Set devices: ".$hash->{devices});
+    Log3($name,5,$name." - Set devices: ".$hash->{devices});
     if (defined $hash->{devices} && ref($hash->{devices}) eq 'HASH' && keys %{$hash->{devices}} > 0) {
         my @device_serials = keys %{$hash->{devices}};
         $val .= " selectDevice:" . join(",", @device_serials);
@@ -1434,12 +1437,14 @@ sub vitoconnect_Set {
     elsif ($opt eq "password" )                         {   # set <name> password: store password in key store
         my $err = vitoconnect_StoreKeyValue($hash,"passwd",$args[0]);   # Kennwort verschlüsselt speichern
         return $err if ($err);
+        RemoveInternalTimer($hash);
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
     }
     elsif ($opt eq "apiKey" )                           {   # set <name> apiKey: bisher keine Beschreibung
         $hash->{apiKey} = $args[0];
         my $err = vitoconnect_StoreKeyValue($hash,"apiKey",$args[0]);   # apiKey verschlüsselt speichern
+        return $err if ($err);
         RemoveInternalTimer($hash);
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
@@ -2782,7 +2787,7 @@ sub vitoconnect_Attr {
 sub vitoconnect_GetUpdate {
     my ($hash) = @_;# Übergabe-Parameter
     my $name = $hash->{NAME};
-    Log3($name,4,$name." - GetUpdate called ...");
+    Log3($name,4,$name." GetUpdate called by caller name: $name, memoryadress: $hash");
     if (IsDisabled($name))      {   # Device disabled
         Log3($name,4,$name." - device disabled");
         InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);   # nach Intervall erneut versuchen
@@ -3454,6 +3459,7 @@ sub vitoconnect_getResource {
     Log3($name,4,$name." - installation: ".$installation);
     Log3($name,4,$name." - gw: ".$gw);
     if ($access_token eq "" || $installation eq "" || $gw eq "") {  # noch kein: Token, ID, GW
+        RemoveInternalTimer($hash);  
         vitoconnect_getCode($hash);
         return;
     }
@@ -3974,7 +3980,7 @@ sub vitoconnect_errorHandling {
                 # RATE_LIMIT_EXCEEDED
                 readingsSingleUpdate($hash,"state","Anzahl der möglichen API Calls in überschritten!",1);
                 Log3 $name, 1,
-                  "$name - Anzahl der möglichen API Calls in überschritten!";
+                  "$name - Anzahl der möglichen API Calls in überschritten! Caller Name: $hash->{NAME}, memoryadress: $hash";
                 InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
@@ -4178,7 +4184,7 @@ sub vitoconnect_DeleteKeyValue {
             If you have more than one gateway, the gateway serial is attached to the filenames.</li>
         <a id="vitoconnect-set-apiKey"></a>
         <li><code>apiKey</code><br>
-            You need to create an API Key under <a href="https://developer.viessmann.com/">https://developer.viessmann.com/</a>.
+            You need to create an API Key under <a href="https://developer.viessmann-climatesolutions.com/">https://developer.viessmann-climatesolutions.com/</a>.
             Create an account, add a new client (disable Google reCAPTCHA, Redirect URI = <code>http://localhost:4200/</code>).
             Copy the Client ID here as <code>apiKey</code>.</li>
         <li><code>Setters for your device will be available depending on the mapping method you choose with the help of the attributes <code>vitoconnect_raw_readings</code> or <code>vitoconnect_mapping_roger</code>.</code><br>
@@ -4413,7 +4419,7 @@ sub vitoconnect_DeleteKeyValue {
             Wenn mehrere Gateways vorhanden sind, wird die Seriennummer des Gateways an die Dateinamen angehängt.</li>
         <a id="vitoconnect-set-apiKey"></a>
         <li><code>apiKey</code><br>
-            Ein API-Schlüssel muss unter https://developer.viessmann.com/ erstellt werden.
+            Ein API-Schlüssel muss unter https://developer.viessmann-climatesolutions.com/ erstellt werden.
             Dazu ein Konto anlegen, einen neuen Client hinzufügen (Google reCAPTCHA deaktivieren, Redirect URI = http://localhost:4200/).
             Die Client-ID muss als apiKey hier eingefügt werden.</li>
         <li><code>Die Setter für das Gerät hängen von der gewählten Mappingmethode ab, die durch die Attribute vitoconnect_raw_readings oder vitoconnect_mapping_roger gesteuert wird.</code><br>
