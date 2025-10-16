@@ -46,7 +46,7 @@ use Blocking;
 use HttpUtils;
 use feature 'state';
 
-my $ModulVersion = "08.20.06";
+my $ModulVersion = "08.20.06a";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -5513,6 +5513,9 @@ sub FRITZBOX_Readout_Run_Web_LuaQuery($$$$) {
    FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlan_2.4GHz", "";
    FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlan_5GHz", "";
 
+   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_2.4GHz", "";
+   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_5GHz", "";
+
    if ($hash->{fhem}{fwVersion} < 750) {
      FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
      FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_5GHz", $result->{box_wlan_5GHz}, "onoff";
@@ -8307,6 +8310,11 @@ sub FRITZBOX_Readout_Process($$)
    my $startTime = time();
 
    my $name = $hash->{NAME};
+
+   if (substr($string, -1) eq "|") {
+     $string .= "&#eof";
+   }
+
    my (%values) = split("\\|", $string);
 
    my $reading_list = AttrVal($name, "disableBoxReadings", "none");
@@ -8372,6 +8380,7 @@ sub FRITZBOX_Readout_Process($$)
    while (my ($rName, $rValue) = each(%values) ) {
 
      $rValue =~ s/&#0124/\|/g;  # handling valid character | in FritzBox names
+     $rValue =~ s/&#eof//g;     # handling if last value equal "" or undef
 
      #hash values
      if ($rName =~ /->/) {
@@ -8610,101 +8619,103 @@ sub FRITZBOX_Readout_Format($$$)
 {
    my ($hash, $format, $readout) = @_;
 
-   return "" unless defined $readout;
+   return "" if !defined($readout);
 
-   return $readout unless defined( $format ) || $format eq "";
+   # Handling | as valid character in FritzBox names
+   $readout =~ s/\|/&#0124/g;
 
-   if ($format eq "01" && $readout ne "1") {
-      $readout = "0";
+   return $readout if(!defined($format) || ($format eq ""));
+
+   if ($format eq "01") {
+     $readout = "0" if $readout ne "1";
    }
-
-   if ($format eq "aldays") {
-      if ($readout eq "0") {
-         $readout = "once";
-      }
-      elsif ($readout >= 127) {
-         $readout = "daily";
-      }
-      else {
-         my $bitStr = $readout;
-         $readout = "";
-         foreach (sort {$a <=> $b} keys %alarmDays) {
-            $readout .= (($bitStr & $_) == $_) ? $alarmDays{$_}." " : "";
-         }
-         chop($readout);
-      }
+   elsif ($format eq "aldays") {
+     if ($readout eq "0") {
+       $readout = "once";
+     }
+     elsif ($readout >= 127) {
+       $readout = "daily";
+     }
+     else {
+       my $bitStr = $readout;
+       $readout = "";
+       foreach (sort {$a <=> $b} keys %alarmDays) {
+         $readout .= (($bitStr & $_) == $_) ? $alarmDays{$_}." " : "";
+       }
+       chop($readout);
+     }
    }
    elsif ($format eq "alnumber") {
-      my $intern = $readout;
-      if (1 <= $readout && $readout <=2) {
-         $readout = "FON $intern";
-      } elsif ($readout == 9) {
-         $readout = "all DECT";
-      } elsif (60 <= $readout && $readout <=65) {
-         $intern = $readout + 550;
-         $readout = "DECT $intern";
-      } elsif ($readout == 50) {
-         $readout = "all";
-      }
-      $readout .= " (".$hash->{fhem}{$intern}{name}.")" if defined $hash->{fhem}{$intern}{name};
+     my $intern = $readout;
+     if (1 <= $readout && $readout <=2) {
+       $readout = "FON $intern";
+     } elsif ($readout == 9) {
+       $readout = "all DECT";
+     } elsif (60 <= $readout && $readout <=65) {
+       $intern = $readout + 550;
+       $readout = "DECT $intern";
+     } elsif ($readout == 50) {
+       $readout = "all";
+     }
+     $readout .= " (".$hash->{fhem}{$intern}{name}.")" if defined $hash->{fhem}{$intern}{name};
    }
    elsif ($format eq "altime") {
-      $readout =~ s/(\d\d)(\d\d)/$1:$2/;
+     $readout =~ s/(\d\d)(\d\d)/$1:$2/;
    }
    elsif ($format eq "deviceip") {
-      $readout = $landevice{$readout}." ($readout)" if defined $landevice{$readout};
+     $readout = $landevice{$readout}." ($readout)" if defined $landevice{$readout};
    }
    elsif ($format eq "dialport") {
-      $readout = $dialPort{$readout}   if $dialPort{$readout};
+     $readout = $dialPort{$readout}   if $dialPort{$readout};
    }
    elsif ($format eq "gsmnetstate") {
-      $readout = $gsmNetworkState{$readout} if defined $gsmNetworkState{$readout};
+     $readout = $gsmNetworkState{$readout} if defined $gsmNetworkState{$readout};
    }
    elsif ($format eq "gsmact") {
-      $readout = $gsmTechnology{$readout} if defined $gsmTechnology{$readout};
+     $readout = $gsmTechnology{$readout} if defined $gsmTechnology{$readout};
    }
    elsif ($format eq "model") {
-      $readout = $fonModel{$readout} if defined $fonModel{$readout};
+     $readout = $fonModel{$readout} if defined $fonModel{$readout};
    }
    elsif ($format eq "mohtype") {
-      $readout = $mohtype{$readout} if defined $mohtype{$readout};
+     $readout = $mohtype{$readout} if defined $mohtype{$readout};
    }
    elsif ($format eq "nounderline") {
-      $readout =~ s/_/ /g;
+     $readout =~ s/_/ /g;
    }
    elsif ($format eq "onoff") {
-      $readout =~ s/er//;
-      $readout =~ s/no-emu//;
-      $readout =~ s/^0*$/off/;
-      $readout =~ s/^1*$/on/;
+     $readout =~ s/er//;
+     $readout =~ s/no-emu//;
+     $readout =~ s/^0*$/off/;
+     $readout =~ s/^1*$/on/;
    }
    elsif ($format eq "yesno") {
-      $readout =~ s/er//;
-      $readout =~ s/no-emu//;
-      $readout =~ s/^0*$/no/;
-      $readout =~ s/^1*$/yes/;
+     $readout =~ s/er//;
+     $readout =~ s/no-emu//;
+     $readout =~ s/^0*$/no/;
+     $readout =~ s/^1*$/yes/;
    }
    elsif ($format eq "radio") {
-      if (defined $hash->{fhem}{radio}{$readout}) {
-         $readout = $hash->{fhem}{radio}{$readout};
-      }
-      else {
-         $readout .= " (unknown)";
-      }
+     if (defined $hash->{fhem}{radio}{$readout}) {
+       $readout = $hash->{fhem}{radio}{$readout};
+     }
+     else {
+       $readout .= " (unknown)";
+     }
    }
    elsif ($format eq "ringtone") {
-      $readout = $ringTone{$readout}   if $ringTone{$readout};
+     $readout = $ringTone{$readout}   if $ringTone{$readout};
    }
    elsif ($format eq "secondsintime") {
-      if ($readout < 243600) {
-         $readout = sprintf "%d:%02d", int $readout/3600, int( ($readout %3600) / 60);
-      }
-      else {
-         $readout = sprintf "%dd %d:%02d", int $readout/24/3600, int ($readout%24*3600)/3600, int( ($readout %3600) / 60);
-      }
+     if ($readout < 243600) {
+       $readout = sprintf "%d:%02d", int $readout/3600, int( ($readout %3600) / 60);
+     }
+     else {
+       $readout = sprintf "%dd %d:%02d", int $readout/24/3600, int ($readout%24*3600)/3600, int( ($readout %3600) / 60);
+     }
    }
    elsif ($format eq "usertype") {
-      $readout = $userType{$readout};
+     $readout = $userType{$readout};
    }
 
    return $readout;
@@ -8716,10 +8727,6 @@ sub FRITZBOX_Readout_Add_Reading ($$$$@)
 {
    my ($hash, $roReadings, $rName, $rValue, $rFormat) = @_;
 
-   # Handling | as valid character in FritzBox names
-   $rValue =~ s/\|/&#0124/g if defined $rValue;
-
-   $rFormat = "" unless defined $rFormat;
    $rValue = FRITZBOX_Readout_Format ($hash, $rFormat, $rValue);
 
    push @{$roReadings}, $rName . "|" . $rValue ;
@@ -8960,6 +8967,7 @@ sub FRITZBOX_Readout_SetGet_Done($)
    elsif  ($success == 2 )
    {
       $result = decode_base64($result);
+
       FRITZBOX_Readout_Process ( $hash, $result );
    }
    # internes FritzBox Log: alles ok und es findet noch eine Nachverarbeitung durch eine sub in einer 99_...pm statt.
