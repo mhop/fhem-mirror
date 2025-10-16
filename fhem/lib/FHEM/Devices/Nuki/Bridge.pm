@@ -429,49 +429,55 @@ sub Set {
         getdevicelist => sub {
             return 'usage: getDeviceList' if $arg;
             $endpoint = 'list';
+            return;
         },
         info => sub {
             return 'usage: info' if $arg;
             $endpoint = 'info';
+            return;
         },
         fwupdate => sub {
             return 'usage: fwUpdate' if $arg;
             $endpoint = 'fwupdate';
+            return;
         },
         reboot => sub {
             return 'usage: reboot' if $arg;
             $endpoint = 'reboot';
+            return;
         },
         clearlog => sub {
             return 'usage: clearLog' if $arg;
             $endpoint = 'clearlog';
+            return;
         },
         factoryreset => sub {
             return 'usage: factoryReset' if $arg;
             $endpoint = 'factoryreset';
+            return;
         },
         callbackremove => sub {
             return 'usage: callbackRemove'
               if ( split( m{\s+}xms, $arg ) > 1 );
             my $id = defined $arg ? $arg : 0;
-            $param    = '{"param":"' . $id . '"}';
             $endpoint = 'callback/remove';
+            $param    = '{"param":"' . $id . '"}';
+            return;
         },
         configauth => sub {
             return 'usage: configAuth'
               if ( split( m{\s+}xms, $arg ) > 1 );
             my $configAuth = 'enable=' . ( $arg eq 'enable' ? 1 : 0 );
-            $param    = '{"param":"' . $configAuth . '"}';
             $endpoint = 'configAuth';
+            $param    = '{"param":"' . $configAuth . '"}';
+            return;
         },
     );
 
     if ( exists $handlers{$cmd} ) {
         my $result = $handlers{$cmd}->();
         return $result
-          if defined $result
-          && length $result
-          && $result ne $endpoint;
+          if defined $result && length $result;
     }
     else {
         my $list = 'info:noArg getDeviceList:noArg ';
@@ -501,19 +507,19 @@ sub Get {
         logfile => sub {
             return 'usage: logFile' if defined $arg;
             $endpoint = 'log';
+            return;
         },
         callbacklist => sub {
             return 'usage: callbackList' if defined $arg;
             $endpoint = 'callback/list';
+            return;
         },
     );
 
     if ( exists $handlers{$cmd} ) {
         my $result = $handlers{$cmd}->();
         return $result
-          if defined $result
-          && length $result
-          && $result ne $endpoint;
+          if defined $result && length $result;
     }
     else {
         my $list = 'callbackList:noArg ';
