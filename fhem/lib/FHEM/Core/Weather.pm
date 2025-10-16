@@ -234,9 +234,6 @@ sub _LanguageInitialize {
         %status_items_txt_i18n   = %status_items_txt_nl;
     }
     elsif ( $lang eq 'fr' ) {
-
-    }
-    elsif ( $lang eq 'fr' ) {
         %wdays_txt_i18n          = %wdays_txt_fr;
         @directions_txt_i18n     = @directions_txt_fr;
         %pressure_trend_txt_i18n = %pressure_trend_txt_fr;
@@ -870,11 +867,11 @@ sub Attr {
         ::InternalTimer( gettimeofday() + 0.5,
             \&FHEM::Core::Weather::DeleteForecastreadings, $hash );
     }
-    elsif ('forecastLimit') {
+    elsif ( $cmd eq 'forecastLimit' ) {
         ::InternalTimer( gettimeofday() + 0.5,
             \&FHEM::Core::Weather::DeleteForecastreadings, $hash );
     }
-    elsif ('alerts') {
+    elsif ( $cmd eq 'alerts' ) {
         if ( $cmd eq 'set' ) {
             $hash->{fhem}->{api}->setAlerts($AttrVal);
         }
