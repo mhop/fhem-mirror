@@ -167,6 +167,8 @@
 # 6.04.1    new: improved commands for PLUGS_UI
 #           fix: update interval of energy readings (Gen2 energy meter)
 # 6.04.2    new: Shelly shutter added
+# 6.04.3    new: Shelly Pro2 UL-type added
+#           fix: do not set gain to 100% on set hsv|rgb. 
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -191,7 +193,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.04.2 04.09.2025";
+my $version = "6.04.3 16.10.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -374,7 +376,9 @@ my %shelly_vendor_ids = (
     # Android Devices / Control Panels
     "SAWD-0A1XX10EU1" => ["walldisplay1",   "Shelly Wall Display"], ## prelim version ?  ## not listed by KB
     "SAWD1"           => ["walldisplay1",   "Shelly Wall Display"],
-    "SAWD-2A1XX10EU1" => ["walldisplay1",   "Shelly Wall Display", 0x3002]    # added 03/2025
+    "SAWD-2A1XX10EU1" => ["walldisplay1",   "Shelly Wall Display", 0x3002],   # added 03/2025
+    # UL-Types
+    "SPSW-202XE12UL"  => ["shellypro2",     "Shelly Pro 2 v.1"]          # added 10/2025, not listed by KB
     );
 
 my %shelly_family = (
@@ -3134,7 +3138,7 @@ sub Shelly_Set ($@) {
       $green=int($green*255+0.5);
       $blue= int($blue*255+0.5);
       $cmd0=sprintf("red=%d&green=%d&blue=%d",$red,$green,$blue);
-      if($model eq "shellybulb"){
+      if($model eq "Xshellybulb"){
           $cmd0 .= "&gain=100";
       }else{
           $cmd0 .= sprintf("&gain=%d",$value*100);  #new
@@ -3149,7 +3153,7 @@ sub Shelly_Set ($@) {
           $cmd0    = sprintf("white=%d",$white);
       }
       $cmd0    .= sprintf("&red=%d&green=%d&blue=%d",$red,$green,$blue);
-      $cmd0    .= "&gain=100";
+ ##     $cmd0    .= "&gain=100";
     }elsif( $cmd eq "white" ){  # value 0 ... 100
       $cmd0=sprintf("white=%d",$value*2.55);
     }elsif( $cmd eq "gain" ){  # value 0 ... 100
