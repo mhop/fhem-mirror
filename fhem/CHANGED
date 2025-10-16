@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 73_NUKIBridge: in the `Set` and `Get` methods, updated the return
+                          conditions to exclude the endpoint from the results
+                          when it matches the output from the command handlers
  - bugfix: 72_FRITZBOX: warning: Odd number of elements in hash assignment
  - bugfix: 98_vitoconnect: Fix duplicate timer in case of password update
  - change: 74_NUKIDevice: Add UTF-8 encoding for reading bulk updates

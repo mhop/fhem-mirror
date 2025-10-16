@@ -454,21 +454,24 @@ sub Set {
             return 'usage: callbackRemove'
               if ( split( m{\s+}xms, $arg ) > 1 );
             my $id = defined $arg ? $arg : 0;
-            $endpoint = 'callback/remove';
             $param    = '{"param":"' . $id . '"}';
+            $endpoint = 'callback/remove';
         },
         configauth => sub {
             return 'usage: configAuth'
               if ( split( m{\s+}xms, $arg ) > 1 );
             my $configAuth = 'enable=' . ( $arg eq 'enable' ? 1 : 0 );
-            $endpoint = 'configAuth';
             $param    = '{"param":"' . $configAuth . '"}';
+            $endpoint = 'configAuth';
         },
     );
 
     if ( exists $handlers{$cmd} ) {
         my $result = $handlers{$cmd}->();
-        return $result if defined $result && length $result;
+        return $result
+          if defined $result
+          && length $result
+          && $result ne $endpoint;
     }
     else {
         my $list = 'info:noArg getDeviceList:noArg ';
@@ -507,7 +510,10 @@ sub Get {
 
     if ( exists $handlers{$cmd} ) {
         my $result = $handlers{$cmd}->();
-        return $result if defined $result && length $result;
+        return $result
+          if defined $result
+          && length $result
+          && $result ne $endpoint;
     }
     else {
         my $list = 'callbackList:noArg ';
