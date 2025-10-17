@@ -12242,7 +12242,7 @@ sub __batChargeOptTargetPower {
               $otp->{$sbn}{target} = $target;
           }
 
-          $diff = $spls;                                                                                         # PV-Überschuß
+          $diff = min ($spls, $hsurp->{$hod}{$sbn}{pneedmin});                                                   # kleinster Wert aus PV-Überschuß oder Ladeleistungsbegrenzung
           
           if ($nhr eq '00') {                                                                                    # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
               $diff = $spls / 60 * (60 - int $minute);                                                  
