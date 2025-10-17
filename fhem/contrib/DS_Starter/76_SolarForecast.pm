@@ -161,7 +161,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
-                           "new Reading Battery_TargetAchievable_XX ",
+                           "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
                            "__batChargeOptTargetPower: use pinmax if achievable==0, new ctrlBatSocManagementXX->stepSoC key ".
 						   "loadStrategy: possible value smartPower ", 
@@ -7485,16 +7485,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       delete $data{$name}{batteries}{$bn}{bpoutmax};
       delete $data{$name}{batteries}{$bn}{befficiency};
   }
-  elsif ($paref->{cmd} eq 'del') {
-      #readingsDelete    ($hash, 'Current_PowerBatIn_'.$bn);
-      #readingsDelete    ($hash, 'Current_PowerBatOut_'.$bn);
-      #readingsDelete    ($hash, 'Current_BatCharge_'.$bn);
-      #readingsDelete    ($hash, 'Battery_ChargeOptTargetPower_'.$bn);
-      #readingsDelete    ($hash, 'Battery_ChargeUnrestricted_'.$bn);
-      #readingsDelete    ($hash, 'Battery_ChargeRequest_'.$bn);
-      #readingsDelete    ($hash, 'Battery_OptimumTargetSoC_'.$bn);
-      #readingsDelete    ($hash, 'Battery_TargetAchievable_'.$bn);
-                                                                                     # Liste der lesbaren Namen ohne Suffix und $bn
+  elsif ($paref->{cmd} eq 'del') {                                                          
       my @fields = qw(                                                                
           Current_PowerBatIn
           Current_PowerBatOut
@@ -11436,7 +11427,7 @@ sub _batSocTarget {
       delete $paref->{batnmb};
       delete $paref->{careCycle};
 
-      my $nt         = '';
+      # my $nt         = '';
       my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
       my $target     = $lowSoc;
       my $yday       = strftime "%d", localtime($t - 86400);                                    # Vortag  (range 01 to 31)
@@ -11468,9 +11459,12 @@ sub _batSocTarget {
 
       ## Pflege-SoC (Soll SoC MAXSOCDEF bei $stepSoc % Steigerung p. Tag)
       #####################################################################
-      my $sunset  = CurrentVal ($name, 'sunsetTodayTs', $t);
-      my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
-      my $la      = '';
+      my $sunset  = CurrentVal ($name, 'sunsetTodayTs',  $t);
+      my $sunrise = CurrentVal ($name, 'sunriseTodayTs', $t); 
+	  #my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
+      my $delayts = $sunrise + (($sunset - $sunrise) / 2);                                      # V 1.59.5 neues SoC-Ziel ab ca. Mittag berechnen/anwenden
+	  my $nt      = (timestampToTimestring ($delayts, $paref->{lang}))[0];
+	  my $la      = '';
       my $careSoc = $target;
 
       my $ntsmsc    = CircularVal ($name, 99, 'nextTsMaxSocChge'.$bn, $t);
@@ -11478,8 +11472,7 @@ sub _batSocTarget {
       my $docare    = 0;                                                                       # keine Zwangsanwendung care SoC
 
       my $whneed    = ($maxSoc / 100 * $batinstcap) - ($soc / 100 * $batinstcap);              # benötigte Ladeenergie in Wh bis $maxSoc
-      $whneed       = $whneed < 0 ? 0 : $whneed;
-      $whneed       = sprintf "%.0f", $whneed;
+      $whneed       = sprintf "%.0f", max (0, $whneed);
 
       if ($t > $delayts || $pvexpect < $whneed || !$days2care) {
           $paref->{batnmb}    = $bn;
@@ -11501,8 +11494,7 @@ sub _batSocTarget {
           $la = "calc care SoC -> docare: $docare, care SoC: $careSoc %, Remaining days until care SoC: $days2care, Target: $target %";
       }
       else {
-          $nt = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-          $la = "calc care SoC -> docare: $docare, care SoC: $careSoc %, use preliminary Target: $target % (care SoC calculation & activation postponed to after $nt)";
+          $la = "calc care SoC -> docare: $docare, care SoC: $careSoc %, use preliminary Target: $target % (new care SoC calc & act postponed to after $nt)";
       }
 
       debugLog ($paref, 'batteryManagement', "SoC Step2 Bat $bn - basics -> Energy expected for charging: $pvexpect Wh, need until maxsoc: $whneed Wh");
@@ -11525,14 +11517,13 @@ sub _batSocTarget {
 
       my $logadd = '';
 
-      if ($newtarget > $csopt && $t > $delayts) {                                              # Erhöhung des SoC (wird ab Sonnenuntergang angewendet)
+      if ($newtarget > $csopt && $t > $delayts) {                                              # Erhöhung des SoC (wird ab delayts angewendet)
           $target = $newtarget;
           $logadd = "(new target > $csopt % and Sunset has passed)";
       }
       elsif ($newtarget > $csopt && $t <= $delayts && !$docare) {                              # bisheriges Optimum bleibt vorerst
           $target = $csopt;
-          $nt     = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-          $logadd = "(new target $newtarget % is activated after $nt)";
+          $logadd = "(new target SoC is calculated & activated after $nt)";
       }
       elsif ($newtarget < $csopt) {                                                            # Targetminderung sofort umsetzen -> Freiplatz für Ladeprognose
           $target = $newtarget;
