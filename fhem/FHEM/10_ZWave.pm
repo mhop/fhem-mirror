@@ -6523,7 +6523,7 @@ ZWave_tmSet($)
   </ul>
 
   <br><br><b>All</b>
-  <a id="ZWave-set-neighborUpdate"/>
+  <a id="ZWave-set-neighborUpdate"></a>
   <li>neighborUpdate<br>
     Requests controller to update its routing table which is based on
     slave's neighbor list. The update may take significant time to complete.
@@ -6531,26 +6531,26 @@ ZWave_tmSet($)
     update process.  To read node's neighbor list see neighborList get
     below.</li>
 
-  <a id="ZWave-set-returnRouteAdd"/>
+  <a id="ZWave-set-returnRouteAdd"></a>
   <li>returnRouteAdd &lt;decimal nodeId&gt;<br>
     Assign up to 4 static return routes to the routing/enhanced slave to
     allow direct communication to &lt;decimal nodeId&gt;. (experts only)</li>
 
-  <a id="ZWave-set-returnRouteDel"/>
+  <a id="ZWave-set-returnRouteDel"></a>
   <li>returnRouteDel<br>
     Delete all static return routes. (experts only)</li>
 
-  <a id="ZWave-set-sucRouteAdd"/>
+  <a id="ZWave-set-sucRouteAdd"></a>
   <li>sucRouteAdd<br>
     Inform the routing/enhanced slave of the presence of a SUC/SIS. Assign
     up to 4 static return routes to SUC/SIS.</li>
 
-  <a id="ZWave-set-sucRouteDel"/>
+  <a id="ZWave-set-sucRouteDel"></a>
   <li>sucRouteDel<br>
     Delete static return routes to SUC/SIS node.</li>
 
 <br><br><b>Class ALARM</b>
-  <a id="ZWave-set-alarmnotification"/>
+  <a id="ZWave-set-alarmnotification"></a>
   <li>alarmnotification &lt;alarmType&gt; (on|off)<br>
     Enable (on) or disable (off) the sending of unsolicited reports for
     the alarm type &lt;alarmType&gt;. A list of supported alarm types of the
@@ -6566,54 +6566,54 @@ ZWave_tmSet($)
     regardless of the version.</li>
 
   <br><br><b>Class ASSOCIATION</b>
-  <a id="ZWave-set-associationAdd"/>
+  <a id="ZWave-set-associationAdd"></a>
   <li>associationAdd groupId nodeId ...<br>
   Add the specified list of nodeIds to the association group groupId.<br> Note:
   upon creating a FHEM-device for the first time FHEM will automatically add
   the controller to the first association group of the node corresponding to
   the FHEM device, i.e it issues a "set name associationAdd 1
   controllerNodeId"</li>
-  <a id="ZWave-set-associationDel"/>
+  <a id="ZWave-set-associationDel"></a>
   <li>associationDel groupId nodeId ...<br>
   Remove the specified list of nodeIds from the association group groupId.</li>
 
   <br><br><b>Class BASIC</b>
-  <a id="ZWave-set-basicValue"/>
+  <a id="ZWave-set-basicValue"></a>
   <li>basicValue value<br>
     Send value (0-255) to this device. The interpretation is device dependent,
     e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
-  <a id="ZWave-set-basicValue"/>
+  <a id="ZWave-set-basicValue"></a>
   <li>basicValue value<br>
     Alias for basicValue, to make mapping from the incoming events easier.
     </li>
 
   <br><br><b>Class BARRIER_OPERATOR</b>
-  <a id="ZWave-set-barrierClose"/>
+  <a id="ZWave-set-barrierClose"></a>
   <li>barrierClose<br>
     start closing the barrier.</li>
-  <a id="ZWave-set-barrierOpen"/>
+  <a id="ZWave-set-barrierOpen"></a>
   <li>barrierOpen<br>
     start opening the barrier.
     </li>
 
   <br><br><b>Class BASIC_WINDOW_COVERING</b>
-  <a id="ZWave-set-coveringClose"/>
+  <a id="ZWave-set-coveringClose"></a>
   <li>coveringClose<br>
     Starts closing the window cover. Moving stops if blinds are fully closed or
     a coveringStop command was issued.
     </li>
-  <a id="ZWave-set-coveringOpen"/>
+  <a id="ZWave-set-coveringOpen"></a>
   <li>coveringOpen<br>
     Starts opening the window cover.  Moving stops if blinds are fully open or
     a coveringStop command was issued.
     </li>
-  <a id="ZWave-set-coveringStop"/>
+  <a id="ZWave-set-coveringStop"></a>
   <li>coveringStop<br>
     Stop moving the window cover. Blinds are partially open (closed).
   </li>
 
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
-  <a id="ZWave-set-ccs"/>
+  <a id="ZWave-set-ccs"></a>
   <li>ccs [mon|tue|wed|thu|fri|sat|sun] HH:MM tempDiff HH:MM tempDiff ...<br>
     set the climate control schedule for the given day.<br>
     Up to 9 pairs of HH:MM tempDiff may be specified.<br>
@@ -6623,7 +6623,7 @@ ZWave_tmSet($)
     If only a weekday is specified without any time and tempDiff, then the
     complete schedule for the specified day is removed and marked as unused.
     </li>
-  <a id="ZWave-set-ccsOverride"/>
+  <a id="ZWave-set-ccsOverride"></a>
   <li>ccsOverride (no|temporary|permanent) (frost|energy|$tempOffset) <br>
     set the override state<br>
     no: switch the override off<br>
@@ -6635,13 +6635,13 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class CLOCK</b>
-  <a id="ZWave-set-clock"/>
+  <a id="ZWave-set-clock"></a>
   <li>clock<br>
     set the clock to the current date/time (no argument required)
     </li>
 
   <br><br><b>Class COLOR_CONTROL</b>
-  <a id="ZWave-set-color"/>
+  <a id="ZWave-set-color"></a>
   <li>color colorComponent level colorComponent level ...<br>
     Set the colorComponent(s) to level<br>
     Up to 8 pairs of colorComponent level may be specified.<br>
@@ -6649,11 +6649,11 @@ ZWave_tmSet($)
     0 = warm white, 1 = cold white, 2 = red, 3 = green, 4 = blue, 
     5 = amber,6 = cyan, 7 = purple, 8 = indexed color<br>
     level is specified with a value from 0 to 255.</li>
-  <a id="ZWave-set-rgb"/>
+  <a id="ZWave-set-rgb"></a>
   <li>rgb<br>
     Set the color of the device as a 6 digit RGB Value (RRGGBB), each color is
     specified with a value from 00 to ff.</li>
-  <a id="ZWave-set-wcrgb"/>
+  <a id="ZWave-set-wcrgb"></a>
   <li>wcrgb<br>
     Used for sending warm white, cold white, red, green and blue values
     to device. Values must be decimal (0 - 255) and separated by blanks.
@@ -6664,9 +6664,9 @@ ZWave_tmSet($)
 
   <br><br><b>Class CONFIGURATION</b>
   <li>
-      <a id="ZWave-set-configByte"/>
-      <a id="ZWave-set-configWord"/>
-      <a id="ZWave-set-configLong"/>
+      <a id="ZWave-set-configByte"></a>
+      <a id="ZWave-set-configWord"></a>
+      <a id="ZWave-set-configLong"></a>
       configByte cfgAddress 8bitValue<br>
       configWord cfgAddress 16bitValue<br>
       configLong cfgAddress 32bitValue<br>
@@ -6674,13 +6674,13 @@ ZWave_tmSet($)
     value are node specific.<br>
     Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
     specific config commands are available.</li>
-  <a id="ZWave-set-configDefault"/>
+  <a id="ZWave-set-configDefault"></a>
   <li>configDefault cfgAddress<br>
     Reset the configuration parameter for the cfgAddress parameter to its
     default value.  See the device documentation to determine this value.</li>
 
   <br><br><b>Class DOOR_LOCK, V2</b>
-  <a id="ZWave-set-doorLockOperation"/>
+  <a id="ZWave-set-doorLockOperation"></a>
   <li>doorLockOperation DOOR_LOCK_MODE<br>
     Set the operation mode of the door lock.<br>
     DOOR_LOCK_MODE:<br>
@@ -6695,7 +6695,7 @@ ZWave_tmSet($)
     FF = Door secured<br>
     Note: open/close can be used as an alias for 00/FF.
     </li>
-  <a id="ZWave-set-doorLockConfiguration"/>
+  <a id="ZWave-set-doorLockConfiguration"></a>
   <li>doorLockConfiguration operationType outsidehandles
       insidehandles timeoutSeconds<br>
     Set the configuration for the door lock.<br>
@@ -6708,30 +6708,30 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class FIRMWARE_UPDATE_META_DATA</b>
-  <a id="ZWave-set-fwUpdate "/>
+  <a id="ZWave-set-fwUpdate "></a>
   <li>fwUpdate  &lt;decimal Target&gt;  &lt;filename&gt;<br>
   updates specified firmware target with firmware given in filename. The file is searched within 
   the in the modpath/FHEM/firmware/ folder. The supported targets can be requested with the get fwMetaData command. 
   FIRMWARE_UPDATE_MD class version &gt 3 untested, feedback welcome. FIRMWARE_UPDATE_MD class version &gt 4 not supported feedback welcome.</li>
 
   <br><br><b>Class INDICATOR</b>
-  <a id="ZWave-set-indicatorOn"/>
+  <a id="ZWave-set-indicatorOn"></a>
   <li>indicatorOn<br>
     switch the indicator on</li>
-  <a id="ZWave-set-indicatorOff"/>
+  <a id="ZWave-set-indicatorOff"></a>
   <li>indicatorOff<br>
     switch the indicator off</li>
-  <a id="ZWave-set-indicatorDim"/>
+  <a id="ZWave-set-indicatorDim"></a>
   <li>indicatorDim value<br>
     takes values from 1 to 99.
     If the indicator does not support dimming, it is interpreted as on.</li>
 
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
    <br>Fibaro FGR(M)-222 only:
-  <a id="ZWave-set-positionBlinds"/>
+  <a id="ZWave-set-positionBlinds"></a>
   <li>positionBlinds<br>
     drive blinds to position %</li>
-  <a id="ZWave-set-positionSlat"/>
+  <a id="ZWave-set-positionSlat"></a>
   <li>positionSlat<br>
     drive slat to position %</li>
    <br>D-Link DCH-Z510, Philio PSE02, Zipato Indoor Siren only:<br>
@@ -6745,27 +6745,27 @@ ZWave_tmSet($)
 
 
   <br><br><b>Class METER</b>
-  <a id="ZWave-set-meterReset"/>
+  <a id="ZWave-set-meterReset"></a>
   <li>meterReset</a><br>
     Reset all accumulated meter values.<br>
     Note: see meterSupported command and its output to detect if resetting the
     value is supported by the device.<br>
     The command will reset ALL accumulated values, it is not possible to
     choose a single value.</li>
-  <a id="ZWave-set-meterResetToValue"/>
+  <a id="ZWave-set-meterResetToValue"></a>
   <li>meterResetToValue type value<br>
     Reset type (one of energy,gas,water,heating,cooling) to the value specified.
     Only supported by METER version 6.</li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
-  <a id="ZWave-set-mcCreateAll"/>
+  <a id="ZWave-set-mcCreateAll"></a>
   <li>mcCreateAll<br>
     Create a FHEM device for all channels. This command is executed after
     inclusion of a new device.
     </li>
 
   <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
-  <a id="ZWave-set-mcaAdd"/>
+  <a id="ZWave-set-mcaAdd"></a>
   <li>mcaAdd groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
     Add a list of node or node:endpoint associations. The latter can be used to
     create channels on remotes. E.g. to configure the button 1,2,... on the
@@ -6777,7 +6777,7 @@ ZWave_tmSet($)
     </ul>
     For each button a separate FHEM device will be generated.
     </li>
-  <a id="ZWave-set-mcaDel"/>
+  <a id="ZWave-set-mcaDel"></a>
   <li>mcaDel groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
     delete node or node:endpoint associations.
     Special cases: just specifying the groupId will delete everything for this
@@ -6785,7 +6785,7 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class NETWORK_SCHEDULE (SCHEDULE), V1</b>
-  <a id="ZWave-set-schedule"/>
+  <a id="ZWave-set-schedule"></a>
   <li>schedule ID USER_ID YEAR-MONTH-DAY WDAY ACTIVE_ID DURATION_TYPE
     HOUR:MINUTE DURATION NUM_REPORTS CMD ... CMD<br>
     Set a schedule for a user. Due to lack of documentation,
@@ -6809,86 +6809,86 @@ ZWave_tmSet($)
           specified.<br>
       </ul>
       </li>
-  <a id="ZWave-set-scheduleRemove"/>
+  <a id="ZWave-set-scheduleRemove"></a>
   <li>scheduleRemove ID<br>
     Remove the schedule with the id ID</li>
-  <a id="ZWave-set-scheduleState"/>
+  <a id="ZWave-set-scheduleState"></a>
   <li>scheduleState ID STATE<br>
     Set the STATE of the schedule with the id ID. Description for
       parameter STATE is not available.</li>
 
   <br><br><b>Class NODE_NAMING</b>
-  <a id="ZWave-set-name"/>
+  <a id="ZWave-set-name"></a>
   <li>name NAME<br>
     Store NAME in the EEPROM. Note: only ASCII is supported.</li>
-  <a id="ZWave-set-location"/>
+  <a id="ZWave-set-location"></a>
   <li>location LOCATION<br>
     Store LOCATION in the EEPROM. Note: only ASCII is supported.</li>
 
   <br><br><b>Class SOUND_SWITCH</b>
-  <a id="ZWave-set-toneConfiguration"/>
+  <a id="ZWave-set-toneConfiguration"></a>
   <li>toneConfiguration VOLUME DEFAULTNR<br>
      Configure the volume and the default tone. Volume 0 is off, 1..100 is
      interpreted as 1% to 100%, and 255 restores last volume, if the current is
      0. If DEFAULTNR is 0, set only the volume.</li>
-  <a id="ZWave-set-tonePlay"/>
+  <a id="ZWave-set-tonePlay"></a>
   <li>tonePlay TONENUMBER<br>
      Play tone Number TONENUMBER.</li>
-  <a id="ZWave-set-tonePlayDefault"/>
+  <a id="ZWave-set-tonePlayDefault"></a>
   <li>tonePlayDefault<br>
      Play the default tone.</li>
-  <a id="ZWave-set-toneStop"/>
+  <a id="ZWave-set-toneStop"></a>
   <li>toneStop<br>
      Stop playing.</li>
 
   <br><br><b>Class POWERLEVEL</b>
   <li>Class is only used in an installation or test situation</li>
-  <a id="ZWave-set-powerlevel"/>
+  <a id="ZWave-set-powerlevel"></a>
   <li>powerlevel level timeout/s<br>
     set powerlevel to level [0-9] for timeout/s [1-255].<br>
     level 0=normal, level 1=-1dBm, .., level 9=-9dBm.</li>
-  <a id="ZWave-set-powerlevelTest"/>
+  <a id="ZWave-set-powerlevelTest"></a>
   <li>powerlevelTest nodeId level frames <br>
     send number of frames [1-65535] to nodeId with level [0-9].</li>
 
   <br><br><b>Class PROTECTION</b>
-  <a id="ZWave-set-protectionOff"/>
+  <a id="ZWave-set-protectionOff"></a>
   <li>protectionOff<br>
     device is unprotected</li>
-  <a id="ZWave-set-protectionOn"/>
+  <a id="ZWave-set-protectionOn"></a>
   <li>protectionOn<br>
     device is protected</li>
-  <a id="ZWave-set-protectionSeq"/>
+  <a id="ZWave-set-protectionSeq"></a>
   <li>protectionSeq<br>
     device can be operated, if a certain sequence is keyed.</li>
-  <a id="ZWave-set-protectionBytes"/>
+  <a id="ZWave-set-protectionBytes"></a>
   <li>protectionBytes LocalProtectionByte RFProtectionByte<br>
     for commandclass PROTECTION V2 - see devicemanual for supported
     protectionmodes</li>
 
   <br><br><b>Class SCENE_ACTIVATION</b>
-  <a id="ZWave-set-sceneConfig"/>
+  <a id="ZWave-set-sceneConfig"></a>
   <li>sceneConfig<br>
     activate settings for a specific scene.
     Parameters are: sceneId, dimmingDuration (0..255)
     </li>
 
   <br><br><b>Class SCENE_ACTUATOR_CONF</b>
-  <a id="ZWave-set-sceneConfig"/>
+  <a id="ZWave-set-sceneConfig"></a>
   <li>sceneConfig<br>
     set configuration for a specific scene.
     Parameters are: sceneId, dimmingDuration, finalValue (0..255)
     </li>
 
   <br><br><b>Class SCENE_CONTROLLER_CONF</b>
-  <a id="ZWave-set-groupConfig"/>
+  <a id="ZWave-set-groupConfig"></a>
   <li>groupConfig<br>
     set configuration for a specific scene.
     Parameters are: groupId, sceneId, dimmingDuration.
     </li>
 
   <br><br><b>Class SCHEDULE_ENTRY_LOCK, V1, V2, V3</b>
-  <a id="ZWave-set-scheduleEntryLockSet"/>
+  <a id="ZWave-set-scheduleEntryLockSet"></a>
   <li>scheduleEntryLockSet USER_ID ENABLED<br>
     enables or disables schedules for a specified user ID (V1)<br>
       <ul>
@@ -6897,14 +6897,14 @@ ZWave_tmSet($)
       ENABLED: 0=disabled, 1=enabled<br>
       </ul>
     </li>
-  <a id="ZWave-set-scheduleEntryLockAllSet"/>
+  <a id="ZWave-set-scheduleEntryLockAllSet"></a>
   <li>scheduleEntryLockAllSet ENABLED<br>
     enables or disables schedules for all users (V1)<br>
       <ul>
       ENABLED: 0=disabled, 1=enabled<br>
       </ul>
     </li>
-  <a id="ZWave-set-scheduleEntryLockWeekDaySet"/>
+  <a id="ZWave-set-scheduleEntryLockWeekDaySet"></a>
   <li>scheduleEntryLockWeekDaySet ACTION USER_ID SCHEDULE_ID WEEKDAY
       STARTTIME ENDTIME<br>
     erase or set a week day schedule for a specified user ID (V1)<br>
@@ -6923,7 +6923,7 @@ ZWave_tmSet($)
                     (leading 0 is mandatory)<br>
       </ul>
     </li>
-  <a id="ZWave-set-scheduleEntryLockYearDaySet"/>
+  <a id="ZWave-set-scheduleEntryLockYearDaySet"></a>
   <li>scheduleEntryLockYearDaySet ACTION USER_ID SCHEDULE_ID
         STARTDATE STARTTIME ENDDATE ENDTIME<br>
     erase or set a year day schedule for a specified user ID (V1)<br>
@@ -6942,7 +6942,7 @@ ZWave_tmSet($)
                     (leading 0 is mandatory)<br>
       </ul>
     </li>
-  <a id="ZWave-set-scheduleEntryLockTimeOffsetSet"/>
+  <a id="ZWave-set-scheduleEntryLockTimeOffsetSet"></a>
   <li>scheduleEntryLockTimeOffsetSet TZO DST<br>
     set the TZO and DST (V2)<br>
       <ul>
@@ -6952,7 +6952,7 @@ ZWave_tmSet($)
           (sign is mandatory, minutes: 0 to 127, 1-3 digits)<br>
       </ul>
     </li>
-  <a id="ZWave-set-scheduleEntryLockDailyRepeatingSet"/>
+  <a id="ZWave-set-scheduleEntryLockDailyRepeatingSet"></a>
   <li>scheduleEntryLockDailyRepeatingSet ACTION USER_ID SCHEDULE_ID
         WEEKDAYS STARTTIME DURATION<br>
     set a daily repeating schedule for the specified user (V3)<br>
@@ -6975,35 +6975,35 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class SWITCH_ALL</b>
-  <a id="ZWave-set-swaIncludeNone"/>
+  <a id="ZWave-set-swaIncludeNone"></a>
   <li>swaIncludeNone<br>
     the device does not react to swaOn and swaOff commands</li>
-  <a id="ZWave-set-swaIncludeOff"/>
+  <a id="ZWave-set-swaIncludeOff"></a>
   <li>swaIncludeOff<br>
     the device reacts to the swaOff command
     but does not react to the swaOn command</li>
-  <a id="ZWave-set-swaIncludeOn"/>
+  <a id="ZWave-set-swaIncludeOn"></a>
   <li>swaIncludeOn<br>
     the device reacts to the swaOn command
     but does not react to the swaOff command</li>
-  <a id="ZWave-set-swaIncludeOnOff"/>
+  <a id="ZWave-set-swaIncludeOnOff"></a>
   <li>swaIncludeOnOff<br>
     the device reacts to the swaOn and swaOff commands</li>
-  <a id="ZWave-set-swaOn"/>
+  <a id="ZWave-set-swaOn"></a>
   <li>swaOn<br>
     sends the all on command to the device</li>
-  <a id="ZWave-set-swaOff"/>
+  <a id="ZWave-set-swaOff"></a>
   <li>swaOff<br>
     sends the all off command to the device.</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
-  <a id="ZWave-set-on"/>
+  <a id="ZWave-set-on"></a>
   <li>on<br>
     switch the device on</li>
-  <a id="ZWave-set-off"/>
+  <a id="ZWave-set-off"></a>
   <li>off<br>
     switch the device off</li>
-  <a id="ZWave-set-on"/>
+  <a id="ZWave-set-on"></a>
   <li>on-for-timer seconds<br>
       off-for-timer seconds<br>
     For version 2 of this class the ZWave implementation of this command is
@@ -7021,13 +7021,13 @@ ZWave_tmSet($)
   <li>on, off<br>
     the same as for SWITCH_BINARY.</li>
 
-  <a id="ZWave-set-dim"/>
+  <a id="ZWave-set-dim"></a>
   <li>dim &lt;value&gt;<br>
     dim/jump to the requested &lt;value&gt; (0..99)<br>
     Note: ZWave defines the range for &lt;value&gt; to 0..99, with 99
     representing "on".</li>
 
-  <a id="ZWave-set-dimUpDown"/>
+  <a id="ZWave-set-dimUpDown"></a>
   <li>dimUpDown (UP|DOWN) (IGNORE|USE) &lt;startlevel&gt;<br>
     starts dimming up or down, starting at a &lt;startlevel&gt; if USE
     is specified. If IGNORE is specified, the startlevel will be
@@ -7036,7 +7036,7 @@ ZWave_tmSet($)
     The device SHOULD respect the &lt;startlevel&gt;, however,
     most devices will ignore the specified startlevel.</li>
 
-  <a id="ZWave-set-dimUpDownIncDecWithDuration"/>
+  <a id="ZWave-set-dimUpDownIncDecWithDuration"></a>
   <li>dimUpDownIncDecWithDuration (UP|DOWN|NOMOTION) (IGNORE|USE)
     &lt;startlevel&gt; &lt;duration&gt; (INC|DEC|NOINCDEC) &lt;stepsize&gt;<br>  
     similar to dimUpDownWithDuration, adding support for secondary switch types
@@ -7056,7 +7056,7 @@ ZWave_tmSet($)
     will use their internal default duration and ignore the specified duration.
     </li>
 
-  <a id="ZWave-set-dimUpDownWithDuration"/>
+  <a id="ZWave-set-dimUpDownWithDuration"></a>
   <li>dimUpDownWithDuration (up|down) (ignore|use) &lt;startlevel&gt;
     &lt;duration&gt;<br>  
     similar to dimUpDown, adding a &lt;duration&gt; time for the
@@ -7068,7 +7068,7 @@ ZWave_tmSet($)
     will use their internal default duration and ignore the specified duration.
     </li>
 
-  <a id="ZWave-set-dimWithDuration"/>
+  <a id="ZWave-set-dimWithDuration"></a>
   <li>dimWithDuration &lt;value&gt; &lt;duration&gt;<br>
     dim to the requested &lt;value&gt; (0..99) in &lt;duration&gt; seconds.
     (V2) <br>
@@ -7079,7 +7079,7 @@ ZWave_tmSet($)
     will use their internal default duration and ignore the specified duration.
     </li>
 
-  <a id="ZWave-set-stop"/>
+  <a id="ZWave-set-stop"></a>
   <li>stop<br>
     stop dimming/operation</li>
 
@@ -7104,26 +7104,26 @@ ZWave_tmSet($)
   <li>tmFullPower</li>
   <li>tmManual<br>
     set the thermostat mode.</li>
-  <a id="ZWave-set-thermostatMode"/>
+  <a id="ZWave-set-thermostatMode"></a>
   <li>thermostatMode {Off|Heating|Cooling|...}<br>
     just like the above, but in combination with the setReadingOnAck ZWDongle
     attribute it produces an easier way to check the current state.
     </li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
-  <a id="ZWave-set-setpointHeating"/>
+  <a id="ZWave-set-setpointHeating"></a>
   <li>setpointHeating value<br>
     set the thermostat to heat to the given value.
     The value is an integer in celsius.<br>
     See thermostatSetpointSet for a more enhanced method.
   </li>
-  <a id="ZWave-set-setpointCooling"/>
+  <a id="ZWave-set-setpointCooling"></a>
   <li>setpointCooling value<br>
     set the thermostat to cool down to the given value.
     The value is an integer in celsius.<br>
     See thermostatSetpointSet for a more enhanced method.
   </li>
-  <a id="ZWave-set-thermostatSetpointSet"/>
+  <a id="ZWave-set-thermostatSetpointSet"></a>
   <li>thermostatSetpointSet TEMP [SCALE [TYPE [PREC [SIZE]]]]<br>
     set the setpoint of the thermostat to the given value.<br>
       <ul>
@@ -7162,13 +7162,13 @@ ZWave_tmSet($)
         </ul>
       </ul>
     </li>
-  <a id="ZWave-set-desired"/>
+  <a id="ZWave-set-desired"></a>
   <li>desired-temp value<br>
     same as thermostatSetpointSet, used to make life easier for helper-modules
     </li>
 
   <br><br><b>Class TIME, V2</b>
-  <a id="ZWave-set-timeOffset"/>
+  <a id="ZWave-set-timeOffset"></a>
   <li>timeOffset TZO DST_Offset DST_START DST_END<br>
     Set the time offset for the internal clock of the device.<br>
     TZO: Offset of time zone to UTC in format [+|-]hh:mm.<br>
@@ -7181,12 +7181,12 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class TIME_PARAMETERS, V1</b>
-  <a id="ZWave-set-timeParametersGet"/>
+  <a id="ZWave-set-timeParametersGet"></a>
   <li>timeParametersGet<br>
     Request time parameters. Define a notify with a "set timeParameters"
     command.
     </li>
-  <a id="ZWave-set-timeParameters"/>
+  <a id="ZWave-set-timeParameters"></a>
   <li>timeParameters DATE TIME<br>
     Set the time (UTC) to the internal clock of the device.<br>
     DATE: Date in format YYYY-MM-DD.<br>
@@ -7195,35 +7195,35 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class USER_CODE</b>
-  <a id="ZWave-set-userCode"/>
+  <a id="ZWave-set-userCode"></a>
   <li>userCode id status code</br>
     set code and status for the id n. n ist starting at 1, status is 0 for
     available (deleted) and 1 for set (occupied). code is a hexadecimal string.
     </li>
 
   <br><br><b>Class WAKE_UP</b>
-  <a id="ZWave-set-wakeupInterval"/>
+  <a id="ZWave-set-wakeupInterval"></a>
   <li>wakeupInterval value nodeId<br>
     Set the wakeup interval of battery operated devices to the given value in
     seconds. Upon wakeup the device sends a wakeup notification to nodeId.</li>
-  <a id="ZWave-set-wakeupNoMoreInformation"/>
+  <a id="ZWave-set-wakeupNoMoreInformation"></a>
   <li>wakeupNoMoreInformation<br>
     put a battery driven device into sleep mode. </li>
 
   <br><br><b>Class WINDOW_COVERING</b>
   <li>
-    <a id="ZWave-set-wincov_out_left_mvt"/>
-    <a id="ZWave-set-wincov_out_right_mvt"/>
-    <a id="ZWave-set-wincov_in_left_mvt"/>
-    <a id="ZWave-set-wincov_in_right_mvt"/>
-    <a id="ZWave-set-wincov_in_right_left_mvt"/>
-    <a id="ZWave-set-wincov_vert_slats_mvt"/>
-    <a id="ZWave-set-wincov_out_bottom_mvt"/>
-    <a id="ZWave-set-wincov_out_top_mvt"/>
-    <a id="ZWave-set-wincov_in_bottom_mvt"/>
-    <a id="ZWave-set-wincov_in_top_mvt"/>
-    <a id="ZWave-set-wincov_in_top_bottom_mvt"/>
-    <a id="ZWave-set-wincov_hor_slats_mvt"/>
+    <a id="ZWave-set-wincov_out_left_mvt"></a>
+    <a id="ZWave-set-wincov_out_right_mvt"></a>
+    <a id="ZWave-set-wincov_in_left_mvt"></a>
+    <a id="ZWave-set-wincov_in_right_mvt"></a>
+    <a id="ZWave-set-wincov_in_right_left_mvt"></a>
+    <a id="ZWave-set-wincov_vert_slats_mvt"></a>
+    <a id="ZWave-set-wincov_out_bottom_mvt"></a>
+    <a id="ZWave-set-wincov_out_top_mvt"></a>
+    <a id="ZWave-set-wincov_in_bottom_mvt"></a>
+    <a id="ZWave-set-wincov_in_top_mvt"></a>
+    <a id="ZWave-set-wincov_in_top_bottom_mvt"></a>
+    <a id="ZWave-set-wincov_hor_slats_mvt"></a>
     wincov*mvt open|close|stop &lt;duration&gt;<br>
     start (open and close) or stop a movement.<br>
     duration is 0 for immediate, interpreted as seconds for values < 127, as
@@ -7231,18 +7231,18 @@ ZWave_tmSet($)
     stop ignores the duration.
   </li>
   <li>
-    <a id="ZWave-set-wincov_out_left_pos"/>
-    <a id="ZWave-set-wincov_out_right_pos"/>
-    <a id="ZWave-set-wincov_in_left_pos"/>
-    <a id="ZWave-set-wincov_in_right_pos"/>
-    <a id="ZWave-set-wincov_in_right_left_pos"/>
-    <a id="ZWave-set-wincov_vert_slats_pos"/>
-    <a id="ZWave-set-wincov_out_bottom_pos"/>
-    <a id="ZWave-set-wincov_out_top_pos"/>
-    <a id="ZWave-set-wincov_in_bottom_pos"/>
-    <a id="ZWave-set-wincov_in_top_pos"/>
-    <a id="ZWave-set-wincov_in_top_bottom_pos"/>
-    <a id="ZWave-set-wincov_hor_slats_pos"/>
+    <a id="ZWave-set-wincov_out_left_pos"></a>
+    <a id="ZWave-set-wincov_out_right_pos"></a>
+    <a id="ZWave-set-wincov_in_left_pos"></a>
+    <a id="ZWave-set-wincov_in_right_pos"></a>
+    <a id="ZWave-set-wincov_in_right_left_pos"></a>
+    <a id="ZWave-set-wincov_vert_slats_pos"></a>
+    <a id="ZWave-set-wincov_out_bottom_pos"></a>
+    <a id="ZWave-set-wincov_out_top_pos"></a>
+    <a id="ZWave-set-wincov_in_bottom_pos"></a>
+    <a id="ZWave-set-wincov_in_top_pos"></a>
+    <a id="ZWave-set-wincov_in_top_bottom_pos"></a>
+    <a id="ZWave-set-wincov_hor_slats_pos"></a>
     wincov*pos &lt;position&gt; &lt;duration&gt;<br>
     set the covering to a defined position, where 0 is open, and 99 is
     closed.<br>
@@ -7257,7 +7257,7 @@ ZWave_tmSet($)
   <b>Get</b>
   <ul>
   <br><br><b>All</b>
-  <a id="ZWave-get-neighborList"/>
+  <a id="ZWave-get-neighborList"></a>
   <li>neighborList<br>
     returns the list of neighbors.  Provides insights to actual network
     topology.  List includes dead links and non-routing neighbors.
@@ -7265,17 +7265,17 @@ ZWave_tmSet($)
     returned directly even for WAKE_UP devices.</li>
 
   <br><br><b>Class ALARM</b>
-  <a id="ZWave-get-alarm"/>
+  <a id="ZWave-get-alarm"></a>
   <li>alarm &lt;alarmId&gt;<br>
     return the value for the (decimal) alarmId. The value is device
     specific. This command is specified in version 1 and should only
     be used with old devices that only support version 1.</li>
-  <a id="ZWave-get-alarmWithType"/>
+  <a id="ZWave-get-alarmWithType"></a>
   <li>alarmWithType &lt;alarmType&gt;<br>
     return the event for the specified alarm type. This command is
     specified in version 2.
     </li>
-  <a id="ZWave-get-alarmWithTypeEvent"/>
+  <a id="ZWave-get-alarmWithTypeEvent"></a>
   <li>alarmWithTypeEvent &lt;alarmType&gt; &lt;eventnumber&gt;<br>
     return the event details for the specified alarm type and
     eventnumber. This command is specified in version 3. The eventnumber
@@ -7283,12 +7283,12 @@ ZWave_tmSet($)
     eventnumbers can be obtained by the "alarmEventSupported" command,
     refer also to the documentation of the device.
     </li>
-  <a id="ZWave-get-alarmTypeSupported"/>
+  <a id="ZWave-get-alarmTypeSupported"></a>
   <li>alarmTypeSupported<br>
     Returns a list of the supported alarm types of the device which are
     used as parameters in the "alarmWithType" and "alarmWithTypeEvent"
     commands. This command is specified in version 2.</li>  
-  <a id="ZWave-get-alarmEventSupported"/>
+  <a id="ZWave-get-alarmEventSupported"></a>
   <li>alarmEventSupported &lt;alarmType&gt;<br>
     Returns a list of the supported events for the specified alarm type.
     The number of the events can be used as parameter in the
@@ -7296,38 +7296,38 @@ ZWave_tmSet($)
     version 3.</li>  
 
   <br><br><b>Class ASSOCIATION</b>
-  <a id="ZWave-get-association"/>
+  <a id="ZWave-get-association"></a>
   <li>association groupId<br>
     return the list of nodeIds in the association group groupId in the form:<br>
     assocGroup_X:Max Y, Nodes id,id...
     </li>
-  <a id="ZWave-get-associationGroups"/>
+  <a id="ZWave-get-associationGroups"></a>
   <li>associationGroups<br>
     return the number of association groups<br>
     </li>
-  <a id="ZWave-get-associationAll"/>
+  <a id="ZWave-get-associationAll"></a>
   <li>associationAll<br>
     request association info for all possible groups.</li>
 
   <br><br><b>Class ASSOCIATION_GRP_INFO</b>
-  <a id="ZWave-get-associationGroupName"/>
+  <a id="ZWave-get-associationGroupName"></a>
   <li>associationGroupName groupId<br>
     return the name of association groups
     </li>
-  <a id="ZWave-get-associationGroupCmdList"/>
+  <a id="ZWave-get-associationGroupCmdList"></a>
   <li>associationGroupCmdList groupId<br>
     return Command Classes and Commands that will be sent to associated
     devices in this group<br>
     </li>
 
   <br><br><b>Class BARRIER_OPERATOR</b>
-  <a id="ZWave-get-barrierState"/>
+  <a id="ZWave-get-barrierState"></a>
   <li>barrierState<br>
     request state of the barrier.
     </li>
 
   <br><br><b>Class BASIC</b>
-  <a id="ZWave-get-basicStatus"/>
+  <a id="ZWave-get-basicStatus"></a>
   <li>basicStatus<br>
     return the status of the node as basicReport:XY. The value (XY) depends on
     the node, e.g. a SWITCH_BINARY device reports 00 for off and FF (255) for on.
@@ -7338,17 +7338,17 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class BATTERY</b>
-  <a id="ZWave-get-battery"/>
+  <a id="ZWave-get-battery"></a>
   <li>battery<br>
     return the state and charge of the battery, see below the events
     </li>
 
   <br><br><b>CLASS DOOR_LOCK_LOGGING, V1 (deprecated)</b>
-  <a id="ZWave-get-doorLockLoggingRecordsSupported"/>
+  <a id="ZWave-get-doorLockLoggingRecordsSupported"></a>
   <li>doorLockLoggingRecordsSupported<br>
     Gives back the number of records that can be stored by the device.
     </li>
-  <a id="ZWave-get-doorLockLoggingRecord"/>
+  <a id="ZWave-get-doorLockLoggingRecord"></a>
   <li>doorLockLoggingRecord n<br>
     Requests and reports the logging record number n.<br>
     You will get a reading with the requested record number, the record status,
@@ -7363,60 +7363,60 @@ ZWave_tmSet($)
     DESIGNS in the version of 2017-07-10.</li>
 
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
-  <a id="ZWave-get-ccsOverride"/>
+  <a id="ZWave-get-ccsOverride"></a>
   <li>ccsOverride<br>
     request the climate control schedule override report
     </li>
-  <a id="ZWave-get-ccs"/>
+  <a id="ZWave-get-ccs"></a>
   <li>ccs [mon|tue|wed|thu|fri|sat|sun]<br>
     request the climate control schedule for the given day.
     </li>
-  <a id="ZWave-get-ccsAll"/>
+  <a id="ZWave-get-ccsAll"></a>
   <li>ccsAll<br>
     request the climate control schedule for all days. (runs in background)
     </li>
 
   <br><br><b>Class CLOCK</b>
-  <a id="ZWave-get-clock"/>
+  <a id="ZWave-get-clock"></a>
   <li>clock<br>
     request the clock data
     </li>
 
   <br><br><b>Class COLOR_CONTROL</b>
-  <a id="ZWave-get-ccCapability"/>
+  <a id="ZWave-get-ccCapability"></a>
   <li>ccCapability<br>
     return capabilities.</li>
-  <a id="ZWave-get-ccStatus"/>
+  <a id="ZWave-get-ccStatus"></a>
   <li>ccStatus channelId<br>
     return status of channel ChannelId.
     </li>
 
   <br><br><b>Class CONFIGURATION</b>
-  <a id="ZWave-get-config"/>
+  <a id="ZWave-get-config"></a>
   <li>config cfgAddress<br>
     return the value of the configuration parameter cfgAddress. The value is
     device specific.<br>
     Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
     specific config commands are available.
     </li>
-  <a id="ZWave-get-configAll"/>
+  <a id="ZWave-get-configAll"></a>
   <li>configAll<br>
     If the model of a device is set, and configuration descriptions are
     available from the database for this device, then request the value of all
     known configuration parameters.</li>
 
   <br><br><b>Class DOOR_LOCK, V2</b>
-  <a id="ZWave-get-doorLockConfiguration"/>
+  <a id="ZWave-get-doorLockConfiguration"></a>
   <li>doorLockConfiguration<br>
     Request the configuration report from the door lock.
     </li>
-  <a id="ZWave-get-doorLockOperation"/>
+  <a id="ZWave-get-doorLockOperation"></a>
   <li>doorLockOperation<br>
     Request the operconfiguration report from the door lock.
     </li>
     
     <br><br><b>Class FIRMWARE_UPDATE_META_DATA</b>
-  <a id="ZWave-get-fwMetaData"/>
+  <a id="ZWave-get-fwMetaData"></a>
   <li>fwMetaData<br>
     Interviews the device about the firmware update capabilities. Generates the reading fwMd which holdes, 
     dependent on the classversion the data about the manufacturer ids, the firmware ids and check sum of the 
@@ -7424,30 +7424,30 @@ ZWave_tmSet($)
   </li>
 
   <br><br><b>Class HRV_STATUS</b>
-  <a id="ZWave-get-hrvStatus"/>
+  <a id="ZWave-get-hrvStatus"></a>
   <li>hrvStatus<br>
     report the current status (temperature, etc.)
     </li>
-  <a id="ZWave-get-hrvStatusSupported"/>
+  <a id="ZWave-get-hrvStatusSupported"></a>
   <li>hrvStatusSupported<br>
     report the supported status fields as a bitfield.
     </li>
 
   <br><br><b>Class INDICATOR</b>
-  <a id="ZWave-get-indicatorStatus"/>
+  <a id="ZWave-get-indicatorStatus"></a>
   <li>indicatorStatus<br>
     return the indicator status of the node, as indState:on, indState:off or
     indState:dim value.
     </li>
 
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
-  <a id="ZWave-get-position"/>
+  <a id="ZWave-get-position"></a>
   <li>position<br>
     Fibaro FGRM-222 only: return the blinds position and slat angle.
     </li>
 
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
-  <a id="ZWave-get-model"/>
+  <a id="ZWave-get-model"></a>
   <li>model<br>
     return the manufacturer specific id (16bit),
     the product type (16bit)
@@ -7457,7 +7457,7 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class METER</b>
-  <a id="ZWave-get-meter"/>
+  <a id="ZWave-get-meter"></a>
   <li>meter [scale [export|import]]<br>
     return the meter report for the requested scale.<br>
     Note: protocol V1 does not support the scale parameter, the parameter
@@ -7467,7 +7467,7 @@ ZWave_tmSet($)
     If the scale parameter is omitted, the default unit will be reported.
     export/import is only valid for protocol V4 or higher.
     </li>
-  <a id="ZWave-get-meterSupported"/>
+  <a id="ZWave-get-meterSupported"></a>
   <li>meterSupported<br>
     request the type of the meter, the supported scales and the
     capability to reset the accumulated value.<br>
@@ -7476,12 +7476,12 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
-  <a id="ZWave-get-mcEndpoints"/>
+  <a id="ZWave-get-mcEndpoints"></a>
   <li>mcEndpoints<br>
     return the list of endpoints available, e.g.:<br>
     mcEndpoints: total 2, identical
     </li>
-  <a id="ZWave-get-mcCapability"/>
+  <a id="ZWave-get-mcCapability"></a>
   <li>mcCapability chid<br>
     return the classes supported by the endpoint/channel chid. If the channel
     does not exist, create a FHEM node for it. Example:<br>
@@ -7491,84 +7491,84 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
-  <a id="ZWave-get-mca"/>
+  <a id="ZWave-get-mca"></a>
   <li>mca groupid<br>
     return the associations for the groupid. for the syntax of the returned
     data see the mcaAdd command above.</li>
-  <a id="ZWave-get-mcaAll"/>
+  <a id="ZWave-get-mcaAll"></a>
   <li>mcaAll<br>
     request association info for all possible groupids.
     </li>
 
   <br><br><b>Class NETWORK_SCHEDULE (SCHEDULE), V1</b>
-  <a id="ZWave-get-scheduleSupported"/>
+  <a id="ZWave-get-scheduleSupported"></a>
   <li>scheduleSupported<br>
     Request the supported features, e.g. number of supported schedules.
       Due to the lack of documentation, details for some fields in the
       report are not available.</li>
-  <a id="ZWave-get-schedule"/>
+  <a id="ZWave-get-schedule"></a>
   <li>schedule ID<br>
     Request the details for the schedule with the id ID. Due to the
       lack of documentation, details for some fields in the report are
       not available.</li>
-  <a id="ZWave-get-scheduleState"/>
+  <a id="ZWave-get-scheduleState"></a>
   <li>scheduleState<br>
     Request the details for the schedule state. Due to the lack of
       documentation, details for some fields in the report are not
       available.</li>
 
   <br><br><b>Class NODE_NAMING</b>
-  <a id="ZWave-get-name"/>
+  <a id="ZWave-get-name"></a>
   <li>name<br>
     Get the name from the EEPROM. Note: only ASCII is supported.</li>
-  <a id="ZWave-get-location"/>
+  <a id="ZWave-get-location"></a>
   <li>location<br>
     Get the location from the EEPROM. Note: only ASCII is supported.</li>
 
   <br><br><b>Class SOUND_SWITCH</b>
-  <a id="ZWave-get-toneConfiguration"/>
+  <a id="ZWave-get-toneConfiguration"></a>
   <li>toneConfiguration<br>
      Request the current configuration.</li>
-  <a id="ZWave-get-toneNumbers"/>
+  <a id="ZWave-get-toneNumbers"></a>
   <li>toneNumbers<br>
      Request the number of tones supported.</li>
-  <a id="ZWave-get-tonePlay"/>
+  <a id="ZWave-get-tonePlay"></a>
   <li>tonePlay<br>
      Request the tone number being played.</li>
 
   <br><br><b>Class POWERLEVEL</b>
-  <a id="ZWave-get-powerlevel"/>
+  <a id="ZWave-get-powerlevel"></a>
   <li>powerlevel<br>
     Get the current powerlevel and remaining time in this level.</li>
-  <a id="ZWave-get-powerlevelTest"/>
+  <a id="ZWave-get-powerlevelTest"></a>
   <li>powerlevelTest<br>
     Get the result of last powerlevelTest.</li>
 
   <br><br><b>Class PROTECTION</b>
-  <a id="ZWave-get-protection"/>
+  <a id="ZWave-get-protection"></a>
   <li>protection<br>
     returns the protection state. It can be on, off or seq.</li>
 
   <br><br><b>Class SCENE_ACTUATOR_CONF</b>
-  <a id="ZWave-get-sceneConfig"/>
+  <a id="ZWave-get-sceneConfig"></a>
   <li>sceneConfig<br>
     returns the settings for a given scene. Parameter is sceneId
     </li>
 
   <br><br><b>Class SCENE_CONTROLLER_CONF</b>
-  <a id="ZWave-get-groupConfig"/>
+  <a id="ZWave-get-groupConfig"></a>
   <li>groupConfig<br>
     returns the settings for a given group. Parameter is groupId
     </li>
 
   <br><br><b>Class SCHEDULE_ENTRY_LOCK, V1, V2, V3</b>
-  <a id="ZWave-get-scheduleEntryLockTypeSupported"/>
+  <a id="ZWave-get-scheduleEntryLockTypeSupported"></a>
   <li>scheduleEntryLockTypeSupported<br>
     returns the number of available slots for week day and year day
       schedules (V1), in V3 the number of available slots for the daily
       repeating schedule is reported additionally
     </li>
-  <a id="ZWave-get-scheduleEntryLockWeekDay"/>
+  <a id="ZWave-get-scheduleEntryLockWeekDay"></a>
   <li>scheduleEntryLockWeekDay USER_ID SCHEDULE_ID<br>
     returns the specified week day schedule for the specified user
       (day of week, start time, end time) (V1)<br>
@@ -7579,7 +7579,7 @@ ZWave_tmSet($)
                     schedule slots)<br>
       </ul>
     </li>
-  <a id="ZWave-get-scheduleEntryLockYearDay"/>
+  <a id="ZWave-get-scheduleEntryLockYearDay"></a>
   <li>scheduleEntryLockYearDay USER_ID SCHEDULE_ID<br>
     returns the specified year day schedule for the specified user
       (start date, start time, end date, end time) (V1)<br>
@@ -7590,7 +7590,7 @@ ZWave_tmSet($)
                     schedule slots)<br>
       </ul>
     </li>
-  <a id="ZWave-get-scheduleEntryLockDailyRepeating"/>
+  <a id="ZWave-get-scheduleEntryLockDailyRepeating"></a>
   <li>scheduleEntryLockDailyRepeating USER_ID SCHEDULE_ID<br>
     returns the specified daily schedule for the specified user
       (weekdays, start date, duration) (V3)<br>
@@ -7601,14 +7601,14 @@ ZWave_tmSet($)
                     schedule slots)<br>
       </ul>
     </li>
-  <a id="ZWave-get-scheduleEntryLockTimeOffset"/>
+  <a id="ZWave-get-scheduleEntryLockTimeOffset"></a>
   <li>scheduleEntryLockTimeOffset<br>
     returns the time zone offset TZO and the daylight saving time
     offset (V2)
     </li>
 
   <br><br><b>Class SECURITY</b>
-  <a id="ZWave-get-secSupportedReport"/>
+  <a id="ZWave-get-secSupportedReport"></a>
   <li>secSupportedReport<br>
     (internaly used to) request the command classes that are supported
     with SECURITY
@@ -7623,7 +7623,7 @@ ZWave_tmSet($)
     will be removed from the interface in future version.</li>
 
   <br><br><b>Class SENSOR_ALARM</b>
-  <a id="ZWave-get-alarm"/>
+  <a id="ZWave-get-alarm"></a>
   <li>alarm alarmType<br>
     return the nodes alarm status of the requested alarmType. 00 = GENERIC,
     01 = SMOKE, 02 = CO, 03 = CO2, 04 = HEAT, 05 = WATER, 255 = returns the
@@ -7631,65 +7631,65 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class SENSOR_BINARY</b>
-  <a id="ZWave-get-sbStatus"/>
+  <a id="ZWave-get-sbStatus"></a>
   <li>sbStatus<br>
     return the status of the node.
     </li>
 
   <br><br><b>Class SENSOR_MULTILEVEL</b>
-  <a id="ZWave-get-smStatus"/>
+  <a id="ZWave-get-smStatus"></a>
   <li>smStatus<br>
     request data from the node (temperature/humidity/etc)
     </li>
 
   <br><br><b>Class SWITCH_ALL</b>
-  <a id="ZWave-get-swaInclude"/>
+  <a id="ZWave-get-swaInclude"></a>
   <li>swaInclude<br>
     return the switch-all mode of the node.
     </li>
 
   <br><br><b>Class SWITCH_BINARY</b>
-  <a id="ZWave-get-swbStatus"/>
+  <a id="ZWave-get-swbStatus"></a>
   <li>swbStatus<br>
     return the status of the node, as state:on or state:off.
     </li>
 
   <br><br><b>Class SWITCH_MULTILEVEL</b>
-  <a id="ZWave-get-swmStatus"/>
+  <a id="ZWave-get-swmStatus"></a>
   <li>swmStatus<br>
     return the status of the node, as state:on, state:off or state:dim value.
     </li>
-  <a id="ZWave-get-swmSupported"/>
+  <a id="ZWave-get-swmSupported"></a>
   <li>swmSupported<br>
     return the supported switch types (class version 3)
     </li>
 
   <br><br><b>Class THERMOSTAT_FAN_MODE</b>
-  <a id="ZWave-get-fanMode"/>
+  <a id="ZWave-get-fanMode"></a>
   <li>fanMode<br>
     request the mode
     </li>
 
   <br><br><b>Class THERMOSTAT_FAN_STATE</b>
-  <a id="ZWave-get-fanMode"/>
+  <a id="ZWave-get-fanMode"></a>
   <li>fanMode<br>
     request the state
     </li>
 
   <br><br><b>Class THERMOSTAT_MODE</b>
-  <a id="ZWave-get-thermostatMode"/>
+  <a id="ZWave-get-thermostatMode"></a>
   <li>thermostatMode<br>
     request the mode
     </li>
     
   <br><br><b>Class THERMOSTAT_OPERATING_STATE</b>
-  <a id="ZWave-get-thermostatOperatingState"/>
+  <a id="ZWave-get-thermostatOperatingState"></a>
   <li>thermostatOperatingState<br>
     request the operating state
     </li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
-  <a id="ZWave-get-setpoint"/>
+  <a id="ZWave-get-setpoint"></a>
   <li>setpoint [TYPE]<br>
     request the setpoint<br>
       TYPE: (optional) setpoint type; [1, 15], defaults to 1=heating<br>
@@ -7707,49 +7707,49 @@ ZWave_tmSet($)
         15=fullPower
         </ul>
     </li>
-  <a id="ZWave-get-thermostatSetpointSupported"/>
+  <a id="ZWave-get-thermostatSetpointSupported"></a>
   <li>thermostatSetpointSupported<br>
     requests the list of supported setpoint types
     </li>
 
   <br><br><b>Class TIME, V2</b>
-  <a id="ZWave-get-time"/>
+  <a id="ZWave-get-time"></a>
   <li>time<br>
     Request the (local) time from the internal clock of the device.
     </li>
-  <a id="ZWave-get-date"/>
+  <a id="ZWave-get-date"></a>
   <li>date<br>
     Request the (local) date from the internal clock of the device.
     </li>
-  <a id="ZWave-get-timeOffset"/>
+  <a id="ZWave-get-timeOffset"></a>
   <li>timeOffset<br>
     Request the report for the time offset and DST settings from the
       internal clock of the device.
     </li>
 
   <br><br><b>Class TIME_PARAMETERS, V1</b>
-  <a id="ZWave-get-time"/>
+  <a id="ZWave-get-time"></a>
   <li>time<br>
     Request the date and time (UTC) from the internal clock of the device.
     </li>
 
   <br><br><b>Class USER_CODE</b>
-  <a id="ZWave-get-userCode"/>
+  <a id="ZWave-get-userCode"></a>
   <li>userCode n</br>
     request status and code for the id n
     </li>
 
   <br><br><b>Class VERSION</b>
-  <a id="ZWave-get-version"/>
+  <a id="ZWave-get-version"></a>
   <li>version<br>
     return the version information of this node in the form:<br>
     Lib A Prot x.y App a.b
     </li>
-  <a id="ZWave-get-versionClass"/>
+  <a id="ZWave-get-versionClass"></a>
   <li>versionClass classId or className<br>
      return the supported command version for the requested class
     </li>
-  <a id="ZWave-get-versionClassAll"/>
+  <a id="ZWave-get-versionClassAll"></a>
   <li>versionClassAll<br>
     executes "get devicename versionClass class" for each class from the
     classes attribute in the background without generating events, and sets the
@@ -7757,12 +7757,12 @@ ZWave_tmSet($)
     </li>
 
   <br><br><b>Class WAKE_UP</b>
-  <a id="ZWave-get-wakeupInterval"/>
+  <a id="ZWave-get-wakeupInterval"></a>
   <li>wakeupInterval<br>
     return the wakeup interval in seconds, in the form<br>
     wakeupReport:interval seconds target id
     </li>
-  <a id="ZWave-get-wakeupIntervalCapabilities"/>
+  <a id="ZWave-get-wakeupIntervalCapabilities"></a>
   <li>wakeupIntervalCapabilities (V2 only)<br>
     return the wake up interval capabilities in seconds, in the form<br>
     wakeupIntervalCapabilitiesReport:min seconds max seconds default seconds
@@ -7770,36 +7770,36 @@ ZWave_tmSet($)
   </li>
 
   <br><br><b>Class WINDOW_COVERING</b>
-  <a id="ZWave-get-wincov_supported"/>
+  <a id="ZWave-get-wincov_supported"></a>
   <li>wincov_supported<br>
     return the list of supported configuration. FHEM will offer a corresponding
     get and set command for each supported configuration.
     </li>
   <li>
-    <a id="ZWave-get-wincov_out_left_mvt"/>
-    <a id="ZWave-get-wincov_out_right_mvt"/>
-    <a id="ZWave-get-wincov_in_left_mvt"/>
-    <a id="ZWave-get-wincov_in_right_mvt"/>
-    <a id="ZWave-get-wincov_in_right_left_mvt"/>
-    <a id="ZWave-get-wincov_vert_slats_mvt"/>
-    <a id="ZWave-get-wincov_out_bottom_mvt"/>
-    <a id="ZWave-get-wincov_out_top_mvt"/>
-    <a id="ZWave-get-wincov_in_bottom_mvt"/>
-    <a id="ZWave-get-wincov_in_top_mvt"/>
-    <a id="ZWave-get-wincov_in_top_bottom_mvt"/>
-    <a id="ZWave-get-wincov_hor_slats_mvt"/>
-    <a id="ZWave-get-wincov_out_left_pos"/>
-    <a id="ZWave-get-wincov_out_right_pos"/>
-    <a id="ZWave-get-wincov_in_left_pos"/>
-    <a id="ZWave-get-wincov_in_right_pos"/>
-    <a id="ZWave-get-wincov_in_right_left_pos"/>
-    <a id="ZWave-get-wincov_vert_slats_pos"/>
-    <a id="ZWave-get-wincov_out_bottom_pos"/>
-    <a id="ZWave-get-wincov_out_top_pos"/>
-    <a id="ZWave-get-wincov_in_bottom_pos"/>
-    <a id="ZWave-get-wincov_in_top_pos"/>
-    <a id="ZWave-get-wincov_in_top_bottom_pos"/>
-    <a id="ZWave-get-wincov_hor_slats_pos"/>
+    <a id="ZWave-get-wincov_out_left_mvt"></a>
+    <a id="ZWave-get-wincov_out_right_mvt"></a>
+    <a id="ZWave-get-wincov_in_left_mvt"></a>
+    <a id="ZWave-get-wincov_in_right_mvt"></a>
+    <a id="ZWave-get-wincov_in_right_left_mvt"></a>
+    <a id="ZWave-get-wincov_vert_slats_mvt"></a>
+    <a id="ZWave-get-wincov_out_bottom_mvt"></a>
+    <a id="ZWave-get-wincov_out_top_mvt"></a>
+    <a id="ZWave-get-wincov_in_bottom_mvt"></a>
+    <a id="ZWave-get-wincov_in_top_mvt"></a>
+    <a id="ZWave-get-wincov_in_top_bottom_mvt"></a>
+    <a id="ZWave-get-wincov_hor_slats_mvt"></a>
+    <a id="ZWave-get-wincov_out_left_pos"></a>
+    <a id="ZWave-get-wincov_out_right_pos"></a>
+    <a id="ZWave-get-wincov_in_left_pos"></a>
+    <a id="ZWave-get-wincov_in_right_pos"></a>
+    <a id="ZWave-get-wincov_in_right_left_pos"></a>
+    <a id="ZWave-get-wincov_vert_slats_pos"></a>
+    <a id="ZWave-get-wincov_out_bottom_pos"></a>
+    <a id="ZWave-get-wincov_out_top_pos"></a>
+    <a id="ZWave-get-wincov_in_bottom_pos"></a>
+    <a id="ZWave-get-wincov_in_top_pos"></a>
+    <a id="ZWave-get-wincov_in_top_bottom_pos"></a>
+    <a id="ZWave-get-wincov_hor_slats_pos"></a>
     wincov*<br>
     return the corresponding current and target values and the duration needed
     to reach the target.<br>
@@ -7807,7 +7807,7 @@ ZWave_tmSet($)
   </li>
 
   <br><br><b>Class ZWAVEPLUS_INFO</b>
-  <a id="ZWave-get-zwavePlusInfo"/>
+  <a id="ZWave-get-zwavePlusInfo"></a>
   <li>zwavePlusInfo<br>
     request the zwavePlusInfo
     </li>
