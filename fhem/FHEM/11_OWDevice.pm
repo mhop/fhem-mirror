@@ -27,7 +27,6 @@ package main;
 
 use strict;
 use warnings;
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 use vars qw(%owdevice);
 
@@ -598,7 +597,7 @@ OWDevice_Get($@)
         return "get $name needs one argument" if(int(@a) != 2);
         my $cmdname= $a[1];
         my @getters= @{$hash->{fhem}{getters}};
-        if($cmdname ~~ @getters) {
+        if(main::contains_string($cmdname, @getters)) {
           my $value= OWDevice_ReadValue($hash, $cmdname);
           readingsSingleUpdate($hash,$cmdname,$value,1);
           return $value;
@@ -617,7 +616,7 @@ OWDevice_Set($@)
         my $cmdname= $a[1];
         my $value= $a[2];
         my @setters= @{$hash->{fhem}{setters}};
-        if($cmdname ~~ @setters) {
+        if(main::contains_string($cmdname, @setters)) {
           # LCD Display need more than two arguments, to display text
           # added by m.fischer
           if($cmdname =~ /(line16.0|line16.1|line16.2|line16.3|screen16)/ ||
