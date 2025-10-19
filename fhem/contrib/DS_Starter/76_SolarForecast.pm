@@ -160,6 +160,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.59.6" => "19.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
+                           "Width of a text field in graphicHeaderOwnspec fixed to 10 ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
                            "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
@@ -259,7 +261,7 @@ my %vNotesIntern = (
   "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
   "1.52.0" => "11.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
                            "valInverter: add isource, new keys: ac2dc, dc2ac, _flowGraphic: add battery inverter type ".
-                           "and extensive adjustments, new sub removeMinMaxArray, ___getFWwidget: bugfix with state-Reading ".
+                           "and extensive adjustments, new sub removeMinMaxArray, ___ownSpecGetFWwidget: bugfix with state-Reading ".
                            "flowGraphicControl: new key showGenerators, code cleaning ",
   "1.51.8" => "02.05.2025  _specialActivities: delete overhanging days at the change of month ".
                            "Bugfix: https://forum.fhem.de/index.php?msg=1340666 ",
@@ -288,7 +290,7 @@ my %vNotesIntern = (
   "1.50.4" => "16.04.2025  Consumer Strokes: fix val2pahColor, new key flowGraphicControl->strokeCmrRedColLimit ".
                            "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ".
                            "normBeamWidth: decouple content batsocCombi_, energycosts, feedincome from the conversion Wh -> kWh ".
-                           "___getFWwidget: textField-long -> textFieldNL-long ",
+                           "___ownSpecGetFWwidget: textField-long -> textFieldNL-long ",
   "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
                            "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
   "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
@@ -431,6 +433,7 @@ use constant {
   KJ2WH          => 0.2777777778,                                                   # Umrechnungsfaktor kJ in Wh
   WH2KJ          => 3.6,                                                            # Umrechnungsfaktor Wh in kJ
   DEFLANG        => 'EN',                                                           # default Sprache wenn nicht konfiguriert
+  INPUTSIZE      => 10,                                                             # default Breite eines Textfeldes in graphicHeaderOwnspec
   DEFMAXVAR      => 0.75,                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
   DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
   SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
@@ -2058,10 +2061,13 @@ sub _setattrKeyVal {                         ## no critic "not used"
 
   return if(!$init_done);
   
+  Log3 ($name, 1, "$name - Arg Orig: $arg");
+  
+  $arg =~ s/=\s*/=/g;                                                                    # V 1.59.6 wichtig für graphicHeaderOwnspec Behandlung einzelner Keys -> ersetze jedes = samt folgendem Leerraum durch ein reines =
   $arg =~ s/^([^,]*)\s+/$1,/;                                                            # das erste auftretende Leerzeichen-Cluster durch ',' ersetzen, aber nur wenn es in dem String vor dem Leerzeichen-Cluster noch kein Komma gibt
-   #Log3 ($name, 1, "$name - Arg Orig: $arg");
   $arg =~ s/^([^=]*?),/$1 /;                                                             
-   #Log3 ($name, 1, "$name - Arg Substitute: $arg");
+   
+  Log3 ($name, 1, "$name - Arg Substitute: $arg");
    
   my ($a, $h)    = parseParams ($arg);
   my $targetattr = $a->[0];
@@ -11427,7 +11433,6 @@ sub _batSocTarget {
       delete $paref->{batnmb};
       delete $paref->{careCycle};
 
-      # my $nt         = '';
       my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
       my $target     = $lowSoc;
       my $yday       = strftime "%d", localtime($t - 86400);                                    # Vortag  (range 01 to 31)
@@ -11441,13 +11446,13 @@ sub _batSocTarget {
 
       ## erwartete PV ermitteln & Anteilsfaktor Bat anwenden
       ########################################################
-      my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);                 # PV Prognose morgen
-      my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',            0);                 # PV Prognose Rest heute
-      my $pvexpraw = $pvfctm > $pvfctd ? $pvfctm : $pvfctd - $tdconsset;                       # erwartete (Rest) PV-Leistung des Tages
-      $pvexpraw    = $pvexpraw > 0 ? $pvexpraw : 0;                                            # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
+      my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);                  # PV Prognose morgen
+      my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',            0);                  # PV Prognose Rest heute
+      my $pvexpraw = $pvfctm > $pvfctd ? $pvfctm : $pvfctd - $tdconsset;                        # erwartete (Rest) PV-Leistung des Tages
+      $pvexpraw    = $pvexpraw > 0 ? $pvexpraw : 0;                                             # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
 
       #my $sf       = __batCapShareFactor ($name, $bn);                                         # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
-      my $sf       = __batDeficitShareFactor ($name, $bn);
+      my $sf       = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor der Batterie XX Ladebedarf an Gesamtladebedarf
 	  my $pvexpect = $sf * $pvexpraw;
 
       if ($debug =~ /batteryManagement/xs) {
@@ -11751,7 +11756,7 @@ sub _batChargeMgmt {
       my $befficiency = BatteryVal  ($name, $bn, 'befficiency', STOREFFDEF) / 100;                 # Speicherwirkungsgrad
       my $cgbt        = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
       #my $sf          = __batCapShareFactor     ($name, $bn);                                      # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
-      my $sf          = __batDeficitShareFactor ($name, $bn);                                      # Anteilsfaktor Ladungsdefizit
+      my $sf          = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor Ladungsdefizit
       my $strategy    = 'loadRelease';                                                             # 'loadRelease', 'optPower', 'smartPower'
       my $wou         = 0;                                                                         # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)     
       my $lowSoc      = 0;
@@ -16885,6 +16890,7 @@ sub __createOwnSpec {
   }
 
   my $ownv;
+  my $cakey;
   my $rows = ceil (scalar(@vals) / $vinr);
   my $col  = 0;
 
@@ -16892,11 +16898,13 @@ sub __createOwnSpec {
       my ($h, $v, $u);
 
       for (my $k = 0 ; $k < $vinr; $k++) {
-          ($h->{$k}{label}, $h->{$k}{elm}) = split ":", $vals[$col] if($vals[$col]);  # Label und darzustellendes Element
+          ($h->{$k}{label}, $h->{$k}{elm}) = split ":", $vals[$col] if($vals[$col]);         # Label und darzustellendes Element
 
           $h->{$k}{elm}   //= '';
-          my ($elm, $dev)   = split "@", $h->{$k}{elm};                               # evtl. anderes Devices
+          my ($elm, $dev)   = split "@", $h->{$k}{elm};                                      # evtl. anderes Devices
           $dev            //= $name;
+          
+          ($elm, $cakey)    = split "->", $elm;                                              # zusammengesetztes Attribut: gewünschtes Schlüssel identifizieren
 
           $col++;
 
@@ -16905,10 +16913,12 @@ sub __createOwnSpec {
               next;
           }
 
-          my $setcmd = ___getFWwidget ($name, $dev, $elm, $allsets, 'set');           # Set-Kommandos identifizieren
+          ## Set-Kommandos identifizieren
+          #################################
+          my $setcmd = ___ownSpecGetFWwidget ($name, $dev, $elm, $allsets, 'set', $cakey);           
 
           if ($setcmd) {
-              if ($pah) {                                                             # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
+              if ($pah) {                                                                    # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
                   undef $h->{$k}{label};
                   $setcmd = '<hidden by pageAsHtml>';
               }
@@ -16920,10 +16930,12 @@ sub __createOwnSpec {
               next;
           }
 
-          my $attrcmd = ___getFWwidget ($name, $dev, $elm, $allattrs, 'attr');        # Attr-Kommandos identifizieren
+          ## Attr-Kommandos identifizieren
+          ##################################
+          my $attrcmd = ___ownSpecGetFWwidget ($name, $dev, $elm, $allattrs, 'attr', $cakey);        
 
           if ($attrcmd) {
-              if ($pah) {                                                             # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
+              if ($pah) {                                                                    # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
                   undef $h->{$k}{label};
                   $attrcmd = '<hidden by pageAsHtml>';
               }
@@ -16935,10 +16947,12 @@ sub __createOwnSpec {
               next;
           }
 
+          ## Reading identifizieren
+          ###########################
           $v->{$k} = ReadingsVal ($dev, $elm, undef);
 
           if (defined $v->{$k} && $v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
-              ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');       # Value und Unit trennen wenn Value numerisch
+              ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');              # Value und Unit trennen wenn Value numerisch
           }
 
           $u->{$k} //= q{};
@@ -16993,12 +17007,14 @@ return $ownv;
 ################################################################
 #  liefert ein FHEMWEB set/attr Widget zurück
 ################################################################
-sub ___getFWwidget {
-  my $name = shift;
-  my $dev  = shift // $name;                # Device des Elements, default=$name
-  my $elm  = shift;                         # zu prüfendes Element (setter / attribut)
-  my $allc = shift;                         # Kommandovorrat -> ist Element enthalten?
-  my $ctyp = shift // 'set';                # Kommandotyp: set/attr
+sub ___ownSpecGetFWwidget {
+  my $name  = shift;
+  my $dev   = shift;                         # Device des Elements, default=$name
+  my $elm   = shift;                         # zu prüfendes Element (Setter / Attribut)
+  my $allc  = shift;                         # Kommandovorrat -> ist Element enthalten?
+  my $ctyp  = shift;                         # Kommandotyp: set/attr
+  my $cakey = shift;                         # ein einzelner Schlüssel zur Selektion aus einem zusammengesetzten Attribut
+  my $isize = shift // INPUTSIZE;            # Breite eines Text-Eingabefeldes 
 
   return if(!$elm || $elm eq 'state');
 
@@ -17015,14 +17031,13 @@ sub ___getFWwidget {
   }
 
   if ($allc =~ /\s$elm:?(.*?)\s/xs) {                                                    # Element in allen Sets oder Attr enthalten
-      my $arg = $1;
+      my $arg = $1 // '';
 
-      if (!$arg || $arg eq 'textField') {                                                # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
-          $arg = 'textFieldNL';
+      if ($arg =~ /textField-long/xs) {                                                  # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
+          $arg = 'textFieldNL-long,,'.$isize;
       }
-
-      if ($arg eq 'textField-long') {                                                    # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
-          $arg = 'textFieldNL-long';
+      elsif (!$arg || $arg =~ /textField/xs) {                                           # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
+          $arg = 'textFieldNL,,'.$isize;
       }
 
       if ($arg !~ /^\#/xs && $arg !~ /^$allwidgets/xs) {
@@ -17036,6 +17051,7 @@ sub ___getFWwidget {
 
       if ($ctyp eq 'attr') {                                                             # Attributwerte als verstecktes Reading abbilden
           $current = AttrVal ($dev, $elm, '');
+          $current =~ s/(?<! )\R(?! )/ /g;                                               # V 1.59.6: ersetzt alle Zeilenumbrüche, die weder links noch rechts ein Leerzeichen haben, durch ein Leerzeichen
           $reading = '.'.$dev.'_'.$elm;
       }
       else {
@@ -17047,20 +17063,28 @@ sub ___getFWwidget {
               $reading = $elm;
           }
       }
-
+      
       if ($reading && $reading =~ /^\./xs) {                                             # verstecktes Reading für spätere Löschung merken
           push @widgetreadings, $reading;
           readingsSingleUpdate ($defs{$name}, $reading, $current, 0);
       }
 
-      $widget = ___widgetFallback ( { name     => $name,
-                                      dev      => $dev,
-                                      ctyp     => $ctyp,
-                                      elm      => $elm,
-                                      reading  => $reading,
-                                      arg      => $arg
-                                    }
-                                  );
+      if ($cakey) {                                                                     # einzelnen Schlüssel eines Composite-Attributs behandeln
+          my ($ea, $eh) = parseParams (AttrVal ($name, $elm, ''));
+          my $cakeyval  = $eh->{$cakey};
+          my $kv        = "$cakey=$cakeyval" if(defined $cakeyval);
+          $widget       = "<div class='fhemWidget' cmd='' reading='' dev='' arg='$arg' current='$cakeyval' type='set $dev attrKeyVal $elm $cakey='></div>";
+      }
+      else {
+          $widget = ___widgetFallback ( { name     => $name,
+                                          dev      => $dev,
+                                          ctyp     => $ctyp,
+                                          elm      => $elm,
+                                          reading  => $reading,
+                                          arg      => $arg
+                                        }
+                                      );      
+      }
 
       if (!$widget) {
           $widget = FW_pH ("cmd=$ctyp $dev $elm", $elm, 0, "", 1, 1);
@@ -17077,7 +17101,7 @@ sub ___widgetFallback {
   my $pars     = shift;
   my $name     = $pars->{name};
   my $dev      = $pars->{dev};
-  my $ctyp     = $pars->{ctyp};
+  my $ctyp     = $pars->{ctyp};                                    # Kommandotyp: set/attr
   my $elm      = $pars->{elm};
   my $reading  = $pars->{reading};
   my $arg      = $pars->{arg};
@@ -27763,14 +27787,16 @@ to ensure that the system configuration is correct.
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b> <br><br>
 
          Display of any readings, set commands and attributes of the device in the graphic header. <br>
-         Readings, set commands and attributes of other devices can be displayed by specifying the optional [@Device]. <br>
-         The values to be displayed are separated by spaces.
          Four values (fields) are displayed per line. <br>
-         The input can be made in multiple lines. Values with the units "Wh" or "kWh" are converted according to the
-         setting of the attribute <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a>.
+         Values with the units "Wh" or "kWh" are converted according to the setting of the attribute 
+         <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a>.
          <br><br>
 
-         Each value is to be defined by a label and the corresponding reading connected by ":". <br>
+         Each value must be defined by a label and the element to be displayed (attribute, reading, set command) connected by “:”. <br>
+         A single key value of a combined attribute (ctrlBatSocManagementXX, flowGraphicControl, etc.) can be displayed and changed by 
+         adding '->&lt;key&gt;'. <br>
+         The element can optionally be supplemented with '@&lt;Device&gt;' to display readings, set commands, and attributes of other devices. <br>
+         The elements to be displayed are separated by spaces or a new line.
          Spaces in the label are to be inserted by "&amp;nbsp;", a line break by "&lt;br&gt;". <br>
          An empty field in a line is created by ":". <br>
          A line title can be inserted by specifying "#:&lt;Text&gt;", an empty title by entering "#".
@@ -27793,7 +27819,7 @@ to ensure that the system configuration is correct.
             <tr><td>                                         </td><td>#Battery                                                                                </td></tr>
             <tr><td>                                         </td><td>in&amp;nbsp;today:special_todayBatIn                                                    </td></tr>
             <tr><td>                                         </td><td>out&amp;nbsp;today:special_todayBatOut                                                  </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
+            <tr><td>                                         </td><td>Charging&amp;nbsp;target:ctrlBatSocManagement01->loadTarget                                                                                       </td></tr>
             <tr><td>                                         </td><td>:                                                                                       </td></tr>
             <tr><td>                                         </td><td>#Settings                                                                               </td></tr>
             <tr><td>                                         </td><td>Autocorrection:pvCorrectionFactor_Auto : : :                                            </td></tr>
@@ -30474,14 +30500,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b> <br><br>
 
          Anzeige beliebiger Readings, Set-Kommandos und Attribute des SolarForecast Devices im Grafikkopf. <br>
-         Durch Angabe des optionalen [@Device] können Readings, Set-Kommandos und Attribute anderer Devices angezeigt werden. <br>
-         Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
          Es werden vier Werte (Felder) pro Zeile dargestellt. <br>
-         Die Eingabe kann mehrzeilig erfolgen. Werte mit den Einheiten "Wh" bzw. "kWh" werden entsprechend der Einstellung
+         Werte mit den Einheiten "Wh" bzw. "kWh" werden entsprechend der Einstellung
          des Attributs <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a> umgerechnet.
          <br><br>
 
-         Jeder Wert ist jeweils durch ein Label und das dazugehörige Reading verbunden durch ":" zu definieren. <br>
+         Jeder Wert ist jeweils durch ein Label und das anzuzeigende Element (Attribut, Reading, Set-Kommando) verbunden durch ":" zu definieren. <br>
+         Ein einzelner Schlüsselwert eines kombinierten Attributes (ctrlBatSocManagementXX, flowGraphicControl, etc.) kann durch Ergänzung 
+         von '->&lt;Schlüssel&gt;' angezeigt und geändert werden. <br>
+         Das Element kann optional mit '@&lt;Device&gt;' ergänzt werden um Readings, Set-Kommandos und Attribute anderer Devices anzuzeigen. <br>
+         Die anzuzeigenden Elemente werden durch Leerzeichen oder eine neue Zeile getrennt.
          Leerzeichen im Label sind durch "&amp;nbsp;" einzufügen, ein Zeilenumbruch durch "&lt;br&gt;". <br>
          Ein leeres Feld in einer Zeile wird durch ":" erzeugt. <br>
          Ein Zeilentitel kann durch Angabe von "#:&lt;Text&gt;" eingefügt werden, ein leerer Titel durch die Eingabe von "#".
@@ -30504,7 +30532,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                         </td><td>#Batterie                                                                     </td></tr>
             <tr><td>                                         </td><td>in&amp;nbsp;heute:special_todayBatIn                                          </td></tr>
             <tr><td>                                         </td><td>out&amp;nbsp;heute:special_todayBatOut                                        </td></tr>
-            <tr><td>                                         </td><td>:                                                                             </td></tr>
+            <tr><td>                                         </td><td>Ladeziel:ctrlBatSocManagement01->loadTarget                                                                             </td></tr>
             <tr><td>                                         </td><td>:                                                                             </td></tr>
             <tr><td>                                         </td><td>#Settings                                                                     </td></tr>
             <tr><td>                                         </td><td>Autokorrektur:pvCorrectionFactor_Auto : : :                                   </td></tr>
