@@ -4963,8 +4963,22 @@ sub EnOcean_Set($@) {
           $updateState = 0;
           $data = sprintf "%04X%02X%02X", int($shutTime * $settingAccuracy + 0.5), $shutCmd, $setCmd;
 
+        } elsif ($cmd eq "teachInSec") {
+          ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          ($err, $response, $logLevel) = EnOcean_sec_createTeachIn(undef, $hash, 'uniDir', 'VAES', 'A5-3F-7F', 3,
+                                                                   '2++', 'false', 'encryption', undef, $subDef, $destinationID);
+          if ($err) {
+            Log3 $name, $logLevel, "EnOcean $name Error: $err";
+            return $err;
+          } else {
+            EnOcean_CommandSave(undef, undef);
+            Log3 $name, $logLevel, "EnOcean $name $response";
+            readingsSingleUpdate($hash, "teach", "STE teach-in sent", 1);
+            return(undef);
+          }
+
         } else {
-          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "position:slider,0,5,100 anglePos:slider,-180,5,180 closes:noArg down local:learn opens:noArg stop:noArg teach:noArg up"
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "position:slider,0,5,100 anglePos:slider,-180,5,180 closes:noArg down local:learn opens:noArg stop:noArg teach:noArg teachInSec:noArg up"
         }
         if ($shutCmd || $cmd eq "stop") {
           #$updateState = 0;
