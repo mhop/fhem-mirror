@@ -160,8 +160,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.6" => "19.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
-                           "Width of a text field in graphicHeaderOwnspec fixed to 10 ",
+  "1.59.6" => "20.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
+                           "Width of a text field in graphicHeaderOwnspec fixed to 10 ".
+                           "__batChargeOptTargetPower: use an average for the charging power if optPower set and charging target are not achievable ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
                            "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
@@ -11699,6 +11700,9 @@ sub _batChargeMgmt {
   my $gfeedin   = CurrentVal  ($name, 'gridfeedin',               0);                            # aktuelle Netzeinspeisung
   my $inplim    = 0;
   
+  my $tdaysset  = CurrentVal ($name, 'sunsetTodayTs', $t);                                       # Timestamp Sonneuntergang am aktuellen Tag
+  my $hs2sunset = sprintf "%.2f", ($tdaysset - $t);                                              # Rest-Stunden bis Sonnenuntergang 
+  
   my $hsurp  = {};                                                                               # Hashreferenz Überschuß
   my $hsoc   = {};                                                                               # Hashreferenz Prognose-SOC über alle Batterien
   my $trans  = {};                                                                               # Referenz Übertrags-Hash 
@@ -11998,7 +12002,9 @@ sub _batChargeMgmt {
   ################################################################# 
   for my $lfd (0..max (0, keys %{$hsurp})) {
       $paref->{hsurp} = $hsurp->{$lfd}; 
-      my ($hopt, $otp) = __batChargeOptTargetPower ($paref, $lfd, $minute, $trans);
+      
+      my ($hopt, $otp) = __batChargeOptTargetPower ($paref, $lfd, $minute, $trans, $hs2sunset);
+      
       delete $paref->{hsurp};
       
       ## Debuglog OTP
@@ -12109,10 +12115,11 @@ return;
 #   Ladeleistung verteilt über die Tagstunden mit PV-Überschuß)
 ################################################################       
 sub __batChargeOptTargetPower {
-  my $paref   = shift;
-  my $lfd     = shift;                                                                                           # laufender Tag (1..X)
-  my  $minute = shift;
-  my $trans   = shift;                                                                                           # Übertrags-Hash Referenz
+  my $paref     = shift;
+  my $lfd       = shift;                                                                                         # laufender Tag (1..X)
+  my $minute    = shift;
+  my $trans     = shift;                                                                                         # Übertrags-Hash Referenz
+  my $hs2sunset = shift;
   
   my $name  = $paref->{name};
   my $hsurp = $paref->{hsurp};                                                                                   # Hashref Überschußhash
@@ -12204,7 +12211,8 @@ sub __batChargeOptTargetPower {
           
           $needraw      = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
           $needraw      = max ($needraw, $bpinreduced);                                                          # Mindestladeleistung bpinreduced sicherstellen                  
-          my $pneedmin  = $needraw * (1 + $otpMargin / 100);                                                     # initialer Sicherheitsaufschlag
+          
+          my $pneedmin  = $needraw * (1 + $otpMargin / 100);                                                     # optPower: initialer Sicherheitsaufschlag
           
           if ($strategy eq 'smartPower') {
               $pneedmin = ___batAdjustPowerByMargin ($name, $needraw, $bpinmax, $runwhneed, $otpMargin);         # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
@@ -12227,9 +12235,10 @@ sub __batChargeOptTargetPower {
                       $target = ___batAdjustPowerByMargin ($name, $target, $bpinmax, $runwhneed, $otpMargin);
                   }
               }
-              else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)
-                  $target *= (1 + $otpMargin / 100) ** 2;
-
+              else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)                 
+                  $target  = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : 0;  
+                  $target *= (1 + $otpMargin / 100) ** 2;                
+                                    
                   if ($strategy eq 'smartPower') {                                                               # smartPower: maximale Ladeleistung erzwingen
                       $target = $bpinmax;
                   }
@@ -16898,8 +16907,8 @@ sub __createOwnSpec {
       my ($h, $v, $u);
 
       for (my $k = 0 ; $k < $vinr; $k++) {
-          ($h->{$k}{label}, $h->{$k}{elm}) = split ":", $vals[$col] if($vals[$col]);         # Label und darzustellendes Element
-
+          ($h->{$k}{label}, $h->{$k}{elm}) = $vals[$col] =~ /^(.*):(.*)$/ if($vals[$col]);   # Label und darzustellendes Element am LETZTEN : trennen
+          
           $h->{$k}{elm}   //= '';
           my ($elm, $dev)   = split "@", $h->{$k}{elm};                                      # evtl. anderes Devices
           $dev            //= $name;
