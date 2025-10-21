@@ -162,7 +162,8 @@ BEGIN {
 my %vNotesIntern = (
   "1.59.6" => "20.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
                            "Width of a text field in graphicHeaderOwnspec fixed to 10 ".
-                           "__batChargeOptTargetPower: use an average for the charging power if optPower set and charging target are not achievable ",
+                           "__batChargeOptTargetPower: use an average for the charging power if optPower set and charging target are not achievable ".
+						   "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
                            "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
@@ -12223,8 +12224,8 @@ sub __batChargeOptTargetPower {
           
           $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin > 0 ? $pneedmin : 0;                                        # Ladeleistung abhängig von Ziel-SoC Erfüllung        
                
-          ## NextHour 00 bearbeiten
-          ###########################
+          ## NextHour 00 (aktuelle Stunde) behandeln
+          ############################################
           if ($nhr eq '00') {
               my $target = $needraw > 0 ? $needraw / $befficiency : 0;                                           # Zielleistung mit Batterie Effizienzgrad erhöhen
 
@@ -16899,10 +16900,10 @@ sub __createOwnSpec {
       push @vals, $f;
   }
 
-  my $ownv;
-  my $cakey;
-  my $rows = ceil (scalar(@vals) / $vinr);
-  my $col  = 0;
+  my ($ownv, $cakey);
+  my $isize = INPUTSIZE;
+  my $rows  = ceil (scalar(@vals) / $vinr);
+  my $col   = 0;
 
   for (my $i = 1 ; $i <= $rows; $i++) {
       my ($h, $v, $u);
@@ -16913,19 +16914,21 @@ sub __createOwnSpec {
           $h->{$k}{elm}   //= '';
           my ($elm, $dev)   = split "@", $h->{$k}{elm};                                      # evtl. anderes Devices
           $dev            //= $name;
-          
-          ($elm, $cakey)    = split "->", $elm;                                              # zusammengesetztes Attribut: gewünschtes Schlüssel identifizieren
+          $elm            //= '';
+          ($elm, $cakey)    = split "->", $elm;                                              # zusammengesetztes Attribut: gewünschten Schlüssel identifizieren
 
           $col++;
 
-          if (!$h->{$k}{label}) {
-              undef $h->{$k}{label};
-              next;
+          if (!defined $h->{$k}{label}) {
+              #undef $h->{$k}{label};
+			  $h->{$k}{label} = '';
+              #next;
+			  $h->{$k}{elm}   = '';
           }
 
           ## Set-Kommandos identifizieren
           #################################
-          my $setcmd = ___ownSpecGetFWwidget ($name, $dev, $elm, $allsets, 'set', $cakey);           
+          my $setcmd = ___ownSpecGetFWwidget ($name, $dev, $elm, $allsets, 'set', $cakey, $isize);           
 
           if ($setcmd) {
               if ($pah) {                                                                    # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
@@ -16942,7 +16945,7 @@ sub __createOwnSpec {
 
           ## Attr-Kommandos identifizieren
           ##################################
-          my $attrcmd = ___ownSpecGetFWwidget ($name, $dev, $elm, $allattrs, 'attr', $cakey);        
+          my $attrcmd = ___ownSpecGetFWwidget ($name, $dev, $elm, $allattrs, 'attr', $cakey, $isize);        
 
           if ($attrcmd) {
               if ($pah) {                                                                    # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
@@ -16959,11 +16962,13 @@ sub __createOwnSpec {
 
           ## Reading identifizieren
           ###########################
-          $v->{$k} = ReadingsVal ($dev, $elm, undef);
+          if ($elm) {
+			  $v->{$k} = ReadingsVal ($dev, $elm, undef);
 
-          if (defined $v->{$k} && $v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
-              ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');              # Value und Unit trennen wenn Value numerisch
-          }
+			  if (defined $v->{$k} && $v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
+				  ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');         # Value und Unit trennen wenn Value numerisch
+			  }
+		  }
 
           $u->{$k} //= q{};
 
@@ -17000,10 +17005,10 @@ sub __createOwnSpec {
 
       $ownv .= "<tr>";
       $ownv .= "<td $dstyle>".($cats[$i-1] ? '<b>'.$cats[$i-1].'</b>' : '')."</td>";
-      $ownv .= "<td $dstyle><b>".$h->{0}{label}.":</b></td> <td align=right $dstyle>".$v->{0}." ".$u->{0}."</td>" if(defined $h->{0}{label});
-      $ownv .= "<td $dstyle><b>".$h->{1}{label}.":</b></td> <td align=right $dstyle>".$v->{1}." ".$u->{1}."</td>" if(defined $h->{1}{label});
-      $ownv .= "<td $dstyle><b>".$h->{2}{label}.":</b></td> <td align=right $dstyle>".$v->{2}." ".$u->{2}."</td>" if(defined $h->{2}{label});
-      $ownv .= "<td $dstyle><b>".$h->{3}{label}.":</b></td> <td align=right $dstyle>".$v->{3}." ".$u->{3}."</td>" if(defined $h->{3}{label});
+      $ownv .= "<td $dstyle><b>".$h->{0}{label}.($h->{0}{label} ? ':' : '')."</b></td> <td align=right $dstyle>".$v->{0}." ".$u->{0}."</td>";
+      $ownv .= "<td $dstyle><b>".$h->{1}{label}.($h->{1}{label} ? ':' : '')."</b></td> <td align=right $dstyle>".$v->{1}." ".$u->{1}."</td>";
+      $ownv .= "<td $dstyle><b>".$h->{2}{label}.($h->{2}{label} ? ':' : '')."</b></td> <td align=right $dstyle>".$v->{2}." ".$u->{2}."</td>";
+      $ownv .= "<td $dstyle><b>".$h->{3}{label}.($h->{3}{label} ? ':' : '')."</b></td> <td align=right $dstyle>".$v->{3}." ".$u->{3}."</td>";
       $ownv .= "</tr>";
   }
 
@@ -17024,7 +17029,7 @@ sub ___ownSpecGetFWwidget {
   my $allc  = shift;                         # Kommandovorrat -> ist Element enthalten?
   my $ctyp  = shift;                         # Kommandotyp: set/attr
   my $cakey = shift;                         # ein einzelner Schlüssel zur Selektion aus einem zusammengesetzten Attribut
-  my $isize = shift // INPUTSIZE;            # Breite eines Text-Eingabefeldes 
+  my $isize = shift;                         # Breite eines Text-Eingabefeldes 
 
   return if(!$elm || $elm eq 'state');
 
