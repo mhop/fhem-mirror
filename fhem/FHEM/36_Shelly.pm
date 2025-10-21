@@ -169,6 +169,7 @@
 # 6.04.2    new: Shelly shutter added
 # 6.04.3    new: Shelly Pro2 UL-type added
 #           fix: do not set gain to 100% on set hsv|rgb. 
+# 6.04.4    fix: accept set rgbw .. (ShellyPlusRGBWpm)
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -193,7 +194,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.04.3 16.10.2025";
+my $version = "6.04.4 21.10.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -248,7 +249,8 @@ my %shelly_dropdowns = (
     "Rol"     => " closed open stop:noArg pct:slider,0,1,100 delta zero:noArg predefAttr:noArg",
     "RgbwW"   => " pct:slider,1,1,100 dim dimup dimdown dim-for-timer",   ## later we add calibrate for shellydimmer
     "BulbW"   => " ct:colorpicker,CT,3000,10,6500 pct:slider,1,1,100",
-    "RgbwC"   => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100 effect:select,Off,1,2,3",
+    "RgbwC"   => " rgbw rgb:colorpicker,HSV hsv white:slider,0,1,100 gain:slider,0,1,100",
+    "RgbwEff" => " effect:select,Off,1,2,3",   # only Gen1 devices
     "Input"   => " input:momentary,toggle,edge,detached,activation", 
     "Input1"  => ",momentary_on_release",  # only Shelly1
     "Input2"  => ",cycle",                  # only ShellyPlus2
@@ -363,7 +365,7 @@ my %shelly_vendor_ids = (
     "SPSW-202PE16EU"  => ["shellypro2pm",   "Shelly Pro 2PM v.1"],
     "SPSH-002PE16EU"  => ["shellyprodual",  "Shelly Pro Dual Cover/Shutter PM"],
     "SPCC-001PE10EU"  => ["shellyplus010v", "Shelly Pro Dimmer 0/1-10V PM",   0x2011],    # addes 03/2025  <<< 1V base not supported here
-    "SPDC-0D5PE16EU"  => ["shellyplusrgbwpm", "Shelly Pro RGBWW PM",  0x2012],    # added 02/2025  <<<< two channels of White not supported here
+    "SPDC-0D5PE16EU"  => ["shellyprorgbwpm","Shelly Pro RGBWW PM",    0x2012],    # added 02/2025  <<<< two channels of White not supported here
     "SPDM-001PE01EU"  => ["shellyprodm1pm", "Shelly Pro Dimmer 1PM",  0x200D],    ##new
     "SPDM-002PE01EU"  => ["shellyprodm2pm", "Shelly Pro Dimmer 2PM",  0x200E],
     "SPSW-003XE16EU"  => ["shellypro3",     "Shelly Pro 3"],
@@ -439,7 +441,7 @@ my %shelly_models = (
     "shellyplusuni" => [2,0,0, 0,1,2,  0,0,0],    ### entwurf wie shellypro2; 1 xtra input as counter
     "shellyplus010v"=> [0,0,1, 0,2,2,  0,0,0],    # one instance of light, 0-10V output
     "shellyplusi4"  => [0,0,0, 0,1,4,  0,0,0],
-    "shellyplusrgbwpm"=>[0,0,4,4,2,4,  0,1,2],
+    "shellyplusrgbwpm"=>[0,0,4,4,2,4,  0,1,3],    # profiles:  light,rgb,rgbw
     "shellypro1"    => [1,0,0, 0,1,2,  0,0,0],
     "shellypro1pm"  => [1,0,0, 1,1,2,  0,0,0],
     "shellypro2"    => [2,0,0, 0,1,2,  0,0,0],
@@ -451,6 +453,7 @@ my %shelly_models = (
     "shellyproem50" => [1,0,0, 0,1,0,  2,0,0],    # has two single-phase meter and one relay
     "shellypro3em"  => [0,0,0, 0,1,0,  3,0,2],    # has 1 three-phase meter [EM] in triphase profile or 3 meter [EM1] in monophase-profile
     "shellyprodual" => [0,2,0, 4,1,4,  0,0,0],
+    "shellyprorgbwpm"=>[0,0,5, 5,2,5,  0,1,4],    # profiles:  light,rgbcct,cctx2,rgbx2light // not really supported yet
     #-- 3rd generation devices (Gen3)
     "shellypmmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to ShellyPlusPM
     "shellyemG3"    => [1,0,0, 0,3,0,  2,0,0],    # similar to 'shellyproem50'
@@ -1444,7 +1447,7 @@ sub Shelly_Attr(@) {
           Log3 $name,4,"[Shelly_Attr] deleted defchannel etc from device $name: model=$attrVal, mode=". (!$mode?"not defined":$mode);
     }
 
-    if( defined($mode) && $mode eq "color" && $shelly_models{$attrVal}[7]==1 ){  #rgbw in color mode
+    if( defined($mode) && $mode =~ /color|rgbw/ && $shelly_models{$attrVal}[7]==1 ){  #color-device (eg. RGBW) in color mode
           $hash->{'.AttrList'} =~ s/$attributes{'multichannel'}/""/e;
     }
 
@@ -2298,6 +2301,10 @@ sub Shelly_Set ($@) {
       $newkeys .= $shelly_dropdowns{Multi} if( ($mode ne "roller" && $shelly_models{$model}[0]>1) || ($shelly_models{$model}[2]>1 && $mode eq "white") );
       if( $mode eq "roller" || ($shelly_models{$model}[0]==0 && $shelly_models{$model}[1]>0)){
           $newkeys .= $shelly_dropdowns{Rol};
+ #    }elsif( $model =~ /shelly(rgbw|bulb).*/ && $mode eq "color" ){
+      }elsif( $shelly_models{$model}[7] > 0 && $mode =~ /color|rgbw/ ){
+          $newkeys .= $shelly_dropdowns{RgbwC};
+          $newkeys .= $shelly_dropdowns{RgbwEff}  if($shelly_models{$model}[4] == 0);   # first gen devices only (ShellyRGBW,ShellyBulb)
       }elsif( $shelly_models{$model}[2] > 0 && $mode ne 'color' ){
                #$model =~ /shellydimmer/ || ($model =~ /shellyrgbw.*/ && $mode eq "white") || $model eq "shellyplus010v" ){
           $newkeys .= $shelly_dropdowns{RgbwW};
@@ -2309,8 +2316,6 @@ sub Shelly_Set ($@) {
           foreach my $cmd ( 'on','off','toggle' ){
               $newkeys =~ s/$cmd /$cmd:noArg /g;
           }
-      }elsif( $model =~ /shelly(rgbw|bulb).*/ && $mode eq "color" ){
-          $newkeys .= $shelly_dropdowns{RgbwC};
       }elsif( $shelly_models{$model}[5]==1 ){ # devices with one input only
           $newkeys .= $shelly_dropdowns{Input};
           $newkeys .= $shelly_dropdowns{Input1}  if( $model =~ /Shelly1/ );
