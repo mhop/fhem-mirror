@@ -2062,13 +2062,13 @@ sub _setattrKeyVal {                         ## no critic "not used"
 
   return if(!$init_done);
   
-  Log3 ($name, 1, "$name - Arg Orig: $arg");
+  #Log3 ($name, 1, "$name - Arg Orig: $arg");
   
   $arg =~ s/=\s*/=/g;                                                                    # V 1.59.6 wichtig für graphicHeaderOwnspec Behandlung einzelner Keys -> ersetze jedes = samt folgendem Leerraum durch ein reines =
   $arg =~ s/^([^,]*)\s+/$1,/;                                                            # das erste auftretende Leerzeichen-Cluster durch ',' ersetzen, aber nur wenn es in dem String vor dem Leerzeichen-Cluster noch kein Komma gibt
   $arg =~ s/^([^=]*?),/$1 /;                                                             
    
-  Log3 ($name, 1, "$name - Arg Substitute: $arg");
+  #Log3 ($name, 1, "$name - Arg Substitute: $arg");
    
   my ($a, $h)    = parseParams ($arg);
   my $targetattr = $a->[0];
