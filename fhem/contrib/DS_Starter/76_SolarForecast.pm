@@ -161,7 +161,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.59.6" => "20.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
-                           "Width of a text field in graphicHeaderOwnspec fixed to 10 ".
+                           "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
                            "__batChargeOptTargetPower: use an average for the charging power if optPower set and charging target are not achievable ".
 						   "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
@@ -27135,11 +27135,10 @@ to ensure that the system configuration is correct.
         The remaining runtime is not affected by an interrupt!
         <br><br>
 
-        The <b>power</b> key indicates the nominal power consumption of the consumer according to its data sheet.
-        This value is used to schedule the switching times of the load and to control the switching depending on
-        the actual PV surplus at the time of scheduling.
-        This value is used to schedule the switching times of the load and to control the switching depending on
-        the actual PV surplus at the time of scheduling.
+        The <b>power</b> key indicates the power consumption of the consumer. <br>
+        Depending on this value, the switching times of the consumer are planned and the cycle of the consumer is started depending on
+        the sufficient PV surplus at the time of planning. <br>
+        If <b>power=0</b> is set, the consumer is switched on as planned, regardless of whether there is sufficient PV surplus.
         <br><br>
 
          <ul>
@@ -27163,7 +27162,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                                                     Display functions or manual switching are available.                                                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
-            <tr><td> <b>power</b>          </td><td>nominal power consumption of the consumer (see data sheet) in W                                                                                   </td></tr>
+            <tr><td> <b>power</b>          </td><td>Power consumption of the consumer in W. This can be the nominal power according to the data sheet or a dynamically specified reference value.     </td></tr>
             <tr><td>                       </td><td>(can be set to "0")                                                                                                                               </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.      </td></tr>
@@ -29847,9 +29846,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         Die verbleibende Laufzeit wird durch einen Interrupt nicht beeinflusst!
         <br><br>
 
-        Der Schlüssel <b>power</b> gibt die nominale Leistungsaufnahme des Verbrauchers gemäß seines Datenblattes an.
-        Dieser Wert wird verwendet um die Schaltzeiten des Verbrauchers zu planen und das Schalten in Abhängigkeit
-        des tatsächlichen PV-Überschusses zum Einplanungszeitpunkt zu steuern.
+        Der Schlüssel <b>power</b> gibt die Leistungsaufnahme des Verbrauchers an. <br>
+        Abhängig von diesem Wert werden die Schaltzeiten des Verbrauchers geplant und der Zyklus des Verbrauchers in Abhängigkeit
+        des ausreichenden PV-Überschußes zum Einplanungszeitpunkt gestartet. <br>
         Ist <b>power=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichend vorhandenem PV-Überschuß
         wie eingeplant geschaltet.
         <br><br>
@@ -29875,7 +29874,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                                                     Anzeigefunktionen oder manuelle Schaltungen sind verfügbar.                                                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                                </td></tr>
+            <tr><td> <b>power</b>          </td><td>Leistungsaufnahme des Verbrauchers in W. Es kann die nominale Leistung gemäß Datenblatt oder ein dynamisch vorgegebener Richtwert sein.            </td></tr>
             <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                                      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>Das angegebene &lt;device&gt; wird als Schalter Device dem Verbraucher zugeordnet (optional). Schaltvorgänge werden mit diesem Gerät               </td></tr>
