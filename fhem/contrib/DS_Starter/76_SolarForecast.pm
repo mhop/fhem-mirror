@@ -12206,7 +12206,7 @@ sub __batChargeOptTargetPower {
           ## weiter mit Überschuß (Prognose)
           ####################################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
-          my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed, $befficiency);
+          my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed);
           my $needraw   = min ($fref->{ph}, $spls);                                                              # Ladeleistung auf Surplus begrenzen
           
           $needraw      = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
@@ -12226,7 +12226,7 @@ sub __batChargeOptTargetPower {
           ## NextHour 00 bearbeiten
           ###########################
           if ($nhr eq '00') {
-              my $target = $needraw > 0 ? $needraw : 0;           
+              my $target = $needraw > 0 ? $needraw / $befficiency : 0;                                           # Zielleistung mit Batterie Effizienzgrad erhöhen
 
               if ($achievable) {                                                                                 # Tagesziel erreichbar: Basisziel um otpMargin% erhöhen
                   $target *= 1 + ($otpMargin / 100);
@@ -12347,7 +12347,7 @@ return $value;
 #   die vollständige Ausnutzung der vorhandenen Kapazität.
 ###############################################################################################
 sub ___batFindMinPhWh {
-    my ($hsurp, $aref, $Ereq, $befficiency) = @_;
+    my ($hsurp, $aref, $Ereq) = @_;
     
     my @hods     = @$aref;
     my $low      = 0;                                                 
