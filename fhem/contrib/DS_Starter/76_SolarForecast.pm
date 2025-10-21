@@ -11701,7 +11701,7 @@ sub _batChargeMgmt {
   my $inplim    = 0;
   
   my $tdaysset  = CurrentVal ($name, 'sunsetTodayTs', $t);                                       # Timestamp Sonneuntergang am aktuellen Tag
-  my $hs2sunset = sprintf "%.2f", ($tdaysset - $t);                                              # Rest-Stunden bis Sonnenuntergang 
+  my $hs2sunset = sprintf "%.2f", (($tdaysset - $t) / 3600);                                     # Rest-Stunden bis Sonnenuntergang 
   
   my $hsurp  = {};                                                                               # Hashreferenz Überschuß
   my $hsoc   = {};                                                                               # Hashreferenz Prognose-SOC über alle Batterien
