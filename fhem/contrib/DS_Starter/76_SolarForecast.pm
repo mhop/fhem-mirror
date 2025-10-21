@@ -13769,7 +13769,9 @@ sub __setConsRcmdState {
 
   my ($method, $surplus) = determSurplus ($name, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
 
-  $data{$name}{consumers}{$c}{surpmethResult} = sprintf "%.0f", $surplus;                 # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
+  $data{$name}{consumers}{$c}{surpmethResult} = defined $surplus 
+                                                ? (sprintf "%.0f", $surplus) 
+                                                : undef;                                  # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
 
   if ($debug =~ /consumerSwitching${c}/x) {
       my $splref = CurrentVal ($name, 'surplusslidereg', '.');
@@ -13935,7 +13937,7 @@ sub ___switchConsumerOn {
 
           delete $paref->{ps};
       }
-      elsif ($mode eq "must" || $isConsRcmd) {                                                    # "Muss"-Planung oder Überschuß > Leistungsaufnahme (can)
+      elsif ($mode eq "must" || $isConsRcmd) {                                                    # "Muss"-Planung oder Überschuß > Ratio (can)
           $state = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom"};
 
           if ($debug =~ /consumerSwitching${c}/x) {
