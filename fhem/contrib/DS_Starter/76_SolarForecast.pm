@@ -12236,8 +12236,9 @@ sub __batChargeOptTargetPower {
                   }
               }
               else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)                 
-                  $target  = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : 0;  
-                  $target *= (1 + $otpMargin / 100) ** 2;                
+                  $hs2sunset -= 1;
+				  $target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;  
+                  $target    *= (1 + $otpMargin / 100) ** 2;                
                                     
                   if ($strategy eq 'smartPower') {                                                               # smartPower: maximale Ladeleistung erzwingen
                       $target = $bpinmax;
