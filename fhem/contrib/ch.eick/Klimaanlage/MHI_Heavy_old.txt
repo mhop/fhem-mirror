@@ -1,0 +1,263 @@
+defmod MHI_Heavy HTTPMOD none 0
+attr MHI_Heavy DbLogExclude .*
+attr MHI_Heavy disable 0
+attr MHI_Heavy enableControlSet 0
+attr MHI_Heavy get01-1Name info_apiVer
+attr MHI_Heavy get01-2Name info_command
+attr MHI_Heavy get01-3Name info_deviceId
+attr MHI_Heavy get01-4Name info_result
+attr MHI_Heavy get01-5Name contents_airconId
+attr MHI_Heavy get01-6Name contents_macAddress
+attr MHI_Heavy get01-7Name info_operatorId
+attr MHI_Heavy get01-8Name contents_apMode
+attr MHI_Heavy get01-9Name info_timestamp
+attr MHI_Heavy get01CheckAllReadings 1
+attr MHI_Heavy get01Data {"apiVer":"1.0","command":"getDeviceInfo","deviceId":"%deviceId%","operatorId":"%operatorId%","timestamp":%TIME%}
+attr MHI_Heavy get01JSON .
+attr MHI_Heavy get01Name 01_getDeviceInfo
+attr MHI_Heavy get01URL http://%IP-MHI_Heavy%:51443/beaver/command
+attr MHI_Heavy get02-10Name contents_logStat
+attr MHI_Heavy get02-11Name contents_lowTemp
+attr MHI_Heavy get02-12Name contents_wireless_firmVer
+attr MHI_Heavy get02-13Name contents_numOfAccount
+attr MHI_Heavy get02-14Name contents_remoteList_0
+attr MHI_Heavy get02-15Name contents_remoteList_1
+attr MHI_Heavy get02-16Name contents_remoteList_2
+attr MHI_Heavy get02-17Name contents_remoteList_3
+attr MHI_Heavy get02-18Name contents_timezone
+attr MHI_Heavy get02-19Name contents_updatedBy
+attr MHI_Heavy get02-1Name info_apiVer
+attr MHI_Heavy get02-20Name contents_mcu_firmVer
+attr MHI_Heavy get02-21Name contents_airconId
+attr MHI_Heavy get02-22Name info_operatorId
+attr MHI_Heavy get02-23Name contents_ledStat
+attr MHI_Heavy get02-24Name info_timestamp
+attr MHI_Heavy get02-2Name info_command
+attr MHI_Heavy get02-3Name info_deviceId
+attr MHI_Heavy get02-4Name contents_airconStat
+attr MHI_Heavy get02-5Name contents_autoHeating
+attr MHI_Heavy get02-6Name contents_expires
+attr MHI_Heavy get02-7Name contents_firmType
+attr MHI_Heavy get02-8Name contents_highTemp
+attr MHI_Heavy get02-9Name info_result
+attr MHI_Heavy get02CheckAllReadings 1
+attr MHI_Heavy get02Data {"apiVer":"1.0","command":"getAirconStat","deviceId":"%deviceId%","operatorId":"%operatorId%","timestamp":%TIME%}
+attr MHI_Heavy get02JSON .
+attr MHI_Heavy get02Name 02_getAirconStat
+attr MHI_Heavy get02URL http://%IP-MHI_Heavy%:51443/beaver/command
+attr MHI_Heavy get03CheckAllReadings 1
+attr MHI_Heavy get03Data {"apiVer":"1.0","command":"getAccountInfo","deviceId":"%deviceId%","operatorId":"%operatorId%","timestamp":%TIME%}
+attr MHI_Heavy get03JSON .
+attr MHI_Heavy get03Name 03_getAccountInfo
+attr MHI_Heavy get03URL http://%IP-MHI_Heavy%:51443/beaver/command
+attr MHI_Heavy group PV Eigenverbrauch
+attr MHI_Heavy icon sani_solar
+attr MHI_Heavy replacement01Mode text
+attr MHI_Heavy replacement01Regex %IP-MHI_Heavy%
+attr MHI_Heavy replacement01Value < MHI_Heavy IP-Address >
+attr MHI_Heavy replacement02Mode text
+attr MHI_Heavy replacement02Regex %deviceId%
+attr MHI_Heavy replacement02Value <deviceId>
+attr MHI_Heavy replacement03Mode text
+attr MHI_Heavy replacement03Regex %operatorId%
+attr MHI_Heavy replacement03Value <operatorId>
+attr MHI_Heavy replacement04Mode expression
+attr MHI_Heavy replacement04Regex %TIME%
+attr MHI_Heavy replacement04Value {round(time(),0)}
+attr MHI_Heavy replacement05Mode reading
+attr MHI_Heavy replacement05Regex %AIRCONSTAT%
+attr MHI_Heavy replacement05Value contents_airconStat
+attr MHI_Heavy room Neu
+attr MHI_Heavy set02-10Name contents_logStat
+attr MHI_Heavy set02-11Name contents_lowTemp
+attr MHI_Heavy set02-12Name contents_wireless_firmVer
+attr MHI_Heavy set02-13Name contents_numOfAccount
+attr MHI_Heavy set02-14Name contents_remoteList_0
+attr MHI_Heavy set02-15Name contents_remoteList_1
+attr MHI_Heavy set02-16Name contents_remoteList_2
+attr MHI_Heavy set02-17Name contents_remoteList_3
+attr MHI_Heavy set02-18Name contents_timezone
+attr MHI_Heavy set02-19Name contents_updatedBy
+attr MHI_Heavy set02-1Name info_apiVer
+attr MHI_Heavy set02-20Name contents_mcu_firmVer
+attr MHI_Heavy set02-21Name contents_airconId
+attr MHI_Heavy set02-22Name info_operatorId
+attr MHI_Heavy set02-23Name contents_ledStat
+attr MHI_Heavy set02-24Name info_timestamp
+attr MHI_Heavy set02-2Name info_command
+attr MHI_Heavy set02-3Name info_deviceId
+attr MHI_Heavy set02-4Name contents_airconStat
+attr MHI_Heavy set02-5Name contents_autoHeating
+attr MHI_Heavy set02-6Name contents_expires
+attr MHI_Heavy set02-7Name contents_firmType
+attr MHI_Heavy set02-8Name contents_highTemp
+attr MHI_Heavy set02-9Name info_result
+attr MHI_Heavy set02CheckAllReadings 1
+attr MHI_Heavy set02Data {"apiVer":"1.0","command":"setAirconStat","operatorId":"%operatorId%","deviceId":"%deviceId%","timestamp":%TIME%,"contents":{"airconId":"%operatorId%","airconStat":"%AIRCONSTAT%"}}
+attr MHI_Heavy set02JSON .
+attr MHI_Heavy set02Name 02_setAirconStat
+attr MHI_Heavy set02NoArg 1
+attr MHI_Heavy set02ParseResponse 1
+attr MHI_Heavy set02URL http://%IP-MHI_Heavy%:51443/beaver/command
+attr MHI_Heavy set03-1Name info_apiVer
+attr MHI_Heavy set03-2Name info_command
+attr MHI_Heavy set03-3Name info_deviceId
+attr MHI_Heavy set03-4Name info_operatorId
+attr MHI_Heavy set03-5Name info_result
+attr MHI_Heavy set03-6Name info_timestamp
+attr MHI_Heavy set03CheckAllReadings 1
+attr MHI_Heavy set03Data {"apiVer":"1.0","command":"updateAccountInfo","deviceId":"%deviceId%","operatorId":"%operatorId%","timestamp":%TIME%}
+attr MHI_Heavy set03JSON .
+attr MHI_Heavy set03Method PUT
+attr MHI_Heavy set03Name 03_updateAccountInfo
+attr MHI_Heavy set03NoArg 1
+attr MHI_Heavy set03ParseResponse 1
+attr MHI_Heavy set03URL http://%IP-MHI_Heavy%:51443/beaver/command
+attr MHI_Heavy showBody 1
+attr MHI_Heavy showError 1
+attr MHI_Heavy sortby 212
+attr MHI_Heavy timeout 7
+attr MHI_Heavy userReadings contents_airconStat_Status:contents_airconStat:.* {\
+ use MIME::Base64;;\
+\
+    my $dev = "MHI_Heavy";;\
+    my $hash = $defs{$dev};;\
+\
+    # Rohdaten aus Reading holen\
+    my $raw = ReadingsVal($dev,"contents_airconStat","");;\
+    return if($raw eq "");;\
+\
+    # Base64 decodieren\
+    my $bytes = decode_base64($raw);;\
+    my @b = unpack("C*", $bytes);;\
+\
+    # --- Debug: Alle Bytes anzeigen ---\
+    my $hex = join " ", map { sprintf "%02X", $_ } @b;;\
+    Log 1, "Aircon Debug Bytes: $hex";;\
+\
+    # --- Power: Byte 2, Bit 0 ---\
+    my $power = ($b[2] & 0x01) ? "On" : "Off";;\
+\
+    # --- Mode ---\
+  # Mode aus Byte 26\
+   my ($index) = grep { $b[$_] == 0x81 && $b[$_+1] == 0x04 } 0..$#b-1;;\
+   my $modeByte = $b[$index+2];;\
+    my %modeMap = (\
+      0x01 => "Auto",\
+      0x09 => "Cool",\
+      0x11 => "Heat",\
+      0x0D => "Fan",\
+      0x05 => "Dry",\
+);;\
+my $mode = exists $modeMap{$modeByte} ? $modeMap{$modeByte} : "Unknown";;\
+\
+  # === Temperaturen ===\
+    my $setTemp  = $b[29] / 2;;   # Solltemperatur\
+\
+\
+  # === RoomTemp (Bytes 45+46 Little Endian) ===\
+    my $roomTemp = (($b[46] << 8) + $b[45]) / 1585;;  # Skalierung passend für App-Werte\
+\
+    # === Außentemperatur (Bytes 30,31) ===\
+    my $outTemp = (($b[31] << 8) + $b[33]) / 10;;  # Zehntelgrad °C\
+\
+    # --- Fan ---\
+    my $fanbyte = $b[3] & 0x0F;;\
+    my %fanmap = (\
+      0x0F => "Auto",\
+      0x08 => "1",\
+      0x09 => "2",\
+      0x0A => "3",\
+      0x0E => "4"\
+);;\
+my $fan = $fanmap{$fanbyte} // "Unknown";;\
+\
+    # --- Swing / Lamellen ---\
+    #-------- Vertikal------\
+    my $b2 = $b[2];;\
+    my $b3 = $b[3];;\
+\
+my %vertical_map = (\
+    0 => 'auto',\
+    1 => 'highest',\
+    2 => 'middle',\
+    3 => 'normal',\
+    4 => 'lowest',\
+);;\
+\
+my $vert;;\
+\
+# Erkennen anhand von Byte 2 & 3\
+if ( ($b2 & 0xC0) == 0xC0 && ($b3 & 0x80) == 0x80 ) {\
+    $vert = $vertical_map{0};;\
+} else {\
+    my $pos;;\
+    if    ( ($b3 & 0xB0) == 0x80 ) { $pos = 1;; } # highest\
+    elsif ( ($b3 & 0xB0) == 0x90 ) { $pos = 2;; } # middle\
+    elsif ( ($b3 & 0xB0) == 0xA0 ) { $pos = 3;; } # normal\
+    elsif ( ($b3 & 0xB0) == 0xB0 ) { $pos = 4;; } # lowest\
+    else { $pos = -1;; }\
+\
+    $vert = defined $vertical_map{$pos} ? $vertical_map{$pos} : "unknown";;\
+}\
+\
+# ----- Horizontal ---------\
+\
+#Horizontale Lamellenstellung aus Bytes dekodieren\
+# Byte 11 und 12 enthalten die horizontale Windrichtung\
+my $b11 = $b[11];;\
+my $b12 = $b[12];;\
+\
+my %horizontal_map = (\
+  0 => 'auto',\
+  1 => 'left-left',\
+  2 => 'left-center',\
+  3 => 'center-center',\
+  4 => 'center-right',\
+  5 => 'right-right',\
+  6 => 'left-right',\
+  7 => 'right-left',\
+);;\
+\
+my $hor;;\
+\
+# Prüfen, ob Auto/Swing aktiv ist\
+if ( ($b12 & 0x03) == 0x03 ) {\
+    $hor = $horizontal_map{0};; # auto\
+} else {\
+    # untere 4 Bits von Byte 11 enthalten Positionscode (0x10–0x16)\
+    my $pos = ($b11 & 0x0F);;\
+    # 0x10 -> 0, 0x11 -> 1, ..., 0x16 -> 6\
+    $hor = $horizontal_map{$pos} // "unknown";;\
+}\
+ \
+# ab hier muss noch weiteres Reverseenginnering betrieben werden.\
+ \
+\
+    # --- Humidity ---\
+    my $humidity = $b[5];; # direktes Byte, %\
+\
+    # --- LED ---\
+    my $led = $b[6];;\
+\
+    # --- Energie kWh ---\
+    my $energy = ($b[10]<<8 | $b[11])/10;;  # Beispielberechnung\
+\
+    # --- Readings setzen ---\
+    readingsBeginUpdate($hash);;\
+    readingsBulkUpdate($hash,"contents_airconStat_Power",$power);;\
+    readingsBulkUpdate($hash,"contents_airconStat_Mode",$mode);;\
+    readingsBulkUpdate($hash,"contents_airconStat_Fan",$fan);;\
+    readingsBulkUpdate($hash,"contents_airconStat_LamelleVert",$vert);;\
+    readingsBulkUpdate($hash,"contents_airconStat_LamelleHor",$hor);;\
+    readingsBulkUpdate($hash,"contents_airconStat_TempRoom",sprintf("%.1f",$roomTemp));;\
+    readingsBulkUpdate($hash,"contents_airconStat_TempOut",sprintf("%.1f",$outTemp));;\
+    readingsBulkUpdate($hash,"contents_airconStat_TempSet",sprintf("%.1f",$setTemp));;\
+    readingsBulkUpdate($hash,"contents_airconStat_Humidity",$humidity);;\
+    readingsBulkUpdate($hash,"contents_airconStat_LED",$led);;\
+    readingsBulkUpdate($hash,"contents_airconStat_Energy_kWh",sprintf("%.1f",$energy));;\
+    readingsEndUpdate($hash,1);;\
+\
+    return 1;;\
+}
+attr MHI_Heavy verbose 5
