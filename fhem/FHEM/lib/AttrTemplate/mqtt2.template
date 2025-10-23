@@ -1110,7 +1110,7 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 setreading DEVICE attrTemplateVersion 20220110
 
 
-name:zigbee2mqtt_thermostat_with_weekrofile
+name:zigbee2mqtt_thermostat_with_weekprofile
 desc: Developed for <a href="https://zigbee.blakadder.com/Moes_HY368-ZB.html">Model HY368-ZB manufactured by Moes</a> via zigbee2mqtt <br>Might not completely work for all firmware versions and also some commands seem not yet to be fully integrated on the zigbee2mqtt side... <br>To contribute, participate in <a href="https://forum.fhem.de/index.php/topic,116535.0.html">Forum Thread</a>
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_17a
@@ -1144,14 +1144,51 @@ attr DEVICE stateFormat btnLock\
 Measured: temperature Battery: batteryPercent %
 attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
 attr DEVICE webCmd desired-temp
-attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+attr DEVICE widgetOverride desired-temp@set:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
 attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode battery:batteryPercent voltage:batterymV
 attr DEVICE setStateList on off
 attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}, batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
-attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile
+attr DEVICE model zigbee2mqtt_thermostat_with_weekprofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20220110
+setreading DEVICE attrTemplateVersion 20251023
+
+# contributed by Neubert
+name:zigbee2mqtt_thermostat_aqara_srts_a01
+desc: Developed for <a href="https://www.zigbee2mqtt.io/devices/SRTS-A01.html#aqara-srts-a01">Aqara SRTS-A01</a> via zigbee2mqtt
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_17b0
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
+farewell:template has been applied successfully.
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE userattr weekprofile
+attr DEVICE readingList $\DEVICETOPIC:.* { my %h; my $temp = $EVENT; $temp =~ s/,?("(holidays|workdays)":.([^]]+))./$h{$2}=$3/ge; $EVENT =~ s/,?("(holidays|workdays)":.([^]]+)).//g; my $h2 = json2nameValue($EVENT,'',$JSONMAP); %h = (%h,%$h2); \%h }
+attr DEVICE setList \
+  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"occupied_heating_setpoint": $EVTPART1 }\
+  btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
+  preset:manual,away,auto $\DEVICETOPIC/set {"preset": "$EVTPART1"}\
+  mode:off,heat $\DEVICETOPIC/set {"system_mode": "$EVTPART1"}\
+  x_send_set_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set $payload)}
+attr DEVICE getList \
+  desired-temp:noArg desired-temp $\DEVICETOPIC/get {"occupied_heating_setpoint": ""}\
+  temperature:noArg temperature $\DEVICETOPIC/get {"local_temperature": ""}\
+  btnLock:noArg btnLock $\DEVICETOPIC/get {"child_lock": ""}\
+  preset:noArg preset $\DEVICETOPIC/get {"preset": ""}
+attr DEVICE periodicCmd temperature:55
+attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
+attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
+attr DEVICE webCmd desired-temp
+attr DEVICE widgetOverride desired-temp@set:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+attr DEVICE jsonMap occupied_heating_setpoint:desired-temp local_temperature:temperature system_mode:mode battery:batteryPercent voltage:batterymV child_lock:btnLock
+attr DEVICE setStateList on off
+attr DEVICE userReadings batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
+attr DEVICE model zigbee2mqtt_thermostat_aqara_srts_a01
+set DEVICE attrTemplate speechcontrol_type_thermostat
+deletereading -q DEVICE (?!associatedWith|IODev).*
+setreading DEVICE attrTemplateVersion 20251210
 
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1145005.html#msg1145005
 name:zigbee2mqtt_thermostat_without_weekprofile
@@ -1177,14 +1214,14 @@ attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temp
 attr DEVICE stateFormat btnLock\
 Measured: temperature Battery: batteryPercent %
 attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}, batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
-attr DEVICE model zigbee2mqtt_thermostat_without_weekrofile
+attr DEVICE model zigbee2mqtt_thermostat_without_weekprofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
 setreading DEVICE attrTemplateVersion 20240402
 
 
 #contributed by clumsy via pm
-name:zigbee2mqtt_thermostat_with_weekrofile_5_1_1
+name:zigbee2mqtt_thermostat_with_weekprofile_5_1_1
 desc: Developed for <a href="https://www.zigbee2mqtt.io/devices/BHT-002_BHT-006.html#moes-bht-002%252Fbht-006">Models Moes BHT-002/BHT-006</a> via zigbee2mqtt <br>
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_17b1
@@ -1210,7 +1247,7 @@ attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temp
 attr DEVICE stateFormat btnLock\
 Measured: temperature Battery: batteryPercent %
 attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}, batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
-attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile_5_1_1
+attr DEVICE model zigbee2mqtt_thermostat_with_weekprofile_5_1_1
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
 setreading DEVICE attrTemplateVersion 20240402
