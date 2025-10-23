@@ -11918,7 +11918,7 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{nhr}               = $nhr;
               $hsurp->{$fd}{$hod}{speff}             = $surpls;                                  # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0  
               $hsurp->{$fd}{$hod}{surplswh}          = $surplswh.'.'.$hod;                       # absoluter Überschuß in Wh der Stunde mit Sortierhilfe 
-              $hsurp->{$fd}{$hod}{$bn}{spday}        = $spday;                                   # (Rest)PV-Überschuß am laufenden Tag
+			  $hsurp->{$fd}{$hod}{$bn}{spday}        = $spday;                                   # (Rest)PV-Überschuß am laufenden Tag
               $hsurp->{$fd}{$hod}{$bn}{initsocwh}    = $socwh;                                   # durch LR fortgeschriebener SoC
               $hsurp->{$fd}{$hod}{$bn}{batinstcap}   = $batinstcap;                              # installierte Batteriekapazität (Wh)
               $hsurp->{$fd}{$hod}{$bn}{goalwh}       = $goalwh;                                  # Ladeziel
@@ -12124,6 +12124,28 @@ sub __batChargeOptTargetPower {
   
   my $name  = $paref->{name};
   my $hsurp = $paref->{hsurp};                                                                                   # Hashref Überschußhash
+  
+  ## Surplus der Stunde 00 in Variable extrahieren und im Hash durch Zeitgewichtung ersetzen
+  ############################################################################################  
+  my $spls00 = 0;                                                              
+
+  for my $k (keys %$hsurp) {
+	  my $nh = $hsurp->{$k}{nhr};
+      
+	  if ($nh eq '00') {
+		  my $val = $hsurp->{$k}{surplswh};
+		  
+		  if (defined $val && $val =~ /^(\d+)\.(\w+)$/) {
+			  $spls00         = $1;
+			  my $replacement = sprintf "%.0f", ($spls00 / 60 * (60 - int $minute));                             # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß     
+			  $replacement   .= '.'.$2;
+			  $hsurp->{$k}{surplswh} = $replacement;
+			  #Log3 ($name, 1, "$name - spls00: $spls00, replacement: $replacement ");
+		  }
+		  
+		  last;                                                                                                  # da Stunde 00 nur einmal vorkommt, können wir abbrechen
+      }	  
+  }
 
   my $fipl       = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
   my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert
@@ -12134,7 +12156,10 @@ sub __batChargeOptTargetPower {
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
 	  my $nhr     = $hsurp->{$hod}{nhr};
-      my $spls    = int ($hsurp->{$hod}{surplswh} // 0);	  
+      my $spls    = int ($hsurp->{$hod}{surplswh} // 0);
+
+      $spls       = $spls00 if($nhr eq '00');                                                                    # aktuelle Stunde: zeitgewichteter PV-Überschuß mit Original ersetzen
+	  
 	  my $nexthod = sprintf "%02d", (int $hod + 1);
 	  my $nextnhr = $hsurp->{$nexthod}{nhr};
       
@@ -12208,7 +12233,7 @@ sub __batChargeOptTargetPower {
           ####################################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
           my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed);
-          my $needraw   = min ($fref->{ph}, $spls);                                                              # Ladeleistung auf Surplus begrenzen
+          my $needraw   = min ($fref->{ph}, $spls);                                                              # Ladeleistung auf Surplus begrenzen (es kommen Nachberechnungen)
           
           $needraw      = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
           $needraw      = max ($needraw, $bpinreduced);                                                          # Mindestladeleistung bpinreduced sicherstellen                  
@@ -13763,9 +13788,13 @@ sub __setConsRcmdState {
   my $debug = $paref->{debug};
 
   my $hash       = $defs{$name};
-  my $nompower   = ConsumerVal      ($name, $c, 'power',                  0);             # Consumer nominale Leistungsaufnahme (W)
+  my $nompower   = ConsumerVal ($name, $c, 'power',     0);                               # Consumer nominale Leistungsaufnahme (W)
+  my $pvshare    = ConsumerVal ($name, $c, 'pvshare', 100);                               # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit 0 PV-Überschuß betrieben werden 
+  
+  my $sharepower = $nompower * $pvshare / 100;
+  
   my $ccr        = AttrVal          ($name, 'ctrlConsRecommendReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
-  my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $nompower;                          # resultierender Verbauch nach Einschaltung Consumer
+  my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $sharepower;                        # resultierender Verbauch nach Einschaltung Consumer
 
   my ($method, $surplus) = determSurplus ($name, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
 
