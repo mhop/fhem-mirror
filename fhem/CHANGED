@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 59_Weather: Fix Weather.pm to use READINGS instead of readings
  - change: 11_OWDevice: replaced deprecated smartmatch
  - feature: 76_SolarForecast: Version 1.59.5
  - bugfix: 73_NUKIBridge: Refactor command handler return logic for clarity
