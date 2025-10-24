@@ -196,8 +196,15 @@
 # MH 20250201  fix dpt16 dblog-split fn
 #              feature: new attr readingNmap - modify readingnames on the fly
 #              internal code change: _define2, _attr, _set, _encodeByDpt
-# MH 202505xx  modify blink cmd logic - support widgetList
-#
+# MH 20250727  modify blink cmd logic - support widgetList
+# MH 20251025  modify dpt10, dpt11 encode
+#              test for duplicate gadNames - modify on the fly
+#              fix dpt19 regex $PAT_DATE
+#              add dpt21, add sub-dpts for dpt20, cmd-ref
+#              modify DBLog_split unit logic
+#              modified dpt18 encode
+#              prepare for removal of $MODELERR
+# 
 # todo-4/2024  remove support for oldsyntax cmd's: raw,value,string,rgb
 
 
@@ -263,7 +270,7 @@ my $SVNID       = '$Id$'; ## no critic (Policy::ValuesAndExpressions::RequireInt
 #pattern for group-adress
 my $PAT_GAD = '(3[01]|[012][\d]|[\d])\/([0-7])\/(2[0-4][\d]|25[0-5]|(?:[01])?[\d]{1,2})'; # 0-31/0-7/0-255
 #pattern for group-adress in hex-format
-my $PAT_GAD_HEX = '[01][0-9a-f][0-7][0-9a-f]{2}'; # max is 1F7FF -> 31/7/255 5 digits
+my $PAT_GADHEX = '[01][0-9a-f][0-7][0-9a-f]{2}'; # max is 1F7FF -> 31/7/255 5 digits
 #pattern for group-no
 my $PAT_GNO = qr/^g[1-9][\d]?$/xms;
 #pattern for GAD-Options
@@ -271,16 +278,15 @@ my $PAT_GAD_OPTIONS = 'get|set|listenonly';
 #pattern for GAD-suffixes
 my $PAT_GAD_SUFFIX = 'nosuffix';
 #pattern for forbidden GAD-Names
-my $PAT_GAD_NONAME = 'on|off|on-for-timer|on-until|off-for-timer|off-until|toggle|raw|rgb|string|value|get|set|listenonly|nosuffix';
+my $PAT_GAD_NONAME = qr/^((?:on|off)(?:-for-timer|-until|-till)?|toggle|blink|raw|rgb|string|value|get|set|listenonly|nosuffix)$/xms; ## no critic (RegularExpressions::ProhibitComplexRegexes)
 #pattern for DPT
-my $PAT_GAD_DPT = 'dpt\d+\.?\d*';
+my $PAT_DPT = qr/dpt(?:\d+(?:[.]\d{3,4})?|RAW)/mxs;
 #pattern for dpt1 (standard)
 my $PAT_DPT1_PAT = 'on|off|[01]';
 #pattern for date
-my $PAT_DTSEP  = qr/(?:_)/ixms; # date/time separator
 my $PAT_DATEdm = qr/^(3[01]|[1-2]\d|0?[1-9])[.](1[0-2]|0?[1-9])/ixms; # day/month
-my $PAT_DATE   = qr/$PAT_DATEdm[.]((?:19|20|21)\d{2})/ixms; # dpt19 year range: 1900-2155 ! 
-my $PAT_DATE2  = qr/$PAT_DATEdm[.](199\d|20[0-8]\d)/ixms; # dpt11 year range: 1990-2089 !
+my $PAT_DATE19 = qr/$PAT_DATEdm[.]((?:19|20|)\d{2}|21[0-4]\d|215[0-5])/xms; # dpt19 year range: 1900-2155 !
+my $PAT_DATE11 = qr/$PAT_DATEdm[.](199\d|20[0-8]\d)/ixms; # dpt11 year range: 1990-2089 !
 #pattern for time
 my $PAT_TIME = qr/(2[0-4]|[01]{0,1}\d):([0-5]{0,1}\d):([0-5]{0,1}\d)/ixms;
 my $PAT_DPT16_CLR = qr/>CLR</ixms;
@@ -417,9 +423,9 @@ my %dpttypes = (
 	'dpt10.001' => {CODE=>'dpt10', UNIT=>q{}, PATTERN=>qr/($PAT_TIME|now)/ixms, MIN=>undef, MAX=>undef},
 
 	# Date  
-	'dpt11'     => {CODE=>'dpt11', UNIT=>q{}, PATTERN=>qr/($PAT_DATE2|now)/ixms, MIN=>undef, MAX=>undef,
+	'dpt11'     => {CODE=>'dpt11', UNIT=>q{}, PATTERN=>qr/($PAT_DATE11|now)/ixms, MIN=>undef, MAX=>undef,
                         DEC=>\&dec_dpt11,ENC=>\&enc_dpt11,}, # year range 1990-2089 !
-	'dpt11.001' => {CODE=>'dpt11', UNIT=>q{}, PATTERN=>qr/($PAT_DATE2|now)/ixms, MIN=>undef, MAX=>undef},
+	'dpt11.001' => {CODE=>'dpt11', UNIT=>q{}, PATTERN=>qr/($PAT_DATE11|now)/ixms, MIN=>undef, MAX=>undef},
 
 	# 4-Octet unsigned value
 	'dpt12'     => {CODE=>'dpt12', UNIT=>q{},    PATTERN=>qr/[+]?\d{1,10}/xms, MIN=>0, MAX=>4294967295,
@@ -548,21 +554,32 @@ my %dpttypes = (
 	'dpt17.001' => {CODE=>'dpt17', UNIT=>q{}, PATTERN=>qr/[+]?\d{1,2}/xms, MIN=>0, MAX=>63},
 
 	# Scene, 1-64
-	'dpt18'     => {CODE=>'dpt18', UNIT=>q{}, PATTERN=>qr/(activate[,]|learn[,])?[+]?\d{1,2}/xms, OFFSET=>1, MIN=>1, MAX=>64,
+	'dpt18'     => {CODE=>'dpt18', UNIT=>q{}, PATTERN=>qr/(activate[,\s]|learn[,\s])?[+]?\d{1,2}/xms, OFFSET=>1, MIN=>1, MAX=>64,
                         DEC=>\&dec_dpt18,ENC=>\&enc_dpt18,},
-	'dpt18.001' => {CODE=>'dpt18', UNIT=>q{}, PATTERN=>qr/(activate[,]|learn[,])?[+]?\d{1,2}/xms, OFFSET=>1, MIN=>1, MAX=>64, SETLIST=>'widgetList,3,select,activate,learn,1,textField'},
+	'dpt18.001' => {CODE=>'dpt18', UNIT=>q{}, PATTERN=>qr/(activate[,\s]|learn[,\s])?[+]?\d{1,2}/xms, OFFSET=>1, MIN=>1, MAX=>64, SETLIST=>'widgetList,3,select,activate,learn,1,textField'},
 
 	#date and time
-	'dpt19'     => {CODE=>'dpt19', UNIT=>q{}, PATTERN=>qr/($PAT_DATE$PAT_DTSEP$PAT_TIME|now)/ixms, MIN=>undef, MAX=>undef,
+	'dpt19'     => {CODE=>'dpt19', UNIT=>q{}, PATTERN=>qr/($PAT_DATE19[_]$PAT_TIME|now)/ixms, MIN=>undef, MAX=>undef,
                         DEC=>\&dec_dpt19,ENC=>\&enc_dpt19,},
-	'dpt19.001' => {CODE=>'dpt19', UNIT=>q{}, PATTERN=>qr/($PAT_DATE$PAT_DTSEP$PAT_TIME|now)/ixms, MIN=>undef, MAX=>undef},
+	'dpt19.001' => {CODE=>'dpt19', UNIT=>q{}, PATTERN=>qr/($PAT_DATE19[_]$PAT_TIME|now)/ixms, MIN=>undef, MAX=>undef},
 
-	# HVAC mode, 1Byte
+	# 1 Byte HVAC mode, Windspeed (Bf), Cloudstate
 	'dpt20'     => {CODE=>'dpt20', UNIT=>q{}, PATTERN=>qr/(auto|comfort|standby|(economy|night)|(protection|frost|heat))/ixms, ## no critic (RegularExpressions::ProhibitComplexRegexes)
                         MIN=>undef, MAX=>undef, SETLIST=>'Auto,Comfort,Standby,Economy,Protection',
                         DEC=>\&dec_dpt20,ENC=>\&enc_dpt20,},
+	'dpt20.014' => {CODE=>'dpt20', UNIT=>q{}, PATTERN=>qr/(calm|light_air|(light|gentle|moderate|fresh|strong)_breeze|(near|fresh|strong)_gale|storm|violent_storm|hurricane)/ixms, ## no critic (RegularExpressions::ProhibitComplexRegexes)
+                        MIN=>0, MAX=>12,
+                        SETLIST=>'calm,light_air,light_breeze,gentle_breeze,moderate_breeze,fresh_breeze,strong_breeze,near_gale,fresh_gale,strong_gale,storm,violent_storm,hurricane'},
+	'dpt20.021' => {CODE=>'dpt20', UNIT=>q{}, PATTERN=>qr/(cloudless|sunny|sunshiny|lightly_cloudy|scattered_cloudy|cloudy|most_cloudy|most_overcast|overcast|sky_obstructed)/xms, ## no critic (RegularExpressions::ProhibitComplexRegexes)
+                        MIN=>0, MAX=>9, SETLIST=>'cloudless,sunny,sunshiny,lightly_cloudy,scattered_cloudy,cloudy,most_cloudy,most_overcast,overcast,sky_obstructed'},
 	'dpt20.102' => {CODE=>'dpt20', UNIT=>q{}, PATTERN=>qr/(auto|comfort|standby|(economy|night)|(protection|frost|heat))/ixms, ## no critic (RegularExpressions::ProhibitComplexRegexes)
                         MIN=>undef, MAX=>undef, SETLIST=>'Auto,Comfort,Standby,Economy,Protection'},
+
+	# Z8 Status info - receive only
+	'dpt21'     => {CODE=>'dpt21', UNIT=>q{}, PATTERN=>qr/noset/xms,MIN=>0, MAX=>31,SETLIST=>'noset',
+	                DEC=>\&dec_dpt21,},
+	'dpt21.001' => {CODE=>'dpt21', UNIT=>q{}, PATTERN=>qr/noset/xms,MIN=>0, MAX=>31,SETLIST=>'noset',},
+	'dpt21.002' => {CODE=>'dpt21', UNIT=>q{}, PATTERN=>qr/noset/xms,MIN=>0, MAX=>7,SETLIST=>'noset',},
 
 	# HVAC mode RHCC Status, 2Byte - receive only!!!
 	'dpt22'     => {CODE=>'dpt22', UNIT=>q{}, PATTERN=>qr/noset/ixms, MIN=>undef, MAX=>undef, SETLIST=>'noset',
@@ -635,13 +652,22 @@ sub KNX_Define {
 	my $hash = shift // return;
 	my $def = shift;
 
+### prepare for removal of $MODELERR
+	# replace all instances of MODELERR with dptRAW
+#	if ($def =~ /[:]MODEL_NOT_DEFINED/xms) {
+#		$def =~ s/[:]MODEL_NOT_DEFINED/[:]dptRAW/gxms;
+#		KNX_Log ($hash, 2, q{replaced all instances of 'MODEL_NOT_DEFINED' with 'dptRAW', pls. save config!});
+#	}
+###
 	my @a = split(/[ \t\n]+/xms, $def); #enable newline within define with \
 	my $name = $a[0];
 	$hash->{NAME} = $name;
 	$hash->{'.SVN'} = $SVNID =~ s/.+[.]pm\s(\S+\s+\S+).+/$1/rxms;
 
 	#too less arguments or no valid 1st gad
-	if (int(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GAD_HEX)[:](?:dpt|$MODELERR)/ixms) { # at least the first gad must be valid
+	if (scalar(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GADHEX)[:](?:$PAT_DPT|$MODELERR)/ixms) { # at least the first gad must be valid
+### prepare for removal of $MODELERR
+#	if (scalar(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GADHEX)[:]$PAT_DPT/ixms) { # at least the first gad must be valid
 		return (qq{KNX_define: wrong syntax or wrong group-format (0-31/0-7/0-255)\n} .
 		       qq{  "define $name KNX <group:model[:GAD-name]>[:set|get|listenonly][:nosuffix] } .
 		       q{[<group:model[:GAD-name]>[:set|get|listenonly][:nosuffix]]"});
@@ -702,6 +728,8 @@ sub KNX_Define2 {
 			next;
 		}
 
+### prepare for removal of $MODELERR
+# remove if cond
 		if ($gadModel eq $MODELERR) { #within autocreate no model is supplied - throw warning
 			KNX_Log ($name, 3, q{autocreate device will be disabled, correct def with valid dpt and enable device});
 			if (AttrNum($name,'disable',0) != 1) {$attr{$name}->{disable} = 1;}
@@ -726,9 +754,18 @@ sub KNX_Define2 {
 			push(@logarr,q{syntax or parameter error in options definition: } . join(q{:},@gadArgs));
 		}
 
-		if (($gadName =~ /^($PAT_GAD_NONAME)$/xms) || ($gadName eq q{state} && defined($gadNoSuffix))) { # allow mixed case
+		if (($gadName =~ /$PAT_GAD_NONAME/xms) || ($gadName eq q{state} && defined($gadNoSuffix))) { # allow mixed case
 			push(@logarr,qq{forbidden gadName: $gadName - modified to: g} . $gadNo);
 			$gadName = q{g} . $gadNo;
+		}
+
+		# test for duplicate gadname
+		foreach my $gval (values %{$hash->{GADTABLE}}) {
+			next if ($gval ne $gadName);
+			$gadName .= q{_} . $gadNo;
+			push(@logarr,qq{duplicate gadName: $gval - modified to: $gadName});
+			$hash->{DEF} =~ s/($gad[:]$gadModel[:])$gval/$1$gadName/xms; # alter def
+			last;
 		}
 
 		$hash->{GADTABLE}->{$gadCode} = $gadName; #add key and value to GADTABLE
@@ -932,7 +969,8 @@ sub KNX_Set_oldsyntax {
 	#select another group, if the last arg starts with a g
 	if($na >= 1 && $arg[$na - 1] =~ m/$PAT_GNO/xms) {
 		$groupnr = pop (@arg);
-		KNX_Log ($name, 3, q{you are still using old syntax, pls. change to "set } . qq{$name $groupnr $cmd } . q{<value>"});
+		KNX_Log ($name, 3, q{you are still using old syntax, pls. change to "set } .
+		         qq{$name $groupnr $cmd } . join(q{\s},@arg) . q{"});
 		$groupnr =~ s/^[g]//ixms; #remove "g"
 		$na--;
 	}
@@ -1151,8 +1189,7 @@ sub KNX_Attr {
 		if ($aName eq 'disable') {
 			my @defentries = split(/[\s\t\n]+/xms,$hash->{DEF});
 			foreach my $def (@defentries) { # check all entries
-#				next if ($def eq ReadingsVal($name,'IODev',undef)); # deprecated IOdev
-				next if ($def =~ /:dpt(?:[\d+]|RAW)/xms);
+				next if ($def =~ /$PAT_DPT/xms);
 				return qq{Attribut "disable" cannot be deleted for device $name until you specify a valid dpt!};
 			}
 			delete $hash->{RAWMSG}; # debug internal
@@ -1227,11 +1264,10 @@ sub KNX_DbLog_split {
 	my $devhash = $defs{$device};
 	foreach my $key (keys %{$devhash->{GADDETAILS}}) {
 		next if ($devhash->{GADDETAILS}->{$key}->{MODEL} !~ /^dpt16/xms);
-		next if ($reading ne q{state} &&
-		         $reading ne $devhash->{GADDETAILS}->{$key}->{RDNAMESET} &&
-		         $reading ne $devhash->{GADDETAILS}->{$key}->{RDNAMEGET});
- 		$dpt16flag = 1;
-		last;
+		if ($reading =~ /state|$devhash->{GADDETAILS}->{$key}->{RDNAMESET}|$devhash->{GADDETAILS}->{$key}->{RDNAMEGET}/xms) {
+			$dpt16flag = 1;
+			last;
+		}
 	}
 	if (($dpt16flag == 0) &&
 	    Scalar::Util::looks_like_number($strings[0]) &&
@@ -1403,7 +1439,9 @@ sub KNX_autoCreate {
 		my $igntypes = AttrVal($acdev,'ignoreTypes',q{});
 		return q{} if($newDevName =~ /$igntypes/xms);
 	}
+### prepare for removal of $MODELERR
 	return qq{UNDEFINED $newDevName KNX $gad} . q{:} . $MODELERR;
+#	return qq{UNDEFINED $newDevName KNX $gad} . q{:dptRAW};
 }
 
 ### KNX_SetReadings is called from KNX_Set and KNX_Parse
@@ -1554,7 +1592,7 @@ sub KNX_hex2Name {
 sub KNX_name2gadCode {
 	my $gad = shift // return;
 
-	if ($gad =~ m/^$PAT_GAD_HEX$/ixms) {$gad = KNX_hex2Name($gad);} # called with hex-option
+	if ($gad =~ m/^$PAT_GADHEX$/ixms) {$gad = KNX_hex2Name($gad);} # called with hex-option
 	if ($gad =~ m/^$PAT_GAD$/xms) {
 		return sprintf('%02x%01x%02x',$1,$2,$3);
 	}
@@ -1620,7 +1658,7 @@ sub KNX_makeRdNames {
 	my $nosuffix = shift;
 
 	my $rdNameSet = $gadName;
-	if (exists ($hash->{Helper}->{RDNAMEMAP}->{$gadName})) {
+	if (exists ($hash->{Helper}->{RDNAMEMAP}) && exists ($hash->{Helper}->{RDNAMEMAP}->{$gadName})) {
 		$rdNameSet = $hash->{Helper}->{RDNAMEMAP}->{$gadName};
 	}
 
@@ -1731,16 +1769,12 @@ sub KNX_encodeByDpt {
 	if ($code eq 'dpt10' && $value =~ /^[\d]{2}:[\d]{2}$/xms) {$value .= ':00';}
 
 	# support dpt18 learn
-	my $arg1 = undef;
-	my $arg2 = undef;
+	my $dpt18flag = 0;
 	if ($code eq 'dpt18') {
-		if ($value =~ /(activate|learn)$/xms) {
-			$value = shift(@arg); # blank separated
-			$arg1 = $1;
-		}
-		else {
-			($arg1, $arg2) = split(/[,]/xms,$value); # widget or just number?
-			$value = (defined($arg2))?$arg2:$arg1;
+		if (defined($arg[0])) {$value .= q{ } . $arg[0];} # blank separated 
+		if ($value =~ /(?:(activate|learn)[,\s])?(\d+)$/xms) {
+			$value = $2;
+			if (defined($1) && ($1 eq q{learn})) {$dpt18flag = 1};
 		}
 	}
 
@@ -1757,7 +1791,8 @@ sub KNX_encodeByDpt {
 
 	if (ref($dpttypes{$code}->{ENC}) eq 'CODE') {
 		my $hexval = $dpttypes{$code}->{ENC}->($lvalue, $model);
-		if ($code eq 'dpt18' && $arg1 =~ /^learn/xms) {$hexval = sprintf('00%.2x',hex($hexval) + 0x80);}
+#		if ($code eq 'dpt18' && $arg1 =~ /^learn/xms) {$hexval = sprintf('00%.2x',hex($hexval) + 0x80);}
+		if ($dpt18flag == 1) {$hexval = sprintf('00%.2x',hex($hexval) + 0x80);}
 		KNX_Log ($name, 5, qq{gadName= $gadName model= $model } .
 		        qq{in-Value= $value out-Value= $lvalue out-ValueHex= $hexval});
 		return $hexval;
@@ -1872,44 +1907,35 @@ sub enc_dpt9 { #2-Octet Float value
 
 sub enc_dpt10 { #Time of Day
 	my $value = shift;
-	my $numval = 0;
 	my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time); # default now
 	if ($value =~ /$PAT_TIME/ixms) {
 		($hours,$mins,$secs) = split(/[:]/ixms,$value);
 		my $ts = fhemTimeLocal($secs, $mins, $hours, $mday, $mon, $year);
 		($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($ts);
 	}
-	#add offsets
-	$year += 1900;
-	$mon++;
 	# calculate offset for weekday
 	if ($wday == 0) {$wday = 7;}
-	$hours += 32 * $wday;
-	$numval = $secs + ($mins << 8) + ($hours << 16);
-
-	return sprintf('00%.6x',$numval);
+	$hours += ($wday << 5);
+	return sprintf('00%.2x%.2x%.2x',$hours,$mins,$secs);
 }
 
 sub enc_dpt11 { #Date year range is 1990-2089 {0 => 2000 , 89 => 2089, 90 => 1990}
 	my $value = shift;
-	my $numval = 0;
+	my ($day, $month, $year);
 	if ($value =~ m/now/ixms) {
 		#get actual time
-		my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+		my ($secs,$mins,$hours,$mday,$mon,$yr,$wday,$yday,$isdst) = localtime(time);
 		#add offsets
-		$year+=1900;
-		$mon++;
-		# calculate offset for weekday
-		if ($wday == 0) {$wday = 7;}
-		$numval = ($year - 2000) + ($mon << 8) + ($mday << 16);
+		$year  = $yr - 100; # based on 1900
+		$month = $mon + 1;
+		$day   = $mday;
 	}
 	else {
-		my ($dd, $mm, $yyyy) = split (/[.]/xms, $value);
-		$yyyy -= 2000;
-		if ($yyyy < 0)  {$yyyy += 100;}
-		$numval = ($yyyy) + ($mm << 8) + ($dd << 16);
+		($day, $month, $year) = split (/[.]/xms, $value);
+		$year -= 2000;
+		if ($year < 0)  {$year += 100;}
 	}
-	return sprintf('00%.6x',$numval);
+	return sprintf('00%.2x%.2x%.2x',$day,$month,$year);
 }
 
 sub enc_dpt12 { #4-Octet unsigned value
@@ -1945,7 +1971,7 @@ sub enc_dpt16 { #14-Octet String
 
 sub enc_dpt18 { # scene 10/2024 allow activate & learn
 	my $value = shift;
-	$value = ($value & 0x3f);
+#	$value = ($value & 0x3f);
 	return sprintf('00%.2x',$value);
 }
 
@@ -1953,7 +1979,7 @@ sub enc_dpt19 { #DateTime
 	my $value = shift;
 	my $ts = time; # default or when "now" is given
 	# if no match we assume now and use current date/time
-	if ($value =~ m/^$PAT_DATE$PAT_DTSEP$PAT_TIME/xms) {
+	if ($value =~ m/^$PAT_DATE19[_]$PAT_TIME/xms) {
 		$ts = fhemTimeLocal($6, $5, $4, $1, $2-1, $3 - 1900);
 	}
 	my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($ts);
@@ -1967,12 +1993,16 @@ sub enc_dpt19 { #DateTime
 	return sprintf('00%02x%02x%02x%02x%02x%02x%02x%02x',$year,$mon,$mday,$hours,$mins,$secs,$status1,$status0);
 }
 
-sub enc_dpt20 { # HVAC 1Byte
+sub enc_dpt20 { # HVAC, Wind (Bf), Clouds - 1Byte
 	my $value = shift;
-	my $dpt20list = {auto => 0, comfort => 1, standby => 2, economy => 3, protection => 4,};
-	my $numval = $dpt20list->{lc($value)};
-	if (! defined($numval)) {$numval = 5;}
-	return sprintf('00%.2x',$numval);
+	my $model = shift;
+	my @dpt_txt = split(/[,]/xms,$dpttypes{$model}->{SETLIST});
+	my $i = 0;
+	foreach (@dpt_txt) {
+		last if ($_ eq $value);
+		$i++;
+	}
+	return sprintf('00%.2x',$i);
 }
 
 sub enc_dpt232 { #RGB-Code
@@ -2172,12 +2202,30 @@ sub dec_dpt19 { #DateTime
 	return sprintf('%02d.%02d.%04d_%02d:%02d:%02d', $day, $month, $year, $hours, $mins, $secs);
 }
 
-sub dec_dpt20 { #HVAC
+sub dec_dpt20 { #HVAC, Wind, Clouds
 	my $numval = hex (shift);
-	$numval = ($numval & 0x07); # mask any non-std bits!
-	my @dpt20_102txt = qw(Auto Comfort Standby Economy Protection reserved);
-	if ($numval > 4) {$numval = 5;} # dpt20.102
-	return $dpt20_102txt[$numval];
+	my $model  = shift;
+	my @dpt_txt = split(/[,]/xms,$dpttypes{$model}->{SETLIST});
+	return q{reserved} if ($numval >= scalar(@dpt_txt));
+	return $dpt_txt[$numval];
+}
+
+sub dec_dpt21 { # Z8 status info 5bit
+	my $numval = hex (shift);
+	my $model  = shift;
+	if ($model eq 'dpt21') {return sprintf('%.8b',$numval)}; # binary bits
+	my $state  = q{};
+	$numval = $numval & 0x1f; # 5 bits
+	return q{ok} if ($numval == 0);
+	my @dpt_txt = qw(invalid_dpt);
+	if ($model eq 'dpt21.001')    {@dpt_txt = qw(OutofService Fault Overridden InAlarm AlarmUnack);}
+	elsif ($model eq 'dpt21.002') {@dpt_txt = qw(UserStopped OwnIA VerifyMode);}
+	foreach (@dpt_txt) {
+		if (($numval & 0x01) == 0x01) {$state .= $_ . q{,} };
+		$numval = $numval >> 1;
+	}
+	$state =~ s/[,]$//xms;
+	return $state;
 }
 
 sub dec_dpt22 { #HVAC dpt22.101 only
@@ -2226,17 +2274,13 @@ sub dec_dptRAW {
 # entry: $hash, desired gadNO
 # return: undef on error / gadName
 sub KNX_gadNameByNO {
-	my $hash = shift;
-	my $groupnr  = shift // 1; # default: search for g1
+	my $hash    = shift;
+	my $groupnr = shift // 1; # default: search for g1
 
-	my $targetGadName = undef;
-	foreach my $key (keys %{$hash->{GADDETAILS}}) {
-		if ($hash->{GADDETAILS}->{$key}->{NO} == $groupnr) {
-			$targetGadName = $key;
-			last;
-		}
+	foreach my $targetGadName (keys %{$hash->{GADDETAILS}}) {
+		return $targetGadName if ($hash->{GADDETAILS}->{$targetGadName}->{NO} == $groupnr);
 	}
-	return $targetGadName;
+	return;
 }
 
 ### unified Log handling
@@ -2297,6 +2341,7 @@ sub main::KNX_scan {
 		foreach my $key (keys %{$devhash->{GADDETAILS}}) {
 			last if (! defined($key));
 			next if($devhash->{GADDETAILS}->{$key}->{MODEL} eq $MODELERR);
+#			next if($devhash->{GADDETAILS}->{$key}->{MODEL} eq q{dptRAW});
 			my $option = $devhash->{GADDETAILS}->{$key}->{OPTION};
 			next if (defined($option) && $option =~ /(?:set|listenonly)/ixms);
 			$k++;
@@ -2415,13 +2460,13 @@ This module provides a basic set of operations (on, off, toggle, on-until, on-fo
  correct value and optional unit.</p>
 <p>The KNX-Bus protocol defines three basic commands, any KNX-device, including FHEM, has to support&colon;
 <ol>
-<li><strong>write</strong> - send a msg to KNX-bus - FHEM implementation&colon; set cmd</li>
-<li><strong>read&nbsp;</strong> - send request for a msg to another KNX-device - FHEM implementation&colon; get cmd</li> 
+<li><strong>write</strong> - send a msg to a KNX-bus device - FHEM implementation&colon; set cmd</li>
+<li><strong>read&nbsp;</strong> - send request for an answer from a KNX-bus device - FHEM implementation&colon; get cmd</li> 
 <li><strong>reply</strong> - send answer when receiving a read-cmd from KNX-Bus - FHEM implementation&colon; putCmd attribute</li>
 </ol>
 </p>
-<p>For each received message there will be a reading containing the received value and the sender address.<br/> 
-For every set, there will be a reading containing the sent value.<br/> 
+<p>For each received message or get-cmd there will be a reading containing the received value and the sender address.<br/> 
+For every set-cmd, there will be a reading containing the sent value.<br/> 
 The reading &lt;state&gt; will be updated with the last sent or received value.&nbsp;</p>
 <p>A (german) wiki page is avaliable here&colon; <a href="https://wiki.fhem.de/wiki/KNX">FHEM Wiki</a></p>
 </li>
@@ -2440,9 +2485,10 @@ The reading &lt;state&gt; will be updated with the last sent or received value.&
 <p>If &lt;gadName&gt; not specified, the default is "g&lt;number&gt;". The corresponding reading-names are getG&lt;number&gt; 
 and setG&lt;number&gt;.<br/> 
 The optional parameteter &lt;gadName&gt; may contain an alias for the GAD. The following gadNames are <b>not allowed&colon;</b>
- state, on, off, on-for-timer, on-until, off-for-timer, off-until, toggle, raw, rgb, string, value, set, get, listenonly, nosuffix
+ state, on, off, on-for-timer, on-until, off-for-timer, off-until, toggle, blink, raw, rgb, string, value, set, get, listenonly, nosuffix
  -  because of conflict with cmds &amp; parameters.<br/>
-If you supply &lt;gadName&gt; this name is used instead as cmd prefix. The reading-names are &lt;gadName&gt;-get and &lt;gadName&gt;-set. 
+If you supply &lt;gadName&gt; this name is used instead as cmd prefix. &lt;gadName&gt; has to be unique within a device definition.<br/>
+ The reading-names are &lt;gadName&gt;-get and &lt;gadName&gt;-set. 
  The synonyms &lt;getName&gt; and &lt;setName&gt; are used in this documentation. 
  Reading-names may be modified by <a href="#KNX-attr-readingNmap">attribute readingNmap</a>, see examples.<br/> 
 If you add the option "nosuffix", &lt;getName&gt; and &lt;setName&gt; have the identical name - &lt;gadName&gt;.
@@ -2595,9 +2641,10 @@ Examples&colon;
   having more fun with icons, ...
 <pre>
 Examples&colon;
-<code>   attr &lt;device&gt; stateRegex /position:0/aus/ # on update of reading "position" and value=0, reading state value will be "aus"
-   attr &lt;device&gt; stateRegex /position/pos-/  # on update of reading "position" reading state value will be prepended with "pos-".
-   attr &lt;device&gt; stateRegex /desired-pos//   # reading state will NOT get updated when reading "desired-pos" is updated.
+<code>   attr &lt;device&gt; stateRegex /position:0/aus/   # on update of reading "position" and value=0, reading state value will be "aus"
+   attr &lt;device&gt; stateRegex /position:(.*)/$1/ # on update of reading "position" reading state is updated with reading position value".
+   attr &lt;device&gt; stateRegex /position/pos-/    # on update of reading "position" reading state value will be prepended with "pos-".
+   attr &lt;device&gt; stateRegex /desired-pos//     # reading state will NOT get updated when reading "desired-pos" is updated.
 </code></pre>
 </li>
 <li><a id="KNX-attr-stateCmd"></a><b>stateCmd</b><br/>
@@ -2675,11 +2722,11 @@ Examples&colon;
 
 <li><a id="KNX-dpt"></a><strong>DPT - data-point-types</strong><br/>
 <p>The following dpt are implemented and have to be assigned within the device definition. 
-   The values right to the dpt define the valid range of Set-command values and Get-command return values and units.</p>
+   The values right to the dpt define the valid range or min/max Set-command values and Get-command return values and units.</p>
 <ol id="KNX-dpt_ul">
-<li><b>dpt1     </b>  off, on, toggle - see Note 1</li>
+<li><b>dpt1     </b>  off, on, blink, toggle, timer functions - Note 1</li>
 <li><b>dpt1.000 </b>  0, 1</li>
-<li><b>dpt1.001 </b>  off, on, toggle</li>
+<li><b>dpt1.001 </b>  off, on, blink, toggle, timer functions</li>
 <li><b>dpt1.002 </b>  false, true</li>
 <li><b>dpt1.003 </b>  disable, enable</li>
 <li><b>dpt1.004 </b>  no_ramp, ramp</li>
@@ -2706,20 +2753,20 @@ Examples&colon;
 <li><b>dpt2     </b>  off, on, forceOff, forceOn</li>
 <li><b>dpt2.000 </b>  0,1,2,3</li>
 <li><b>dpt3     </b>  -100..+100</li>
-<li><b>dpt3.007 </b>  -100..+100 %</li>
-<li><b>dpt3.008 </b>  -100..+100 %</li>
+<li><b>dpt3.007 </b>  -100..+100 % </li>
+<li><b>dpt3.008 </b>  -100..+100 % </li>
 <li><b>dpt4     </b>  single ASCII char</li>
 <li><b>dpt4.001 </b>  single ASCII char</li>
 <li><b>dpt4.002 </b>  single ISO-8859-1 char</li>
 <li><b>dpt5     </b>  0..255</li>
-<li><b>dpt5.001 </b>  0..100 %</li>
-<li><b>dpt5.003 </b>  0..360 &deg;</li>
-<li><b>dpt5.004 </b>  0..255 %</li>
+<li><b>dpt5.001 </b>  0..100 % </li>
+<li><b>dpt5.003 </b>  0..360 &deg; </li>
+<li><b>dpt5.004 </b>  0..255 % </li>
 <li><b>dpt5.005 </b>  0..255 (decimal factor)</li>
 <li><b>dpt5.006 </b>  0..255 (tariff info)</li>
 <li><b>dpt5.010 </b>  0..255 p (pulsecount)</li>
 <li><b>dpt6     </b>  -128..+127</li>
-<li><b>dpt6.001 </b>  -128 %..+127 %</li>
+<li><b>dpt6.001 </b>  -128..+127 % </li>
 <li><b>dpt6.010 </b>  -128..+127 p (pulsecount)</li>
 <li><b>dpt7     </b>  0..65535</li>
 <li><b>dpt7.001 </b>  0..65535 p (pulsecount)</li>
@@ -2741,7 +2788,7 @@ Examples&colon;
 <li><b>dpt8.005 </b>  -32768..32767 s</li>
 <li><b>dpt8.006 </b>  -32768..32767 min</li>
 <li><b>dpt8.007 </b>  -32768..32767 h</li>
-<li><b>dpt8.010 </b>  -32768..32767 %</li>
+<li><b>dpt8.010 </b>  -32768..32767 % </li>
 <li><b>dpt8.011 </b>  -32768..32767 &deg;</li>
 <li><b>dpt8.012 </b>  -32768..32767 m</li>
 <li><b>dpt9     </b>  -671088.64..+670433.28</li>
@@ -2751,7 +2798,7 @@ Examples&colon;
 <li><b>dpt9.004 </b>  0..+670433.28 lux</li>
 <li><b>dpt9.005 </b>  0..+670433.28 m/s</li>
 <li><b>dpt9.006 </b>  0..+670433.28 Pa</li>
-<li><b>dpt9.007 </b>  0..+670433.28 %</li>
+<li><b>dpt9.007 </b>  0..+670433.28 % </li>
 <li><b>dpt9.008 </b>  0..+670433.28 ppm</li>
 <li><b>dpt9.009 </b>  -671088.64..+670433.28 m&sup3;/h</li>
 <li><b>dpt9.010 </b>  -671088.64..+670433.28 s</li>
@@ -2863,7 +2910,7 @@ Examples&colon;
 <li><b>dpt14.074</b>  -1.4e-45..+1.7e+38 s (time)</li>
 <li><b>dpt14.075</b>  -1.4e-45..+1.7e+38 Nm (torque)</li>
 <li><b>dpt14.076</b>  -1.4e-45..+1.7e+38 m&sup3; (volume)</li>
-<li><b>dpt14.077</b>  -1.4e-45..+1.7e+38 m³/s (volume flux)</li>
+<li><b>dpt14.077</b>  -1.4e-45..+1.7e+38 m&sup3;/s (volume flux)</li>
 <li><b>dpt14.078</b>  -1.4e-45..+1.7e+38 N (weight)</li>
 <li><b>dpt14.079</b>  -1.4e-45..+1.7e+38 J (work)</li>
 <li><b>dpt14.080</b>  -1.4e-45..+1.7e+38 VA (apparent power)</li>
@@ -2876,7 +2923,12 @@ Examples&colon;
 <li><b>dpt18.001</b>  [(activate|learn),]1..64</li>
 <li><b>dpt19    </b>  DD.MM.YYYY_HH:MM:SS (Date&amp;Time combined)</li>
 <li><b>dpt19.001</b>  DD.MM.YYYY_HH:MM:SS (Date&amp;Time combined)</li>
+<li><b>dpt20.014</b>  Windforce (Beaufort)</li>
+<li><b>dpt20.021</b>  Cloud Cover</li>
 <li><b>dpt20.102</b>  HVAC mode</li>
+<li><b>dpt21    </b>  status - bitstring (readonly)</li>
+<li><b>dpt21.001</b>  Z8 status info (readonly)</li>
+<li><b>dpt21.002</b>  Device control (readonly)</li>
 <li><b>dpt22.101</b>  HVAC RHCC Status (readonly)</li>
 <li><b>dpt217.001</b>  dpt version (readonly)</li>
 <li><b>dpt221    </b>  MFGCode.SerialNr (readony)</li>
