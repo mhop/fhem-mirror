@@ -1,6 +1,6 @@
-REV 30433
+REV 30437
 DIR unused
-UPD 2025-10-19_07:45:09 450207 ./CHANGED
+UPD 2025-10-24_07:45:04 450281 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2025-09-12_07:45:04 47218 ./MAINTAINER.txt
 UPD 2025-03-18_07:45:03 47176 ./configDB.pm
@@ -313,7 +313,7 @@ UPD 2021-01-02_07:45:03 40665 FHEM/59_PROPLANTA.pm
 UPD 2025-02-20_07:45:04 61068 FHEM/59_Twilight.pm
 UPD 2020-04-17_07:45:02 21167 FHEM/59_WUup.pm
 UPD 2015-07-28_14:05:31 19347 FHEM/59_WWO.pm
-UPD 2025-10-17_07:45:05 24566 FHEM/59_Weather.pm
+UPD 2025-10-24_07:45:04 24566 FHEM/59_Weather.pm
 UPD 2019-03-23_07:45:03 44752 FHEM/59_Wunderground.pm
 UPD 2016-08-19_14:49:02 10915 FHEM/60_EM.pm
 UPD 2021-01-10_07:45:02 152508 FHEM/60_Watches.pm
@@ -661,7 +661,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2023-12-30_07:45:03 10369 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2025-02-14_07:45:03 442800 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2025-10-24_07:45:04 445539 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2024-10-26_07:45:03 11260 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -768,8 +768,8 @@ UPD 2025-10-19_07:45:16 5368358 docs/commandref.html
 UPD 2025-10-19_07:45:20 3379328 docs/commandref_DE.html
 UPD 2025-05-03_07:45:04 86553 docs/commandref_frame.html
 UPD 2025-05-03_07:45:04 97225 docs/commandref_frame_DE.html
-UPD 2025-10-23_07:45:16 326323 docs/commandref_modular.html
-UPD 2025-10-23_07:45:18 338159 docs/commandref_modular_DE.html
+UPD 2025-10-24_07:45:16 326323 docs/commandref_modular.html
+UPD 2025-10-24_07:45:18 338159 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -797,7 +797,7 @@ UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
 UPD 2021-05-26_07:45:02 6647 lib/FHEM/Core/Timer/Register.pm
 UPD 2021-04-26_07:45:03 8936 lib/FHEM/Core/Utils/FHEMbackup.pm
 UPD 2023-01-18_07:45:03 1432 lib/FHEM/Core/Utils/Math.pm
-UPD 2025-10-17_07:45:05 34206 lib/FHEM/Core/Weather.pm
+UPD 2025-10-24_07:45:04 34206 lib/FHEM/Core/Weather.pm
 UPD 2025-06-19_07:45:03 148004 lib/FHEM/Devices/AMConnect/Common.pm
 UPD 2024-10-15_07:45:03 55783 lib/FHEM/Devices/LGTV/LGTVWebOS.pm
 UPD 2025-10-17_07:45:05 43087 lib/FHEM/Devices/Nuki/Bridge.pm
