@@ -160,12 +160,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.6" => "20.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
+  "1.59.6" => "24.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
                            "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
                            "__batChargeOptTargetPower: use an average for the charging power if optPower set and charging target are not achievable ".
 						   "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
-						   "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add pvshare calculation ".
-						   "___doPlanning: code improvements ",
+						   "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add PV share calculation ".
+						   "___doPlanning: code improvements and implement PV share needed ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
                            "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
@@ -12150,7 +12150,6 @@ sub __batChargeOptTargetPower {
 			  my $replacement = sprintf "%.0f", ($spls00 / 60 * (60 - int $minute));                             # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß     
 			  $replacement   .= '.'.$2;
 			  $hsurp->{$k}{surplswh} = $replacement;
-			  #Log3 ($name, 1, "$name - spls00: $spls00, replacement: $replacement ");
 		  }
 		  
 		  last;                                                                                                  # da Stunde 00 nur einmal vorkommt, können wir abbrechen
@@ -12272,20 +12271,13 @@ sub __batChargeOptTargetPower {
                       $target = ___batAdjustPowerByMargin ($name, $target, $bpinmax, $runwhneed, $otpMargin);
                   }
               }
-              else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)                 
-                  #$hs2sunset -= 1;
-#Log3 ($name, 1, "$name - target0: $target"); 
-				  #$target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target; 
-#Log3 ($name, 1, "$name - runwhneed: $runwhneed, hs2sunset: $hs2sunset, target: $target");				  
-                  #$target    *= (1 + $otpMargin / 100) ** 2;                
-#Log3 ($name, 1, "$name - target1: $target");                                    
-                  if ($strategy eq 'smartPower') {                                                               # smartPower: maximale Ladeleistung erzwingen
-                      #$target = $bpinmax;
+              else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)                                                    
+                  if ($strategy eq 'smartPower') {                                                               # smartPower: agressivere Ladeleistung
 					  $hs2sunset -= 1;
 					  $target = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
                   }
 				  
-				  $target    *= (1 + $otpMargin / 100) ** 2;
+				  $target *= (1 + $otpMargin / 100) ** 2;
               }
 
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
@@ -13343,7 +13335,6 @@ sub ___doPlanning {
   my $debug  = $paref->{debug};
   my $lang   = $paref->{lang};
   my $nh     = $data{$name}{nexthours};
-  my $cicfip = CurrentVal ($name, 'consForecastInPlanning', 0);                            # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
 
   my $hash   = $defs{$name};
   
@@ -13354,9 +13345,12 @@ sub ___doPlanning {
 	  return;	  
   }
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
-
+  my $cicfip   = CurrentVal  ($name, 'consForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
+  my $pvshare  = ConsumerVal ($name, $c, 'pvshare',          100);                         # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden   
+  my $shfactor = $pvshare / 100;
   my (%tmp, %max, %mtimes);
+  
+  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
 
   ## max. PV-Forecast bzw. Überschuß (bei gesetzen consForecastInPlanning) ermitteln
   ####################################################################################
@@ -13364,7 +13358,7 @@ sub ___doPlanning {
       my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',    0);
       my $confcex = NexthoursVal ($name, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
 
-      my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierter Energieüberschuß (kann negativ sein)
+      my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierte Leistung -> Überschuß oder negativ
 
       my ($hour)              = $idx =~ /NextHour(\d+)/xs;
       $tmp{$spexp}{starttime} = NexthoursVal ($name, $idx, 'starttime', '');
@@ -13393,7 +13387,7 @@ sub ___doPlanning {
   
   my $epiece1 = $data{$name}{consumers}{$c}{epieces}{1};
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - first energy piece: $epiece1});
+  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - first energy piece: $epiece1, PV share needed: $pvshare %, energy piece share: }.$epiece1 * $shfactor);
 
   my $mode            = getConsumerPlanningMode ($hash, $c);                                           # Planungsmode 'can' oder 'must'
   my $calias          = ConsumerVal ($name, $c, 'alias',     '');
@@ -13428,7 +13422,7 @@ sub ___doPlanning {
       }
 
       for my $ts (sort{$a<=>$b} keys %mtimes) {
-          if ($mtimes{$ts}{spexp} >= $epiece1) {                                                       # die früheste Startzeit sofern Überschuß größer als Bedarf
+          if ($mtimes{$ts}{spexp} >= $epiece1 * $shfactor) {                                           # die früheste Startzeit mit Leistung > als Bedarf
               my $starttime       = $mtimes{$ts}{starttime};
               $paref->{starttime} = $starttime;
               $starttime          = ___switchonTimelimits ($paref);
@@ -13493,6 +13487,10 @@ sub ___doPlanning {
           delete $paref->{supplement};
       }
   }
+  
+  delete $paref->{maxref};
+  delete $paref->{mintime};
+  delete $paref->{stopdiff};
 
   my $planstate = ConsumerVal ($name, $c, 'planstate',      '');
   my $planspmlt = ConsumerVal ($name, $c, 'planSupplement', '');
@@ -27140,7 +27138,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                                  <br>
+       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [pvshare=&lt;Value&gt;] [switchdev=&lt;device&gt;]                                                                                  <br>
                          [aliasshort=&lt;String&gt;] [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
                          [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                           <br>
                          [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                             <br>
@@ -27175,10 +27173,12 @@ to ensure that the system configuration is correct.
         The remaining runtime is not affected by an interrupt!
         <br><br>
 
-        The <b>power</b> key indicates the power consumption of the consumer. <br>
-        Depending on this value, the switching times of the consumer are planned and the cycle of the consumer is started depending on
+        The key <b>power</b> specifies the power consumption of the consumer. The key <b>pvshare</b> can be used to specify the desired 
+        percentage of PV to cover the power consumption. <br>
+        Depending on these values, the switching times of the consumer are planned and the cycle of the consumer is started depending on
         the sufficient PV surplus at the time of planning. <br>
-        If <b>power=0</b> is set, the consumer is switched on as planned, regardless of whether there is sufficient PV surplus.
+        If <b>power=0</b> or <b>pvshare=0</b> is set, the consumer is switched on as planned, regardless of whether there is sufficient 
+		PV surplus.
         <br><br>
 
          <ul>
@@ -27204,6 +27204,10 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>power</b>          </td><td>Power consumption of the consumer in W. This can be the nominal power according to the data sheet or a dynamically specified reference value.     </td></tr>
             <tr><td>                       </td><td>(can be set to "0")                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>pvshare</b>        </td><td>Defines the PV share of consumer power (key ‘power’) that is considered sufficient for the consumer. (optional)                                   </td></tr>
+            <tr><td>                       </td><td>The setting 100% defines a required PV surplus of at least ‘power’. With 0%, the consumer does not require any PV surplus.                        </td></tr>
+			<tr><td>                       </td><td>Value: <b>0..100</b>, default: 100 (%)                                                                                                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.      </td></tr>
             <tr><td>                       </td><td>The key is useful for consumers where energy measurement and switching is carried out with different devices                                      </td></tr>
@@ -29852,7 +29856,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                                  <br>
+       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [pvshare=&lt;Wert&gt;] [switchdev=&lt;device&gt;]                                                                                  <br>
                          [aliasshort=&lt;String&gt;] [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                         <br>
                          [notbefore=&lt;Ausdruck&gt;] [notafter=&lt;Ausdruck&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                                 <br>
@@ -29886,10 +29890,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         Die verbleibende Laufzeit wird durch einen Interrupt nicht beeinflusst!
         <br><br>
 
-        Der Schlüssel <b>power</b> gibt die Leistungsaufnahme des Verbrauchers an. <br>
-        Abhängig von diesem Wert werden die Schaltzeiten des Verbrauchers geplant und der Zyklus des Verbrauchers in Abhängigkeit
+        Der Schlüssel <b>power</b> gibt die Leistungsaufnahme des Verbrauchers an. Mit dem Schlüssel <b>pvshare</b> kann der gewünschte 
+        prozentuale PV-Anteil zur Deckung der Leistungsaufnahme festgelgt werden. <br>
+        Abhängig von diesen Werten werden die Schaltzeiten des Verbrauchers geplant und der Zyklus des Verbrauchers in Abhängigkeit
         des ausreichenden PV-Überschußes zum Einplanungszeitpunkt gestartet. <br>
-        Ist <b>power=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichend vorhandenem PV-Überschuß
+        Ist <b>power=0</b> oder <b>pvshare=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichend vorhandenem PV-Überschuß
         wie eingeplant geschaltet.
         <br><br>
 
@@ -29916,6 +29921,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>power</b>          </td><td>Leistungsaufnahme des Verbrauchers in W. Es kann die nominale Leistung gemäß Datenblatt oder ein dynamisch vorgegebener Richtwert sein.            </td></tr>
             <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                                      </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pvshare</b>        </td><td>Legt den PV-Anteil der Verbraucherleistung (Schlüssel 'power') fest, der als ausreichend für den Verbraucher gewertet wird. (optional)             </td></tr>
+            <tr><td>                       </td><td>Die Einstellung 100% definiert einen benötigten PV-Überschuß von mindestens 'power'. Mit 0% benötigt der Verbraucher keinen PV-Überschuß.          </td></tr>
+			<tr><td>                       </td><td>Wert: <b>0..100</b>, default: 100 (%)                                                                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>Das angegebene &lt;device&gt; wird als Schalter Device dem Verbraucher zugeordnet (optional). Schaltvorgänge werden mit diesem Gerät               </td></tr>
             <tr><td>                       </td><td>ausgeführt. Der Schlüssel ist für Verbraucher nützlich bei denen Energiemessung und Schaltung mit verschiedenen Geräten vorgenommen                </td></tr>
@@ -29984,7 +29993,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
             <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                               </td></tr>
+            <tr><td> <b>swoffcond</b>      </td><td>Vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                               </td></tr>
             <tr><td>                       </td><td><b>Device:Reading</b> - die Device/Reading Kombination liefert den Prüfwert $VALUE ('undef' wird ignoriert)                                        </td></tr>
             <tr><td>                       </td><td>Die Prüfung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                               </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                                     </td></tr>
