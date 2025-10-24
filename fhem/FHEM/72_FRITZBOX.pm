@@ -46,7 +46,7 @@ use Blocking;
 use HttpUtils;
 use feature 'state';
 
-my $ModulVersion = "08.20.06a";
+my $ModulVersion = "08.20.07";
 my $missingModul = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
@@ -200,12 +200,12 @@ my %IGD064   = (
         WANIPConnectionIPv6DNS     => { service => "WANIPConnection:1",
                                         control => "WANIPConn1",
                                         action  => "X_AVM_DE_GetIPv6DNSServer",
+                                        igd     => 1},
+        WANIPv6FirewallControl     => { service => "WANIPv6FirewallControl:1",
+                                        control => "WANIPv6Firewall1",
+                                        action  => "GetFirewallStatus",
                                         igd     => 1}
 );
-#        WANIPv6FirewallControl     => { service => "WANIPv6FirewallControl:1",
-#                                        control => "WANIPv6Firewall1",
-#                                        action  => "GetFirewallStatus",
-#                                        igd     => 1}
 
 
 
@@ -240,7 +240,7 @@ my %TR064   = (
                                         igd     => 0},
         OnTelGetPhonebook          => { service => "X_AVM-DE_OnTel:1",
                                         control => "x_contact",
-                                        action  => "GetPhonebook NewPhonebookID item_id",
+                                        action  => "GetPhonebook NewPhonebookID 0",
                                         igd     => 0},
         OnTelGetPhonebookList      => { service => "X_AVM-DE_OnTel:1",
                                         control => "x_contact",
@@ -889,8 +889,8 @@ sub FRITZBOX_DebugLog($$$$;$) {
   my $name = $hash->{'NAME'};
   my $tim;
 
-  $loglevel .= ":" if ($loglevel);
-  $loglevel ||= "";
+  $loglevel ||= "0";
+  $loglevel .= ":";
 
   my ($seconds, $microseconds) = gettimeofday();
   my @t = localtime($seconds);
@@ -1249,7 +1249,7 @@ sub FRITZBOX_Define($$)
      $hash->{TR064control}{$key}{control} = $TR064{$key}{control};
      $hash->{TR064control}{$key}{action}  = $TR064{$key}{action};
      $hash->{TR064control}{$key}{igd}     = $TR064{$key}{igd};
-     $hash->{TR064control}{$key}{active}  = 1;
+     $hash->{TR064control}{$key}{active}  = -1;
    }
 
    # $hash->{IGDcontrol} = \%IGD064;
@@ -1258,7 +1258,7 @@ sub FRITZBOX_Define($$)
      $hash->{IGDcontrol}{$key}{control} = $IGD064{$key}{control};
      $hash->{IGDcontrol}{$key}{action}  = $IGD064{$key}{action};
      $hash->{IGDcontrol}{$key}{igd}     = $IGD064{$key}{igd};
-     $hash->{IGDcontrol}{$key}{active}  = 1;
+     $hash->{IGDcontrol}{$key}{active}  = -1;
    }
 
    # Check APIs after fhem.cfg is processed
@@ -4247,7 +4247,7 @@ sub FRITZBOX_Get($@)
        return "Wrong number of arguments, usage: get $name showUsedApis data.lua|query.lua|tr064|javascript" if int @val != 1;
        return "Wrong arguments, usage: get $name tr064servicelist data.lua|query.lua|tr064|javascript" if $val[0] !~ /data\.lua|query\.lua|tr064|javascript/;
 
-       my $command  = "<div id=\"button\"><button style=\"color:red; background-color: transparent; cursor: pointer; border-radius: 10px; box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);\" id=\"keyButton\" onclick=\"JS:FW_cmd(FW_root+\'?cmd=PERLcmd"; #&XHR=1\')\">quittieren</button></div></html>";
+       my $command  = "<div id=\"button\"><button style=\"color:green; background-color: transparent; cursor: pointer; border-radius: 10px; box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);\" id=\"keyButton\" onclick=\"JS:FW_cmd(FW_root+\'?cmd=PERLcmd"; #&XHR=1\')\">quittieren</button></div></html>";
           $command .= "&XHR=1\', function(data){let preData = \'\<pre\>\' + data + \'\<\/pre\>\'; FW_okDialog(preData);})\">quittieren</button></div>";
 
        # FRITZBOX_Log $hash, 3, "command:\n $command";
@@ -4349,28 +4349,25 @@ sub FRITZBOX_Get($@)
            # get <name> tr064Command <service> <control> <action>
 
            foreach my $key (sort { $a cmp $b } keys %{ $hash->{TR064control} }) {
-             if(($key !~ /WANIPConnection|WANPPPConnection/) || ($key eq "WANIPConnection" && lc($avmModel) =~ /cable|fibre|lte/) || ($key eq "WANPPPConnection" && lc($avmModel) !~ /cable|fibre|lte/)) {
+             my $klickcmd = $command;
 
-               my $klickcmd = $command;
-
-               if ($hash->{TR064control}{$key}{active} == 1) {
-                 $klickcmd =~ s/keyButton/$key/g;
-                 $klickcmd =~ s/PERLcmd/get $name tr064Command $hash->{TR064control}{$key}{service} $hash->{TR064control}{$key}{control} $hash->{TR064control}{$key}{action}/g;
-                 $klickcmd =~ s/quittieren/$key/g;
-               } elsif($hash->{TR064control}{$key}{active} == -1) {
-                 $klickcmd = "TR064 not activated";
-               } else {
-                 $klickcmd = "not available";
-               }
- 
-               $returnStr .= "<tr>\n";
-               $returnStr .= "<td>" . $klickcmd . "</td>";
-               $returnStr .= "<td>" . $hash->{TR064control}{$key}{service} . "</td>";
-               $returnStr .= "<td>" . $hash->{TR064control}{$key}{control} . "</td>";
-               $returnStr .= "<td>" . $hash->{TR064control}{$key}{action}  . "</td>";
-               $returnStr .= "<td>" . ($hash->{TR064control}{$key}{active} ? "yes" : "no")  . "</td>";
-               $returnStr .= "</tr>\n";
+             if ($hash->{TR064control}{$key}{active} == 1) {
+               $klickcmd =~ s/keyButton/$key/g;
+               $klickcmd =~ s/PERLcmd/get $name tr064Command $hash->{TR064control}{$key}{service} $hash->{TR064control}{$key}{control} $hash->{TR064control}{$key}{action}/g;
+               $klickcmd =~ s/quittieren/$key/g;
+             } elsif($hash->{TR064control}{$key}{active} == -1) {
+               $klickcmd = "TR064 not activated";
+             } else {
+               $klickcmd = "<s>" . $key . "</s>";
              }
+ 
+             $returnStr .= "<tr>\n";
+             $returnStr .= "<td>" . $klickcmd . "</td>";
+             $returnStr .= "<td>" . $hash->{TR064control}{$key}{service} . "</td>";
+             $returnStr .= "<td>" . $hash->{TR064control}{$key}{control} . "</td>";
+             $returnStr .= "<td>" . $hash->{TR064control}{$key}{action}  . "</td>";
+             $returnStr .= "<td>" . ($hash->{TR064control}{$key}{active} ? "yes" : "no")  . "</td>";
+             $returnStr .= "</tr>\n";
            }
 
            $returnStr .= "<tr>\n";
@@ -4394,7 +4391,7 @@ sub FRITZBOX_Get($@)
              } elsif($hash->{IGDcontrol}{$key}{active} == -1) {
                $klickcmd = "TR064 not activated";
              } else {
-               $klickcmd = "not available";
+               $klickcmd = "<s>" . $key . "</s>";
              }
 
              $returnStr .= "<tr>\n";
@@ -7326,16 +7323,19 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
      #-------------------------------------------------------------------------------------
      # DOCSIS Informationen FB Cable
 
-     if ( AttrVal($name, "enableDocsisInfo", 0) && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") && $hash->{fhem}{fwVersion} >= 721) { # && $hash->{fhem}{fwVersion} < 810 ) { # FB Cable
+     if ( AttrVal($name, "enableDocsisInfo", 1) && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]") && $hash->{fhem}{fwVersion} >= 721) { # && $hash->{fhem}{fwVersion} < 810 ) { # FB Cable
 #     if (1==1) {
 
        FRITZBOX_Log $hash, 4, "DOCSIS FB Cable - start getting data";
 
        my $returnStr;
 
+       my $resData;
        my $powerLevels;
        my $frequencys;
        my $modulations;
+       my $channels;
+       my $channel;
        my $modType;
        my $latencys;
        my $corrErrors;
@@ -7351,12 +7351,12 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
        push @webCmdArray, "lang"        => "de";
        push @webCmdArray, "page"        => "docInfo";
        push @webCmdArray, "xhrId"       => "all";
-       push @webCmdArray, "no_sidrenew" => "";
 
 #       for debugging
 #       my $TestSIS = '{"pid":"docInfo","hide":{"mobile":true,"ssoSet":true,"liveTv":true},"time":[],"data":{"channelDs":{"docsis31":[{"powerLevel":"-1.6","type":"4K","channel":1,"channelID":0,"frequency":"751 - 861"},{"powerLevel":"7.7","type":"4K","channel":2,"channelID":1,"frequency":"175 - 237"}],"docsis30":[{"type":"256QAM","corrErrors":92890,"mse":"-36.4","powerLevel":"5.1","channel":1,"nonCorrErrors":9773,"latency":0.32,"channelID":7,"frequency":"538"},{"type":"256QAM","corrErrors":20553,"mse":"-37.4","powerLevel":"10.2","channel":2,"nonCorrErrors":9420,"latency":0.32,"channelID":26,"frequency":"698"},{"type":"256QAM","corrErrors":28673,"mse":"-37.6","powerLevel":"10.0","channel":3,"nonCorrErrors":140,"latency":0.32,"channelID":25,"frequency":"690"},{"type":"256QAM","corrErrors":25930,"mse":"-37.6","powerLevel":"10.0","channel":4,"nonCorrErrors":170,"latency":0.32,"channelID":27,"frequency":"706"},{"type":"256QAM","corrErrors":98698,"mse":"-36.6","powerLevel":"8.8","channel":5,"nonCorrErrors":9151,"latency":0.32,"channelID":30,"frequency":"746"},{"type":"256QAM","corrErrors":24614,"mse":"-37.4","powerLevel":"9.4","channel":6,"nonCorrErrors":9419,"latency":0.32,"channelID":28,"frequency":"730"},{"type":"256QAM","corrErrors":25882,"mse":"-37.4","powerLevel":"9.9","channel":7,"nonCorrErrors":9308,"latency":0.32,"channelID":24,"frequency":"682"},{"type":"256QAM","corrErrors":33817,"mse":"-37.4","powerLevel":"9.8","channel":8,"nonCorrErrors":146,"latency":0.32,"channelID":23,"frequency":"674"},{"type":"256QAM","corrErrors":112642,"mse":"-37.6","powerLevel":"7.8","channel":9,"nonCorrErrors":7783,"latency":0.32,"channelID":3,"frequency":"490"},{"type":"256QAM","corrErrors":41161,"mse":"-37.6","powerLevel":"9.8","channel":10,"nonCorrErrors":203,"latency":0.32,"channelID":21,"frequency":"658"},{"type":"256QAM","corrErrors":33219,"mse":"-37.4","powerLevel":"8.8","channel":11,"nonCorrErrors":10962,"latency":0.32,"channelID":18,"frequency":"634"},{"type":"256QAM","corrErrors":32680,"mse":"-37.6","powerLevel":"9.2","channel":12,"nonCorrErrors":145,"latency":0.32,"channelID":19,"frequency":"642"},{"type":"256QAM","corrErrors":33001,"mse":"-37.4","powerLevel":"9.8","channel":13,"nonCorrErrors":7613,"latency":0.32,"channelID":22,"frequency":"666"},{"type":"256QAM","corrErrors":42666,"mse":"-37.4","powerLevel":"8.1","channel":14,"nonCorrErrors":172,"latency":0.32,"channelID":17,"frequency":"626"},{"type":"256QAM","corrErrors":41023,"mse":"-37.4","powerLevel":"9.3","channel":15,"nonCorrErrors":10620,"latency":0.32,"channelID":20,"frequency":"650"},{"type":"256QAM","corrErrors":106921,"mse":"-37.6","powerLevel":"7.4","channel":16,"nonCorrErrors":356,"latency":0.32,"channelID":4,"frequency":"498"},{"type":"256QAM","corrErrors":86650,"mse":"-36.4","powerLevel":"4.9","channel":17,"nonCorrErrors":85,"latency":0.32,"channelID":12,"frequency":"578"},{"type":"256QAM","corrErrors":91838,"mse":"-36.4","powerLevel":"4.8","channel":18,"nonCorrErrors":168,"latency":0.32,"channelID":8,"frequency":"546"},{"type":"256QAM","corrErrors":110719,"mse":"-35.8","powerLevel":"4.5","channel":19,"nonCorrErrors":103,"latency":0.32,"channelID":10,"frequency":"562"},{"type":"256QAM","corrErrors":111846,"mse":"-37.6","powerLevel":"8.2","channel":20,"nonCorrErrors":247,"latency":0.32,"channelID":2,"frequency":"482"},{"type":"256QAM","corrErrors":668242,"mse":"-36.6","powerLevel":"5.8","channel":21,"nonCorrErrors":6800,"latency":0.32,"channelID":5,"frequency":"522"},{"type":"256QAM","corrErrors":104070,"mse":"-36.6","powerLevel":"5.3","channel":22,"nonCorrErrors":149,"latency":0.32,"channelID":6,"frequency":"530"},{"type":"256QAM","corrErrors":120994,"mse":"-35.8","powerLevel":"4.4","channel":23,"nonCorrErrors":10240,"latency":0.32,"channelID":9,"frequency":"554"},{"type":"256QAM","corrErrors":59145,"mse":"-36.4","powerLevel":"5.3","channel":24,"nonCorrErrors":9560,"latency":0.32,"channelID":11,"frequency":"570"},{"type":"256QAM","corrErrors":118271,"mse":"-37.6","powerLevel":"8.4","channel":25,"nonCorrErrors":810,"latency":0.32,"channelID":1,"frequency":"474"},{"type":"256QAM","corrErrors":40255,"mse":"-37.4","powerLevel":"6.5","channel":26,"nonCorrErrors":13474,"latency":0.32,"channelID":15,"frequency":"602"},{"type":"256QAM","corrErrors":62716,"mse":"-36.4","powerLevel":"5.3","channel":27,"nonCorrErrors":9496,"latency":0.32,"channelID":13,"frequency":"586"},{"type":"256QAM","corrErrors":131364,"mse":"-36.6","powerLevel":"8.9","channel":28,"nonCorrErrors":12238,"latency":0.32,"channelID":29,"frequency":"738"}]},"oem":"lgi","readyState":"ready","channelUs":{"docsis31":[],"docsis30":[{"powerLevel":"43.0","type":"64QAM","channel":1,"multiplex":"ATDMA","channelID":4,"frequency":"51"},{"powerLevel":"44.3","type":"64QAM","channel":2,"multiplex":"ATDMA","channelID":2,"frequency":"37"},{"powerLevel":"43.8","type":"64QAM","channel":3,"multiplex":"ATDMA","channelID":3,"frequency":"45"},{"powerLevel":"45.8","type":"64QAM","channel":4,"multiplex":"ATDMA","channelID":1,"frequency":"31"}]}},"sid":"14341afbc7d83b4c"}';
 #       my $TestSIS = '{"pid":"docInfo","hide":{"mobile":true,"ssoSet":true,"liveTv":true},"time":[],"data":{"channelDs":{"docsis30":[{"type":"256QAM","corrErrors":92890,"mse":"-36.4","powerLevel":"5.1","channel":1,"nonCorrErrors":9773,"latency":0.32,"channelID":7,"frequency":"538"},{"type":"256QAM","corrErrors":20553,"mse":"-37.4","powerLevel":"10.2","channel":2,"nonCorrErrors":9420,"latency":0.32,"channelID":26,"frequency":"698"},{"type":"256QAM","corrErrors":28673,"mse":"-37.6","powerLevel":"10.0","channel":3,"nonCorrErrors":140,"latency":0.32,"channelID":25,"frequency":"690"},{"type":"256QAM","corrErrors":25930,"mse":"-37.6","powerLevel":"10.0","channel":4,"nonCorrErrors":170,"latency":0.32,"channelID":27,"frequency":"706"},{"type":"256QAM","corrErrors":98698,"mse":"-36.6","powerLevel":"8.8","channel":5,"nonCorrErrors":9151,"latency":0.32,"channelID":30,"frequency":"746"},{"type":"256QAM","corrErrors":24614,"mse":"-37.4","powerLevel":"9.4","channel":6,"nonCorrErrors":9419,"latency":0.32,"channelID":28,"frequency":"730"},{"type":"256QAM","corrErrors":25882,"mse":"-37.4","powerLevel":"9.9","channel":7,"nonCorrErrors":9308,"latency":0.32,"channelID":24,"frequency":"682"},{"type":"256QAM","corrErrors":33817,"mse":"-37.4","powerLevel":"9.8","channel":8,"nonCorrErrors":146,"latency":0.32,"channelID":23,"frequency":"674"},{"type":"256QAM","corrErrors":112642,"mse":"-37.6","powerLevel":"7.8","channel":9,"nonCorrErrors":7783,"latency":0.32,"channelID":3,"frequency":"490"},{"type":"256QAM","corrErrors":41161,"mse":"-37.6","powerLevel":"9.8","channel":10,"nonCorrErrors":203,"latency":0.32,"channelID":21,"frequency":"658"},{"type":"256QAM","corrErrors":33219,"mse":"-37.4","powerLevel":"8.8","channel":11,"nonCorrErrors":10962,"latency":0.32,"channelID":18,"frequency":"634"},{"type":"256QAM","corrErrors":32680,"mse":"-37.6","powerLevel":"9.2","channel":12,"nonCorrErrors":145,"latency":0.32,"channelID":19,"frequency":"642"},{"type":"256QAM","corrErrors":33001,"mse":"-37.4","powerLevel":"9.8","channel":13,"nonCorrErrors":7613,"latency":0.32,"channelID":22,"frequency":"666"},{"type":"256QAM","corrErrors":42666,"mse":"-37.4","powerLevel":"8.1","channel":14,"nonCorrErrors":172,"latency":0.32,"channelID":17,"frequency":"626"},{"type":"256QAM","corrErrors":41023,"mse":"-37.4","powerLevel":"9.3","channel":15,"nonCorrErrors":10620,"latency":0.32,"channelID":20,"frequency":"650"},{"type":"256QAM","corrErrors":106921,"mse":"-37.6","powerLevel":"7.4","channel":16,"nonCorrErrors":356,"latency":0.32,"channelID":4,"frequency":"498"},{"type":"256QAM","corrErrors":86650,"mse":"-36.4","powerLevel":"4.9","channel":17,"nonCorrErrors":85,"latency":0.32,"channelID":12,"frequency":"578"},{"type":"256QAM","corrErrors":91838,"mse":"-36.4","powerLevel":"4.8","channel":18,"nonCorrErrors":168,"latency":0.32,"channelID":8,"frequency":"546"},{"type":"256QAM","corrErrors":110719,"mse":"-35.8","powerLevel":"4.5","channel":19,"nonCorrErrors":103,"latency":0.32,"channelID":10,"frequency":"562"},{"type":"256QAM","corrErrors":111846,"mse":"-37.6","powerLevel":"8.2","channel":20,"nonCorrErrors":247,"latency":0.32,"channelID":2,"frequency":"482"},{"type":"256QAM","corrErrors":668242,"mse":"-36.6","powerLevel":"5.8","channel":21,"nonCorrErrors":6800,"latency":0.32,"channelID":5,"frequency":"522"},{"type":"256QAM","corrErrors":104070,"mse":"-36.6","powerLevel":"5.3","channel":22,"nonCorrErrors":149,"latency":0.32,"channelID":6,"frequency":"530"},{"type":"256QAM","corrErrors":120994,"mse":"-35.8","powerLevel":"4.4","channel":23,"nonCorrErrors":10240,"latency":0.32,"channelID":9,"frequency":"554"},{"type":"256QAM","corrErrors":59145,"mse":"-36.4","powerLevel":"5.3","channel":24,"nonCorrErrors":9560,"latency":0.32,"channelID":11,"frequency":"570"},{"type":"256QAM","corrErrors":118271,"mse":"-37.6","powerLevel":"8.4","channel":25,"nonCorrErrors":810,"latency":0.32,"channelID":1,"frequency":"474"},{"type":"256QAM","corrErrors":40255,"mse":"-37.4","powerLevel":"6.5","channel":26,"nonCorrErrors":13474,"latency":0.32,"channelID":15,"frequency":"602"},{"type":"256QAM","corrErrors":62716,"mse":"-36.4","powerLevel":"5.3","channel":27,"nonCorrErrors":9496,"latency":0.32,"channelID":13,"frequency":"586"},{"type":"256QAM","corrErrors":131364,"mse":"-36.6","powerLevel":"8.9","channel":28,"nonCorrErrors":12238,"latency":0.32,"channelID":29,"frequency":"738"}]},"oem":"lgi","readyState":"ready","channelUs":{"docsis30":[{"powerLevel":"43.0","type":"64QAM","channel":1,"multiplex":"ATDMA","channelID":4,"frequency":"51"},{"powerLevel":"44.3","type":"64QAM","channel":2,"multiplex":"ATDMA","channelID":2,"frequency":"37"},{"powerLevel":"43.8","type":"64QAM","channel":3,"multiplex":"ATDMA","channelID":3,"frequency":"45"},{"powerLevel":"45.8","type":"64QAM","channel":4,"multiplex":"ATDMA","channelID":1,"frequency":"31"}]}},"sid":"14341afbc7d83b4c"}';
-#       my $resultData = FRITZBOX_Helper_process_JSON($hash, $TestSIS, "14341afbc7d83b4c", ""); ;
+#       my $TestSIS = '{"pid":"docInfo","hide":{"shareUsb":true,"autoUp":true,"liveTv":true,"update":true,"rrd":true,"mobile":true,"userUp":true,"wizUpdate":true,"ssoSet":true},"timeTillLogout":"1199","time":[],"data":{"channelDs":{"docsis30":[{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.6","channelID":13,"frequency":"250.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":15,"latency":0.32,"mse":"-37.6","channelID":5,"frequency":"186.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.6","channelID":9,"frequency":"218.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":0,"latency":0.32,"mse":"-37.4","channelID":1,"frequency":"154.000"},{"powerLevel":"4.5","nonCorrErrors":0,"modulation":"256QAM","corrErrors":10,"latency":0.32,"mse":"-37.4","channelID":2,"frequency":"162.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":14,"latency":0.32,"mse":"-37.4","channelID":3,"frequency":"170.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":13,"latency":0.32,"mse":"-37.6","channelID":4,"frequency":"178.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":13,"latency":0.32,"mse":"-37.6","channelID":6,"frequency":"194.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.4","channelID":7,"frequency":"202.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":8,"latency":0.32,"mse":"-37.4","channelID":8,"frequency":"210.000"},{"powerLevel":"4.0","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.6","channelID":10,"frequency":"226.000"},{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":5,"latency":0.32,"mse":"-37.6","channelID":11,"frequency":"234.000"},{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.4","channelID":12,"frequency":"242.000"},{"powerLevel":"4.1","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.6","channelID":14,"frequency":"258.000"},{"powerLevel":"4.8","nonCorrErrors":0,"modulation":"256QAM","corrErrors":15,"latency":0.32,"mse":"-37.6","channelID":15,"frequency":"266.000"},{"powerLevel":"4.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":10,"latency":0.32,"mse":"-37.6","channelID":16,"frequency":"274.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":22,"latency":0.32,"mse":"-37.6","channelID":17,"frequency":"282.000"},{"powerLevel":"4.4","nonCorrErrors":0,"modulation":"256QAM","corrErrors":17,"latency":0.32,"mse":"-37.6","channelID":18,"frequency":"290.000"},{"powerLevel":"4.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":34,"latency":0.32,"mse":"-37.4","channelID":19,"frequency":"298.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":32,"latency":0.32,"mse":"-37.6","channelID":20,"frequency":"306.000"},{"powerLevel":"4.4","nonCorrErrors":0,"modulation":"256QAM","corrErrors":28,"latency":0.32,"mse":"-37.4","channelID":21,"frequency":"314.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":29,"latency":0.32,"mse":"-37.4","channelID":22,"frequency":"322.000"},{"powerLevel":"4.8","nonCorrErrors":0,"modulation":"256QAM","corrErrors":32,"latency":0.32,"mse":"-37.6","channelID":23,"frequency":"330.000"},{"powerLevel":"4.6","nonCorrErrors":0,"modulation":"256QAM","corrErrors":27,"latency":0.32,"mse":"-37.6","channelID":24,"frequency":"338.000"}]},"oem":"avm","readyState":"ready","channelUs":{"docsis30":[{"powerLevel":"42.3","modulation":"64QAM","multiplex":"ATDMA","channelID":8,"frequency":"48.400"},{"powerLevel":"42.0","modulation":"64QAM","multiplex":"ATDMA","channelID":10,"frequency":"61.400"},{"powerLevel":"42.0","modulation":"64QAM","multiplex":"ATDMA","channelID":9,"frequency":"54.800"},{"powerLevel":"42.3","modulation":"64QAM","multiplex":"ATDMA","channelID":6,"frequency":"35.200"},{"powerLevel":"41.8","modulation":"64QAM","multiplex":"ATDMA","channelID":7,"frequency":"41.800"}]}},"sid":"ee9c7ab49ebf6e09"}';
+#       my $resultData = FRITZBOX_Helper_process_JSON($hash, $TestSIS, "ee9c7ab49ebf6e09", "");
       
        $resultData = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray) ;
 
@@ -7367,175 +7367,171 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
 
        FRITZBOX_Log $hash, 5, "\n" . FRITZBOX_Helper_Dumper($hash, $resultData->{data}, 5);
  
-       #collect current docsis-readings (to delete the ones that are inactive or disappeared)
-       #foreach (keys %{ $hash->{READINGS} }) {
-       #  $oldDocDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^docsis/ && defined $hash->{READINGS}{$_}{VAL};
-       #}
+       # compute channelUs docsis30
 
-       $nbViews = 0;
+       $resData     = "";
+       $powerLevels = "";
+       $frequencys  = "";
+       $modulations = "";
+       $channel     = "";
+       $channels    = 0;
+
        if (defined $resultData->{data}->{channelUs}->{docsis30}) {
-         $views = $resultData->{data}->{channelUs}->{docsis30};
-         $nbViews = scalar @$views;
-       }
+         $resData = $resultData->{data}->{channelUs}->{docsis30};
+         @$resData = sort {$a->{channelID} <=> $b->{channelID} } @$resData;
 
-       if ($nbViews > 0) {
+         if (@{$resData}) {
+           $docsisAvailable = 1;
+           $channels = @{$resData};
 
-         $docsisAvailable = 1;
+           for my $i (0 .. $channels - 1) {
 
-         $powerLevels = "";
-         $frequencys  = "";
-         $modulations = "";
+             $modType     = $resData->[$i]->{type}?"type":"modulation";
 
-         $modType = $resultData->{data}->{channelUs}->{docsis30}->[0]->{type}?"type":"modulation";
-
-         eval {
-           for(my $i = 0; $i <= $nbViews - 1; $i++) {
-             $powerLevels .= $resultData->{data}->{channelUs}->{docsis30}->[$i]->{powerLevel} . " ";
-             $frequencys  .= $resultData->{data}->{channelUs}->{docsis30}->[$i]->{frequency} . " ";
-             $modulations .= $1 if($resultData->{data}->{channelUs}->{docsis30}->[$i]->{$modType} =~ /(\d+)/);
+             $channel     .= $resData->[$i]->{channelID} . " ";
+             $powerLevels .= $resData->[$i]->{powerLevel} . " ";
+             $frequencys  .= $resData->[$i]->{frequency} . " ";
+             $modulations .= $1 if($resData->[$i]->{$modType} =~ /(\d+)/);
              $modulations .= " ";
            }
-
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Us_powerLevels", substr($powerLevels,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Us_frequencys", substr($frequencys,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Us_modulations", substr($modulations,0,-1);
-           delete $oldDocDevice{box_docsis30_Us_powerLevels} if exists $oldDocDevice{docsis30_Us_powerLevels};
-           delete $oldDocDevice{box_docsis30_Us_frequencys} if exists $oldDocDevice{docsis30_Us_frequencys};
-           delete $oldDocDevice{box_docsis30_Us_modulations} if exists $oldDocDevice{docsis30_Us_modulations};
-         };
+         }
        }
 
-       $nbViews = 0;
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Us_channelsCnt", ($channels ? $channels : "");
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Us_channelIDs",  substr($channel,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Us_powerLevels", substr($powerLevels,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Us_frequencys",  substr($frequencys,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Us_modulations", substr($modulations,0,-1);
+
+
+       # compute channelUs docsis31
+
+       $resData     = "";
+       $powerLevels = "";
+       $frequencys  = "";
+       $modulations = "";
+       $channel     = "";
+       $channels    = 0;
+
        if (defined $resultData->{data}->{channelUs}->{docsis31}) {
-         $views = $resultData->{data}->{channelUs}->{docsis31};
-         $nbViews = scalar @$views;
-       }
+         $resData = $resultData->{data}->{channelUs}->{docsis31};
+         @$resData = sort {$a->{channelID} <=> $b->{channelID} } @$resData;
 
-       if ($nbViews > 0) {
+         if (@{$resData}) {
+           $docsisAvailable = 1;
+           $channels = @{$resData};
 
-         $docsisAvailable = 1;
+           for my $i (0 .. $channels - 1) {
 
-         $powerLevels = "";
-         $frequencys  = "";
-         $modulations  = "";
+             $modType     = $resData->[$i]->{type}?"type":"modulation";
 
-         $modType = $resultData->{data}->{channelUs}->{docsis31}->[0]->{type}?"type":"modulation";
-
-         eval {
-           for(my $i = 0; $i <= $nbViews - 1; $i++) {
-             $powerLevels .= $resultData->{data}->{channelUs}->{docsis31}->[$i]->{powerLevel} . " ";
-             $frequencys  .= $resultData->{data}->{channelUs}->{docsis31}->[$i]->{frequency} . " ";
-             $modulations .= $1 if($resultData->{data}->{channelUs}->{docsis31}->[$i]->{$modType} =~ /(\d+)/);
+             $channel     .= $resData->[$i]->{channelID} . " ";
+             $powerLevels .= $resData->[$i]->{powerLevel} . " ";
+             $frequencys  .= $resData->[$i]->{frequency} . " ";
+             $modulations .= $1 if($resData->[$i]->{$modType} =~ /(\d+)/);
              $modulations .= " ";
            }
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Us_powerLevels", substr($powerLevels,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Us_frequencys", substr($frequencys,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Us_modulations", substr($modulations,0,-1);
-           delete $oldDocDevice{box_docsis31_Us_powerLevels} if exists $oldDocDevice{docsis31_Us_powerLevels};
-           delete $oldDocDevice{box_docsis31_Us_frequencys} if exists $oldDocDevice{docsis31_Us_frequencys};
-           delete $oldDocDevice{box_docsis31_Us_modulations} if exists $oldDocDevice{docsis31_Us_modulations};
-         };
-
+         }
        }
 
-       $nbViews = 0;
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Us_channelsCnt", ($channels ? $channels : "");
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Us_channelIDs",  substr($channel,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Us_powerLevels", substr($powerLevels,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Us_frequencys",  substr($frequencys,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Us_modulations", substr($modulations,0,-1);
+
+       # compute channelDs docsis30
+
+       $resData       = "";
+       $powerLevels   = "";
+       $latencys      = "";
+       $frequencys    = "";
+       $corrErrors    = "";
+       $nonCorrErrors = "";
+       $mses          = "";
+       $modulations   = "";
+       $channel       = "";
+       $channels      = 0;
+
        if (defined $resultData->{data}->{channelDs}->{docsis30}) {
-           $views = $resultData->{data}->{channelDs}->{docsis30};
-           $nbViews = scalar @$views;
-       }
+         $resData = $resultData->{data}->{channelDs}->{docsis30};
+         @$resData = sort {$a->{channelID} <=> $b->{channelID} } @$resData;
 
-       if ($nbViews > 0) {
+         if (@{$resData}) {
+           $docsisAvailable = 1;
+           $channels = @{$resData};
 
-         $docsisAvailable = 1;
+           for my $i (0 .. $channels - 1) {
+             $modType     = $resData->[$i]->{type}?"type":"modulation";
 
-         $powerLevels   = "";
-         $latencys      = "";
-         $frequencys    = "";
-         $corrErrors    = "";
-         $nonCorrErrors = "";
-         $mses          = "";
-         $modulations   = "";
-
-         $modType = $resultData->{data}->{channelDs}->{docsis30}->[0]->{type}?"type":"modulation";
-
-         eval {
-           for(my $i = 0; $i <= $nbViews - 1; $i++) {
-             $powerLevels   .= $resultData->{data}->{channelDs}->{docsis30}->[$i]->{powerLevel} . " ";
-             $latencys      .= $resultData->{data}->{channelDs}->{docsis30}->[$i]->{latency} . " ";
-             $frequencys    .= $resultData->{data}->{channelDs}->{docsis30}->[$i]->{frequency} . " ";
-             $corrErrors    .= $resultData->{data}->{channelDs}->{docsis30}->[$i]->{corrErrors} . " ";
-             $nonCorrErrors .= $resultData->{data}->{channelDs}->{docsis30}->[$i]->{nonCorrErrors} . " ";
-             $mses          .= $resultData->{data}->{channelDs}->{docsis30}->[$i]->{mse} . " ";
-             $modulations   .= $1 if($resultData->{data}->{channelDs}->{docsis30}->[$i]->{$modType} =~ /(\d+)/);
+             $channel       .= $resData->[$i]->{channelID} . " ";
+             $powerLevels   .= $resData->[$i]->{powerLevel} . " ";
+             $latencys      .= $resData->[$i]->{latency} . " ";
+             $frequencys    .= $resData->[$i]->{frequency} . " ";
+             $corrErrors    .= $resData->[$i]->{corrErrors} . " ";
+             $nonCorrErrors .= $resData->[$i]->{nonCorrErrors} . " ";
+             $mses          .= $resData->[$i]->{mse} . " ";
+             $modulations   .= $1 if($resData->[$i]->{$modType} =~ /(\d+)/);
              $modulations   .= " ";
            }
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_powerLevels", substr($powerLevels,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_latencys", substr($latencys,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_frequencys", substr($frequencys,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_corrErrors", substr($corrErrors,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_nonCorrErrors", substr($latencys,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_mses", substr($mses,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_modulations", substr($modulations,0,-1);
-           delete $oldDocDevice{box_docsis30_Ds_powerLevels}   if exists $oldDocDevice{docsis30_Ds_powerLevels};
-           delete $oldDocDevice{box_docsis30_Ds_latencys}      if exists $oldDocDevice{docsis30_Ds_latencys};
-           delete $oldDocDevice{box_docsis30_Ds_frequencys}    if exists $oldDocDevice{docsis30_Ds_frequencys};
-           delete $oldDocDevice{box_docsis30_Ds_corrErrors}    if exists $oldDocDevice{docsis30_Ds_corrErrors};
-           delete $oldDocDevice{box_docsis30_Ds_nonCorrErrors} if exists $oldDocDevice{docsis30_Ds_nonCorrErrors};
-           delete $oldDocDevice{box_docsis30_Ds_mses}          if exists $oldDocDevice{docsis30_Ds_mses};
-           delete $oldDocDevice{box_docsis30_Ds_modulations}   if exists $oldDocDevice{docsis30_Ds_modulations};
-         };
-
+         }
        }
 
-       $nbViews = 0;
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_channelsCnt", ($channels ? $channels : "");
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_channelIDs",  substr($channel,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_powerLevels", substr($powerLevels,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_latencys",    substr($latencys,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_frequencys",  substr($frequencys,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_corrErrs",    substr($corrErrors,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_nonCorrErrs", substr($nonCorrErrors,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_mses",        substr($mses,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis30_Ds_modulations", substr($modulations,0,-1);
+
+       # compute channelDs docsis31
+
+       $resData     = "";
+       $powerLevels = "";
+       $frequencys  = "";
+       $modulations = "";
+       $channel     = "";
+       $channels    = 0;
+
        if (defined $resultData->{data}->{channelDs}->{docsis31}) {
-         $views = $resultData->{data}->{channelDs}->{docsis31};
-         $nbViews = scalar @$views;
-       }
+         $resData = $resultData->{data}->{channelDs}->{docsis31};
+         @$resData = sort {$a->{channelID} <=> $b->{channelID} } @$resData;
 
-       if ($nbViews > 0) {
+         if (@{$resData}) {
+           $docsisAvailable = 1;
+           $channels = @{$resData};
 
-         $docsisAvailable = 1;
+           for my $i (0 .. $channels - 1) {
+             $modType     = $resData->[$i]->{type}?"type":"modulation";
 
-         $powerLevels = "";
-         $frequencys  = "";
-         $modulations   = "";
-
-         $modType = $resultData->{data}->{channelDs}->{docsis31}->[0]->{type}?"type":"modulation";
-
-         eval {
-           for(my $i = 0; $i <= $nbViews - 1; $i++) {
-             $powerLevels .= $resultData->{data}->{channelDs}->{docsis31}->[$i]->{powerLevel} . " ";
-             $frequencys  .= $resultData->{data}->{channelDs}->{docsis31}->[$i]->{frequency} . " ";
-             $modulations .= $1 if($resultData->{data}->{channelDs}->{docsis31}->[$i]->{$modType} =~ /(\d+)/);
+             $channel     .= $resData->[$i]->{channelID} . " ";
+             $powerLevels .= $resData->[$i]->{powerLevel} . " ";
+             $frequencys  .= $resData->[$i]->{frequency} . " ";
+             $modulations .= $1 if($resData->[$i]->{$modType} =~ /(\d+)/);
              $modulations .= " ";
            }
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Ds_powerLevels", substr($powerLevels,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Ds_frequencys", substr($frequencys,0,-1);
-           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Ds_modulations", substr($modulations,0,-1);
-           delete $oldDocDevice{box_docsis31_Ds_powerLevels} if exists $oldDocDevice{docsis31_Ds_powerLevels};
-           delete $oldDocDevice{box_docsis31_Ds_frequencys}  if exists $oldDocDevice{docsis31_Ds_frequencys};
-           delete $oldDocDevice{box_docsis31_Ds_modulations} if exists $oldDocDevice{docsis31_Ds_modulations};
-         };
+         }
        }
 
-       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis_Available", $docsisAvailable;
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Ds_channelsCnt", ($channels ? $channels : "");
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Ds_channelIDs",  substr($channel,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Ds_powerLevels", substr($powerLevels,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Ds_frequencys",  substr($frequencys,0,-1);
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis31_Ds_modulations", substr($modulations,0,-1);
 
-       # Remove inactive or non existing docsis-readings in two steps
-       #foreach ( keys %oldDocDevice ) {
-       # set the docsis readings to 'inactive' and delete at next readout
-       #  if ( $oldDocDevice{$_} ne "inactive" ) {
-       #    FRITZBOX_Readout_Add_Reading $hash, $roReadings, $_, "inactive";
-       #  } else {
-       #    FRITZBOX_Readout_Add_Reading $hash, $roReadings, $_, "";
-       #  }
-       #}
+       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "docsis_Available", $docsisAvailable;
 
        FRITZBOX_Log $hash, 4, "DOCSIS FB Cable - end getting data";
 
      } else {
        FRITZBOX_Log $hash, 4, "wrong Fritz!OS: $hash->{fhem}{fwVersionStr} or AVM-Model: $avmModel for docsis informations.";
      }
+
+     #-------------------------------------------------------------------------------------
+     # CPU informations
 
      my $cpuInfo = AttrVal($name, "enableCPUInfo", 0);
 
@@ -7923,28 +7919,21 @@ sub FRITZBOX_Readout_Run_Web_TR064($$$$)
        # getting WANIPConnection Info WANIPConnection:1 wanipconnection1 GetInfo
 
        #-------------------------------------------------------------------------------------
-       # Retrieve WANPPPConnection information or WANIPConnection information. Both connection types can be used, e.g., DSL connection with mobile fallback.
+       # Retrieve WANPPPConnection information or WANIPConnection information. Both connection types can be used, i.e., DSL connection with mobile fallback.
 
        my $wanConnection = "";
 
-       FRITZBOX_Log $hash, 4, "wanipconnection - start getting TR064 data";
+       FRITZBOX_Log $hash, 4, "wan(ip|ppp)connection - start getting TR064 data";
 
-       #-------------------------------------------------------------------------------------
-#           my $dns_servers = $tr064Result[0]->{GetInfoResponse}->{NewDNSServers};
-#           $dns_servers =~ s/ //;
-#           my @dns_list = split(/\,/, $dns_servers);
-#           my $cnt = 0;
-#           foreach ( @dns_list ) {
-#             FRITZBOX_Readout_Add_Reading $hash, $roReadings, "box_dns_Server$cnt", $_;
-#             $cnt++;
-#           }
-       #-------------------------------------------------------------------------------------
        # WANIPConnection:1 wanipconnection1 GetInfo
        # WANPPPConnection:1 wanpppconn1 GetInfo
 
-       my @conn = ("ip", "ppp");
+       my @conn = ();
 
-       for (my $i = 0; $i <= 1; $i++) {
+       push (@conn, "ip")  if ($hash->{TR064control}{WANIPConnection}{active} == 1);
+       push (@conn, "ppp") if ($hash->{TR064control}{WANPPPConnection}{active} == 1);
+
+       for (my $i = 0; $i < @conn; $i++) {
 
          $wanConnection = "wan" .$conn[$i]. "conn";
 
@@ -8561,18 +8550,22 @@ sub FRITZBOX_Readout_Process($$)
      }
    }
 
+   my $TR064_chg = 0;
+
    # adapt TR064-Mode
    if ( defined $values{box_tr064} ) {
      if ( $values{box_tr064} eq "off" && defined $hash->{SECPORT} ) {
        FRITZBOX_Log $hash, 4, "TR-064 is switched off";
        delete $hash->{SECPORT};
        $hash->{TR064} = 0;
+       $TR064_chg = 1;
      }
      elsif ( $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
        FRITZBOX_Log $hash, 4, "TR-064 is switched on";
        my $tr064Port = FRITZBOX_init_TR064 ($hash, $hash->{HOST});
        $hash->{SECPORT} = $tr064Port if $tr064Port;
        $hash->{TR064} = 1;
+       $TR064_chg = 1;
      }
    }
 
@@ -8589,6 +8582,23 @@ sub FRITZBOX_Readout_Process($$)
    readingsEndUpdate( $hash, 1 );
 
    readingsSingleUpdate( $hash, "retStat_processReadout", sprintf( "%.2f s", time()-$startTime), 1);
+
+   if ( $TR064_chg == 1) {
+
+     FRITZBOX_Log $hash, 3, "TR-064 is switched -> start a new API check";
+     $hash->{APICHECKED}         = 0;
+     $hash->{WEBCONNECT}         = 0;
+     $hash->{APICHECK_RET_CODES} = "-";
+     $hash->{fhem}{sidTime}      = 0;
+     $hash->{fhem}{sidErrCount}  = 0;
+     $hash->{fhem}{sidNewCount}  = 0;
+     $hash->{fhem}{LOCAL}        = 1;
+     $hash->{SID_RENEW_ERR_CNT}  = 0;
+     $hash->{SID_RENEW_CNT}      = 0;
+     FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
+     $hash->{fhem}{LOCAL} = 0;
+
+   }
 
 } # end FRITZBOX_Readout_Process
 
@@ -9302,63 +9312,100 @@ sub FRITZBOX_Set_check_APIs($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 1;
 
+         # start testing TR064 services
+         if($hash->{TR064} == 1) {
 
-         if($tr064Port && FRITZBOX_get_TR064_ServiceList($hash, "wancommonifconfig1") ) {
-           FRITZBOX_Log $hash, 4, "wancommonifconfig1/box_wan_AccessType - start getting TR064 data";
+           if(FRITZBOX_get_TR064_ServiceList($hash, "wancommonifconfig1") ) {
+             FRITZBOX_Log $hash, 4, "wancommonifconfig1/box_wan_AccessType - start getting TR064 data";
 
-           # WANCommonInterfaceConfig:1 wancommonifconfig1 GetCommonLinkProperties
-           my @tr064CmdArray = (["WANCommonInterfaceConfig:1", "wancommonifconfig1", "GetCommonLinkProperties"]);
-           my @tr064Result = FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
+             # WANCommonInterfaceConfig:1 wancommonifconfig1 GetCommonLinkProperties
+             my @tr064CmdArray = (["WANCommonInterfaceConfig:1", "wancommonifconfig1", "GetCommonLinkProperties"]);
+             my @tr064Result = FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
  
-           if ($tr064Result[0]->{UPnPError}) {
-             FRITZBOX_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . FRITZBOX_Helper_Dumper($hash, \@tr064Result, 5);
-             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
-           } else {
-             FRITZBOX_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . FRITZBOX_Helper_Dumper($hash, \@tr064Result, 5);
-
-             if ($tr064Result[0]->{GetCommonLinkPropertiesResponse}) {
-               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", $tr064Result[0]->{GetCommonLinkPropertiesResponse}->{NewWANAccessType};
-             } else {
+             if ($tr064Result[0]->{UPnPError}) {
+               FRITZBOX_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . FRITZBOX_Helper_Dumper($hash, \@tr064Result, 5);
                FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
+             } else {
+               FRITZBOX_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . FRITZBOX_Helper_Dumper($hash, \@tr064Result, 5);
+
+               if ($tr064Result[0]->{GetCommonLinkPropertiesResponse}) {
+                 FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", $tr064Result[0]->{GetCommonLinkPropertiesResponse}->{NewWANAccessType};
+               } else {
+                 FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
+               }
+             }
+           } else {
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "";
+           }
+
+           my $avmModel = InternalVal($name, "MODEL", $hash->{boxModel});
+           my $serviceList = FRITZBOX_get_TR064_ServiceList ($hash, undef, "tr64" . "desc.xml");
+
+           FRITZBOX_Log $hash, 4, "ApiCheck TR64 serviceList\n" . $serviceList;
+
+           # Reboot will not be tested, but added in TR064control
+           my $tr64service = $hash->{TR064control}{Reboot}{control};
+
+           if ($serviceList =~ /$tr64service/) {
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->Reboot->active", 1;
+           } else {
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->Reboot->active", 0;
+           }
+
+           # has to be deleted for preventing from testing
+           delete $hash->{TR064control}{Reboot}; 
+
+           foreach my $key (keys %{ $hash->{TR064control} }) {
+
+             $tr64service = $hash->{TR064control}{$key}{control};
+
+             if ($serviceList =~ /$tr64service/) {
+               my @tr064CmdArray = ([$hash->{TR064control}{$key}{service}, $hash->{TR064control}{$key}{control}, $hash->{TR064control}{$key}{action}]);
+               my @tr064Result = FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
+
+               if ($tr064Result[0]->{UPnPError}) {
+                 FRITZBOX_Log $hash, 4, "$key = $hash->{TR064control}{$key}{control}: not Ok";
+                 FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->" . $key . "->active", 0;
+               } else {
+                 FRITZBOX_Log $hash, 4, "$key = $hash->{TR064control}{$key}{control}: Ok";
+                 FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->" . $key . "->active", 1;
+               }
+             } else {
+               FRITZBOX_Log $hash, 4, "$key = $hash->{TR064control}{$key}{control}: not Ok";
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->" . $key . "->active", 0;
+             }
+           }
+
+           $serviceList = FRITZBOX_get_TR064_ServiceList ($hash, undef, "igd" . "desc.xml");
+           FRITZBOX_Log $hash, 4, "ApiCheck IGD serviceList\n" . $serviceList;
+
+           foreach my $key (keys %{ $hash->{IGDcontrol} }) {
+
+             my $IGDcontrol = $hash->{IGDcontrol}{$key}{control};
+             if ($serviceList =~ /$IGDcontrol/) {
+               my @tr064CmdArray = ([$hash->{IGDcontrol}{$key}{service}, $hash->{IGDcontrol}{$key}{control}, $hash->{IGDcontrol}{$key}{action}]);
+               my @tr064Result = FRITZBOX_call_TR064_Cmd( $hash, 0, \@tr064CmdArray, 1 );
+
+               if ($tr064Result[0]->{UPnPError}) {
+                 FRITZBOX_Log $hash, 4, "$key = $hash->{IGDcontrol}{$key}{control}: not Ok";
+                 FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "IGDcontrol->" . $key . "->active", 0;
+               } else {
+                 FRITZBOX_Log $hash, 4, "$key = $hash->{IGDcontrol}{$key}{control}: Ok";
+                 FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "IGDcontrol->" . $key . "->active", 1;
+               }
+             } else {
+               FRITZBOX_Log $hash, 4, "$key = $hash->{IGDcontrol}{$key}{control}: not Ok";
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "IGDcontrol->" . $key . "->active", 0;
              }
            }
          } else {
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "";
-         }
-
-         my $avmModel = InternalVal($name, "MODEL", $hash->{boxModel});
-         my $serviceList = FRITZBOX_get_TR064_ServiceList ($hash, undef, "tr64" . "desc.xml");
-
-         FRITZBOX_Log $hash, 4, "ApiCheck TR64 serviceList\n" . $serviceList;
-
-         foreach my $key (keys %{ $hash->{TR064control} }) {
-           if(($key !~ /WANIPConnection|WANPPPConnection/) || ($key eq "WANIPConnection" && lc($avmModel) =~ /cable|fibre|lte/) || ($key eq "WANPPPConnection" && lc($avmModel) !~ /cable|fibre|lte/)) {
-
-             my $tr64service = $hash->{TR064control}{$key}{control};
-             if ($serviceList =~ /$tr64service/) {
-               FRITZBOX_Log $hash, 4, "$key = $hash->{TR064control}{$key}{control}: Ok";
-               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->" . $key . "->active", 1;
-             } else {
-               FRITZBOX_Log $hash, 4, "$key = $hash->{TR064control}{$key}{control}: not Ok";
-               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->" . $key . "->active", ($hash->{TR064} != 1 ? -1 : 0)
-             }
+           foreach my $key (keys %{ $hash->{TR064control} }) {
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "TR064control->" . $key . "->active", -1;
            }
-         }
-
-         $serviceList = FRITZBOX_get_TR064_ServiceList ($hash, undef, "igd" . "desc.xml");
-         FRITZBOX_Log $hash, 4, "ApiCheck IGD serviceList\n" . $serviceList;
-
-         foreach my $key (keys %{ $hash->{IGDcontrol} }) {
-
-           my $IGDcontrol = $hash->{IGDcontrol}{$key}{control};
-           if ($serviceList =~ /$IGDcontrol/) {
-             FRITZBOX_Log $hash, 4, "$key = $hash->{IGDcontrol}{$key}{control}: Ok";
-             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "IGDcontrol->" . $key . "->active", 1;
-           } else {
-             FRITZBOX_Log $hash, 4, "$key = $hash->{IGDcontrol}{$key}{control}: not Ok";
-             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "IGDcontrol->" . $key . "->active", ($hash->{TR064} != 1 ? -1 : 0)
+           foreach my $key (keys %{ $hash->{IGDcontrol} }) {
+             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "IGDcontrol->" . $key . "->active", -1;
            }
-         }
+         } # end testing TR064 services
 
          if($luaQueryOk) {
 
@@ -12194,15 +12241,17 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
    my ($hash) = @_;
    my $name = $hash->{NAME};
 
-   # xhr 1 lang de page docInfo xhrId all no_sidrenew nop
+   # xhr 1 lang de page docInfo xhrId all
    my @webCmdArray;
    push @webCmdArray, "xhr"         => "1";
    push @webCmdArray, "lang"        => "de";
    push @webCmdArray, "page"        => "docInfo";
    push @webCmdArray, "xhrId"       => "all";
-   push @webCmdArray, "no_sidrenew" => "";
 
    my $returnStr;
+
+#   my $TestSIS = '{"pid":"docInfo","hide":{"shareUsb":true,"autoUp":true,"liveTv":true,"update":true,"rrd":true,"mobile":true,"userUp":true,"wizUpdate":true,"ssoSet":true},"timeTillLogout":"1199","time":[],"data":{"channelDs":{"docsis30":[{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.6","channelID":13,"frequency":"250.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":15,"latency":0.32,"mse":"-37.6","channelID":5,"frequency":"186.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.6","channelID":9,"frequency":"218.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":0,"latency":0.32,"mse":"-37.4","channelID":1,"frequency":"154.000"},{"powerLevel":"4.5","nonCorrErrors":0,"modulation":"256QAM","corrErrors":10,"latency":0.32,"mse":"-37.4","channelID":2,"frequency":"162.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":14,"latency":0.32,"mse":"-37.4","channelID":3,"frequency":"170.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":13,"latency":0.32,"mse":"-37.6","channelID":4,"frequency":"178.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":13,"latency":0.32,"mse":"-37.6","channelID":6,"frequency":"194.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.4","channelID":7,"frequency":"202.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":8,"latency":0.32,"mse":"-37.4","channelID":8,"frequency":"210.000"},{"powerLevel":"4.0","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.6","channelID":10,"frequency":"226.000"},{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":5,"latency":0.32,"mse":"-37.6","channelID":11,"frequency":"234.000"},{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.4","channelID":12,"frequency":"242.000"},{"powerLevel":"4.1","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.6","channelID":14,"frequency":"258.000"},{"powerLevel":"4.8","nonCorrErrors":0,"modulation":"256QAM","corrErrors":15,"latency":0.32,"mse":"-37.6","channelID":15,"frequency":"266.000"},{"powerLevel":"4.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":10,"latency":0.32,"mse":"-37.6","channelID":16,"frequency":"274.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":22,"latency":0.32,"mse":"-37.6","channelID":17,"frequency":"282.000"},{"powerLevel":"4.4","nonCorrErrors":0,"modulation":"256QAM","corrErrors":17,"latency":0.32,"mse":"-37.6","channelID":18,"frequency":"290.000"},{"powerLevel":"4.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":34,"latency":0.32,"mse":"-37.4","channelID":19,"frequency":"298.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":32,"latency":0.32,"mse":"-37.6","channelID":20,"frequency":"306.000"},{"powerLevel":"4.4","nonCorrErrors":0,"modulation":"256QAM","corrErrors":28,"latency":0.32,"mse":"-37.4","channelID":21,"frequency":"314.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":29,"latency":0.32,"mse":"-37.4","channelID":22,"frequency":"322.000"},{"powerLevel":"4.8","nonCorrErrors":0,"modulation":"256QAM","corrErrors":32,"latency":0.32,"mse":"-37.6","channelID":23,"frequency":"330.000"},{"powerLevel":"4.6","nonCorrErrors":0,"modulation":"256QAM","corrErrors":27,"latency":0.32,"mse":"-37.6","channelID":24,"frequency":"338.000"}]},"oem":"avm","readyState":"ready","channelUs":{"docsis30":[{"powerLevel":"42.3","modulation":"64QAM","multiplex":"ATDMA","channelID":8,"frequency":"48.400"},{"powerLevel":"42.0","modulation":"64QAM","multiplex":"ATDMA","channelID":10,"frequency":"61.400"},{"powerLevel":"42.0","modulation":"64QAM","multiplex":"ATDMA","channelID":9,"frequency":"54.800"},{"powerLevel":"42.3","modulation":"64QAM","multiplex":"ATDMA","channelID":6,"frequency":"35.200"},{"powerLevel":"41.8","modulation":"64QAM","multiplex":"ATDMA","channelID":7,"frequency":"41.800"}]}},"sid":"ee9c7ab49ebf6e09"}';
+#   my $result  = FRITZBOX_Helper_process_JSON($hash, $TestSIS, "ee9c7ab49ebf6e09", "");
 
    my $result = FRITZBOX_call_LuaData($hash, "data", \@webCmdArray) ;
 
@@ -12222,10 +12271,6 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
 
    FRITZBOX_Log $hash, 5, "\n" . FRITZBOX_Helper_Dumper($hash, $result->{data}, 5);
 
-   my $views;
-   my $nbViews;
-
-#  border(8),cellspacing(10),cellpadding(20)
    my $tableFormat = AttrVal($name, "disableTableFormat", "undef");
 
    $returnStr .= '<table';
@@ -12236,143 +12281,179 @@ sub FRITZBOX_Get_DOCSIS_Informations($) {
    $returnStr .= "<tr>\n";
    $returnStr .= '<td colspan="10">DOCSIS Informationen</td>';
    $returnStr .= "</tr>\n";
-   $returnStr .= "<tr>\n";
-   $returnStr .= "<td>Kanal</td><td>KanalID</td><td>Multiplex</td><td>Typ</td><td>Powerlevel</td><td>Frequenz</td>";
-   $returnStr .= "<td>Latenz</td><td>corrErrors</td><td>nonCorrErrors</td><td>MSE</td>\n";
-   $returnStr .= "</tr>\n";
 
-   $nbViews = 0;
-   if (defined $result->{data}->{channelUs}->{docsis30}) {
-     $views = $result->{data}->{channelUs}->{docsis30};
-     $nbViews = scalar @$views;
-   }
-
-   if ($nbViews > 0) {
+   if (defined $result->{data}->{noJSONinfo}) {
      $returnStr .= "<tr>\n";
-     $returnStr .= '<td colspan="10">channelUs - docsis30</td>';
+     $returnStr .= '<td colspan="10">' .$result->{data}->{noJSONinfo}. '</td>';
      $returnStr .= "</tr>\n";
-
-     my $modType = $result->{data}->{channelUs}->{docsis30}->[0]->{type}?"type":"modulation";
-
-     eval {
-       for(my $i = 0; $i <= $nbViews - 1; $i++) {
-         $returnStr .= "<tr>\n";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{channel} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{channelID} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{multiplex} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{type} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{powerLevel} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis30}->[$i]->{frequency} . "</td>";
-         $returnStr .= "<td>";
-         $returnStr .= $1 if($result->{data}->{channelUs}->{docsis30}->[$i]->{$modType} =~ /(\d+)/);
-         $returnStr .= "</td>";
-         $returnStr .= "</tr>\n";
-       }
-     };
-
-     $returnStr .= "</tr>\n";
-     $returnStr .= '<td colspan="10"> </td>';
-     $returnStr .= "</tr>\n";
+     $returnStr .= "</table>\n";
+     return $returnStr;
    }
 
-   $nbViews = 0;
+   my $resData     = "";
+   my $channels    = 0;
+   my $docsisInfo  = 0;
+
+   if (defined $result->{data}->{channelUs}->{docsis30}) {
+     $resData = $result->{data}->{channelUs}->{docsis30};
+     @$resData = sort {$a->{channelID} <=> $b->{channelID} } @$resData;
+
+     if (@{$resData}) {
+       $returnStr .= "<tr>\n";
+       $returnStr .= '<td colspan="10">channelUs - docsis30</td>';
+       $returnStr .= "</tr>\n";
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>Kanal</td><td>KanalID</td><td>Typ</td><td>Multiplex</td><td>Powerlevel</td><td>Frequenz</td>";
+       $returnStr .= "</tr>\n";
+
+       $channels   = @{$resData};
+       $docsisInfo = 1;
+
+       for my $i (0 .. $channels - 1) {
+
+         my $modType = $resData->[$i]->{type}?"type":"modulation";
+
+         $returnStr .= "<tr>\n";
+
+         $returnStr .= "<td>" .($resData->[$i]->{channel}?$resData->[$i]->{channel}:" "). "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{channelID}  . "</td>";
+         $returnStr .= "<td>";
+         $returnStr .= $1 if($resData->[$i]->{$modType} =~ /(\d+)/);
+         $returnStr .= "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{multiplex}  . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{powerLevel} . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{frequency}  . "</td>";
+
+         $returnStr .= "</tr>\n";
+       }
+
+       $returnStr .= "</tr>\n";
+       $returnStr .= '<td colspan="10"> </td>';
+       $returnStr .= "</tr>\n";
+     }
+   }
+
    if (defined $result->{data}->{channelUs}->{docsis31}) {
-     $views = $result->{data}->{channelUs}->{docsis31};
-     $nbViews = scalar @$views;
-   }
+     $resData = $result->{data}->{channelUs}->{docsis31};
+     @$resData = sort {$a->{channelID} <=> $b->{channelID} } @$resData;
 
-   if ($nbViews > 0) {
-     $returnStr .= "</tr>\n";
-     $returnStr .= '<td colspan="10">channelUs - docsis31</td>';
-     $returnStr .= "</tr>\n";
+     if (@{$resData}) {
+       $returnStr .= "</tr>\n";
+       $returnStr .= '<td colspan="10">channelUs - docsis31</td>';
+       $returnStr .= "</tr>\n";
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>Kanal</td><td>KanalID</td><td>Typ</td><td>Multiplex</td><td>Powerlevel</td><td>Frequenz</td>";
+       $returnStr .= "</tr>\n";
 
-     my $modType = $result->{data}->{channelUs}->{docsis31}->[0]->{type}?"type":"modulation";
+       $channels   = @{$resData};
+       $docsisInfo = 1;
 
-     eval {
-       for(my $i = 0; $i <= $nbViews - 1; $i++) {
+       for my $i (0 .. $channels - 1) {
+
+         my $modType = $resData->[$i]->{type}?"type":"modulation";
+
          $returnStr .= "<tr>\n";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{channel} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{channelID} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{multiplex} . "</td>" if $result->{data}->{channelUs}->{docsis31}->[$i]->{multiplex};
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{type} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{powerLevel} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelUs}->{docsis31}->[$i]->{frequency} . "</td>";
+
+         $returnStr .= "<td>" .($resData->[$i]->{channel}?$resData->[$i]->{channel}:" "). "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{channelID}  . "</td>";
          $returnStr .= "<td>";
-         $returnStr .= $1 if($result->{data}->{channelUs}->{docsis31}->[$i]->{$modType} =~ /(\d+)/);
+         $returnStr .= $1 if($resData->[$i]->{$modType} =~ /(\d+)/);
          $returnStr .= "</td>";
+         $returnStr .= "<td>" . ($resData->[$i]->{multiplex}?$resData->[$i]->{multiplex}:" ")  . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{powerLevel} . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{frequency}  . "</td>";
+         $returnStr .= "</td>";
+
          $returnStr .= "</tr>\n";
        }
-     };
 
-     $returnStr .= "</tr>\n";
-     $returnStr .= '<td colspan="10"> </td>';
-     $returnStr .= "</tr>\n";
+       $returnStr .= "</tr>\n";
+       $returnStr .= '<td colspan="10"> </td>';
+       $returnStr .= "</tr>\n";
+     }
    }
 
-   $nbViews = 0;
    if (defined $result->{data}->{channelDs}->{docsis30}) {
-     $views = $result->{data}->{channelDs}->{docsis30};
-     $nbViews = scalar @$views;
-   }
+     $resData = $result->{data}->{channelDs}->{docsis30};
+     @$resData = sort {$a->{channelID} <=> $b->{channelID} } @$resData;
 
-   if ($nbViews > 0) {
-     $returnStr .= "</tr>\n";
-     $returnStr .= '<td colspan="10">channelDs - docsis30</td>';
-     $returnStr .= "</tr>\n";
+     if (@{$resData}) {
+       $returnStr .= "</tr>\n";
+       $returnStr .= '<td colspan="10">channelDs - docsis30</td>';
+       $returnStr .= "</tr>\n";
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>Kanal</td><td>KanalID</td><td>Typ</td><td>Powerlevel</td><td>Frequenz</td>";
+       $returnStr .= "<td>Latenz</td><td>corrErrors</td><td>nonCorrErrors</td><td>MSE</td>\n";
+       $returnStr .= "</tr>\n";
 
-     my $modType = $result->{data}->{channelDs}->{docsis30}->[0]->{type}?"type":"modulation";
+       $channels   = @{$resData};
+       $docsisInfo = 1;
 
-     eval {
-       for(my $i = 0; $i <= $nbViews - 1; $i++) {
+       for my $i (0 .. $channels - 1) {
+
+         my $modType = $resData->[$i]->{type}?"type":"modulation";
+
          $returnStr .= "<tr>\n";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{channel} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{channelID} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{type} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{powerLevel} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{latency} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{frequency} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{corrErrors} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{nonCorrErrors} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis30}->[$i]->{mse} . "</td>";
+
+         $returnStr .= "<td>" .($resData->[$i]->{channel}?$resData->[$i]->{channel}:" "). "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{channelID}     . "</td>";
          $returnStr .= "<td>";
-         $returnStr .= $1 if($result->{data}->{channelDs}->{docsis30}->[$i]->{$modType} =~ /(\d+)/);
+         $returnStr .= $1 if($resData->[$i]->{$modType} =~ /(\d+)/);
          $returnStr .= "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{powerLevel}    . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{frequency}     . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{latency}       . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{corrErrors}    . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{nonCorrErrors} . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{mse}           . "</td>";
+
          $returnStr .= "</tr>\n";
        }
-     };
 
-     $returnStr .= "</tr>\n";
-     $returnStr .= '<td colspan="10"> </td>';
-     $returnStr .= "</tr>\n";
+       $returnStr .= "</tr>\n";
+       $returnStr .= '<td colspan="10"> </td>';
+       $returnStr .= "</tr>\n";
+     }
    }
 
-   $nbViews = 0;
    if (defined $result->{data}->{channelDs}->{docsis31}) {
-     $views = $result->{data}->{channelDs}->{docsis31};
-     $nbViews = scalar @$views;
-   }
+     $resData = $result->{data}->{channelDs}->{docsis31};
+     @$resData = sort {$a->{channelID} <=> $b->{channelID} } @$resData;
 
-   if ($nbViews > 0) {
-     $returnStr .= "</tr>\n";
-     $returnStr .= '<td colspan="10">channelDs - docsis31</td>';
-     $returnStr .= "</tr>\n";
+     if (@{$resData}) {
+       $returnStr .= "</tr>\n";
+       $returnStr .= '<td colspan="10">channelDs - docsis31</td>';
+       $returnStr .= "</tr>\n";
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>Kanal</td><td>KanalID</td><td>Typ</td><td>Powerlevel</td><td>Frequenz</td>";
+       $returnStr .= "</tr>\n";
 
-     my $modType = $result->{data}->{channelDs}->{docsis31}->[0]->{type}?"type":"modulation";
+       $channels   = @{$resData};
+       $docsisInfo = 1;
 
-     eval {
-       for(my $i = 0; $i <= $nbViews - 1; $i++) {
+       for my $i (0 .. $channels - 1) {
+
+         my $modType = $resData->[$i]->{type}?"type":"modulation";
+
          $returnStr .= "<tr>\n";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{channel} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{channelID} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{type} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{powerLevel} . "</td>";
-         $returnStr .= "<td>" . $result->{data}->{channelDs}->{docsis31}->[$i]->{frequency} . "</td>";
+
+         $returnStr .= "<td>" .($resData->[$i]->{channel}?$resData->[$i]->{channel}:" "). "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{channelID}  . "</td>";
          $returnStr .= "<td>";
-         $returnStr .= $1 if($result->{data}->{channelDs}->{docsis31}->[$i]->{$modType} =~ /(\d+)/);
+         $returnStr .= $1 if($resData->[$i]->{$modType} =~ /(\d+)/);
          $returnStr .= "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{powerLevel} . "</td>";
+         $returnStr .= "<td>" . $resData->[$i]->{frequency}  . "</td>";
+
          $returnStr .= "</tr>\n";
        }
-     };
+     }
+   }
+
+   unless($docsisInfo) {
+     $returnStr .= "</tr>\n";
+     $returnStr .= '<td colspan="10">no docsis-Info available</td>';
+     $returnStr .= "</tr>\n";
    }
 
    $returnStr .= "</table>\n";
@@ -17386,22 +17467,30 @@ sub FRITZBOX_Helper_Dumper($$;@) {
 
       <li><b>docsis...</b>Readings docsis. Available when the enableDocsisInfo attribute is enabled</li>
       <li><b>docsis_Available</b> - Fritz!Box Cable only</li> 
-      <li><b>docsis30_Ds_corrErrors</b> - Fritz!Box Cable only</li> 
+      <li><b>docsis30_Ds_channelIDs</b> - Fritz!Box Cable only</li> 
+      <li><b>docsis30_Ds_channelsCnt</b> - Fritz!Box Cable only</li> 
+      <li><b>docsis30_Ds_corrErrs</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Ds_frequencys</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Ds_latencies</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Ds_mses</b> - Fritz!Box Cable only</li> 
-      <li><b>docsis30_Ds_nonCorrErrors</b> - Fritz!Box Cable only</li> 
+      <li><b>docsis30_Ds_nonCorrErrs</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Ds_powerLevels</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Ds_modulations</b> - Fritz!Box Cable only</li> 
 
+      <li><b>docsis30_Us_channelIDs</b> - Fritz!Box Cable only</li> 
+      <li><b>docsis30_Us_channelsCnt</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Us_frequencys</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Us_powerLevels</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Us_modulations</b> - Fritz!Box Cable only</li> 
 
+      <li><b>docsis31_Ds_channelIDs</b> - Fritz!Box Cable only</li> 
+      <li><b>docsis31_Ds_channelsCnt</b> - Fritz!Box Cable only</li> 
       <li><b>docsis31_Ds_frequencys</b> - Fritz!Box Cable only</li> 
       <li><b>docsis31_Ds_powerLevels</b> - Fritz!Box Cable only</li> 
       <li><b>docsis31_Ds_modulations</b> - Fritz!Box Cable only</li> 
 
+      <li><b>docsis31_Us_channelIDs</b> - Fritz!Box Cable only</li> 
+      <li><b>docsis31_Us_channelsCnt</b> - Fritz!Box Cable only</li> 
       <li><b>docsis31_Us_frequencys</b> - Fritz!Box Cable only</li> 
       <li><b>docsis31_Us_powerLevels</b> - Fritz!Box only Cable</li> 
       <li><b>docsis31_Us_modulations</b> - Fritz!Box Cable only</li> 
@@ -18535,22 +18624,30 @@ sub FRITZBOX_Helper_Dumper($$;@) {
 
       <li><b>docsis...</b>Readings docsis. Verfügbar, wenn das Attribut enabledocsisInfo aktiviert ist</li>
       <li><b>docsis_Available</b> - Nur Fritz!Box Cable</li> 
-      <li><b>docsis30_Ds_corrErrors</b> - Nur Fritz!Box Cable</li>
+      <li><b>docsis30_Ds_channelIDs</b> - Nur Fritz!Box Cable</li>
+      <li><b>docsis30_Ds_channelsCnt</b> - Nur Fritz!Box Cable</li>
+      <li><b>docsis30_Ds_corrErrs</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis30_Ds_frequencys</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis30_Ds_latencys</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis30_Ds_mses</b> - Nur Fritz!Box Cable</li>
-      <li><b>docsis30_Ds_nonCorrErrors</b> - Nur Fritz!Box Cable</li>
+      <li><b>docsis30_Ds_nonCorrErrs</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis30_Ds_powerLevels</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis30_Ds_modulations</b> - Nur Fritz!Box Cable</li>
 
+      <li><b>docsis30_Us_channelIDs</b> - Nur Fritz!Box Cable</li>
+      <li><b>docsis30_Us_channelsCnt</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis30_Us_frequencys</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis30_Us_powerLevels</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis30_Us_modulations</b> - Nur Fritz!Box Cable</li>
 
+      <li><b>docsis31_Ds_channelIDs</b> - Nur Fritz!Box Cable</li>
+      <li><b>docsis31_Ds_channelsCnt</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis31_Ds_frequencys</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis31_Ds_powerLevels</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis31_Ds_modulations</b> - Nur Fritz!Box Cable</li>
 
+      <li><b>docsis31_Us_channelIDs</b> - Nur Fritz!Box Cable</li>
+      <li><b>docsis31_Us_channelsCnt</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis31_Us_frequencys</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis31_Us_powerLevels</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis31_Us_modulations</b> - Nur Fritz!Box Cable</li>
@@ -18931,3 +19028,17 @@ sub FRITZBOX_Helper_Dumper($$;@) {
 # transfer-encoding        chunked
 # x-content-type-options   nosniff
 # x-frame-options          SAMEORIGIN
+#
+# Request URL              http://192.168.0.1/api/v0/generic/tr064
+# Request Method           PUT
+# Status Code              200 OK
+# Remote Address           192.168.0.1:80
+# Referrer Policy          same-origin
+# {enabled: "1"} enabled:"1"
+#
+# Request URL              http://192.168.0.1/api/v0/generic/box
+# Request Method           PUT
+# Status Code              200 OK
+# Remote Address           192.168.0.1:80
+# Referrer Policy          same-origin
+# {upnp_activated: "1"} upnp_activated:"1"
