@@ -86,9 +86,11 @@
 #            use AttrNum instead of AttrVal where possible
 #            PBP remove postfix if
 # 20/02/2025 add a few responseIDs in readH fn.
-# xx/06/2025 modify some Log-msgs _ReadH fn
+# 27/07/2025 modify some Log-msgs _ReadH fn
 #            fix rollover in seqcntrRx
 #            rework _readST, _dispatch, _processFIFo, _deldupes subs
+# 25/10/2025 modify error handling (dupl. msg received) mode H
+#            modify _processFIFO fn
 
 
 package KNXIO; ## no critic 'package'
@@ -503,24 +505,31 @@ sub KNXIO_ReadH {
 
 		my $discardFrame = undef;
 		my $cntrdiff = $rxseqcntr - $hash->{KNXIOhelper}->{SEQUENCECNTR};
-		if (($cntrdiff == -1) || ($cntrdiff == 255)) { # rollover...
-			KNXIO_Log ($name, 3, q{TunnelRequest duplicate message received - ack it } .
-			        qq{seqcntrRx=$rxseqcntr });
+		if ($cntrdiff == 0) {
+			KNXIO_Log ($name, 4, q{TunnelRequest received - send Ack and decode } .
+			        qq{seqcntrRx=$rxseqcntr});
+		}
+		elsif (($cntrdiff == -1) || ($cntrdiff == 255)) { # rollover...
+			KNXIO_Log ($name, 3, q{TunnelRequest duplicate message received } .
+			        qq{CCID=$ccid seqcntrRx=$rxseqcntr} . q{ - ack and verify connection});
 			$discardFrame = 1; # one packet duplicate... we ack it but do not process
 		}
-		elsif ($cntrdiff != 0) { # really out of sequence
-			KNXIO_Log ($name, 3, q{TunnelRequest messaage out of sequence received: } .
-			        qq{(seqcntrRx=$rxseqcntr seqcntrTx=$hash->{KNXIOhelper}->{SEQUENCECNTR} ) - no ack & discard});
+		else { # really out of sequence
+			KNXIO_Log ($name, 3, q{TunnelRequest message out of sequence received: } .
+			        q{seqcntrRx received/expected= } . $rxseqcntr .
+			        q{/} . $hash->{KNXIOhelper}->{SEQUENCECNTR} . q{ - no ack & discard});
+			KNXIO_keepAlive($hash); # send connectionstaterequest
 			return;
 		}
-		if (! defined($discardFrame)) {
-			KNXIO_Log ($name, 4, q{TunnelRequest received - send Ack and decode. } .
-			        qq{seqcntrRx=$hash->{KNXIOhelper}->{SEQUENCECNTR}} );
-		}
+
 		my $tacksend = pack('nnnCCCC',0x0610,0x0421,10,4,$ccid,$rxseqcntr,0); # send ack
-		$hash->{KNXIOhelper}->{SEQUENCECNTR} =  ($rxseqcntr + 1) % 256;
 		::DevIo_SimpleWrite($hash,$tacksend,0);
-		return if ($discardFrame); # duplicate frame
+		$hash->{KNXIOhelper}->{SEQUENCECNTR} =  ($rxseqcntr + 1) % 256;
+
+		if (defined($discardFrame)) { # send connectionstaterequest
+			KNXIO_keepAlive($hash);
+			return;
+		}
 
 		#now decode & send to clients
 		$buf = substr($buf,10); # strip off header (10 bytes)
@@ -1053,6 +1062,7 @@ sub KNXIO_dispatch {
 	return;
 }
 
+=begin comment
 ### called from FIFO TIMER
 sub KNXIO_dispatch2 {
 ##	my ($hash, $outbuf ) = ($_[0]->{h}, $_[0]->{m});
@@ -1069,6 +1079,8 @@ sub KNXIO_dispatch2 {
 	KNXIO_processFIFO($hash);
 	return;
 }
+=end comment
+=cut
 
 ### fetch msgs from FIFO and call dispatch
 sub KNXIO_processFIFO {
@@ -1085,10 +1097,12 @@ sub KNXIO_processFIFO {
 	if ($queentries > 0) { # process timer is not running & fifo not empty
 		my $msg = shift(@{$hash->{KNXIOhelper}->{FIFO}});
 		KNXIO_Log ($name, 4, qq{dispatching buf=$msg Nr_msgs=$queentries});
-		KNXIO_dispatch2($hash, $msg);
-##		if ($queentries > 1) {
-			InternalTimer(Time::HiRes::time() + 0.05, \&KNXIO_processFIFO, $hash); # allow time for new/duplicate msgs to be read
-##		}
+#		KNXIO_dispatch2($hash, $msg);
+		$hash->{'MSGCNT'}++; # update internals and dispatch
+		$hash->{'MSGTIME'} = TimeNow();
+		Dispatch($hash, $msg);
+
+		InternalTimer(Time::HiRes::time() + 0.05, \&KNXIO_processFIFO, $hash); # allow time for new/duplicate msgs to be read
 	}
 	return;
 }
