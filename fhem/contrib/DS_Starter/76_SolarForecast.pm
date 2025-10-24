@@ -163,7 +163,9 @@ my %vNotesIntern = (
   "1.59.6" => "20.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
                            "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
                            "__batChargeOptTargetPower: use an average for the charging power if optPower set and charging target are not achievable ".
-						   "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ",
+						   "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
+						   "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add pvshare calculation ".
+						   "___doPlanning: code improvements ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
                            "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
@@ -6183,6 +6185,7 @@ sub _attrconsumer {                      ## no critic "not used"
       locktime      => '',
       noshow        => '',
       exconfc       => '',
+      pvshare       => '',
   };
 
   if ($cmd eq "set") {      
@@ -6234,6 +6237,12 @@ sub _attrconsumer {                      ## no critic "not used"
       if (exists $h->{aliasshort}) {                                                       # Kurzalias
           return qq{The short alias "$h->{aliasshort}" longer than allowed. See command reference.} 
                  if(strlength ($h->{aliasshort})> 10);
+      }
+      
+      if (exists $h->{pvshare}) {
+          if ($h->{pvshare} !~ /^(100|[1-9]?[0-9])$/xs) {          
+              return "The key 'pvshare=$h->{pvshare}' is not specified correctly. Please refer to the command reference.";
+          }
       }
 
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
@@ -6409,14 +6418,14 @@ sub _attrconsumer {                      ## no critic "not used"
       }
   }
   else {
-      my $day  = strftime "%d", localtime(time);                                                   # aktueller Tag  (range 01 to 31)
-      my ($c)  = $aName =~ /consumer([0-9]+)/xs;
+      my $day = strftime "%d", localtime(time);                                                    # aktueller Tag  (range 01 to 31)
+      my ($c) = $aName =~ /consumer([0-9]+)/xs;
 
       $paref->{c} = $c;
       delConsumerFromMem ($paref);                                                                 # Consumerdaten aus Speicher löschen
       delete $paref->{c};
 
-      deleteReadingspec  ($hash, "consumer${c}.*");
+      deleteReadingspec ($hash, "consumer${c}.*");
   }
 
   writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                          # Cache File Consumer schreiben
@@ -9353,6 +9362,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{aliasshort}        = $hc->{aliasshort}   // q{};               # Kurzalias des Verbrauchers
       $data{$name}{consumers}{$c}{type}              = $hc->{type}         // DEFCTYPE;          # Typ des Verbrauchers
       $data{$name}{consumers}{$c}{power}             = $hc->{power};                             # Leistungsaufnahme des Verbrauchers in W
+      $data{$name}{consumers}{$c}{pvshare}           = $hc->{pvshare}      // 100;               # Anteil PV am Strommix des Verbrauchers
       $data{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // DEFCMODE;          # Planungsmode des Verbrauchers
@@ -12156,8 +12166,9 @@ sub __batChargeOptTargetPower {
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
 	  my $nhr     = $hsurp->{$hod}{nhr};
+	  next if(!defined $nhr);
+	  
       my $spls    = int ($hsurp->{$hod}{surplswh} // 0);
-
       $spls       = $spls00 if($nhr eq '00');                                                                    # aktuelle Stunde: zeitgewichteter PV-Überschuß mit Original ersetzen
 	  
 	  my $nexthod = sprintf "%02d", (int $hod + 1);
@@ -12233,7 +12244,7 @@ sub __batChargeOptTargetPower {
           ####################################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
           my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed);
-          my $needraw   = min ($fref->{ph}, $spls);                                                              # Ladeleistung auf Surplus begrenzen (es kommen Nachberechnungen)
+          my $needraw   = min ($fref->{ph}, $spls);                                                              # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
           
           $needraw      = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
           $needraw      = max ($needraw, $bpinreduced);                                                          # Mindestladeleistung bpinreduced sicherstellen                  
@@ -12262,13 +12273,19 @@ sub __batChargeOptTargetPower {
                   }
               }
               else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)                 
-                  $hs2sunset -= 1;
-				  $target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;  
-                  $target    *= (1 + $otpMargin / 100) ** 2;                
-                                    
+                  #$hs2sunset -= 1;
+#Log3 ($name, 1, "$name - target0: $target"); 
+				  #$target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target; 
+#Log3 ($name, 1, "$name - runwhneed: $runwhneed, hs2sunset: $hs2sunset, target: $target");				  
+                  #$target    *= (1 + $otpMargin / 100) ** 2;                
+#Log3 ($name, 1, "$name - target1: $target");                                    
                   if ($strategy eq 'smartPower') {                                                               # smartPower: maximale Ladeleistung erzwingen
-                      $target = $bpinmax;
+                      #$target = $bpinmax;
+					  $hs2sunset -= 1;
+					  $target = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
                   }
+				  
+				  $target    *= (1 + $otpMargin / 100) ** 2;
               }
 
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
@@ -13027,7 +13044,7 @@ sub __calcEnergyPieces {
 
   delete $data{$name}{consumers}{$c}{epieces};
 
-  my $cotype          = ConsumerVal ($hash, $c, "type",      DEFCTYPE);
+  my $cotype          = ConsumerVal ($hash, $c, 'type', DEFCTYPE);
   my ($err, $mintime) = getConsumerMintime ( { name    => $name,
                                                c       => $c,
                                                nolog   => 1,
@@ -13329,62 +13346,58 @@ sub ___doPlanning {
   my $cicfip = CurrentVal ($name, 'consForecastInPlanning', 0);                            # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
 
   my $hash   = $defs{$name};
+  
+  my $epieces = ConsumerVal ($name, $c, 'epieces', '');
+  
+  if (ref $epieces ne 'HASH') {
+      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - no first energy piece found. Exiting...});
+	  return;	  
+  }
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
 
-  my %max;
-  my %mtimes;
+  my (%tmp, %max, %mtimes);
 
   ## max. PV-Forecast bzw. Überschuß (bei gesetzen consForecastInPlanning) ermitteln
   ####################################################################################
   for my $idx (sort keys %{$nh}) {
-      my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',    0);
-      my $confcex = NexthoursVal ($hash, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
+      my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',    0);
+      my $confcex = NexthoursVal ($name, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
 
       my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierter Energieüberschuß (kann negativ sein)
 
       my ($hour)              = $idx =~ /NextHour(\d+)/xs;
-      $max{$spexp}{starttime} = NexthoursVal ($hash, $idx, 'starttime', '');
-      $max{$spexp}{today}     = NexthoursVal ($hash, $idx, 'today',      0);
-      $max{$spexp}{nexthour}  = int ($hour);
+      $tmp{$spexp}{starttime} = NexthoursVal ($name, $idx, 'starttime', '');
+      $tmp{$spexp}{today}     = NexthoursVal ($name, $idx, 'today',      0);
+      $tmp{$spexp}{nexthour}  = int ($hour);
   }
 
   my $order = 1;
   
-  for my $k (reverse sort{$a<=>$b} keys %max) {
-      my $ts                  = timestringToTimestamp ($max{$k}{starttime});
+  for my $k (reverse sort{$a<=>$b} keys %tmp) {
+      my $ts                  = timestringToTimestamp ($tmp{$k}{starttime});
 
       $max{$order}{spexp}     = $k;
       $max{$order}{ts}        = $ts;
-      $max{$order}{starttime} = $max{$k}{starttime};
-      $max{$order}{nexthour}  = $max{$k}{nexthour};
-      $max{$order}{today}     = $max{$k}{today};
+      $max{$order}{starttime} = $tmp{$k}{starttime};
+      $max{$order}{nexthour}  = $tmp{$k}{nexthour};
+      $max{$order}{today}     = $tmp{$k}{today};
 
       $mtimes{$ts}{spexp}     = $k;
-      $mtimes{$ts}{starttime} = $max{$k}{starttime};
-      $mtimes{$ts}{nexthour}  = $max{$k}{nexthour};
-      $mtimes{$ts}{today}     = $max{$k}{today};
-
-      delete $max{$k};
+      $mtimes{$ts}{starttime} = $tmp{$k}{starttime};
+      $mtimes{$ts}{nexthour}  = $tmp{$k}{nexthour};
+      $mtimes{$ts}{today}     = $tmp{$k}{today};
 
       $order++;
   }
+  
+  my $epiece1 = $data{$name}{consumers}{$c}{epieces}{1};
 
-  my $epiece1 = (~0 >> 1);
-  my $epieces = ConsumerVal ($hash, $c, "epieces", "");
-
-  if (ref $epieces eq "HASH") {
-      $epiece1 = $data{$name}{consumers}{$c}{epieces}{1};
-  }
-  else {
-      return;
-  }
-
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - epiece1: $epiece1});
+  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - first energy piece: $epiece1});
 
   my $mode            = getConsumerPlanningMode ($hash, $c);                                           # Planungsmode 'can' oder 'must'
-  my $calias          = ConsumerVal ($hash, $c, 'alias',     '');
-  my $oldplanstate    = ConsumerVal ($hash, $c, 'planstate', '');                                      # V. 1.35.0
+  my $calias          = ConsumerVal ($name, $c, 'alias',     '');
+  my $oldplanstate    = ConsumerVal ($name, $c, 'planstate', '');                                      # V. 1.35.0
 
   my ($err, $mintime) = getConsumerMintime ( { name    => $name,                                       # Einplanungsdauer
                                                c       => $c,
@@ -13481,8 +13494,8 @@ sub ___doPlanning {
       }
   }
 
-  my $planstate = ConsumerVal ($hash, $c, 'planstate',      '');
-  my $planspmlt = ConsumerVal ($hash, $c, 'planSupplement', '');
+  my $planstate = ConsumerVal ($name, $c, 'planstate',      '');
+  my $planspmlt = ConsumerVal ($name, $c, 'planSupplement', '');
 
   if ($planstate && ($planstate ne $oldplanstate)) {                                                   # V 1.35.0
       Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate $planspmlt});
@@ -13514,15 +13527,11 @@ sub ___saveEhodpieces {
       my $chod    = (strftime "%H", localtime($i)) + 1;
       my $epieces = ConsumerVal ($hash, $c, 'epieces', '');
 
-      my $ep = 0;
-      if (ref $epieces eq "HASH") {
-          $ep = defined $data{$name}{consumers}{$c}{epieces}{$p} ?
-                        $data{$name}{consumers}{$c}{epieces}{$p} :
-                        0;
-      }
-      else {
-          last;
-      }
+      last if(ref $epieces ne "HASH");
+      
+      my $ep = defined $data{$name}{consumers}{$c}{epieces}{$p} 
+               ? $data{$name}{consumers}{$c}{epieces}{$p} 
+               : 0;
 
       $chod                                          = sprintf '%02d', $chod;
       $data{$name}{consumers}{$c}{ehodpieces}{$chod} = sprintf '%.2f', $ep if($ep);
@@ -13789,12 +13798,12 @@ sub __setConsRcmdState {
 
   my $hash       = $defs{$name};
   my $nompower   = ConsumerVal ($name, $c, 'power',     0);                               # Consumer nominale Leistungsaufnahme (W)
-  my $pvshare    = ConsumerVal ($name, $c, 'pvshare', 100);                               # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit 0 PV-Überschuß betrieben werden 
-  
-  my $sharepower = $nompower * $pvshare / 100;
+  my $pvshare    = ConsumerVal ($name, $c, 'pvshare', 100);                               # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden 
+  my $pvsharepow = $nompower * $pvshare / 100;                                            # Anteil PV an Leistungsaufnahme in Watt
+  my $gridshare  = $nompower - $pvsharepow;                                               # Anteil Netzleistung an Leistungsaufnahme in Watt
   
   my $ccr        = AttrVal          ($name, 'ctrlConsRecommendReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
-  my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $sharepower;                        # resultierender Verbauch nach Einschaltung Consumer
+  my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $nompower;                          # resultierender Verbrauch nach Einschaltung Consumer
 
   my ($method, $surplus) = determSurplus ($name, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
 
@@ -13824,7 +13833,7 @@ sub __setConsRcmdState {
   if (!defined $surplus) {                                                                # $surplus kann undef sein! -> dann bisherigen isConsumptionRecommended verwenden
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = ReadingsVal ($name, "consumer${c}_ConsumptionRecommended", 0);
   }
-  elsif (!$nompower || $surplus - $rescons > 0 || $spignore) {
+  elsif (!$pvsharepow || $surplus - $rescons > 0 - $gridshare || $spignore) {
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                          # Einschalten des Consumers günstig bzw. Freigabe für "on" von Überschußseite erteilt
   }
   else {
@@ -13935,7 +13944,7 @@ sub ___switchConsumerOn {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable -> $intrptcatic{$isintable}});
   }
 
-  my $isConsRcmd = isConsRcmd ($hash, $c);
+  my $isConsRcmd = isConsRcmd ($hash, $c);                                                       # PV-Überschuß als Bedingung
 
   my $supplmnt         = ConsumerVal ($hash, $c, 'planSupplement', '');
   $paref->{supplement} = '' if($supplmnt =~ /swoncond\snot|swoncond\snicht/xs && $swoncond);
