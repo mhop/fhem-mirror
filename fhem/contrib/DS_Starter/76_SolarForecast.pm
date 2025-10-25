@@ -12276,7 +12276,8 @@ sub __batChargeOptTargetPower {
                   
                   if ($strategy eq 'smartPower') {                                                               # smartPower: agressivere Ladeleistung
 					  $hs2sunset -= 1;
-					  $target = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
+					  $target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
+                      $target    *= 1 + ($otpMargin / 100);
                   }
               }
 
