@@ -162,7 +162,7 @@ BEGIN {
 my %vNotesIntern = (
   "1.59.6" => "24.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
                            "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
-                           "__batChargeOptTargetPower: use an average for the charging power if optPower set and charging target are not achievable ".
+                           "__batChargeOptTargetPower: use an average for the charging power if smartPower set and charging target are not achievable ".
 						   "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
 						   "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add PV share calculation ".
 						   "___doPlanning: code improvements and implement PV share needed ",
@@ -12272,12 +12272,12 @@ sub __batChargeOptTargetPower {
                   }
               }
               else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)                                                    
+                  $target *= (1 + $otpMargin / 100) ** 2;
+                  
                   if ($strategy eq 'smartPower') {                                                               # smartPower: agressivere Ladeleistung
 					  $hs2sunset -= 1;
 					  $target = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
                   }
-				  
-				  $target *= (1 + $otpMargin / 100) ** 2;
               }
 
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
@@ -27205,8 +27205,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>power</b>          </td><td>Power consumption of the consumer in W. This can be the nominal power according to the data sheet or a dynamically specified reference value.     </td></tr>
             <tr><td>                       </td><td>(can be set to "0")                                                                                                                               </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
-            <tr><td> <b>pvshare</b>        </td><td>Defines the PV share of consumer power (key ‘power’) that is considered sufficient for the consumer. (optional)                                   </td></tr>
-            <tr><td>                       </td><td>The setting 100% defines a required PV surplus of at least ‘power’. With 0%, the consumer does not require any PV surplus.                        </td></tr>
+            <tr><td> <b>pvshare</b>        </td><td>The key can be used to specify the desired percentage of PV power to cover the power consumption 'power'. (optional)                                   </td></tr>
+            <tr><td>                       </td><td>The setting 100% defines a required PV surplus of at least 'power'. With 0%, the consumer does not require any PV surplus.                        </td></tr>
 			<tr><td>                       </td><td>Value: <b>0..100</b>, default: 100 (%)                                                                                                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.      </td></tr>
@@ -29891,7 +29891,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         <br><br>
 
         Der Schlüssel <b>power</b> gibt die Leistungsaufnahme des Verbrauchers an. Mit dem Schlüssel <b>pvshare</b> kann der gewünschte 
-        prozentuale PV-Anteil zur Deckung der Leistungsaufnahme festgelgt werden. <br>
+        prozentuale PV-Anteil zur Deckung der Leistungsaufnahme festgelegt werden. <br>
         Abhängig von diesen Werten werden die Schaltzeiten des Verbrauchers geplant und der Zyklus des Verbrauchers in Abhängigkeit
         des ausreichenden PV-Überschußes zum Einplanungszeitpunkt gestartet. <br>
         Ist <b>power=0</b> oder <b>pvshare=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichend vorhandenem PV-Überschuß
@@ -29922,7 +29922,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>power</b>          </td><td>Leistungsaufnahme des Verbrauchers in W. Es kann die nominale Leistung gemäß Datenblatt oder ein dynamisch vorgegebener Richtwert sein.            </td></tr>
             <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                                      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>pvshare</b>        </td><td>Legt den PV-Anteil der Verbraucherleistung (Schlüssel 'power') fest, der als ausreichend für den Verbraucher gewertet wird. (optional)             </td></tr>
+            <tr><td> <b>pvshare</b>        </td><td>Mit dem Schlüssel kann der gewünschte prozentuale PV-Anteil zur Deckung der Leistungsaufnahme 'power' festgelegt werden. (optional)                </td></tr>
             <tr><td>                       </td><td>Die Einstellung 100% definiert einen benötigten PV-Überschuß von mindestens 'power'. Mit 0% benötigt der Verbraucher keinen PV-Überschuß.          </td></tr>
 			<tr><td>                       </td><td>Wert: <b>0..100</b>, default: 100 (%)                                                                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
