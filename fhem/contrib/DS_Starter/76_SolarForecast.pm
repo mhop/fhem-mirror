@@ -163,14 +163,14 @@ my %vNotesIntern = (
   "1.59.6" => "24.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
                            "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
                            "__batChargeOptTargetPower: use an average for the charging power if smartPower set and charging target are not achievable ".
-						   "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
-						   "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add PV share calculation ".
-						   "___doPlanning: code improvements and implement PV share needed ",
+                           "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
+                           "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add PV share calculation ".
+                           "___doPlanning: code improvements and implement PV share needed ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
                            "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
                            "__batChargeOptTargetPower: use pinmax if achievable==0, new ctrlBatSocManagementXX->stepSoC key ".
-						   "loadStrategy: possible value smartPower ", 
+                           "loadStrategy: possible value smartPower ", 
   "1.59.3" => "10.10.2025  ___batChargeSaveResults: fix writing 'rcdchargebatXX' ",
   "1.59.2" => "09.10.2025  one more fix of color filling of svg icon ",
   "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
@@ -11420,18 +11420,18 @@ sub _batSocTarget {
           Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement${bn} is active, but required keys 'lowSoc' and 'upSoC' are not set. Go to Next...");
           next;          
       }
-	  
-	  if (!$stepSoc) {
-		  debugLog ($paref, 'batteryManagement', "SoC Step1 Bat $bn - The SoC-Management is switched off. Battery_OptimumTargetSoC_$bn is set to lowSoC and Battery_ChargeRequest_$bn to '0'.");
-		  
-		  ## pvHistory/Readings schreiben
-		  #################################
-		  writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, hour => 99 } );
-		  storeReading   ('Battery_OptimumTargetSoC_'.$bn, $lowSoc.' %');
-		  storeReading   ('Battery_ChargeRequest_'.$bn, 0);
+      
+      if (!$stepSoc) {
+          debugLog ($paref, 'batteryManagement', "SoC Step1 Bat $bn - The SoC-Management is switched off. Battery_OptimumTargetSoC_$bn is set to lowSoC and Battery_ChargeRequest_$bn to '0'.");
+          
+          ## pvHistory/Readings schreiben
+          #################################
+          writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, hour => 99 } );
+          storeReading   ('Battery_OptimumTargetSoC_'.$bn, $lowSoc.' %');
+          storeReading   ('Battery_ChargeRequest_'.$bn, 0);
 
-          next;		  
-	  }
+          next;       
+      }
       
       my $oldd2care = CircularVal ($name, 99, 'days2care'.$bn,            0);
       my $ltsmsr    = CircularVal ($name, 99, 'lastTsMaxSocRchd'.$bn, undef);
@@ -11465,7 +11465,7 @@ sub _batSocTarget {
 
       #my $sf       = __batCapShareFactor ($name, $bn);                                         # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $sf       = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor der Batterie XX Ladebedarf an Gesamtladebedarf
-	  my $pvexpect = $sf * $pvexpraw;
+      my $pvexpect = $sf * $pvexpraw;
 
       if ($debug =~ /batteryManagement/xs) {
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Battery share factor of total required load: $sf");
@@ -11478,10 +11478,10 @@ sub _batSocTarget {
       #####################################################################
       my $sunset  = CurrentVal ($name, 'sunsetTodayTs',  $t);
       my $sunrise = CurrentVal ($name, 'sunriseTodayTs', $t); 
-	  #my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
+      #my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
       my $delayts = $sunrise + (($sunset - $sunrise) / 2);                                      # V 1.59.5 neues SoC-Ziel ab ca. Mittag berechnen/anwenden
-	  my $nt      = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-	  my $la      = '';
+      my $nt      = (timestampToTimestring ($delayts, $paref->{lang}))[0];
+      my $la      = '';
       my $careSoc = $target;
 
       my $ntsmsc    = CircularVal ($name, 99, 'nextTsMaxSocChge'.$bn, $t);
@@ -11833,14 +11833,14 @@ sub _batChargeMgmt {
       # Debuglog
       ############
       if ($paref->{debug} =~ /batteryManagement/) {
-		  Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - selected charging strategy: $strategy");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - selected charging strategy: $strategy");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - General load termination condition: $labortCond");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control time Slot - Slot start: $lcstart, Slot end: $lcend");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Battery efficiency used: ".($befficiency * 100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - charging target: $goalpercent % / $goalwh Wh");
           #Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Percentage of the total amount of charging energy required: ".(sprintf "%.1f", $sf*100)." %");
-		  Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - The PV generation, consumption and surplus listed below are based on the battery's share of the total amount of charging energy required!");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - The PV generation, consumption and surplus listed below are based on the battery's share of the total amount of charging energy required!");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - used safety margin: $lrMargin %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - weighted self-consumption: $wou %");
       }
@@ -11928,7 +11928,7 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{nhr}               = $nhr;
               $hsurp->{$fd}{$hod}{speff}             = $surpls;                                  # effektiver PV Überschuß bzw. effektiver Verbrauch wenn < 0  
               $hsurp->{$fd}{$hod}{surplswh}          = $surplswh.'.'.$hod;                       # absoluter Überschuß in Wh der Stunde mit Sortierhilfe 
-			  $hsurp->{$fd}{$hod}{$bn}{spday}        = $spday;                                   # (Rest)PV-Überschuß am laufenden Tag
+              $hsurp->{$fd}{$hod}{$bn}{spday}        = $spday;                                   # (Rest)PV-Überschuß am laufenden Tag
               $hsurp->{$fd}{$hod}{$bn}{initsocwh}    = $socwh;                                   # durch LR fortgeschriebener SoC
               $hsurp->{$fd}{$hod}{$bn}{batinstcap}   = $batinstcap;                              # installierte Batteriekapazität (Wh)
               $hsurp->{$fd}{$hod}{$bn}{goalwh}       = $goalwh;                                  # Ladeziel
@@ -12031,7 +12031,7 @@ sub _batChargeMgmt {
           my @batteries = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hopt->{24}};
           
           for my $bat (sort @batteries) {
-              next if(!defined $hopt->{$shod}{$bat}{batinstcap});			  
+              next if(!defined $hopt->{$shod}{$bat}{batinstcap});             
               my $ssocwh = $hopt->{$shod}{$bat}{runwh} // '-';
               
               ## SOC-Prognose OTP
@@ -12140,20 +12140,20 @@ sub __batChargeOptTargetPower {
   my $spls00 = 0;                                                              
 
   for my $k (keys %$hsurp) {
-	  my $nh = $hsurp->{$k}{nhr};
+      my $nh = $hsurp->{$k}{nhr};
       
-	  if ($nh eq '00') {
-		  my $val = $hsurp->{$k}{surplswh};
-		  
-		  if (defined $val && $val =~ /^(\d+)\.(\w+)$/) {
-			  $spls00         = $1;
-			  my $replacement = sprintf "%.0f", ($spls00 / 60 * (60 - int $minute));                             # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß     
-			  $replacement   .= '.'.$2;
-			  $hsurp->{$k}{surplswh} = $replacement;
-		  }
-		  
-		  last;                                                                                                  # da Stunde 00 nur einmal vorkommt, können wir abbrechen
-      }	  
+      if ($nh eq '00') {
+          my $val = $hsurp->{$k}{surplswh};
+          
+          if (defined $val && $val =~ /^(\d+)\.(\w+)$/) {
+              $spls00         = $1;
+              my $replacement = sprintf "%.0f", ($spls00 / 60 * (60 - int $minute));                             # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß     
+              $replacement   .= '.'.$2;
+              $hsurp->{$k}{surplswh} = $replacement;
+          }
+          
+          last;                                                                                                  # da Stunde 00 nur einmal vorkommt, können wir abbrechen
+      }   
   }
 
   my $fipl       = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
@@ -12164,28 +12164,28 @@ sub __batChargeOptTargetPower {
   my $otp;
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
-	  my $nhr     = $hsurp->{$hod}{nhr};
-	  next if(!defined $nhr);
-	  
+      my $nhr     = $hsurp->{$hod}{nhr};
+      next if(!defined $nhr);
+      
       my $spls    = int ($hsurp->{$hod}{surplswh} // 0);
       $spls       = $spls00 if($nhr eq '00');                                                                    # aktuelle Stunde: zeitgewichteter PV-Überschuß mit Original ersetzen
-	  
-	  my $nexthod = sprintf "%02d", (int $hod + 1);
-	  my $nextnhr = $hsurp->{$nexthod}{nhr};
+      
+      my $nexthod = sprintf "%02d", (int $hod + 1);
+      my $nextnhr = $hsurp->{$nexthod}{nhr};
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
-	  my $total          = 0;                                               
-	  $total            += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
+      my $total          = 0;                                               
+      $total            += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
 
-      for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie		  
-		  my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
+      for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie          
+          my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
           my $batinstcap  = $hsurp->{$hod}{$sbn}{batinstcap};                                                    # Kapa dieser Batterie 
           my $lowSocwh    = $hsurp->{$hod}{$sbn}{lowSocwh};                                                      # eingestellter lowSoc in Wh
           my $batoptsocwh = $hsurp->{$hod}{$sbn}{batoptsocwh};                                                   # optimaler SoC in Wh
           my $csocwh      = $hsurp->{$hod}{$sbn}{csocwh};                                                        # aktueller SoC in Wh
           my $bpinreduced = $hsurp->{$hod}{$sbn}{bpinreduced};                                                   # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
           my $befficiency = $hsurp->{$hod}{$sbn}{befficiency};                                                   # Speicherwirkungsgrad
-		  my $strategy    = $hsurp->{$hod}{$sbn}{strategy};                                                      # Ladestrategie
+          my $strategy    = $hsurp->{$hod}{$sbn}{strategy};                                                      # Ladestrategie
           
           # Initialisierung / Fortschreibung Prognose-SOC (Wh)
           ######################################################
@@ -12233,8 +12233,8 @@ sub __batChargeOptTargetPower {
               $runwh += $diff / $befficiency;                                                                    # um Verbrauch reduzieren
               $runwh  = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                         # runwh begrenzen                  
               
-              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;                	  
-			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			            
+              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;                    
+              $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde                        
               
               next;
           }                                   
@@ -12275,8 +12275,8 @@ sub __batChargeOptTargetPower {
                   $target *= (1 + $otpMargin / 100) ** 2;
                   
                   if ($strategy eq 'smartPower') {                                                               # smartPower: agressivere Ladeleistung
-					  $hs2sunset -= 1;
-					  $target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
+                      $hs2sunset -= 1;
+                      $target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
                       $target    *= 1 + ($otpMargin / 100);
                   }
               }
@@ -12301,7 +12301,7 @@ sub __batChargeOptTargetPower {
           
           $runwh = min ($goalwh, $runwh + $diff * $befficiency);                                                 # Endwert Prognose        
           $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen
-		  
+          
           $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;
           $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);               # Startwert kommende Stunde  
       }
@@ -12317,6 +12317,7 @@ return ($hsurp, $otp);
 ################################################################
 #  Zielleistung mit Sicherheitszuschlag behandeln  
 #  abfallend proportional zum linearen Rest-Überschuss des Tages
+#  Forum: https://forum.fhem.de/index.php?msg=1349579
 ################################################################       
 sub ___batAdjustPowerByMargin {
   my ($name, $target, $pinmax, $runwhneed, $otpMargin) = @_;
@@ -12465,8 +12466,8 @@ sub ___batChargeSaveResults {
   ## abhängig von Strategie in entsprechender Schleife setzen 
   #############################################################
   if (($loopid eq 'LR' && $strategy eq 'loadRelease') || ($loopid eq 'OTP' && $strategy =~ /(?:opt|smart)Power/xs)) {
-	  $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
-	  
+      $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
+      
       if ($today && $hod) {                                                                                      
           writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
       }
@@ -13343,7 +13344,7 @@ sub ___doPlanning {
   
   if (ref $epieces ne 'HASH') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - no first energy piece found. Exiting...});
-	  return;	  
+      return;     
   }
 
   my $cicfip   = CurrentVal  ($name, 'consForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
@@ -14211,7 +14212,7 @@ sub ___setConsumerSwitchingState {
 
       delete $paref->{supplement};
 
-      $state = qq{Consumer '$calias' was external switched on};
+      $state = qq{Consumer '$calias' was switched on externally};
       $dowri = 1;
   }
   elsif ($oldpsw eq 'on' && isConsumerPhysOff ($hash, $c)) {
@@ -14221,7 +14222,7 @@ sub ___setConsumerSwitchingState {
 
       delete $paref->{supplement};
 
-      $state = qq{Consumer '$calias' was external switched off};
+      $state = qq{Consumer '$calias' was switched off externally};
       $dowri = 1;
   }
 
@@ -16928,21 +16929,32 @@ sub __createOwnSpec {
 
   my @fields = split (/\s+/sx, $spec);
 
-  my (@cats, @vals);
+  my (@props, @cats, @vals);                                                           # @props - Eigenschaften, @cats - Kategorien, @vals - Label:Werte Paare
 
   for my $f (@fields) {
-      if ($f =~ /^\#(.*)/xs) {
+      if ($f =~ /^\#(.*)/xs) {                                                         # eine Kategorie erkannt
           push @cats, $1;
           next;
+      }
+      elsif ($f =~ /^\.([^\s]+)/xs) {                                                  # eine Eigenschaft erkannt
+          push @props, $1;
+          next;          
       }
 
       push @vals, $f;
   }
 
-  my ($ownv, $cakey);
   my $isize = INPUTSIZE;
-  my $rows  = ceil (scalar(@vals) / $vinr);
-  my $col   = 0;
+  
+  if (@props) {
+      my $properties = join (' ', @props);
+      my ($pa, $ph) = parseParams ($properties);
+      $isize = $ph->{inputSize} if(defined $ph->{inputSize});
+  } 
+  
+  my $rows = ceil (scalar(@vals) / $vinr);
+  my $col  = 0;
+  my ($ownv, $cakey);
 
   for (my $i = 1 ; $i <= $rows; $i++) {
       my ($h, $v, $u);
@@ -16959,10 +16971,8 @@ sub __createOwnSpec {
           $col++;
 
           if (!defined $h->{$k}{label}) {
-              #undef $h->{$k}{label};
-			  $h->{$k}{label} = '';
-              #next;
-			  $h->{$k}{elm}   = '';
+              $h->{$k}{label} = '';
+              $h->{$k}{elm}   = '';
           }
 
           ## Set-Kommandos identifizieren
@@ -17002,12 +17012,12 @@ sub __createOwnSpec {
           ## Reading identifizieren
           ###########################
           if ($elm) {
-			  $v->{$k} = ReadingsVal ($dev, $elm, undef);
+              $v->{$k} = ReadingsVal ($dev, $elm, undef);
 
-			  if (defined $v->{$k} && $v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
-				  ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');         # Value und Unit trennen wenn Value numerisch
-			  }
-		  }
+              if (defined $v->{$k} && $v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
+                  ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');         # Value und Unit trennen wenn Value numerisch
+              }
+          }
 
           $u->{$k} //= q{};
 
@@ -18586,7 +18596,7 @@ sub __batteryOnBeam {
           
           my $stysymbol = $strategy eq 'loadRelease' ? 'ldreleas' : 
                           $strategy eq 'optPower'    ? 'optchpow' :
-						  $strategy eq 'smartPower'  ? 'smtchpow' :
+                          $strategy eq 'smartPower'  ? 'smtchpow' :
                           'norate';
           
           my ($bpower, $currsoc);
@@ -18988,7 +18998,7 @@ END0
                                            }
                                          );
           
-		  my $ccicon = (split '@', $cicon)[1];
+          my $ccicon = (split '@', $cicon)[1];
           $cicon     = FW_makeImage         ($cicon, ''); 
           $cicon     = __normIconInnerScale ($cicon, $ccicon);       
   
@@ -19054,7 +19064,7 @@ END1
 
       my $cdicon = (split '@', $dicon)[1];
       $dicon     = FW_makeImage         ($dicon, '');
-	  $dicon     = __normIconInnerScale ($dicon, $cdicon); 
+      $dicon     = __normIconInnerScale ($dicon, $cdicon); 
 
       $ret .= qq{<g id="dummy_$stna" transform="translate(660 360)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
@@ -19533,11 +19543,11 @@ sub __addInputProducerIcon {
                                                                   }
                                                                 );
                   
-				  my $gcolor = (split '@', $genericon)[1];
+                  my $gcolor = (split '@', $genericon)[1];
                   $genericon = FW_makeImage         ($genericon, '');
-				  $genericon = __normIconInnerScale ($genericon, $gcolor);
-				  
-				  $ret .= qq{<g id="generator_${pn}_$stna" fill="grey" transform="translate($xstart $ystart)">};
+                  $genericon = __normIconInnerScale ($genericon, $gcolor);
+                  
+                  $ret .= qq{<g id="generator_${pn}_$stna" fill="grey" transform="translate($xstart $ystart)">};
                   $ret .= "<title>$genertxt</title>".$genericon;
                   $ret .= '</g> ';
               }
@@ -19555,8 +19565,8 @@ sub __addInputProducerIcon {
 
           my $cpicon = (split '@', $picon)[1];
           $picon     = FW_makeImage         ($picon, '');
-		  $picon     = __normIconInnerScale ($picon, $cpicon); 
-		  
+          $picon     = __normIconInnerScale ($picon, $cpicon); 
+          
           $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($xstart $y_coord)">};
           $ret .= "<title>$ptxt</title>".$picon;
           $ret .= '</g> ';
@@ -19593,7 +19603,7 @@ sub __addNodeIcon {
   my $cnicon = (split '@', $nicon)[1];
   $nicon     = FW_makeImage         ($nicon, '');
   $nicon     = __normIconInnerScale ($nicon, $cnicon);
-		  
+          
   my $ret = qq{<g id="node_$stna" transform="translate($x_coord $y_coord)">};     # translate(X-Koordinate,Y-Koordinate)
   $ret   .= "<title>$ntxt</title>".$nicon;
   $ret   .= '</g> ';
@@ -27179,7 +27189,7 @@ to ensure that the system configuration is correct.
         Depending on these values, the switching times of the consumer are planned and the cycle of the consumer is started depending on
         the sufficient PV surplus at the time of planning. <br>
         If <b>power=0</b> or <b>pvshare=0</b> is set, the consumer is switched on as planned, regardless of whether there is sufficient 
-		PV surplus.
+        PV surplus.
         <br><br>
 
          <ul>
@@ -27208,7 +27218,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>pvshare</b>        </td><td>The key can be used to specify the desired percentage of PV power to cover the power consumption 'power'. (optional)                                   </td></tr>
             <tr><td>                       </td><td>The setting 100% defines a required PV surplus of at least 'power'. With 0%, the consumer does not require any PV surplus.                        </td></tr>
-			<tr><td>                       </td><td>Value: <b>0..100</b>, default: 100 (%)                                                                                                            </td></tr>
+            <tr><td>                       </td><td>Value: <b>0..100</b>, default: 100 (%)                                                                                                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.      </td></tr>
             <tr><td>                       </td><td>The key is useful for consumers where energy measurement and switching is carried out with different devices                                      </td></tr>
@@ -27395,7 +27405,7 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
             <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
-			<tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr> 
+            <tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr> 
             <tr><td>                     </td><td><b>Note:</b> The relationship ‘careCycle * stepSoC = 100’ should be observed!                   </td></tr>
             <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>          
@@ -27422,8 +27432,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>loadTarget</b>   </td><td>Optional target SoC in % for calculating charge release or optimal charging power.              </td></tr>
             <tr><td>                     </td><td>The target value is a calculated figure. The actual SoC may be higher or lower than this within </td></tr>
             <tr><td>                     </td><td>certain limits, depending on the situation. The higher value from Reading                       </td></tr>
-			<tr><td>                     </td><td><b>Battery_OptimumTargetSoC_XX</b> and 'loadTarget' takes precedence for the calculation.       </td></tr>
-			<tr><td>                     </td><td>Value: <b>0..100</b>, default: 100                                                              </td></tr>           
+            <tr><td>                     </td><td><b>Battery_OptimumTargetSoC_XX</b> and 'loadTarget' takes precedence for the calculation.       </td></tr>
+            <tr><td>                     </td><td>Value: <b>0..100</b>, default: 100                                                              </td></tr>           
             <tr><td>                     </td><td>                                                                                                </td></tr>           
             <tr><td> <b>safetyMargin</b> </td><td>When calculating the load clearance and optimized load capacity, safety margins are taken       </td></tr>
             <tr><td>                     </td><td>into account in the predicted load requirements.                                                </td></tr>
@@ -27851,47 +27861,68 @@ to ensure that the system configuration is correct.
          <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a>.
          <br><br>
 
-         Each value must be defined by a label and the element to be displayed (attribute, reading, set command) connected by “:”. <br>
-         A single key value of a combined attribute (ctrlBatSocManagementXX, flowGraphicControl, etc.) can be displayed and changed by 
-         adding '->&lt;key&gt;'. <br>
-         The element can optionally be supplemented with '@&lt;Device&gt;' to display readings, set commands, and attributes of other devices. <br>
-         The elements to be displayed are separated by spaces or a new line.
-         Spaces in the label are to be inserted by "&amp;nbsp;", a line break by "&lt;br&gt;". <br>
-         An empty field in a line is created by ":". <br>
-         A line title can be inserted by specifying "#:&lt;Text&gt;", an empty title by entering "#".
+         Each element to be displayed must be defined by a label, the separator “:”, and the value (attribute, reading, set command). <br>
+         The input can be entered on multiple lines for a clear structure. <br>
+         The syntax for inserting elements and defining additional properties is as follows:
          <br><br>
+         
+         <ul>
+           <table>
+           <colgroup> <col width="30%"> <col width="70%"> </colgroup>
+              <tr><td> <b>.inputSize=&lt;Integer&gt; </b>                 </td><td>sets the width of text input fields (default: 10)                                           </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&amp;nbsp; </b>                                 </td><td>inserts a space in the label                                                                </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;br&gt; </b>                                 </td><td>inserts a line break in the label                                                           </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>#&lt;Text&gt; </b>                              </td><td>defines a row title                                                                         </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b># </b>                                          </td><td>creates an empty line title                                                                 </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Value&gt; </b>                </td><td>creates the &lt;label&gt;:&lt;value&gt; pair to be displayed.                               </td></tr>
+              <tr><td>                                                    </td><td>&lt;value&gt; can be an attribute, reading, or set command.                                 </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Value&gt;@&lt;Device&gt; </b> </td><td>the value of another &lt;Device&gt; is displayed                                            </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Attr&gt;->&lt;Key&gt; </b>    </td><td>the key value of a combined attribute (e.g., flowGraphicControl) is displayed               </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>: </b>                                          </td><td>creates a blank space                                                                       </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+           </table>
+         </ul> 
 
-       <ul>
-         <b>Example: </b> <br>
-         <table>
-         <colgroup> <col width="33%"> <col width="67%"> </colgroup>
-            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>#                                                                                       </td></tr>
-            <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                                         </td></tr>
-            <tr><td>                                         </td><td>Surplus:Current_Surplus                                                                 </td></tr>
-            <tr><td>                                         </td><td>current&amp;nbsp;Gridconsumption:Current_GridConsumption                                </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
-            <tr><td>                                         </td><td>#                                                                                       </td></tr>
-            <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:special_todayConForecastTillSunset                    </td></tr>
-            <tr><td>                                         </td><td>PV&amp;nbsp;Day&amp;nbsp;after&amp;nbsp;tomorrow:special_dayAfterTomorrowPVforecast     </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
-            <tr><td>                                         </td><td>#Battery                                                                                </td></tr>
-            <tr><td>                                         </td><td>in&amp;nbsp;today:special_todayBatIn                                                    </td></tr>
-            <tr><td>                                         </td><td>out&amp;nbsp;today:special_todayBatOut                                                  </td></tr>
-            <tr><td>                                         </td><td>Charging&amp;nbsp;target:ctrlBatSocManagement01->loadTarget                                                                                       </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
-            <tr><td>                                         </td><td>#Settings                                                                               </td></tr>
-            <tr><td>                                         </td><td>Autocorrection:pvCorrectionFactor_Auto : : :                                            </td></tr>
-            <tr><td>                                         </td><td>Consumer&lt;br&gt;Replanning:consumerNewPlanning : : :                                  </td></tr>
-            <tr><td>                                         </td><td>Consumer&lt;br&gt;Quickstart:consumerImmediatePlanning : : :                            </td></tr>
-            <tr><td>                                         </td><td>Weather:graphicShowWeather : : :                                                        </td></tr>
-            <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                                        </td></tr>
-            <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                                        </td></tr>
-            <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                                   </td></tr>
-         </table>
-       </ul>
+         <ul>
+           <b>Example: </b> <br>
+           <table>
+           <colgroup> <col width="33%"> <col width="67%"> </colgroup>
+              <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>.inputSize=5                                                                            </td></tr>
+              <tr><td>                                         </td><td>#                                                                                       </td></tr>
+              <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                                         </td></tr>
+              <tr><td>                                         </td><td>Surplus:Current_Surplus                                                                 </td></tr>
+              <tr><td>                                         </td><td>current&amp;nbsp;Gridconsumption:Current_GridConsumption                                </td></tr>
+              <tr><td>                                         </td><td>:                                                                                       </td></tr>
+              <tr><td>                                         </td><td>#                                                                                       </td></tr>
+              <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:special_todayConForecastTillSunset                    </td></tr>
+              <tr><td>                                         </td><td>PV&amp;nbsp;Day&amp;nbsp;after&amp;nbsp;tomorrow:special_dayAfterTomorrowPVforecast     </td></tr>
+              <tr><td>                                         </td><td>:                                                                                       </td></tr>
+              <tr><td>                                         </td><td>:                                                                                       </td></tr>
+              <tr><td>                                         </td><td>#Battery                                                                                </td></tr>
+              <tr><td>                                         </td><td>in&amp;nbsp;today:special_todayBatIn                                                    </td></tr>
+              <tr><td>                                         </td><td>out&amp;nbsp;today:special_todayBatOut                                                  </td></tr>
+              <tr><td>                                         </td><td>Charging&amp;nbsp;target:ctrlBatSocManagement01->loadTarget                             </td></tr>
+              <tr><td>                                         </td><td>:                                                                                       </td></tr>
+              <tr><td>                                         </td><td>#Settings                                                                               </td></tr>
+              <tr><td>                                         </td><td>Autocorrection:pvCorrectionFactor_Auto : : :                                            </td></tr>
+              <tr><td>                                         </td><td>Consumer&lt;br&gt;Replanning:consumerNewPlanning : : :                                  </td></tr>
+              <tr><td>                                         </td><td>Consumer&lt;br&gt;Quickstart:consumerImmediatePlanning : : :                            </td></tr>
+              <tr><td>                                         </td><td>Weather:graphicShowWeather : : :                                                        </td></tr>
+              <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                                        </td></tr>
+              <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                                        </td></tr>
+              <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                                   </td></tr>
+           </table>
+         </ul>
+         <br>
        </li>
-       <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
        <li><b>graphicHeaderOwnspecValForm </b> <br><br>
@@ -29925,7 +29956,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pvshare</b>        </td><td>Mit dem Schlüssel kann der gewünschte prozentuale PV-Anteil zur Deckung der Leistungsaufnahme 'power' festgelegt werden. (optional)                </td></tr>
             <tr><td>                       </td><td>Die Einstellung 100% definiert einen benötigten PV-Überschuß von mindestens 'power'. Mit 0% benötigt der Verbraucher keinen PV-Überschuß.          </td></tr>
-			<tr><td>                       </td><td>Wert: <b>0..100</b>, default: 100 (%)                                                                                                              </td></tr>
+            <tr><td>                       </td><td>Wert: <b>0..100</b>, default: 100 (%)                                                                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>Das angegebene &lt;device&gt; wird als Schalter Device dem Verbraucher zugeordnet (optional). Schaltvorgänge werden mit diesem Gerät               </td></tr>
             <tr><td>                       </td><td>ausgeführt. Der Schlüssel ist für Verbraucher nützlich bei denen Energiemessung und Schaltung mit verschiedenen Geräten vorgenommen                </td></tr>
@@ -30113,7 +30144,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
             <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
-			<tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr> 
+            <tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr> 
             <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100' sollte eingehalten werden!            </td></tr>
             <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>          
@@ -30140,8 +30171,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>loadTarget</b>   </td><td>Optionaler Ziel-SoC in % für die Berechnung der Ladefreigabe bzw. der optimalen Ladeleistung.   </td></tr>
             <tr><td>                     </td><td>Der Zielwert ist eine kalkulatorische Rechengröße. Der reale SoC kann situativ in Grenzen       </td></tr>
             <tr><td>                     </td><td>über- oder unterschritten werden. Der höhere Wert aus Reading <b>Battery_OptimumTargetSoC_XX</b></td></tr>
-			<tr><td>                     </td><td>und 'loadTarget' hat für die Berechnung Vorrang.                                                </td></tr>
-			<tr><td>                     </td><td>Wert: <b>0..100</b>, default: 100                                                               </td></tr>           
+            <tr><td>                     </td><td>und 'loadTarget' hat für die Berechnung Vorrang.                                                </td></tr>
+            <tr><td>                     </td><td>Wert: <b>0..100</b>, default: 100                                                               </td></tr>           
             <tr><td>                     </td><td>                                                                                                </td></tr>           
             <tr><td> <b>safetyMargin</b> </td><td>Bei der Berechnung der Ladefreigabe und optimierten Ladeleistung werden Sicherheitszuschläge    </td></tr>
             <tr><td>                     </td><td>auf den prognostizierten Ladungsbedarf berücksichtigt.                                          </td></tr>
@@ -30569,48 +30600,69 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          des Attributs <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a> umgerechnet.
          <br><br>
 
-         Jeder Wert ist jeweils durch ein Label und das anzuzeigende Element (Attribut, Reading, Set-Kommando) verbunden durch ":" zu definieren. <br>
-         Ein einzelner Schlüsselwert eines kombinierten Attributes (ctrlBatSocManagementXX, flowGraphicControl, etc.) kann durch Ergänzung 
-         von '->&lt;Schlüssel&gt;' angezeigt und geändert werden. <br>
-         Das Element kann optional mit '@&lt;Device&gt;' ergänzt werden um Readings, Set-Kommandos und Attribute anderer Devices anzuzeigen. <br>
-         Die anzuzeigenden Elemente werden durch Leerzeichen oder eine neue Zeile getrennt.
-         Leerzeichen im Label sind durch "&amp;nbsp;" einzufügen, ein Zeilenumbruch durch "&lt;br&gt;". <br>
-         Ein leeres Feld in einer Zeile wird durch ":" erzeugt. <br>
-         Ein Zeilentitel kann durch Angabe von "#:&lt;Text&gt;" eingefügt werden, ein leerer Titel durch die Eingabe von "#".
+         Jedes anzuzeigende Element ist durch ein Label, dem Trenner ":" und dem Wert (Attribut, Reading, Set-Kommando) zu definieren. <br>
+         Die Eingabe kann für eine übersichtliche Struktur mehrzeilig erfolgen. <br>
+         Die Syntax um Elemente einzufügen sowie weitere Eigenschaften zu definieren sind:
          <br><br>
-
-       <ul>
-         <b>Beispiel: </b> <br>
-         <table>
-         <colgroup> <col width="35%"> <col width="65%"> </colgroup>
-            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>#                                                                             </td></tr>
-            <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                               </td></tr>
-            <tr><td>                                         </td><td>Überschuß:Current_Surplus                                                     </td></tr>
-            <tr><td>                                         </td><td>aktueller&amp;nbsp;Netzbezug:Current_GridConsumption                          </td></tr>
-            <tr><td>                                         </td><td>:                                                                             </td></tr>
-            <tr><td>                                         </td><td>#                                                                             </td></tr>
-            <tr><td>                                         </td><td>CO&amp;nbsp;bis&amp;nbsp;Sonnenuntergang:special_todayConForecastTillSunset   </td></tr>
-            <tr><td>                                         </td><td>PV&amp;nbsp;Übermorgen:special_dayAfterTomorrowPVforecast                     </td></tr>
-            <tr><td>                                         </td><td>InverterRelay:gridrelay_status@MySTP_5000                                     </td></tr>
-            <tr><td>                                         </td><td>:                                                                             </td></tr>
-            <tr><td>                                         </td><td>#Batterie                                                                     </td></tr>
-            <tr><td>                                         </td><td>in&amp;nbsp;heute:special_todayBatIn                                          </td></tr>
-            <tr><td>                                         </td><td>out&amp;nbsp;heute:special_todayBatOut                                        </td></tr>
-            <tr><td>                                         </td><td>Ladeziel:ctrlBatSocManagement01->loadTarget                                                                             </td></tr>
-            <tr><td>                                         </td><td>:                                                                             </td></tr>
-            <tr><td>                                         </td><td>#Settings                                                                     </td></tr>
-            <tr><td>                                         </td><td>Autokorrektur:pvCorrectionFactor_Auto : : :                                   </td></tr>
-            <tr><td>                                         </td><td>Consumer&lt;br&gt;Neuplanung:consumerNewPlanning : : :                        </td></tr>
-            <tr><td>                                         </td><td>Consumer&lt;br&gt;Sofortstart:consumerImmediatePlanning : : :                 </td></tr>
-            <tr><td>                                         </td><td>Wetter:graphicShowWeather : : :                                               </td></tr>
-            <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                              </td></tr>
-            <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                              </td></tr>
-            <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                         </td></tr>
-         </table>
-       </ul>
+         
+         <ul>
+           <table>
+           <colgroup> <col width="30%"> <col width="70%"> </colgroup>
+              <tr><td> <b>.inputSize=&lt;Ganzzahl&gt; </b>               </td><td>legt die Breite von Texteingabefeldern fest (default: 10)                                   </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&amp;nbsp; </b>                                </td><td>fügt ein Leerzeichen im Label ein                                                           </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;br&gt; </b>                                </td><td>fügt einen Zeilenumbruch im Label ein                                                       </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>#&lt;Text&gt; </b>                             </td><td>definiert einen Zeilentitel                                                                 </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b># </b>                                         </td><td>erzeugt einen leeren Zeilentitel                                                            </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Wert&gt; </b>                </td><td>Erstellt das anzuzeigende &lt;Label&gt;:&lt;Wert&gt; Paar.                                  </td></tr>
+              <tr><td>                                                   </td><td>&lt;Wert&gt; kann ein Attribut, Reading, oder Set-Kommando sein.                            </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Wert&gt;@&lt;Device&gt; </b> </td><td>der Wert eines anderen &lt;Device&gt; wird angezeigt                                        </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Attr&gt;->&lt;Key&gt; </b>   </td><td>der Schlüsselwert eines kombinierten Attributes (z.B. flowGraphicControl) wird angezeigt    </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>: </b>                                         </td><td>erzeugt ein Leerfeld                                                                        </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+           </table>
+         </ul>  
+       
+         <ul>
+           <b>Beispiel: </b> <br>
+           <table>
+           <colgroup> <col width="35%"> <col width="65%"> </colgroup>
+              <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>.inputSize=5                                                                  </td></tr>
+              <tr><td>                                         </td><td>#                                                                             </td></tr>
+              <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                               </td></tr>
+              <tr><td>                                         </td><td>Überschuß:Current_Surplus                                                     </td></tr>
+              <tr><td>                                         </td><td>aktueller&amp;nbsp;Netzbezug:Current_GridConsumption                          </td></tr>
+              <tr><td>                                         </td><td>:                                                                             </td></tr>
+              <tr><td>                                         </td><td>#                                                                             </td></tr>
+              <tr><td>                                         </td><td>CO&amp;nbsp;bis&amp;nbsp;Sonnenuntergang:special_todayConForecastTillSunset   </td></tr>
+              <tr><td>                                         </td><td>PV&amp;nbsp;Übermorgen:special_dayAfterTomorrowPVforecast                     </td></tr>
+              <tr><td>                                         </td><td>InverterRelay:gridrelay_status@MySTP_5000                                     </td></tr>
+              <tr><td>                                         </td><td>:                                                                             </td></tr>
+              <tr><td>                                         </td><td>#Batterie                                                                     </td></tr>
+              <tr><td>                                         </td><td>in&amp;nbsp;heute:special_todayBatIn                                          </td></tr>
+              <tr><td>                                         </td><td>out&amp;nbsp;heute:special_todayBatOut                                        </td></tr>
+              <tr><td>                                         </td><td>Ladeziel:ctrlBatSocManagement01->loadTarget                                   </td></tr>
+              <tr><td>                                         </td><td>:                                                                             </td></tr>
+              <tr><td>                                         </td><td>#Settings                                                                     </td></tr>
+              <tr><td>                                         </td><td>Autokorrektur:pvCorrectionFactor_Auto : : :                                   </td></tr>
+              <tr><td>                                         </td><td>Consumer&lt;br&gt;Neuplanung:consumerNewPlanning : : :                        </td></tr>
+              <tr><td>                                         </td><td>Consumer&lt;br&gt;Sofortstart:consumerImmediatePlanning : : :                 </td></tr>
+              <tr><td>                                         </td><td>Wetter:graphicShowWeather : : :                                               </td></tr>
+              <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                              </td></tr>
+              <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                              </td></tr>
+              <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                         </td></tr>
+           </table>
+         </ul>
+         <br>
        </li>
-       <br>
-
+         
        <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
        <li><b>graphicHeaderOwnspecValForm </b> <br><br>
 
