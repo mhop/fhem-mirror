@@ -160,7 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.6" => "24.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
+  "1.59.6" => "26.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
                            "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
                            "__batChargeOptTargetPower: use an average for the charging power if smartPower set and charging target are not achievable ".
                            "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
@@ -11718,7 +11718,7 @@ sub _batChargeMgmt {
   my $hsoc   = {};                                                                               # Hashreferenz Prognose-SOC über alle Batterien
   my $trans  = {};                                                                               # Referenz Übertrags-Hash 
   my $values = {};                                                                               # Hashreferenz
-  my $progsoc;
+  my ($progsoc, $strategy);
   
   ## Inverter Limits ermitteln
   ##############################
@@ -11743,13 +11743,13 @@ sub _batChargeMgmt {
 
   ## Schleife über alle Batterien
   #################################  
-  for my $bn (1..MAXBATTERIES) {                                                                 # für jede Batterie
+  for my $bn (1..MAXBATTERIES) {                                                                   # für jede Batterie
       $bn = sprintf "%02d", $bn;
       
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
-      my $batinstcap = BatteryVal ($name, $bn, 'binstcap', 0);                                   # installierte Batteriekapazität Wh
+      my $batinstcap = BatteryVal ($name, $bn, 'binstcap', 0);                                     # installierte Batteriekapazität Wh
 
       if (!$inplim || !$batinstcap) {
           debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation for Bat '$bn' are not met. Check key 'cap'. Go to Next.");
@@ -11772,7 +11772,7 @@ sub _batChargeMgmt {
       my $cgbt        = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
       #my $sf          = __batCapShareFactor     ($name, $bn);                                      # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $sf          = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor Ladungsdefizit
-      my $strategy    = 'loadRelease';                                                             # 'loadRelease', 'optPower', 'smartPower'
+      $strategy       = 'loadRelease';                                                             # 'loadRelease', 'optPower', 'smartPower'
       my $wou         = 0;                                                                         # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)     
       my $lowSoc      = 0;
       my $loadAbort   = '';
@@ -11830,19 +11830,24 @@ sub _batChargeMgmt {
       $lcslot             //= '00:00-23:59';
       my ($lcstart, $lcend) = split "-", $lcslot;
       
-      # Debuglog
-      ############
+      # Debuglog allgemein
+      ######################
       if ($paref->{debug} =~ /batteryManagement/) {
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - selected charging strategy: $strategy");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - General load termination condition: $labortCond");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control time Slot - Slot start: $lcstart, Slot end: $lcend");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Battery efficiency used: ".($befficiency * 100)." %");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - weighted self-consumption: $wou %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - charging target: $goalpercent % / $goalwh Wh");
           #Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Percentage of the total amount of charging energy required: ".(sprintf "%.1f", $sf*100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - The PV generation, consumption and surplus listed below are based on the battery's share of the total amount of charging energy required!");
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - used safety margin: $lrMargin %");
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - weighted self-consumption: $wou %");
+      }
+     
+      ## Debuglog LR
+      ################
+      if ($paref->{debug} =~ /batteryManagement/ && $strategy eq 'loadRelease') {
+          Log3 ($name, 1, "$name DEBUG> ChargeLR Bat $bn - used safety margin: $lrMargin %");
       }
       
       ## Auswertung für jede kommende Stunde
@@ -11942,7 +11947,6 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{$bn}{lcintime}     = $lcintime;                                # Ladesteuerung "In Time" oder "nicht In Time"
               $hsurp->{$fd}{$hod}{$bn}{stt}          = $stt;                                     # Day/Time für Debuglog 
               $hsurp->{$fd}{$hod}{$bn}{strategy}     = $strategy;                                # Ladestrategie
-              $hsurp->{$fd}{$hod}{$bn}{weightOwnUse} = $wou;                                     # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)
               $hsurp->{$fd}{$hod}{$bn}{befficiency}  = $befficiency;                             # Speicherwirkungsgrad
           }
           
@@ -11969,17 +11973,19 @@ sub _batChargeMgmt {
           
           ## Debuglog LR
           ################
-          my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W, inTime: ".($cgbt ? $lcintime : '-');
+          if ($paref->{debug} =~ /batteryManagement/ && $strategy eq 'loadRelease') {
+              my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W, inTime: ".($cgbt ? $lcintime : '-');
 
-          if ($num) {
-              $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
+              if ($num) {
+                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
 
-              if (!$today) {
-                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, roTomPV: $tompvfc, roTomCON: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
+                  if (!$today) {
+                      $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, roTomPV: $tompvfc, roTomCON: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
+                  }
               }
+              
+              Log3 ($name, 1, "$name DEBUG> ChargeLR Bat $bn $stt - lr: $crel, $msg");
           }
-          
-          debugLog ($paref, 'batteryManagement', "ChargeLR Bat $bn $stt - lr: $crel, $msg");
 
           ## Fortschreibung
           ###################
@@ -12018,12 +12024,6 @@ sub _batChargeMgmt {
       
       delete $paref->{hsurp};
       
-      ## Debuglog OTP
-      #################
-      if ($paref->{debug} =~ /batteryManagement/ && !$lfd) {
-          Log3 ($name, 1, "$name DEBUG> ChargeOTP - The limit for grid feed-in is $feedinlim W");
-      }
-      
       ## Speicherung und Readings erstellen OTP
       ###########################################
       for my $shod (sort { $a <=> $b } keys %{$hopt}) {
@@ -12031,7 +12031,9 @@ sub _batChargeMgmt {
           my @batteries = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hopt->{24}};
           
           for my $bat (sort @batteries) {
-              next if(!defined $hopt->{$shod}{$bat}{batinstcap});             
+              next if(!defined $hopt->{$shod}{$bat}{batinstcap});
+
+              $strategy  = $hopt->{$shod}{$bat}{strategy};            
               my $ssocwh = $hopt->{$shod}{$bat}{runwh} // '-';
               
               ## SOC-Prognose OTP
@@ -12049,7 +12051,7 @@ sub _batChargeMgmt {
                           socwh    => $fcendwh,
                           hod      => $shod,
                           loopid   => 'OTP',
-                          strategy => $hopt->{$shod}{$bat}{strategy},
+                          strategy => $strategy,
                           crel     => $hopt->{$shod}{$bat}{loadrel},                                                  
                        };
 
@@ -12057,24 +12059,24 @@ sub _batChargeMgmt {
               
               ## Debuglog OTP
               #################
-              if ($paref->{debug} =~ /batteryManagement/) {              
+              if ($paref->{debug} =~ /batteryManagement/ && $strategy ne 'loadRelease') {              
                   my $lcintime = $hopt->{$shod}{$bat}{lcintime};             
                   my $spls     = int $hopt->{$shod}{surplswh};
                   my $pneedmin = $hopt->{$shod}{$bat}{pneedmin};
                   my $ttt      = $hopt->{$shod}{$bat}{stt};
-                  my $crel     = $hopt->{$shod}{$bat}{loadrel};           
+                  my $crel     = $hopt->{$shod}{$bat}{loadrel};  
+                  my $spday    = $hopt->{$shod}{$bat}{spday};                 
                   
                   if ($nhr eq '00') {
-                      $pneedmin        = $otp->{$bat}{target} // 0;
-                      my $achievelog   = $hopt->{$shod}{$bat}{achievelog};
-                      my $otpMargin    = $hopt->{$shod}{$bat}{otpMargin};
-                      my $weightOwnUse = $hopt->{$shod}{$bat}{weightOwnUse};
+                      $pneedmin      = $otp->{$bat}{target} // 0;
+                      my $achievelog = $hopt->{$shod}{$bat}{achievelog};
+                      my $otpMargin  = $hopt->{$shod}{$bat}{otpMargin};
+                      
                       Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - used safety margin: $otpMargin %");
-                      Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - weighted self-consumption: $weightOwnUse %");
                       Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - $achievelog");
                   }              
                   
-                  Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat $ttt - hod: $shod / $nhr, lr/lc: $crel/$lcintime, SoC S/E: $ssocwh / $fcendwh Wh, Surplus: $spls Wh, OTP: $pneedmin W");
+                  Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat $ttt - hod: $shod/$nhr, lr/lc: $crel/$lcintime, SoC S/E: $ssocwh/$fcendwh Wh, Surp h/d: $spls/$spday Wh, OTP: $pneedmin W");
               }
           }
       }
@@ -12239,19 +12241,31 @@ sub __batChargeOptTargetPower {
               next;
           }                                   
           
-          ## weiter mit Überschuß (Prognose)
-          ####################################
+          ## weiter mit Überschuß
+          #########################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
           my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed);
-          my $needraw   = min ($fref->{ph}, $spls);                                                              # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
           
-          $needraw      = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
-          $needraw      = max ($needraw, $bpinreduced);                                                          # Mindestladeleistung bpinreduced sicherstellen                  
+          #Log3 ($name, 1, "$name - ph: $fref->{ph}") if($name eq "SolCast");
+          my $minpower  = $achievable 
+                          ? min ($fref->{ph}, $spls)
+                          : $fref->{ph};                                                                         # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
           
-          my $pneedmin  = $needraw * (1 + $otpMargin / 100);                                                     # optPower: initialer Sicherheitsaufschlag
+          $minpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
+          $minpower     = max ($minpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen                  
+          
+          ## Prognose
+          ############
+          my $pneedmin  = $minpower * (1 + $otpMargin / 100);                                                    # optPower: Sicherheitsaufschlag
           
           if ($strategy eq 'smartPower') {
-              $pneedmin = ___batAdjustPowerByMargin ($name, $needraw, $bpinmax, $runwhneed, $otpMargin);         # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+              $pneedmin = ___batAdjustPowerByMargin ($name,                                                      # smartPower: Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                                                     $minpower, 
+                                                     $bpinmax, 
+                                                     $runwhneed, 
+                                                     $otpMargin, 
+                                                     $hsurp->{$hod}{$sbn}{spday}
+                                                    );         
           }
           
           $pneedmin = sprintf "%.0f", $pneedmin;
@@ -12262,23 +12276,39 @@ sub __batChargeOptTargetPower {
           ## NextHour 00 (aktuelle Stunde) behandeln
           ############################################
           if ($nhr eq '00') {
-              my $target = $needraw > 0 ? $needraw / $befficiency : 0;                                           # Zielleistung mit Batterie Effizienzgrad erhöhen
+              my $target = $minpower > 0 ? $minpower / $befficiency : 0;                                         # Zielleistung mit Batterie Effizienzgrad erhöhen
 
               if ($achievable) {                                                                                 # Tagesziel erreichbar: Basisziel um otpMargin% erhöhen
-                  $target *= 1 + ($otpMargin / 100);
+                  $target *= 1 + ($otpMargin / 100);                                                             # optPower: Sicherheitsaufschlag
                     
-                  if ($strategy eq 'smartPower') {                                                               # smartPower: Sicherheitsaufschlag linear absenkend
-                      $target = ___batAdjustPowerByMargin ($name, $target, $bpinmax, $runwhneed, $otpMargin);
-                  }
+                  #if ($strategy eq 'smartPower') {                                                               # smartPower: Sicherheitsaufschlag linear absenkend
+                  #    $target = ___batAdjustPowerByMargin ($name,                                                # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                  #                                         $minpower, 
+                  #                                         $bpinmax, 
+                  #                                         $runwhneed, 
+                  #                                         $otpMargin, 
+                  #                                         $hsurp->{$hod}{$sbn}{spday}
+                  #                                        ); 
+                  #}
               }
               else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)                                                    
-                  $target *= (1 + $otpMargin / 100) ** 2;
+                  $target *= (1 + $otpMargin / 100) ** 2;                                                        # optPower: Sicherheitsaufschlag
                   
-                  if ($strategy eq 'smartPower') {                                                               # smartPower: agressivere Ladeleistung
-                      $hs2sunset -= 1;
-                      $target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
-                      $target    *= 1 + ($otpMargin / 100);
-                  }
+                  #if ($strategy eq 'smartPower') {                                                               # smartPower: agressivere Ladeleistung
+                  #    $hs2sunset -= 1;
+                  #    $target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
+                  #    $target    *= 1 + ($otpMargin / 100);
+                  #}
+              }
+              
+              if ($strategy eq 'smartPower') {                                                               # smartPower: Sicherheitsaufschlag linear absenkend
+                  $target = ___batAdjustPowerByMargin ($name,                                                # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                                                       $minpower, 
+                                                       $bpinmax, 
+                                                       $runwhneed, 
+                                                       $otpMargin, 
+                                                       $hsurp->{$hod}{$sbn}{spday}
+                                                      ); 
               }
 
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
@@ -12320,16 +12350,15 @@ return ($hsurp, $otp);
 #  Forum: https://forum.fhem.de/index.php?msg=1349579
 ################################################################       
 sub ___batAdjustPowerByMargin {
-  my ($name, $target, $pinmax, $runwhneed, $otpMargin) = @_;
+  my ($name, $minpower, $pinmax, $whneed, $otpMargin, $spday) = @_;
 
-  my $ratio   = 0;
-  my $rodpvfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);                     # PV Prognose Rest des Tages
-  $ratio      = $rodpvfc * 100 / $runwhneed if($runwhneed);
+  my $ratio = 0;
+  $ratio    = $spday * 100 / $whneed if($whneed);
   
-  return $pinmax if($target == $pinmax || $ratio <= 100);
-  return $target * (1 + $otpMargin / 100) if($target == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
+  return $pinmax if($minpower == $pinmax || $ratio <= 100);
+  return $minpower * (1 + $otpMargin / 100) if($minpower == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
   
-  my $pow = $pinmax - ($pinmax - $target) * ($ratio - 100) / $otpMargin;
+  my $pow = $pinmax - ($pinmax - $minpower) * ($ratio - 100) / $otpMargin;
 
 return $pow;
 }
