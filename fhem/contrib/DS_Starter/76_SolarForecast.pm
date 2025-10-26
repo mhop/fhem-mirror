@@ -12245,11 +12245,11 @@ sub __batChargeOptTargetPower {
           #########################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
           my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed);
+          my $minpower  = $achievable || $strategy eq 'optPower'
+                          ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
+                          : $fref->{ph};                                                                         
           
           #Log3 ($name, 1, "$name - ph: $fref->{ph}") if($name eq "SolCast");
-          my $minpower  = $achievable 
-                          ? min ($fref->{ph}, $spls)
-                          : $fref->{ph};                                                                         # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
           
           $minpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
           $minpower     = max ($minpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen                  
