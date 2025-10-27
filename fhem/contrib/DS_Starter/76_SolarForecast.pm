@@ -12065,7 +12065,8 @@ sub _batChargeMgmt {
                   my $pneedmin = $hopt->{$shod}{$bat}{pneedmin};
                   my $ttt      = $hopt->{$shod}{$bat}{stt};
                   my $crel     = $hopt->{$shod}{$bat}{loadrel};  
-                  my $spday    = $hopt->{$shod}{$bat}{spday};                 
+                  my $spday    = $hopt->{$shod}{$bat}{spday};
+                  my $frefph   = $hopt->{$shod}{$bat}{frefph} // '-';                  
                   
                   if ($nhr eq '00') {
                       $pneedmin      = $otp->{$bat}{target} // 0;
@@ -12076,7 +12077,7 @@ sub _batChargeMgmt {
                       Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - $achievelog");
                   }              
                   
-                  Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat $ttt - hod: $shod/$nhr, lr/lc: $crel/$lcintime, SoC S/E: $ssocwh/$fcendwh Wh, Surp h/d: $spls/$spday Wh, OTP: $pneedmin W");
+                  Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat $ttt - hod:$shod/$nhr, lr/lc:$crel/$lcintime, SocS/E:$ssocwh/$fcendwh Wh, SurpH/D:$spls/$spday Wh, OTP:$pneedmin/$frefph W");
               }
           }
       }
@@ -12137,9 +12138,10 @@ sub __batChargeOptTargetPower {
   my $name  = $paref->{name};
   my $hsurp = $paref->{hsurp};                                                                                   # Hashref Überschußhash
   
-  ## Surplus der Stunde 00 in Variable extrahieren und im Hash durch Zeitgewichtung ersetzen
-  ############################################################################################  
-  my $spls00 = 0;                                                              
+  ## Surplus der Stunde 00 mit Zeitgewichtung in $replacement speichern
+  #######################################################################
+  #my $spls00 = 0;
+  my $replacement;  
 
   for my $k (keys %$hsurp) {
       my $nh = $hsurp->{$k}{nhr};
@@ -12148,10 +12150,10 @@ sub __batChargeOptTargetPower {
           my $val = $hsurp->{$k}{surplswh};
           
           if (defined $val && $val =~ /^(\d+)\.(\w+)$/) {
-              $spls00         = $1;
-              my $replacement = sprintf "%.0f", ($spls00 / 60 * (60 - int $minute));                             # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß     
-              $replacement   .= '.'.$2;
-              $hsurp->{$k}{surplswh} = $replacement;
+              #my $spls00   = $1;
+              $replacement  = sprintf "%.0f", ($1 / 60 * (60 - int $minute));                                    # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß     
+              $replacement .= '.'.$2;
+              #$hsurp->{$k}{surplswh} = $replacement;
           }
           
           last;                                                                                                  # da Stunde 00 nur einmal vorkommt, können wir abbrechen
@@ -12159,25 +12161,32 @@ sub __batChargeOptTargetPower {
   }
 
   my $fipl       = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
-  my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert
   my @batteries  = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hsurp->{24}};
+  my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert ohne Zeitgewichtung h 00
   
   my ($fcendwh, $diff);
   my $otp;
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
-      my $nhr     = $hsurp->{$hod}{nhr};
+      my $nhr = $hsurp->{$hod}{nhr};
       next if(!defined $nhr);
       
       my $spls    = int ($hsurp->{$hod}{surplswh} // 0);
-      $spls       = $spls00 if($nhr eq '00');                                                                    # aktuelle Stunde: zeitgewichteter PV-Überschuß mit Original ersetzen
+      # $spls       = $spls00 if($nhr eq '00');                                                                    # aktuelle Stunde: zeitgewichteter PV-Überschuß mit Original ersetzen
       
       my $nexthod = sprintf "%02d", (int $hod + 1);
       my $nextnhr = $hsurp->{$nexthod}{nhr};
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
       my $total          = 0;                                               
-      $total            += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
+      # $total            += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtwert aller Stunden mit PV-Überschuß ermitteln
+      
+      for my $h (@remaining_hods) {                                                                              # Gesamtwert aller Stunden mit PV-Überschuß ermitteln
+          my $val = $hsurp->{$h}{nhr} eq '00'
+                    ? $replacement // 0
+                    : $hsurp->{$h}{surplswh};
+          $total += int $val;
+      }
 
       for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie          
           my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
@@ -12245,22 +12254,24 @@ sub __batChargeOptTargetPower {
           #########################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
           my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed);
-          my $minpower  = $achievable || $strategy eq 'optPower'
+          my $limpower  = $achievable || $strategy eq 'optPower'
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
                           : $fref->{ph};                                                                         
           
           #Log3 ($name, 1, "$name - ph: $fref->{ph}") if($name eq "SolCast");
           
-          $minpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
-          $minpower     = max ($minpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen                  
+          $limpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
+          $limpower     = max ($limpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen                  
+          
+          $hsurp->{$hod}{$sbn}{frefph} = $fref->{ph};
           
           ## Prognose
           ############
-          my $pneedmin  = $minpower * (1 + $otpMargin / 100);                                                    # optPower: Sicherheitsaufschlag
+          my $pneedmin = $limpower * (1 + $otpMargin / 100);                                                     # optPower: Sicherheitsaufschlag
           
           if ($strategy eq 'smartPower') {
               $pneedmin = ___batAdjustPowerByMargin ($name,                                                      # smartPower: Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
-                                                     $minpower, 
+                                                     $limpower, 
                                                      $bpinmax, 
                                                      $runwhneed, 
                                                      $otpMargin, 
@@ -12276,14 +12287,14 @@ sub __batChargeOptTargetPower {
           ## NextHour 00 (aktuelle Stunde) behandeln
           ############################################
           if ($nhr eq '00') {
-              my $target = $minpower > 0 ? $minpower / $befficiency : 0;                                         # Zielleistung mit Batterie Effizienzgrad erhöhen
+              my $target = $limpower > 0 ? $limpower / $befficiency : 0;                                         # Zielleistung mit Batterie Effizienzgrad erhöhen
 
               if ($achievable) {                                                                                 # Tagesziel erreichbar: Basisziel um otpMargin% erhöhen
                   $target *= 1 + ($otpMargin / 100);                                                             # optPower: Sicherheitsaufschlag
                     
                   #if ($strategy eq 'smartPower') {                                                               # smartPower: Sicherheitsaufschlag linear absenkend
                   #    $target = ___batAdjustPowerByMargin ($name,                                                # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
-                  #                                         $minpower, 
+                  #                                         $limpower, 
                   #                                         $bpinmax, 
                   #                                         $runwhneed, 
                   #                                         $otpMargin, 
@@ -12301,9 +12312,9 @@ sub __batChargeOptTargetPower {
                   #}
               }
               
-              if ($strategy eq 'smartPower') {                                                               # smartPower: Sicherheitsaufschlag linear absenkend
-                  $target = ___batAdjustPowerByMargin ($name,                                                # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
-                                                       $minpower, 
+              if ($strategy eq 'smartPower') {                                                                   # smartPower: Sicherheitsaufschlag linear absenkend
+                  $target = ___batAdjustPowerByMargin ($name,                                                    # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                                                       $limpower, 
                                                        $bpinmax, 
                                                        $runwhneed, 
                                                        $otpMargin, 
@@ -12350,15 +12361,15 @@ return ($hsurp, $otp);
 #  Forum: https://forum.fhem.de/index.php?msg=1349579
 ################################################################       
 sub ___batAdjustPowerByMargin {
-  my ($name, $minpower, $pinmax, $whneed, $otpMargin, $spday) = @_;
+  my ($name, $limpower, $pinmax, $whneed, $otpMargin, $spday) = @_;
 
   my $ratio = 0;
   $ratio    = $spday * 100 / $whneed if($whneed);
   
-  return $pinmax if($minpower == $pinmax || $ratio <= 100);
-  return $minpower * (1 + $otpMargin / 100) if($minpower == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
+  return $pinmax if($limpower == $pinmax || $ratio <= 100);
+  return $limpower * (1 + $otpMargin / 100) if($limpower == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
   
-  my $pow = $pinmax - ($pinmax - $minpower) * ($ratio - 100) / $otpMargin;
+  my $pow = $pinmax - ($pinmax - $limpower) * ($ratio - 100) / $otpMargin;
 
 return $pow;
 }
@@ -14593,7 +14604,7 @@ sub _calcConsForecast_circular {
                   ## Stundenweise exkludes und inkludes aufnehmen
                   #################################################
                   $do = 1;
-                  if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+                  if ($swdfcfc) {                                                                           # nur gleiche Tage (Mo...So) einbeziehen
                       my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
                       $do     = 0 if(!$hdn || $hdn ne $todayname);
                   }
@@ -20629,6 +20640,8 @@ sub aiAddInstance {
       $data{$name}{aidectree}{object}{$tn}{enum}  = $aiAddedToTrain;
   }
 
+  delete $data{$name}{aidectree}{aitrained};
+  
   $paref->{cst} = $cst;
   $serial = aiTrain ($paref);
   delete $paref->{cst};
@@ -20690,10 +20703,10 @@ sub aiTrain {
   }
   
   $data{$name}{aidectree}{aitrained} = \@ensemble;
-
   $err = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
+  delete $data{$name}{aidectree}{aitrained};
+  
   my $rn;
-
   if (!$err) {
       $rn = delete $entities{rn};
 
