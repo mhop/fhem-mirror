@@ -5789,13 +5789,14 @@ sub EnOcean_Set($@) {
         }
         if (defined $a[0]) {
           # position value
-          if (($a[0] =~ m/^\d+$/) && ($a[0] >= 0) && ($a[0] <= 100)) {
+          if ($a[0] =~ m/^\d+$/ && $a[0] >= 0 && $a[0] <= 100) {
             $position = shift(@a);
 
             if (defined $a[0]) {
             # angle value
-              if (($a[0] =~ m/^\d+$/) && ($a[0] >= 0) && ($a[0] <= 100)) {
+              if ($a[0] =~ m/^[+-]?\d+$/ && $a[0] >= -1 && $a[0] <= 100) {
                 $angle = shift(@a);
+                $angle = 127 if ($angle == -1);
 
                 if (defined $a[0]) {
                   # channel
@@ -20735,8 +20736,10 @@ sub EnOcean_Delete($$) {
         drive blinds to position with angle value</li>
       <li>stop<br>
         issue stop command</li>
-     <li>teach<br>
+      <li>teach<br>
         initiate teach-in mode</li>
+      <li>teachInSec<br>
+        initiate secure teach-in</li>
       <li>up tu/s<br>
         issue roll up command</li>
     </ul><br>
@@ -20918,7 +20921,7 @@ sub EnOcean_Delete($$) {
     </ul><br>
       Channel Range: 1 ... 4|all, default is all<br>
       Position Range: position = 0 % ... 100 %<br>
-      Slat Angle Range: &alpha; = 0 % ... 100 %<br>
+      Slat Angle Range: &alpha; = -1, 0 % ... 100 % (-1 = angle position unchanged)<br>
       The devive can only fully controlled if the attributes <a href="#EnOcean-attr-alarmAction">alarmAction</a>,
       <a href="#EnOcean-attr-angleTime">angleTime</a>, <a href="#EnOcean-attr-reposition">reposition</a> and <a href="#EnOcean-attr-shutTime">shutTime</a>
       are set correctly.<br>
