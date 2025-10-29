@@ -160,12 +160,13 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.59.6" => "26.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
+  "1.59.6" => "28.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
                            "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
                            "__batChargeOptTargetPower: use an average for the charging power if smartPower set and charging target are not achievable ".
                            "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
                            "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add PV share calculation ".
-                           "___doPlanning: code improvements and implement PV share needed ",
+                           "___doPlanning: code improvements and implement PV share needed ".
+                           " Task 2: chamge timestamp of day before to 24:00:00, _restorePlantConfig: fix problem with attr sequence ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
                            "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
@@ -626,14 +627,26 @@ my @aconfigs = qw( aiControl
                    ctrlSpecialReadings
                    ctrlUserExitFn
                    disable
-                   graphicHeaderOwnspec graphicHeaderOwnspecValForm
+                   graphicHeaderOwnspec 
+				   graphicHeaderOwnspecValForm
                    graphicHistoryHour
-                   graphicSelect graphicShowNight graphicShowWeather
-                   graphicWeatherColor graphicWeatherColorNight
-                   setupMeterDev setupInverterStrings setupRadiationAPI setupStringPeak setupStringAzimuth setupStringDeclination
-                   setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
+                   graphicSelect 
+				   graphicShowNight 
+				   graphicShowWeather
+                   graphicWeatherColor 
+				   graphicWeatherColorNight
+                   setupMeterDev 
+				   setupInverterStrings 
+				   setupRadiationAPI 
+				   setupStringPeak 
+				   setupStringAzimuth 
+				   setupStringDeclination
                    setupRoofTops
                  );
+				 
+  for my $wd (1..3) {
+      push @aconfigs, "setupWeatherDev${wd}";                     # add Wetter Dev Attribute
+  }
 
   for my $cn (1..MAXCONSUMER) {
       $cn = sprintf "%02d", $cn;
@@ -8467,7 +8480,7 @@ sub readCacheFile {
       my ($nr, $na);
 
       if ($plantcfg) {
-          ($nr, $na) = _restorePlantConfig ($hash, $plantcfg);
+          ($nr, $na) = _restorePlantConfig ($name, $plantcfg);
           Log3 ($name, 3, qq{$name - cached data "$title" restored. Number of restored Readings/Attributes: $nr/$na});
       }
 
@@ -8689,20 +8702,20 @@ return ($plantcfg, $nr, $na);
 #    Anlagenkonfiguration aus fileRetrieve wiederherstellen
 ################################################################
 sub _restorePlantConfig {
-  my $hash     = shift;
+  my $name     = shift;
   my $plantcfg = shift;
-  my $name     = $hash->{NAME};
 
   my ($nr, $na) = (0,0);
 
   while (my ($key, $val) = each %{$plantcfg}) {
-      if (grep /^$key$/, @rconfigs) {                                          # Reading wiederherstellen
+      if (grep /^$key$/, @rconfigs) {                                          # Readings wiederherstellen
           CommandSetReading (undef,"$name $key $val");
           $nr++;
       }
 
-      if (grep /^$key$/, @aconfigs) {                                          # Attribut wiederherstellen
-          CommandAttr (undef, "$name $key $val");
+      if (grep /^$key$/, @aconfigs) {                                          # Attribute wiederherstellen
+          # CommandAttr (undef, "$name $key $val");
+		  $attr{$name}{$key} = $val;
           $na++;
       }
   }
@@ -12071,11 +12084,13 @@ sub _batChargeMgmt {
                   
                   if ($nhr eq '00') {
                       $pneedmin      = $otp->{$bat}{target} // 0;
+					  my $ratio      = $otp->{$bat}{ratio}  // '<unknown>';
                       my $achievelog = $hopt->{$shod}{$bat}{achievelog};
                       my $otpMargin  = $hopt->{$shod}{$bat}{otpMargin};
                       
                       Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - used safety margin: $otpMargin %");
                       Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - $achievelog");
+					  Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - current Ratio of surplus / energy requirement to achieve the load target: $ratio %") if($strategy eq 'smartPower');
                   }              
                   
                   Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat $ttt - hod:$shod/$nhr, lr/lc:$crel/$lcintime, SocS/E:$ssocwh/$fcendwh Wh, SurpH/D:$spls/$spday Wh, OTP:$pneedmin/$frefph W");
@@ -12141,7 +12156,6 @@ sub __batChargeOptTargetPower {
   
   ## Surplus der Stunde 00 mit Zeitgewichtung in $replacement speichern
   #######################################################################
-  #my $spls00 = 0;
   my $replacement;  
 
   for my $k (keys %$hsurp) {
@@ -12151,10 +12165,8 @@ sub __batChargeOptTargetPower {
           my $val = $hsurp->{$k}{surplswh};
           
           if (defined $val && $val =~ /^(\d+)\.(\w+)$/) {
-              #my $spls00   = $1;
               $replacement  = sprintf "%.0f", ($1 / 60 * (60 - int $minute));                                    # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß     
               $replacement .= '.'.$2;
-              #$hsurp->{$k}{surplswh} = $replacement;
           }
           
           last;                                                                                                  # da Stunde 00 nur einmal vorkommt, können wir abbrechen
@@ -12165,24 +12177,20 @@ sub __batChargeOptTargetPower {
   my @batteries  = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hsurp->{24}};
   my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert ohne Zeitgewichtung h 00
   
-  my ($fcendwh, $diff);
-  my $otp;
+  my ($fcendwh, $diff, $otp, $ratio);
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
       my $nhr = $hsurp->{$hod}{nhr};
       next if(!defined $nhr);
       
       my $spls    = int ($hsurp->{$hod}{surplswh} // 0);
-      # $spls       = $spls00 if($nhr eq '00');                                                                    # aktuelle Stunde: zeitgewichteter PV-Überschuß mit Original ersetzen
-      
       my $nexthod = sprintf "%02d", (int $hod + 1);
       my $nextnhr = $hsurp->{$nexthod}{nhr};
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
       my $total          = 0;                                               
-      # $total            += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtwert aller Stunden mit PV-Überschuß ermitteln
       
-      for my $h (@remaining_hods) {                                                                              # Gesamtwert aller Stunden mit PV-Überschuß ermitteln
+      for my $h (@remaining_hods) {                                                                              # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
           my $val = $hsurp->{$h}{nhr} eq '00'
                     ? $replacement // 0
                     : $hsurp->{$h}{surplswh};
@@ -12240,6 +12248,7 @@ sub __batChargeOptTargetPower {
               if ($nhr eq '00') {
                   $diff                = $diff / 60 * (60 - int $minute);                                        # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungsabfluß
                   $otp->{$sbn}{target} = $csocwh <= $lowSocwh ? $bpinreduced : $bpinmax;
+				  $otp->{$sbn}{ratio}  = 0;
               }
               
               $runwh += $diff / $befficiency;                                                                    # um Verbrauch reduzieren
@@ -12259,8 +12268,6 @@ sub __batChargeOptTargetPower {
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
                           : $fref->{ph};                                                                         
           
-          #Log3 ($name, 1, "$name - ph: $fref->{ph}") if($name eq "SolCast");
-          
           $limpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
           $limpower     = max ($limpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen                  
           
@@ -12271,13 +12278,13 @@ sub __batChargeOptTargetPower {
           my $pneedmin = $limpower * (1 + $otpMargin / 100);                                                     # optPower: Sicherheitsaufschlag
           
           if ($strategy eq 'smartPower') {
-              $pneedmin = ___batAdjustPowerByMargin ($name,                                                      # smartPower: Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
-                                                     $limpower, 
-                                                     $bpinmax, 
-                                                     $runwhneed, 
-                                                     $otpMargin, 
-                                                     $hsurp->{$hod}{$sbn}{spday}
-                                                    );         
+              ($pneedmin) = ___batAdjustPowerByMargin ($name,                                                    # smartPower: Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                                                       $limpower, 
+                                                       $bpinmax, 
+                                                       $runwhneed, 
+                                                       $otpMargin, 
+                                                       $total
+                                                      );         
           }
           
           $pneedmin = sprintf "%.0f", $pneedmin;
@@ -12292,35 +12299,21 @@ sub __batChargeOptTargetPower {
 
               if ($achievable) {                                                                                 # Tagesziel erreichbar: Basisziel um otpMargin% erhöhen
                   $target *= 1 + ($otpMargin / 100);                                                             # optPower: Sicherheitsaufschlag
-                    
-                  #if ($strategy eq 'smartPower') {                                                               # smartPower: Sicherheitsaufschlag linear absenkend
-                  #    $target = ___batAdjustPowerByMargin ($name,                                                # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
-                  #                                         $limpower, 
-                  #                                         $bpinmax, 
-                  #                                         $runwhneed, 
-                  #                                         $otpMargin, 
-                  #                                         $hsurp->{$hod}{$sbn}{spday}
-                  #                                        ); 
-                  #}
               }
               else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)                                                    
                   $target *= (1 + $otpMargin / 100) ** 2;                                                        # optPower: Sicherheitsaufschlag
-                  
-                  #if ($strategy eq 'smartPower') {                                                               # smartPower: agressivere Ladeleistung
-                  #    $hs2sunset -= 1;
-                  #    $target     = $runwhneed > 0 && $hs2sunset > 0 ? $runwhneed / $hs2sunset : $target;
-                  #    $target    *= 1 + ($otpMargin / 100);
-                  #}
               }
               
               if ($strategy eq 'smartPower') {                                                                   # smartPower: Sicherheitsaufschlag linear absenkend
-                  $target = ___batAdjustPowerByMargin ($name,                                                    # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
-                                                       $limpower, 
-                                                       $bpinmax, 
-                                                       $runwhneed, 
-                                                       $otpMargin, 
-                                                       $hsurp->{$hod}{$sbn}{spday}
-                                                      ); 
+                  ($target, $ratio) = ___batAdjustPowerByMargin ($name,                                          # smartPower: agressivere Ladeleistung, Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                                                                 $limpower, 
+                                                                 $bpinmax, 
+                                                                 $runwhneed, 
+                                                                 $otpMargin, 
+                                                                 $total
+                                                                );
+
+		          $otp->{$sbn}{ratio} = $ratio;											
               }
 
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
@@ -12362,17 +12355,17 @@ return ($hsurp, $otp);
 #  Forum: https://forum.fhem.de/index.php?msg=1349579
 ################################################################       
 sub ___batAdjustPowerByMargin {
-  my ($name, $limpower, $pinmax, $whneed, $otpMargin, $spday) = @_;
+  my ($name, $limpower, $pinmax, $whneed, $otpMargin, $total) = @_;
 
   my $ratio = 0;
-  $ratio    = $spday * 100 / $whneed if($whneed);
+  $ratio    = $total * 100 / $whneed if($whneed);
   
-  return $pinmax if($limpower == $pinmax || $ratio <= 100);
-  return $limpower * (1 + $otpMargin / 100) if($limpower == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
+  return ($pinmax, $ratio)                            if($limpower == $pinmax || $ratio <= 100);
+  return ($limpower * (1 + $otpMargin / 100), $ratio) if($limpower == 0       || !$otpMargin || $ratio >= 100 + $otpMargin); 
   
   my $pow = $pinmax - ($pinmax - $limpower) * ($ratio - 100) / $otpMargin;
 
-return $pow;
+return ($pow, $ratio);
 }
 
 ################################################################
