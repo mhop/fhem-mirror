@@ -9,7 +9,7 @@ attr EVU_Tibber_connect15 DbLogValueFn {\
    $mon  += 1;;\
    my $quarter = int($min / 15) * 15;;  # Minuten auf 0, 15, 30 oder 45 runden\
 \
-   $TIMESTAMP = sprintf("%04d-%02d-%02d %02d:%02d:00", $year, $mon, $mday, $hour, $quarter*15);;\
+   $TIMESTAMP = sprintf("%04d-%02d-%02d %02d:%02d:00", $year, $mon, $mday, $hour, $quarter);;\
 \
   }\
 }
