@@ -12260,13 +12260,13 @@ sub __batChargeOptTargetPower {
       my $nextnhr = $hsurp->{$nexthod}{nhr};
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
-      my $total          = 0;                                               
+      my $remainingSurp  = 0;                                               
       
       for my $h (@remaining_hods) {                                                                              # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
-          my $val = $hsurp->{$h}{nhr} eq '00'
-                    ? $replacement // 0
-                    : $hsurp->{$h}{surplswh};
-          $total += int $val;
+          my $val         = $hsurp->{$h}{nhr} eq '00'
+                            ? $replacement // 0
+                            : $hsurp->{$h}{surplswh};
+          $remainingSurp += int $val;
       }
 
       for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie          
@@ -12301,7 +12301,7 @@ sub __batChargeOptTargetPower {
           my $runwhneed  = $goalwh - $runwh; 
           my $achievable = 1;
             
-          if ($runwhneed > 0 && $total * $befficiency < $runwhneed) {                                            # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
+          if ($runwhneed > 0 && $remainingSurp * $befficiency < $runwhneed) {                                    # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
           }
           
@@ -12335,8 +12335,8 @@ sub __batChargeOptTargetPower {
           ## weiter mit Überschuß
           #########################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
-          my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed);
-          my $limpower  = $achievable || $strategy eq 'optPower'
+          my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed, $replacement);
+          my $limpower  = $strategy eq 'optPower'
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
                           : $fref->{ph};                                                                         
           
@@ -12355,7 +12355,7 @@ sub __batChargeOptTargetPower {
                                                        $bpinmax, 
                                                        $runwhneed, 
                                                        $otpMargin, 
-                                                       $total
+                                                       $remainingSurp
                                                       );         
           }
           
@@ -12382,7 +12382,7 @@ sub __batChargeOptTargetPower {
                                                                  $bpinmax, 
                                                                  $runwhneed, 
                                                                  $otpMargin, 
-                                                                 $total
+                                                                 $remainingSurp
                                                                 );
 
                   $otp->{$sbn}{ratio} = sprintf ("%.2f", $ratio);                                           
@@ -12427,15 +12427,21 @@ return ($hsurp, $otp);
 #  Forum: https://forum.fhem.de/index.php?msg=1349579
 ################################################################       
 sub ___batAdjustPowerByMargin {
-  my ($name, $limpower, $pinmax, $whneed, $otpMargin, $total) = @_;
+  my ($name, $limpower, $pinmax, $whneed, $otpMargin, $remainingSurp) = @_;
 
+  my $pow;
   my $ratio = 0;
-  $ratio    = $total * 100 / $whneed if($whneed);
+  $ratio    = $remainingSurp * 100 / $whneed if($whneed);
   
-  return ($pinmax, $ratio)                            if($limpower == $pinmax || $ratio <= 100);
-  return ($limpower * (1 + $otpMargin / 100), $ratio) if($limpower == 0       || !$otpMargin || $ratio >= 100 + $otpMargin); 
-  
-  my $pow = $pinmax - ($pinmax - $limpower) * ($ratio - 100) / $otpMargin;
+  return ($pinmax, $ratio)                            if($limpower == $pinmax);
+  return ($limpower * (1 + $otpMargin / 100), $ratio) if($limpower == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
+
+  if ($ratio <= 100) {
+      $pow = $ratio <= 50 ? $pinmax : $limpower * (1 + $otpMargin / 100);
+  }
+  else {
+      $pow = $pinmax - ($pinmax - $limpower) * ($ratio - 100) / $otpMargin;
+  }
 
 return ($pow, $ratio);
 }
@@ -12490,7 +12496,7 @@ return $value;
 #   die vollständige Ausnutzung der vorhandenen Kapazität.
 ###############################################################################################
 sub ___batFindMinPhWh {
-    my ($hsurp, $aref, $Ereq) = @_;
+    my ($hsurp, $aref, $Ereq, $replacement) = @_;
     
     my @hods     = @$aref;
     my $low      = 0;                                                 
@@ -12506,8 +12512,10 @@ sub ___batFindMinPhWh {
         my $charged = 0;
         
         for my $hod (@hods) {
-            my $cap   = $hsurp->{$hod}{surplswh};
-            $charged += $mid < $cap ? $mid : $cap;
+            my $nhr   = $hsurp->{$hod}{nhr};
+            next if(!defined $nhr);
+            my $cap   = $nhr eq '00' ? int $replacement : $hsurp->{$hod}{surplswh};
+            $charged += min ($mid, $cap);
         }
         
         $charged >= $Ereq ? ($high = $mid) : ($low = $mid);
