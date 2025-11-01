@@ -16,6 +16,9 @@ sed -i /debian.fhem.de/d /etc/apt/sources.list
 if [ -f /etc/apt/sources.list.d/debianfhemde.list ]; then
   rm /etc/apt/sources.list.d/debianfhemde.list
 fi
+if [ -f /etc/apt/sources.list.d/debianfhemde.sources ]; then
+  rm /etc/apt/sources.list.d/debianfhemde.sources
+fi
 
 # set up of autostart
 # systemd:  supported
