@@ -40,17 +40,17 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Math::Trig;
 use List::Util qw(sum min max shuffle);
 use Scalar::Util qw(blessed weaken);
-
-eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
-eval "use FHEM::Utility::CTZ qw(:all);1;" or my $ctzAbsent     = 1;                  ## no critic 'eval'
-#use Test::Memory::Usage;                                                            # https://metacpan.org/pod/Test::Memory::Usage
-
 use Encode;
 use Color;
 use utf8;
 use HttpUtils;
-eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # cpan install JSON
-eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval' # cpan install AI::DecisionTree
+
+eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
+eval "use FHEM::Utility::CTZ qw(:all);1;" or my $ctzAbsent     = 1;                  ## no critic 'eval'
+#use Test::Memory::Usage;                                                            # https://metacpan.org/pod/Test::Memory::Usage
+eval "use JSON;1;"                        or my $jsonabs      = 'JSON';              ## no critic 'eval' # cpan install JSON
+eval "use AI::DecisionTree;1;"            or my $aidtabs      = 'AI::DecisionTree';  ## no critic 'eval' # cpan install AI::DecisionTree
+eval "use Digest::SHA qw(sha1_hex);1;"    or my $digestAbsent = 'Digest::SHA';       ## no critic 'eval'
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                            # Error Code Modul
 use FHEM::SynoModules::SMUtils qw (checkModVer
@@ -160,11 +160,21 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.60.0" => "01.11.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
+                           "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
+                           "__batChargeOptTargetPower: use an average for the charging power if smartPower set and charging target are not achievable ".
+                           "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
+                           "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add PV share calculation ".
+                           "___doPlanning: code improvements and implement PV share needed ".
+                           " Task 2: chamge timestamp of day before to 24:00:00, _restorePlantConfig: fix problem with attr sequence ".
+                           "_setreset: set reset is reworked with widgetList, aiData can be deleted by index ".
+                           "_flowGraphic: new variable node2home_direction  ".
+                           "new sub askLogtime to avoid error logs too often, Forum: https://forum.fhem.de/index.php?msg=1350716 ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
                            "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
                            "__batChargeOptTargetPower: use pinmax if achievable==0, new ctrlBatSocManagementXX->stepSoC key ".
-						   "loadStrategy: possible value smartPower ", 
+                           "loadStrategy: possible value smartPower ", 
   "1.59.3" => "10.10.2025  ___batChargeSaveResults: fix writing 'rcdchargebatXX' ",
   "1.59.2" => "09.10.2025  one more fix of color filling of svg icon ",
   "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
@@ -259,7 +269,7 @@ my %vNotesIntern = (
   "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
   "1.52.0" => "11.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
                            "valInverter: add isource, new keys: ac2dc, dc2ac, _flowGraphic: add battery inverter type ".
-                           "and extensive adjustments, new sub removeMinMaxArray, ___getFWwidget: bugfix with state-Reading ".
+                           "and extensive adjustments, new sub removeMinMaxArray, ___ownSpecGetFWwidget: bugfix with state-Reading ".
                            "flowGraphicControl: new key showGenerators, code cleaning ",
   "1.51.8" => "02.05.2025  _specialActivities: delete overhanging days at the change of month ".
                            "Bugfix: https://forum.fhem.de/index.php?msg=1340666 ",
@@ -288,7 +298,7 @@ my %vNotesIntern = (
   "1.50.4" => "16.04.2025  Consumer Strokes: fix val2pahColor, new key flowGraphicControl->strokeCmrRedColLimit ".
                            "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ".
                            "normBeamWidth: decouple content batsocCombi_, energycosts, feedincome from the conversion Wh -> kWh ".
-                           "___getFWwidget: textField-long -> textFieldNL-long ",
+                           "___ownSpecGetFWwidget: textField-long -> textFieldNL-long ",
   "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
                            "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
   "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
@@ -431,6 +441,7 @@ use constant {
   KJ2WH          => 0.2777777778,                                                   # Umrechnungsfaktor kJ in Wh
   WH2KJ          => 3.6,                                                            # Umrechnungsfaktor Wh in kJ
   DEFLANG        => 'EN',                                                           # default Sprache wenn nicht konfiguriert
+  INPUTSIZE      => 10,                                                             # default Breite eines Textfeldes in graphicHeaderOwnspec
   DEFMAXVAR      => 0.75,                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
   DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
   SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
@@ -485,6 +496,7 @@ use constant {
   TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
   TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
 
+  LOGDELAY       => 600,                                                            # Verzögerungszeit zwischen zwei Logausgaben mit identischen Inhalt
   DEFMINTIME     => 60,                                                             # default Einplanungsdauer in Minuten
   CONSFCLDAYS    => 60,                                                             # die Stundenwerte der letzten CONSFCLDAYS Tage zur Kalkulation der Verbrauchvorhersage einbezogen
   DEFCTYPE       => 'other',                                                        # default Verbrauchertyp
@@ -619,14 +631,26 @@ my @aconfigs = qw( aiControl
                    ctrlSpecialReadings
                    ctrlUserExitFn
                    disable
-                   graphicHeaderOwnspec graphicHeaderOwnspecValForm
+                   graphicHeaderOwnspec 
+                   graphicHeaderOwnspecValForm
                    graphicHistoryHour
-                   graphicSelect graphicShowNight graphicShowWeather
-                   graphicWeatherColor graphicWeatherColorNight
-                   setupMeterDev setupInverterStrings setupRadiationAPI setupStringPeak setupStringAzimuth setupStringDeclination
-                   setupWeatherDev1 setupWeatherDev2 setupWeatherDev3
+                   graphicSelect 
+                   graphicShowNight 
+                   graphicShowWeather
+                   graphicWeatherColor 
+                   graphicWeatherColorNight
+                   setupMeterDev 
+                   setupInverterStrings 
+                   setupRadiationAPI 
+                   setupStringPeak 
+                   setupStringAzimuth 
+                   setupStringDeclination
                    setupRoofTops
                  );
+                 
+  for my $wd (1..3) {
+      push @aconfigs, "setupWeatherDev${wd}";                     # add Wetter Dev Attribute
+  }
 
   for my $cn (1..MAXCONSUMER) {
       $cn = sprintf "%02d", $cn;
@@ -1629,6 +1653,7 @@ my %hfspvh = (
 # $data{$name}{batteries}                                                     # temporärer Speicher Battery Daten
 # $data{$name}{weatherdata}                                                   # temporärer Speicher Wetterdaten
 # $data{$name}{func}                                                          # temporäre interne Funktionen
+# $data{$name}{log}                                                           # Logsperrhash
 # $data{$name}{dwdcatalog}                                                    # temporärer Speicher DWD Stationskatalog
 # $data{$name}{strings}                                                       # temporärer Speicher Stringkonfiguration
 # $data{$name}{aidectree}{object}                                             # AI Decision Tree Object (im BlockingCall)
@@ -1829,7 +1854,8 @@ sub Set {
                pvHistory
              );
 
-  my $resets = join ",", @re;
+  my $resets   = join ",", @re;
+  my $resetnum = scalar @re + 1;
 
   for my $h (@chours) {
       push @cfs, 'pvCorrectionFactor_'. sprintf("%02d",$h);
@@ -1872,7 +1898,7 @@ sub Set {
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,on_complex_api_ai,' : ',')."off ".
-             "reset:$resets ".
+             "reset:widgetList,$resetnum,select,$resets,2,textField,use&nbsp;only&nbsp;when&nbsp;arguments&nbsp;are&nbsp;needed ".  
              $cf." "
              ;
 
@@ -2058,10 +2084,13 @@ sub _setattrKeyVal {                         ## no critic "not used"
 
   return if(!$init_done);
   
+  #Log3 ($name, 1, "$name - Arg Orig: $arg");
+  
+  $arg =~ s/=\s*/=/g;                                                                    # V 1.59.6 wichtig für graphicHeaderOwnspec Behandlung einzelner Keys -> ersetze jedes = samt folgendem Leerraum durch ein reines =
   $arg =~ s/^([^,]*)\s+/$1,/;                                                            # das erste auftretende Leerzeichen-Cluster durch ',' ersetzen, aber nur wenn es in dem String vor dem Leerzeichen-Cluster noch kein Komma gibt
-   #Log3 ($name, 1, "$name - Arg Orig: $arg");
   $arg =~ s/^([^=]*?),/$1 /;                                                             
-   #Log3 ($name, 1, "$name - Arg Substitute: $arg");
+   
+  #Log3 ($name, 1, "$name - Arg Substitute: $arg");
    
   my ($a, $h)    = parseParams ($arg);
   my $targetattr = $a->[0];
@@ -2413,13 +2442,19 @@ return;
 sub _setreset {                          ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no source specified for reset};
-  my $type  = $paref->{type};
+  my $arg   = $paref->{arg} // return qq{no source specified for reset};
+  
   my $hash  = $defs{$name};
+         
+  if   ( $arg =~ /=/ ) { $arg =~ s/,(?=[^=]*=)/ /g; }
+  else                 { $arg =~ s/,/ /g; }
 
-  if ($prop eq 'pvHistory') {
-      my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
-      my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
+  $arg     = trim ($arg);                                                        # trim it
+  my @args = split " ", $arg;
+
+  if ($args[0] eq 'pvHistory') {
+      my $dday  = $args[1] // "";                                                # ein bestimmter Tag der pvHistory angegeben ?
+      my $dhour = $args[2] // "";                                                # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
       if ($dday) {
           $dday = sprintf "%02d", $dday;
@@ -2453,9 +2488,9 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'consumptionHistory') {
-      my $dday  = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
-      my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
+  if ($args[0] eq 'consumptionHistory') {
+      my $dday  = $args[1] // "";                                              # ein bestimmter Tag der pvHistory angegeben ?
+      my $dhour = $args[2] // "";                                              # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
       if ($dday) {
           if ($dhour) {
@@ -2493,7 +2528,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'pvCorrection') {
+  if ($args[0] eq 'pvCorrection') {
       my $dt  = timestringsFromOffset (time, 0);
       my $hod = $dt->{hour} + 1;
       
@@ -2503,8 +2538,8 @@ sub _setreset {                          ## no critic "not used"
           deleteReadingspec ($hash, ".signaldone_${n}") if($n >= $hod);      # Steuerreadings vor aktueller Stunde nicht löschen -> Dopplungsgefahr im Korrektursystem
       }
 
-      my $circ  = $paref->{prop1} // 'no';                                   # alle pvKorr-Werte aus Caches löschen ?
-      my $circh = $paref->{prop2} // q{};                                    # pvKorr-Werte einer bestimmten Stunde aus Caches löschen ?
+      my $circ  = $args[1] // 'no';                                          # alle pvKorr-Werte aus Caches löschen ?
+      my $circh = $args[2] // q{};                                           # pvKorr-Werte einer bestimmten Stunde aus Caches löschen ?
 
       if ($circ eq 'cached') {
           if ($circh) {
@@ -2550,51 +2585,35 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'aiData') {
-      delete $data{$name}{current}{aiinitstate};
-      delete $data{$name}{current}{aitrainstate};
-      delete $data{$name}{current}{aiaddistate};
-      delete $data{$name}{current}{aigetresult};
-
-      delete $data{$name}{aidectree}{airaw};
-
-      my @ftd = ( $airaw.$name,
-                  $aitrained.$name
-                );
-
-      for my $f (@ftd) {
-          my $err = FileDelete ($f);
-
-          if ($err) {
-              Log3 ($name, 1, qq{$name - ERROR deleting file $err});
-          }
-      }
-
-      return;
+  if ($args[0] eq 'aiData') {
+      __resetAiData ($name, $arg, \@args);
   }
 
-  if ($prop eq 'powerTriggerSet') {
+  if ($args[0] eq 'powerTriggerSet') {
       deleteReadingspec ($hash, "powerTrigger.*");
-      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);               # Anlagenkonfiguration File schreiben
+      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                    # Anlagenkonfiguration File schreiben
+      Log3 ($name, 1, qq{$name - data of 'powerTrigger' were deleted});
       return;
   }
 
-  if ($prop eq 'batteryTriggerSet') {
+  if ($args[0] eq 'batteryTriggerSet') {
       deleteReadingspec ($hash, "batteryTrigger.*");
       writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);
+      Log3 ($name, 1, qq{$name - data of 'batteryTrigger' were deleted});
       return;
   }
 
-  if ($prop eq 'energyH4TriggerSet') {
+  if ($args[0] eq 'energyH4TriggerSet') {
       deleteReadingspec ($hash, "energyH4Trigger.*");
       writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);
+      Log3 ($name, 1, qq{$name - data of 'energyH4Trigger' were deleted});
       return;
   }
 
-  readingsDelete ($hash, $prop);
+  readingsDelete ($hash, $args[0]);
 
-  if ($prop eq 'roofIdentPair') {
-      my $pk   = $paref->{prop1} // "";                                        # ein bestimmter PairKey angegeben ?
+  if ($args[0] eq 'roofIdentPair') {
+      my $pk = $args[1] // "";                                                       # ein bestimmter PairKey angegeben ?
 
       if ($pk) {
           delete $data{$name}{statusapi}{'?IdPair'}{'?'.$pk};
@@ -2609,8 +2628,8 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($prop eq 'consumerPlanning') {                                                 # Verbraucherplanung resetten
-      my $c = $paref->{prop1} // "";                                                 # bestimmten Verbraucher setzen falls angegeben
+  if ($args[0] eq 'consumerPlanning') {                                              # Verbraucherplanung resetten
+      my $c = $args[1] // "";                                                        # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
           deleteConsumerPlanning ($hash, $c);
@@ -2624,8 +2643,8 @@ sub _setreset {                          ## no critic "not used"
       writeCacheToFile ($hash, 'consumers', $csmcache.$name);                        # Cache File Consumer schreiben
   }
 
-  if ($prop eq 'consumerMaster') {                                                   # Verbraucherhash löschen
-      my $c = $paref->{prop1} // '';                                                 # bestimmten Verbraucher setzen falls angegeben
+  if ($args[0] eq 'consumerMaster') {                                                # Verbraucherhash löschen
+      my $c = $args[1] // '';                                                        # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
           $paref->{c} = $c;
@@ -2646,6 +2665,86 @@ sub _setreset {                          ## no critic "not used"
   }
 
   createAssociatedWith ($hash);
+
+return;
+}
+
+################################################################
+#                     KI Daten löschen
+################################################################     
+sub __resetAiData {
+  my ($name, $arg, $argsref) = @_;
+
+  my @args = @$argsref;
+
+  if ($args[1] eq 'delDataAll') {
+      delete $data{$name}{current}{aiinitstate};
+      delete $data{$name}{current}{aitrainstate};
+      delete $data{$name}{current}{aiaddistate};
+      delete $data{$name}{current}{aigetresult};
+      delete $data{$name}{aidectree}{airaw};
+
+      my @ftd = ( $airaw.$name,
+                  $aitrained.$name
+                );
+
+      for my $f (@ftd) {
+          my $err = FileDelete ($f);
+
+          if ($err) {
+              Log3 ($name, 1, qq{$name - ERROR deleting file $err});
+          }
+      }
+      
+      Log3 ($name, 1, qq{$name - The AI data, including stored data and files, has been deleted.});
+      
+      return;
+  }
+  
+  my ($aa, $ha) = parseParams ($arg);
+  
+  if ($ha->{delIndex}) {                                                                       # einen oder mehrere Index aus airaw löschen 
+      my @aidx = grep { length } map { s/^\s+|\s+$//gr } split /,/, ($ha->{delIndex} // '');
+      my $dosave;
+
+      for my $idx (@aidx) {
+          if ($idx =~ /^\d+$/) {                                                               # direktes Löschen eines Index (numerisch)
+              if (exists $data{$name}{aidectree}{airaw}{$idx}) {
+                  delete $data{$name}{aidectree}{airaw}{$idx};
+                  $dosave = 1;
+                  Log3 ($name, 1, qq{$name - AI Raw data deleted - idx: $idx});
+              }
+          }
+          else {                                                                               # $idx soll als Regex-Muster interpretiert werden
+              local $@;
+              my $re;
+              eval { $re = qr/$idx/; 1 };
+              if ($@) {
+                  Log3($name, 1, qq{$name - invalid regex '$idx' - skipped});
+                  next;
+              }
+
+              for my $raw (sort keys %{ $data{$name}{aidectree}{airaw} // {} }) {
+                  next unless defined $raw && length $raw;
+                  
+                  if ($raw =~ $re) {
+                      delete $data{$name}{aidectree}{airaw}{$raw};
+                      $dosave = 1;
+                      Log3 ($name, 1, qq{$name - AI Raw data deleted - idx: $raw matched pattern: $idx});
+                  }
+              }
+          }
+      }
+      
+      if ($dosave) {
+          my $err = writeCacheToFile ($defs{$name}, 'airaw', $airaw.$name);
+
+          if (!$err) {
+              $data{$name}{current}{aitrawstate} = 'ok';
+              Log3 ($name, 1, qq{$name - AI raw data saved into file: }.$airaw.$name);
+          }
+      }
+  }
 
 return;
 }
@@ -6175,6 +6274,7 @@ sub _attrconsumer {                      ## no critic "not used"
       locktime      => '',
       noshow        => '',
       exconfc       => '',
+      pvshare       => '',
   };
 
   if ($cmd eq "set") {      
@@ -6226,6 +6326,12 @@ sub _attrconsumer {                      ## no critic "not used"
       if (exists $h->{aliasshort}) {                                                       # Kurzalias
           return qq{The short alias "$h->{aliasshort}" longer than allowed. See command reference.} 
                  if(strlength ($h->{aliasshort})> 10);
+      }
+      
+      if (exists $h->{pvshare}) {
+          if ($h->{pvshare} !~ /^(100|[1-9]?[0-9])$/xs) {          
+              return "The key 'pvshare=$h->{pvshare}' is not specified correctly. Please refer to the command reference.";
+          }
       }
 
       if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
@@ -6401,14 +6507,14 @@ sub _attrconsumer {                      ## no critic "not used"
       }
   }
   else {
-      my $day  = strftime "%d", localtime(time);                                                   # aktueller Tag  (range 01 to 31)
-      my ($c)  = $aName =~ /consumer([0-9]+)/xs;
+      my $day = strftime "%d", localtime(time);                                                    # aktueller Tag  (range 01 to 31)
+      my ($c) = $aName =~ /consumer([0-9]+)/xs;
 
       $paref->{c} = $c;
       delConsumerFromMem ($paref);                                                                 # Consumerdaten aus Speicher löschen
       delete $paref->{c};
 
-      deleteReadingspec  ($hash, "consumer${c}.*");
+      deleteReadingspec ($hash, "consumer${c}.*");
   }
 
   writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                          # Cache File Consumer schreiben
@@ -8450,7 +8556,7 @@ sub readCacheFile {
       my ($nr, $na);
 
       if ($plantcfg) {
-          ($nr, $na) = _restorePlantConfig ($hash, $plantcfg);
+          ($nr, $na) = _restorePlantConfig ($name, $plantcfg);
           Log3 ($name, 3, qq{$name - cached data "$title" restored. Number of restored Readings/Attributes: $nr/$na});
       }
 
@@ -8672,20 +8778,20 @@ return ($plantcfg, $nr, $na);
 #    Anlagenkonfiguration aus fileRetrieve wiederherstellen
 ################################################################
 sub _restorePlantConfig {
-  my $hash     = shift;
+  my $name     = shift;
   my $plantcfg = shift;
-  my $name     = $hash->{NAME};
 
   my ($nr, $na) = (0,0);
 
   while (my ($key, $val) = each %{$plantcfg}) {
-      if (grep /^$key$/, @rconfigs) {                                          # Reading wiederherstellen
+      if (grep /^$key$/, @rconfigs) {                                          # Readings wiederherstellen
           CommandSetReading (undef,"$name $key $val");
           $nr++;
       }
 
-      if (grep /^$key$/, @aconfigs) {                                          # Attribut wiederherstellen
-          CommandAttr (undef, "$name $key $val");
+      if (grep /^$key$/, @aconfigs) {                                          # Attribute wiederherstellen
+          # CommandAttr (undef, "$name $key $val");
+          $attr{$name}{$key} = $val;
           $na++;
       }
   }
@@ -9345,6 +9451,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{aliasshort}        = $hc->{aliasshort}   // q{};               # Kurzalias des Verbrauchers
       $data{$name}{consumers}{$c}{type}              = $hc->{type}         // DEFCTYPE;          # Typ des Verbrauchers
       $data{$name}{consumers}{$c}{power}             = $hc->{power};                             # Leistungsaufnahme des Verbrauchers in W
+      $data{$name}{consumers}{$c}{pvshare}           = $hc->{pvshare}      // 100;               # Anteil PV am Strommix des Verbrauchers
       $data{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // DEFCMODE;          # Planungsmode des Verbrauchers
@@ -9475,7 +9582,8 @@ sub _specialActivities {
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
 
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                         # Vortag (2 h Differenz reichen aus)
-          $ts   = $date." 23:59:59";
+          # $ts   = $date." 23:59:59";
+          $ts   = $date." 24:00:00";
 
           $pvfc = ReadingsNum ($name, "Today_Hour24_PVforecast", 0);
           storeReading ('LastHourPVforecast', "$pvfc Wh", $ts);
@@ -9579,6 +9687,13 @@ sub _specialActivities {
           __createAdditionalEvents ($paref);                                                   # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
           __delObsoleteAPIData     ($paref);                                                   # Bereinigung obsoleter Daten im solcastapi Hash
 
+          my $ttl    = 24 * 3600;                                                              # Logsperrhash: Lebenszeit eines Eintrags bevor er entfernt wird
+          my $cutoff = $t - $ttl;                                                              
+        
+          for my $sh1 (keys %{ $data{$name}{log} }) {                                          # Logsperrhash bereinigen
+              delete $data{$name}{log}{$sh1} if($data{$name}{log}{$sh1}{ts} // 0 < $cutoff);
+          }
+    
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
       }
   }
@@ -11402,18 +11517,18 @@ sub _batSocTarget {
           Log3 ($name, 1, "$name - WARNING - Attribute ctrlBatSocManagement${bn} is active, but required keys 'lowSoc' and 'upSoC' are not set. Go to Next...");
           next;          
       }
-	  
-	  if (!$stepSoc) {
-		  debugLog ($paref, 'batteryManagement', "SoC Step1 Bat $bn - The SoC-Management is switched off. Battery_OptimumTargetSoC_$bn is set to lowSoC and Battery_ChargeRequest_$bn to '0'.");
-		  
-		  ## pvHistory/Readings schreiben
-		  #################################
-		  writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, hour => 99 } );
-		  storeReading   ('Battery_OptimumTargetSoC_'.$bn, $lowSoc.' %');
-		  storeReading   ('Battery_ChargeRequest_'.$bn, 0);
+      
+      if (!$stepSoc) {
+          debugLog ($paref, 'batteryManagement', "SoC Step1 Bat $bn - The SoC-Management is switched off. Battery_OptimumTargetSoC_$bn is set to lowSoC and Battery_ChargeRequest_$bn to '0'.");
+          
+          ## pvHistory/Readings schreiben
+          #################################
+          writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, hour => 99 } );
+          storeReading   ('Battery_OptimumTargetSoC_'.$bn, $lowSoc.' %');
+          storeReading   ('Battery_ChargeRequest_'.$bn, 0);
 
-          next;		  
-	  }
+          next;       
+      }
       
       my $oldd2care = CircularVal ($name, 99, 'days2care'.$bn,            0);
       my $ltsmsr    = CircularVal ($name, 99, 'lastTsMaxSocRchd'.$bn, undef);
@@ -11447,7 +11562,7 @@ sub _batSocTarget {
 
       #my $sf       = __batCapShareFactor ($name, $bn);                                         # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $sf       = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor der Batterie XX Ladebedarf an Gesamtladebedarf
-	  my $pvexpect = $sf * $pvexpraw;
+      my $pvexpect = $sf * $pvexpraw;
 
       if ($debug =~ /batteryManagement/xs) {
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Battery share factor of total required load: $sf");
@@ -11460,10 +11575,10 @@ sub _batSocTarget {
       #####################################################################
       my $sunset  = CurrentVal ($name, 'sunsetTodayTs',  $t);
       my $sunrise = CurrentVal ($name, 'sunriseTodayTs', $t); 
-	  #my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
+      #my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
       my $delayts = $sunrise + (($sunset - $sunrise) / 2);                                      # V 1.59.5 neues SoC-Ziel ab ca. Mittag berechnen/anwenden
-	  my $nt      = (timestampToTimestring ($delayts, $paref->{lang}))[0];
-	  my $la      = '';
+      my $nt      = (timestampToTimestring ($delayts, $paref->{lang}))[0];
+      my $la      = '';
       my $careSoc = $target;
 
       my $ntsmsc    = CircularVal ($name, 99, 'nextTsMaxSocChge'.$bn, $t);
@@ -11693,11 +11808,14 @@ sub _batChargeMgmt {
   my $gfeedin   = CurrentVal  ($name, 'gridfeedin',               0);                            # aktuelle Netzeinspeisung
   my $inplim    = 0;
   
+  my $tdaysset  = CurrentVal ($name, 'sunsetTodayTs', $t);                                       # Timestamp Sonneuntergang am aktuellen Tag
+  my $hs2sunset = sprintf "%.2f", (($tdaysset - $t) / 3600);                                     # Rest-Stunden bis Sonnenuntergang 
+  
   my $hsurp  = {};                                                                               # Hashreferenz Überschuß
   my $hsoc   = {};                                                                               # Hashreferenz Prognose-SOC über alle Batterien
   my $trans  = {};                                                                               # Referenz Übertrags-Hash 
   my $values = {};                                                                               # Hashreferenz
-  my $progsoc;
+  my ($progsoc, $strategy);
   
   ## Inverter Limits ermitteln
   ##############################
@@ -11722,13 +11840,13 @@ sub _batChargeMgmt {
 
   ## Schleife über alle Batterien
   #################################  
-  for my $bn (1..MAXBATTERIES) {                                                                 # für jede Batterie
+  for my $bn (1..MAXBATTERIES) {                                                                   # für jede Batterie
       $bn = sprintf "%02d", $bn;
       
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
-      my $batinstcap = BatteryVal ($name, $bn, 'binstcap', 0);                                   # installierte Batteriekapazität Wh
+      my $batinstcap = BatteryVal ($name, $bn, 'binstcap', 0);                                     # installierte Batteriekapazität Wh
 
       if (!$inplim || !$batinstcap) {
           debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation for Bat '$bn' are not met. Check key 'cap'. Go to Next.");
@@ -11751,7 +11869,7 @@ sub _batChargeMgmt {
       my $cgbt        = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
       #my $sf          = __batCapShareFactor     ($name, $bn);                                      # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $sf          = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor Ladungsdefizit
-      my $strategy    = 'loadRelease';                                                             # 'loadRelease', 'optPower', 'smartPower'
+      $strategy       = 'loadRelease';                                                             # 'loadRelease', 'optPower', 'smartPower'
       my $wou         = 0;                                                                         # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)     
       my $lowSoc      = 0;
       my $loadAbort   = '';
@@ -11809,19 +11927,24 @@ sub _batChargeMgmt {
       $lcslot             //= '00:00-23:59';
       my ($lcstart, $lcend) = split "-", $lcslot;
       
-      # Debuglog
-      ############
+      # Debuglog allgemein
+      ######################
       if ($paref->{debug} =~ /batteryManagement/) {
-		  Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - selected charging strategy: $strategy");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - selected charging strategy: $strategy");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - General load termination condition: $labortCond");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control time Slot - Slot start: $lcstart, Slot end: $lcend");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Battery efficiency used: ".($befficiency * 100)." %");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - weighted self-consumption: $wou %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - charging target: $goalpercent % / $goalwh Wh");
           #Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Percentage of the total amount of charging energy required: ".(sprintf "%.1f", $sf*100)." %");
-		  Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - The PV generation, consumption and surplus listed below are based on the battery's share of the total amount of charging energy required!");
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - used safety margin: $lrMargin %");
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - weighted self-consumption: $wou %");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - The PV generation, consumption and surplus listed below are based on the battery's share of the total amount of charging energy required!");
+      }
+     
+      ## Debuglog LR
+      ################
+      if ($paref->{debug} =~ /batteryManagement/ && $strategy eq 'loadRelease') {
+          Log3 ($name, 1, "$name DEBUG> ChargeLR Bat $bn - used safety margin: $lrMargin %");
       }
       
       ## Auswertung für jede kommende Stunde
@@ -11921,7 +12044,6 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{$bn}{lcintime}     = $lcintime;                                # Ladesteuerung "In Time" oder "nicht In Time"
               $hsurp->{$fd}{$hod}{$bn}{stt}          = $stt;                                     # Day/Time für Debuglog 
               $hsurp->{$fd}{$hod}{$bn}{strategy}     = $strategy;                                # Ladestrategie
-              $hsurp->{$fd}{$hod}{$bn}{weightOwnUse} = $wou;                                     # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)
               $hsurp->{$fd}{$hod}{$bn}{befficiency}  = $befficiency;                             # Speicherwirkungsgrad
           }
           
@@ -11948,17 +12070,19 @@ sub _batChargeMgmt {
           
           ## Debuglog LR
           ################
-          my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W, inTime: ".($cgbt ? $lcintime : '-');
+          if ($paref->{debug} =~ /batteryManagement/ && $strategy eq 'loadRelease') {
+              my $msg = "CurrSoc: $csoc %, SoCfc: $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, CurrPV: $pvCu W, CurrCons: $curcon W, Limit: $inplim W, inTime: ".($cgbt ? $lcintime : '-');
 
-          if ($num) {
-              $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
+              if ($num) {
+                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, rodpvfc: $rodpvfc, confcss: $confcss, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
 
-              if (!$today) {
-                  $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, roTomPV: $tompvfc, roTomCON: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
+                  if (!$today) {
+                      $msg = "SoCfc: $progsoc % / $socwh Wh, whneed: $whneed, pvfc: $pvfc, roTomPV: $tompvfc, roTomCON: $tomconfc, SurpDay: $spday Wh, inTime: ".($cgbt ? $lcintime : '-');
+                  }
               }
+              
+              Log3 ($name, 1, "$name DEBUG> ChargeLR Bat $bn $stt - lr: $crel, $msg");
           }
-          
-          debugLog ($paref, 'batteryManagement', "ChargeLR Bat $bn $stt - lr: $crel, $msg");
 
           ## Fortschreibung
           ###################
@@ -11992,14 +12116,10 @@ sub _batChargeMgmt {
   ################################################################# 
   for my $lfd (0..max (0, keys %{$hsurp})) {
       $paref->{hsurp} = $hsurp->{$lfd}; 
-      my ($hopt, $otp) = __batChargeOptTargetPower ($paref, $lfd, $minute, $trans);
-      delete $paref->{hsurp};
       
-      ## Debuglog OTP
-      #################
-      if ($paref->{debug} =~ /batteryManagement/ && !$lfd) {
-          Log3 ($name, 1, "$name DEBUG> ChargeOTP - The limit for grid feed-in is $feedinlim W");
-      }
+      my ($hopt, $otp) = __batChargeOptTargetPower ($paref, $lfd, $minute, $trans, $hs2sunset);
+      
+      delete $paref->{hsurp};
       
       ## Speicherung und Readings erstellen OTP
       ###########################################
@@ -12008,7 +12128,9 @@ sub _batChargeMgmt {
           my @batteries = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hopt->{24}};
           
           for my $bat (sort @batteries) {
-              next if(!defined $hopt->{$shod}{$bat}{batinstcap});			  
+              next if(!defined $hopt->{$shod}{$bat}{batinstcap});
+
+              $strategy  = $hopt->{$shod}{$bat}{strategy};            
               my $ssocwh = $hopt->{$shod}{$bat}{runwh} // '-';
               
               ## SOC-Prognose OTP
@@ -12026,7 +12148,7 @@ sub _batChargeMgmt {
                           socwh    => $fcendwh,
                           hod      => $shod,
                           loopid   => 'OTP',
-                          strategy => $hopt->{$shod}{$bat}{strategy},
+                          strategy => $strategy,
                           crel     => $hopt->{$shod}{$bat}{loadrel},                                                  
                        };
 
@@ -12034,24 +12156,27 @@ sub _batChargeMgmt {
               
               ## Debuglog OTP
               #################
-              if ($paref->{debug} =~ /batteryManagement/) {              
+              if ($paref->{debug} =~ /batteryManagement/ && $strategy ne 'loadRelease') {              
                   my $lcintime = $hopt->{$shod}{$bat}{lcintime};             
                   my $spls     = int $hopt->{$shod}{surplswh};
                   my $pneedmin = $hopt->{$shod}{$bat}{pneedmin};
                   my $ttt      = $hopt->{$shod}{$bat}{stt};
-                  my $crel     = $hopt->{$shod}{$bat}{loadrel};           
+                  my $crel     = $hopt->{$shod}{$bat}{loadrel};  
+                  my $spday    = $hopt->{$shod}{$bat}{spday};
+                  my $frefph   = $hopt->{$shod}{$bat}{frefph} // '-';                  
                   
                   if ($nhr eq '00') {
-                      $pneedmin        = $otp->{$bat}{target} // 0;
-                      my $achievelog   = $hopt->{$shod}{$bat}{achievelog};
-                      my $otpMargin    = $hopt->{$shod}{$bat}{otpMargin};
-                      my $weightOwnUse = $hopt->{$shod}{$bat}{weightOwnUse};
+                      $pneedmin      = $otp->{$bat}{target} // 0;
+                      my $ratio      = $otp->{$bat}{ratio}  // '<unknown>';
+                      my $achievelog = $hopt->{$shod}{$bat}{achievelog};
+                      my $otpMargin  = $hopt->{$shod}{$bat}{otpMargin};
+                      
                       Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - used safety margin: $otpMargin %");
-                      Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - weighted self-consumption: $weightOwnUse %");
                       Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - $achievelog");
+                      Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat - current Ratio of surplus / energy requirement to achieve the load target: $ratio %") if($strategy eq 'smartPower');
                   }              
                   
-                  Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat $ttt - hod: $shod / $nhr, lr/lc: $crel/$lcintime, SoC S/E: $ssocwh / $fcendwh Wh, Surplus: $spls Wh, OTP: $pneedmin W");
+                  Log3 ($name, 1, "$name DEBUG> ChargeOTP Bat $bat $ttt - hod:$shod/$nhr, lr/lc:$crel/$lcintime, SocS/E:$ssocwh/$fcendwh Wh, SurpH/D:$spls/$spday Wh, OTP:$pneedmin/$frefph W");
               }
           }
       }
@@ -12103,40 +12228,67 @@ return;
 #   Ladeleistung verteilt über die Tagstunden mit PV-Überschuß)
 ################################################################       
 sub __batChargeOptTargetPower {
-  my $paref   = shift;
-  my $lfd     = shift;                                                                                           # laufender Tag (1..X)
-  my  $minute = shift;
-  my $trans   = shift;                                                                                           # Übertrags-Hash Referenz
+  my $paref     = shift;
+  my $lfd       = shift;                                                                                         # laufender Tag (1..X)
+  my $minute    = shift;
+  my $trans     = shift;                                                                                         # Übertrags-Hash Referenz
+  my $hs2sunset = shift;
   
   my $name  = $paref->{name};
   my $hsurp = $paref->{hsurp};                                                                                   # Hashref Überschußhash
+  
+  ## Surplus der Stunde 00 mit Zeitgewichtung in $replacement speichern
+  #######################################################################
+  my $replacement;  
+
+  for my $k (keys %$hsurp) {
+      my $nh = $hsurp->{$k}{nhr};
+      
+      if ($nh eq '00') {
+          my $val = $hsurp->{$k}{surplswh};
+          
+          if (defined $val && $val =~ /^(\d+)\.(\w+)$/) {
+              $replacement  = sprintf "%.0f", ($1 / 60 * (60 - int $minute));                                    # aktuelle (Rest)-Stunde -> zeitgewichteter PV-Überschuß     
+              $replacement .= '.'.$2;
+          }
+          
+          last;                                                                                                  # da Stunde 00 nur einmal vorkommt, können wir abbrechen
+      }   
+  }
 
   my $fipl       = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
-  my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert
   my @batteries  = grep { !/^(?:fd|speff|surplswh|nhr)$/xs } keys %{$hsurp->{24}};
+  my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert ohne Zeitgewichtung h 00
   
-  my ($fcendwh, $diff);
-  my $otp;
+  my ($fcendwh, $diff, $otp, $ratio);
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
-	  my $nhr     = $hsurp->{$hod}{nhr};
-      my $spls    = int ($hsurp->{$hod}{surplswh} // 0);	  
-	  my $nexthod = sprintf "%02d", (int $hod + 1);
-	  my $nextnhr = $hsurp->{$nexthod}{nhr};
+      my $nhr = $hsurp->{$hod}{nhr};
+      next if(!defined $nhr);
+      
+      my $spls    = int ($hsurp->{$hod}{surplswh} // 0);
+      my $nexthod = sprintf "%02d", (int $hod + 1);
+      my $nextnhr = $hsurp->{$nexthod}{nhr};
       
       my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
-	  my $total          = 0;                                               
-	  $total            += $hsurp->{$_}{surplswh} for @remaining_hods;                                           # Gesamtkapazität aller Stunden mit PV-Überschuß ermitteln
+      my $remainingSurp  = 0;                                               
+      
+      for my $h (@remaining_hods) {                                                                              # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
+          my $val = defined $hsurp->{$h}{nhr} && $hsurp->{$h}{nhr} eq '00'
+                    ? int ($replacement) // 0
+                    : $hsurp->{$h}{surplswh};
+          $remainingSurp += int $val;
+      }
 
-      for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie		  
-		  my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
+      for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie          
+          my $bpinmax     = $hsurp->{$hod}{$sbn}{bpinmax};                                                       # Bat max. mögliche Ladelesitung
           my $batinstcap  = $hsurp->{$hod}{$sbn}{batinstcap};                                                    # Kapa dieser Batterie 
           my $lowSocwh    = $hsurp->{$hod}{$sbn}{lowSocwh};                                                      # eingestellter lowSoc in Wh
           my $batoptsocwh = $hsurp->{$hod}{$sbn}{batoptsocwh};                                                   # optimaler SoC in Wh
           my $csocwh      = $hsurp->{$hod}{$sbn}{csocwh};                                                        # aktueller SoC in Wh
           my $bpinreduced = $hsurp->{$hod}{$sbn}{bpinreduced};                                                   # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
           my $befficiency = $hsurp->{$hod}{$sbn}{befficiency};                                                   # Speicherwirkungsgrad
-		  my $strategy    = $hsurp->{$hod}{$sbn}{strategy};                                                      # Ladestrategie
+          my $strategy    = $hsurp->{$hod}{$sbn}{strategy};                                                      # Ladestrategie
           
           # Initialisierung / Fortschreibung Prognose-SOC (Wh)
           ######################################################
@@ -12160,7 +12312,7 @@ sub __batChargeOptTargetPower {
           my $runwhneed  = $goalwh - $runwh; 
           my $achievable = 1;
             
-          if ($runwhneed > 0 && $total * $befficiency < $runwhneed) {                                            # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
+          if ($runwhneed > 0 && $remainingSurp * $befficiency < $runwhneed) {                                    # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
           }
           
@@ -12179,29 +12331,49 @@ sub __batChargeOptTargetPower {
               if ($nhr eq '00') {
                   $diff                = $diff / 60 * (60 - int $minute);                                        # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungsabfluß
                   $otp->{$sbn}{target} = $csocwh <= $lowSocwh ? $bpinreduced : $bpinmax;
+                  $otp->{$sbn}{ratio}  = 0;
               }
               
               $runwh += $diff / $befficiency;                                                                    # um Verbrauch reduzieren
               $runwh  = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                         # runwh begrenzen                  
               
-              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;                	  
-			  $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde 			            
+              $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;                    
+              $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde                        
               
               next;
           }                                   
           
-          ## weiter mit Überschuß (Prognose)
-          ####################################
+          ## weiter mit Überschuß
+          #########################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
-          my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed, $befficiency);
-          my $needraw   = min ($fref->{ph}, $spls);                                                              # Ladeleistung auf Surplus begrenzen
+          my $fref      = ___batFindMinPhWh ( $hsurp, 
+                                              \@remaining_hods, 
+                                              $remainingSurp, 
+                                              $runwhneed, 
+                                              $replacement, 
+                                              $achievable
+                                            );
+          my $limpower  = $strategy eq 'optPower'
+                          ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
+                          : $fref->{ph};                                                                         
           
-          $needraw      = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
-          $needraw      = max ($needraw, $bpinreduced);                                                          # Mindestladeleistung bpinreduced sicherstellen                  
-          my $pneedmin  = $needraw * (1 + $otpMargin / 100);                                                     # initialer Sicherheitsaufschlag
+          $limpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
+          $limpower     = max ($limpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen                  
+          
+          $hsurp->{$hod}{$sbn}{frefph} = $fref->{ph};
+          
+          ## Prognose
+          ############
+          my $pneedmin = $limpower * (1 + $otpMargin / 100);                                                     # optPower: Sicherheitsaufschlag
           
           if ($strategy eq 'smartPower') {
-              $pneedmin = ___batAdjustPowerByMargin ($name, $needraw, $bpinmax, $runwhneed, $otpMargin);         # Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+              ($pneedmin) = ___batAdjustPowerByMargin ($name,                                                    # smartPower: Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                                                       $limpower, 
+                                                       $bpinmax, 
+                                                       $runwhneed, 
+                                                       $otpMargin, 
+                                                       $remainingSurp
+                                                      );         
           }
           
           $pneedmin = sprintf "%.0f", $pneedmin;
@@ -12209,24 +12381,28 @@ sub __batChargeOptTargetPower {
           
           $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin > 0 ? $pneedmin : 0;                                        # Ladeleistung abhängig von Ziel-SoC Erfüllung        
                
-          ## NextHour 00 bearbeiten
-          ###########################
+          ## NextHour 00 (aktuelle Stunde) behandeln
+          ############################################
           if ($nhr eq '00') {
-              my $target = $needraw > 0 ? $needraw : 0;           
+              my $target = $limpower > 0 ? $limpower / $befficiency : 0;                                         # Zielleistung mit Batterie Effizienzgrad erhöhen
 
               if ($achievable) {                                                                                 # Tagesziel erreichbar: Basisziel um otpMargin% erhöhen
-                  $target *= 1 + ($otpMargin / 100);
-                    
-                  if ($strategy eq 'smartPower') {                                                               # smartPower: Sicherheitsaufschlag linear absenkend
-                      $target = ___batAdjustPowerByMargin ($name, $target, $bpinmax, $runwhneed, $otpMargin);
-                  }
+                  $target *= 1 + ($otpMargin / 100);                                                             # optPower: Sicherheitsaufschlag
               }
-              else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)
-                  $target *= (1 + $otpMargin / 100) ** 2;
+              else {                                                                                             # Tagesziel nicht erreichbar: Aufschlag potenziert (zweifach wirksam)                                                    
+                  $target *= (1 + $otpMargin / 100) ** 2;                                                        # optPower: Sicherheitsaufschlag
+              }
+              
+              if ($strategy eq 'smartPower') {                                                                   # smartPower: Sicherheitsaufschlag linear absenkend
+                  ($target, $ratio) = ___batAdjustPowerByMargin ($name,                                          # smartPower: agressivere Ladeleistung, Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                                                                 $limpower, 
+                                                                 $bpinmax, 
+                                                                 $runwhneed, 
+                                                                 $otpMargin, 
+                                                                 $remainingSurp
+                                                                );
 
-                  if ($strategy eq 'smartPower') {                                                               # smartPower: maximale Ladeleistung erzwingen
-                      $target = $bpinmax;
-                  }
+                  $otp->{$sbn}{ratio} = sprintf ("%.2f", $ratio);                                           
               }
 
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
@@ -12249,8 +12425,8 @@ sub __batChargeOptTargetPower {
           
           $runwh = min ($goalwh, $runwh + $diff * $befficiency);                                                 # Endwert Prognose        
           $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen
-		  
-          $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf "%.0f", $runwh;
+          
+          $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf ("%.0f", $runwh);
           $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);               # Startwert kommende Stunde  
       }
   }
@@ -12265,20 +12441,26 @@ return ($hsurp, $otp);
 ################################################################
 #  Zielleistung mit Sicherheitszuschlag behandeln  
 #  abfallend proportional zum linearen Rest-Überschuss des Tages
+#  Forum: https://forum.fhem.de/index.php?msg=1349579
 ################################################################       
 sub ___batAdjustPowerByMargin {
-  my ($name, $target, $pinmax, $runwhneed, $otpMargin) = @_;
+  my ($name, $limpower, $pinmax, $whneed, $otpMargin, $remainingSurp) = @_;
 
-  my $ratio   = 0;
-  my $rodpvfc = ReadingsNum ($name, 'RestOfDayPVforecast', 0);                     # PV Prognose Rest des Tages
-  $ratio      = $rodpvfc * 100 / $runwhneed if($runwhneed);
+  my $pow;
+  my $ratio = 0;
+  $ratio    = $remainingSurp * 100 / $whneed if($whneed);
   
-  return $pinmax if($target == $pinmax || $ratio <= 100);
-  return $target * (1 + $otpMargin / 100) if($target == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
-  
-  my $pow = $pinmax - ($pinmax - $target) * ($ratio - 100) / $otpMargin;
+  return ($pinmax, $ratio)                            if($limpower == $pinmax);
+  return ($limpower * (1 + $otpMargin / 100), $ratio) if($limpower == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
 
-return $pow;
+  if ($ratio <= 100) {
+      $pow = $pinmax;
+  }
+  else {
+      $pow = $pinmax - ($pinmax - $limpower) * ($ratio - 100) / $otpMargin;
+  }
+
+return ($pow, $ratio);
 }
 
 ################################################################
@@ -12320,8 +12502,8 @@ return $value;
 ###############################################################################################
 #   Binärsuche für konstante Ladeleistung: $ph Wh via Binärsuche Iteration
 #   
-# - Wenn die Summe aller surplswh geringer ist als der Bedarf, wird Ereq automatisch auf 
-#   diesen Maximalwert gesetzt und liefert so die tatsächlich erreichbare Energie.
+# - Wenn die Summe aller surplswh geringer ist als der Bedarf, wird ph automatisch auf 
+#   den cap Maximalwert gesetzt und liefert so den maximalen Überschußwert als Ladeleistung.
 # - gewichtete Stundenkapazität @hods enthält die Stunden-Keys sortiert von der niedrigsten 
 #   bis zur höchsten Leistung. In jeder Binärsuche-Iteration addiert das Skript 
 #   min(ph, surplswh) für jede Stunde, wodurch die konstant gewählte Leistung ph gemäß der 
@@ -12331,30 +12513,41 @@ return $value;
 #   die vollständige Ausnutzung der vorhandenen Kapazität.
 ###############################################################################################
 sub ___batFindMinPhWh {
-    my ($hsurp, $aref, $Ereq, $befficiency) = @_;
+  my ($hsurp, $hodsref, $remainingSurp, $Ereq, $replacement, $achievable) = @_;
     
-    my @hods     = @$aref;
-    my $low      = 0;                                                 
-    my $high     = max map { $hsurp->{$_}{surplswh} } @hods;
-    my $eps      = 0.5;                                               # minimale Genauigkeit in Wh  (1e-3)
-    my $max_iter = 100;                                               # Zwangsabbruch nach X Durchläufen
-    my $loop     = 0;
+  my @hods     = @$hodsref;
+  my $low      = 0;                                                 
+  my $high     = $remainingSurp;                                    # Summe aller verbleibenden Tagesüberschüsse auf Stundenbasis inkl. Gewichtung Stunde 00          
+  my $eps      = 0.5;                                               # minimale Genauigkeit in Wh  (1e-3)
+  my $max_iter = 100;                                               # Zwangsabbruch nach X Durchläufen
+  my $loop     = 0;
+                        
+  if (!$achievable) {
+      my $max_cap = max map { defined $hsurp->{$_}{nhr} && $hsurp->{$_}{nhr} eq '00'
+                              ? int($replacement)
+                              : $hsurp->{$_}{surplswh} // 0
+                            } @hods;
+                        
+      return { ph => (sprintf "%.0f", $max_cap), iterations => $loop, blur => (sprintf "%.4f", 0) };
+  }
     
-    while (($high - $low) > $eps) {
-        last if ++$loop > $max_iter;
+  while (($high - $low) > $eps) {
+      last if ++$loop > $max_iter;
         
-        my $mid     = ($low + $high) / 2;
-        my $charged = 0;
+      my $mid     = ($low + $high) / 2;
+      my $charged = 0;
         
-        for my $hod (@hods) {
-            my $cap   = $hsurp->{$hod}{surplswh};
-            $charged += $mid < $cap ? $mid : $cap;
-        }
+      for my $hod (@hods) {
+          my $nhr   = $hsurp->{$hod}{nhr};
+          next if(!defined $nhr);
+          my $cap   = $nhr eq '00' ? int $replacement : $hsurp->{$hod}{surplswh};
+          $charged += min ($mid, $cap);
+      }
         
-        $charged >= $Ereq ? ($high = $mid) : ($low = $mid);
-    } 
+      $charged >= $Ereq ? ($high = $mid) : ($low = $mid);
+  } 
     
-    $high = max (0, $high);
+  $high = max (0, $high);
     
 return { ph => (sprintf "%.0f", $high), iterations => $loop, blur => (sprintf "%.4f", ($high - $low)) };
 }
@@ -12413,8 +12606,8 @@ sub ___batChargeSaveResults {
   ## abhängig von Strategie in entsprechender Schleife setzen 
   #############################################################
   if (($loopid eq 'LR' && $strategy eq 'loadRelease') || ($loopid eq 'OTP' && $strategy =~ /(?:opt|smart)Power/xs)) {
-	  $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
-	  
+      $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
+      
       if ($today && $hod) {                                                                                      
           writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
       }
@@ -12946,7 +13139,7 @@ sub __getAutomaticState {
   my $auto   = 1;
   $auto      = ReadingsVal ($dswitch, $autord, 1) if($autord);                         # Reading für Ready-Bit -> Einschalten möglich ?
 
-  $data{$name}{consumers}{$c}{auto} = $auto;                                    # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus
+  $data{$name}{consumers}{$c}{auto} = $auto;                                           # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus
 
 return;
 }
@@ -12985,7 +13178,7 @@ sub __calcEnergyPieces {
 
   delete $data{$name}{consumers}{$c}{epieces};
 
-  my $cotype          = ConsumerVal ($hash, $c, "type",      DEFCTYPE);
+  my $cotype          = ConsumerVal ($hash, $c, 'type', DEFCTYPE);
   my ($err, $mintime) = getConsumerMintime ( { name    => $name,
                                                c       => $c,
                                                nolog   => 1,
@@ -13284,65 +13477,63 @@ sub ___doPlanning {
   my $debug  = $paref->{debug};
   my $lang   = $paref->{lang};
   my $nh     = $data{$name}{nexthours};
-  my $cicfip = CurrentVal ($name, 'consForecastInPlanning', 0);                            # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
 
   my $hash   = $defs{$name};
+  
+  my $epieces = ConsumerVal ($name, $c, 'epieces', '');
+  
+  if (ref $epieces ne 'HASH') {
+      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - no first energy piece found. Exiting...});
+      return;     
+  }
 
+  my $cicfip   = CurrentVal  ($name, 'consForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
+  my $pvshare  = ConsumerVal ($name, $c, 'pvshare',          100);                         # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden   
+  my $shfactor = $pvshare / 100;
+  my (%tmp, %max, %mtimes);
+  
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
-
-  my %max;
-  my %mtimes;
 
   ## max. PV-Forecast bzw. Überschuß (bei gesetzen consForecastInPlanning) ermitteln
   ####################################################################################
   for my $idx (sort keys %{$nh}) {
-      my $pvfc    = NexthoursVal ($hash, $idx, 'pvfc',    0);
-      my $confcex = NexthoursVal ($hash, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
+      my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',    0);
+      my $confcex = NexthoursVal ($name, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
 
-      my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierter Energieüberschuß (kann negativ sein)
+      my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierte Leistung -> Überschuß oder negativ
 
       my ($hour)              = $idx =~ /NextHour(\d+)/xs;
-      $max{$spexp}{starttime} = NexthoursVal ($hash, $idx, 'starttime', '');
-      $max{$spexp}{today}     = NexthoursVal ($hash, $idx, 'today',      0);
-      $max{$spexp}{nexthour}  = int ($hour);
+      $tmp{$spexp}{starttime} = NexthoursVal ($name, $idx, 'starttime', '');
+      $tmp{$spexp}{today}     = NexthoursVal ($name, $idx, 'today',      0);
+      $tmp{$spexp}{nexthour}  = int ($hour);
   }
 
   my $order = 1;
   
-  for my $k (reverse sort{$a<=>$b} keys %max) {
-      my $ts                  = timestringToTimestamp ($max{$k}{starttime});
+  for my $k (reverse sort{$a<=>$b} keys %tmp) {
+      my $ts                  = timestringToTimestamp ($tmp{$k}{starttime});
 
       $max{$order}{spexp}     = $k;
       $max{$order}{ts}        = $ts;
-      $max{$order}{starttime} = $max{$k}{starttime};
-      $max{$order}{nexthour}  = $max{$k}{nexthour};
-      $max{$order}{today}     = $max{$k}{today};
+      $max{$order}{starttime} = $tmp{$k}{starttime};
+      $max{$order}{nexthour}  = $tmp{$k}{nexthour};
+      $max{$order}{today}     = $tmp{$k}{today};
 
       $mtimes{$ts}{spexp}     = $k;
-      $mtimes{$ts}{starttime} = $max{$k}{starttime};
-      $mtimes{$ts}{nexthour}  = $max{$k}{nexthour};
-      $mtimes{$ts}{today}     = $max{$k}{today};
-
-      delete $max{$k};
+      $mtimes{$ts}{starttime} = $tmp{$k}{starttime};
+      $mtimes{$ts}{nexthour}  = $tmp{$k}{nexthour};
+      $mtimes{$ts}{today}     = $tmp{$k}{today};
 
       $order++;
   }
+  
+  my $epiece1 = $data{$name}{consumers}{$c}{epieces}{1};
 
-  my $epiece1 = (~0 >> 1);
-  my $epieces = ConsumerVal ($hash, $c, "epieces", "");
-
-  if (ref $epieces eq "HASH") {
-      $epiece1 = $data{$name}{consumers}{$c}{epieces}{1};
-  }
-  else {
-      return;
-  }
-
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - epiece1: $epiece1});
+  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - first energy piece: $epiece1, PV share needed: $pvshare %, energy piece share: }.$epiece1 * $shfactor);
 
   my $mode            = getConsumerPlanningMode ($hash, $c);                                           # Planungsmode 'can' oder 'must'
-  my $calias          = ConsumerVal ($hash, $c, 'alias',     '');
-  my $oldplanstate    = ConsumerVal ($hash, $c, 'planstate', '');                                      # V. 1.35.0
+  my $calias          = ConsumerVal ($name, $c, 'alias',     '');
+  my $oldplanstate    = ConsumerVal ($name, $c, 'planstate', '');                                      # V. 1.35.0
 
   my ($err, $mintime) = getConsumerMintime ( { name    => $name,                                       # Einplanungsdauer
                                                c       => $c,
@@ -13373,7 +13564,7 @@ sub ___doPlanning {
       }
 
       for my $ts (sort{$a<=>$b} keys %mtimes) {
-          if ($mtimes{$ts}{spexp} >= $epiece1) {                                                       # die früheste Startzeit sofern Überschuß größer als Bedarf
+          if ($mtimes{$ts}{spexp} >= $epiece1 * $shfactor) {                                           # die früheste Startzeit mit Leistung > als Bedarf
               my $starttime       = $mtimes{$ts}{starttime};
               $paref->{starttime} = $starttime;
               $starttime          = ___switchonTimelimits ($paref);
@@ -13438,9 +13629,13 @@ sub ___doPlanning {
           delete $paref->{supplement};
       }
   }
+  
+  delete $paref->{maxref};
+  delete $paref->{mintime};
+  delete $paref->{stopdiff};
 
-  my $planstate = ConsumerVal ($hash, $c, 'planstate',      '');
-  my $planspmlt = ConsumerVal ($hash, $c, 'planSupplement', '');
+  my $planstate = ConsumerVal ($name, $c, 'planstate',      '');
+  my $planspmlt = ConsumerVal ($name, $c, 'planSupplement', '');
 
   if ($planstate && ($planstate ne $oldplanstate)) {                                                   # V 1.35.0
       Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate $planspmlt});
@@ -13472,15 +13667,11 @@ sub ___saveEhodpieces {
       my $chod    = (strftime "%H", localtime($i)) + 1;
       my $epieces = ConsumerVal ($hash, $c, 'epieces', '');
 
-      my $ep = 0;
-      if (ref $epieces eq "HASH") {
-          $ep = defined $data{$name}{consumers}{$c}{epieces}{$p} ?
-                        $data{$name}{consumers}{$c}{epieces}{$p} :
-                        0;
-      }
-      else {
-          last;
-      }
+      last if(ref $epieces ne "HASH");
+      
+      my $ep = defined $data{$name}{consumers}{$c}{epieces}{$p} 
+               ? $data{$name}{consumers}{$c}{epieces}{$p} 
+               : 0;
 
       $chod                                          = sprintf '%02d', $chod;
       $data{$name}{consumers}{$c}{ehodpieces}{$chod} = sprintf '%.2f', $ep if($ep);
@@ -13746,13 +13937,19 @@ sub __setConsRcmdState {
   my $debug = $paref->{debug};
 
   my $hash       = $defs{$name};
-  my $nompower   = ConsumerVal      ($name, $c, 'power',                  0);             # Consumer nominale Leistungsaufnahme (W)
+  my $nompower   = ConsumerVal ($name, $c, 'power',     0);                               # Consumer nominale Leistungsaufnahme (W)
+  my $pvshare    = ConsumerVal ($name, $c, 'pvshare', 100);                               # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden 
+  my $pvsharepow = $nompower * $pvshare / 100;                                            # Anteil PV an Leistungsaufnahme in Watt
+  my $gridshare  = $nompower - $pvsharepow;                                               # Anteil Netzleistung an Leistungsaufnahme in Watt
+  
   my $ccr        = AttrVal          ($name, 'ctrlConsRecommendReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
-  my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $nompower;                          # resultierender Verbauch nach Einschaltung Consumer
+  my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $nompower;                          # resultierender Verbrauch nach Einschaltung Consumer
 
   my ($method, $surplus) = determSurplus ($name, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
 
-  $data{$name}{consumers}{$c}{surpmethResult} = sprintf "%.0f", $surplus;                 # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
+  $data{$name}{consumers}{$c}{surpmethResult} = defined $surplus 
+                                                ? (sprintf "%.0f", $surplus) 
+                                                : undef;                                  # Ergebnis der Surplus Ermittlung im Consumerstammsatz speichern, Forum: https://forum.fhem.de/index.php?msg=1345058
 
   if ($debug =~ /consumerSwitching${c}/x) {
       my $splref = CurrentVal ($name, 'surplusslidereg', '.');
@@ -13776,7 +13973,7 @@ sub __setConsRcmdState {
   if (!defined $surplus) {                                                                # $surplus kann undef sein! -> dann bisherigen isConsumptionRecommended verwenden
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = ReadingsVal ($name, "consumer${c}_ConsumptionRecommended", 0);
   }
-  elsif (!$nompower || $surplus - $rescons > 0 || $spignore) {
+  elsif (!$pvsharepow || $surplus - $rescons > 0 - $gridshare || $spignore) {
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                          # Einschalten des Consumers günstig bzw. Freigabe für "on" von Überschußseite erteilt
   }
   else {
@@ -13837,7 +14034,7 @@ sub ___switchConsumerOn {
 
   if ($err) {
       $state = 'ERROR - '.$err;
-      Log3 ($name, 1, "$name - $state");
+      Log3 ($name, 1, "$name - $state") if(askLogtime ($name, $err));
       return $state;
   }
 
@@ -13887,7 +14084,7 @@ sub ___switchConsumerOn {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable -> $intrptcatic{$isintable}});
   }
 
-  my $isConsRcmd = isConsRcmd ($hash, $c);
+  my $isConsRcmd = isConsRcmd ($hash, $c);                                                       # PV-Überschuß als Bedingung
 
   my $supplmnt         = ConsumerVal ($hash, $c, 'planSupplement', '');
   $paref->{supplement} = '' if($supplmnt =~ /swoncond\snot|swoncond\snicht/xs && $swoncond);
@@ -13918,7 +14115,7 @@ sub ___switchConsumerOn {
 
           delete $paref->{ps};
       }
-      elsif ($mode eq "must" || $isConsRcmd) {                                                    # "Muss"-Planung oder Überschuß > Leistungsaufnahme (can)
+      elsif ($mode eq "must" || $isConsRcmd) {                                                    # "Muss"-Planung oder Überschuß > Ratio (can)
           $state = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom"};
 
           if ($debug =~ /consumerSwitching${c}/x) {
@@ -14155,7 +14352,7 @@ sub ___setConsumerSwitchingState {
 
       delete $paref->{supplement};
 
-      $state = qq{Consumer '$calias' was external switched on};
+      $state = qq{Consumer '$calias' was switched on externally};
       $dowri = 1;
   }
   elsif ($oldpsw eq 'on' && isConsumerPhysOff ($hash, $c)) {
@@ -14165,7 +14362,7 @@ sub ___setConsumerSwitchingState {
 
       delete $paref->{supplement};
 
-      $state = qq{Consumer '$calias' was external switched off};
+      $state = qq{Consumer '$calias' was switched off externally};
       $dowri = 1;
   }
 
@@ -14507,7 +14704,7 @@ sub _calcConsForecast_circular {
                   ## Stundenweise exkludes und inkludes aufnehmen
                   #################################################
                   $do = 1;
-                  if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+                  if ($swdfcfc) {                                                                           # nur gleiche Tage (Mo...So) einbeziehen
                       my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
                       $do     = 0 if(!$hdn || $hdn ne $todayname);
                   }
@@ -16872,42 +17069,58 @@ sub __createOwnSpec {
 
   my @fields = split (/\s+/sx, $spec);
 
-  my (@cats, @vals);
+  my (@props, @cats, @vals);                                                           # @props - Eigenschaften, @cats - Kategorien, @vals - Label:Werte Paare
 
   for my $f (@fields) {
-      if ($f =~ /^\#(.*)/xs) {
+      if ($f =~ /^\#(.*)/xs) {                                                         # eine Kategorie erkannt
           push @cats, $1;
           next;
+      }
+      elsif ($f =~ /^\.([^\s]+)/xs) {                                                  # eine Eigenschaft erkannt
+          push @props, $1;
+          next;          
       }
 
       push @vals, $f;
   }
 
-  my $ownv;
+  my $isize = INPUTSIZE;
+  
+  if (@props) {
+      my $properties = join (' ', @props);
+      my ($pa, $ph) = parseParams ($properties);
+      $isize = $ph->{inputSize} if(defined $ph->{inputSize});
+  } 
+  
   my $rows = ceil (scalar(@vals) / $vinr);
   my $col  = 0;
+  my ($ownv, $cakey);
 
   for (my $i = 1 ; $i <= $rows; $i++) {
       my ($h, $v, $u);
 
       for (my $k = 0 ; $k < $vinr; $k++) {
-          ($h->{$k}{label}, $h->{$k}{elm}) = split ":", $vals[$col] if($vals[$col]);  # Label und darzustellendes Element
-
+          ($h->{$k}{label}, $h->{$k}{elm}) = $vals[$col] =~ /^(.*):(.*)$/ if($vals[$col]);   # Label und darzustellendes Element am LETZTEN : trennen
+          
           $h->{$k}{elm}   //= '';
-          my ($elm, $dev)   = split "@", $h->{$k}{elm};                               # evtl. anderes Devices
+          my ($elm, $dev)   = split "@", $h->{$k}{elm};                                      # evtl. anderes Devices
           $dev            //= $name;
+          $elm            //= '';
+          ($elm, $cakey)    = split "->", $elm;                                              # zusammengesetztes Attribut: gewünschten Schlüssel identifizieren
 
           $col++;
 
-          if (!$h->{$k}{label}) {
-              undef $h->{$k}{label};
-              next;
+          if (!defined $h->{$k}{label}) {
+              $h->{$k}{label} = '';
+              $h->{$k}{elm}   = '';
           }
 
-          my $setcmd = ___getFWwidget ($name, $dev, $elm, $allsets, 'set');           # Set-Kommandos identifizieren
+          ## Set-Kommandos identifizieren
+          #################################
+          my $setcmd = ___ownSpecGetFWwidget ($name, $dev, $elm, $allsets, 'set', $cakey, $isize);           
 
           if ($setcmd) {
-              if ($pah) {                                                             # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
+              if ($pah) {                                                                    # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
                   undef $h->{$k}{label};
                   $setcmd = '<hidden by pageAsHtml>';
               }
@@ -16919,10 +17132,12 @@ sub __createOwnSpec {
               next;
           }
 
-          my $attrcmd = ___getFWwidget ($name, $dev, $elm, $allattrs, 'attr');        # Attr-Kommandos identifizieren
+          ## Attr-Kommandos identifizieren
+          ##################################
+          my $attrcmd = ___ownSpecGetFWwidget ($name, $dev, $elm, $allattrs, 'attr', $cakey, $isize);        
 
           if ($attrcmd) {
-              if ($pah) {                                                             # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
+              if ($pah) {                                                                    # bei get pageAsHtml setter/attr nicht anzeigen (js Fehler)
                   undef $h->{$k}{label};
                   $attrcmd = '<hidden by pageAsHtml>';
               }
@@ -16934,10 +17149,14 @@ sub __createOwnSpec {
               next;
           }
 
-          $v->{$k} = ReadingsVal ($dev, $elm, undef);
+          ## Reading identifizieren
+          ###########################
+          if ($elm) {
+              $v->{$k} = ReadingsVal ($dev, $elm, undef);
 
-          if (defined $v->{$k} && $v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
-              ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');       # Value und Unit trennen wenn Value numerisch
+              if (defined $v->{$k} && $v->{$k} =~ /^\s*(-?\d+(\.\d+)?)/xs) {
+                  ($v->{$k}, $u->{$k}) = split /\s+/, ReadingsVal ($dev, $elm, '');         # Value und Unit trennen wenn Value numerisch
+              }
           }
 
           $u->{$k} //= q{};
@@ -16975,10 +17194,10 @@ sub __createOwnSpec {
 
       $ownv .= "<tr>";
       $ownv .= "<td $dstyle>".($cats[$i-1] ? '<b>'.$cats[$i-1].'</b>' : '')."</td>";
-      $ownv .= "<td $dstyle><b>".$h->{0}{label}.":</b></td> <td align=right $dstyle>".$v->{0}." ".$u->{0}."</td>" if(defined $h->{0}{label});
-      $ownv .= "<td $dstyle><b>".$h->{1}{label}.":</b></td> <td align=right $dstyle>".$v->{1}." ".$u->{1}."</td>" if(defined $h->{1}{label});
-      $ownv .= "<td $dstyle><b>".$h->{2}{label}.":</b></td> <td align=right $dstyle>".$v->{2}." ".$u->{2}."</td>" if(defined $h->{2}{label});
-      $ownv .= "<td $dstyle><b>".$h->{3}{label}.":</b></td> <td align=right $dstyle>".$v->{3}." ".$u->{3}."</td>" if(defined $h->{3}{label});
+      $ownv .= "<td $dstyle><b>".$h->{0}{label}.($h->{0}{label} ? ':' : '')."</b></td> <td align=right $dstyle>".$v->{0}." ".$u->{0}."</td>";
+      $ownv .= "<td $dstyle><b>".$h->{1}{label}.($h->{1}{label} ? ':' : '')."</b></td> <td align=right $dstyle>".$v->{1}." ".$u->{1}."</td>";
+      $ownv .= "<td $dstyle><b>".$h->{2}{label}.($h->{2}{label} ? ':' : '')."</b></td> <td align=right $dstyle>".$v->{2}." ".$u->{2}."</td>";
+      $ownv .= "<td $dstyle><b>".$h->{3}{label}.($h->{3}{label} ? ':' : '')."</b></td> <td align=right $dstyle>".$v->{3}." ".$u->{3}."</td>";
       $ownv .= "</tr>";
   }
 
@@ -16992,12 +17211,14 @@ return $ownv;
 ################################################################
 #  liefert ein FHEMWEB set/attr Widget zurück
 ################################################################
-sub ___getFWwidget {
-  my $name = shift;
-  my $dev  = shift // $name;                # Device des Elements, default=$name
-  my $elm  = shift;                         # zu prüfendes Element (setter / attribut)
-  my $allc = shift;                         # Kommandovorrat -> ist Element enthalten?
-  my $ctyp = shift // 'set';                # Kommandotyp: set/attr
+sub ___ownSpecGetFWwidget {
+  my $name  = shift;
+  my $dev   = shift;                         # Device des Elements, default=$name
+  my $elm   = shift;                         # zu prüfendes Element (Setter / Attribut)
+  my $allc  = shift;                         # Kommandovorrat -> ist Element enthalten?
+  my $ctyp  = shift;                         # Kommandotyp: set/attr
+  my $cakey = shift;                         # ein einzelner Schlüssel zur Selektion aus einem zusammengesetzten Attribut
+  my $isize = shift;                         # Breite eines Text-Eingabefeldes 
 
   return if(!$elm || $elm eq 'state');
 
@@ -17014,14 +17235,13 @@ sub ___getFWwidget {
   }
 
   if ($allc =~ /\s$elm:?(.*?)\s/xs) {                                                    # Element in allen Sets oder Attr enthalten
-      my $arg = $1;
+      my $arg = $1 // '';
 
-      if (!$arg || $arg eq 'textField') {                                                # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
-          $arg = 'textFieldNL';
+      if ($arg =~ /textField-long/xs) {                                                  # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
+          $arg = 'textFieldNL-long,,'.$isize;
       }
-
-      if ($arg eq 'textField-long') {                                                    # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
-          $arg = 'textFieldNL-long';
+      elsif (!$arg || $arg =~ /textField/xs) {                                           # Label (Reading) ausblenden -> siehe fhemweb.js function FW_createTextField Zeile 1657
+          $arg = 'textFieldNL,,'.$isize;
       }
 
       if ($arg !~ /^\#/xs && $arg !~ /^$allwidgets/xs) {
@@ -17035,6 +17255,7 @@ sub ___getFWwidget {
 
       if ($ctyp eq 'attr') {                                                             # Attributwerte als verstecktes Reading abbilden
           $current = AttrVal ($dev, $elm, '');
+          $current =~ s/(?<! )\R(?! )/ /g;                                               # V 1.59.6: ersetzt alle Zeilenumbrüche, die weder links noch rechts ein Leerzeichen haben, durch ein Leerzeichen
           $reading = '.'.$dev.'_'.$elm;
       }
       else {
@@ -17046,20 +17267,28 @@ sub ___getFWwidget {
               $reading = $elm;
           }
       }
-
+      
       if ($reading && $reading =~ /^\./xs) {                                             # verstecktes Reading für spätere Löschung merken
           push @widgetreadings, $reading;
           readingsSingleUpdate ($defs{$name}, $reading, $current, 0);
       }
 
-      $widget = ___widgetFallback ( { name     => $name,
-                                      dev      => $dev,
-                                      ctyp     => $ctyp,
-                                      elm      => $elm,
-                                      reading  => $reading,
-                                      arg      => $arg
-                                    }
-                                  );
+      if ($cakey) {                                                                     # einzelnen Schlüssel eines Composite-Attributs behandeln
+          my ($ea, $eh) = parseParams (AttrVal ($name, $elm, ''));
+          my $cakeyval  = $eh->{$cakey};
+          my $kv        = "$cakey=$cakeyval" if(defined $cakeyval);
+          $widget       = "<div class='fhemWidget' cmd='' reading='' dev='' arg='$arg' current='$cakeyval' type='set $dev attrKeyVal $elm $cakey='></div>";
+      }
+      else {
+          $widget = ___widgetFallback ( { name     => $name,
+                                          dev      => $dev,
+                                          ctyp     => $ctyp,
+                                          elm      => $elm,
+                                          reading  => $reading,
+                                          arg      => $arg
+                                        }
+                                      );      
+      }
 
       if (!$widget) {
           $widget = FW_pH ("cmd=$ctyp $dev $elm", $elm, 0, "", 1, 1);
@@ -17076,7 +17305,7 @@ sub ___widgetFallback {
   my $pars     = shift;
   my $name     = $pars->{name};
   my $dev      = $pars->{dev};
-  my $ctyp     = $pars->{ctyp};
+  my $ctyp     = $pars->{ctyp};                                    # Kommandotyp: set/attr
   my $elm      = $pars->{elm};
   my $reading  = $pars->{reading};
   my $arg      = $pars->{arg};
@@ -18507,7 +18736,7 @@ sub __batteryOnBeam {
           
           my $stysymbol = $strategy eq 'loadRelease' ? 'ldreleas' : 
                           $strategy eq 'optPower'    ? 'optchpow' :
-						  $strategy eq 'smartPower'  ? 'smtchpow' :
+                          $strategy eq 'smartPower'  ? 'smtchpow' :
                           'norate';
           
           my ($bpower, $currsoc);
@@ -18909,7 +19138,7 @@ END0
                                            }
                                          );
           
-		  my $ccicon = (split '@', $cicon)[1];
+          my $ccicon = (split '@', $cicon)[1];
           $cicon     = FW_makeImage         ($cicon, ''); 
           $cicon     = __normIconInnerScale ($cicon, $ccicon);       
   
@@ -18975,7 +19204,7 @@ END1
 
       my $cdicon = (split '@', $dicon)[1];
       $dicon     = FW_makeImage         ($dicon, '');
-	  $dicon     = __normIconInnerScale ($dicon, $cdicon); 
+      $dicon     = __normIconInnerScale ($dicon, $cdicon); 
 
       $ret .= qq{<g id="dummy_$stna" transform="translate(660 360)">};
       $ret .= "<title>$dumtxt</title>".$dicon;
@@ -18985,11 +19214,12 @@ END1
   ## Laufketten Node->Home, Node->Grid, Bat->Home
   #################################################
   my $node2home_style        = $node2home        ? "$stna active_normal" : "$stna inactive";
+  my $node2home_direction    = $node2home < 0    ? "M700,580 L700,400"   : "M700,400 L700,580";       
   my $node2gridMetered_style = $node2gridMetered ? "$stna active_normal" : "$stna inactive";
 
   $ret .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-  <path id="node2home_$stna" class="$node2home_style" d="M700,400 L700,580" />
+  <path id="node2home_$stna" class="$node2home_style" d="$node2home_direction" />  
   <path id="node2grid_$stna" class="$node2gridMetered_style" d="M670,400 L250,480" />
   <path id="grid2home_$stna" class="$grid2home_style" d="$gconMetered_direction" />
 END2
@@ -19454,11 +19684,11 @@ sub __addInputProducerIcon {
                                                                   }
                                                                 );
                   
-				  my $gcolor = (split '@', $genericon)[1];
+                  my $gcolor = (split '@', $genericon)[1];
                   $genericon = FW_makeImage         ($genericon, '');
-				  $genericon = __normIconInnerScale ($genericon, $gcolor);
-				  
-				  $ret .= qq{<g id="generator_${pn}_$stna" fill="grey" transform="translate($xstart $ystart)">};
+                  $genericon = __normIconInnerScale ($genericon, $gcolor);
+                  
+                  $ret .= qq{<g id="generator_${pn}_$stna" fill="grey" transform="translate($xstart $ystart)">};
                   $ret .= "<title>$genertxt</title>".$genericon;
                   $ret .= '</g> ';
               }
@@ -19476,8 +19706,8 @@ sub __addInputProducerIcon {
 
           my $cpicon = (split '@', $picon)[1];
           $picon     = FW_makeImage         ($picon, '');
-		  $picon     = __normIconInnerScale ($picon, $cpicon); 
-		  
+          $picon     = __normIconInnerScale ($picon, $cpicon); 
+          
           $ret .= qq{<g id="producer_${pn}_$stna" fill="grey" transform="translate($xstart $y_coord)">};
           $ret .= "<title>$ptxt</title>".$picon;
           $ret .= '</g> ';
@@ -19514,7 +19744,7 @@ sub __addNodeIcon {
   my $cnicon = (split '@', $nicon)[1];
   $nicon     = FW_makeImage         ($nicon, '');
   $nicon     = __normIconInnerScale ($nicon, $cnicon);
-		  
+          
   my $ret = qq{<g id="node_$stna" transform="translate($x_coord $y_coord)">};     # translate(X-Koordinate,Y-Koordinate)
   $ret   .= "<title>$ntxt</title>".$nicon;
   $ret   .= '</g> ';
@@ -20511,6 +20741,8 @@ sub aiAddInstance {
       $data{$name}{aidectree}{object}{$tn}{enum}  = $aiAddedToTrain;
   }
 
+  delete $data{$name}{aidectree}{aitrained};
+  
   $paref->{cst} = $cst;
   $serial = aiTrain ($paref);
   delete $paref->{cst};
@@ -20572,10 +20804,10 @@ sub aiTrain {
   }
   
   $data{$name}{aidectree}{aitrained} = \@ensemble;
-
   $err = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
+  delete $data{$name}{aidectree}{aitrained};
+  
   my $rn;
-
   if (!$err) {
       $rn = delete $entities{rn};
 
@@ -22904,7 +23136,7 @@ sub determSurplus {
 
       if ($err) {
           $fallback = 1;
-          Log3 ($name, 1, qq{$name - ERROR of consumer $c key 'surpmeth':  $err (fall back to default Surplus determination)});
+          Log3 ($name, 1, qq{$name - ERROR of consumer $c key 'surpmeth':  $err (fall back to default Surplus determination)}) if(askLogtime ($name, $err));
       }
       else {
           $surplus = ReadingsNum ($dv, $rd, '');
@@ -23312,6 +23544,47 @@ sub debugLog {
 return;
 }
 
+################################################################
+#  Ausgabe einer Log-Message nach Zeit erlauben. 
+#  Gibt "wahr" zurück wenn die Message noch nicht oder vor
+#  längerer Zeit als $delay Sekunden ausgegeben wurde
+#
+#  delay => Sek. bis gleiche Meldung wieder geloggt werden darf
+#           (default LOGDELAY)
+################################################################
+sub askLogtime {                            
+    my $name  = shift;
+    my $err   = shift;
+    my $delay = shift // LOGDELAY;
+    
+    return if(!$err);
+    
+    my $dolog = 1;
+    
+    if ($digestAbsent) {
+        Log3 ($name, 1, "$name - ERROR - The Perl module $digestAbsent is missing. Please install it"); 
+        return $dolog;        
+    }
+
+    my $now           = time;
+    $data{$name}{log} = {} unless ref $data{$name}{log} eq 'HASH';                           # sicherstellen, dass Struktur existiert
+    my $sha1          = sha1_hex ($err);
+
+    if (my $entry = $data{$name}{log}{$sha1}) {
+        $entry->{msg} = $err unless defined $entry->{msg} && $entry->{msg} eq $err;          # falls der gespeicherte Text aus irgendeinem Grund anders ist, aktualisiere ihn
+        
+        if ($entry->{ts} && $entry->{ts} + $delay > $now) {
+            $dolog = 0;                                                                      # noch innerhalb der Drosselzeit -> nicht loggen
+        }
+    }
+
+    if ($dolog) { 
+        $data{$name}{log}{$sha1} = { ts => $now, msg => $err };                              # Eintrag aktualisieren / anlegen wenn log erlaubt ist
+    } 
+    
+return $dolog;
+}
+
 ##################################################################
 # Konvertiert Azimut von der Solar-Konvention (+180 .. 0 .. -180) 
 # in die astronomische Konvention (0 ... 360°)
@@ -23529,7 +23802,7 @@ sub getConsumerPlanningMode {
   my ($err)     = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );
 
   if ($err) {
-      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to 'DEFCMODE' mode.});
+      Log3 ($name, 1, "$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to ".DEFCMODE." mode.") if(askLogtime ($name, $err));
       return DEFCMODE;
   }
 
@@ -23738,7 +24011,7 @@ sub isConsumerPhysOn {
   my ($err, $cname, $dswname) = getCDnames ($hash, $c);                  # Consumer und Switch Device Name
 
   if ($err) {
-      Log3 ($name, 1, "$name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err") if(askLogtime ($name, $err));
       return 0;
   }
 
@@ -23765,7 +24038,7 @@ sub isConsumerPhysOff {
   my ($err, $cname, $dswname) = getCDnames ($hash, $c);                  # Consumer und Switch Device Name
 
   if ($err) {
-      Log3 ($name, 1, "$name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err") if(askLogtime ($name, $err));
       return 0;
   }
 
@@ -23798,7 +24071,7 @@ sub isConsumerLogOn {
   my ($err) = isDeviceValid ( { name => $name, obj => $cname, method => 'string' } );
 
   if ($err) {
-      Log3 ($name, 1, qq{$name - ERROR - The consumer device '$cname' is invalid. The 'on'-state can't be identified.});
+      Log3 ($name, 1, qq{$name - ERROR - The consumer device '$cname' is invalid. The 'on'-state can't be identified.}) if(askLogtime ($name, $err));
       return 0;
   }
 
@@ -24459,13 +24732,13 @@ sub isDeviceValid {
 
   if (!$dv || !$defs{$dv}) {
       $dv //= '';
-      $err  = qq{The device '$dv' doesn't exist or is not a valid device.};
-      $err  = qq{There is no device set. Check the syntax with the command reference.}            if(!$dv);
-      $err  = qq{The device '$dv' doesn't exist anymore! Delete or change the attribute '$obj'.}  if(!$defs{$dv} && $method eq 'attr' && $obj =~ /consumer/);
+      $err  = qq{The device '$dv' doesn't exist or is not a valid device};
+      $err  = qq{There is no device set. Check the syntax with the command reference}            if(!$dv);
+      $err  = qq{The device '$dv' doesn't exist anymore! Delete or change the attribute '$obj'}  if(!$defs{$dv} && $method eq 'attr' && $obj =~ /consumer/);
   }
 
   if ($err) {
-      Log3 ($name, 1, "$name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err") if(askLogtime ($name, $err));
   }
 
   if ($al) {                                                                   # Leerzeichen im SF-Alias generieren
@@ -24681,7 +24954,8 @@ sub lastConsumerSwitchtime {
   my ($err, $cname, $dswname) = getCDnames ($hash, $c);                        # Consumer und Switch Device Name
 
   if ($err) {
-      Log3 ($name, 1, qq{$name - ERROR - The last switching time can't be identified due to the device '$dswname' is invalid. Please check device names in consumer "$c" attribute});
+      Log3 ($name, 1, qq{$name - ERROR - The last switching time can't be identified due to the device '$dswname' is invalid. 
+                         Please check device names in consumer "$c" attribute}) if(askLogtime ($name, $err));
       return;
   }
 
@@ -26380,43 +26654,57 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-set-reset"></a>
       <li><b>reset </b> <br><br>
 
-       Deletes the data source selected from the drop-down list, readings belonging to the function or other internal
-       data structures. <br><br>
+       Deletes the data source selected from the drop-down list, readings associated with the function, or other internal
+       data structures. If the selected command does not require any options, the input field is left blank.
+       <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>deletes an existing AI instance including all training and raw data and reinitializes it                                              </td></tr>
-            <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                                     </td></tr>
-            <tr><td> <b>consumerPlanning</b>   </td><td>deletes the planning data of all registered consumers                                                                                 </td></tr>
-            <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                                </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Consumer number&gt; </ul>                                                             </td></tr>
-            <tr><td>                           </td><td>The module carries out an automatic rescheduling of the consumer circuit.                                                             </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>deletes the current and historical data of all registered consumers from the memory                                                   </td></tr>
-            <tr><td>                           </td><td>The defined consumer attributes remain and the data is collected again.                                                               </td></tr>
-            <tr><td>                           </td><td>To delete the data of only one consumer use:                                                                                          </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Consumer number&gt; </ul>                                                               </td></tr>
-            <tr><td> <b>consumptionHistory</b> </td><td>deletes the stored consumption values of the house from the pvHistory memory                                                          </td></tr>
-            <tr><td>                           </td><td>To delete the consumption values of a specific day:                                                                                   </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumptionHistory 08) </ul>                 </td></tr>
-            <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                                         </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumptionHistory 08 10) </ul>   </td></tr>
-            <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                              </td></tr>
-            <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                                   </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>Deletes the readings pvCorrectionFactor* and hidden control readings of the correction system.                                        </td></tr>
-            <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                                </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                  </td></tr>
-            <tr><td>                           </td><td>To delete stored PV correction factors of a certain hour from the caches:                                                             </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;  </ul>                                                                    </td></tr>
-            <tr><td>                           </td><td><ul>(e.g. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                  </td></tr>
-            <tr><td> <b>pvHistory</b>          </td><td>deletes the memory of all historical days (01 ... 31)                                                                                 </td></tr>
-            <tr><td>                           </td><td>To delete a specific historical day:                                                                                                  </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset pvHistory 08) </ul>                                   </td></tr>
-            <tr><td>                           </td><td>To delete a specific hour of a historical day:                                                                                        </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt; &lt;Hour&gt;  (e.g. set &lt;name&gt; reset pvHistory 08 10) </ul>                    </td></tr>
-            <tr><td> <b>roofIdentPair</b>      </td><td>deletes all saved SolCast API Rooftop ID / API Key pairs.                                                                             </td></tr>
-            <tr><td>                           </td><td>To delete a specific pair, specify its key &lt;pk&gt;:                                                                                </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (e.g. set &lt;name&gt; reset roofIdentPair p1) </ul>                            </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>The following arguments can be used to selectively or completely remove AI data:                                                                                </td></tr>
+            <tr><td>                           </td><td><b>delDataAll</b> - deletes the AI instance, including all training and raw data as well as data at the file level, and reinitializes it.                       </td></tr>
+            <tr><td>                           </td><td><b>delIndex=&lt;Index&gt;,&lt;Index&gt;,...</b> - deletes one or more records with the index. The index can be specified as a regex.                            </td></tr>
+            <tr><td>                           </td><td>Examples: <b>1.)</b> delIndex=2025013023  <b>2.)</b> delIndex=2025013023,2025013024 <b>3.)</b> delIndex=202501.* <b>4.)</b> delIndex=20250130[0-9]              </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                                                               </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consumerPlanning</b>   </td><td>deletes the planning data of all registered consumers                                                                                                           </td></tr>
+            <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Consumer number&gt; </ul>                                                                                       </td></tr>
+            <tr><td>                           </td><td>The module carries out an automatic rescheduling of the consumer circuit.                                                                                       </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>deletes the current and historical data of all registered consumers from the memory                                                                             </td></tr>
+            <tr><td>                           </td><td>The defined consumer attributes remain and the data is collected again.                                                                                         </td></tr>
+            <tr><td>                           </td><td>To delete the data of only one consumer use:                                                                                                                    </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Consumer number&gt; </ul>                                                                                         </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consumptionHistory</b> </td><td>deletes the stored consumption values of the house from the pvHistory memory                                                                                    </td></tr>
+            <tr><td>                           </td><td>To delete the consumption values of a specific day:                                                                                                             </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumptionHistory 08) </ul>                                           </td></tr>
+            <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                                                                   </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumptionHistory 08 10) </ul>                             </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                                                        </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                                                             </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>Deletes the readings pvCorrectionFactor* and hidden control readings of the correction system.                                                                  </td></tr>
+            <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                                            </td></tr>
+            <tr><td>                           </td><td>To delete stored PV correction factors of a certain hour from the caches:                                                                                       </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;  </ul>                                                                                              </td></tr>
+            <tr><td>                           </td><td><ul>(e.g. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                                            </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>pvHistory</b>          </td><td>deletes the memory of all historical days (01 ... 31)                                                                                                           </td></tr>
+            <tr><td>                           </td><td>To delete a specific historical day:                                                                                                                            </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset pvHistory 08) </ul>                                                             </td></tr>
+            <tr><td>                           </td><td>To delete a specific hour of a historical day:                                                                                                                  </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Day&gt; &lt;Hour&gt;  (e.g. set &lt;name&gt; reset pvHistory 08 10) </ul>                                              </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>roofIdentPair</b>      </td><td>deletes all saved SolCast API Rooftop ID / API Key pairs.                                                                                                       </td></tr>
+            <tr><td>                           </td><td>To delete a specific pair, specify its key &lt;pk&gt;:                                                                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (e.g. set &lt;name&gt; reset roofIdentPair p1) </ul>                                                      </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
          </table>
       </ul>
       </li>
@@ -27060,7 +27348,7 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                                  <br>
+       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [pvshare=&lt;Value&gt;] [switchdev=&lt;device&gt;]                                                                                  <br>
                          [aliasshort=&lt;String&gt;] [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Color&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
                          [on=&lt;command&gt;] [off=&lt;command&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                           <br>
                          [notbefore=&lt;Expression&gt;] [notafter=&lt;Expression&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                             <br>
@@ -27095,11 +27383,12 @@ to ensure that the system configuration is correct.
         The remaining runtime is not affected by an interrupt!
         <br><br>
 
-        The <b>power</b> key indicates the nominal power consumption of the consumer according to its data sheet.
-        This value is used to schedule the switching times of the load and to control the switching depending on
-        the actual PV surplus at the time of scheduling.
-        This value is used to schedule the switching times of the load and to control the switching depending on
-        the actual PV surplus at the time of scheduling.
+        The key <b>power</b> specifies the power consumption of the consumer. The key <b>pvshare</b> can be used to specify the desired 
+        percentage of PV to cover the power consumption. <br>
+        Depending on these values, the switching times of the consumer are planned and the cycle of the consumer is started depending on
+        the sufficient PV surplus at the time of planning. <br>
+        If <b>power=0</b> or <b>pvshare=0</b> is set, the consumer is switched on as planned, regardless of whether there is sufficient 
+        PV surplus.
         <br><br>
 
          <ul>
@@ -27123,8 +27412,12 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                                                     Display functions or manual switching are available.                                                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
-            <tr><td> <b>power</b>          </td><td>nominal power consumption of the consumer (see data sheet) in W                                                                                   </td></tr>
+            <tr><td> <b>power</b>          </td><td>Power consumption of the consumer in W. This can be the nominal power according to the data sheet or a dynamically specified reference value.     </td></tr>
             <tr><td>                       </td><td>(can be set to "0")                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>pvshare</b>        </td><td>The key can be used to specify the desired percentage of PV power to cover the power consumption 'power'. (optional)                                   </td></tr>
+            <tr><td>                       </td><td>The setting 100% defines a required PV surplus of at least 'power'. With 0%, the consumer does not require any PV surplus.                        </td></tr>
+            <tr><td>                       </td><td>Value: <b>0..100</b>, default: 100 (%)                                                                                                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>The specified &lt;device&gt; is assigned to the consumer as a switch device (optional). Switching operations are performed with this device.      </td></tr>
             <tr><td>                       </td><td>The key is useful for consumers where energy measurement and switching is carried out with different devices                                      </td></tr>
@@ -27311,7 +27604,7 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
             <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
-			<tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr> 
+            <tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr> 
             <tr><td>                     </td><td><b>Note:</b> The relationship ‘careCycle * stepSoC = 100’ should be observed!                   </td></tr>
             <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>          
@@ -27338,8 +27631,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>loadTarget</b>   </td><td>Optional target SoC in % for calculating charge release or optimal charging power.              </td></tr>
             <tr><td>                     </td><td>The target value is a calculated figure. The actual SoC may be higher or lower than this within </td></tr>
             <tr><td>                     </td><td>certain limits, depending on the situation. The higher value from Reading                       </td></tr>
-			<tr><td>                     </td><td><b>Battery_OptimumTargetSoC_XX</b> and 'loadTarget' takes precedence for the calculation.       </td></tr>
-			<tr><td>                     </td><td>Value: <b>0..100</b>, default: 100                                                              </td></tr>           
+            <tr><td>                     </td><td><b>Battery_OptimumTargetSoC_XX</b> and 'loadTarget' takes precedence for the calculation.       </td></tr>
+            <tr><td>                     </td><td>Value: <b>0..100</b>, default: 100                                                              </td></tr>           
             <tr><td>                     </td><td>                                                                                                </td></tr>           
             <tr><td> <b>safetyMargin</b> </td><td>When calculating the load clearance and optimized load capacity, safety margins are taken       </td></tr>
             <tr><td>                     </td><td>into account in the predicted load requirements.                                                </td></tr>
@@ -27762,50 +28055,73 @@ to ensure that the system configuration is correct.
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b> <br><br>
 
          Display of any readings, set commands and attributes of the device in the graphic header. <br>
-         Readings, set commands and attributes of other devices can be displayed by specifying the optional [@Device]. <br>
-         The values to be displayed are separated by spaces.
          Four values (fields) are displayed per line. <br>
-         The input can be made in multiple lines. Values with the units "Wh" or "kWh" are converted according to the
-         setting of the attribute <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a>.
+         Values with the units "Wh" or "kWh" are converted according to the setting of the attribute 
+         <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a>.
          <br><br>
 
-         Each value is to be defined by a label and the corresponding reading connected by ":". <br>
-         Spaces in the label are to be inserted by "&amp;nbsp;", a line break by "&lt;br&gt;". <br>
-         An empty field in a line is created by ":". <br>
-         A line title can be inserted by specifying "#:&lt;Text&gt;", an empty title by entering "#".
+         Each element to be displayed must be defined by a label, the separator “:”, and the value (attribute, reading, set command). <br>
+         The input can be entered on multiple lines for a clear structure. <br>
+         The syntax for inserting elements and defining additional properties is as follows:
          <br><br>
+         
+         <ul>
+           <table>
+           <colgroup> <col width="30%"> <col width="70%"> </colgroup>
+              <tr><td> <b>.inputSize=&lt;Integer&gt; </b>                 </td><td>sets the width of text input fields (default: 10)                                           </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&amp;nbsp; </b>                                 </td><td>inserts a space in the label                                                                </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;br&gt; </b>                                 </td><td>inserts a line break in the label                                                           </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>#&lt;Text&gt; </b>                              </td><td>defines a row title                                                                         </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b># </b>                                          </td><td>creates an empty line title                                                                 </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Value&gt; </b>                </td><td>creates the &lt;label&gt;:&lt;value&gt; pair to be displayed.                               </td></tr>
+              <tr><td>                                                    </td><td>&lt;value&gt; can be an attribute, reading, or set command.                                 </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Value&gt;@&lt;Device&gt; </b> </td><td>the value of another &lt;Device&gt; is displayed                                            </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Attr&gt;->&lt;Key&gt; </b>    </td><td>the key value of a combined attribute (e.g., flowGraphicControl) is displayed               </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+              <tr><td> <b>: </b>                                          </td><td>creates a blank space                                                                       </td></tr>
+              <tr><td>                                                    </td><td>                                                                                            </td></tr>
+           </table>
+         </ul> 
 
-       <ul>
-         <b>Example: </b> <br>
-         <table>
-         <colgroup> <col width="33%"> <col width="67%"> </colgroup>
-            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>#                                                                                       </td></tr>
-            <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                                         </td></tr>
-            <tr><td>                                         </td><td>Surplus:Current_Surplus                                                                 </td></tr>
-            <tr><td>                                         </td><td>current&amp;nbsp;Gridconsumption:Current_GridConsumption                                </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
-            <tr><td>                                         </td><td>#                                                                                       </td></tr>
-            <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:special_todayConForecastTillSunset                    </td></tr>
-            <tr><td>                                         </td><td>PV&amp;nbsp;Day&amp;nbsp;after&amp;nbsp;tomorrow:special_dayAfterTomorrowPVforecast     </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
-            <tr><td>                                         </td><td>#Battery                                                                                </td></tr>
-            <tr><td>                                         </td><td>in&amp;nbsp;today:special_todayBatIn                                                    </td></tr>
-            <tr><td>                                         </td><td>out&amp;nbsp;today:special_todayBatOut                                                  </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
-            <tr><td>                                         </td><td>:                                                                                       </td></tr>
-            <tr><td>                                         </td><td>#Settings                                                                               </td></tr>
-            <tr><td>                                         </td><td>Autocorrection:pvCorrectionFactor_Auto : : :                                            </td></tr>
-            <tr><td>                                         </td><td>Consumer&lt;br&gt;Replanning:consumerNewPlanning : : :                                  </td></tr>
-            <tr><td>                                         </td><td>Consumer&lt;br&gt;Quickstart:consumerImmediatePlanning : : :                            </td></tr>
-            <tr><td>                                         </td><td>Weather:graphicShowWeather : : :                                                        </td></tr>
-            <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                                        </td></tr>
-            <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                                        </td></tr>
-            <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                                   </td></tr>
-         </table>
-       </ul>
+         <ul>
+           <b>Example: </b> <br>
+           <table>
+           <colgroup> <col width="33%"> <col width="67%"> </colgroup>
+              <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>.inputSize=5                                                                            </td></tr>
+              <tr><td>                                         </td><td>#                                                                                       </td></tr>
+              <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                                         </td></tr>
+              <tr><td>                                         </td><td>Surplus:Current_Surplus                                                                 </td></tr>
+              <tr><td>                                         </td><td>current&amp;nbsp;Gridconsumption:Current_GridConsumption                                </td></tr>
+              <tr><td>                                         </td><td>:                                                                                       </td></tr>
+              <tr><td>                                         </td><td>#                                                                                       </td></tr>
+              <tr><td>                                         </td><td>CO&amp;nbsp;until&amp;nbsp;sunset:special_todayConForecastTillSunset                    </td></tr>
+              <tr><td>                                         </td><td>PV&amp;nbsp;Day&amp;nbsp;after&amp;nbsp;tomorrow:special_dayAfterTomorrowPVforecast     </td></tr>
+              <tr><td>                                         </td><td>:                                                                                       </td></tr>
+              <tr><td>                                         </td><td>:                                                                                       </td></tr>
+              <tr><td>                                         </td><td>#Battery                                                                                </td></tr>
+              <tr><td>                                         </td><td>in&amp;nbsp;today:special_todayBatIn                                                    </td></tr>
+              <tr><td>                                         </td><td>out&amp;nbsp;today:special_todayBatOut                                                  </td></tr>
+              <tr><td>                                         </td><td>Charging&amp;nbsp;target:ctrlBatSocManagement01->loadTarget                             </td></tr>
+              <tr><td>                                         </td><td>:                                                                                       </td></tr>
+              <tr><td>                                         </td><td>#Settings                                                                               </td></tr>
+              <tr><td>                                         </td><td>Autocorrection:pvCorrectionFactor_Auto : : :                                            </td></tr>
+              <tr><td>                                         </td><td>Consumer&lt;br&gt;Replanning:consumerNewPlanning : : :                                  </td></tr>
+              <tr><td>                                         </td><td>Consumer&lt;br&gt;Quickstart:consumerImmediatePlanning : : :                            </td></tr>
+              <tr><td>                                         </td><td>Weather:graphicShowWeather : : :                                                        </td></tr>
+              <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                                        </td></tr>
+              <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                                        </td></tr>
+              <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                                   </td></tr>
+           </table>
+         </ul>
+         <br>
        </li>
-       <br>
 
        <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
        <li><b>graphicHeaderOwnspecValForm </b> <br><br>
@@ -29092,42 +29408,56 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>reset </b> <br><br>
 
        Löscht die aus der Drop-Down Liste gewählte Datenquelle, zu der Funktion gehörende Readings oder weitere interne
-       Datenstrukturen. <br><br>
+       Datenstrukturen. Benötigt der gewählte Befehl keine Optionen, wird das Eingabefeld leer gelassen. 
+       <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>löscht eine vorhandene KI Instanz inklusive aller Trainings- und Rohdaten und initialisiert sie neu                                   </td></tr>
-            <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                                        </td></tr>
-            <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                              </td></tr>
-            <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                                 </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                                           </td></tr>
-            <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                                          </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher                                          </td></tr>
-            <tr><td>                           </td><td>Die definierten Consumer Attribute bleiben bestehen und die Daten werden neu gesammelt.                                               </td></tr>
-            <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                                         </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                                             </td></tr>
-            <tr><td> <b>consumptionHistory</b> </td><td>löscht die gespeicherten Verbrauchswerte des Hauses aus dem pvHistory Speicher                                                        </td></tr>
-            <tr><td>                           </td><td>Um die Verbrauchswerte eines bestimmten Tages zu löschen:                                                                             </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumptionHistory 08) </ul>                 </td></tr>
-            <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                                </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumptionHistory 08 10) </ul> </td></tr>
-            <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                                            </td></tr>
-            <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                                       </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>Löscht die Readings pvCorrectionFactor* sowie verborgene Steuerreadings des Korrektursystems.                                         </td></tr>
-            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                                          </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                  </td></tr>
-            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                                               </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                                  </td></tr>
-            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                  </td></tr>
-            <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                                               </td></tr>
-            <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                                      </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                                   </td></tr>
-            <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                                         </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>                  </td></tr>
-            <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                                      </td></tr>
-            <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                                          </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>                            </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>Mit den nachfolgenden Argumenten können die KI-Daten selektiv oder komplett entfernt werden:                                                                    </td></tr>
+            <tr><td>                           </td><td><b>delDataAll</b> - löscht die KI Instanz inklusive aller Trainings- und Rohdaten sowie Daten auf Fileebene und initialisiert sie neu                           </td></tr>
+            <tr><td>                           </td><td><b>delIndex=&lt;Index&gt;,&lt;Index&gt;,...</b> - löscht einen oder mehrere Datensätze mit dem Index. Der Index kann als Regex angegeben sein.                  </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> delIndex=2025013023  <b>2.)</b> delIndex=2025013023,2025013024 <b>3.)</b> delIndex=202501.* <b>4.)</b> delIndex=20250130[0-9]             </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                                                                  </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                                                        </td></tr>
+            <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                                                           </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                                                                     </td></tr>
+            <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                                                                    </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher                                                                    </td></tr>
+            <tr><td>                           </td><td>Die definierten Consumer Attribute bleiben bestehen und die Daten werden neu gesammelt.                                                                         </td></tr>
+            <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                                                                   </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                                                                       </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consumptionHistory</b> </td><td>löscht die gespeicherten Verbrauchswerte des Hauses aus dem pvHistory Speicher                                                                                  </td></tr>
+            <tr><td>                           </td><td>Um die Verbrauchswerte eines bestimmten Tages zu löschen:                                                                                                       </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumptionHistory 08) </ul>                                           </td></tr>
+            <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                                                          </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumptionHistory 08 10) </ul>                           </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                                                                      </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                                                                 </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>Löscht die Readings pvCorrectionFactor* sowie verborgene Steuerreadings des Korrektursystems.                                                                   </td></tr>
+            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                                                                    </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                                            </td></tr>
+            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                                                                         </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                                                            </td></tr>
+            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                                            </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                                                                         </td></tr>
+            <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                                                             </td></tr>
+            <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                                                                   </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul>                                            </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                                                                </td></tr>
+            <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                                                                    </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>                                                      </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
          </table>
       </ul>
       </li>
@@ -29771,7 +30101,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [switchdev=&lt;device&gt;]                                                                                  <br>
+       <li><b>consumerXX &lt;Device&gt;[:&lt;Alias&gt;] type=&lt;type&gt; power=&lt;power&gt; [pvshare=&lt;Wert&gt;] [switchdev=&lt;device&gt;]                                                                                  <br>
                          [aliasshort=&lt;String&gt;] [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;[@&lt;Farbe&gt;]] [mintime=&lt;Option&gt;]                                                                                                 <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;] [asynchron=&lt;Option&gt;]                                         <br>
                          [notbefore=&lt;Ausdruck&gt;] [notafter=&lt;Ausdruck&gt;] [locktime=&lt;offlt&gt;[:&lt;onlt&gt;]]                                                                                 <br>
@@ -29805,10 +30135,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         Die verbleibende Laufzeit wird durch einen Interrupt nicht beeinflusst!
         <br><br>
 
-        Der Schlüssel <b>power</b> gibt die nominale Leistungsaufnahme des Verbrauchers gemäß seines Datenblattes an.
-        Dieser Wert wird verwendet um die Schaltzeiten des Verbrauchers zu planen und das Schalten in Abhängigkeit
-        des tatsächlichen PV-Überschusses zum Einplanungszeitpunkt zu steuern.
-        Ist <b>power=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichend vorhandenem PV-Überschuß
+        Der Schlüssel <b>power</b> gibt die Leistungsaufnahme des Verbrauchers an. Mit dem Schlüssel <b>pvshare</b> kann der gewünschte 
+        prozentuale PV-Anteil zur Deckung der Leistungsaufnahme festgelegt werden. <br>
+        Abhängig von diesen Werten werden die Schaltzeiten des Verbrauchers geplant und der Zyklus des Verbrauchers in Abhängigkeit
+        des ausreichenden PV-Überschußes zum Einplanungszeitpunkt gestartet. <br>
+        Ist <b>power=0</b> oder <b>pvshare=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichend vorhandenem PV-Überschuß
         wie eingeplant geschaltet.
         <br><br>
 
@@ -29833,8 +30164,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                                                     Anzeigefunktionen oder manuelle Schaltungen sind verfügbar.                                                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                                </td></tr>
+            <tr><td> <b>power</b>          </td><td>Leistungsaufnahme des Verbrauchers in W. Es kann die nominale Leistung gemäß Datenblatt oder ein dynamisch vorgegebener Richtwert sein.            </td></tr>
             <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                                      </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pvshare</b>        </td><td>Mit dem Schlüssel kann der gewünschte prozentuale PV-Anteil zur Deckung der Leistungsaufnahme 'power' festgelegt werden. (optional)                </td></tr>
+            <tr><td>                       </td><td>Die Einstellung 100% definiert einen benötigten PV-Überschuß von mindestens 'power'. Mit 0% benötigt der Verbraucher keinen PV-Überschuß.          </td></tr>
+            <tr><td>                       </td><td>Wert: <b>0..100</b>, default: 100 (%)                                                                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>switchdev</b>      </td><td>Das angegebene &lt;device&gt; wird als Schalter Device dem Verbraucher zugeordnet (optional). Schaltvorgänge werden mit diesem Gerät               </td></tr>
             <tr><td>                       </td><td>ausgeführt. Der Schlüssel ist für Verbraucher nützlich bei denen Energiemessung und Schaltung mit verschiedenen Geräten vorgenommen                </td></tr>
@@ -29903,7 +30238,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
             <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                               </td></tr>
+            <tr><td> <b>swoffcond</b>      </td><td>Vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                               </td></tr>
             <tr><td>                       </td><td><b>Device:Reading</b> - die Device/Reading Kombination liefert den Prüfwert $VALUE ('undef' wird ignoriert)                                        </td></tr>
             <tr><td>                       </td><td>Die Prüfung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                               </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                                     </td></tr>
@@ -30022,7 +30357,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
             <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
-			<tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr> 
+            <tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr> 
             <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100' sollte eingehalten werden!            </td></tr>
             <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>          
@@ -30049,8 +30384,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>loadTarget</b>   </td><td>Optionaler Ziel-SoC in % für die Berechnung der Ladefreigabe bzw. der optimalen Ladeleistung.   </td></tr>
             <tr><td>                     </td><td>Der Zielwert ist eine kalkulatorische Rechengröße. Der reale SoC kann situativ in Grenzen       </td></tr>
             <tr><td>                     </td><td>über- oder unterschritten werden. Der höhere Wert aus Reading <b>Battery_OptimumTargetSoC_XX</b></td></tr>
-			<tr><td>                     </td><td>und 'loadTarget' hat für die Berechnung Vorrang.                                                </td></tr>
-			<tr><td>                     </td><td>Wert: <b>0..100</b>, default: 100                                                               </td></tr>           
+            <tr><td>                     </td><td>und 'loadTarget' hat für die Berechnung Vorrang.                                                </td></tr>
+            <tr><td>                     </td><td>Wert: <b>0..100</b>, default: 100                                                               </td></tr>           
             <tr><td>                     </td><td>                                                                                                </td></tr>           
             <tr><td> <b>safetyMargin</b> </td><td>Bei der Berechnung der Ladefreigabe und optimierten Ladeleistung werden Sicherheitszuschläge    </td></tr>
             <tr><td>                     </td><td>auf den prognostizierten Ladungsbedarf berücksichtigt.                                          </td></tr>
@@ -30473,51 +30808,74 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <li><b>graphicHeaderOwnspec &lt;Label&gt;:&lt;Reading&gt;[@Device] &lt;Label&gt;:&lt;Set&gt;[@Device] &lt;Label&gt;:&lt;Attr&gt;[@Device] ... </b> <br><br>
 
          Anzeige beliebiger Readings, Set-Kommandos und Attribute des SolarForecast Devices im Grafikkopf. <br>
-         Durch Angabe des optionalen [@Device] können Readings, Set-Kommandos und Attribute anderer Devices angezeigt werden. <br>
-         Die anzuzeigenden Werte werden durch Leerzeichen getrennt.
          Es werden vier Werte (Felder) pro Zeile dargestellt. <br>
-         Die Eingabe kann mehrzeilig erfolgen. Werte mit den Einheiten "Wh" bzw. "kWh" werden entsprechend der Einstellung
+         Werte mit den Einheiten "Wh" bzw. "kWh" werden entsprechend der Einstellung
          des Attributs <a href="#SolarForecast-attr-graphicControl">graphicControl->energyUnit</a> umgerechnet.
          <br><br>
 
-         Jeder Wert ist jeweils durch ein Label und das dazugehörige Reading verbunden durch ":" zu definieren. <br>
-         Leerzeichen im Label sind durch "&amp;nbsp;" einzufügen, ein Zeilenumbruch durch "&lt;br&gt;". <br>
-         Ein leeres Feld in einer Zeile wird durch ":" erzeugt. <br>
-         Ein Zeilentitel kann durch Angabe von "#:&lt;Text&gt;" eingefügt werden, ein leerer Titel durch die Eingabe von "#".
+         Jedes anzuzeigende Element ist durch ein Label, dem Trenner ":" und dem Wert (Attribut, Reading, Set-Kommando) zu definieren. <br>
+         Die Eingabe kann für eine übersichtliche Struktur mehrzeilig erfolgen. <br>
+         Die Syntax um Elemente einzufügen sowie weitere Eigenschaften zu definieren sind:
          <br><br>
-
-       <ul>
-         <b>Beispiel: </b> <br>
-         <table>
-         <colgroup> <col width="35%"> <col width="65%"> </colgroup>
-            <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>#                                                                             </td></tr>
-            <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                               </td></tr>
-            <tr><td>                                         </td><td>Überschuß:Current_Surplus                                                     </td></tr>
-            <tr><td>                                         </td><td>aktueller&amp;nbsp;Netzbezug:Current_GridConsumption                          </td></tr>
-            <tr><td>                                         </td><td>:                                                                             </td></tr>
-            <tr><td>                                         </td><td>#                                                                             </td></tr>
-            <tr><td>                                         </td><td>CO&amp;nbsp;bis&amp;nbsp;Sonnenuntergang:special_todayConForecastTillSunset   </td></tr>
-            <tr><td>                                         </td><td>PV&amp;nbsp;Übermorgen:special_dayAfterTomorrowPVforecast                     </td></tr>
-            <tr><td>                                         </td><td>InverterRelay:gridrelay_status@MySTP_5000                                     </td></tr>
-            <tr><td>                                         </td><td>:                                                                             </td></tr>
-            <tr><td>                                         </td><td>#Batterie                                                                     </td></tr>
-            <tr><td>                                         </td><td>in&amp;nbsp;heute:special_todayBatIn                                          </td></tr>
-            <tr><td>                                         </td><td>out&amp;nbsp;heute:special_todayBatOut                                        </td></tr>
-            <tr><td>                                         </td><td>:                                                                             </td></tr>
-            <tr><td>                                         </td><td>:                                                                             </td></tr>
-            <tr><td>                                         </td><td>#Settings                                                                     </td></tr>
-            <tr><td>                                         </td><td>Autokorrektur:pvCorrectionFactor_Auto : : :                                   </td></tr>
-            <tr><td>                                         </td><td>Consumer&lt;br&gt;Neuplanung:consumerNewPlanning : : :                        </td></tr>
-            <tr><td>                                         </td><td>Consumer&lt;br&gt;Sofortstart:consumerImmediatePlanning : : :                 </td></tr>
-            <tr><td>                                         </td><td>Wetter:graphicShowWeather : : :                                               </td></tr>
-            <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                              </td></tr>
-            <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                              </td></tr>
-            <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                         </td></tr>
-         </table>
-       </ul>
+         
+         <ul>
+           <table>
+           <colgroup> <col width="30%"> <col width="70%"> </colgroup>
+              <tr><td> <b>.inputSize=&lt;Ganzzahl&gt; </b>               </td><td>legt die Breite von Texteingabefeldern fest (default: 10)                                   </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&amp;nbsp; </b>                                </td><td>fügt ein Leerzeichen im Label ein                                                           </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;br&gt; </b>                                </td><td>fügt einen Zeilenumbruch im Label ein                                                       </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>#&lt;Text&gt; </b>                             </td><td>definiert einen Zeilentitel                                                                 </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b># </b>                                         </td><td>erzeugt einen leeren Zeilentitel                                                            </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Wert&gt; </b>                </td><td>Erstellt das anzuzeigende &lt;Label&gt;:&lt;Wert&gt; Paar.                                  </td></tr>
+              <tr><td>                                                   </td><td>&lt;Wert&gt; kann ein Attribut, Reading, oder Set-Kommando sein.                            </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Wert&gt;@&lt;Device&gt; </b> </td><td>der Wert eines anderen &lt;Device&gt; wird angezeigt                                        </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>&lt;Label&gt;:&lt;Attr&gt;->&lt;Key&gt; </b>   </td><td>der Schlüsselwert eines kombinierten Attributes (z.B. flowGraphicControl) wird angezeigt    </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+              <tr><td> <b>: </b>                                         </td><td>erzeugt ein Leerfeld                                                                        </td></tr>
+              <tr><td>                                                   </td><td>                                                                                            </td></tr>
+           </table>
+         </ul>  
+       
+         <ul>
+           <b>Beispiel: </b> <br>
+           <table>
+           <colgroup> <col width="35%"> <col width="65%"> </colgroup>
+              <tr><td> attr &lt;name&gt; graphicHeaderOwnspec  </td><td>.inputSize=5                                                                  </td></tr>
+              <tr><td>                                         </td><td>#                                                                             </td></tr>
+              <tr><td>                                         </td><td>AutarkyRate:Current_AutarkyRate                                               </td></tr>
+              <tr><td>                                         </td><td>Überschuß:Current_Surplus                                                     </td></tr>
+              <tr><td>                                         </td><td>aktueller&amp;nbsp;Netzbezug:Current_GridConsumption                          </td></tr>
+              <tr><td>                                         </td><td>:                                                                             </td></tr>
+              <tr><td>                                         </td><td>#                                                                             </td></tr>
+              <tr><td>                                         </td><td>CO&amp;nbsp;bis&amp;nbsp;Sonnenuntergang:special_todayConForecastTillSunset   </td></tr>
+              <tr><td>                                         </td><td>PV&amp;nbsp;Übermorgen:special_dayAfterTomorrowPVforecast                     </td></tr>
+              <tr><td>                                         </td><td>InverterRelay:gridrelay_status@MySTP_5000                                     </td></tr>
+              <tr><td>                                         </td><td>:                                                                             </td></tr>
+              <tr><td>                                         </td><td>#Batterie                                                                     </td></tr>
+              <tr><td>                                         </td><td>in&amp;nbsp;heute:special_todayBatIn                                          </td></tr>
+              <tr><td>                                         </td><td>out&amp;nbsp;heute:special_todayBatOut                                        </td></tr>
+              <tr><td>                                         </td><td>Ladeziel:ctrlBatSocManagement01->loadTarget                                   </td></tr>
+              <tr><td>                                         </td><td>:                                                                             </td></tr>
+              <tr><td>                                         </td><td>#Settings                                                                     </td></tr>
+              <tr><td>                                         </td><td>Autokorrektur:pvCorrectionFactor_Auto : : :                                   </td></tr>
+              <tr><td>                                         </td><td>Consumer&lt;br&gt;Neuplanung:consumerNewPlanning : : :                        </td></tr>
+              <tr><td>                                         </td><td>Consumer&lt;br&gt;Sofortstart:consumerImmediatePlanning : : :                 </td></tr>
+              <tr><td>                                         </td><td>Wetter:graphicShowWeather : : :                                               </td></tr>
+              <tr><td>                                         </td><td>History:graphicHistoryHour : : :                                              </td></tr>
+              <tr><td>                                         </td><td>ShowNight:graphicShowNight : : :                                              </td></tr>
+              <tr><td>                                         </td><td>Debug:ctrlDebug : : :                                                         </td></tr>
+           </table>
+         </ul>
+         <br>
        </li>
-       <br>
-
+         
        <a id="SolarForecast-attr-graphicHeaderOwnspecValForm"></a>
        <li><b>graphicHeaderOwnspecValForm </b> <br><br>
 
@@ -31384,6 +31742,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "Blocking": 0,
         "Color": 0,
         "utf8": 0,
+        "Digest::SHA": 0,
         "HttpUtils": 0,
         "JSON": 4.020,
         "FHEM::SynoModules::SMUtils": 1.0270,

@@ -496,6 +496,7 @@ use constant {
   TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
   TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
 
+  LOGDELAY       => 600,                                                            # Verzögerungszeit zwischen zwei Logausgaben mit identischen Inhalt
   DEFMINTIME     => 60,                                                             # default Einplanungsdauer in Minuten
   CONSFCLDAYS    => 60,                                                             # die Stundenwerte der letzten CONSFCLDAYS Tage zur Kalkulation der Verbrauchvorhersage einbezogen
   DEFCTYPE       => 'other',                                                        # default Verbrauchertyp
@@ -12273,9 +12274,9 @@ sub __batChargeOptTargetPower {
       my $remainingSurp  = 0;                                               
       
       for my $h (@remaining_hods) {                                                                              # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
-          my $val         = $hsurp->{$h}{nhr} eq '00'
-                            ? $replacement // 0
-                            : $hsurp->{$h}{surplswh};
+          my $val = defined $hsurp->{$h}{nhr} && $hsurp->{$h}{nhr} eq '00'
+                    ? int ($replacement) // 0
+                    : $hsurp->{$h}{surplswh};
           $remainingSurp += int $val;
       }
 
@@ -12345,7 +12346,13 @@ sub __batChargeOptTargetPower {
           ## weiter mit Überschuß
           #########################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
-          my $fref      = ___batFindMinPhWh ($hsurp, \@remaining_hods, $runwhneed, $replacement);
+          my $fref      = ___batFindMinPhWh ( $hsurp, 
+                                              \@remaining_hods, 
+                                              $remainingSurp, 
+                                              $runwhneed, 
+                                              $replacement, 
+                                              $achievable
+                                            );
           my $limpower  = $strategy eq 'optPower'
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
                           : $fref->{ph};                                                                         
@@ -12495,8 +12502,8 @@ return $value;
 ###############################################################################################
 #   Binärsuche für konstante Ladeleistung: $ph Wh via Binärsuche Iteration
 #   
-# - Wenn die Summe aller surplswh geringer ist als der Bedarf, wird Ereq automatisch auf 
-#   diesen Maximalwert gesetzt und liefert so die tatsächlich erreichbare Energie.
+# - Wenn die Summe aller surplswh geringer ist als der Bedarf, wird ph automatisch auf 
+#   den cap Maximalwert gesetzt und liefert so den maximalen Überschußwert als Ladeleistung.
 # - gewichtete Stundenkapazität @hods enthält die Stunden-Keys sortiert von der niedrigsten 
 #   bis zur höchsten Leistung. In jeder Binärsuche-Iteration addiert das Skript 
 #   min(ph, surplswh) für jede Stunde, wodurch die konstant gewählte Leistung ph gemäß der 
@@ -12506,32 +12513,41 @@ return $value;
 #   die vollständige Ausnutzung der vorhandenen Kapazität.
 ###############################################################################################
 sub ___batFindMinPhWh {
-    my ($hsurp, $aref, $Ereq, $replacement) = @_;
+  my ($hsurp, $hodsref, $remainingSurp, $Ereq, $replacement, $achievable) = @_;
     
-    my @hods     = @$aref;
-    my $low      = 0;                                                 
-    my $high     = max map { $hsurp->{$_}{surplswh} } @hods;
-    my $eps      = 0.5;                                               # minimale Genauigkeit in Wh  (1e-3)
-    my $max_iter = 100;                                               # Zwangsabbruch nach X Durchläufen
-    my $loop     = 0;
+  my @hods     = @$hodsref;
+  my $low      = 0;                                                 
+  my $high     = $remainingSurp;                                    # Summe aller verbleibenden Tagesüberschüsse auf Stundenbasis inkl. Gewichtung Stunde 00          
+  my $eps      = 0.5;                                               # minimale Genauigkeit in Wh  (1e-3)
+  my $max_iter = 100;                                               # Zwangsabbruch nach X Durchläufen
+  my $loop     = 0;
+                        
+  if (!$achievable) {
+      my $max_cap = max map { defined $hsurp->{$_}{nhr} && $hsurp->{$_}{nhr} eq '00'
+                              ? int($replacement)
+                              : $hsurp->{$_}{surplswh} // 0
+                            } @hods;
+                        
+      return { ph => (sprintf "%.0f", $max_cap), iterations => $loop, blur => (sprintf "%.4f", 0) };
+  }
     
-    while (($high - $low) > $eps) {
-        last if ++$loop > $max_iter;
+  while (($high - $low) > $eps) {
+      last if ++$loop > $max_iter;
         
-        my $mid     = ($low + $high) / 2;
-        my $charged = 0;
+      my $mid     = ($low + $high) / 2;
+      my $charged = 0;
         
-        for my $hod (@hods) {
-            my $nhr   = $hsurp->{$hod}{nhr};
-            next if(!defined $nhr);
-            my $cap   = $nhr eq '00' ? int $replacement : $hsurp->{$hod}{surplswh};
-            $charged += min ($mid, $cap);
-        }
+      for my $hod (@hods) {
+          my $nhr   = $hsurp->{$hod}{nhr};
+          next if(!defined $nhr);
+          my $cap   = $nhr eq '00' ? int $replacement : $hsurp->{$hod}{surplswh};
+          $charged += min ($mid, $cap);
+      }
         
-        $charged >= $Ereq ? ($high = $mid) : ($low = $mid);
-    } 
+      $charged >= $Ereq ? ($high = $mid) : ($low = $mid);
+  } 
     
-    $high = max (0, $high);
+  $high = max (0, $high);
     
 return { ph => (sprintf "%.0f", $high), iterations => $loop, blur => (sprintf "%.4f", ($high - $low)) };
 }
@@ -23534,12 +23550,12 @@ return;
 #  längerer Zeit als $delay Sekunden ausgegeben wurde
 #
 #  delay => Sek. bis gleiche Meldung wieder geloggt werden darf
-#           (default 600)
+#           (default LOGDELAY)
 ################################################################
 sub askLogtime {                            
     my $name  = shift;
     my $err   = shift;
-    my $delay = shift // 600;
+    my $delay = shift // LOGDELAY;
     
     return if(!$err);
     
