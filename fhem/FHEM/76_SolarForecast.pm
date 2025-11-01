@@ -9582,8 +9582,7 @@ sub _specialActivities {
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
 
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                         # Vortag (2 h Differenz reichen aus)
-          # $ts   = $date." 23:59:59";
-          $ts   = $date." 24:00:00";
+          $ts   = $date." 23:59:59";
 
           $pvfc = ReadingsNum ($name, "Today_Hour24_PVforecast", 0);
           storeReading ('LastHourPVforecast', "$pvfc Wh", $ts);
