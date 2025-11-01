@@ -97,7 +97,8 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
-  "0.9.6"  => "31.10.2025  One Base Message Übersetzung und Listen",
+  "0.9.7"  => "02.11.2025  order of lists fixed",
+  "0.9.6"  => "31.10.2025  One Base Message lists and translations",
   "0.9.5"  => "15.10.2025  Fix duplicate timer in case of password update (getCode)",
   "0.9.4"  => "15.10.2025  More logging for timers",
   "0.9.3"  => "15.10.2025  URL to dev portal updated",
@@ -4187,7 +4188,12 @@ sub vitoconnect_getErrorCode {
     };
   }
 
-  @entries = sort { $b->{timestamp} cmp $a->{timestamp} } @entries;
+  # Sort entries by timestamp descending using epoch
+  @entries = sort {
+    my $a_epoch = eval { Time::Piece->strptime($a->{timestamp}, "%d.%m.%Y %H:%M:%S")->epoch } || 0;
+    my $b_epoch = eval { Time::Piece->strptime($b->{timestamp}, "%d.%m.%Y %H:%M:%S")->epoch } || 0;
+    $b_epoch <=> $a_epoch;
+  } @entries;
 
   my %grouped;
   foreach my $entry (@entries) {
@@ -4228,7 +4234,15 @@ sub vitoconnect_getErrorCode {
       $existing_map{$key} = "$entry->{timestamp} - $entry->{code} - $entry->{text}" unless exists $existing_map{$key};
     }
 
-    my @final = sort { $b cmp $a } values %existing_map;
+    # Final sort by timestamp descending using epoch
+    my @final = sort {
+      my ($a_ts) = ($a =~ /^(\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})/);
+      my ($b_ts) = ($b =~ /^(\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})/);
+      my $a_epoch = eval { Time::Piece->strptime($a_ts, "%d.%m.%Y %H:%M:%S")->epoch } || 0;
+      my $b_epoch = eval { Time::Piece->strptime($b_ts, "%d.%m.%Y %H:%M:%S")->epoch } || 0;
+      $b_epoch <=> $a_epoch;
+    } values %existing_map;
+
     my $joined = join("\n", @final) . "\n";
     readingsBulkUpdate($hash, "device.messages.$type.list", $joined);
   }
