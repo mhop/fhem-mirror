@@ -40,17 +40,17 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Math::Trig;
 use List::Util qw(sum min max shuffle);
 use Scalar::Util qw(blessed weaken);
-
-eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
-eval "use FHEM::Utility::CTZ qw(:all);1;" or my $ctzAbsent     = 1;                  ## no critic 'eval'
-#use Test::Memory::Usage;                                                            # https://metacpan.org/pod/Test::Memory::Usage
-
 use Encode;
 use Color;
 use utf8;
 use HttpUtils;
-eval "use JSON;1;"                        or my $jsonabs = 'JSON';                   ## no critic 'eval' # cpan install JSON
-eval "use AI::DecisionTree;1;"            or my $aidtabs = 'AI::DecisionTree';       ## no critic 'eval' # cpan install AI::DecisionTree
+
+eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
+eval "use FHEM::Utility::CTZ qw(:all);1;" or my $ctzAbsent     = 1;                  ## no critic 'eval'
+#use Test::Memory::Usage;                                                            # https://metacpan.org/pod/Test::Memory::Usage
+eval "use JSON;1;"                        or my $jsonabs      = 'JSON';              ## no critic 'eval' # cpan install JSON
+eval "use AI::DecisionTree;1;"            or my $aidtabs      = 'AI::DecisionTree';  ## no critic 'eval' # cpan install AI::DecisionTree
+eval "use Digest::SHA qw(sha1_hex);1;"    or my $digestAbsent = 'Digest::SHA';       ## no critic 'eval'
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                            # Error Code Modul
 use FHEM::SynoModules::SMUtils qw (checkModVer
@@ -160,14 +160,16 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.60.0" => "30.10.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
+  "1.60.0" => "01.11.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
                            "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
                            "__batChargeOptTargetPower: use an average for the charging power if smartPower set and charging target are not achievable ".
                            "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
                            "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add PV share calculation ".
                            "___doPlanning: code improvements and implement PV share needed ".
                            " Task 2: chamge timestamp of day before to 24:00:00, _restorePlantConfig: fix problem with attr sequence ".
-                           "_setreset: set reset is reworked with widgetList, aiData can be deleted by index ",
+                           "_setreset: set reset is reworked with widgetList, aiData can be deleted by index ".
+                           "_flowGraphic: new variable node2home_direction  ".
+                           "new sub askLogtime to avoid error logs too often, Forum: https://forum.fhem.de/index.php?msg=1350716 ",
   "1.59.5" => "15.10.2025  new sub ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
                            "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
   "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
@@ -1650,6 +1652,7 @@ my %hfspvh = (
 # $data{$name}{batteries}                                                     # temporärer Speicher Battery Daten
 # $data{$name}{weatherdata}                                                   # temporärer Speicher Wetterdaten
 # $data{$name}{func}                                                          # temporäre interne Funktionen
+# $data{$name}{log}                                                           # Logsperrhash
 # $data{$name}{dwdcatalog}                                                    # temporärer Speicher DWD Stationskatalog
 # $data{$name}{strings}                                                       # temporärer Speicher Stringkonfiguration
 # $data{$name}{aidectree}{object}                                             # AI Decision Tree Object (im BlockingCall)
@@ -9683,6 +9686,13 @@ sub _specialActivities {
           __createAdditionalEvents ($paref);                                                   # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
           __delObsoleteAPIData     ($paref);                                                   # Bereinigung obsoleter Daten im solcastapi Hash
 
+          my $ttl    = 24 * 3600;                                                              # Logsperrhash: Lebenszeit eines Eintrags bevor er entfernt wird
+          my $cutoff = $t - $ttl;                                                              
+        
+          for my $sh1 (keys %{ $data{$name}{log} }) {                                          # Logsperrhash bereinigen
+              delete $data{$name}{log}{$sh1} if($data{$name}{log}{$sh1}{ts} // 0 < $cutoff);
+          }
+    
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
       }
   }
@@ -12437,7 +12447,7 @@ sub ___batAdjustPowerByMargin {
   return ($limpower * (1 + $otpMargin / 100), $ratio) if($limpower == 0 || !$otpMargin || $ratio >= 100 + $otpMargin); 
 
   if ($ratio <= 100) {
-      $pow = $ratio <= 50 ? $pinmax : $limpower * (1 + $otpMargin / 100);
+      $pow = $pinmax;
   }
   else {
       $pow = $pinmax - ($pinmax - $limpower) * ($ratio - 100) / $otpMargin;
@@ -13113,7 +13123,7 @@ sub __getAutomaticState {
   my $auto   = 1;
   $auto      = ReadingsVal ($dswitch, $autord, 1) if($autord);                         # Reading für Ready-Bit -> Einschalten möglich ?
 
-  $data{$name}{consumers}{$c}{auto} = $auto;                                    # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus
+  $data{$name}{consumers}{$c}{auto} = $auto;                                           # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus
 
 return;
 }
@@ -14008,7 +14018,7 @@ sub ___switchConsumerOn {
 
   if ($err) {
       $state = 'ERROR - '.$err;
-      Log3 ($name, 1, "$name - $state");
+      Log3 ($name, 1, "$name - $state") if(askLogtime ($name, $err));
       return $state;
   }
 
@@ -19188,11 +19198,12 @@ END1
   ## Laufketten Node->Home, Node->Grid, Bat->Home
   #################################################
   my $node2home_style        = $node2home        ? "$stna active_normal" : "$stna inactive";
+  my $node2home_direction    = $node2home < 0    ? "M700,580 L700,400"   : "M700,400 L700,580";       
   my $node2gridMetered_style = $node2gridMetered ? "$stna active_normal" : "$stna inactive";
 
   $ret .= << "END2";
   <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-  <path id="node2home_$stna" class="$node2home_style" d="M700,400 L700,580" />
+  <path id="node2home_$stna" class="$node2home_style" d="$node2home_direction" />  
   <path id="node2grid_$stna" class="$node2gridMetered_style" d="M670,400 L250,480" />
   <path id="grid2home_$stna" class="$grid2home_style" d="$gconMetered_direction" />
 END2
@@ -23109,7 +23120,7 @@ sub determSurplus {
 
       if ($err) {
           $fallback = 1;
-          Log3 ($name, 1, qq{$name - ERROR of consumer $c key 'surpmeth':  $err (fall back to default Surplus determination)});
+          Log3 ($name, 1, qq{$name - ERROR of consumer $c key 'surpmeth':  $err (fall back to default Surplus determination)}) if(askLogtime ($name, $err));
       }
       else {
           $surplus = ReadingsNum ($dv, $rd, '');
@@ -23517,6 +23528,47 @@ sub debugLog {
 return;
 }
 
+################################################################
+#  Ausgabe einer Log-Message nach Zeit erlauben. 
+#  Gibt "wahr" zurück wenn die Message noch nicht oder vor
+#  längerer Zeit als $delay Sekunden ausgegeben wurde
+#
+#  delay => Sek. bis gleiche Meldung wieder geloggt werden darf
+#           (default 600)
+################################################################
+sub askLogtime {                            
+    my $name  = shift;
+    my $err   = shift;
+    my $delay = shift // 600;
+    
+    return if(!$err);
+    
+    my $dolog = 1;
+    
+    if ($digestAbsent) {
+        Log3 ($name, 1, "$name - ERROR - The Perl module $digestAbsent is missing. Please install it"); 
+        return $dolog;        
+    }
+
+    my $now           = time;
+    $data{$name}{log} = {} unless ref $data{$name}{log} eq 'HASH';                           # sicherstellen, dass Struktur existiert
+    my $sha1          = sha1_hex ($err);
+
+    if (my $entry = $data{$name}{log}{$sha1}) {
+        $entry->{msg} = $err unless defined $entry->{msg} && $entry->{msg} eq $err;          # falls der gespeicherte Text aus irgendeinem Grund anders ist, aktualisiere ihn
+        
+        if ($entry->{ts} && $entry->{ts} + $delay > $now) {
+            $dolog = 0;                                                                      # noch innerhalb der Drosselzeit -> nicht loggen
+        }
+    }
+
+    if ($dolog) { 
+        $data{$name}{log}{$sha1} = { ts => $now, msg => $err };                              # Eintrag aktualisieren / anlegen wenn log erlaubt ist
+    } 
+    
+return $dolog;
+}
+
 ##################################################################
 # Konvertiert Azimut von der Solar-Konvention (+180 .. 0 .. -180) 
 # in die astronomische Konvention (0 ... 360°)
@@ -23734,7 +23786,7 @@ sub getConsumerPlanningMode {
   my ($err)     = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );
 
   if ($err) {
-      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to 'DEFCMODE' mode.});
+      Log3 ($name, 1, "$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to ".DEFCMODE." mode.") if(askLogtime ($name, $err));
       return DEFCMODE;
   }
 
@@ -23943,7 +23995,7 @@ sub isConsumerPhysOn {
   my ($err, $cname, $dswname) = getCDnames ($hash, $c);                  # Consumer und Switch Device Name
 
   if ($err) {
-      Log3 ($name, 1, "$name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err") if(askLogtime ($name, $err));
       return 0;
   }
 
@@ -23970,7 +24022,7 @@ sub isConsumerPhysOff {
   my ($err, $cname, $dswname) = getCDnames ($hash, $c);                  # Consumer und Switch Device Name
 
   if ($err) {
-      Log3 ($name, 1, "$name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err") if(askLogtime ($name, $err));
       return 0;
   }
 
@@ -24003,7 +24055,7 @@ sub isConsumerLogOn {
   my ($err) = isDeviceValid ( { name => $name, obj => $cname, method => 'string' } );
 
   if ($err) {
-      Log3 ($name, 1, qq{$name - ERROR - The consumer device '$cname' is invalid. The 'on'-state can't be identified.});
+      Log3 ($name, 1, qq{$name - ERROR - The consumer device '$cname' is invalid. The 'on'-state can't be identified.}) if(askLogtime ($name, $err));
       return 0;
   }
 
@@ -24664,13 +24716,13 @@ sub isDeviceValid {
 
   if (!$dv || !$defs{$dv}) {
       $dv //= '';
-      $err  = qq{The device '$dv' doesn't exist or is not a valid device.};
-      $err  = qq{There is no device set. Check the syntax with the command reference.}            if(!$dv);
-      $err  = qq{The device '$dv' doesn't exist anymore! Delete or change the attribute '$obj'.}  if(!$defs{$dv} && $method eq 'attr' && $obj =~ /consumer/);
+      $err  = qq{The device '$dv' doesn't exist or is not a valid device};
+      $err  = qq{There is no device set. Check the syntax with the command reference}            if(!$dv);
+      $err  = qq{The device '$dv' doesn't exist anymore! Delete or change the attribute '$obj'}  if(!$defs{$dv} && $method eq 'attr' && $obj =~ /consumer/);
   }
 
   if ($err) {
-      Log3 ($name, 1, "$name - ERROR - $err");
+      Log3 ($name, 1, "$name - ERROR - $err") if(askLogtime ($name, $err));
   }
 
   if ($al) {                                                                   # Leerzeichen im SF-Alias generieren
@@ -24886,7 +24938,8 @@ sub lastConsumerSwitchtime {
   my ($err, $cname, $dswname) = getCDnames ($hash, $c);                        # Consumer und Switch Device Name
 
   if ($err) {
-      Log3 ($name, 1, qq{$name - ERROR - The last switching time can't be identified due to the device '$dswname' is invalid. Please check device names in consumer "$c" attribute});
+      Log3 ($name, 1, qq{$name - ERROR - The last switching time can't be identified due to the device '$dswname' is invalid. 
+                         Please check device names in consumer "$c" attribute}) if(askLogtime ($name, $err));
       return;
   }
 
@@ -31673,6 +31726,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "Blocking": 0,
         "Color": 0,
         "utf8": 0,
+        "Digest::SHA": 0,
         "HttpUtils": 0,
         "JSON": 4.020,
         "FHEM::SynoModules::SMUtils": 1.0270,
