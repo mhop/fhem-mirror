@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 98_vitoconnect: order of lists fixed
  - feature: 76_SolarForecast: Version 1.60.0
  - feature: 98_vitoconnect: Message Übersetzung und Listen auch One Base 
  - bugfix: 72_FRITZBOX: docsis überarbeitet
