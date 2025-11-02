@@ -12391,9 +12391,9 @@ sub __batChargeOptTargetPower {
                                                       );         
           }
           
-          $pneedmin = sprintf "%.0f", $pneedmin;
           $pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
           $pneedmin = max ($pneedmin, 0);
+          $pneedmin = sprintf "%.0f", $pneedmin;
           
           $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin;                                               
                
@@ -12427,12 +12427,12 @@ sub __batChargeOptTargetPower {
               if ( !$bpin && $gfeedin > $fipl )           {$inc = $gfeedin - $fipl}                              # Ladeleistung wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
               if (  $bpin && ($gfeedin - $bpin) > $fipl ) {$inc = $bpin + (($gfeedin - $bpin) - $fipl)}          # Ladeleistung wenn akt. Bat-Ladung UND Einspeisung - Bat-Ladung > Einspeiselimit der Anlage
               
-              my $lowph = $csocwh <= $lowSocwh 
+              my $limph = $csocwh <= $lowSocwh 
                           ? $bpinreduced 
                           : $bpinmax;
                         
               $target = max ($target, $inc);                                                                     # Einspeiselimit berücksichtigen              
-              $target = min ($target, $lowph);                                                                   # Begrenzung auf diverse Limits 
+              $target = min ($target, $limph);                                                                   # Begrenzung auf diverse Limits 
               $target = sprintf "%.0f", $target;
               
               $otp->{$sbn}{target} = $target;
@@ -12442,13 +12442,12 @@ sub __batChargeOptTargetPower {
           ###################
           if ($nhr eq '00') { $diff = $otp->{$sbn}{target} / 60 * (60 - int $minute) }                           # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
           else              { $diff = min ($spls, $hsurp->{$hod}{$sbn}{pneedmin}) }                              # kleinster Wert aus PV-Überschuß oder Ladeleistungsbegrenzung
-          
-          $diff  = sprintf "%.0f", $diff;
-          
-          $runwh = min ($goalwh, $runwh + $diff * $befficiency);                                                 # Endwert Prognose        
+                    
+          $runwh = min ($goalwh, $runwh + ($diff * $befficiency));                                               # Endwert Prognose        
           $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen
+          $runwh = sprintf "%.0f", $runwh;
           
-          $hsurp->{$hod}{$sbn}{fcendwh}      = sprintf ("%.0f", $runwh);
+          $hsurp->{$hod}{$sbn}{fcendwh}      = $runwh;
           $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);               # Startwert kommende Stunde  
       }
   }
