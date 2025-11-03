@@ -170,6 +170,8 @@
 # 6.04.3    new: Shelly Pro2 UL-type added
 #           fix: do not set gain to 100% on set hsv|rgb. 
 # 6.04.4    fix: accept set rgbw .. (ShellyPlusRGBWpm)
+# 6.04.5    new: add "less than an hour" to uptime reading
+#           fix: do not format incoming values als float for set power ... etc.
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -194,7 +196,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.04.4 21.10.2025";
+my $version = "6.04.5 03.11.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -203,7 +205,7 @@ my %shelly_firmware = (  # latest known versions  # as of 29.08.2024
     # used by sub Shelly_firmwarecheck
     "gen1"        => "1.14.0",   # v1.14.1-rc1
     "shelly4"     => "1.6.6",
-    "gen2"        => "1.7.0",  
+    "gen2"        => "1.7.1",  
     "walldisplay" => "2.3.6"
     );
 
@@ -2435,11 +2437,10 @@ sub Shelly_Set ($@) {
              }
              if( $channel =~ /\D/ || $channel >= $channels ){ # check if channel is anything else than a digit or wrong number
                  Shelly_error_handling($hash,"Shelly_Set","Wrong channel <$channel> for command <$cmd>",1);
-             }elsif( $value !~ /[0-9.]/ ){ # check if value is a number
+             }elsif( $value !~ /^[+-]?[0-9.]+$/ ){ # check if value is a number (may have two dots)
                  Shelly_error_handling($hash,"Shelly_Set","Wrong value <$value> for command <$cmd>",1);
              }else{
                  $subs = $channels>1?"_".$channel:"" ;
-                 $value = sprintf( "%5.2f", $value ); ## %5.1f
                  Shelly_readingsBulkUpdate($hash,$signal.$subs,$value,$signal);
              }
           }
@@ -2454,17 +2455,17 @@ sub Shelly_Set ($@) {
           $reading .='_pushed' if( $signal eq "Active_Power" );
           $reading .= $mapping{ps}{$suffix}{$isWhat.'_'};
           if( $signal eq "Active_Power" ){
-          # save pushed active power value of a single phase for later calculation of total value
-          # these values are overwritten by regular updates @ interval
-          $hash->{helper}{"$isWhat\_Active_Power"}=$value;
+              # save pushed active power value of a single phase for later calculation of total value
+              # these values are overwritten by regular updates @ interval
+              $hash->{helper}{"$isWhat\_Active_Power"}=$value;
+ 
+              $value = sprintf( "%5.1f%s", $value, $si_units{power}[$hash->{units}] );
+              readingsBulkUpdateMonitored($hash,$reading,$value );
 
-          $value = sprintf( "%5.1f%s", $value, $si_units{power}[$hash->{units}] );
-          readingsBulkUpdateMonitored($hash,$reading,$value );
-
-          $reading = $mapping{pr}{$suffix}{'total_'} . "Active_Power_pushed" . $mapping{ps}{$suffix}{'total_'};
-          # calculate total value out of pushed and regular values
-          $value = $hash->{helper}{a_Active_Power}+$hash->{helper}{b_Active_Power}+$hash->{helper}{c_Active_Power};
-          $value = sprintf("%5.1f%s", $value, $si_units{power}[$hash->{units}] );
+              $reading = $mapping{pr}{$suffix}{'total_'} . "Active_Power_pushed" . $mapping{ps}{$suffix}{'total_'};
+              # calculate total value out of pushed and regular values
+              $value = $hash->{helper}{a_Active_Power}+$hash->{helper}{b_Active_Power}+$hash->{helper}{c_Active_Power};
+              $value = sprintf("%5.1f%s", $value, $si_units{power}[$hash->{units}] );
           }else{  ##  $signal eq "Voltage" || "Current"
               $value = sprintf("%8.3f%s", $value, $si_units{ lc($signal) }[$hash->{units}] );
           }
@@ -7409,7 +7410,8 @@ sub Shelly_readingsBulkUpdate($$$@){ # derived from fhem.pl readingsBulkUpdateIf
              elsif( $seconds > 192800 )  { $num = int($seconds/86400); # 24 hrsm per day
                                            $value .= " (more than $num days)"; }
              elsif( $seconds > 86400 )   { $value .= " (more than a day)"; }
-             else                        { $value .= " (less than a day)"; } # don't worry if it is exactly a day
+             elsif( $seconds >= 3600 )   { $value .= " (less than a day)"; }
+             else                        { $value .= " (less than an hour)"; } # don't worry if it is exactly a day
              $value .= ", last reboot at ".FmtDateTime(time()-$seconds);
         }elsif( AttrVal($name,"showunits","none") ne "none" ){
             $value .= $si_units{$unit}[1];  # add a si-units string to the reading
