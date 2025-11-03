@@ -916,6 +916,30 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_Water_Leak_Sensor
 setreading DEVICE attrTemplateVersion 20200904
 
+#contributed by dadoc
+name:zigbee2mqtt_Soil_Moisture_Sensor
+desc: Soil Moisture sensor via zigbee2mqtt <br>Tested with: Coolo Soil moisture sensor sensor CS-201Z
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_10a
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to weather_pollen;{ AttrVal("DEVICE","icon","weather_pollen") }
+attr DEVICE icon ICON
+attr DEVICE stateFormat {sprintf ("Temp.: %.1f°C Hum.: %.1f%% Alert: %s Moisture: %.1f", ReadingsVal($name,"temperature",0), ReadingsVal($name,"humidity",0), ReadingsVal($name,"dry",0), ReadingsVal($name,"soil_moisture",0)) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList \
+  temperature_unit:celsius,fahrenheit $\DEVICETOPIC/set {"temperature_unit":"$EVTPART1"}\
+  temperature_calibration:slider,-2,0.1,2,1 $\DEVICETOPIC/set {"temperature_calibration":$EVTPART1}\
+  humidity_calibration:slider,-30,1,30 $\DEVICETOPIC/set {"humidity_calibration":$EVTPART1}\
+  soil_calibration:slider,-30,1,30 $\DEVICETOPIC/set {"soil_calibration":$EVTPART1}\
+  temperature_sampling:slider,5,1,3600 $\DEVICETOPIC/set {"temperature_sampling":$EVTPART1}\
+  soil_sampling:slider,5,1,3600 $\DEVICETOPIC/set {"soil_sampling":$EVTPART1}\
+  soil_warning:slider,0,1,100 $\DEVICETOPIC/set {"soil_warning":$EVTPART1}
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE model zigbee2mqtt_Soil_Moisture_Sensor
+setreading DEVICE attrTemplateVersion 20251101
+
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:zigbee2mqtt_Light_Switch
 desc: Smart light switch 2btn via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG02LM 2btn Smart Light Switch
