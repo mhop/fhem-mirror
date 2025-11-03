@@ -12319,17 +12319,19 @@ sub __batChargeOptTargetPower {
           ## Ziel und dessen Erreichbarkeit
           ###################################
           my $goalwh     = $hsurp->{$hod}{$sbn}{goalwh};                                                         # Ladeziel 
-          my $runwhneed  = $goalwh - $runwh; 
+          my $runwhneed  = ($goalwh - $runwh) / $befficiency;  
           my $achievable = 1;
             
-          if ($runwhneed > 0 && $remainingSurp * $befficiency < $runwhneed) {                                    # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
+          if ($runwhneed > 0 && $remainingSurp < $runwhneed) {                                                   # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
           }
           
           storeReading ('Battery_TargetAchievable_'.$sbn, $achievable) if($nhr eq '00');
           
           $hsurp->{$hod}{$sbn}{loadrel}    = $runwhneed > 0 ? 1 : 0;                                             # Ladefreigabe abhängig von Ziel-SoC Erfüllung
-          $hsurp->{$hod}{$sbn}{achievelog} = "charging target: $goalwh Wh, remaining: ".(sprintf "%.0f", $runwhneed).' Wh -> target likely achievable? '.($achievable ? 'yes' : 'no'); 
+          $hsurp->{$hod}{$sbn}{achievelog} = "charging target: $goalwh Wh, remaining: ".
+		                                     (sprintf "%.0f", ($runwhneed * $befficiency)).' Wh -> target likely achievable? '.
+											 ($achievable ? 'yes' : 'no'); 
           
           ## kein Überschuß
           ###################
