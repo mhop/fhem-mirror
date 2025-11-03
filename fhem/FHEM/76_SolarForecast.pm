@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
   "1.60.0" => "01.11.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
                            "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
@@ -12340,11 +12341,14 @@ sub __batChargeOptTargetPower {
               if ($nhr eq '00') {
                   $diff                = $diff / 60 * (60 - int $minute);                                        # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungsabfluß
                   $otp->{$sbn}{ratio}  = 0;
-                  $otp->{$sbn}{target} = $csocwh <= $lowSocwh 
-                                         ? $bpinreduced 
-                                         : $csocwh <= $barrierSoCWh
-                                         ? $bpinmax
-                                         : $bpinmax;
+                  $otp->{$sbn}{target} = ___batApplySocAreas ( { target    => $bpinmax,                          # Ladeleistung zur Einordnung
+                                                                 soc       => $csocwh,                           # aktueller SoC in Wh
+                                                                 low       => $lowSocwh,                         # lowSoC in Wh
+                                                                 lowph     => $bpinreduced,                      # Ladeleistung bei SoC < lowSoC
+                                                                 barrier   => $barrierSoCWh,                     # Barriere SoC in Wh
+                                                                 barrierph => $bpinmax                           # Ladeleistung im Bereich lowSoC <= SoC < barrierSoC  
+                                                               } 
+                                                             );
               }
               
               $runwh += $diff / $befficiency;                                                                    # um Verbrauch reduzieren
@@ -12368,6 +12372,9 @@ sub __batChargeOptTargetPower {
                                                 befficiency   => $befficiency
                                               }
                                             );
+          
+          $hsurp->{$hod}{$sbn}{frefph} = $fref->{ph};
+          
           my $limpower  = $strategy eq 'optPower'
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
                           : $fref->{ph};                                                                         
@@ -12375,8 +12382,6 @@ sub __batChargeOptTargetPower {
           $limpower     = $limpower // 0 > 0 ? $limpower / $befficiency : 0;                                     # Zielleistung mit Batterie Effizienzgrad erhöhen
           $limpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
           $limpower     = max ($limpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen                  
-          
-          $hsurp->{$hod}{$sbn}{frefph} = $fref->{ph};
           
           ## Prognose
           ############
@@ -12393,6 +12398,15 @@ sub __batChargeOptTargetPower {
           
           $pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
           $pneedmin = max ($pneedmin, 0);
+          $pneedmin = ___batApplySocAreas ( { target    => $pneedmin,                                            # Ladeleistung zur Einordnung
+                                              soc       => $csocwh,                                              # aktueller SoC in Wh
+                                              low       => $lowSocwh,                                            # lowSoC in Wh
+                                              lowph     => $bpinreduced,                                         # Ladeleistung bei SoC < lowSoC
+                                              barrier   => $barrierSoCWh,                                        # Barriere SoC in Wh
+                                              barrierph => $bpinmax                                              # Ladeleistung im Bereich lowSoC <= SoC < barrierSoC  
+                                            } 
+                                          );
+                      
           $pneedmin = sprintf "%.0f", $pneedmin;
           
           $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin;                                               
@@ -12427,12 +12441,16 @@ sub __batChargeOptTargetPower {
               if ( !$bpin && $gfeedin > $fipl )           {$inc = $gfeedin - $fipl}                              # Ladeleistung wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
               if (  $bpin && ($gfeedin - $bpin) > $fipl ) {$inc = $bpin + (($gfeedin - $bpin) - $fipl)}          # Ladeleistung wenn akt. Bat-Ladung UND Einspeisung - Bat-Ladung > Einspeiselimit der Anlage
               
-              my $limph = $csocwh <= $lowSocwh 
-                          ? $bpinreduced 
-                          : $bpinmax;
-                        
               $target = max ($target, $inc);                                                                     # Einspeiselimit berücksichtigen              
-              $target = min ($target, $limph);                                                                   # Begrenzung auf diverse Limits 
+              $target = ___batApplySocAreas ( { target    => $target,                                            # Ladeleistung zur Einordnung
+                                                soc       => $csocwh,                                            # aktueller SoC in Wh
+                                                low       => $lowSocwh,                                          # lowSoC in Wh
+                                                lowph     => $bpinreduced,                                       # Ladeleistung bei SoC < lowSoC
+                                                barrier   => $barrierSoCWh,                                      # Barriere SoC in Wh
+                                                barrierph => $bpinmax                                            # Ladeleistung im Bereich lowSoC <= SoC < barrierSoC  
+                                              } 
+                                            );                        
+              
               $target = sprintf "%.0f", $target;
               
               $otp->{$sbn}{target} = $target;
@@ -12517,6 +12535,29 @@ sub ___batClampValue {
            $value; 
 
 return $value;
+}
+
+################################################################
+#    die Ladecharacteristiken und Limits den SoC-Bereichen
+#    zuweisen bzw. mappen
+################################################################            
+sub ___batApplySocAreas {
+  my $paref = shift;
+  
+  my $target    = $paref->{target};
+  my $soc       = $paref->{soc};
+  my $low       = $paref->{low};
+  my $lowph     = $paref->{lowph};
+  my $barrier   = $paref->{barrier};
+  my $barrierph = $paref->{barrierph};
+ 
+  my $ph = $soc < $low 
+           ? $lowph 
+           : $soc < $barrier
+           ? $barrierph
+           : $target;
+
+return $ph;
 }
 
 ###############################################################################################
