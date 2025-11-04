@@ -1,3 +1,4 @@
+
 # $Id$
 ##############################################################################
 #
@@ -33,7 +34,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "01.03d";
+my $ModulVersion = "01.03e";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -287,7 +288,6 @@ sub PRESENCE2_Define($$) {
         $hash->{helper}{updateConfig}      = $name . ".Initialize";
 
         use List::Util qw(pairmap);
-        my $hciDev = qx(hcitool dev);
 
         if   ($a[2] eq "lan-ping") {
             delete $attr{$name}{nonblockingTimeOut};
@@ -382,6 +382,8 @@ sub PRESENCE2_Define($$) {
                       . "prGroupDisp:condense,verbose "
                       . "FhemLog3Std:0,1 "
                       . "hcitoolParam:name,info ";
+
+            my $hciDev = qx(hcitool dev);
 
             if ($hciDev =~ /Devices:/) {
               $hciDev =~ s/\s+/ /g;
@@ -1894,7 +1896,6 @@ Options:
 
 <a name="PRESENCE2"></a>
 <h3>PRESENCE2</h3>
-<div>
 <ul>
   Das PRESENCE2-Modul bietet mehrere Möglichkeiten, die PRESENCE2-Geräte wie Mobiltelefone oder Tablets zu überprüfen.<br>
   Darüber hinaus können FHEM- oder Systemebene-Aktionen regelmäßig ausgeführt und analysiert werden<br>
@@ -2240,7 +2241,7 @@ Optionen:
     <u>Allgemein</u><br>
     <ul>
     <li><b>Status</b>: (absent|present|disabled) – Der Status des Geräts, Prüffehler oder „deaktiviert“, wenn das Attribut <a href="#PRESENCE2_disable">disable</a> ist aktiviert</li>
-    <li><b>PRESENCE2</b>: (abwesend|vielleicht abwesend|vorhanden|vielleicht vorhanden) – Der PRESENCE2-Status des Geräts. Der Wert „vielleicht abwesend“ tritt nur auf, wenn <a href="#PRESENCE2_thresholdAbsence">thresholdAbsence</a> aktiviert ist.</li>
+    <li><b>PRESENCE2</b>: (absent|maybe absent|present|maybe present) – Der PRESENCE2-Status des Geräts. Der Wert „maybe absent“ tritt nur auf, wenn <a href="#PRESENCE2_thresholdAbsence">thresholdAbsence</a> aktiviert ist.</li>
     <li><b>appearCnt</b>: Anzahl der verfügbaren Eingaben</li>
     <li><b>lastAppear</b>: Zeitstempel des letzten Erscheinens</li>
     <li><b>lastDisappear</b>: Zeitstempel des letzten Verschwindens</li>
@@ -2264,7 +2265,6 @@ Optionen:
     </ul><br><br>
   </ul>
 </ul>
-</div>
 
 =end html_DE
 
