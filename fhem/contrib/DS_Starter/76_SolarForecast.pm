@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.60.3" => "03.11.2025  more preparation for barrierSoC ",
   "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
   "1.60.0" => "01.11.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
@@ -7648,19 +7649,19 @@ sub _attrBatSocManagement {              ## no critic "not used"
                  if(!BatteryVal ($name, $bn, 'binstcap', 0));                    # https://forum.fhem.de/index.php?msg=1310930
 
   my $valid = {
-      lowSoc       => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
-      upSoC        => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
-      maxSoC       => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
-      barrierSoC   => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
-      stepSoC      => { comp => '[0-5]',                                                 must => 0, act => 0 },
-      careCycle    => { comp => '\d+',                                                   must => 0, act => 0 },
-      lcSlot       => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
-      careCycle    => { comp => '\d+',                                                   must => 0, act => 0 },
-      loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',      must => 0, act => 0 },
-      loadStrategy => { comp => '(loadRelease|optPower|smartPower)',                     must => 0, act => 0 },
-      loadTarget   => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
-      safetyMargin => { comp => '(?:100|[1-9]?\d)(?::(?:100|[1-9]?\d))?',                must => 0, act => 0 },
-      weightOwnUse => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
+      lowSoc       => { comp => '(?:100|[1-9][0-9]?)',                                               must => 1, act => 0 },
+      upSoC        => { comp => '(?:100|[1-9][0-9]?)',                                               must => 1, act => 0 },
+      maxSoC       => { comp => '(?:100|[1-9][0-9]?)',                                               must => 0, act => 0 },
+      barrierSoC   => { comp => '(?:0|[1-9]\d?|100):(?:set|inc|dec|prc):(?:-?\d+|[A-Za-z0-9_]+)',    must => 0, act => 0 },
+      stepSoC      => { comp => '[0-5]',                                                             must => 0, act => 0 },
+      careCycle    => { comp => '\d+',                                                               must => 0, act => 0 },
+      lcSlot       => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)',             must => 0, act => 1 },
+      careCycle    => { comp => '\d+',                                                               must => 0, act => 0 },
+      loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',                  must => 0, act => 0 },
+      loadStrategy => { comp => '(loadRelease|optPower|smartPower)',                                 must => 0, act => 0 },
+      loadTarget   => { comp => '(100|[1-9]?[0-9])',                                                 must => 0, act => 0 },
+      safetyMargin => { comp => '(?:100|[1-9]?\d)(?::(?:100|[1-9]?\d))?',                            must => 0, act => 0 },
+      weightOwnUse => { comp => '(100|[1-9]?[0-9])',                                                 must => 0, act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -7702,13 +7703,20 @@ sub _attrBatSocManagement {              ## no critic "not used"
 
       ## 2. Durchlauf - Endprüfung
       #############################
-      my $parsed = __parseAttrBatSoc ($name, $aVal);
-      my $lowSoc = $parsed->{lowSoc};
-      my $upSoc  = $parsed->{upSoc};
-      my $maxSoc = $parsed->{maxSoc};
-
-      if (!($lowSoc > 0 && $lowSoc < $upSoc && $upSoc < $maxSoc)) {
+      my $parsed     = __parseAttrBatSoc ($name, $aVal);
+      my $lowSoc     = $parsed->{lowSoc};
+      my $upSoc      = $parsed->{upSoc};
+      my $maxSoc     = $parsed->{maxSoc};
+      my $barrierSoc = $parsed->{barrierSoc};
+      
+      unless ($lowSoc < $upSoc && $upSoc < $maxSoc) {
           return 'The specified values are not plausible. Compare the attribute help.';
+      }
+      
+      if (defined $barrierSoc) {
+          unless ($lowSoc < $barrierSoc && $barrierSoc < $upSoc) {
+              return 'The specified values are not plausible. Compare the attribute help.';
+          }
       }
   }                                                             
   else {
@@ -11697,13 +11705,13 @@ sub __parseAttrBatSoc {
   my $name = shift;
   my $cgbt = shift // return;
 
-  my ($lrMargin, $otpMargin);
-  my ($pa, $ph)           = parseParams ($cgbt);
-  ($lrMargin, $otpMargin) = split ':', $ph->{safetyMargin} if(defined $ph->{safetyMargin});
+  my ($lrMargin, $otpMargin, $barrierSoC, $barrierVal);
+  my ($pa, $ph)              = parseParams ($cgbt);
+  ($lrMargin, $otpMargin)    = split (':', $ph->{safetyMargin})  if(defined $ph->{safetyMargin});
+  ($barrierSoC, $barrierVal) = split (':', $ph->{barrierSoC}, 2) if(defined $ph->{barrierSoC});
 
   my $parsed = {
       lowSoc       => $ph->{lowSoc},                                               
-      barrierSoC   => $ph->{barrierSoC},                                                  # SoC Barriere ab der eine Ladeleistungssteuerung aktiv sein soll
       upSoc        => $ph->{upSoC}, 
       maxSoc       => $ph->{maxSoC}    // MAXSOCDEF,                                      # optional (default: MAXSOCDEF)
       stepSoc      => $ph->{stepSoC}   // BATSOCCHGDAY,                                   # mögliche SoC-Änderung pro Tag
@@ -11715,6 +11723,8 @@ sub __parseAttrBatSoc {
       weightOwnUse => $ph->{weightOwnUse},      
       lrMargin     => $lrMargin,       
       otpMargin    => $otpMargin,
+      barrierSoc   => $barrierSoC,                                                        # SoC Barriere ab der eine Ladeleistungssteuerung aktiv sein soll
+      barrierVal   => $barrierVal,
   };
   
 return $parsed;
@@ -11875,17 +11885,18 @@ sub _batChargeMgmt {
       $strategy       = 'loadRelease';                                                             # 'loadRelease', 'optPower', 'smartPower'
       my $wou         = 0;                                                                         # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)     
       my $lowSoc      = 0;
-      my $barrierSoC  = 0;
+      my $barrierSoc  = 0;
       my $loadAbort   = '';
       my $goalwh      = $batinstcap;                                                               # initiales Ladeziel (Wh)
       my $lrMargin    = SFTYMARGIN_50;
       my $otpMargin   = SFTYMARGIN_20;                                                               
-      my $lcslot;
+      my ($lcslot, $barrierVal);
             
       if ($cgbt) {
           my $parsed  = __parseAttrBatSoc ($name, $cgbt);
           $lowSoc     = $parsed->{lowSoc}       // 0;
-          $barrierSoC = $parsed->{barrierSoC}   // $barrierSoC;                                    # SoC-Barriere, ab der die Ladesteuerung akitv sein soll 
+          $barrierSoc = $parsed->{barrierSoc}   // $barrierSoc;                                    # SoC-Barriere, ab der die Ladesteuerung akitv sein soll 
+          $barrierVal = $parsed->{barrierVal};                                                     # Aktion innerhalb der SoC Barriere
           $lcslot     = $parsed->{lcslot};
           $loadAbort  = $parsed->{loadAbort};
           $lrMargin   = $parsed->{lrMargin}     // $lrMargin;                                      # Sicherheitszuschlag LR (%)
@@ -11898,8 +11909,8 @@ sub _batChargeMgmt {
                         ? sprintf "%.0f", ___batSocPercentToWh ($batinstcap, $tgt) 
                         : $goalwh;                                                                 # Ladeziel-SoC in Wh
       }
-      
-      my $barrierSoCWh = sprintf "%.0f", ___batSocPercentToWh ($batinstcap, $barrierSoC);
+
+      my $barrierSocWh = sprintf "%.0f", ___batSocPercentToWh ($batinstcap, $barrierSoc);
       my $goalpercent  = sprintf "%.0f", ___batSocWhToPercent ($batinstcap, $goalwh);              # Ladeziel in %
 
       ## generelle Ladeabbruchbedingung evaluieren
@@ -11939,7 +11950,8 @@ sub _batChargeMgmt {
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - selected charging strategy: $strategy");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - General load termination condition: $labortCond");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control time Slot - Slot start: $lcstart, Slot end: $lcend");
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control barrier SoC - $barrierSoC % / $barrierSoCWh Wh");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control barrier SoC: $barrierSoc % / $barrierSocWh Wh");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control barrier Action: $barrierVal");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Battery efficiency used: ".($befficiency * 100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - weighted self-consumption: $wou %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - charging target: $goalpercent % / $goalwh Wh");
@@ -12027,7 +12039,7 @@ sub _batChargeMgmt {
           if ( $bpin && ($gfeedin - $bpin) > $feedinlim )    {$crel = 1}                         # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
           if ( !$cgbt )                                      {$crel = 1}                         # generelle Ladefreigabe wenn kein BatSoc/Lade-Management
           if ( !$lcintime )                                  {$crel = 1}                         # generelle Ladefreigabe wenn nicht innerhalb Zeitslot für Ladesteuerung
-          if ( $csocwh <= $barrierSoCWh)                     {$crel = 1}                         # generelle Ladefreigabe wenn aktueller SoC <= Barriere-SoC
+          if ( $csocwh <= $barrierSocWh)                     {$crel = 1}                         # generelle Ladefreigabe wenn aktueller SoC <= Barriere-SoC
           if ( $labortCond )                                 {$crel = 0}                         # keine Ladefreigabe bei genereller Abbruchbedingung 
           
           # Steuerhash für optimimierte Ladeleistung erstellen
@@ -12046,7 +12058,8 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{$bn}{bpinreduced}  = $bpinreduced;                             # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
               $hsurp->{$fd}{$hod}{$bn}{bpoutmax}     = $bpoutmax;                                # max. mögliche Entladeleistung
               $hsurp->{$fd}{$hod}{$bn}{lowSocwh}     = $lowSocwh;                                # eingestellter lowSoC in Wh
-              $hsurp->{$fd}{$hod}{$bn}{barrierSoCWh} = $barrierSoCWh;                            # eingestellter Barriere SoC in Wh
+              $hsurp->{$fd}{$hod}{$bn}{barrierSocWh} = $barrierSocWh;                            # eingestellter Barriere SoC in Wh
+              $hsurp->{$fd}{$hod}{$bn}{barrierVal}   = $barrierVal;                              # Aktion im Barriere SoC Bereich
               $hsurp->{$fd}{$hod}{$bn}{batoptsocwh}  = $batoptsocwh;                             # optimaler SoC in Wh
               $hsurp->{$fd}{$hod}{$bn}{csocwh}       = $csocwh;                                  # aktueller SoC in Wh
               $hsurp->{$fd}{$hod}{$bn}{otpMargin}    = $otpMargin;                               # Sicherheitszuschlag für Berechnungen
@@ -12295,7 +12308,8 @@ sub __batChargeOptTargetPower {
           my $lowSocwh     = $hsurp->{$hod}{$sbn}{lowSocwh};                                                     # eingestellter lowSoc in Wh
           my $batoptsocwh  = $hsurp->{$hod}{$sbn}{batoptsocwh};                                                  # optimaler SoC in Wh
           my $csocwh       = $hsurp->{$hod}{$sbn}{csocwh};                                                       # aktueller SoC in Wh
-          my $barrierSoCWh = $hsurp->{$hod}{$sbn}{barrierSoCWh};                                                 # Barriere SoC in Wh
+          my $barrierSocWh = $hsurp->{$hod}{$sbn}{barrierSocWh};                                                 # Barriere SoC in Wh
+          my $barrierVal   = $hsurp->{$hod}{$sbn}{barrierVal};                                                   # Aktion im Barriere SoC Bereich
           my $bpinreduced  = $hsurp->{$hod}{$sbn}{bpinreduced};                                                  # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
           my $befficiency  = $hsurp->{$hod}{$sbn}{befficiency};                                                  # Speicherwirkungsgrad
           my $strategy     = $hsurp->{$hod}{$sbn}{strategy};                                                     # Ladestrategie
@@ -12347,7 +12361,7 @@ sub __batChargeOptTargetPower {
                                                                  soc       => $csocwh,                           # aktueller SoC in Wh
                                                                  low       => $lowSocwh,                         # lowSoC in Wh
                                                                  lowph     => $bpinreduced,                      # Ladeleistung bei SoC < lowSoC
-                                                                 barrier   => $barrierSoCWh,                     # Barriere SoC in Wh
+                                                                 barrier   => $barrierSocWh,                     # Barriere SoC in Wh
                                                                  barrierph => $bpinmax                           # Ladeleistung im Bereich lowSoC <= SoC < barrierSoC  
                                                                } 
                                                              );
@@ -12371,7 +12385,8 @@ sub __batChargeOptTargetPower {
                                                 Ereq          => $runwhneed, 
                                                 replacement   => $replacement, 
                                                 achievable    => $achievable,
-                                                befficiency   => $befficiency
+                                                befficiency   => $befficiency,
+                                                minute        => $minute
                                               }
                                             );
           
@@ -12404,7 +12419,7 @@ sub __batChargeOptTargetPower {
                                               soc       => $csocwh,                                              # aktueller SoC in Wh
                                               low       => $lowSocwh,                                            # lowSoC in Wh
                                               lowph     => $bpinreduced,                                         # Ladeleistung bei SoC < lowSoC
-                                              barrier   => $barrierSoCWh,                                        # Barriere SoC in Wh
+                                              barrier   => $barrierSocWh,                                        # Barriere SoC in Wh
                                               barrierph => $bpinmax                                              # Ladeleistung im Bereich lowSoC <= SoC < barrierSoC  
                                             } 
                                           );
@@ -12448,7 +12463,7 @@ sub __batChargeOptTargetPower {
                                                 soc       => $csocwh,                                            # aktueller SoC in Wh
                                                 low       => $lowSocwh,                                          # lowSoC in Wh
                                                 lowph     => $bpinreduced,                                       # Ladeleistung bei SoC < lowSoC
-                                                barrier   => $barrierSoCWh,                                      # Barriere SoC in Wh
+                                                barrier   => $barrierSocWh,                                      # Barriere SoC in Wh
                                                 barrierph => $bpinmax                                            # Ladeleistung im Bereich lowSoC <= SoC < barrierSoC  
                                               } 
                                             );                        
@@ -12585,6 +12600,7 @@ sub ___batFindMinPhWh {
   my $replacement   = $paref->{replacement};
   my $achievable    = $paref->{achievable};
   my $befficiency   = $paref->{befficiency};
+  my $minute        = $paref->{minute};
     
   my @hods     = @$hodsref;
   my $low      = 0;                                                 
@@ -12609,11 +12625,15 @@ sub ___batFindMinPhWh {
       my $charged = 0;
         
       for my $hod (@hods) {
-          my $nhr   = $hsurp->{$hod}{nhr};
+          my $nhr = $hsurp->{$hod}{nhr};
           next if(!defined $nhr);
-          my $cap   = $nhr eq '00' ? int $replacement : $hsurp->{$hod}{surplswh};
+          my $cap = $hsurp->{$hod}{surplswh};                                        # Energie der Stunde zeitlich ungewichtet
+          
+          if ($nhr eq '00') { $cap = min ($mid, $cap) / 60 * (60 - int $minute)}     # Zeitgewichtung aktuelle Stunde
+          else              { $cap = min ($mid, $cap)}                               
+
           $cap     *= $befficiency;
-          $charged += min ($mid, $cap);
+          $charged += $cap;
       }
         
       $charged >= $Ereq ? ($high = $mid) : ($low = $mid);
