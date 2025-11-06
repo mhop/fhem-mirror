@@ -12417,8 +12417,6 @@ sub __batChargeOptTargetPower {
                                                       );         
           }
           
-          $pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
-          $pneedmin = max ($pneedmin, 0);
           $pneedmin = ___batApplySocAreas ( { name       => $name,
                                               target     => $pneedmin,                                           # Ladeleistung zur Einordnung
                                               soc        => $csocwh,                                             # aktueller SoC in Wh
@@ -12429,7 +12427,9 @@ sub __batChargeOptTargetPower {
                                               bpinmax    => $bpinmax                                              
                                             } 
                                           );
-                      
+
+          $pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
+          $pneedmin = max ($pneedmin, 0);                     
           $pneedmin = sprintf "%.0f", $pneedmin;
           
           $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin;                                               
@@ -12476,6 +12476,8 @@ sub __batChargeOptTargetPower {
                                               } 
                                             );                        
               
+              $target = min ($target, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
+              $target = max ($target, $bpinreduced); 
               $target = sprintf "%.0f", $target;
               
               $otp->{$sbn}{target} = $target;
@@ -12483,7 +12485,7 @@ sub __batChargeOptTargetPower {
 
           ## Fortschreibung
           ###################
-          if ($nhr eq '00') { $diff = $otp->{$sbn}{target} / 60 * (60 - int $minute) }                           # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
+          if ($nhr eq '00') { $diff = min ($spls, $otp->{$sbn}{target} / 60 * (60 - int $minute)) }              # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
           else              { $diff = min ($spls, $hsurp->{$hod}{$sbn}{pneedmin}) }                              # kleinster Wert aus PV-Überschuß oder Ladeleistungsbegrenzung
                     
           $runwh = min ($goalwh, $runwh + ($diff * $befficiency));                                               # Endwert Prognose        
@@ -12643,6 +12645,7 @@ sub ___batFindMinPhWh {
   my $eps      = 0.5;                                               # minimale Genauigkeit in Wh  (1e-3)
   my $max_iter = 100;                                               # Zwangsabbruch nach X Durchläufen
   my $loop     = 0;
+  my $cap;
                         
   if (!$achievable) {
       my $max_cap = max map { defined $hsurp->{$_}{nhr} && $hsurp->{$_}{nhr} eq '00'
@@ -12662,10 +12665,9 @@ sub ___batFindMinPhWh {
       for my $hod (@hods) {
           my $nhr = $hsurp->{$hod}{nhr};
           next if(!defined $nhr);
-          my $cap = $hsurp->{$hod}{surplswh};                                        # Energie der Stunde zeitlich ungewichtet
           
-          if ($nhr eq '00') { $cap = min ($mid, $cap) / 60 * (60 - int $minute)}     # Zeitgewichtung aktuelle Stunde
-          else              { $cap = min ($mid, $cap)}                               
+          if ($nhr eq '00') { $cap = min ($mid, $hsurp->{$hod}{surplswh}) / 60 * (60 - int $minute)}     # Zeitgewichtung aktuelle Stunde
+          else              { $cap = min ($mid, $hsurp->{$hod}{surplswh})}                               
 
           $cap     *= $befficiency;
           $charged += $cap;
@@ -30498,17 +30500,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                     </td><td><ul> prc - das Limit wird um einen prozentualen Wert / Readingswert geändert    </ul>           </td></tr>
 			<tr><td>                     </td><td><b>Wert</b> - der Wert (in W bzw. %) mit dem die Aktion ausgeführt wird                         </td></tr>
 			<tr><td>                     </td><td><b>Reading</b> - Reading im SF-Device welches den Wert für die Aktion enthält                   </td></tr>
-			<tr><td>                     </td><td><b>default</b> - der default-Wert wenn ein Reading angegeben ist                                </td></tr>
+			<tr><td>                     </td><td><b>default</b> - der default-Wert bei Angabe eines Readings                                     </td></tr>
 			<tr><td>                     </td><td><b>Beispiele</b> für einen barrierSoC von 40 %:                                                 </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:max  -> Limit wird auf setupBatteryDevXX->pinmax gesetzt                          </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:set:&lt;Reading&gt;:&lt;default&gt -> Limit auf den Wert &lt;Reading&gt; setzen   </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:set:1350 -> Limit wird auf 1350 W gesetzt                                         </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:inc:&lt;Reading&gt;:&lt;default&gt -> Limit um den Wert &lt;Reading&gt; erhöhen   </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:inc:200  -> Limit wird um 200 W erhöht                                            </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:dec:&lt;Reading&gt;:&lt;default&gt -> Limit um den Wert &lt;Reading&gt; verringern</td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:dec:100  -> Limit wird um 100 W verringert                                        </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt -> Limit um &lt;Reading&gt; Prozent ändern (+ erhöhen, - verringern) </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:prc:50   -> Limit um 50% ändern (+ erhöhen, - verringern)                         </td></tr>
+			<tr><td>                     </td><td>barrierSoC=40:max:-                              <b>-></b> Limit wird auf setupBatteryDevXX->pinmax gesetzt                  </td></tr>
+			<tr><td>                     </td><td>barrierSoC=40:set:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit auf den Wert &lt;Reading&gt; setzen                         </td></tr>
+			<tr><td>                     </td><td>barrierSoC=40:set:1350                           <b>-></b> Limit wird auf 1350 W gesetzt                                     </td></tr>
+			<tr><td>                     </td><td>barrierSoC=40:inc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um den Wert &lt;Reading&gt; erhöhen                         </td></tr>
+			<tr><td>                     </td><td>barrierSoC=40:inc:200                            <b>-></b> Limit wird um 200 W erhöht                                        </td></tr>
+			<tr><td>                     </td><td>barrierSoC=40:dec:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um den Wert &lt;Reading&gt; verringern                      </td></tr>
+			<tr><td>                     </td><td>barrierSoC=40:dec:100                            <b>-></b> Limit wird um 100 W verringert                                    </td></tr>
+			<tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um &lt;Reading&gt; Prozent ändern (+ erhöhen, - verringern) </td></tr>
+			<tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Limit um 50% ändern (+ erhöhen, - verringern)                     </td></tr>
 			<tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
             <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
