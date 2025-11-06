@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2025.11.06 v0.2.31 
+# - CHANGE:  Neue Check API URL cookielogin6
+#
 # 2024.01.26 v0.2.30
 # - CHANGE:  voice_reading auf neue API umgestellt
 # - FEATURE: Unterstützung A2UONLFQW0PADH Echo Show 8 Gen3
@@ -399,7 +402,7 @@
 # - CHANGE:  Reading version
 #
 # v0.0.22
-# - FEATURE: Attribut browser_useragent https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Attribute
+# - FEATURE: Attribut browser_useragent https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Attribute
 #
 # v0.0.21
 # - CHANGE:  Header
@@ -534,7 +537,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.30";
+my $ModulVersion     = "0.2.31";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -736,25 +739,25 @@ sub echodevice_Get($@) {
 		my $return = '<html><table align="" border="0" cellspacing="0" cellpadding="3" width="100%" height="100%" class="mceEditable"><tbody>';
 		$return   .= "<p><strong>Hilfe:</strong></p>";
 		$return   .= "<tr><td><strong>Dokumentation Modul&nbsp;&nbsp;&nbsp</strong></td><td><strong></strong></td></tr>";			
-		$return .= "<tr><td>"."Beschreibung"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice</td></tr>";
-		$return .= "<tr><td>"."Readings"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Readings' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Readings</td></tr>";
-		$return .= "<tr><td>"."Attribute"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Attribute' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Attribute</td></tr>";
-		$return .= "<tr><td>"."Set"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Set' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Set</td></tr>";
-		$return .= "<tr><td>"."Get"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Get' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Get</td></tr>";
-		$return .= "<tr><td>"."Medieninformationen ermitteln"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Medieninformationen_ermitteln' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Medieninformationen_ermitteln</td></tr>";
-		$return .= "<tr><td>"."Cookie_ermitteln"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Cookie_ermitteln' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Cookie_ermitteln</td></tr>";
-		$return .= "<tr><td>"."Loginmit Captcha"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Login_captcha' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Login_captcha</td></tr>";
-		$return .= "<tr><td>"."MP3 Playlisten"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#MP3_Playlisten' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#MP3_Playlisten</td></tr>";
-		$return .= "<tr><td>"."Amazon Stimmen"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#AWS_Konfiguration' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#AWS_Konfiguration</td></tr>";
+		$return .= "<tr><td>"."Beschreibung"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice</td></tr>";
+		$return .= "<tr><td>"."Readings"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Readings' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Readings</td></tr>";
+		$return .= "<tr><td>"."Attribute"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Attribute' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Attribute</td></tr>";
+		$return .= "<tr><td>"."Set"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Set' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Set</td></tr>";
+		$return .= "<tr><td>"."Get"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Get' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Get</td></tr>";
+		$return .= "<tr><td>"."Medieninformationen ermitteln"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Medieninformationen_ermitteln' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Medieninformationen_ermitteln</td></tr>";
+		$return .= "<tr><td>"."Cookie_ermitteln"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Cookie_ermitteln' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Cookie_ermitteln</td></tr>";
+		$return .= "<tr><td>"."Loginmit Captcha"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Login_captcha' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Login_captcha</td></tr>";
+		$return .= "<tr><td>"."MP3 Playlisten"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#MP3_Playlisten' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#MP3_Playlisten</td></tr>";
+		$return .= "<tr><td>"."Amazon Stimmen"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#AWS_Konfiguration' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#AWS_Konfiguration</td></tr>";
 		$return .= "<tr><td>&nbsp</td><td> </td></tr>";
 
 		$return .= "<tr><td><strong>Diverse Anleitungen</strong></td><td></td></tr>";
 		$return .= "<tr><td></td><td></td></tr>";
-		$return .= "<tr><td>"."Amazon ECHO TTS/POM"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/sonstiges/amazon-echo-tts-mp3s' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/sonstiges/amazon-echo-tts-mp3s</td></tr>";
-		$return .= "<tr><td>"."MPD Streamserver"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/sonstiges/mpd-streamserver' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/sonstiges/mpd-streamserver</td></tr>";
-		$return .= "<tr><td>"."MPD Web Frontend"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/sonstiges/mpd-webfrontend' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/sonstiges/mpd-webfrontend</td></tr>";
-		$return .= "<tr><td>"."IceCast2"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/sonstiges/icecast2' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/sonstiges/icecast2</td></tr>";
-		$return .= "<tr><td>"."NPM Login"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/modul-echodevice-npm' .'"'. "</a>https://mwinkler.jimdo.com/modul-echodevice-npm</td></tr>";
+		$return .= "<tr><td>"."Amazon ECHO TTS/POM"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/sonstiges/amazon-echo-tts-mp3s' .'"'. "</a>https://mwinklerblog.de/smarthome/sonstiges/amazon-echo-tts-mp3s</td></tr>";
+		$return .= "<tr><td>"."MPD Streamserver"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/sonstiges/mpd-streamserver' .'"'. "</a>https://mwinklerblog.de/smarthome/sonstiges/mpd-streamserver</td></tr>";
+		$return .= "<tr><td>"."MPD Web Frontend"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/sonstiges/mpd-webfrontend' .'"'. "</a>https://mwinklerblog.de/smarthome/sonstiges/mpd-webfrontend</td></tr>";
+		$return .= "<tr><td>"."IceCast2"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/sonstiges/icecast2' .'"'. "</a>https://mwinklerblog.de/smarthome/sonstiges/icecast2</td></tr>";
+		$return .= "<tr><td>"."NPM Login"."&nbsp;&nbsp;&nbsp;</td><td><a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/modul-echodevice-npm' .'"'. "</a>https://mwinklerblog.de/modul-echodevice-npm</td></tr>";
 		$return .= "<tr><td>&nbsp</td><td> </td></tr>";
 		
 		$return .= "<tr><td><strong>Forum</strong></td><td></td></tr>";
@@ -967,7 +970,7 @@ sub echodevice_Set($@) {
 	
 		$usage .= 'volume:slider,0,1,100 play:noArg pause:noArg next:noArg previous:noArg forward:noArg rewind:noArg shuffle:on,off repeat:on,off dnd:on,off volume_alarm:slider,0,1,100 ';
 		$usage .= 'info:Beliebig_Auf_Wiedersehen,Beliebig_Bestaetigung,Beliebig_Geburtstag,Beliebig_Guten_Morgen,Beliebig_Gute_Nacht,Beliebig_Ich_Bin_Zuhause,Beliebig_Kompliment,Erzaehle_Geschichte,Erzaehle_Was_Neues,Erzaehle_Witz,Kalender_Heute,Kalender_Morgen,Kalender_Naechstes_Ereignis,Nachrichten,Singe_Song,Verkehr,Wetter sounds:glocken,kirchenglocke,summer,tuerklingel_1,tuerklingel_2,tuerklingel_3,jubelnde_menschenmenge,publikumsapplaus,flugzeug,katastrophenalarm,motoren_an,schilde_hoch,sirenen,zappen,boing_1,boing_2,kamera,lufthupe,quitschende_tuer,tickende_uhr,trompete,hahn,hundegebell,katzenmauzen,loewengebruell,wolfsgeheul,gruselig_quitschende_tuer,weihnachtsglocken tunein primeplaylist primeplaysender primeplayeigene primeplayeigeneplaylist alarm_normal alarm_repeat reminder_normal reminder_repeat speak speak_ssml tts tts_translate:textField-long playownmusic:textField-long saveownplaylist:textField-long ';
-		$usage .= 'textcommand ';
+		$usage .= 'textcommand getsmarthome ';
 
 		$usage .= 'homescreen ' if ($hash->{model} eq "Echo Show 5" || $hash->{model} eq "Echo Show 8" || $hash->{model} eq "Echo Show" || $hash->{model} eq "Echo Show Gen2" || $hash->{model} eq "Echo Show Gen3"); 
 			
@@ -1040,6 +1043,10 @@ sub echodevice_Set($@) {
 	
 	if($command eq "NPM_install"){ 
 		return echodevice_NPMInstall($hash);
+	}
+
+	if($command eq "getsmarthome"){ 
+		echodevice_SendCommand($hash,"getsmarthome","");
 	}
 
 	if($command eq "NPM_login"){ 
@@ -1787,6 +1794,15 @@ sub echodevice_SendCommand($$$) {
 		$SendData   = '{"previousRequestToken": null}';
 	}
 
+	elsif ($type eq "customer-history-records") {
+		#$SendUrl    = "https://www.amazon.de/alexa-privacy/apd/rvh/customer-history-records/?startTime=0&endTime=2005090388459&recordType=VOICE_HISTORY&maxRecordSize=100";
+		$SendUrl    = "https://www.amazon.de/alexa-privacy/apd/rvh/customer-history-records-v2/?startTime=0&endTime=2005090388459&pageType=VOICE_HISTORY";
+		$SendMetode = "POST";
+		$SendDataL  = '{"previousRequestToken": null}';
+		$SendData   = '{"previousRequestToken": null}';
+	}	
+	
+
 	elsif ($type eq "csrfPageUrl") {
 		$SendUrl = "https://www.amazon.de/alexa-privacy/apd/activity?ref=activityHistory";
 		$SendMetode = "GET";
@@ -2100,14 +2116,7 @@ sub echodevice_SendCommand($$$) {
 		$SendDataL  = $SendData ;
 		$SendData   = "";
 	}
-	
-	elsif ($type eq "customer-history-records") {
-		$SendUrl    = "https://www.amazon.de/alexa-privacy/apd/rvh/customer-history-records/?startTime=0&endTime=2005090388459&recordType=VOICE_HISTORY&maxRecordSize=100";
-		$SendMetode = "GET";
-		$SendDataL  = "" ;
-		$SendData   = "";
-	}	
-	
+
 	elsif ($type eq "config_address_from" || $type eq "config_address_to" || $type eq "config_address_between") {
 		$SendUrl   .= "/api/traffic/settings";
 		$SendMetode = "POST";
@@ -2536,7 +2545,8 @@ sub echodevice_SendLoginCommand($$$) {
 	}
 	
 	if ($type eq "cookielogin6" ) {
-		$param->{url}         = "https://".$hash->{helper}{SERVER}."/api/bootstrap";
+		$param->{url}         = "https://".$hash->{helper}{SERVER}."/api/customer-status";
+		#$param->{url}         = "https://".$hash->{helper}{SERVER}."/api/bootstrap";
 		$param->{header}      = "User-Agent: ".$UserAgent."\r\nCookie: ".$hash->{helper}{'.COOKIE'};
 		$param->{callback}    = \&echodevice_ParseAuth;
 		$param->{noshutdown}  = 1;
@@ -4110,18 +4120,21 @@ sub echodevice_Parse($$$) {
 				foreach my $Voicerecords (@{$result->{voiceHistoryRecordItems}}) {
 				
 					next if ($Voicerecords->{recordItemType} eq "TTS_REPLACEMENT_TEXT") ;
+					next if ($Voicerecords->{recordItemType} eq "ALEXA_RESPONSE") ;
 					my ($S, $M, $H, $d, $m, $Y) = localtime($result->{timestamp} / 1000);
 					$m += 1;
 					$Y += 1900;
 					my $dt = sprintf("%02d.%02d.%04d %02d:%02d:%02d", $d,$m, $Y, $H, $M, $S);
-					$addresscount ++;
 									
 					if ($Voicerecords->{transcriptText} eq "") {$Voicetext = "Falsch erkannt";} else {$Voicetext=$Voicerecords->{transcriptText};}
 					
 					my $MP3Filename = $Voicerecords->{recordItemKey} . ".mp3";
 					$MP3Filename =~ s/#//g;
 					
-					$return .= "<tr><td>" . $dt . " &nbsp;&nbsp;&nbsp;</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;". $result->{device}{"deviceName"} . '</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' . '<audio controls><source src="' . $FW_ME . '/echodevice/VoiceRecords/' . $MP3Filename .'" type="audio/wav">' . '<a target="_blank" href=' . '"' . $FW_ME . '/echodevice/VoiceRecords/' . $MP3Filename .'"' . '>play' . "</a>"  .  '</audio>' . "</td><td><p>" . $Voicetext . "</p> &nbsp;&nbsp;&nbsp;</td></tr>";
+					if ($Voicerecords->{utteranceId} ne "" and $Voicetext ne "Falsch erkannt") {
+						$addresscount ++;
+						$return .= "<tr><td>" . $dt . " &nbsp;&nbsp;&nbsp;</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;". $result->{device}{"deviceName"} . '</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' . '<audio controls><source src="' . $FW_ME . '/echodevice/VoiceRecords/' . $MP3Filename .'" type="audio/wav">' . '<a target="_blank" href=' . '"' . $FW_ME . '/echodevice/VoiceRecords/' . $MP3Filename .'"' . '>play' . "</a>"  .  '</audio>' . "</td><td><p>" . $Voicetext . "</p> &nbsp;&nbsp;&nbsp;</td></tr>";						
+					}		
 					
 					if ((-e $FW_dir . "/echodevice/VoiceRecords/". $MP3Filename)) { 
 						Log3 $name, 4, "[$name] [echodevice_AmazonVoiceMP3] Use EXIST MP3File  = " . $MP3Filename ;
@@ -4143,22 +4156,25 @@ sub echodevice_Parse($$$) {
 						if($hash->{model} eq "ACCOUNT") {$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 						else 							{$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{IODev}->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{IODev}->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 						
-						my $params =  {
-						   url             => "https://www.amazon.de/alexa-privacy/apd/rvh/audio?uid=" . urlEncode($Voicerecords->{utteranceId}),
-						   header          => $AmazonHeader,
-						   timeout         => 10,
-						   noshutdown      => 1,
-						   keepalive       => 1,
-						   method          => "GET",
-						   CL              => $param->{CL},
-						   hash            => $hash,
-						   type            => $MP3Filename,
-						   httpversion     => $param->{httpversion},
-						   NAME            => $name,
-						   callback        => \&echodevice_AmazonVoiceMP3
-						};
+						if ($Voicerecords->{utteranceId} ne "") {
+							my $params =  {
+							   url             => "https://www.amazon.de/alexa-privacy/apd/rvh/audio?uid=" . urlEncode($Voicerecords->{utteranceId}),
+							   header          => $AmazonHeader,
+							   timeout         => 10,
+							   noshutdown      => 1,
+							   keepalive       => 1,
+							   method          => "GET",
+							   CL              => $param->{CL},
+							   hash            => $hash,
+							   type            => $MP3Filename,
+							   httpversion     => $param->{httpversion},
+							   NAME            => $name,
+							   callback        => \&echodevice_AmazonVoiceMP3
+							};
 
-						HttpUtils_NonblockingGet($params);						
+							HttpUtils_NonblockingGet($params);		
+							
+						}
 					}
 				}
 			}
@@ -4282,7 +4298,7 @@ sub echodevice_GetSettings($) {
 				if ($hash->{IODev}{STATE} eq "connected") {
 					echodevice_SendCommand($hash,"player","");
 					echodevice_SendCommand($hash,"media","");
-					echodevice_SendCommand($hash,"getsmarthome","");
+					#echodevice_SendCommand($hash,"getsmarthome","");
 				}
 				else {
 					$nextupdate = 10;
@@ -4468,7 +4484,7 @@ sub echodevice_ParseAuth($$$) {
 	
 	my $nextupdate = int(AttrVal($name,"intervallogin",60));
 
-	Log3 $name, 4, "[$name] [echodevice_ParseAuth] [$msgtype] ";
+	Log3 $name, 4, "[$name] [] [$msgtype] ";
 	Log3 $name, 5, "[$name] [echodevice_ParseAuth] [$msgtype] DATA Dumper=" . Dumper(echodevice_anonymize($hash, $data));
 	
 	# HTML Informationen mit schreiben
@@ -4510,7 +4526,8 @@ sub echodevice_ParseAuth($$$) {
 		return undef;
 	}
 
-	if($json->{authentication}{authenticated}){
+	#if($json->{authentication}{authenticated}){
+	if($json->{eulaAcceptance}){
 	
 		if ($hash->{helper}{".LOGINERROR"} >= 1) {
 			Log3 $name, 3, "[$name] [echodevice_ParseAuth] reset loginerror from " . $hash->{helper}{".LOGINERROR"} . " to 0" ;
@@ -4671,7 +4688,7 @@ sub echodevice_getHelpText($){
 	}
 
 	#Allgemeine Infos
-	$ReturnHelpText .= "<br><br>More informations: <a target=" . "_blank" . " href=" .'"' . 'https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Set' .'"'. "</a>https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/#Set</html>";
+	$ReturnHelpText .= "<br><br>More informations: <a target=" . "_blank" . " href=" .'"' . 'https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Set' .'"'. "</a>https://mwinklerblog.de/smarthome/eigene-module/echodevice/#Set</html>";
 
 	return $ReturnHelpText;
 }
@@ -5881,7 +5898,7 @@ sub echodevice_StartTTSMessage($) {
 <h3>echodevice</h3>
 <ul>
   Basic remote control for Amazon Echo devices. You can find the complete documentation here. 
-  <br/><br/><a href="https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/" target="_blank"><b><font size=4 color="blue">https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/</font></b></a>
+  <br/><br/><a href="https://mwinklerblog.de/smarthome/eigene-module/echodevice/" target="_blank"><b><font size=4 color="blue">https://mwinklerblog.de/smarthome/eigene-module/echodevice/</font></b></a>
   
   <br/><br/>
   <b>Define</b>
@@ -5945,7 +5962,7 @@ sub echodevice_StartTTSMessage($) {
 <h3>echodevice</h3>
 <ul>
   Basic remote control fuer Amazon Echo devices. Die komplette Dokumentation findet Ihr hier. 
-  <br/><br/><a href="https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/" target="_blank"><b><font size=4 color="blue">https://mwinkler.jimdo.com/smarthome/eigene-module/echodevice/</font></b></a>
+  <br/><br/><a href="https://mwinklerblog.de/smarthome/eigene-module/echodevice/" target="_blank"><b><font size=4 color="blue">https://mwinklerblog.de/smarthome/eigene-module/echodevice/</font></b></a>
   
   <br/><br/>
   <b>Define</b>
