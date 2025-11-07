@@ -160,6 +160,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
   "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
   "1.60.0" => "01.11.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
@@ -7648,19 +7649,19 @@ sub _attrBatSocManagement {              ## no critic "not used"
                  if(!BatteryVal ($name, $bn, 'binstcap', 0));                    # https://forum.fhem.de/index.php?msg=1310930
 
   my $valid = {
-      lowSoc       => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
-      upSoC        => { comp => '(100|[1-9]?[0-9])',                                     must => 1, act => 0 },
-      maxSoC       => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
-      barrierSoC   => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
-      stepSoC      => { comp => '[0-5]',                                                 must => 0, act => 0 },
-      careCycle    => { comp => '\d+',                                                   must => 0, act => 0 },
-      lcSlot       => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)', must => 0, act => 1 },
-      careCycle    => { comp => '\d+',                                                   must => 0, act => 0 },
-      loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',      must => 0, act => 0 },
-      loadStrategy => { comp => '(loadRelease|optPower|smartPower)',                     must => 0, act => 0 },
-      loadTarget   => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
-      safetyMargin => { comp => '(?:100|[1-9]?\d)(?::(?:100|[1-9]?\d))?',                must => 0, act => 0 },
-      weightOwnUse => { comp => '(100|[1-9]?[0-9])',                                     must => 0, act => 0 },
+      lowSoc       => { comp => '(?:100|[1-9][0-9]?)',                                                                   must => 1, act => 0 },
+      upSoC        => { comp => '(?:100|[1-9][0-9]?)',                                                                   must => 1, act => 0 },
+      maxSoC       => { comp => '(?:100|[1-9][0-9]?)',                                                                   must => 0, act => 0 },
+      barrierSoC   => { comp => '(?:0|[1-9]\d?|100):(?:max|set|inc|dec|prc):(?:-?\d+|[A-Za-z0-9_.\/-]+)(?::[+-]?\d+)?',  must => 0, act => 0 },
+      stepSoC      => { comp => '[0-5]',                                                                                 must => 0, act => 0 },
+      careCycle    => { comp => '\d+',                                                                                   must => 0, act => 0 },
+      lcSlot       => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)',                                 must => 0, act => 1 },
+      careCycle    => { comp => '\d+',                                                                                   must => 0, act => 0 },
+      loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',                                      must => 0, act => 0 },
+      loadStrategy => { comp => '(loadRelease|optPower|smartPower)',                                                     must => 0, act => 0 },
+      loadTarget   => { comp => '(100|[1-9]?[0-9])',                                                                     must => 0, act => 0 },
+      safetyMargin => { comp => '(?:100|[1-9]?\d)(?::(?:100|[1-9]?\d))?',                                                must => 0, act => 0 },
+      weightOwnUse => { comp => '(100|[1-9]?[0-9])',                                                                     must => 0, act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -7702,13 +7703,20 @@ sub _attrBatSocManagement {              ## no critic "not used"
 
       ## 2. Durchlauf - Endprüfung
       #############################
-      my $parsed = __parseAttrBatSoc ($name, $aVal);
-      my $lowSoc = $parsed->{lowSoc};
-      my $upSoc  = $parsed->{upSoc};
-      my $maxSoc = $parsed->{maxSoc};
-
-      if (!($lowSoc > 0 && $lowSoc < $upSoc && $upSoc < $maxSoc)) {
+      my $parsed     = __parseAttrBatSoc ($name, $aVal);
+      my $lowSoc     = $parsed->{lowSoc};
+      my $upSoc      = $parsed->{upSoc};
+      my $maxSoc     = $parsed->{maxSoc};
+      my $barrierSoc = $parsed->{barrierSoc};
+      
+      unless ($lowSoc < $upSoc && $upSoc < $maxSoc) {
           return 'The specified values are not plausible. Compare the attribute help.';
+      }
+      
+      if (defined $barrierSoc) {
+          unless ($lowSoc < $barrierSoc && $barrierSoc < $maxSoc) {
+              return 'The specified values are not plausible. Compare the attribute help.';
+          }
       }
   }                                                             
   else {
@@ -11697,13 +11705,13 @@ sub __parseAttrBatSoc {
   my $name = shift;
   my $cgbt = shift // return;
 
-  my ($lrMargin, $otpMargin);
-  my ($pa, $ph)           = parseParams ($cgbt);
-  ($lrMargin, $otpMargin) = split ':', $ph->{safetyMargin} if(defined $ph->{safetyMargin});
+  my ($lrMargin, $otpMargin, $barrierSoC, $barrierPar);
+  my ($pa, $ph)              = parseParams ($cgbt);
+  ($lrMargin, $otpMargin)    = split (':', $ph->{safetyMargin})  if(defined $ph->{safetyMargin});
+  ($barrierSoC, $barrierPar) = split (':', $ph->{barrierSoC}, 2) if(defined $ph->{barrierSoC});
 
   my $parsed = {
       lowSoc       => $ph->{lowSoc},                                               
-      barrierSoC   => $ph->{barrierSoC},                                                  # SoC Barriere ab der eine Ladeleistungssteuerung aktiv sein soll
       upSoc        => $ph->{upSoC}, 
       maxSoc       => $ph->{maxSoC}    // MAXSOCDEF,                                      # optional (default: MAXSOCDEF)
       stepSoc      => $ph->{stepSoC}   // BATSOCCHGDAY,                                   # mögliche SoC-Änderung pro Tag
@@ -11715,6 +11723,8 @@ sub __parseAttrBatSoc {
       weightOwnUse => $ph->{weightOwnUse},      
       lrMargin     => $lrMargin,       
       otpMargin    => $otpMargin,
+      barrierSoc   => $barrierSoC,                                                        # SoC Barriere ab der eine Ladeleistungssteuerung aktiv sein soll
+      barrierPar   => $barrierPar,                                                        # Aktionsparameter für Barriere Bereich
   };
   
 return $parsed;
@@ -11875,17 +11885,18 @@ sub _batChargeMgmt {
       $strategy       = 'loadRelease';                                                             # 'loadRelease', 'optPower', 'smartPower'
       my $wou         = 0;                                                                         # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)     
       my $lowSoc      = 0;
-      my $barrierSoC  = 0;
+      my $barrierSoc  = 0;
       my $loadAbort   = '';
       my $goalwh      = $batinstcap;                                                               # initiales Ladeziel (Wh)
       my $lrMargin    = SFTYMARGIN_50;
       my $otpMargin   = SFTYMARGIN_20;                                                               
-      my $lcslot;
+      my ($lcslot, $barrierPar);
             
       if ($cgbt) {
           my $parsed  = __parseAttrBatSoc ($name, $cgbt);
           $lowSoc     = $parsed->{lowSoc}       // 0;
-          $barrierSoC = $parsed->{barrierSoC}   // $barrierSoC;                                    # SoC-Barriere, ab der die Ladesteuerung akitv sein soll 
+          $barrierSoc = $parsed->{barrierSoc}   // $barrierSoc;                                    # SoC-Barriere, ab der die Ladesteuerung akitv sein soll 
+          $barrierPar = $parsed->{barrierPar};                                                     # Aktionsparameter innerhalb der SoC Barriere
           $lcslot     = $parsed->{lcslot};
           $loadAbort  = $parsed->{loadAbort};
           $lrMargin   = $parsed->{lrMargin}     // $lrMargin;                                      # Sicherheitszuschlag LR (%)
@@ -11898,8 +11909,8 @@ sub _batChargeMgmt {
                         ? sprintf "%.0f", ___batSocPercentToWh ($batinstcap, $tgt) 
                         : $goalwh;                                                                 # Ladeziel-SoC in Wh
       }
-      
-      my $barrierSoCWh = sprintf "%.0f", ___batSocPercentToWh ($batinstcap, $barrierSoC);
+
+      my $barrierSocWh = sprintf "%.0f", ___batSocPercentToWh ($batinstcap, $barrierSoc);
       my $goalpercent  = sprintf "%.0f", ___batSocWhToPercent ($batinstcap, $goalwh);              # Ladeziel in %
 
       ## generelle Ladeabbruchbedingung evaluieren
@@ -11939,7 +11950,8 @@ sub _batChargeMgmt {
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - selected charging strategy: $strategy");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - General load termination condition: $labortCond");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control time Slot - Slot start: $lcstart, Slot end: $lcend");
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control barrier SoC - $barrierSoC % / $barrierSoCWh Wh");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control barrier SoC: $barrierSoc % / $barrierSocWh Wh");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control barrier Parameter: $barrierPar");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Battery efficiency used: ".($befficiency * 100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - weighted self-consumption: $wou %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - charging target: $goalpercent % / $goalwh Wh");
@@ -12027,7 +12039,7 @@ sub _batChargeMgmt {
           if ( $bpin && ($gfeedin - $bpin) > $feedinlim )    {$crel = 1}                         # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
           if ( !$cgbt )                                      {$crel = 1}                         # generelle Ladefreigabe wenn kein BatSoc/Lade-Management
           if ( !$lcintime )                                  {$crel = 1}                         # generelle Ladefreigabe wenn nicht innerhalb Zeitslot für Ladesteuerung
-          if ( $csocwh <= $barrierSoCWh)                     {$crel = 1}                         # generelle Ladefreigabe wenn aktueller SoC <= Barriere-SoC
+          if ( $csocwh <= $barrierSocWh)                     {$crel = 1}                         # generelle Ladefreigabe wenn aktueller SoC <= Barriere-SoC
           if ( $labortCond )                                 {$crel = 0}                         # keine Ladefreigabe bei genereller Abbruchbedingung 
           
           # Steuerhash für optimimierte Ladeleistung erstellen
@@ -12046,7 +12058,8 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{$bn}{bpinreduced}  = $bpinreduced;                             # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
               $hsurp->{$fd}{$hod}{$bn}{bpoutmax}     = $bpoutmax;                                # max. mögliche Entladeleistung
               $hsurp->{$fd}{$hod}{$bn}{lowSocwh}     = $lowSocwh;                                # eingestellter lowSoC in Wh
-              $hsurp->{$fd}{$hod}{$bn}{barrierSoCWh} = $barrierSoCWh;                            # eingestellter Barriere SoC in Wh
+              $hsurp->{$fd}{$hod}{$bn}{barrierSocWh} = $barrierSocWh;                            # eingestellter Barriere SoC in Wh
+              $hsurp->{$fd}{$hod}{$bn}{barrierPar}   = $barrierPar;                              # Aktionsparameter im Barriere SoC Bereich
               $hsurp->{$fd}{$hod}{$bn}{batoptsocwh}  = $batoptsocwh;                             # optimaler SoC in Wh
               $hsurp->{$fd}{$hod}{$bn}{csocwh}       = $csocwh;                                  # aktueller SoC in Wh
               $hsurp->{$fd}{$hod}{$bn}{otpMargin}    = $otpMargin;                               # Sicherheitszuschlag für Berechnungen
@@ -12172,7 +12185,8 @@ sub _batChargeMgmt {
                   my $ttt      = $hopt->{$shod}{$bat}{stt};
                   my $crel     = $hopt->{$shod}{$bat}{loadrel};  
                   my $spday    = $hopt->{$shod}{$bat}{spday};
-                  my $frefph   = $hopt->{$shod}{$bat}{frefph} // '-';                  
+                  my $frefph   = $hopt->{$shod}{$bat}{frefph}     // '-';
+                  my $iter     = $hopt->{$shod}{$bat}{iterations} // '-';                  
                   
                   if ($nhr eq '00') {
                       $pneedmin      = $otp->{$bat}{target} // 0;
@@ -12295,7 +12309,8 @@ sub __batChargeOptTargetPower {
           my $lowSocwh     = $hsurp->{$hod}{$sbn}{lowSocwh};                                                     # eingestellter lowSoc in Wh
           my $batoptsocwh  = $hsurp->{$hod}{$sbn}{batoptsocwh};                                                  # optimaler SoC in Wh
           my $csocwh       = $hsurp->{$hod}{$sbn}{csocwh};                                                       # aktueller SoC in Wh
-          my $barrierSoCWh = $hsurp->{$hod}{$sbn}{barrierSoCWh};                                                 # Barriere SoC in Wh
+          my $barrierSocWh = $hsurp->{$hod}{$sbn}{barrierSocWh};                                                 # Barriere SoC in Wh
+          my $barrierPar   = $hsurp->{$hod}{$sbn}{barrierPar};                                                   # Aktionsparameter im Barriere SoC Bereich
           my $bpinreduced  = $hsurp->{$hod}{$sbn}{bpinreduced};                                                  # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
           my $befficiency  = $hsurp->{$hod}{$sbn}{befficiency};                                                  # Speicherwirkungsgrad
           my $strategy     = $hsurp->{$hod}{$sbn}{strategy};                                                     # Ladestrategie
@@ -12330,8 +12345,8 @@ sub __batChargeOptTargetPower {
           
           $hsurp->{$hod}{$sbn}{loadrel}    = $runwhneed > 0 ? 1 : 0;                                             # Ladefreigabe abhängig von Ziel-SoC Erfüllung
           $hsurp->{$hod}{$sbn}{achievelog} = "charging target: $goalwh Wh, remaining: ".
-		                                     (sprintf "%.0f", ($runwhneed * $befficiency)).' Wh -> target likely achievable? '.
-											 ($achievable ? 'yes' : 'no'); 
+                                             (sprintf "%.0f", ($runwhneed * $befficiency)).' Wh -> target likely achievable? '.
+                                             ($achievable ? 'yes' : 'no'); 
           
           ## kein Überschuß
           ###################
@@ -12343,12 +12358,14 @@ sub __batChargeOptTargetPower {
               if ($nhr eq '00') {
                   $diff                = $diff / 60 * (60 - int $minute);                                        # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungsabfluß
                   $otp->{$sbn}{ratio}  = 0;
-                  $otp->{$sbn}{target} = ___batApplySocAreas ( { target    => $bpinmax,                          # Ladeleistung zur Einordnung
-                                                                 soc       => $csocwh,                           # aktueller SoC in Wh
-                                                                 low       => $lowSocwh,                         # lowSoC in Wh
-                                                                 lowph     => $bpinreduced,                      # Ladeleistung bei SoC < lowSoC
-                                                                 barrier   => $barrierSoCWh,                     # Barriere SoC in Wh
-                                                                 barrierph => $bpinmax                           # Ladeleistung im Bereich lowSoC <= SoC < barrierSoC  
+                  $otp->{$sbn}{target} = ___batApplySocAreas ( { name       => $name,
+                                                                 target     => $bpinmax,                         # Ladeleistung zur Einordnung
+                                                                 soc        => $csocwh,                          # aktueller SoC in Wh
+                                                                 low        => $lowSocwh,                        # lowSoC in Wh
+                                                                 lowph      => $bpinreduced,                     # Ladeleistung bei SoC < lowSoC
+                                                                 barrier    => $barrierSocWh,                    # Barriere SoC in Wh
+                                                                 barrierPar => $barrierPar,                      # Aktionsparameter im Barriere SoC Bereich
+                                                                 bpinmax    => $bpinmax                             
                                                                } 
                                                              );
               }
@@ -12371,11 +12388,13 @@ sub __batChargeOptTargetPower {
                                                 Ereq          => $runwhneed, 
                                                 replacement   => $replacement, 
                                                 achievable    => $achievable,
-                                                befficiency   => $befficiency
+                                                befficiency   => $befficiency,
+                                                minute        => $minute
                                               }
                                             );
           
-          $hsurp->{$hod}{$sbn}{frefph} = $fref->{ph};
+          $hsurp->{$hod}{$sbn}{frefph}     = $fref->{ph};
+          $hsurp->{$hod}{$sbn}{iterations} = $fref->{iterations};
           
           my $limpower  = $strategy eq 'optPower'
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
@@ -12398,17 +12417,19 @@ sub __batChargeOptTargetPower {
                                                       );         
           }
           
-          $pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
-          $pneedmin = max ($pneedmin, 0);
-          $pneedmin = ___batApplySocAreas ( { target    => $pneedmin,                                            # Ladeleistung zur Einordnung
-                                              soc       => $csocwh,                                              # aktueller SoC in Wh
-                                              low       => $lowSocwh,                                            # lowSoC in Wh
-                                              lowph     => $bpinreduced,                                         # Ladeleistung bei SoC < lowSoC
-                                              barrier   => $barrierSoCWh,                                        # Barriere SoC in Wh
-                                              barrierph => $bpinmax                                              # Ladeleistung im Bereich lowSoC <= SoC < barrierSoC  
+          $pneedmin = ___batApplySocAreas ( { name       => $name,
+                                              target     => $pneedmin,                                           # Ladeleistung zur Einordnung
+                                              soc        => $csocwh,                                             # aktueller SoC in Wh
+                                              low        => $lowSocwh,                                           # lowSoC in Wh
+                                              lowph      => $bpinreduced,                                        # Ladeleistung bei SoC < lowSoC
+                                              barrier    => $barrierSocWh,                                       # Barriere SoC in Wh
+                                              barrierPar => $barrierPar,                                         # Aktionsparameter im Barriere SoC Bereich
+                                              bpinmax    => $bpinmax                                              
                                             } 
                                           );
-                      
+
+          $pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
+          $pneedmin = max ($pneedmin, 0);                     
           $pneedmin = sprintf "%.0f", $pneedmin;
           
           $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin;                                               
@@ -12444,15 +12465,19 @@ sub __batChargeOptTargetPower {
               if (  $bpin && ($gfeedin - $bpin) > $fipl ) {$inc = $bpin + (($gfeedin - $bpin) - $fipl)}          # Ladeleistung wenn akt. Bat-Ladung UND Einspeisung - Bat-Ladung > Einspeiselimit der Anlage
               
               $target = max ($target, $inc);                                                                     # Einspeiselimit berücksichtigen              
-              $target = ___batApplySocAreas ( { target    => $target,                                            # Ladeleistung zur Einordnung
-                                                soc       => $csocwh,                                            # aktueller SoC in Wh
-                                                low       => $lowSocwh,                                          # lowSoC in Wh
-                                                lowph     => $bpinreduced,                                       # Ladeleistung bei SoC < lowSoC
-                                                barrier   => $barrierSoCWh,                                      # Barriere SoC in Wh
-                                                barrierph => $bpinmax                                            # Ladeleistung im Bereich lowSoC <= SoC < barrierSoC  
+              $target = ___batApplySocAreas ( { name       => $name,
+                                                target     => $target,                                           # Ladeleistung zur Einordnung
+                                                soc        => $csocwh,                                           # aktueller SoC in Wh
+                                                low        => $lowSocwh,                                         # lowSoC in Wh
+                                                lowph      => $bpinreduced,                                      # Ladeleistung bei SoC < lowSoC
+                                                barrier    => $barrierSocWh,                                     # Barriere SoC in Wh
+                                                barrierPar => $barrierPar,                                       # Aktionsparameter im Barriere SoC Bereich
+                                                bpinmax    => $bpinmax                                            
                                               } 
                                             );                        
               
+              $target = min ($target, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
+              $target = max ($target, $bpinreduced); 
               $target = sprintf "%.0f", $target;
               
               $otp->{$sbn}{target} = $target;
@@ -12460,7 +12485,7 @@ sub __batChargeOptTargetPower {
 
           ## Fortschreibung
           ###################
-          if ($nhr eq '00') { $diff = $otp->{$sbn}{target} / 60 * (60 - int $minute) }                           # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
+          if ($nhr eq '00') { $diff = min ($spls, $otp->{$sbn}{target} / 60 * (60 - int $minute)) }              # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
           else              { $diff = min ($spls, $hsurp->{$hod}{$sbn}{pneedmin}) }                              # kleinster Wert aus PV-Überschuß oder Ladeleistungsbegrenzung
                     
           $runwh = min ($goalwh, $runwh + ($diff * $befficiency));                                               # Endwert Prognose        
@@ -12546,18 +12571,45 @@ return $value;
 sub ___batApplySocAreas {
   my $paref = shift;
   
-  my $target    = $paref->{target};
-  my $soc       = $paref->{soc};
-  my $low       = $paref->{low};
-  my $lowph     = $paref->{lowph};
-  my $barrier   = $paref->{barrier};
-  my $barrierph = $paref->{barrierph};
+  my $name       = $paref->{name};
+  my $target     = $paref->{target};
+  my $soc        = $paref->{soc};
+  my $low        = $paref->{low};
+  my $lowph      = $paref->{lowph};
+  my $barrier    = $paref->{barrier};
+  my $barrierPar = $paref->{barrierPar};
+  my $bpinmax    = $paref->{bpinmax};
  
   my $ph = $soc < $low 
            ? $lowph 
            : $soc < $barrier
-           ? $barrierph
+           ? ___batApplyBarrierAction ($name, $target, $barrierPar, $bpinmax)
            : $target;
+
+return $ph;
+}
+
+################################################################
+#   Aktionen im Bereich lowSoC <= SoC < barrierSoC
+################################################################     
+sub ___batApplyBarrierAction {
+  my ($name, $tgt, $barrierPar, $bpinmax) = @_;
+  
+  return $tgt if(!defined $barrierPar);
+ 
+  my ($action, $arg, $def) = split (":", $barrierPar);
+  $def //= 0;
+  my $ph;
+
+  if    ($action eq 'max') { $ph = $bpinmax }
+  elsif ($action eq 'set') { if ($arg =~ /^\d+$/xs)      {$ph = $arg}                   else {$ph = ReadingsNum ($name, $arg, $def)                  } }
+  elsif ($action eq 'inc') { if ($arg =~ /^\d+$/xs)      {$ph = $tgt + $arg}            else {$ph = $tgt + ReadingsNum ($name, $arg, $def)           } }
+  elsif ($action eq 'dec') { if ($arg =~ /^\d+$/xs)      {$ph = $tgt - $arg}            else {$ph = $tgt - ReadingsNum ($name, $arg, $def)           } }
+  elsif ($action eq 'prc') { if ($arg =~ /^[+-]?\d+$/xs) {$ph = $tgt + $tgt * $arg/100} else {$ph = $tgt + $tgt * ReadingsNum ($name, $arg, $def)/100} }
+  else  {$ph = $tgt}
+  
+  $ph = max (0, $ph);
+  $ph = min ($bpinmax, $ph);
 
 return $ph;
 }
@@ -12585,6 +12637,7 @@ sub ___batFindMinPhWh {
   my $replacement   = $paref->{replacement};
   my $achievable    = $paref->{achievable};
   my $befficiency   = $paref->{befficiency};
+  my $minute        = $paref->{minute};
     
   my @hods     = @$hodsref;
   my $low      = 0;                                                 
@@ -12592,6 +12645,7 @@ sub ___batFindMinPhWh {
   my $eps      = 0.5;                                               # minimale Genauigkeit in Wh  (1e-3)
   my $max_iter = 100;                                               # Zwangsabbruch nach X Durchläufen
   my $loop     = 0;
+  my $cap;
                         
   if (!$achievable) {
       my $max_cap = max map { defined $hsurp->{$_}{nhr} && $hsurp->{$_}{nhr} eq '00'
@@ -12609,11 +12663,14 @@ sub ___batFindMinPhWh {
       my $charged = 0;
         
       for my $hod (@hods) {
-          my $nhr   = $hsurp->{$hod}{nhr};
+          my $nhr = $hsurp->{$hod}{nhr};
           next if(!defined $nhr);
-          my $cap   = $nhr eq '00' ? int $replacement : $hsurp->{$hod}{surplswh};
+          
+          if ($nhr eq '00') { $cap = min ($mid, $hsurp->{$hod}{surplswh}) / 60 * (60 - int $minute)}     # Zeitgewichtung aktuelle Stunde
+          else              { $cap = min ($mid, $hsurp->{$hod}{surplswh})}                               
+
           $cap     *= $befficiency;
-          $charged += min ($mid, $cap);
+          $charged += $cap;
       }
         
       $charged >= $Ereq ? ($high = $mid) : ($low = $mid);
@@ -27640,8 +27697,8 @@ to ensure that the system configuration is correct.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [stepSoC=&lt;Value&gt;] [careCycle=&lt;Value&gt;] 
-                                     [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Value&gt; upSoC=&lt;Value&gt; [maxSoC=&lt;Value&gt;] [stepSoC=&lt;Value&gt;] [barrierSoC=&lt;Syntax&gt;] 
+                                     [careCycle=&lt;Value&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
                                      [safetyMargin=&lt;Value&gt;[:&lt;Value&gt;]] [loadStrategy=&lt;Value&gt;] [loadTarget=&lt;Wert&gt;] 
                                      [weightOwnUse=&lt;Wert&gt;] </b> <br><br>
                                      
@@ -27673,6 +27730,34 @@ to ensure that the system configuration is correct.
             <tr><td> <b>maxSoC</b>       </td><td>Maximum minimum SoC - value that must be reached at least every 'careCycle' days                </td></tr>
             <tr><td>                     </td><td>in order to balance the charge in the storage network.                                          </td></tr>
             <tr><td>                     </td><td>The specification is optional (&lt;= 100, default: 95)                                          </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>barrierSoC</b>   </td><td>Optional parameter for changing the calculated limit of the charging power in the range lowSoC <= SoC < barrierSoC.   </td></tr>
+            <tr><td>                     </td><td>The limit can be a fixed value, surcharges/discounts, or percentage changes.                        </td></tr>
+            <tr><td>                     </td><td>All manipulations take place only in the SoC range lowSoC &lt;= SoC &lt; barrierSoC.                </td></tr>
+            <tr><td>                     </td><td>The syntax of the parameter is specified according to the following scheme:                         </td></tr>
+            <tr><td>                     </td><td><b>barrierSoC=XX:&lt;Action&gt;:&lt;Value&gt;</b>  or                                               </td></tr>
+            <tr><td>                     </td><td><b>barrierSoC=XX:&lt;Action&gt;:&lt;Reading&gt;:&lt;default&gt</b>                                  </td></tr>
+            <tr><td>                     </td><td>The details are as follows:                                                                         </td></tr>
+            <tr><td>                     </td><td><b>XX</b> - the value of barrierSoC in %. The following applies lowSoC &lt; barrierSoC &lt; maxSoC  </td></tr>
+            <tr><td>                     </td><td><b>Action</b> - the specification defines one of the possible manipulations:                        </td></tr>
+            <tr><td>                     </td><td><ul> max - the limit is set to setupBatteryDevXX->pinmax.                       </ul>               </td></tr>
+            <tr><td>                     </td><td><ul> set - the limit is set to a fixed value or reading value.                  </ul>               </td></tr>
+            <tr><td>                     </td><td><ul> inc - the limit is increased by a fixed value or reading value.            </ul>               </td></tr>
+            <tr><td>                     </td><td><ul> dec - the limit is reduced by a fixed value or reading value.              </ul>               </td></tr>
+            <tr><td>                     </td><td><ul> prc - the limit is changed by a percentage value / reading value.          </ul>               </td></tr>
+            <tr><td>                     </td><td><b>Value</b> - the value (in W or %) at which the action is executed                                </td></tr>
+            <tr><td>                     </td><td><b>Reading</b> - Reading in the SF device containing the value for the action                       </td></tr>
+            <tr><td>                     </td><td><b>default</b> - the default value when specifying a reading                                        </td></tr>
+            <tr><td>                     </td><td><b>Examples</b> for a barrierSoC of 40%:                                                            </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:max:-                              <b>-></b> Limit is set to setupBatteryDevXX->pinmax                            </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:set:&lt;Reading&gt;:&lt;default&gt <b>-></b> set limit to value &lt;Reading&gt;                                   </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:set:1350                           <b>-></b> Limit set to 1350 W                                                  </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:inc:&lt;Reading&gt;:&lt;default&gt <b>-></b> increase limit by the value &lt;Reading&gt;                          </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:inc:200                            <b>-></b> Limit increased by 200 W                                             </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:dec:&lt;Reading&gt;:&lt;default&gt <b>-></b> decrease limit by value &lt;Reading&gt;                              </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:dec:100                            <b>-></b> Limit reduced by 100 W                                               </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Change limit around &lt;Reading&gt; percent (+ increase, - decrease) </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Change limit by 50% (+ increase, - decrease)                         </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
             <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
@@ -30392,8 +30477,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <br>
 
        <a id="SolarForecast-attr-ctrlBatSocManagementXX" data-pattern="ctrlBatSocManagement.*"></a>
-       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [stepSoC=&lt;Wert&gt;] [careCycle=&lt;Wert&gt;] 
-                                     [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
+       <li><b>ctrlBatSocManagementXX lowSoc=&lt;Wert&gt; upSoC=&lt;Wert&gt; [maxSoC=&lt;Wert&gt;] [stepSoC=&lt;Wert&gt;] [barrierSoC=&lt;Syntax&gt;]
+                                     [careCycle=&lt;Wert&gt;] [lcSlot=&lt;hh:mm&gt;-&lt;hh:mm&gt;] [loadAbort=&lt;SoC1&gt;:&lt;MinPwr&gt;:&lt;SoC2&gt;] 
                                      [safetyMargin=&lt;Wert&gt;[:&lt;Wert&gt;]] [loadStrategy=&lt;Wert&gt;] [loadTarget=&lt;Wert&gt;] 
                                      [weightOwnUse=&lt;Wert&gt;] </b> <br><br>
          
@@ -30426,6 +30511,34 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>maxSoC</b>       </td><td>maximaler Mindest-SoC - Wert der mindestens im Abstand von 'careCycle' Tagen erreicht           </td></tr>
             <tr><td>                     </td><td>werden muß um den Ladungsausgleich im Speicherverbund auszuführen.                              </td></tr>
             <tr><td>                     </td><td>Die Angabe ist optional (&lt;= 100, default: 95)                                                </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>barrierSoC</b>   </td><td>Optionaler Parameter zur Änderung des berechneten Limits der Ladeleistung im Bereich lowSoC <= SoC < barrierSoC.   </td></tr>
+            <tr><td>                     </td><td>Das Limit kann einen festen Wert, Zu/Abschläge oder prozentuale Änderungen erhalten.            </td></tr>
+            <tr><td>                     </td><td>Alle Manipulationen erfolgen nur im SoC-Bereich lowSoC &lt;= SoC &lt; barrierSoC.               </td></tr>
+            <tr><td>                     </td><td>Die Syntax des Parameters wird gemäß des folgenden Schemas angegeben:                           </td></tr>
+            <tr><td>                     </td><td><b>barrierSoC=XX:&lt;Aktion&gt;:&lt;Wert&gt;</b>  oder                                          </td></tr>
+            <tr><td>                     </td><td><b>barrierSoC=XX:&lt;Aktion&gt;:&lt;Reading&gt;:&lt;default&gt</b>                              </td></tr>
+            <tr><td>                     </td><td>Die Angaben bedeuten im Einzelnen:                                                              </td></tr>
+            <tr><td>                     </td><td><b>XX</b> - der Wert von barrierSoC in %. Es gilt lowSoC &lt; barrierSoC &lt; maxSoC            </td></tr>
+            <tr><td>                     </td><td><b>Aktion</b> - die Angabe legt eine der möglichen Manipulationen fest:                         </td></tr>
+            <tr><td>                     </td><td><ul> max - das Limit wird auf setupBatteryDevXX->pinmax festgelegt              </ul>           </td></tr>
+            <tr><td>                     </td><td><ul> set - das Limit wird auf einen festen Wert oder Readingswert gesetzt       </ul>           </td></tr>
+            <tr><td>                     </td><td><ul> inc - das Limit wird um einen festen Wert oder Readingswert erhöht         </ul>           </td></tr>
+            <tr><td>                     </td><td><ul> dec - das Limit wird um einen festen Wert oder Readingswert verringert     </ul>           </td></tr>
+            <tr><td>                     </td><td><ul> prc - das Limit wird um einen prozentualen Wert / Readingswert geändert    </ul>           </td></tr>
+            <tr><td>                     </td><td><b>Wert</b> - der Wert (in W bzw. %) mit dem die Aktion ausgeführt wird                         </td></tr>
+            <tr><td>                     </td><td><b>Reading</b> - Reading im SF-Device welches den Wert für die Aktion enthält                   </td></tr>
+            <tr><td>                     </td><td><b>default</b> - der default-Wert bei Angabe eines Readings                                     </td></tr>
+            <tr><td>                     </td><td><b>Beispiele</b> für einen barrierSoC von 40 %:                                                 </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:max:-                              <b>-></b> Limit wird auf setupBatteryDevXX->pinmax gesetzt                  </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:set:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit auf den Wert &lt;Reading&gt; setzen                         </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:set:1350                           <b>-></b> Limit wird auf 1350 W gesetzt                                     </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:inc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um den Wert &lt;Reading&gt; erhöhen                         </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:inc:200                            <b>-></b> Limit wird um 200 W erhöht                                        </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:dec:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um den Wert &lt;Reading&gt; verringern                      </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:dec:100                            <b>-></b> Limit wird um 100 W verringert                                    </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um &lt;Reading&gt; Prozent ändern (+ erhöhen, - verringern) </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Limit um 50% ändern (+ erhöhen, - verringern)                     </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
             <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
