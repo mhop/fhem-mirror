@@ -29,11 +29,13 @@
 #
 #########################################################################################################################
 main::LoadModule ('Astro');                                                          # Astro Modul für Sonnenkennzahlen laden
+use strict;
+use warnings;
 
 package FHEM::SolarForecast;                                                         ## no critic 'package'
 
-use strict;
-use warnings;
+#use strict;
+#use warnings;
 use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
@@ -160,7 +162,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.60.3" => "03.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change ",
+  "1.60.4" => "08.11.2025  smoothValue as OOP implemantation ",
+  "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
   "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
   "1.60.0" => "01.11.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
@@ -495,6 +498,8 @@ use constant {
   SFTYMARGIN_20  => 20,                                                             # Sicherheitszuschlag 20%
   SFTYMARGIN_50  => 50,                                                             # Sicherheitszuschlag 50%
   STOREFFDEF     => 87,                                                             # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
+  OTPDEADBAND    => 10.0,                                                           # Smoother Standard OTP Power Schwellenwert für Änderungen
+  OTPALPHA       => 1.0,                                                            # Smoother Standard OTP Power Alpha default
   TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
   TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
   TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
@@ -12334,7 +12339,8 @@ sub __batChargeOptTargetPower {
           ## Ziel und dessen Erreichbarkeit
           ###################################
           my $goalwh     = $hsurp->{$hod}{$sbn}{goalwh};                                                         # Ladeziel 
-          my $runwhneed  = ($goalwh - $runwh) / $befficiency;  
+          #my $runwhneed  = ($goalwh - $runwh) / $befficiency; 
+          my $runwhneed  = $goalwh - $runwh;          
           my $achievable = 1;
             
           if ($runwhneed > 0 && $remainingSurp < $runwhneed) {                                                   # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
@@ -12344,9 +12350,12 @@ sub __batChargeOptTargetPower {
           storeReading ('Battery_TargetAchievable_'.$sbn, $achievable) if($nhr eq '00');
           
           $hsurp->{$hod}{$sbn}{loadrel}    = $runwhneed > 0 ? 1 : 0;                                             # Ladefreigabe abhängig von Ziel-SoC Erfüllung
+          #$hsurp->{$hod}{$sbn}{achievelog} = "charging target: $goalwh Wh, remaining: ".
+          #                                   (sprintf "%.0f", ($runwhneed * $befficiency)).' Wh -> target likely achievable? '.
+          #                                   ($achievable ? 'yes' : 'no'); 
           $hsurp->{$hod}{$sbn}{achievelog} = "charging target: $goalwh Wh, remaining: ".
-		                                     (sprintf "%.0f", ($runwhneed * $befficiency)).' Wh -> target likely achievable? '.
-											 ($achievable ? 'yes' : 'no'); 
+                                             (sprintf "%.0f", $runwhneed).' Wh -> target likely achievable? '.
+                                             ($achievable ? 'yes' : 'no'); 
           
           ## kein Überschuß
           ###################
@@ -12388,7 +12397,7 @@ sub __batChargeOptTargetPower {
                                                 Ereq          => $runwhneed, 
                                                 replacement   => $replacement, 
                                                 achievable    => $achievable,
-                                                befficiency   => $befficiency,
+                                                #befficiency   => $befficiency,
                                                 minute        => $minute
                                               }
                                             );
@@ -12400,7 +12409,8 @@ sub __batChargeOptTargetPower {
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
                           : $fref->{ph};                                                                         
                                                    
-          $limpower     = $limpower // 0 > 0 ? $limpower / $befficiency : 0;                                     # Zielleistung mit Batterie Effizienzgrad erhöhen
+          #$limpower     = $limpower // 0 > 0 ? $limpower / $befficiency : 0;                                     # Zielleistung mit Batterie Effizienzgrad erhöhen
+          $limpower     = $limpower // 0 > 0 ? $limpower : 0;
           $limpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
           $limpower     = max ($limpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen                  
           
@@ -12427,7 +12437,8 @@ sub __batChargeOptTargetPower {
                                               bpinmax    => $bpinmax                                              
                                             } 
                                           );
-
+          
+          $pneedmin = $pneedmin / $befficiency;      # neu!
           $pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
           $pneedmin = max ($pneedmin, 0);                     
           $pneedmin = sprintf "%.0f", $pneedmin;
@@ -12476,6 +12487,7 @@ sub __batChargeOptTargetPower {
                                               } 
                                             );                        
               
+              $target = $target / $befficiency;      # neu!
               $target = min ($target, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
               $target = max ($target, $bpinreduced); 
               $target = sprintf "%.0f", $target;
@@ -12488,7 +12500,8 @@ sub __batChargeOptTargetPower {
           if ($nhr eq '00') { $diff = min ($spls, $otp->{$sbn}{target} / 60 * (60 - int $minute)) }              # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
           else              { $diff = min ($spls, $hsurp->{$hod}{$sbn}{pneedmin}) }                              # kleinster Wert aus PV-Überschuß oder Ladeleistungsbegrenzung
                     
-          $runwh = min ($goalwh, $runwh + ($diff * $befficiency));                                               # Endwert Prognose        
+          #$runwh = min ($goalwh, $runwh + ($diff * $befficiency));                                               # Endwert Prognose
+          $runwh = min ($goalwh, $runwh + $diff);                                                                # Endwert Prognose          
           $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen
           $runwh = sprintf "%.0f", $runwh;
           
@@ -12636,7 +12649,7 @@ sub ___batFindMinPhWh {
   my $Ereq          = $paref->{Ereq};
   my $replacement   = $paref->{replacement};
   my $achievable    = $paref->{achievable};
-  my $befficiency   = $paref->{befficiency};
+  #my $befficiency   = $paref->{befficiency};
   my $minute        = $paref->{minute};
     
   my @hods     = @$hodsref;
@@ -12669,7 +12682,7 @@ sub ___batFindMinPhWh {
           if ($nhr eq '00') { $cap = min ($mid, $hsurp->{$hod}{surplswh}) / 60 * (60 - int $minute)}     # Zeitgewichtung aktuelle Stunde
           else              { $cap = min ($mid, $hsurp->{$hod}{surplswh})}                               
 
-          $cap     *= $befficiency;
+          #$cap     *= $befficiency;
           $charged += $cap;
       }
         
@@ -12728,7 +12741,15 @@ sub ___batChargeSaveResults {
   if ($loopid eq 'OTP') {
       if ($nhr eq '00') {                                                                            # Target für aktuelle Stunde
           my $needmin = $otp->{$bn}{target} // 0;
-          storeReading ('Battery_ChargeOptTargetPower_'.$bn, $needmin.' W');
+          my ($smoothed, $changed) = smoothValue ( { name     => $name,
+                                                     chan     => 'OTP',
+                                                     rdg      => 'Battery_ChargeOptTargetPower_'.$bn,
+                                                     newval   => $needmin,
+                                                     deadband => OTPDEADBAND,
+                                                     alpha    => OTPALPHA
+                                                   }
+                                                 );
+          storeReading ('Battery_ChargeOptTargetPower_'.$bn, $smoothed.' W');
       }
   }
   
@@ -26327,7 +26348,134 @@ sub StatusAPIVal {
 return $def;
 }
 
+################################################################
+#        Glättung des übergebenen Wertes $newval
+# $chan - ID der Glättungsgruppe
+# SM_new als Key/Value-Liste übergeben
+################################################################      
+sub smoothValue {
+  my $paref = shift;
+
+  my $name     = $paref->{name};
+  my $chan     = $paref->{chan};
+  my $rdg      = $paref->{rdg};
+  my $newval   = $paref->{newval}   // return;
+  my $deadband = $paref->{deadband} // OTPDEADBAND;
+  my $alpha    = $paref->{alpha}    // OTPALPHA;
+    
+  my $hash    = $defs{$name};
+  my $vold    = ReadingsNum ($name, $rdg, 0);                                                
+  my $changed = 0;
+  
+  $data{$name}{current}{smoother}{$chan}{$rdg}{OLD}      = $vold;
+  $data{$name}{current}{smoother}{$chan}{$rdg}{NEWVAL}   = $newval;
+  $data{$name}{current}{smoother}{$chan}{$rdg}{ALPHA}    = $alpha;
+  $data{$name}{current}{smoother}{$chan}{$rdg}{DEADBAND} = $deadband;
+
+  unless ($data{$name}{current}{smoother}{$chan}{$rdg}{OBJ}) {                               
+      $data{$name}{current}{smoother}{$chan}{$rdg}{OBJ} = FHEM::SolarForecast::Smoother->SM_new ( initial  => $vold,
+                                                                                                  deadband => $deadband,
+                                                                                                  alpha    => $alpha
+                                                                                                );
+  }
+ 
+  my $s = $data{$name}{current}{smoother}{$chan}{$rdg}{OBJ};
+  
+  unless (blessed ($s)) {
+      Log3 ($name, 1, "$name - ERROR - Wrong Smoother class: ".ref($s));
+      
+      $changed = 1 if($newval != $vold);
+      return ($newval, $changed);
+  }
+  
+  my $smoothed = $s->SM_update ($newval);
+  $changed     = 1 if($smoothed != $vold);
+  
+  $data{$name}{current}{smoother}{$chan}{$rdg}{SMOOTHED} = $smoothed;
+  $data{$name}{current}{smoother}{$chan}{$rdg}{CHANGED}  = $changed;
+
+return ($smoothed, $changed);
+}
+
+
+#####################################################################################################################
+#  Smoother - Glättungsfilter
+#  Kleine Änderungen (<= X) werden ignoriert und nur bei größeren Änderungen 
+#  auf einen neuen Wert reagiert. Der Übergang kann glatt 
+#  (anstatt eines plötzlichen Sprungs) erfolgen.
+#  
+#  deadband:       Schwellwert X; Änderungen ≤ X werden nicht als neuer Zielwert übernommen.
+#  step-smoothing: Wenn Änderung > X, kann der aktuelle Wert entweder sofort auf den neuen gesetzt werden oder 
+#                  schrittweise (mit Faktor alpha) Richtung Ziel gleiten.
+
+#  konfigurierbar: X und Alpha sind Parameter.
+#####################################################################################################################
+
+package FHEM::SolarForecast::Smoother;
+
+sub SM_new {
+  my ($class, %opts) = @_;
+  my $self = {
+      value    => $opts{initial}  // 0,                             # aktueller (ausgegebener) Wert
+      deadband => $opts{deadband} // 0.5,                           # X: minimale Änderungsamplitude (Schwellenwert für Ergebnisanpassung)
+      alpha    => defined $opts{alpha} ? $opts{alpha} : 1.0,        # 1.0 = sofortiger Sprung; <1 = gleitend
+  };
+  
+  bless $self, $class;
+    
+return $self;
+}
+
+sub SM_update {                                                     # update mit neuem Messwert; gibt den geglätteten Wert zurück
+  my ($self, $newval) = @_;
+  return $self->{value} unless defined $newval;
+
+  my $current = $self->{value};
+  my $diff    = $newval - $current;
+  my $abs     = $diff >= 0 ? $diff : -$diff;
+
+  if ($abs <= $self->{deadband}) {                                  # innerhalb der deadband: kein Wechsel
+      return $current;
+  }
+
+  if ($self->{alpha} >= 1) {                                        # außerhalb deadband: Ziel ist der neue Messwert; gleiten je nach alpha
+      $self->{value} = $newval;
+  } 
+  else {
+      $self->{value} = $current + $self->{alpha} * $diff;
+  }
+
+return $self->{value};
+}
+
+################################################################################
+# Hilfs-Accessoren
+# Routinen arbeiten auf dem Objekt-Hash (typisches Perl-OO mit blessed Hash): 
+#        $_[0] ist das Objekt, $_[1] das übergebene Argument.
+#
+#
+# # my $s = $hash->{HELPER}{SMOOTHER}{$chan};
+# unless ($s) {
+#   return;
+# }
+# Getter (akt. Wert lesen):
+# my $current = $s->SM_getValue;
+#
+# Setter zur Änderung von Objektwerten:
+# my $dead  = 0.5;
+# my $alpha = 1.0;
+# my $value = 222;
+# $s->SM_setDeadband ($dead);
+# $s->SM_setAlpha    ($alpha);
+# $s->SM_setValue    ($value);
+################################################################################
+sub SM_getValue    { $_[0]->{value} }                         # gibt den aktuellen geglätteten Wert zurück
+sub SM_setValue    { $_[0]->{value}    = $_[1] }              # setzt einen neuen Vergleichswert im Objekt
+sub SM_setDeadband { $_[0]->{deadband} = $_[1] }              # setzt den Deadband-Parameter des Objekts
+sub SM_setAlpha    { $_[0]->{alpha}    = $_[1] }              # setzt den Alpha-Parameter des Objekts
+
 1;
+
 
 =pod
 =item summary    Visualization of solar predictions for PV systems and Consumer control
@@ -27730,6 +27878,34 @@ to ensure that the system configuration is correct.
             <tr><td> <b>maxSoC</b>       </td><td>Maximum minimum SoC - value that must be reached at least every 'careCycle' days                </td></tr>
             <tr><td>                     </td><td>in order to balance the charge in the storage network.                                          </td></tr>
             <tr><td>                     </td><td>The specification is optional (&lt;= 100, default: 95)                                          </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td> <b>barrierSoC</b>   </td><td>Optional parameter for changing the calculated limit of the charging power in the range lowSoC <= SoC < barrierSoC.   </td></tr>
+            <tr><td>                     </td><td>The limit can be a fixed value, surcharges/discounts, or percentage changes.                        </td></tr>
+            <tr><td>                     </td><td>All manipulations take place only in the SoC range lowSoC &lt;= SoC &lt; barrierSoC.                </td></tr>
+            <tr><td>                     </td><td>The syntax of the parameter is specified according to the following scheme:                         </td></tr>
+            <tr><td>                     </td><td><b>barrierSoC=XX:&lt;Action&gt;:&lt;Value&gt;</b>  or                                               </td></tr>
+            <tr><td>                     </td><td><b>barrierSoC=XX:&lt;Action&gt;:&lt;Reading&gt;:&lt;default&gt</b>                                  </td></tr>
+            <tr><td>                     </td><td>The details are as follows:                                                                         </td></tr>
+            <tr><td>                     </td><td><b>XX</b> - the value of barrierSoC in %. The following applies lowSoC &lt; barrierSoC &lt; maxSoC  </td></tr>
+            <tr><td>                     </td><td><b>Action</b> - the specification defines one of the possible manipulations:                        </td></tr>
+            <tr><td>                     </td><td><ul> max - the limit is set to setupBatteryDevXX->pinmax.                       </ul>               </td></tr>
+            <tr><td>                     </td><td><ul> set - the limit is set to a fixed value or reading value.                  </ul>               </td></tr>
+            <tr><td>                     </td><td><ul> inc - the limit is increased by a fixed value or reading value.            </ul>               </td></tr>
+            <tr><td>                     </td><td><ul> dec - the limit is reduced by a fixed value or reading value.              </ul>               </td></tr>
+            <tr><td>                     </td><td><ul> prc - the limit is changed by a percentage value / reading value.          </ul>               </td></tr>
+            <tr><td>                     </td><td><b>Value</b> - the value (in W or %) at which the action is executed                                </td></tr>
+            <tr><td>                     </td><td><b>Reading</b> - Reading in the SF device containing the value for the action                       </td></tr>
+            <tr><td>                     </td><td><b>default</b> - the default value when specifying a reading                                        </td></tr>
+            <tr><td>                     </td><td><b>Examples</b> for a barrierSoC of 40%:                                                            </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:max:-                              <b>-></b> Limit is set to setupBatteryDevXX->pinmax                            </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:set:&lt;Reading&gt;:&lt;default&gt <b>-></b> set limit to value &lt;Reading&gt;                                   </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:set:1350                           <b>-></b> Limit set to 1350 W                                                  </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:inc:&lt;Reading&gt;:&lt;default&gt <b>-></b> increase limit by the value &lt;Reading&gt;                          </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:inc:200                            <b>-></b> Limit increased by 200 W                                             </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:dec:&lt;Reading&gt;:&lt;default&gt <b>-></b> decrease limit by value &lt;Reading&gt;                              </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:dec:100                            <b>-></b> Limit reduced by 100 W                                               </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Change limit around &lt;Reading&gt; percent (+ increase, - decrease) </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Change limit by 50% (+ increase, - decrease)                         </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
             <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
@@ -30486,32 +30662,32 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>barrierSoC</b>   </td><td>Optionaler Parameter zur Änderung des berechneten Limits der Ladeleistung im Bereich lowSoC <= SoC < barrierSoC.   </td></tr>
             <tr><td>                     </td><td>Das Limit kann einen festen Wert, Zu/Abschläge oder prozentuale Änderungen erhalten.            </td></tr>
-			<tr><td>                     </td><td>Alle Manipulationen erfolgen nur im SoC-Bereich lowSoC &lt;= SoC &lt; barrierSoC.               </td></tr>
-			<tr><td>                     </td><td>Die Syntax des Parameters wird gemäß des folgenden Schemas angegeben:                           </td></tr>
-			<tr><td>                     </td><td><b>barrierSoC=XX:&lt;Aktion&gt;:&lt;Wert&gt;</b>  oder                                          </td></tr>
-			<tr><td>                     </td><td><b>barrierSoC=XX:&lt;Aktion&gt;:&lt;Reading&gt;:&lt;default&gt</b>                              </td></tr>
-		    <tr><td>                     </td><td>Die Angaben bedeuten im Einzelnen:                                                              </td></tr>
-			<tr><td>                     </td><td><b>XX</b> - der Wert von barrierSoC in %. Es gilt lowSoC &lt; barrierSoC &lt; maxSoC            </td></tr>
-			<tr><td>                     </td><td><b>Aktion</b> - die Angabe legt eine der möglichen Manipulationen fest:                         </td></tr>
-			<tr><td>                     </td><td><ul> max - das Limit wird auf setupBatteryDevXX->pinmax festgelegt              </ul>           </td></tr>
+            <tr><td>                     </td><td>Alle Manipulationen erfolgen nur im SoC-Bereich lowSoC &lt;= SoC &lt; barrierSoC.               </td></tr>
+            <tr><td>                     </td><td>Die Syntax des Parameters wird gemäß des folgenden Schemas angegeben:                           </td></tr>
+            <tr><td>                     </td><td><b>barrierSoC=XX:&lt;Aktion&gt;:&lt;Wert&gt;</b>  oder                                          </td></tr>
+            <tr><td>                     </td><td><b>barrierSoC=XX:&lt;Aktion&gt;:&lt;Reading&gt;:&lt;default&gt</b>                              </td></tr>
+            <tr><td>                     </td><td>Die Angaben bedeuten im Einzelnen:                                                              </td></tr>
+            <tr><td>                     </td><td><b>XX</b> - der Wert von barrierSoC in %. Es gilt lowSoC &lt; barrierSoC &lt; maxSoC            </td></tr>
+            <tr><td>                     </td><td><b>Aktion</b> - die Angabe legt eine der möglichen Manipulationen fest:                         </td></tr>
+            <tr><td>                     </td><td><ul> max - das Limit wird auf setupBatteryDevXX->pinmax festgelegt              </ul>           </td></tr>
             <tr><td>                     </td><td><ul> set - das Limit wird auf einen festen Wert oder Readingswert gesetzt       </ul>           </td></tr>
-			<tr><td>                     </td><td><ul> inc - das Limit wird um einen festen Wert oder Readingswert erhöht         </ul>           </td></tr>
-			<tr><td>                     </td><td><ul> dec - das Limit wird um einen festen Wert oder Readingswert verringert     </ul>           </td></tr>
-			<tr><td>                     </td><td><ul> prc - das Limit wird um einen prozentualen Wert / Readingswert geändert    </ul>           </td></tr>
-			<tr><td>                     </td><td><b>Wert</b> - der Wert (in W bzw. %) mit dem die Aktion ausgeführt wird                         </td></tr>
-			<tr><td>                     </td><td><b>Reading</b> - Reading im SF-Device welches den Wert für die Aktion enthält                   </td></tr>
-			<tr><td>                     </td><td><b>default</b> - der default-Wert bei Angabe eines Readings                                     </td></tr>
-			<tr><td>                     </td><td><b>Beispiele</b> für einen barrierSoC von 40 %:                                                 </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:max:-                              <b>-></b> Limit wird auf setupBatteryDevXX->pinmax gesetzt                  </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:set:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit auf den Wert &lt;Reading&gt; setzen                         </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:set:1350                           <b>-></b> Limit wird auf 1350 W gesetzt                                     </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:inc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um den Wert &lt;Reading&gt; erhöhen                         </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:inc:200                            <b>-></b> Limit wird um 200 W erhöht                                        </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:dec:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um den Wert &lt;Reading&gt; verringern                      </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:dec:100                            <b>-></b> Limit wird um 100 W verringert                                    </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um &lt;Reading&gt; Prozent ändern (+ erhöhen, - verringern) </td></tr>
-			<tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Limit um 50% ändern (+ erhöhen, - verringern)                     </td></tr>
-			<tr><td>                     </td><td>                                                                                                </td></tr>
+            <tr><td>                     </td><td><ul> inc - das Limit wird um einen festen Wert oder Readingswert erhöht         </ul>           </td></tr>
+            <tr><td>                     </td><td><ul> dec - das Limit wird um einen festen Wert oder Readingswert verringert     </ul>           </td></tr>
+            <tr><td>                     </td><td><ul> prc - das Limit wird um einen prozentualen Wert / Readingswert geändert    </ul>           </td></tr>
+            <tr><td>                     </td><td><b>Wert</b> - der Wert (in W bzw. %) mit dem die Aktion ausgeführt wird                         </td></tr>
+            <tr><td>                     </td><td><b>Reading</b> - Reading im SF-Device welches den Wert für die Aktion enthält                   </td></tr>
+            <tr><td>                     </td><td><b>default</b> - der default-Wert bei Angabe eines Readings                                     </td></tr>
+            <tr><td>                     </td><td><b>Beispiele</b> für einen barrierSoC von 40 %:                                                 </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:max:-                              <b>-></b> Limit wird auf setupBatteryDevXX->pinmax gesetzt                  </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:set:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit auf den Wert &lt;Reading&gt; setzen                         </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:set:1350                           <b>-></b> Limit wird auf 1350 W gesetzt                                     </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:inc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um den Wert &lt;Reading&gt; erhöhen                         </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:inc:200                            <b>-></b> Limit wird um 200 W erhöht                                        </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:dec:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um den Wert &lt;Reading&gt; verringern                      </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:dec:100                            <b>-></b> Limit wird um 100 W verringert                                    </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um &lt;Reading&gt; Prozent ändern (+ erhöhen, - verringern) </td></tr>
+            <tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Limit um 50% ändern (+ erhöhen, - verringern)                     </td></tr>
+            <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
             <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
             <tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr> 
