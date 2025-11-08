@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.60.4" => "08.11.2025  smoothValue as OOP implemantation ",
+  "1.60.4" => "08.11.2025  smoothValue as OOP implemantation, battery efficiency rework ",
   "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
   "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
