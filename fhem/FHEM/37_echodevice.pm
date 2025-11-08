@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2025.11.08 v0.2.32
+# - BUG:     diverse Befehle gingen nicht mehr
+#
 # 2025.11.06 v0.2.31 
 # - CHANGE:  Neue Check API URL cookielogin6
 #
@@ -537,7 +540,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.31";
+my $ModulVersion     = "0.2.32";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -2161,6 +2164,7 @@ sub echodevice_SendCommand($$$) {
 
 		#Allgemeine Veariablen
 		$SendUrl   .= "/api/behaviors/preview";
+		#$SendUrl   .= "/api/np/command?deviceSerialNumber=".$hash->{helper}{".SERIAL"}."&deviceType=".$hash->{helper}{DEVICETYPE};
 		$SendMetode = "POST";	
 	
 		$SendData = echodevice_getsequenceJson($hash,$type,$SendData);
@@ -2911,6 +2915,7 @@ sub echodevice_Parse($$$) {
 					$Person = 0;
 					if ($recordKey->{utteranceType} eq "GENERAL") {
 					
+						$hash->{helper}{".CUSTOMER"} = $recordKey->{customerId};
 						if(defined($modules{$hash->{TYPE}}{defptr}{$sourceDeviceIds})) {
 							
 							my $echohash = $modules{$hash->{TYPE}}{defptr}{$sourceDeviceIds};
@@ -4539,7 +4544,7 @@ sub echodevice_ParseAuth($$$) {
 		readingsBulkUpdate($hash, "state", "connected", 1);
 		readingsBulkUpdate($hash, "COOKIE_STATE", "OK", 1);
 		readingsEndUpdate($hash,1);
-		$hash->{helper}{".CUSTOMER"} = $json->{authentication}{customerId};
+		#$hash->{helper}{".CUSTOMER"} = $json->{authentication}{customerId};
 		Log3 $name, 4, "[$name] [echodevice_ParseAuth] JSON OK = {authentication}{authenticated}";
 	} 
 	
@@ -4885,7 +4890,7 @@ sub echodevice_getsequenceJson($$$) {
     elsif(lc($Bereich) eq "weihnachtsglocken")			{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"christmas_05\",';}
 	
 	$ResultString   = '{"behaviorId":"PREVIEW","sequenceJson":"{\"@type\":\"com.amazon.alexa.behaviors.model.Sequence\",\"startNode\":{\"@type\":\"com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode\",' . $BereichString . ',\"operationPayload\":{\"deviceType\":\"' . $hash->{helper}{DEVICETYPE} . '\",\"deviceSerialNumber\":\"' . $hash->{helper}{".SERIAL"} . '\",'.$BereichValue .'\"locale\":\"de-DE\",\"customerId\":\"' . $hash->{IODev}->{helper}{".CUSTOMER"} .'\"}}}","status":"ENABLED"}';	
-	
+		
 	return $ResultString;
 }
 
