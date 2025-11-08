@@ -2,8 +2,9 @@
 #
 ##############################################
 #
-# 2025.11.08 v0.2.32
+# 2025.11.08 v0.2.33
 # - BUG:     diverse Befehle gingen nicht mehr
+# - FEATURE: Unterstützung A3EH2E0YZ30OD6 Echo Spot 202
 #
 # 2025.11.06 v0.2.31 
 # - CHANGE:  Neue Check API URL cookielogin6
@@ -540,7 +541,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.32";
+my $ModulVersion     = "0.2.33";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -4674,7 +4675,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A39Y3UG1XLEJLZ" || $ModelNumber eq "Fitbit Sense")				{return "Fitbit Sense";}
 	elsif($ModelNumber eq "A1D6RDUOWH31HF" || $ModelNumber eq "JLR Incontrol")				{return "JLR Incontrol";}
 	elsif($ModelNumber eq "AQCGW9PSYWRF"   || $ModelNumber eq "Polk React Soundbar")		{return "Polk React Soundbar";}
-
+	elsif($ModelNumber eq "A3EH2E0YZ30OD6" || $ModelNumber eq "Echo Spot")					{return "Echo Spot 2024";}
 	elsif($ModelNumber eq "")               {return "";}
 	elsif($ModelNumber eq "ACCOUNT")        {return "ACCOUNT";}
 	else {return "unbekannt";}
