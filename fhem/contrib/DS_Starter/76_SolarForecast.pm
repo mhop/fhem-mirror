@@ -12007,7 +12007,10 @@ sub _batChargeMgmt {
                   delete $data{$name}{current}{tomorrowConsDuringHrsPVGen};                      # alte Summe bereinigen 
               }
               else {
-                  $data{$name}{current}{tomorrowConsDuringHrsPVGen} += $confc if($pvfc);
+                  if ($pvfc) {
+                  my $confwou = $confc * (100 - $wou) / 100;                                     # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)                                        
+                  $data{$name}{current}{tomorrowConsDuringHrsPVGen} += $confwou;  
+                  }
               }
           }
           
