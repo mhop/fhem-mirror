@@ -1,4 +1,4 @@
-REV 30498
+REV 30503
 DIR unused
 UPD 2025-11-08_07:45:04 450746 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -210,7 +210,7 @@ UPD 2022-09-29_07:45:02 11033 FHEM/37_SHC.pm
 UPD 2024-06-15_07:45:03 41541 FHEM/37_SHCdev.pm
 UPD 2018-07-10_07:45:14 56428 FHEM/37_Spotify.pm
 UPD 2017-01-02_07:45:02 7617 FHEM/37_dash_dhcp.pm
-UPD 2025-11-07_07:45:03 264408 FHEM/37_echodevice.pm
+UPD 2025-11-09_07:45:22 264828 FHEM/37_echodevice.pm
 UPD 2019-10-05_07:45:03 22167 FHEM/37_fakeRoku.pm
 UPD 2019-04-14_07:45:03 79219 FHEM/37_harmony.pm
 UPD 2020-04-17_07:45:02 152805 FHEM/37_plex.pm
@@ -768,8 +768,8 @@ UPD 2025-11-08_07:45:12 5383926 docs/commandref.html
 UPD 2025-11-08_07:45:16 3393004 docs/commandref_DE.html
 UPD 2025-05-03_07:45:04 86553 docs/commandref_frame.html
 UPD 2025-05-03_07:45:04 97225 docs/commandref_frame_DE.html
-UPD 2025-11-08_07:45:17 326323 docs/commandref_modular.html
-UPD 2025-11-08_07:45:18 338159 docs/commandref_modular_DE.html
+UPD 2025-11-09_07:45:35 326323 docs/commandref_modular.html
+UPD 2025-11-09_07:45:36 338159 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
