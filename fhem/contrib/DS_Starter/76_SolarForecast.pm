@@ -11639,10 +11639,10 @@ sub _batSocTarget {
       ## Aufladewahrscheinlichkeit beachten
       #######################################
       my $csopt     = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, $lowSoc);           # aktuelles SoC Optimum
-      my $cantarget = sprintf "%.0f", (100 - (100 / $batinstcap) * $pvexpect);                 # berechneter max. möglicher Minimum-SOC nach Berücksichtigung Ladewahrscheinlichkeit
+      my $cantarget = sprintf "%.0f", (100 - $pvexpect * (100 / $batinstcap));                 # maximale SOC-Höhe damit prognostizierte Energie komplett gespeichert werden kann 
       my $newtarget = sprintf "%.0f", ($cantarget < $target ? $cantarget : $target);           # Abgleich möglicher Minimum-SOC gg. berechneten Minimum-SOC
 
-      debugLog ($paref, 'batteryManagement', "SoC Step3 Bat $bn - basics -> cantarget: $cantarget %, newtarget: $newtarget %");
+      debugLog ($paref, 'batteryManagement', "SoC Step3 Bat $bn - basics -> max SOC so that predicted PV can be stored: $cantarget %, newtarget: $newtarget %");
 
       if ($newtarget > $careSoc) {
           $docare = 0;                                                                         # keine Zwangsanwendung care SoC
@@ -11852,12 +11852,12 @@ sub _batChargeMgmt {
       next if(!$iname);
 
       my $feed = InverterVal ($name, $in, 'ifeed', 'default');
-      next if($feed eq 'grid');                                                                  # Inverter 'Grid' ausschließen
+      next if($feed eq 'grid');                                                                    # Inverter 'Grid' ausschließen
 
       my $icap  = InverterVal ($name, $in, 'invertercap',   0);
-      my $limit = InverterVal ($name, $in, 'ilimit',      100);                                  # Wirkleistungsbegrenzung  (default keine Begrenzung)
+      my $limit = InverterVal ($name, $in, 'ilimit',      100);                                    # Wirkleistungsbegrenzung  (default keine Begrenzung)
       my $aplim = $icap * $limit / 100;
-      $inplim  += $aplim;                                                                        # max. Leistung aller WR mit Berücksichtigung Wirkleistungsbegrenzung
+      $inplim  += $aplim;                                                                          # max. Leistung aller WR mit Berücksichtigung Wirkleistungsbegrenzung
 
       debugLog ($paref, 'batteryManagement', "ChargeMgmt - Inverter '$iname' cap: $icap W, Power limit: $limit % -> Pmax eff: $aplim W");
   }
@@ -11937,12 +11937,8 @@ sub _batChargeMgmt {
           
           $releaseSoC //= $abortSoc;
           
-          if ($csoc >= $abortSoc && $bpowerin <= $abortpin) {
-              $data{$name}{batteries}{$bn}{bloadAbortCond} = 1;
-          }
-          elsif ($csoc < $releaseSoC) {
-              $data{$name}{batteries}{$bn}{bloadAbortCond} = 0;
-          }
+          if    ($csoc >= $abortSoc && $bpowerin <= $abortpin) { $data{$name}{batteries}{$bn}{bloadAbortCond} = 1; }
+          elsif ($csoc < $releaseSoC)                          { $data{$name}{batteries}{$bn}{bloadAbortCond} = 0; }
       }
       else {
           delete $data{$name}{batteries}{$bn}{bloadAbortCond};
@@ -12049,13 +12045,14 @@ sub _batChargeMgmt {
           
           ## Steuerung nach Ladefreigabe
           ################################
-          if ( $whneed * (1 + ($lrMargin / 100)) >= $spday ) {$crel = 1}                         # Ladefreigabe wenn benötigte Ladeenergie >= Restüberschuß des Tages zzgl. Sicherheitsaufschlag
+          if ( $whneed * (1 + ($lrMargin / 100)) >= $spday ) {$crel = 1}                         # Ladefreigabe wenn benötigte Ladeenergie zzgl. Sicherheitsaufschlag >= Restüberschuß des Tages 
           if ( !$num && ($pvCu - $curcon) >= $inplim )       {$crel = 1}                         # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
           if ( !$bpin && $gfeedin > $feedinlim )             {$crel = 1}                         # V 1.49.6 Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
           if ( $bpin && ($gfeedin - $bpin) > $feedinlim )    {$crel = 1}                         # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
           if ( !$cgbt )                                      {$crel = 1}                         # generelle Ladefreigabe wenn kein BatSoc/Lade-Management
           if ( !$lcintime )                                  {$crel = 1}                         # generelle Ladefreigabe wenn nicht innerhalb Zeitslot für Ladesteuerung
           if ( $csocwh <= $barrierSocWh)                     {$crel = 1}                         # generelle Ladefreigabe wenn aktueller SoC <= Barriere-SoC
+          if ( $whneed <= 0 )                                {$crel = 0}                         # keine Ladefreigabe wenn kein Bedarf, z.B. eingestellter Ziel-SoC erreicht
           if ( $labortCond )                                 {$crel = 0}                         # keine Ladefreigabe bei genereller Abbruchbedingung 
           
           # Steuerhash für optimimierte Ladeleistung erstellen
