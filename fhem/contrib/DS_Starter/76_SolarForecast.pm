@@ -11579,7 +11579,7 @@ sub _batSocTarget {
       ## erwartete PV ermitteln & Anteilsfaktor Bat anwenden
       ########################################################
       my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast',        0);                      # PV Prognose morgen
-      my $constm   = CurrentVal  ($name, 'tomorrowConsDuringHrsPVGen', 0);                      # Verbrauch während PV-Erzeugung
+      my $constm   = CurrentVal  ($name, 'tomorrowConsHoursWithPVGen', 0);                      # Verbrauch während PV-Erzeugung
       my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',        0);                      # PV Prognose Rest heute   
       my $surptd   = $pvfctd - $tdconsset;                                                      # erwarteter (Rest)Überschuß des aktuellen Tages
       my $surptm   = $pvfctm - $constm;                                                         # Überschuß des kommenden Tages während PV-Erzeugung
@@ -11592,7 +11592,7 @@ sub _batSocTarget {
 
       if ($debug =~ /batteryManagement/xs) {
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Battery share factor of total required load: $sf");
-          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging raw: $pvexpraw Wh");
+          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging throughout the day: $pvexpraw Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging after application Share factor: $pvexpect Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - compare with SoC history -> preliminary new Target: $target %");
       }
@@ -11858,8 +11858,8 @@ sub _batChargeMgmt {
       my $feed = InverterVal ($name, $in, 'ifeed', 'default');
       next if($feed eq 'grid');                                                                    # Inverter 'Grid' ausschließen
 
-      my $icap  = InverterVal ($name, $in, 'invertercap',   0);
-      my $limit = InverterVal ($name, $in, 'ilimit',      100);                                    # Wirkleistungsbegrenzung  (default keine Begrenzung)
+      my $icap  = InverterVal ($name, $in, 'invertercap', 0);
+      my $limit = InverterVal ($name, $in, 'ilimit',    100);                                      # Wirkleistungsbegrenzung  (default keine Begrenzung)
       my $aplim = $icap * $limit / 100;
       $inplim  += $aplim;                                                                          # max. Leistung aller WR mit Berücksichtigung Wirkleistungsbegrenzung
 
@@ -12000,16 +12000,16 @@ sub _batChargeMgmt {
           my $confc = NexthoursVal ($name, 'NextHour'.$nhr, 'confc', 0);
           my $pvfc  = NexthoursVal ($name, 'NextHour'.$nhr, 'pvfc',  0);
           
-          ## Summe Verbrauch in Stunden mit PV-Erzeugung am kommenden Tag                  
-          #################################################################                      # V 1.60.4
+          ## Summe Verbrauch der Stunden mit PV-Erzeugung am kommenden Tag                  
+          ##################################################################                     # V 1.60.4
           if ($fd == 1 && $bn == 1) {                                                            # nur für die 1. Bat -> Performance                        
               if ($fh == 0) {
-                  delete $data{$name}{current}{tomorrowConsDuringHrsPVGen};                      # alte Summe bereinigen 
+                  delete $data{$name}{current}{tomorrowConsHoursWithPVGen};                      # alte Summe bereinigen 
               }
               else {
                   if ($pvfc) {
-                  my $confwou = $confc * (100 - $wou) / 100;                                     # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)                                        
-                  $data{$name}{current}{tomorrowConsDuringHrsPVGen} += $confwou;  
+                      my $confwou = $confc * (100 - $wou) / 100;                                 # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)                                        
+                      $data{$name}{current}{tomorrowConsHoursWithPVGen} += $confwou;  
                   }
               }
           }
