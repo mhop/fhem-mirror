@@ -12508,7 +12508,7 @@ sub __batChargeOptTargetPower {
           if ($nhr eq '00') { $diff = min ($spls, $otp->{$sbn}{target} / 60 * (60 - int $minute)) }              # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
           else              { $diff = min ($spls, $hsurp->{$hod}{$sbn}{pneedmin}) }                              # kleinster Wert aus PV-Überschuß oder Ladeleistungsbegrenzung
                     
-          $runwh = min ($goalwh, $runwh + $diff);                                                                # Endwert Prognose          
+          $runwh = min ($goalwh, $runwh + $diff * $befficiency);                                                 # Endwert Prognose          
           $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen
           $runwh = sprintf "%.0f", $runwh;
           
