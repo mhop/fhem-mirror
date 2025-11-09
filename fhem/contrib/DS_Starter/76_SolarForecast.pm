@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.60.4" => "08.11.2025  smoothValue as OOP implemantation, battery efficiency rework ",
+  "1.60.4" => "09.11.2025  smoothValue as OOP implemantation, battery efficiency rework, edit comref ",
   "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
   "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
@@ -7539,7 +7539,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       show       => { comp => '(?:[0-3](?::(?:top|bottom))?)',                must => 0, act => 0 },
       label      => { comp => '(none|below|beside)',                          must => 0, act => 0 },
       asynchron  => { comp => '(0|1)',                                        must => 0, act => 0 },
-      efficiency => { comp => '(100|[1-9]?[0-9])',                            must => 0, act => 0 },
+      efficiency => { comp => '(?:100|[1-9][0-9]?)',                          must => 0, act => 0 },
   };
 
   if ($paref->{cmd} eq 'set') {      
@@ -12438,10 +12438,10 @@ sub __batChargeOptTargetPower {
                                             } 
                                           );
           
-          $pneedmin = $pneedmin / $befficiency;      # neu!
-          $pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
-          $pneedmin = max ($pneedmin, 0);                     
-          $pneedmin = sprintf "%.0f", $pneedmin;
+          #$pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
+          #$pneedmin = max ($pneedmin, 0);                     
+          #$pneedmin = sprintf "%.0f", $pneedmin;
+          $pneedmin = ___batAdjustEfficiencyAndLimits ($pneedmin, $befficiency, $bpinmax, 0);                    # Apply Bat Effizienz und Ladeleistungsbegrenzungen
           
           $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin;                                               
                
@@ -12487,10 +12487,10 @@ sub __batChargeOptTargetPower {
                                               } 
                                             );                        
               
-              $target = $target / $befficiency;      # neu!
-              $target = min ($target, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
-              $target = max ($target, $bpinreduced); 
-              $target = sprintf "%.0f", $target;
+              #$target = min ($target, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
+              #$target = max ($target, $bpinreduced); 
+              #$target = sprintf "%.0f", $target;
+              $target = ___batAdjustEfficiencyAndLimits ($target, $befficiency, $bpinmax, $bpinreduced);         # Apply Bat Effizienz und Ladeleistungsbegrenzungen
               
               $otp->{$sbn}{target} = $target;
           }
@@ -12599,6 +12599,20 @@ sub ___batApplySocAreas {
            ? ___batApplyBarrierAction ($name, $target, $barrierPar, $bpinmax)
            : $target;
 
+return $ph;
+}
+
+################################################################
+#   Endbehandlung einer Leistungsvorgabe für Batterieladung
+################################################################       
+sub ___batAdjustEfficiencyAndLimits {
+  my ($ph, $eff, $max, $min) = @_;
+  
+  $ph /= $eff;
+  $ph  = min ($ph, $max);                              # Begrenzung auf max. mögliche Batterieladeleistung
+  $ph  = max ($ph, $min);                              # Begrenzung auf min. gewünschte Batterieladeleistung
+  $ph  = sprintf "%.0f", $ph;
+  
 return $ph;
 }
 
@@ -28691,7 +28705,7 @@ to ensure that the system configuration is correct.
            <tr><td><b>efficiency</b> </td><td>Optional specification of the energy storage efficiency in %. This efficiency describes not                   </td></tr>
            <tr><td>                  </td><td>only the battery itself, but also the chain of effects, including the inverters involved.                     </td></tr>
            <tr><td>                  </td><td>Depending on the type of coupling and other factors, the typical efficiency is between 75 and 90%.            </td></tr>
-           <tr><td>                  </td><td>Value: <b>0..100</b> default: 87                                                                              </td></tr>
+           <tr><td>                  </td><td>Value: <b>1..100</b> default: 87                                                                              </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>icon</b>      </td><td>Icon and/or (only) color of the battery in the bar graph according to the status (optional).                  </td></tr>
            <tr><td>                  </td><td>The identifier (e.g. blue), HEX value (e.g. #d9d9d9) or 'dyn' can be specified as the color.                  </td></tr>
@@ -31469,7 +31483,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td><b>efficiency</b> </td><td>Optionale Angabe des Wirkungsgrades der Energiespeicherung in %. Dieser Wirkungsgrad beschreibt nicht    </td></tr>
            <tr><td>                  </td><td>nur die Batterie selbst, sondern die Wirkkette inkl. der betroffenen Wechselrichter.                     </td></tr>
            <tr><td>                  </td><td>Je nach Koppelart und anderen Faktoren liegt der typische Wirkungsgrad zwischen 75 - 90 %.               </td></tr>
-           <tr><td>                  </td><td>Wert: <b>0..100</b> default: 87                                                                          </td></tr>
+           <tr><td>                  </td><td>Wert: <b>1..100</b> default: 87                                                                          </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>icon</b>      </td><td>Icon und/oder (nur) Farbe der Batterie in der Balkengrafik entsprechend des Status (optional).           </td></tr>
            <tr><td>                  </td><td>Als Farbe kann der Bezeichner (z.B. blue), HEX-Wert (z.B. #d9d9d9) oder 'dyn' angegeben werden.          </td></tr>
