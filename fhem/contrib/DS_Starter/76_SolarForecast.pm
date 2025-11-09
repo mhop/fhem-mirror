@@ -162,7 +162,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.60.4" => "09.11.2025  smoothValue as OOP implemantation, battery efficiency rework, edit comref, expand loadTarget by time target ",
+  "1.60.4" => "09.11.2025  smoothValue as OOP implemantation, battery efficiency rework, edit comref, expand loadTarget by time target ".
+                           "_batSocTarget: surplus for next day adjusted ",
   "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
   "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
@@ -11577,12 +11578,15 @@ sub _batSocTarget {
 
       ## erwartete PV ermitteln & Anteilsfaktor Bat anwenden
       ########################################################
-      my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast',            0);                  # PV Prognose morgen
-      my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',            0);                  # PV Prognose Rest heute
-      my $pvexpraw = $pvfctm > $pvfctd ? $pvfctm : $pvfctd - $tdconsset;                        # erwartete (Rest) PV-Leistung des Tages
-      $pvexpraw    = $pvexpraw > 0 ? $pvexpraw : 0;                                             # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
+      my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast',        0);                      # PV Prognose morgen
+      my $constm   = CurrentVal  ($name, 'tomorrowConsDuringHrsPVGen', 0);                      # Verbrauch während PV-Erzeugung
+      my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',        0);                      # PV Prognose Rest heute   
+      my $surptd   = $pvfctd - $tdconsset;                                                      # erwarteter (Rest)Überschuß des aktuellen Tages
+      my $surptm   = $pvfctm - $constm;                                                         # Überschuß des kommenden Tages während PV-Erzeugung
+      my $pvexpraw = $surptm > $surptd ? $surptm : $surptd;                                     # V 1.60.4
+      #my $pvexpraw = $pvfctm > $pvfctd ? $pvfctm : $pvfctd - $tdconsset;                        # erwartete (Rest) PV-Leistung des Tages
+      $pvexpraw    = max ($pvexpraw, 0);                                                        # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
 
-      #my $sf       = __batCapShareFactor ($name, $bn);                                         # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $sf       = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor der Batterie XX Ladebedarf an Gesamtladebedarf
       my $pvexpect = $sf * $pvexpraw;
 
@@ -11995,6 +11999,17 @@ sub _batChargeMgmt {
           my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today', 0);
           my $confc = NexthoursVal ($name, 'NextHour'.$nhr, 'confc', 0);
           my $pvfc  = NexthoursVal ($name, 'NextHour'.$nhr, 'pvfc',  0);
+          
+          ## Summe Verbrauch in Stunden mit PV-Erzeugung am kommenden Tag                  
+          #################################################################                      # V 1.60.4
+          if ($fd == 1 && $bn == 1) {                                                            # nur für die 1. Bat -> Performance                        
+              if ($fh == 0) {
+                  delete $data{$name}{current}{tomorrowConsDuringHrsPVGen};                      # alte Summe bereinigen 
+              }
+              else {
+                  $data{$name}{current}{tomorrowConsDuringHrsPVGen} += $confc if($pvfc);
+              }
+          }
           
           if ($fd == 2 && $fh == 0) {
               $tompvfc  = CurrentVal ($name, 'dayAfterTomorrowPVfc',  0);                        # PV Prognose übernächster Tag
