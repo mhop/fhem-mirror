@@ -1182,7 +1182,7 @@ zigbee2mqtt_devStateIcon255($;$$)
       Notes:
       <ul>
         <li>arguments to the set command will be appended to the message
-          published (this is not valid not for the perl expression)</li>
+          published (this is not valid for the perl expression)</li>
         <li>the command arguments are available as $EVENT, $EVTPART0, etc., 
           the name of the device as $NAME, both in the perl expression and the
           "normal" topic variant.</li>

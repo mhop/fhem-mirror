@@ -272,7 +272,8 @@ Svn_GetFile($$;$)
                   if($from =~ m/\.\./ || $to =~ m/\.\./ || $to =~ m,^/,);
   HttpUtils_NonblockingGet({
     url=>"https://svn.fhem.de/trac/browser/trunk/fhem/$from?format=txt",
-    callback=>sub($$$){ 
+    incrementalTimeout=>1,
+    callback=>sub($$$){
       if($_[1]) {
         Log 1, "ERROR Svn_GetFile $from: $_[1]";
         return;
