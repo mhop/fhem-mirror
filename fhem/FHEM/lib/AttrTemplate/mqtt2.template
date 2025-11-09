@@ -5625,7 +5625,7 @@ CheckSubscription:noArg $\DEVICETOPIC/cmd/check-subscriptions
 attr DEVICE userReadings favlist:Favorites.* {sonos2mqtt_ur($name,'favlist')},\
 grouplist:Favorites.* {sonos2mqtt_ur($name,'grouplist')}
 {sonos2mqtt_setup('a:model=sonos2mqtt_bridge')}
-defmod n_configSonos notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+|MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {sonos2mqtt_nty($NAME,$EVENT)}
+defmod n_configSonos notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+|MQTT2_RINCON_[A-Z0-9]+:IPAddress:.*|DEFINED.RINCON_[A-Z0-9]+|RINCON_[A-Z0-9]+:IPAddress:.* {sonos2mqtt_nty($NAME,$EVENT)}
 setreading DEVICE attrTemplateVersion 20210303
 
 name:sonos2mqtt_speaker
