@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.60.4" => "09.11.2025  smoothValue as OOP implemantation, battery efficiency rework, edit comref ",
+  "1.60.4" => "09.11.2025  smoothValue as OOP implemantation, battery efficiency rework, edit comref, expand loadTarget by time target ",
   "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
   "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
@@ -7664,7 +7664,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
       careCycle    => { comp => '\d+',                                                                                   must => 0, act => 0 },
       loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',                                      must => 0, act => 0 },
       loadStrategy => { comp => '(loadRelease|optPower|smartPower)',                                                     must => 0, act => 0 },
-      loadTarget   => { comp => '(100|[1-9]?[0-9])',                                                                     must => 0, act => 0 },
+      loadTarget   => { comp => '(?:100|[1-9]?\d)(?::-?(?:[1-9]|1[0-9]|20))?',                                           must => 0, act => 0 },
       safetyMargin => { comp => '(?:100|[1-9]?\d)(?::(?:100|[1-9]?\d))?',                                                must => 0, act => 0 },
       weightOwnUse => { comp => '(100|[1-9]?[0-9])',                                                                     must => 0, act => 0 },
   };
@@ -7713,6 +7713,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
       my $upSoc      = $parsed->{upSoc};
       my $maxSoc     = $parsed->{maxSoc};
       my $barrierSoc = $parsed->{barrierSoc};
+      my $loadTarget = $parsed->{loadTarget};      
       
       unless ($lowSoc < $upSoc && $upSoc < $maxSoc) {
           return 'The specified values are not plausible. Compare the attribute help.';
@@ -7721,6 +7722,12 @@ sub _attrBatSocManagement {              ## no critic "not used"
       if (defined $barrierSoc) {
           unless ($lowSoc < $barrierSoc && $barrierSoc < $maxSoc) {
               return 'The specified values are not plausible. Compare the attribute help.';
+          }
+      }
+      
+      if (defined $loadTarget) {
+          unless ($lowSoc <= $loadTarget) {
+              return 'The first value of loadTarget must be higher than lowSoc.';
           }
       }
   }                                                             
@@ -11710,10 +11717,11 @@ sub __parseAttrBatSoc {
   my $name = shift;
   my $cgbt = shift // return;
 
-  my ($lrMargin, $otpMargin, $barrierSoC, $barrierPar);
+  my ($lrMargin, $otpMargin, $barrierSoC, $barrierPar, $loadTarget, $timeTarget);
   my ($pa, $ph)              = parseParams ($cgbt);
   ($lrMargin, $otpMargin)    = split (':', $ph->{safetyMargin})  if(defined $ph->{safetyMargin});
   ($barrierSoC, $barrierPar) = split (':', $ph->{barrierSoC}, 2) if(defined $ph->{barrierSoC});
+  ($loadTarget, $timeTarget) = split (':', $ph->{loadTarget})    if(defined $ph->{loadTarget});
 
   my $parsed = {
       lowSoc       => $ph->{lowSoc},                                               
@@ -11724,8 +11732,9 @@ sub __parseAttrBatSoc {
       lcslot       => $ph->{lcSlot}, 
       loadAbort    => $ph->{loadAbort},
       loadStrategy => $ph->{loadStrategy},
-      loadTarget   => $ph->{loadTarget},
-      weightOwnUse => $ph->{weightOwnUse},      
+      weightOwnUse => $ph->{weightOwnUse},
+      loadTarget   => $loadTarget,
+      timeTarget   => $timeTarget,
       lrMargin     => $lrMargin,       
       otpMargin    => $otpMargin,
       barrierSoc   => $barrierSoC,                                                        # SoC Barriere ab der eine Ladeleistungssteuerung aktiv sein soll
@@ -11885,7 +11894,6 @@ sub _batChargeMgmt {
       my $bpinreduced = BatteryVal  ($name, $bn, 'bpinreduced',              0);                   # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid 
       my $befficiency = BatteryVal  ($name, $bn, 'befficiency', STOREFFDEF) / 100;                 # Speicherwirkungsgrad
       my $cgbt        = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
-      #my $sf          = __batCapShareFactor     ($name, $bn);                                      # Anteilsfaktor der Batterie XX Kapazität an Gesamtkapazität
       my $sf          = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor Ladungsdefizit
       $strategy       = 'loadRelease';                                                             # 'loadRelease', 'optPower', 'smartPower'
       my $wou         = 0;                                                                         # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)     
@@ -11895,7 +11903,7 @@ sub _batChargeMgmt {
       my $goalwh      = $batinstcap;                                                               # initiales Ladeziel (Wh)
       my $lrMargin    = SFTYMARGIN_50;
       my $otpMargin   = SFTYMARGIN_20;                                                               
-      my ($lcslot, $barrierPar);
+      my ($lcslot, $barrierPar, $timeTarget);
             
       if ($cgbt) {
           my $parsed  = __parseAttrBatSoc ($name, $cgbt);
@@ -11908,15 +11916,19 @@ sub _batChargeMgmt {
           $otpMargin  = $parsed->{otpMargin}    // $otpMargin;                                     # Sicherheitszuschlag OTP (%)
           $strategy   = $parsed->{loadStrategy} // $strategy;
           $wou        = $parsed->{weightOwnUse} // $wou;
-          my $tgt     = $parsed->{loadTarget};                                                     # Ladeziel-SoC in %
-          $tgt        = $batoptsoc if(defined $tgt && $tgt < $batoptsoc);                          # Wert Battery_OptimumTargetSoC_XX beachten
-          $goalwh     = defined $tgt 
-                        ? sprintf "%.0f", ___batSocPercentToWh ($batinstcap, $tgt) 
-                        : $goalwh;                                                                 # Ladeziel-SoC in Wh
+          $timeTarget = $parsed->{timeTarget};                                                     # Uhrzeit (volle Stunde) wann Ladeziel erreicht sein soll
+          my $tgt     = $parsed->{loadTarget}   // 100;                                            # Ladeziel-SoC in %
+          $tgt        = max ($tgt, $batoptsoc);                                                    # höheren Wert aus Ziel und optimalen SoC verwenden
+          $goalwh     = sprintf "%.0f", ___batSocPercentToWh ($batinstcap, $tgt);                  # Ladeziel-SoC in Wh
       }
 
       my $barrierSocWh = sprintf "%.0f", ___batSocPercentToWh ($batinstcap, $barrierSoc);
       my $goalpercent  = sprintf "%.0f", ___batSocWhToPercent ($batinstcap, $goalwh);              # Ladeziel in %
+      
+      if (defined $timeTarget && $timeTarget < 0) {                                                # Ladezielzeit relativ zum Sonnenuntergang
+          my $dt      = timestringsFromOffset ($tdaysset, $timeTarget * 3600);                           
+          $timeTarget = int ($dt->{hour});                                                         # Uhrzeit ohne führende 0
+      }
 
       ## generelle Ladeabbruchbedingung evaluieren
       ##############################################
@@ -11953,14 +11965,13 @@ sub _batChargeMgmt {
       ######################
       if ($paref->{debug} =~ /batteryManagement/) {
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - selected charging strategy: $strategy");
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - General load termination condition: $labortCond");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - general load termination condition: $labortCond");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control time Slot - Slot start: $lcstart, Slot end: $lcend");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control barrier SoC: $barrierSoc % / $barrierSocWh Wh");
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control barrier Parameter: $barrierPar");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - control barrier Parameter: ".(defined $barrierPar ? $barrierPar : '-'));                       
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Battery efficiency used: ".($befficiency * 100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - weighted self-consumption: $wou %");
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - charging target: $goalpercent % / $goalwh Wh");
-          #Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Installed Battery capacity: $batinstcap Wh, Percentage of total capacity: ".(sprintf "%.1f", $sf*100)." %");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Target load and target time: $goalpercent % / $goalwh Wh / ".(defined $timeTarget ? $timeTarget.' oclock' : '-'));
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Percentage of the total amount of charging energy required: ".(sprintf "%.1f", $sf*100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - The PV generation, consumption and surplus listed below are based on the battery's share of the total amount of charging energy required!");
       }
@@ -12059,6 +12070,7 @@ sub _batChargeMgmt {
               $hsurp->{$fd}{$hod}{$bn}{initsocwh}    = $socwh;                                   # durch LR fortgeschriebener SoC
               $hsurp->{$fd}{$hod}{$bn}{batinstcap}   = $batinstcap;                              # installierte Batteriekapazität (Wh)
               $hsurp->{$fd}{$hod}{$bn}{goalwh}       = $goalwh;                                  # Ladeziel
+              $hsurp->{$fd}{$hod}{$bn}{timeTarget}   = $timeTarget;                              # gewünschte Zeit (volle Stunde) für Zielerreichung
               $hsurp->{$fd}{$hod}{$bn}{bpinmax}      = $bpinmax;                                 # max. mögliche Ladeleistung
               $hsurp->{$fd}{$hod}{$bn}{bpinreduced}  = $bpinreduced;                             # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
               $hsurp->{$fd}{$hod}{$bn}{bpoutmax}     = $bpoutmax;                                # max. mögliche Entladeleistung
@@ -12298,16 +12310,14 @@ sub __batChargeOptTargetPower {
       my $nexthod = sprintf "%02d", (int $hod + 1);
       my $nextnhr = $hsurp->{$nexthod}{nhr};
       
-      my @remaining_hods = grep { int $_ >= int $hod } @sortedhods;
-      my $remainingSurp  = 0;                                               
+      my ($remainingSurp_o, $remainingHodsRef_o) = ___batRemainHodsAndSurp ( $hod,                               # verbleibender Überschuß ohne Zielzeit gesetzt
+                                                                             $hsurp, 
+                                                                             $replacement, 
+                                                                             \@sortedhods
+                                                                          );
       
-      for my $h (@remaining_hods) {                                                                              # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
-          my $val = defined $hsurp->{$h}{nhr} && $hsurp->{$h}{nhr} eq '00'
-                    ? int ($replacement) // 0
-                    : $hsurp->{$h}{surplswh};
-          $remainingSurp += int $val;
-      }
-
+      my ($remainingSurp, $remainingHodsRef);
+      
       for my $sbn (sort { $a <=> $b } @batteries) {                                                              # jede Batterie          
           my $bpinmax      = $hsurp->{$hod}{$sbn}{bpinmax};                                                      # Bat max. mögliche Ladelesitung
           my $batinstcap   = $hsurp->{$hod}{$sbn}{batinstcap};                                                   # Kapa dieser Batterie 
@@ -12319,6 +12329,7 @@ sub __batChargeOptTargetPower {
           my $bpinreduced  = $hsurp->{$hod}{$sbn}{bpinreduced};                                                  # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
           my $befficiency  = $hsurp->{$hod}{$sbn}{befficiency};                                                  # Speicherwirkungsgrad
           my $strategy     = $hsurp->{$hod}{$sbn}{strategy};                                                     # Ladestrategie
+          my $timeTarget   = $hsurp->{$hod}{$sbn}{timeTarget};                                                   # gewünschte Zeit (volle Stunde) für Zielerreichung
           
           # Initialisierung / Fortschreibung Prognose-SOC (Wh)
           ######################################################
@@ -12338,8 +12349,19 @@ sub __batChargeOptTargetPower {
 
           ## Ziel und dessen Erreichbarkeit
           ###################################
+          if ($timeTarget) {                                                                                     # verbleibender Überschuß mit Zielzeit gesetzt
+              ($remainingSurp, $remainingHodsRef) = ___batRemainHodsAndSurp ( $hod, 
+                                                                              $hsurp, 
+                                                                              $replacement, 
+                                                                              \@sortedhods, 
+                                                                              $timeTarget
+                                                                            );
+          }
+          else {
+              ($remainingSurp, $remainingHodsRef) = ($remainingSurp_o, $remainingHodsRef_o);
+          }
+          
           my $goalwh     = $hsurp->{$hod}{$sbn}{goalwh};                                                         # Ladeziel 
-          #my $runwhneed  = ($goalwh - $runwh) / $befficiency; 
           my $runwhneed  = $goalwh - $runwh;          
           my $achievable = 1;
             
@@ -12350,9 +12372,6 @@ sub __batChargeOptTargetPower {
           storeReading ('Battery_TargetAchievable_'.$sbn, $achievable) if($nhr eq '00');
           
           $hsurp->{$hod}{$sbn}{loadrel}    = $runwhneed > 0 ? 1 : 0;                                             # Ladefreigabe abhängig von Ziel-SoC Erfüllung
-          #$hsurp->{$hod}{$sbn}{achievelog} = "charging target: $goalwh Wh, remaining: ".
-          #                                   (sprintf "%.0f", ($runwhneed * $befficiency)).' Wh -> target likely achievable? '.
-          #                                   ($achievable ? 'yes' : 'no'); 
           $hsurp->{$hod}{$sbn}{achievelog} = "charging target: $goalwh Wh, remaining: ".
                                              (sprintf "%.0f", $runwhneed).' Wh -> target likely achievable? '.
                                              ($achievable ? 'yes' : 'no'); 
@@ -12392,12 +12411,11 @@ sub __batChargeOptTargetPower {
           #########################
           my $otpMargin = $hsurp->{$hod}{$sbn}{otpMargin};                              
           my $fref      = ___batFindMinPhWh ( { hsurp         => $hsurp, 
-                                                hodsref       => \@remaining_hods, 
+                                                hodsref       => $remainingHodsRef,
                                                 remainingSurp => $remainingSurp, 
                                                 Ereq          => $runwhneed, 
                                                 replacement   => $replacement, 
                                                 achievable    => $achievable,
-                                                #befficiency   => $befficiency,
                                                 minute        => $minute
                                               }
                                             );
@@ -12409,7 +12427,6 @@ sub __batChargeOptTargetPower {
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
                           : $fref->{ph};                                                                         
                                                    
-          #$limpower     = $limpower // 0 > 0 ? $limpower / $befficiency : 0;                                     # Zielleistung mit Batterie Effizienzgrad erhöhen
           $limpower     = $limpower // 0 > 0 ? $limpower : 0;
           $limpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});            
           $limpower     = max ($limpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen                  
@@ -12438,9 +12455,6 @@ sub __batChargeOptTargetPower {
                                             } 
                                           );
           
-          #$pneedmin = min ($pneedmin, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
-          #$pneedmin = max ($pneedmin, 0);                     
-          #$pneedmin = sprintf "%.0f", $pneedmin;
           $pneedmin = ___batAdjustEfficiencyAndLimits ($pneedmin, $befficiency, $bpinmax, 0);                    # Apply Bat Effizienz und Ladeleistungsbegrenzungen
           
           $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin;                                               
@@ -12486,10 +12500,7 @@ sub __batChargeOptTargetPower {
                                                 bpinmax    => $bpinmax                                            
                                               } 
                                             );                        
-              
-              #$target = min ($target, $bpinmax);                                                                 # Begrenzung auf max. mögliche Batterieladeleistung
-              #$target = max ($target, $bpinreduced); 
-              #$target = sprintf "%.0f", $target;
+
               $target = ___batAdjustEfficiencyAndLimits ($target, $befficiency, $bpinmax, $bpinreduced);         # Apply Bat Effizienz und Ladeleistungsbegrenzungen
               
               $otp->{$sbn}{target} = $target;
@@ -12500,7 +12511,6 @@ sub __batChargeOptTargetPower {
           if ($nhr eq '00') { $diff = min ($spls, $otp->{$sbn}{target} / 60 * (60 - int $minute)) }              # aktuelle (Rest)-Stunde -> zeitgewichteter Ladungszufluß
           else              { $diff = min ($spls, $hsurp->{$hod}{$sbn}{pneedmin}) }                              # kleinster Wert aus PV-Überschuß oder Ladeleistungsbegrenzung
                     
-          #$runwh = min ($goalwh, $runwh + ($diff * $befficiency));                                               # Endwert Prognose
           $runwh = min ($goalwh, $runwh + $diff);                                                                # Endwert Prognose          
           $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen
           $runwh = sprintf "%.0f", $runwh;
@@ -12515,6 +12525,28 @@ sub __batChargeOptTargetPower {
   }
   
 return ($hsurp, $otp);
+}
+
+################################################################
+#   Verbleibende Aktivstunden und deren Überschußsumme liefern
+################################################################       
+sub ___batRemainHodsAndSurp {
+  my ($hod, $hsurp, $replacement, $sortedhodsref, $timeTarget) = @_;
+  
+  my @remaining_hods;
+  my $remainingSurp = 0;  
+  
+  if (defined $timeTarget) { @remaining_hods = grep { int $_ >= int $hod && int $_ <= int $timeTarget } @$sortedhodsref } 
+  else                     { @remaining_hods = grep { int $_ >= int $hod } @$sortedhodsref }                                             
+  
+  for my $h (@remaining_hods) {                                              # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
+      my $val = defined $hsurp->{$h}{nhr} && $hsurp->{$h}{nhr} eq '00'
+                ? int ($replacement) // 0
+                : $hsurp->{$h}{surplswh};
+      $remainingSurp += int $val;
+  }
+
+return ($remainingSurp, \@remaining_hods);
 }
 
 ################################################################
@@ -12663,7 +12695,6 @@ sub ___batFindMinPhWh {
   my $Ereq          = $paref->{Ereq};
   my $replacement   = $paref->{replacement};
   my $achievable    = $paref->{achievable};
-  #my $befficiency   = $paref->{befficiency};
   my $minute        = $paref->{minute};
     
   my @hods     = @$hodsref;
@@ -12696,7 +12727,6 @@ sub ___batFindMinPhWh {
           if ($nhr eq '00') { $cap = min ($mid, $hsurp->{$hod}{surplswh}) / 60 * (60 - int $minute)}     # Zeitgewichtung aktuelle Stunde
           else              { $cap = min ($mid, $hsurp->{$hod}{surplswh})}                               
 
-          #$cap     *= $befficiency;
           $charged += $cap;
       }
         
@@ -25909,38 +25939,9 @@ return $def;
 }
 
 ###################################################################################################
-# Wert des current-Hash zurückliefern
+# Wert des Current-Speichers auslesen
 # Usage:
 # CurrentVal ($hash or $name, $key, $def)
-#
-# $key: aiinitstate          - Initialisierungsstatus der KI
-#       aitrainstate         - Traisningsstatus der KI
-#       aiaddistate          - Add Instanz Status der KI
-#       ctrunning            - aktueller Ausführungsstatus des Central Task
-#       dwdRad1hAge          - Alter des Rad1h Wertes als Datumstring
-#       dwdRad1hAgeTS        - Alter des Rad1h Wertes als Unix Timestamp
-#       genslidereg          - Schieberegister PV Erzeugung (Array)
-#       h4fcslidereg         - Schieberegister 4h PV Forecast (Array)
-#       surplusslidereg      - Schieberegister PV Überschuß (Array)
-#       moonPhaseI           - aktuelle Mondphase (1 .. 8)
-#       batsocslidereg       - Schieberegister Batterie SOC (Array)
-#       consumption          - aktueller Verbrauch (W)
-#       consumerdevs         - alle registrierten Consumerdevices (Array)
-#       consumerCollected    - Statusbit Consumer Attr gesammelt und ausgewertet
-#       gridconsumption      - aktueller Netzbezug
-#       temp                 - aktuelle Außentemperatur
-#       surplus              - aktueller PV Überschuß
-#       tomorrowconsumption  - Verbrauch des kommenden Tages
-#       allstringspeak       - Peakleistung aller Strings nach temperaturabhängiger Korrektur
-#       allstringscount      - aktuelle Anzahl der Anlagenstrings
-#       tomorrowconsumption  - erwarteter Gesamtverbrauch am morgigen Tag
-#       sunriseToday         - Sonnenaufgang heute
-#       sunriseTodayTs       - Sonnenaufgang heute Unix Timestamp
-#       sunsetToday          - Sonnenuntergang heute
-#       sunsetTodayTs        - Sonnenuntergang heute Unix Timestamp
-#
-# $def: Defaultwert
-#
 ###################################################################################################
 sub CurrentVal {
   my $name = shift;
@@ -26440,7 +26441,7 @@ sub SM_new {
 return $self;
 }
 
-sub SM_update {                                                     # update mit neuem Messwert; gibt den geglätteten Wert zurück
+sub SM_update {                                                                       # update mit neuem Messwert; gibt den geglätteten Wert zurück
   my ($self, $newval) = @_;
   return $self->{value} unless defined $newval;
 
@@ -26448,16 +26449,12 @@ sub SM_update {                                                     # update mit
   my $diff    = $newval - $current;
   my $abs     = $diff >= 0 ? $diff : -$diff;
 
-  if ($abs <= $self->{deadband}) {                                  # innerhalb der deadband: kein Wechsel
+  if ($abs <= $self->{deadband}) {                                                    # innerhalb der deadband: kein Wechsel
       return $current;
   }
 
-  if ($self->{alpha} >= 1) {                                        # außerhalb deadband: Ziel ist der neue Messwert; gleiten je nach alpha
-      $self->{value} = $newval;
-  } 
-  else {
-      $self->{value} = $current + $self->{alpha} * $diff;
-  }
+  if ($self->{alpha} >= 1) { $self->{value} = $newval }                               # außerhalb deadband: Ziel ist der neue Messwert; gleiten je nach alpha
+  else                     { $self->{value} = $current + $self->{alpha} * $diff }
 
 return $self->{value};
 }
@@ -27947,11 +27944,14 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>For more information on selecting a strategy, see german <a href="https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Welche_Ladestrategie_soll_ich_w%C3%A4hlen?_-_eine_M%C3%B6glichkeit_zur_Best-Practice_Findung_mit_Codebeispiel">Wiki</a>.  </td></tr>           
             <tr><td>                     </td><td>Value: <b>loadRelease</b> | <b>optPower</b> | <b>smartPower</b>, default: loadRelease           </td></tr>           
             <tr><td>                     </td><td>                                                                                                </td></tr>           
-            <tr><td> <b>loadTarget</b>   </td><td>Optional target SoC in % for calculating charge release or optimal charging power.              </td></tr>
-            <tr><td>                     </td><td>The target value is a calculated figure. The actual SoC may be higher or lower than this within </td></tr>
-            <tr><td>                     </td><td>certain limits, depending on the situation. The higher value from Reading                       </td></tr>
-            <tr><td>                     </td><td><b>Battery_OptimumTargetSoC_XX</b> and 'loadTarget' takes precedence for the calculation.       </td></tr>
-            <tr><td>                     </td><td>Value: <b>0..100</b>, default: 100                                                              </td></tr>           
+            <tr><td> <b>loadTarget</b>   </td><td>Optional target SoC (%), target time for calculating charge release, and optimal charging power.</td></tr>
+			<tr><td>                     </td><td>The specified target SoC must be greater than the value of 'lowSoC'. A higher value in the      </td></tr>
+			<tr><td>                     </td><td>reading <b>Battery_OptimumTargetSoC_XX</b> takes precedence over the parameter setting.         </td></tr>                             
+            <tr><td>                     </td><td>A specified target time is the full hour (1..20) or, as a negative value (-20..-1), the         </td></tr>
+			<tr><td>                     </td><td>last full hour before sunset minus this value.                                                  </td></tr>
+			<tr><td>                     </td><td>Syntax: <b>&lt;Target SoC&gt;[:&lt;Target time&gt;]</b>                                         </td></tr>
+            <tr><td>                     </td><td>Value range Target SoC: <b>lowSoc..100</b>, default: 100                                        </td></tr>
+            <tr><td>                     </td><td>Value range Target time: <b>-20..20</b>(without leading zero), default: undefined               </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>           
             <tr><td> <b>safetyMargin</b> </td><td>When calculating the load clearance and optimized load capacity, safety margins are taken       </td></tr>
             <tr><td>                     </td><td>into account in the predicted load requirements.                                                </td></tr>
@@ -27973,7 +27973,7 @@ to ensure that the system configuration is correct.
          All SoC values are whole numbers in %. The following applies: 'lowSoc' &lt; 'upSoC' &lt; 'maxSoC'. <br><br>
 
          <b>Example: </b> <br>
-         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 safetyMargin=30 weightOwnUse=20 <br>
+         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 safetyMargin=30 weightOwnUse=20 loadTarget=90:-2 <br>
        </li>
        <br>
 
@@ -30728,11 +30728,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>Weitere Informationen zur Auswahl der Strategie siehe <a href="https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Welche_Ladestrategie_soll_ich_w%C3%A4hlen?_-_eine_M%C3%B6glichkeit_zur_Best-Practice_Findung_mit_Codebeispiel">Wiki</a>.  </td></tr>           
             <tr><td>                     </td><td>Wert: <b>loadRelease</b> | <b>optPower</b> | <b>smartPower</b>, default: loadRelease            </td></tr>         
             <tr><td>                     </td><td>                                                                                                </td></tr>           
-            <tr><td> <b>loadTarget</b>   </td><td>Optionaler Ziel-SoC in % für die Berechnung der Ladefreigabe bzw. der optimalen Ladeleistung.   </td></tr>
-            <tr><td>                     </td><td>Der Zielwert ist eine kalkulatorische Rechengröße. Der reale SoC kann situativ in Grenzen       </td></tr>
-            <tr><td>                     </td><td>über- oder unterschritten werden. Der höhere Wert aus Reading <b>Battery_OptimumTargetSoC_XX</b></td></tr>
-            <tr><td>                     </td><td>und 'loadTarget' hat für die Berechnung Vorrang.                                                </td></tr>
-            <tr><td>                     </td><td>Wert: <b>0..100</b>, default: 100                                                               </td></tr>           
+            <tr><td> <b>loadTarget</b>   </td><td>Optionaler Ziel-SoC (%), Zielzeit zur Berechnung der Ladefreigabe und optimalen Ladeleistung.   </td></tr>
+			<tr><td>                     </td><td>Der angegebene Ziel-SoC muß größer als der Wert von 'lowSoC' sein. Ein höherer Wert im Reading  </td></tr>
+			<tr><td>                     </td><td><b>Battery_OptimumTargetSoC_XX</b> gegenüber der Parametervorgabe hat Vorrang.                  </td></tr>                             
+            <tr><td>                     </td><td>Eine angegebene Zielzeit ist die volle Stunde (1..20) oder als negativer Wert (-20..-1) die     </td></tr>
+			<tr><td>                     </td><td>letzte volle Stunde vor dem Sonnenuntergang abzüglich diesem Wert.                              </td></tr>
+			<tr><td>                     </td><td>Syntax: <b>&lt;Ziel-SoC&gt;[:&lt;Zielzeit&gt;]</b>                                              </td></tr>
+            <tr><td>                     </td><td>Wertebereich Ziel-SoC: <b>lowSoc..100</b>, default: 100                                         </td></tr>
+            <tr><td>                     </td><td>Wertebereich Zielzeit: <b>-20..20</b> (ohne führende Null), default: undefiniert                </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>           
             <tr><td> <b>safetyMargin</b> </td><td>Bei der Berechnung der Ladefreigabe und optimierten Ladeleistung werden Sicherheitszuschläge    </td></tr>
             <tr><td>                     </td><td>auf den prognostizierten Ladungsbedarf berücksichtigt.                                          </td></tr>
@@ -30754,7 +30757,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Alle SoC-Werte sind ganze Zahlen in %. Dabei gilt: 'lowSoc' &lt; 'upSoC' &lt; 'maxSoC'. <br><br>
 
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 safetyMargin=30 weightOwnUse=20 <br>
+         attr &lt;name&gt; ctrlBatSocManagement01 lowSoc=10 upSoC=50 maxSoC=99 careCycle=25 lcSlot=11:00-17:30 loadAbort=99:40:90 safetyMargin=30 weightOwnUse=20 loadTarget=90:-2 <br>
        </li>
        <br>
 
