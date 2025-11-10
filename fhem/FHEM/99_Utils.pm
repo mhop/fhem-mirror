@@ -271,7 +271,7 @@ Svn_GetFile($$;$)
   return "Forbidden characters in from/to"
                   if($from =~ m/\.\./ || $to =~ m/\.\./ || $to =~ m,^/,);
   HttpUtils_NonblockingGet({
-    url=>"https://svn.fhem.de/trac/browser/trunk/fhem/$from?format=txt",
+    url=>"https://svn.fhem.de/fhem/trunk/fhem/$from",
     incrementalTimeout=>1,
     callback=>sub($$$){
       if($_[1]) {
