@@ -11582,7 +11582,7 @@ sub _batSocTarget {
       my $constm   = CurrentVal  ($name, 'tomorrowConsHoursWithPVGen', 0);                      # Verbrauch während PV-Erzeugung
       my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',        0);                      # PV Prognose Rest heute   
       my $surptd   = $pvfctd - $tdconsset;                                                      # erwarteter (Rest)Überschuß des aktuellen Tages
-      my $surptm   = $pvfctm - $constm;                                                         # Überschuß des kommenden Tages während PV-Erzeugung
+      my $surptm   = $pvfctm - $constm * 0.5;                                                   # anteilig Überschuß am kommenden Tages während PV-Erzeugung -> Platz lassen!
       my $pvexpraw = $surptm > $surptd ? $surptm : $surptd;                                     # V 1.60.4
       #my $pvexpraw = $pvfctm > $pvfctd ? $pvfctm : $pvfctd - $tdconsset;                        # erwartete (Rest) PV-Leistung des Tages
       $pvexpraw    = max ($pvexpraw, 0);                                                        # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
