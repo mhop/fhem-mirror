@@ -11999,20 +11999,6 @@ sub _batChargeMgmt {
           my $confc = NexthoursVal ($name, 'NextHour'.$nhr, 'confc', 0);
           my $pvfc  = NexthoursVal ($name, 'NextHour'.$nhr, 'pvfc',  0);
           
-          ## Summe Verbrauch der Stunden mit PV-Erzeugung am kommenden Tag                  
-          ##################################################################                     # V 1.60.4
-          if ($fd == 1 && $bn == 1) {                                                            # nur für die 1. Bat -> Performance                        
-              if ($fh == 0) {
-                  delete $data{$name}{current}{tomorrowConsHoursWithPVGen};                      # alte Summe bereinigen 
-              }
-              else {
-                  if ($pvfc) {
-                      my $confwou = $confc * (100 - $wou) / 100;                                 # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)                                        
-                      $data{$name}{current}{tomorrowConsHoursWithPVGen} += $confwou;  
-                  }
-              }
-          }
-          
           if ($fd == 2 && $fh == 0) {
               $tompvfc  = CurrentVal ($name, 'dayAfterTomorrowPVfc',  0);                        # PV Prognose übernächster Tag
               $tomconfc = CurrentVal ($name, 'dayAfterTomorrowConfc', 0);                        # Verbrauchsprognose übernächster Tag
@@ -12904,6 +12890,9 @@ sub _createSummaries {
   $restOfDaySum->{Consumption}  = $hour00confcremain;
 
   for my $h (1..MAXNEXTHOURS) {
+      my ($fd, $fh) = calcDayHourMove ($chour, $h);
+      next if($fd > 2);
+          
       my $idx   = sprintf "%02d", $h;
       my $pvfc  = NexthoursVal ($name, "NextHour".$idx, 'pvfc',      0);
       my $confc = NexthoursVal ($name, "NextHour".$idx, 'confc',     0);
@@ -12957,6 +12946,19 @@ sub _createSummaries {
       elsif ($nhday eq $datmoday) {
           $daftertomSum->{PV}          += $pvfc;
           $daftertomSum->{Consumption} += $confc;          
+      }
+      
+      ## Summe Verbrauch der Stunden mit PV-Erzeugung am kommenden Tag                  
+      ##################################################################                     # V 1.60.4
+      if ($fd == 1) {                                                                        # für den nächsten Tag                        
+          if ($fh == 0) {
+              delete $data{$name}{current}{tomorrowConsHoursWithPVGen};                      # alte Summe bereinigen 
+          }
+          else {
+              if ($pvfc) {
+                  $data{$name}{current}{tomorrowConsHoursWithPVGen} += $confc;  
+              }
+          }
       }
   }
 
