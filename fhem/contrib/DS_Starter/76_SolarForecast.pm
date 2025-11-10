@@ -11582,9 +11582,8 @@ sub _batSocTarget {
       my $constm   = CurrentVal  ($name, 'tomorrowConsHoursWithPVGen', 0);                      # Verbrauch während PV-Erzeugung
       my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',        0);                      # PV Prognose Rest heute   
       my $surptd   = $pvfctd - $tdconsset;                                                      # erwarteter (Rest)Überschuß des aktuellen Tages
-      my $surptm   = $pvfctm - $constm * 0.5;                                                   # anteilig Überschuß am kommenden Tages während PV-Erzeugung -> Platz lassen!
+      my $surptm   = sprintf "%.0f", ($pvfctm - $constm * 0.5);                                 # anteilig Überschuß am kommenden Tages während PV-Erzeugung -> Platz lassen!
       my $pvexpraw = $surptm > $surptd ? $surptm : $surptd;                                     # V 1.60.4
-      #my $pvexpraw = $pvfctm > $pvfctd ? $pvfctm : $pvfctd - $tdconsset;                        # erwartete (Rest) PV-Leistung des Tages
       $pvexpraw    = max ($pvexpraw, 0);                                                        # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
 
       my $sf       = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor der Batterie XX Ladebedarf an Gesamtladebedarf
@@ -11592,7 +11591,7 @@ sub _batSocTarget {
 
       if ($debug =~ /batteryManagement/xs) {
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Battery share factor of total required load: $sf");
-          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging throughout the day: $pvexpraw Wh");
+          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging with proportional consumption: $pvexpraw Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging after application Share factor: $pvexpect Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - compare with SoC history -> preliminary new Target: $target %");
       }
@@ -12380,7 +12379,7 @@ sub __batChargeOptTargetPower {
           my $runwhneed  = $goalwh - $runwh;          
           my $achievable = 1;
             
-          if ($runwhneed > 0 && $remainingSurp < $runwhneed) {                                                   # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
+          if ($runwhneed > 0 && $remainingSurp * $befficiency < $runwhneed) {                                    # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
               $achievable = 0;                                                      
           }
           
