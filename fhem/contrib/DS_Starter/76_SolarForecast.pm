@@ -12724,10 +12724,10 @@ sub ___batFindMinPhWh {
           my $nhr = $hsurp->{$hod}{nhr};
           next if(!defined $nhr);
           
-          if ($nhr eq '00') { $cap = min ($mid, $hsurp->{$hod}{surplswh}) / 60 * (60 - int $minute)}     # Zeitgewichtung aktuelle Stunde
-          else              { $cap = min ($mid, $hsurp->{$hod}{surplswh})}                               
+          if ($nhr eq '00') { $cap = min ($mid, $hsurp->{$hod}{surplswh}) / 60 * (60 - int $minute) }     # Zeitgewichtung aktuelle Stunde
+          else              { $cap = min ($mid, $hsurp->{$hod}{surplswh}) }                               
 
-          $charged += $cap;
+          $charged += $cap // 0;
       }
         
       $charged >= $Ereq ? ($high = $mid) : ($low = $mid);
