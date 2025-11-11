@@ -12440,7 +12440,8 @@ sub __batChargeOptTargetPower {
                                                        $bpinmax, 
                                                        $runwhneed, 
                                                        $otpMargin, 
-                                                       $remainingSurp
+                                                       $remainingSurp,
+                                                       $befficiency
                                                       );         
           }
           
@@ -12476,7 +12477,8 @@ sub __batChargeOptTargetPower {
                                                                  $bpinmax, 
                                                                  $runwhneed, 
                                                                  $otpMargin, 
-                                                                 $remainingSurp
+                                                                 $remainingSurp,
+                                                                 $befficiency
                                                                 );
 
                   $otp->{$sbn}{ratio} = sprintf ("%.2f", $ratio);                                           
@@ -12555,14 +12557,14 @@ return ($remainingSurp, \@remaining_hods);
 #  Forum: https://forum.fhem.de/index.php?msg=1349579
 ################################################################       
 sub ___batAdjustPowerByMargin {
-  my ($limpower, $pinmax, $whneed, $otpMargin, $remainingSurp) = @_;
+  my ($limpower, $pinmax, $whneed, $otpMargin, $remainingSurp, $befficiency) = @_;
 
   my $pow;
   my $ratio = 0;
   
   return ($limpower, $ratio) if(!defined $whneed || $whneed <= 0);
   
-  $ratio    = $remainingSurp * 100 / $whneed;
+  $ratio    = $remainingSurp * 100 / ($whneed / $befficiency);
   $limpower = min ($limpower, $pinmax);                                        # limpower !> pinmax um invertierte Interpolation zu vermeiden 
   
   if    ($limpower <= 0       || !$otpMargin)    {$pow = $limpower} 
