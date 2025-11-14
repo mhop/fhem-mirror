@@ -2,9 +2,12 @@
 #
 ##############################################
 #
+# 2025.11.14 v0.2.34
+# - FEATURE: Unterstützung AQ24620N8QD5Q Echo Show 15 Gen2
+#
 # 2025.11.08 v0.2.33
 # - BUG:     diverse Befehle gingen nicht mehr
-# - FEATURE: Unterstützung A3EH2E0YZ30OD6 Echo Spot 202
+# - FEATURE: Unterstützung A3EH2E0YZ30OD6 Echo Spot 2024
 #
 # 2025.11.06 v0.2.31 
 # - CHANGE:  Neue Check API URL cookielogin6
@@ -541,7 +544,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.33";
+my $ModulVersion     = "0.2.34";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -4602,6 +4605,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A15996VY63BQ2D" || $ModelNumber eq "Echo Show 8")				{return "Echo Show 8 Gen2";}
 	elsif($ModelNumber eq "A2UONLFQW0PADH" || $ModelNumber eq "Echo Show 8")				{return "Echo Show 8 Gen3";}
 	elsif($ModelNumber eq "A1EIANJ7PNB0Q7" || $ModelNumber eq "Echo Show 15")				{return "Echo Show 15 Gen1";}
+	elsif($ModelNumber eq "AQ24620N8QD5Q"  || $ModelNumber eq "Echo Show 15")				{return "Echo Show 15 Gen2";}
 	elsif($ModelNumber eq "A2M35JJZWCQOMZ" || $ModelNumber eq "Echo Plus")					{return "Echo Plus";}
 	elsif($ModelNumber eq "A1JJ0KFC4ZPNJ3" || $ModelNumber eq "Echo Input")					{return "Echo Input";}
 	elsif($ModelNumber eq "A18O6U1UQFJ0XK" || $ModelNumber eq "Echo Plus 2")				{return "Echo Plus 2";}
