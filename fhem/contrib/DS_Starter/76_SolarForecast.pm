@@ -162,8 +162,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.60.4" => "09.11.2025  smoothValue as OOP implemantation, battery efficiency rework, edit comref, expand loadTarget by time target ".
-                           "_batSocTarget: surplus for next day adjusted ",
+  "1.60.5" => "14.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ",
+  "1.60.4" => "13.11.2025  smoothValue as OOP implemantation, battery efficiency rework, edit comref, expand loadTarget by time target ".
+                           "_batSocTarget: surplus for next day adjusted, some code changes ",
   "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
   "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
@@ -455,8 +456,9 @@ use constant {
   SPLSLIDEMAX    => 20,                                                             # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß und anderen
   CONDAYSLIDEMAX => 30,                                                             # max. Anzahl der Arrayelemente im Register pvCircular -> con_all / gcons_a -> <Tag>
   WHISTREPEAT    => 851,                                                            # Wiederholungsintervall Cache File Daten schreiben
-  EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
-
+  EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen für verbraucherspezifische Energiestück Ermittlung (EnergyPieces)
+  EPIECMAXOPHRS  => 5,                                                            # max. Anzahl ununterbrochene Betriebsstunden für Verbraucher ohne Cycle Switch (EnergyPieces)
+  
   MAXWEATHERDEV  => 3,                                                              # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
   MAXBATTERIES   => 3,                                                              # maximale Anzahl der möglichen Batterien
   MAXCONSUMER    => 20,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
@@ -9070,15 +9072,6 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
 
-  for my $c (1..MAXCONSUMER) {                                          # 23.07.
-      $c = sprintf "%02d", $c;
-      my $surpmeth = ConsumerVal ($hash, $c, 'surpmeth', '');
-
-      if ($surpmeth =~ /^[2-9]$|^1[0-9]$|^20$/xs) {
-          fhem ("set $name attrKeyVal consumer${c} surpmeth=average_${surpmeth}");
-      }
-  }
-
   for my $bn (1..MAXBATTERIES) {                                        # 02.10.
       $bn = sprintf "%02d", $bn;
       readingsDelete ($hash, 'Battery_ChargeRecommended_'.$bn);
@@ -12361,7 +12354,8 @@ sub __batChargeOptTargetPower {
           else {
               ($remainingSurp, $remainingHodsRef) = ($remainingSurp_o, $remainingHodsRef_o);
           }
-
+          
+          $remainingSurp = max ($remainingSurp, 0);
           my $goalwh     = $hsurp->{$hod}{$sbn}{goalwh};                                                         # Ladeziel
           my $runwhneed  = $goalwh - $runwh;
           my $achievable = 1;
@@ -12567,13 +12561,15 @@ sub ___batAdjustPowerByMargin {
 
   return ($limpower, $ratio) if(!defined $runwhneed || $runwhneed <= 0);
 
-  $ratio    = $remainingSurp * 100 / ($runwhneed / $befficiency);
-  $limpower = min ($limpower, $pinmax);                                        # limpower !> pinmax um invertierte Interpolation zu vermeiden
+  $ratio            = $remainingSurp * 100.0 * $befficiency / $runwhneed ;             # befficiency als Anteil 0.1 .. 1
+  my $limWithMargin = $limpower * (1.0 + $otpMargin / 100.0);                          # Hinweis: das ist bewusst ein permanenter Sicherheitsaufschlag
+  $limpower         = min ($limpower,      $pinmax);                                   # limpower !> pinmax um invertierte Interpolation zu vermeiden
+  $limWithMargin    = min ($limWithMargin, $pinmax); 
 
-  if    ($limpower <= 0       || !$otpMargin)    {$pow = $limpower}
-  elsif ($limpower == $pinmax || $ratio <= 100)  {$pow = $pinmax}
-  elsif ($ratio >= 100 + $otpMargin)             {$pow = $limpower}
-  else                                           {$pow = $pinmax - ($pinmax - $limpower) * ($ratio - 100) / $otpMargin}
+  if    ($limpower <= 0 || $otpMargin == 0)           { $pow = $limpower }
+  elsif ($limWithMargin >= $pinmax || $ratio <= 100)  { $pow = $pinmax }
+  elsif ($ratio >= 100 + $otpMargin)                  { $pow = $limWithMargin }
+  else                                                { $pow = $pinmax - ($pinmax - $limWithMargin) * ($ratio - 100.0) / $otpMargin }
 
 return ($pow, $ratio);
 }
@@ -13438,18 +13434,19 @@ return;
 ####################################################################################
 #  Verbraucherspezifische Energiestück Ermittlung
 #
-#  epiecMaxCycles    => gibt an wie viele Zyklen betrachtet werden
+#  EPIECMAXCYCLES    => gibt an wie viele Zyklen betrachtet werden
 #                       sollen
-#  epiecHist         => ist die Nummer des Zyklus der aktuell
-#                       benutzt wird.
-#
+#  epiecHist         => ist die Nummer x des Zyklus der aktuell
+#                       beschrieben wird (epiecHist_x).
+#  epiecStartTime    => Start der letzten neuen Aufzeichnung
+#  epiecHour         => aktuelle Anzahl der Betriebsstunden nach 'epiecStartTime'
+#                       oder Cycle Switch 
 #  epiecHist_x       => 1=.. 2=.. 3=.. 4=.. epieces eines Zyklus
 #  epiecHist_x_hours => Stunden des Durchlauf bzw. wie viele
 #                       Einträge epiecHist_x hat
 #  epiecAVG          => 1=.. 2=.. durchschnittlicher Verbrauch pro Betriebsstunde
 #                       1, 2, .. usw.
-#                       wäre ein KPI um eine angepasste Einschaltung zu
-#                       realisieren
+#                       wäre ein KPI um eine angepasste Einschaltung zu realisieren
 #  epiecAVG_hours    => durchschnittliche Betriebsstunden für einen Ein/Aus-Zyklus
 #
 ####################################################################################
@@ -13461,67 +13458,68 @@ sub ___csmSpecificEpieces {
   my $etot  = $paref->{etot};
   my $t     = $paref->{t};
 
-  my $hash  = $defs{$name};
-
-  if (ConsumerVal ($hash, $c, "onoff", "off") eq "on") {                                                # Status "Aus" verzögern um Pausen im Waschprogramm zu überbrücken
+  if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'on') {                                                # Status "Aus" verzögern um Pausen im Waschprogramm zu überbrücken
       $data{$name}{consumers}{$c}{lastOnTime} = $t;
   }
 
   my $tsloff = defined $data{$name}{consumers}{$c}{lastOnTime} ?
                $t - $data{$name}{consumers}{$c}{lastOnTime}    :
-               99;
+               0;
+               
+  my $curr_epiecHour = ConsumerVal ($name, $c, 'epiecHour', 0);
 
-  debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - time since last Switch Off (tsloff): $tsloff seconds});
+  debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - time since last Switch Off (tsloff): $tsloff seconds});
 
-  if ($tsloff < 300) {                                                                                  # erst nach Auszeit >= X Sekunden wird ein neuer epiec-Zyklus gestartet
-      my $ecycle          = "";
-      my $epiecHist_hours = "";
+  if ($tsloff < 300 && $curr_epiecHour <= EPIECMAXOPHRS) {                                              # neuen epiec-Zyklus starten: nach OFF >= X Sekunden oder mehr als EPIECMAXOPHRS ununterbrochenen Betriebsstunden
+      my $ecycle          = q{};
+      my $epiecHist_hours = q{};
 
-      if (ConsumerVal ($hash, $c, "epiecHour", -1) < 0) {                                               # neue Aufzeichnung
+      if ($curr_epiecHour < 0) {                                                                        # neue Aufzeichnung
           $data{$name}{consumers}{$c}{epiecStartTime} = $t;
           $data{$name}{consumers}{$c}{epiecHist}     += 1;
-          $data{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > EPIECMAXCYCLES);
+          $data{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($name, $c, 'epiecHist', 0) > EPIECMAXCYCLES);
 
-          $ecycle = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
+          $ecycle = 'epiecHist_'.ConsumerVal ($name, $c, 'epiecHist', 0);
 
-          delete $data{$name}{consumers}{$c}{$ecycle};                                           # Löschen, wird neu erfasst
+          delete $data{$name}{consumers}{$c}{$ecycle};                                                  # Löschen, wird neu erfasst
       }
 
-      $ecycle          = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);                          # Zyklusnummer für Namen
-      $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours";
-      my $epiecHour    = floor (($t - ConsumerVal ($hash, $c, "epiecStartTime", $t)) / 60 / 60) + 1;    # aktuelle Betriebsstunde ermitteln, ( / 60min) mögliche wäre auch durch 15min /Minute /Stunde
+      $ecycle          = 'epiecHist_'.ConsumerVal ($name, $c, 'epiecHist', 0);                          # Zyklusnummer für Namen
+      $epiecHist_hours = 'epiecHist_'.ConsumerVal ($name, $c, 'epiecHist', 0).'_hours';
+      my $epiecHour    = floor (($t - ConsumerVal ($name, $c, 'epiecStartTime', $t)) / 60 / 60) + 1;    # aktuelle Betriebsstunde ermitteln, ( / 60min) mögliche wäre auch durch 15min /Minute /Stunde
 
-      debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - current cycle number (ecycle): $ecycle});
-      debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Operating hour after switch on (epiecHour): $epiecHour});
+      debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - current cycle number (ecycle): $ecycle});
+      debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Operating hours after switch on or cycle switch: $epiecHour});
 
-      if (ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                                      # Betriebsstundenwechsel ? Differenz von etot noch auf die vorherige Betriebsstunde anrechnen
+      if ($curr_epiecHour != $epiecHour) {                                      # Betriebsstundenwechsel ? Differenz von etot noch auf die vorherige Betriebsstunde anrechnen
           my $epiecHour_last = $epiecHour - 1;
 
-          $data{$name}{consumers}{$c}{$ecycle}{$epiecHour_last} = sprintf '%.2f', ($etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0)) if($epiecHour > 1);
+          $data{$name}{consumers}{$c}{$ecycle}{$epiecHour_last} = sprintf '%.2f', ($etot - ConsumerVal ($name, $c, "epiecStartEtotal", 0)) if($epiecHour > 1);
           $data{$name}{consumers}{$c}{epiecStartEtotal}         = $etot;
 
-          debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Operating hours change - new etotal (epiecStartEtotal): $etot});
+          debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Operating hours change - new etotal (epiecStartEtotal): $etot});
       }
 
-      my $ediff                                               = $etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0);
-      $data{$name}{consumers}{$c}{$ecycle}{$epiecHour} = sprintf '%.2f', $ediff;
+      my $ediff                                        = $etot - ConsumerVal ($name, $c, "epiecStartEtotal", 0);
+      $ediff                                           = sprintf ('%.2f', $ediff);
+      $data{$name}{consumers}{$c}{$ecycle}{$epiecHour} = $ediff;
       $data{$name}{consumers}{$c}{epiecHour}           = $epiecHour;
       $data{$name}{consumers}{$c}{$epiecHist_hours}    = $ediff ? $epiecHour : $epiecHour - 1;           # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
 
-      debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - energy consumption in operating hour $epiecHour (ediff): $ediff});
+      debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - energy consumption in operating hour $epiecHour (ediff): $ediff Wh});
   }
-  else {                                                                                                 # Durchschnitt ermitteln
-      if (ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {
+  else {                                                                                                 # Off-Status länger als 300 Sek. her Durchschnitt ermitteln
+      if ($curr_epiecHour > 0) {
           my $hours = 0;
 
           for my $h (1..EPIECMAXCYCLES) {                                                                # durchschnittliche Betriebsstunden über alle epieces ermitteln und aufrunden
-              $hours += ConsumerVal ($hash, $c, "epiecHist_".$h."_hours", 0);
+              $hours += ConsumerVal ($name, $c, 'epiecHist_'.$h.'_hours', 0);
           }
 
-          my $avghours                                   = ceil ($hours / EPIECMAXCYCLES);
+          my $avghours                                = ceil ($hours / EPIECMAXCYCLES);
           $data{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                       # durchschnittliche Betriebsstunden pro Zyklus
 
-          debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Average operating hours per cycle (epiecAVG_hours): $avghours});
+          debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Average operating hours per cycle (epiecAVG_hours): $avghours});
 
           delete $data{$name}{consumers}{$c}{epiecAVG};                                                  # Durchschnitt für epics ermitteln
 
@@ -13529,7 +13527,7 @@ sub ___csmSpecificEpieces {
               my $hoursE = 1;
 
               for my $h (1..EPIECMAXCYCLES) {                                                            # jedes epiec durchlaufen
-                  my $ecycle = "epiecHist_".$h;
+                  my $ecycle = 'epiecHist_'.$h;
 
                   if (defined $data{$name}{consumers}{$c}{$ecycle}{$hour}) {
                       if ($data{$name}{consumers}{$c}{$ecycle}{$hour} > 5) {
@@ -13545,13 +13543,14 @@ sub ___csmSpecificEpieces {
                           0;
 
               my $ahval = sprintf '%.2f', $eavg / $hoursE;                                               # Durchschnitt ermittelt und speichern
+              
               $data{$name}{consumers}{$c}{epiecAVG}{$hour} = $ahval;
 
-              debugLog ($paref, "epiecesCalc", qq{specificEpieces -> consumer "$c" - Average epiece of operating hour $hour: $ahval});
+              debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Average epiece of operating hour $hour: $ahval});
           }
       }
 
-      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                       # epiecHour auf initialwert setzen für nächsten durchlauf
+      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                       # epiecHour bei nächsten Durchlauf erhöhen 
   }
 
 return;
