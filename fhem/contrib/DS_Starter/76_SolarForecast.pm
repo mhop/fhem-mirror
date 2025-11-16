@@ -12721,6 +12721,7 @@ sub ___batFindMinPhWh {
                             } @hods;
       
       $max_cap //= 0;
+      $max_cap  /= $befficiency;
       
       return { ph => (sprintf "%.0f", $max_cap), iterations => $loop, blur => (sprintf "%.4f", 0) };
   }
