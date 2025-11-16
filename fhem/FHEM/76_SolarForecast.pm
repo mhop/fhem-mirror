@@ -162,7 +162,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ",
+  "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ".
+                           "__solCast_ApiResponse: evaluation of httpheader ",
   "1.60.4" => "13.11.2025  smoothValue as OOP implemantation, battery efficiency rework, edit comref, expand loadTarget by time target ".
                            "_batSocTarget: surplus for next day adjusted, some code changes ",
   "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
@@ -3202,7 +3203,7 @@ sub __solCast_ApiResponse {
   my $caller      = $paref->{caller};
   my $string      = $paref->{string};
   my $allstrings  = $paref->{allstrings};
-  my $stc         = $paref->{stc};                                                                          # Startzeit API Abruf
+  my $stc         = $paref->{stc};                                                                                     # Startzeit API Abruf
   my $lang        = $paref->{lang};
   my $debug       = $paref->{debug};
   my $type        = $paref->{type};
@@ -3211,8 +3212,33 @@ sub __solCast_ApiResponse {
 
   my $msg;
   my $hash = $defs{$name};
-  my $sta  = [gettimeofday];                                                                                # Start Response Verarbeitung
+  my $sta  = [gettimeofday];                                                                                           # Start Response Verarbeitung
 
+  my $head = $paref->{httpheader} // 'empty header';
+  
+  if ($head !~ /200.OK/ixs) {                                                                                          # Auswertung Header
+      ___setSolCastAPIcallKeyData ($paref);
+
+      $data{$name}{statusapi}{SolCast}{'?All'}{response_message} = $head;
+
+      if ($head =~ /429.Too.Many.Requests/xs) {
+          $data{$name}{statusapi}{SolCast}{'?All'}{todayRemainingAPIrequests} = 0;
+      }
+
+      singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+      $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                                # Verarbeitungszeit ermitteln
+      $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));          # API Laufzeit ermitteln
+
+      if ($debug =~ /apiProcess|apiCall/x) {
+          my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', SOLCMAXREQDEF);
+          
+          Log3 ($name, 1, "$name DEBUG> SolCast API Call - Header response content: ".$head);
+          Log3 ($name, 1, "$name DEBUG> SolCast API Call - todayRemainingAPIrequests: ".StatusAPIVal ($hash, 'SolCast', '?All', 'todayRemainingAPIrequests', $apimaxreq));
+      }
+
+      return;
+  }
+  
   if ($err ne "") {
       $msg = 'SolCast API server response: '.$err;
 
@@ -3221,12 +3247,12 @@ sub __solCast_ApiResponse {
       $data{$name}{statusapi}{SolCast}{'?All'}{response_message} = $err;
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-      $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-      $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+      $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                                 # Verarbeitungszeit ermitteln
+      $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));           # API Laufzeit ermitteln
 
       return;
   }
-  elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
+  elsif ($myjson ne "") {                                                                                              # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson ($hash, $myjson);
 
       if (!$success) {
@@ -3341,7 +3367,7 @@ sub __solCast_ApiResponse {
 
           $k++;
       }
-  }
+  } 
 
   Log3 ($name, 4, qq{$name - SolCast API answer received for string "$string"});
 
@@ -3425,7 +3451,7 @@ sub ___setSolCastAPIcallKeyData {
   $data{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];       # letzte Abrufzeit
   $data{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_timestamp} = $t;                                           # letzter Abrufzeitstempel
 
-  my $apimaxreq = AttrVal       ($name, 'ctrlSolCastAPImaxReq',        SOLCMAXREQDEF);
+  my $apimaxreq = AttrVal      ($name, 'ctrlSolCastAPImaxReq',            SOLCMAXREQDEF);
   my $mpl       = StatusAPIVal ($hash, 'SolCast', '?All', 'solCastAPIcallMultiplier', 1);
   my $ddc       = StatusAPIVal ($hash, 'SolCast', '?All', 'todayDoneAPIcalls',        0);
 
@@ -12721,6 +12747,7 @@ sub ___batFindMinPhWh {
                             } @hods;
       
       $max_cap //= 0;
+      $max_cap  /= $befficiency;
       
       return { ph => (sprintf "%.0f", $max_cap), iterations => $loop, blur => (sprintf "%.4f", 0) };
   }
