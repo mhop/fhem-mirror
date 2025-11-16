@@ -163,7 +163,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ".
-                           "__solCast_ApiResponse: evaluation of httpheader ",
+                           "__solCast_ApiResponse: evaluation of httpheader ".
+                           "___csmSpecificEpieces: fix {epiecAVG}{hour} calculation, edit comref, isConsumerLogOn: small fix ",
   "1.60.4" => "13.11.2025  smoothValue as OOP implemantation, battery efficiency rework, edit comref, expand loadTarget by time target ".
                            "_batSocTarget: surplus for next day adjusted, some code changes ",
   "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
@@ -13569,7 +13570,8 @@ sub ___csmSpecificEpieces {
           delete $data{$name}{consumers}{$c}{epiecAVG};                                                                  # Durchschnitt für epics neu ermitteln
 
           for my $hour (1..$avghours) {                                                                      
-              my $hoursE = 1;
+              my $hoursE = 0;
+              my $hsum;
 
               for my $h (1..EPIECMAXCYCLES) {                                                          
                   my $ecycle = 'epiecHist_'.$h;
@@ -13578,29 +13580,26 @@ sub ___csmSpecificEpieces {
                       my $pth = ConsumerVal ($name, $c, 'powerthreshold', 0);   
                       
                       if ($data{$name}{consumers}{$c}{$ecycle}{$hour} > $pth) {
-                          $data{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$name}{consumers}{$c}{$ecycle}{$hour};
-                          $hoursE += 1;
+                          $hsum += $data{$name}{consumers}{$c}{$ecycle}{$hour};
+                          $hoursE++;
                       }
                   }
 
               }
 
-              my $eavg  = defined $data{$name}{consumers}{$c}{epiecAVG}{$hour} ?
-                          $data{$name}{consumers}{$c}{epiecAVG}{$hour}         :
-                          0;
-
-              my $ahval = sprintf '%.2f', ($eavg / $hoursE);                                             # Durchschnitt ermittelt und speichern
+              my $ahval;
+              $ahval = sprintf '%.2f', ($hsum / $hoursE) if($hoursE > 0);                                                # Durchschnitt ermittelt und speichern
               
               $data{$name}{consumers}{$c}{epiecAVG}{$hour} = $ahval;
 
-              debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Average epiece of operating hour $hour: $ahval});
+              debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Average epiece of operating hour $hour: }.(defined $ahval ? $ahval : 'undef'));
           }
           
           debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Average operating hours per cycle (epiecAVG_hours): $avghours});
       }
 
       delete $data{$name}{consumers}{$c}{epiecSwitchTime};
-      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                       # epiecHour bei nächsten Durchlauf erhöhen 
+      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                                     # epiecHour bei nächsten Durchlauf erhöhen 
   }
 
 return;
@@ -14667,31 +14666,31 @@ sub __getCyclesAndRuntime {
   my ($starthour, $startday);
 
   if (isConsumerLogOn ($hash, $c, $pcurr)) {                                                                                             # Verbraucher ist logisch "an"
-        if (ConsumerVal ($hash, $c, 'onoff', 'off') eq 'off') {                                                                          # Status im letzen Zyklus war "off"
+        if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'off') {                                                                          # Status im letzen Zyklus war "off"
             $data{$name}{consumers}{$c}{onoff}          = 'on';
             $data{$name}{consumers}{$c}{startTime}      = $t;                                                                            # startTime ist nicht von "Automatic" abhängig -> nicht identisch mit planswitchon !!!
             $data{$name}{consumers}{$c}{cycleStarttime} = $t;
             $data{$name}{consumers}{$c}{cycleTime}      = 0;
-            $data{$name}{consumers}{$c}{lastMinutesOn}  = ConsumerVal ($hash, $c, 'minutesOn', 0);
+            $data{$name}{consumers}{$c}{lastMinutesOn}  = ConsumerVal ($name, $c, 'minutesOn', 0);
 
             $data{$name}{consumers}{$c}{cycleDayNum}++;                                                                                  # Anzahl der On-Schaltungen am Tag
         }
         else {
-            $data{$name}{consumers}{$c}{cycleTime} = (($t - ConsumerVal ($hash, $c, 'cycleStarttime', $t)) / 60);                        # Minuten
+            $data{$name}{consumers}{$c}{cycleTime} = sprintf "%.2f", ($t - ConsumerVal ($name, $c, 'cycleStarttime', $t)) / 60;                        # Minuten
         }
 
-        $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, 'startTime', $t));
-        $startday  = strftime "%d", localtime(ConsumerVal ($hash, $c, 'startTime', $t));                                                 # aktueller Tag  (range 01 to 31)
+        $starthour = strftime "%H", localtime(ConsumerVal ($name, $c, 'startTime', $t));
+        $startday  = strftime "%d", localtime(ConsumerVal ($name, $c, 'startTime', $t));                                                 # aktueller Tag  (range 01 to 31)
 
         if ($chour eq $starthour) {
-            my $runtime                            = (($t - ConsumerVal ($hash, $c, 'startTime', $t)) / 60);                             # in Minuten ! (gettimeofday sind ms !)
-            $data{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, 'lastMinutesOn', 0) + $runtime;
+            my $runtime                            = sprintf "%.2f", ($t - ConsumerVal ($name, $c, 'startTime', $t)) / 60;                             # in Minuten ! (gettimeofday sind ms !)
+            $data{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($name, $c, 'lastMinutesOn', 0) + $runtime;
         }
         else {                                                                                                                           # Stundenwechsel
-            if (ConsumerVal ($hash, $c, 'onoff', 'off') eq 'on') {                                                                       # Status im letzen Zyklus war "on"
+            if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'on') {                                                                       # Status im letzen Zyklus war "on"
                 my $newst                                  = timestringToTimestamp ($date.' '.sprintf("%02d",  $chour).':00:00');
                 $data{$name}{consumers}{$c}{startTime}     = $newst;
-                $data{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($hash, $c, 'startTime', $newst)) / 60;                   # in Minuten ! (gettimeofday sind ms !)
+                $data{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($name, $c, 'startTime', $newst)) / 60;                   # in Minuten ! (gettimeofday sind ms !)
                 $data{$name}{consumers}{$c}{lastMinutesOn} = 0;
 
                 if ($day ne $startday) {                                                                                                 # Tageswechsel
@@ -14701,8 +14700,8 @@ sub __getCyclesAndRuntime {
         }
   }
   else {                                                                                                                                 # Verbraucher soll nicht aktiv sein
-      $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, 'startTime', 1));
-      $startday  = strftime "%d", localtime(ConsumerVal ($hash, $c, 'startTime', 1));                                                    # aktueller Tag  (range 01 to 31)
+      $starthour = strftime "%H", localtime (ConsumerVal ($name, $c, 'startTime', 1));
+      $startday  = strftime "%d", localtime (ConsumerVal ($name, $c, 'startTime', 1));                                                    # aktueller Tag  (range 01 to 31)
 
       if ($chour ne $starthour) {                                                                                                        # Stundenwechsel
           $data{$name}{consumers}{$c}{minutesOn} = 0;
@@ -14717,25 +14716,25 @@ sub __getCyclesAndRuntime {
 
   if ($debug =~ /consumerSwitching${c}/xs) {
       my $sr  = 'still running';
-      my $son = isConsumerLogOn ($hash, $c, $pcurr) ? $sr : ConsumerVal ($hash, $c, 'cycleTime', 0) * 60;                                # letzte Cycle-Zeitdauer in Sekunden
-      my $cst = ConsumerVal     ($hash, $c, 'cycleStarttime', 0);
+      my $son = isConsumerLogOn ($hash, $c, $pcurr) ? $sr : ConsumerVal ($name, $c, 'cycleTime', 0) * 60;                                # letzte Cycle-Zeitdauer in Sekunden
+      my $cst = ConsumerVal     ($name, $c, 'cycleStarttime', 0);
       $son    = $son && $son ne $sr ? timestampToTimestring ($cst + $son, $paref->{lang}) :
                 $son eq $sr         ? $sr                                                 :
                 '-';
       $cst    = $cst ? timestampToTimestring ($cst, $paref->{lang}) : '-';
 
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - cycleDayNum: }.ConsumerVal ($hash, $c, 'cycleDayNum', 0));
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - cycleDayNum: }.ConsumerVal ($name, $c, 'cycleDayNum', 0));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle start time: $cst});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle end time: $son \n});
   }
 
   ## History schreiben
   ######################
-  $paref->{val}      = ConsumerVal ($hash, $c, "cycleDayNum", 0);                         # Anzahl Tageszyklen des Verbrauchers speichern
+  $paref->{val}      = ConsumerVal ($name, $c, "cycleDayNum", 0);                         # Anzahl Tageszyklen des Verbrauchers speichern
   $paref->{histname} = "cyclescsm${c}";
   setPVhistory ($paref);
 
-  $paref->{val}      = ceil ConsumerVal ($hash, $c, "minutesOn", 0);                      # Verbrauchsminuten akt. Stunde des Consumers speichern
+  $paref->{val}      = ceil ConsumerVal ($name, $c, "minutesOn", 0);                      # Verbrauchsminuten akt. Stunde des Consumers speichern
   $paref->{histname} = "minutescsm${c}";
   setPVhistory ($paref);
 
@@ -24351,23 +24350,24 @@ sub isConsumerLogOn {
       return 0;
   }
 
-  if (isConsumerPhysOff ($hash, $c)) {                                                     # Device ist physisch ausgeschaltet
-      return 0;
-  }
-
-  my $type       = $hash->{TYPE};
   my $nompower   = ConsumerVal ($name, $c, "power",          0);                           # nominale Leistung lt. Typenschild
   my $rpcurr     = ConsumerVal ($name, $c, "rpcurr",        "");                           # Reading für akt. Verbrauch angegeben ?
   my $pthreshold = ConsumerVal ($name, $c, "powerthreshold", 0);                           # Schwellenwert (W) ab der ein Verbraucher als aktiv gewertet wird
 
-  if (!$rpcurr && isConsumerPhysOn ($hash, $c)) {                                          # Workaround wenn Verbraucher ohne Leistungsmessung
-      $pcurr = $nompower;
+  if (!$rpcurr) {                                                                          # Workaround wenn Verbraucher ohne Leistungsmessung
+      if (isConsumerPhysOn ($hash, $c)) { $pcurr = $nompower }
+      else                              { $pcurr = 0         }
   }
 
-  my $currpowerpercent = $pcurr;
-  $currpowerpercent    = ($pcurr / $nompower) * 100 if($nompower > 0);
+  my $currpowerpercent;
+  if ($nompower > 0) { $currpowerpercent = sprintf ('%.2f', $pcurr / $nompower * 100) }
+  else               { $currpowerpercent = 0 }
 
   $data{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
+  
+  if (isConsumerPhysOff ($hash, $c)) {                                                     # Device ist physisch ausgeschaltet
+      return 0;
+  }
 
   if ($pcurr > $pthreshold || (!$pthreshold && $currpowerpercent > DEFPOPERCENT)) {        # Verbraucher ist logisch aktiv
       return 1;
@@ -28929,7 +28929,7 @@ to ensure that the system configuration is correct.
            <tr><td> <b>pvOut</b>      </td><td>A reading that provides the current power from PV generation that is supplied to the battery(ies) or to a battery inverter. </td></tr>
            <tr><td>                   </td><td>A positive numerical value is expected.                                                                                     </td></tr>
            <tr><td>                   </td><td>                                                                                                                            </td></tr>
-           <tr><td> <b>etotal</b>     </td><td>The Reading which provides the total PV energy generated (a steadily increasing counter).                                   </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>The reading, which provides the total PV energy generated by the inverter as a continuously increasing counter.             </td></tr>
            <tr><td>                   </td><td>If the reading violates the specification of a continuously rising counter,                                                 </td></tr>
            <tr><td>                   </td><td>SolarForecast handles this error and reports the situation by means of a log message.                                       </td></tr>
            <tr><td>                   </td><td>                                                                                                                            </td></tr>
@@ -31699,7 +31699,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td> <b>pvOut</b>      </td><td>Ein Reading, welches die aktuelle Leistung aus PV-Erzeugung, die an das Hausnetz oder öffentliche Netz                    </td></tr>
            <tr><td>                   </td><td>geliefert wird, bereitstellt. Es wird ein positiver numerischer Wert erwartet.                                            </td></tr>
            <tr><td>                   </td><td>                                                                                                                          </td></tr>
-           <tr><td> <b>etotal</b>     </td><td>Das Reading, welches die gesamte erzeugte PV-Energie liefert (ein stetig aufsteigender Zähler).                           </td></tr>
+           <tr><td> <b>etotal</b>     </td><td>Das Reading, welches die gesamte erzeugte PV-Energie des Wechselrichters als stetig aufsteigenden Zähler liefert.         </td></tr>
            <tr><td>                   </td><td>Sollte des Reading die Vorgabe eines stetig aufsteigenden Zählers verletzen, behandelt                                    </td></tr>
            <tr><td>                   </td><td>SolarForecast diesen Fehler und meldet die aufgetretene Situation durch einen Logeintrag.                                 </td></tr>
            <tr><td>                   </td><td>                                                                                                                          </td></tr>
