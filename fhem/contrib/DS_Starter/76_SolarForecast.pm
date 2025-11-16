@@ -12417,6 +12417,7 @@ sub __batChargeOptTargetPower {
                                                 Ereq          => $runwhneed,
                                                 replacement   => $replacement,
                                                 achievable    => $achievable,
+                                                befficiency   => $befficiency,
                                                 minute        => $minute
                                               }
                                             );
@@ -12457,7 +12458,7 @@ sub __batChargeOptTargetPower {
                                             }
                                           );
 
-          $pneedmin = ___batAdjustEfficiencyAndLimits ($pneedmin, $befficiency, $bpinmax, 0);                    # Apply Bat Effizienz und Ladeleistungsbegrenzungen
+          $pneedmin = ___batAdjustLimits ($pneedmin, $bpinmax, 0);                                               # Ladeleistungsbegrenzungen
 
           $hsurp->{$hod}{$sbn}{pneedmin} = $pneedmin;
 
@@ -12505,7 +12506,7 @@ sub __batChargeOptTargetPower {
                                               }
                                             );
 
-              $target = ___batAdjustEfficiencyAndLimits ($target, $befficiency, $bpinmax, $bpinreduced);         # Apply Bat Effizienz und Ladeleistungsbegrenzungen
+              $target = ___batAdjustLimits ($target, $bpinmax, $bpinreduced);                                    # Ladeleistungsbegrenzungen
 
               $otp->{$sbn}{target} = $target;
           }
@@ -12643,15 +12644,14 @@ return $ph;
 
 ################################################################
 #   Endbehandlung einer Leistungsvorgabe für Batterieladung
-################################################################
-sub ___batAdjustEfficiencyAndLimits {
-  my ($ph, $eff, $max, $min) = @_;
-
-  $ph /= $eff;
+################################################################       
+sub ___batAdjustLimits {
+  my ($ph, $max, $min) = @_;
+  
   $ph  = min ($ph, $max);                              # Begrenzung auf max. mögliche Batterieladeleistung
   $ph  = max ($ph, $min);                              # Begrenzung auf min. gewünschte Batterieladeleistung
   $ph  = sprintf "%.0f", $ph;
-
+  
 return $ph;
 }
 
@@ -12702,6 +12702,7 @@ sub ___batFindMinPhWh {
   my $Ereq          = $paref->{Ereq};
   my $replacement   = $paref->{replacement};
   my $achievable    = $paref->{achievable};
+  my $befficiency   = $paref->{befficiency};
   my $minute        = $paref->{minute};
 
   my @hods     = @$hodsref;
@@ -12710,6 +12711,7 @@ sub ___batFindMinPhWh {
   my $eps      = 0.5;                                               # minimale Genauigkeit in Wh  (1e-3)
   my $max_iter = 100;                                               # Zwangsabbruch nach X Durchläufen
   my $loop     = 0;
+  $Ereq       /= $befficiency;
   my $cap;
 
   if (!$achievable) {
@@ -12735,7 +12737,7 @@ sub ___batFindMinPhWh {
 
           if ($nhr eq '00') { $cap = min ($mid, $hsurp->{$hod}{surplswh}) / 60 * (60 - int $minute) }     # Zeitgewichtung aktuelle Stunde
           else              { $cap = min ($mid, $hsurp->{$hod}{surplswh}) }
-
+          
           $charged += $cap // 0;
       }
 
