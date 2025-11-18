@@ -162,6 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.60.6" => "18.11.2025  ",
   "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ".
                            "__solCast_ApiResponse: evaluation of httpheader ".
                            "___csmSpecificEpieces: fix {epiecAVG}{hour} calculation, edit comref, isConsumerLogOn: small fix ",
@@ -11604,11 +11605,12 @@ sub _batSocTarget {
 
       ## erwartete PV ermitteln & Anteilsfaktor Bat anwenden
       ########################################################
-      my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast',        0);                      # PV Prognose morgen
-      my $constm   = CurrentVal  ($name, 'tomorrowConsHoursWithPVGen', 0);                      # Verbrauch während PV-Erzeugung
-      my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast',        0);                      # PV Prognose Rest heute
+      my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast', 0);                             # PV Prognose morgen
+      my $constm   = CurrentVal  ($name, 'tmConFcTillSunset',  0);                              # Verbrauch nächster Tag bis Sonnenuntergang Wh
+      my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast', 0);                             # PV Prognose Rest heute
       my $surptd   = $pvfctd - $tdconsset;                                                      # erwarteter (Rest)Überschuß des aktuellen Tages
-      my $surptm   = sprintf "%.0f", ($pvfctm - $constm * 0.5);                                 # anteilig Überschuß am kommenden Tages während PV-Erzeugung -> Platz lassen!
+      my $propfac  = 0.5;
+	  my $surptm   = sprintf "%.0f", ($pvfctm - $constm * $propfac);                            # anteilig Verbrauch am kommenden Tages während PV-Erzeugung -> Platz lassen!
       my $pvexpraw = $surptm > $surptd ? $surptm : $surptd;                                     # V 1.60.4
       $pvexpraw    = max ($pvexpraw, 0);                                                        # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
 
@@ -11617,6 +11619,8 @@ sub _batSocTarget {
 
       if ($debug =~ /batteryManagement/xs) {
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Battery share factor of total required load: $sf");
+		  Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected today -> PV forecast: $pvfctd Wh, consumption till sunset: $tdconsset Wh, used surp: $surptd Wh");
+		  Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected tomorrow -> PV forecast: $pvfctm Wh, consumption till sunset: $constm Wh, used surp: $surptm Wh (".($propfac * 100)." % consumption)");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging with proportional consumption: $pvexpraw Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging after application Share factor: $pvexpect Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - compare with SoC history -> preliminary new Target: $target %");
@@ -12874,11 +12878,11 @@ sub _createSummaries {
 
   $minute = int ($minute) + 1;                                                                        # Minute Range umsetzen auf 1 bis 60
 
-  my $dt     = timestringsFromOffset ($t, 86400);
-  my $tmoday = $dt->{day};                                                                            # Tomorrow Day (01..31)
+  #my $dt     = timestringsFromOffset ($t, 86400);
+  #my $tmoday = $dt->{day};                                                                            # Tomorrow Day (01..31)
 
-  $dt          = timestringsFromOffset ($t, 172800);
-  my $datmoday = $dt->{day};                                                                          # Übermorgen Day (01..31)
+  #$dt          = timestringsFromOffset ($t, 172800);
+  #my $datmoday = $dt->{day};                                                                          # Übermorgen Day (01..31)
 
   ## Initialisierung
   ####################
@@ -12892,11 +12896,15 @@ sub _createSummaries {
   my $todaySumFc    = { "PV" => 0, "Consumption" => 0 };
   my $todaySumRe    = { "PV" => 0, "Consumption" => 0 };
 
-  my $tdaysset = CurrentVal ($name, 'sunsetTodayTs', 0);                                               # Timestamp Sonneuntergang am aktuellen Tag
-  my $dtsset   = timestringsFromOffset ($tdaysset,   0);
+  my $tmorsset = CurrentVal ($name, 'sunsetTomorrowTs', 0);                                            # Timestamp Sonneuntergang kommenden Tag
+  my $htmsset  = timestringsFromOffset ($tmorsset,      0);
+  my $tdaysset = CurrentVal ($name, 'sunsetTodayTs',    0);                                            # Timestamp Sonneuntergang am aktuellen Tag
+  my $dtsset   = timestringsFromOffset ($tdaysset,      0);
 
-  my $tdConFcTillSunset = 0;
-  my $remainminutes     = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
+  my $tdConFcTillSunset  = 0;
+  my $tmConFcTillSunset  = 0;
+  my $tmConInHrWithPVGen = 0;
+  my $remainminutes      = 60 - $minute;                                                               # verbleibende Minuten der aktuellen Stunde
 
   my $hour00pvfc  = NexthoursVal ($name, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;
   my $hour00confc = NexthoursVal ($name, "NextHour00", 'confc', 0);
@@ -12972,32 +12980,24 @@ sub _createSummaries {
       if ($istdy) {
           $restOfDaySum->{PV}          += $pvfc;
           $restOfDaySum->{Consumption} += $confc;
-          $tdConFcTillSunset           += $confc if($don);
+          $tdConFcTillSunset           += $confc if(int ($hod) < int ($dtsset->{hour}) + 1);
 
-          if (int ($hod) == int ($dtsset->{hour}) + 1) {                              # wenn die berücksichtigte Stunde die Stunde des Sonnenuntergangs ist
-              my $diflasth        = 60 - int ($dtsset->{minute}) + 1;                 # fehlende Minuten zur vollen Stunde in der Stunde des Sunset
+          if (int ($hod) == int ($dtsset->{hour}) + 1) {                                     # wenn die berücksichtigte Stunde die Stunde des Sonnenuntergangs ist
+              my $diflasth        = 60 - int ($dtsset->{minute}) + 1;                        # fehlende Minuten zur vollen Stunde in der Stunde des Sunset
               $tdConFcTillSunset -= ($confc / 60) * $diflasth;
           }
       }
-      elsif ($nhday eq $tmoday) {
+      elsif ($fd == 1) {
           $tomorrowSum->{PV} += $pvfc;
+		  $tmConFcTillSunset += $confc if(int ($hod) <= int ($htmsset->{hour}) + 1);         # Verbrauch kommender Tag bis inkl. Stunde des Sonnenuntergangs
+		  
+		  if ($pvfc) {                                                                       # Summe Verbrauch der Stunden mit PV-Erzeugung am kommenden Tag
+			   $tmConInHrWithPVGen += $confc;  
+		  }
       }
-      elsif ($nhday eq $datmoday) {
+      elsif ($fd == 2) {
           $daftertomSum->{PV}          += $pvfc;
           $daftertomSum->{Consumption} += $confc;
-      }
-
-      ## Summe Verbrauch der Stunden mit PV-Erzeugung am kommenden Tag
-      ##################################################################                     # V 1.60.4
-      if ($fd == 1) {                                                                        # für den nächsten Tag
-          if ($fh == 0) {
-              delete $data{$name}{current}{tomorrowConsHoursWithPVGen};                      # alte Summe bereinigen
-          }
-          else {
-              if ($pvfc) {
-                  $data{$name}{current}{tomorrowConsHoursWithPVGen} += $confc;
-              }
-          }
       }
   }
 
@@ -13092,6 +13092,8 @@ sub _createSummaries {
   $data{$name}{current}{selfconsumptionrate}   = $selfconsumptionrate;
   $data{$name}{current}{autarkyrate}           = $autarkyrate;
   $data{$name}{current}{tdConFcTillSunset}     = sprintf "%.0f", $tdConFcTillSunset;
+  $data{$name}{current}{tmConFcTillSunset}     = $tmConFcTillSunset;
+  $data{$name}{current}{tmConInHrWithPVGen}    = $tmConInHrWithPVGen;
   $data{$name}{current}{surplus}               = $surplus;
   $data{$name}{current}{dayAfterTomorrowPVfc}  = $daftertomSum->{PV};
   $data{$name}{current}{dayAfterTomorrowConfc} = $daftertomSum->{Consumption};
