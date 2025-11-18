@@ -11609,7 +11609,7 @@ sub _batSocTarget {
       my $constm   = CurrentVal  ($name, 'tmConFcTillSunset',  0);                              # Verbrauch nächster Tag bis Sonnenuntergang Wh
       my $pvfctd   = ReadingsNum ($name, 'RestOfDayPVforecast', 0);                             # PV Prognose Rest heute
       my $surptd   = $pvfctd - $tdconsset;                                                      # erwarteter (Rest)Überschuß des aktuellen Tages
-      my $propfac  = 0.5;
+      my $propfac  = 0.75;
 	  my $surptm   = sprintf "%.0f", ($pvfctm - $constm * $propfac);                            # anteilig Verbrauch am kommenden Tages während PV-Erzeugung -> Platz lassen!
       my $pvexpraw = $surptm > $surptd ? $surptm : $surptd;                                     # V 1.60.4
       $pvexpraw    = max ($pvexpraw, 0);                                                        # erwartete PV-Leistung inkl. Verbrauchsprognose bis Sonnenuntergang
@@ -11619,9 +11619,9 @@ sub _batSocTarget {
 
       if ($debug =~ /batteryManagement/xs) {
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Battery share factor of total required load: $sf");
-		  Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected today -> PV forecast: $pvfctd Wh, consumption till sunset: $tdconsset Wh, used surp: $surptd Wh");
-		  Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected tomorrow -> PV forecast: $pvfctm Wh, consumption till sunset: $constm Wh, used surp: $surptm Wh (".($propfac * 100)." % consumption)");
-          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging with proportional consumption: $pvexpraw Wh");
+		  Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected today -> PV forecast: $pvfctd Wh, consumption till sunset: $tdconsset Wh, calc Surp: $surptd Wh");
+		  Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected tomorrow -> PV forecast: $pvfctm Wh, consumption till sunset: $constm Wh, calc surp: $surptm Wh (".($propfac * 100)." % consumption)");
+          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> selected energy for charging (the higher Surp value from above): $pvexpraw Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Expected energy for charging after application Share factor: $pvexpect Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - compare with SoC history -> preliminary new Target: $target %");
       }
@@ -11677,18 +11677,14 @@ sub _batSocTarget {
 
       debugLog ($paref, 'batteryManagement', "SoC Step3 Bat $bn - basics -> max SOC so that predicted PV can be stored: $cantarget %, newtarget: $newtarget %");
 
-      if ($newtarget > $careSoc) {
-          $docare = 0;                                                                         # keine Zwangsanwendung care SoC
-      }
-      else {
-          $newtarget = $careSoc;
-      }
+      if ($newtarget > $careSoc) { $docare = 0; }                                              # keine Zwangsanwendung care SoC
+      else                       { $newtarget = $careSoc; }
 
       my $logadd = '';
 
       if ($newtarget > $csopt && $t > $delayts) {                                              # Erhöhung des SoC (wird ab delayts angewendet)
           $target = $newtarget;
-          $logadd = "(new target > $csopt % and Sunset has passed)";
+          $logadd = "(new target > $csopt % and time limit has passed)";
       }
       elsif ($newtarget > $csopt && $t <= $delayts && !$docare) {                              # bisheriges Optimum bleibt vorerst
           $target = $csopt;
