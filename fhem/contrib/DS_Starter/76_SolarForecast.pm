@@ -12402,9 +12402,11 @@ sub __batChargeOptTargetPower {
 
           if ($nhr eq '00') {
               storeReading ('Battery_TargetAchievable_'.$sbn, $achievable);
-			  $ratio = ___batRatio ($runwhneed, $remainingSurp, $befficiency);
+			  $ratio = sprintf "%.2f", ___batRatio ($runwhneed, $remainingSurp, $befficiency);
 			  
 			  $data{$name}{current}{'batRatio'.$sbn} = $ratio;
+              $otp->{$sbn}{ratio}                    = $ratio;
+              $otp->{$sbn}{remainingSurp}            = $remainingSurp;
 	      }
 
           $hsurp->{$hod}{$sbn}{loadrel}    = $runwhneed > 0 ? 1 : 0;                                             # Ladefreigabe abhängig von Ziel-SoC Erfüllung
@@ -12518,9 +12520,6 @@ sub __batChargeOptTargetPower {
                                                        $befficiency
                                                       );
               }
-              
-              $otp->{$sbn}{ratio}         = sprintf ("%.2f", $ratio);
-              $otp->{$sbn}{remainingSurp} = $remainingSurp;
 
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
               my $bpin    = CurrentVal ($name, 'batpowerinsum', 0);                                              # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
@@ -12574,9 +12573,8 @@ return ($hsurp, $otp);
 sub ___batRatio {
   my ($rwh, $surp, $beff) = @_;
 
-  return 0 if(!defined $surp || !defined $rwh || $rwh <= 0);
+  return 0 if($surp <= 0.0 || !defined $rwh || $rwh <= 0.0);
  
-  $surp     = max (0, $surp);
   my $ratio = $surp * 100.0 * $beff / $rwh;                                                                      # beff -> Batterie Effizienz als Anteil 0.1 .. 1
 
 return $ratio;
