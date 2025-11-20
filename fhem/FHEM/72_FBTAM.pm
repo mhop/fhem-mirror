@@ -31,9 +31,9 @@ package main;
 
 use strict;
 use warnings;
-
 use XML::Simple;
 use Digest::MD5 qw(md5_hex);
+#use Digest::SHA qw(sha256_hex);
 use HttpUtils;
 use HTTP::Request;
 use HTTP::Request::Common qw(POST);
@@ -212,6 +212,8 @@ sub FBTAM_storepassword {
 sub FBTAM_readpassword {
     my ($hash) = @_;
     my $name = $hash->{NAME};
+    my $savedUser = AttrVal($name, "username", undef);
+    $hash->{USERNAME} = $savedUser if defined $savedUser;
   
     my $keyname  = 'FBTAM_' . $name . '_PASSWORD';
     my $key   = getUniqueId() . $keyname;
@@ -264,8 +266,8 @@ sub FBTAM_Update {
   my $fbip = InternalVal($fbDev, 'HOST', undef);
   readingsSingleUpdate($hash, 'fritzbox_ip', $fbip, 0) if $fbip;
 
-  my $username = $hash->{USERNAME} // '';
   my $password = FBTAM_readpassword($hash);
+  my $username = $hash->{USERNAME};
   my $tam = $hash->{TAM};
 
   return unless $fbip && $username && $password;
@@ -415,8 +417,8 @@ sub FBTAM_getMsgListUrl {
   my $fbip  = InternalVal($fbDev, 'HOST', undef);
   my $tamIndex = $hash->{TAM}-1;
   
-  my $username = $hash->{USERNAME} // '';
   my $password = FBTAM_readpassword($hash);
+  my $username = $hash->{USERNAME};
   my $ua = LWP::UserAgent->new(timeout => 10);
   $ua->credentials("$fbip:49000", "HTTPS Access", $username, $password);
 
@@ -485,8 +487,8 @@ sub FBTAM_getMsgList {
     return undef;
   }
    
-  my $username = $hash->{USERNAME} // '';
   my $password = FBTAM_readpassword($hash);
+  my $username = $hash->{USERNAME};
   my $ua = LWP::UserAgent->new;
   $ua->credentials($fbip . ':49000', 'HTTPS Access', $username, $password);
 
@@ -990,8 +992,8 @@ sub FBTAM_deleteMsg {
     return
   } 
   
-  my $username = $hash->{USERNAME} // '';
   my $password = FBTAM_readpassword($hash);
+  my $username = $hash->{USERNAME};
   my $ua = LWP::UserAgent->new(timeout => 10);
   $ua->credentials("$fbip:49000", "HTTPS Access", $username, $password);
   
@@ -1053,8 +1055,8 @@ sub FBTAM_markMsg {
   my $tamIndex = $hash->{TAM}-1;
   
   
-  my $username = $hash->{USERNAME} // '';
   my $password = FBTAM_readpassword($hash);
+  my $username = $hash->{USERNAME};
   my $ua = LWP::UserAgent->new(timeout => 10);
   $ua->credentials("$fbip:49000", "HTTPS Access", $username, $password);
   
@@ -1112,8 +1114,8 @@ sub FBTAM_enableTAM {
   #-- careful: tamIndex = tamNr-1
   my $tamIndex = $hash->{TAM}-1;
   
-  my $username = $hash->{USERNAME} // '';
   my $password = FBTAM_readpassword($hash);
+  my $username = $hash->{USERNAME};
   my $ua = LWP::UserAgent->new(timeout => 10);
   $ua->credentials("$fbip:49000", "HTTPS Access", $username, $password);
   
@@ -1163,8 +1165,8 @@ sub FBTAM_getinfo {
   #-- careful: tamIndex = tamNr-1
   my $tamIndex = $hash->{TAM}-1;
   
-  my $username = $hash->{USERNAME} // '';
   my $password = FBTAM_readpassword($hash);
+  my $username = $hash->{USERNAME};
   my $ua = LWP::UserAgent->new(timeout => 10);
   $ua->credentials("$fbip:49000", "HTTPS Access", $username, $password);
   
