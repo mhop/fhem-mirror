@@ -162,6 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code chenges ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
   "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ".
                            "__solCast_ApiResponse: evaluation of httpheader ".
@@ -1446,7 +1447,7 @@ my %hef = (                                                                     
   "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
 );
 
-my %hcsr = (                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
+my %hcsr = (                                                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
   currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
   lastretrieval_time          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => '-'         },
   lastretrieval_timestamp     => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => '-'         },
@@ -1468,6 +1469,7 @@ my %hcsr = (                                                                    
   BatPowerIn_Sum              => { fnr => 5, fn => \&CurrentVal,      par => 'batpowerinsum',        par1 => '',                  unit => ' W',   def => '-'         },
   BatPowerOut_Sum             => { fnr => 5, fn => \&CurrentVal,      par => 'batpoweroutsum',       par1 => '',                  unit => ' W',   def => '-'         },
   BatWeightedTotalSOC         => { fnr => 2, fn => \&CurrentVal,      par => 'batsoctotal',          par1 => '',                  unit => ' %',   def => 0           },
+  BatRatio                    => { fnr => 5, fn => \&CurrentVal,      par => 'batRatio',             par1 => '',                  unit => '',     def => '-'         },
   SunHours_Remain             => { fnr => 5, fn => \&CurrentVal,      par => '',                     par1 => '',                  unit => '',     def => 0           },      # fnr => 3 -> Custom Calc
   SunMinutes_Remain           => { fnr => 5, fn => \&CurrentVal,      par => '',                     par1 => '',                  unit => '',     def => 0           },
   dayAfterTomorrowPVforecast  => { fnr => 5, fn => \&CurrentVal,      par => 'dayAfterTomorrowPVfc', par1 => '',                  unit => ' Wh',  def => 0           },
@@ -1913,7 +1915,7 @@ sub Set {
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:noLearning,on_simple".($ipai ? ',on_simple_ai,' : ',')."on_complex".($ipai ? ',on_complex_ai,on_complex_api_ai,' : ',')."off ".
-             "reset:widgetList,$resetnum,select,$resets,2,textField,use&nbsp;only&nbsp;when&nbsp;arguments&nbsp;are&nbsp;needed ".
+             "reset:widgetList,$resetnum,select,$resets,2,textField,fill&nbsp;in&nbsp;only&nbsp;if&nbsp;arguments&nbsp;are&nbsp;needed ".
              $cf." "
              ;
 
@@ -2572,29 +2574,29 @@ sub _setreset {                          ## no critic "not used"
                   delete $data{$name}{pvhist}{$hid}{$circh}{pvcorrf};
               }
 
-              Log3($name, 3, qq{$name - stored PV correction factor of hour "$circh" from pvCircular and pvHistory deleted});
-              return;
+              Log3 ($name, 3, qq{$name - stored PV correction factor of hour "$circh" from pvCircular and pvHistory deleted});
           }
+          else {
+			  for my $hod (keys %{$data{$name}{circular}}) {
+				  delete $data{$name}{circular}{$hod}{pvcorrf};
+				  delete $data{$name}{circular}{$hod}{quality};
+				  delete $data{$name}{circular}{$hod}{pvrlsum};
+				  delete $data{$name}{circular}{$hod}{pvfcsum};
+				  delete $data{$name}{circular}{$hod}{dnumsum};
 
-          for my $hod (keys %{$data{$name}{circular}}) {
-              delete $data{$name}{circular}{$hod}{pvcorrf};
-              delete $data{$name}{circular}{$hod}{quality};
-              delete $data{$name}{circular}{$hod}{pvrlsum};
-              delete $data{$name}{circular}{$hod}{pvfcsum};
-              delete $data{$name}{circular}{$hod}{dnumsum};
+				  for my $k (keys %{$data{$name}{circular}{$hod}}) {
+					  delete $data{$name}{circular}{$hod}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
+				  }
+			  }
 
-              for my $k (keys %{$data{$name}{circular}{$hod}}) {
-                  delete $data{$name}{circular}{$hod}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
-              }
-          }
+			  for my $hid (keys %{$data{$name}{pvhist}}) {
+				  for my $hidh (keys %{$data{$name}{pvhist}{$hid}}) {
+					  delete $data{$name}{pvhist}{$hid}{$hidh}{pvcorrf};
+				  }
+			  }
 
-          for my $hid (keys %{$data{$name}{pvhist}}) {
-              for my $hidh (keys %{$data{$name}{pvhist}{$hid}}) {
-                  delete $data{$name}{pvhist}{$hid}{$hidh}{pvcorrf};
-              }
-          }
-
-          Log3 ($name, 3, qq{$name - all stored PV correction factors from pvCircular and pvHistory deleted});
+			  Log3 ($name, 3, qq{$name - all stored PV correction factors from pvCircular and pvHistory deleted});
+		  }
       }
 
       return;
@@ -7765,6 +7767,7 @@ sub _attrBatSocManagement {              ## no critic "not used"
   }
   else {
       deleteReadingspec ($hash, 'Battery_.*');
+	  $data{$name}{current}{'batRatio'.$bn};
   }
 
   delete $data{$name}{circular}{99}{'lastTsMaxSocRchd'.$bn};
@@ -9188,7 +9191,7 @@ sub centralTask {
 
   _calcConsForecast_circular  ($centpars);                                            # neue Verbrauchsprognose über pvCircular
 
-  _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
+  _evaluateTrigger            ($centpars);                                            # Schwellenwerte der Trigger bewerten und signalisieren
   _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
   _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
   _calcDataEveryFullHour      ($centpars);                                            # Daten berechnen/speichern die nur einmal nach jeder vollen Stunde ermittelt werden
@@ -11621,7 +11624,7 @@ sub _batSocTarget {
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Battery share factor of total required load: $sf");
 		  Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> today -> PV fc: $pvfctd Wh, con till sunset: $tdconsset Wh, Surp: $surptd Wh");
 		  Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> tomorrow -> PV fc: $pvfctm Wh, con till sunset: $constm Wh, Surp: $surptm Wh (".(PERCCONINSOC * 100)."% con)");
-          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> selected energy for charging (the higher Surp value from above): $pvexpraw Wh");
+          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> selected energy for charging (the higher positive Surp value from above): $pvexpraw Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> expected energy for charging after application Share factor: $pvexpect Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - compare with SoC history -> preliminary new Target: $target %");
       }
@@ -12397,7 +12400,14 @@ sub __batChargeOptTargetPower {
               $achievable = 0;
           }
 
-          storeReading ('Battery_TargetAchievable_'.$sbn, $achievable) if($nhr eq '00');
+          if ($nhr eq '00') {
+              storeReading ('Battery_TargetAchievable_'.$sbn, $achievable);
+			  $ratio = sprintf "%.2f", ___batRatio ($runwhneed, $remainingSurp, $befficiency);
+			  
+			  $data{$name}{current}{'batRatio'.$sbn} = $ratio;
+              $otp->{$sbn}{ratio}                    = $ratio;
+              $otp->{$sbn}{remainingSurp}            = $remainingSurp;
+	      }
 
           $hsurp->{$hod}{$sbn}{loadrel}    = $runwhneed > 0 ? 1 : 0;                                             # Ladefreigabe abhängig von Ziel-SoC Erfüllung
           $hsurp->{$hod}{$sbn}{achievelog} = "charging target: $goalwh Wh, E requirement incl. efficiency: ".
@@ -12465,13 +12475,13 @@ sub __batChargeOptTargetPower {
           my $pneedmin = $limpower * (1 + $otpMargin / 100);                                                     # optPower: Sicherheitsaufschlag
 
           if ($strategy eq 'smartPower') {
-              ($pneedmin) = ___batAdjustPowerByMargin ($limpower,                                                # smartPower: Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
-                                                       $bpinmax,
-                                                       $runwhneed,
-                                                       $otpMargin,
-                                                       $remainingSurp,
-                                                       $befficiency
-                                                      );
+              $pneedmin = ___batAdjustPowerByMargin ($limpower,                                                # smartPower: Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                                                     $bpinmax,
+                                                     $runwhneed,
+                                                     $otpMargin,
+                                                     $remainingSurp,
+                                                     $befficiency
+                                                    );
           }
 
           $pneedmin = ___batApplySocAreas ( { name       => $name,
@@ -12502,16 +12512,13 @@ sub __batChargeOptTargetPower {
               }
 
               if ($strategy eq 'smartPower') {                                                                   # smartPower: Sicherheitsaufschlag linear absenkend
-                  ($target, $ratio) = ___batAdjustPowerByMargin ($limpower,                                      # smartPower: agressivere Ladeleistung, Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
-                                                                 $bpinmax,
-                                                                 $runwhneed,
-                                                                 $otpMargin,
-                                                                 $remainingSurp,
-                                                                 $befficiency
-                                                                );
-
-                  $otp->{$sbn}{ratio}         = sprintf ("%.2f", $ratio);
-                  $otp->{$sbn}{remainingSurp} = $remainingSurp;
+                  $target = ___batAdjustPowerByMargin ($limpower,                                                # smartPower: agressivere Ladeleistung, Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+                                                       $bpinmax,
+                                                       $runwhneed,
+                                                       $otpMargin,
+                                                       $remainingSurp,
+                                                       $befficiency
+                                                      );
               }
 
               my $gfeedin = CurrentVal ($name, 'gridfeedin',    0);                                              # aktuelle Netzeinspeisung
@@ -12560,6 +12567,20 @@ return ($hsurp, $otp);
 }
 
 ################################################################
+#  Ratio zwischen PV-Überschuß und benötigter Ladeenergie 
+#  berechnen
+################################################################
+sub ___batRatio {
+  my ($rwh, $surp, $beff) = @_;
+
+  return 0 if($surp <= 0.0 || !defined $rwh || $rwh <= 0.0);
+ 
+  my $ratio = $surp * 100.0 * $beff / $rwh;                                                                      # beff -> Batterie Effizienz als Anteil 0.1 .. 1
+
+return $ratio;
+}
+
+################################################################
 #   Verbleibende Aktivstunden und deren Überschußsumme liefern
 ################################################################
 sub ___batRemainHodsAndSurp {
@@ -12590,12 +12611,10 @@ return ($remainingSurp, \@remaining_hods);
 sub ___batAdjustPowerByMargin {
   my ($limpower, $pinmax, $runwhneed, $otpMargin, $remainingSurp, $befficiency) = @_;
 
+  return $limpower if(!defined $runwhneed || $runwhneed <= 0);
+  
   my $pow;
-  my $ratio = 0;
-
-  return ($limpower, $ratio) if(!defined $runwhneed || $runwhneed <= 0);
-
-  $ratio            = $remainingSurp * 100.0 * $befficiency / $runwhneed;              # befficiency als Anteil 0.1 .. 1
+  my $ratio         = ___batRatio ($runwhneed, $remainingSurp, $befficiency);
   my $limWithMargin = $limpower * (1.0 + $otpMargin / 100.0);                          # Hinweis: das ist bewusst ein permanenter Sicherheitsaufschlag
   $limpower         = min ($limpower,      $pinmax);                                   # limpower !> pinmax um invertierte Interpolation zu vermeiden
   $limWithMargin    = min ($limWithMargin, $pinmax); 
@@ -12605,7 +12624,7 @@ sub ___batAdjustPowerByMargin {
   elsif ($ratio >= 100 + $otpMargin)                  { $pow = $limWithMargin }
   else                                                { $pow = $pinmax - ($pinmax - $limWithMargin) * ($ratio - 100.0) / $otpMargin }
 
-return ($pow, $ratio);
+return $pow;
 }
 
 ################################################################
@@ -12967,7 +12986,7 @@ sub _createSummaries {
           $next4HoursSum->{Consumption} += $confc / 60 * $minute if($h == 4);
       }
 
-      if ($istdy) {
+      if ($fd == 0) {
           $restOfDaySum->{PV}          += $pvfc;
           $restOfDaySum->{Consumption} += $confc;
           $tdConFcTillSunset           += $confc if(int ($hod) < int ($dtsset->{hour}) + 1);
@@ -15086,15 +15105,15 @@ return;
 }
 
 ################################################################
-#     Schwellenwerte auswerten und signalisieren
+#     Schwellenwerte für Trigger auswerten und signalisieren
 ################################################################
-sub _evaluateThresholds {
+sub _evaluateTrigger {
   my $paref = shift;
   my $name  = $paref->{name};
 
-  my $bt    = ReadingsVal($name, 'batteryTrigger',  '');
-  my $pt    = ReadingsVal($name, 'powerTrigger',    '');
-  my $eh4t  = ReadingsVal($name, 'energyH4Trigger', '');
+  my $bt    = ReadingsVal ($name, 'batteryTrigger',  '');
+  my $pt    = ReadingsVal ($name, 'powerTrigger',    '');
+  my $eh4t  = ReadingsVal ($name, 'energyH4Trigger', '');
 
   if ($bt) {
       $paref->{cobj}   = 'batsocslidereg';
@@ -15139,13 +15158,13 @@ sub __evaluateArray {
 
   my $aaref = CurrentVal ($name, $cobj, '');
   my @aa    = ();
-  @aa       = @{$aaref} if (ref $aaref eq 'ARRAY');
+  @aa       = @{$aaref} if(ref $aaref eq 'ARRAY');
 
   return if(scalar @aa < SLIDENUMMAX);
 
-  my $gen1   = $aa[0];
-  my $gen2   = $aa[1];
-  my $gen3   = $aa[2];
+  my $gen1 = $aa[0];
+  my $gen2 = $aa[1];
+  my $gen3 = $aa[2];
 
   my ($a, $h) = parseParams ($tholds);
 
@@ -15155,13 +15174,13 @@ sub __evaluateArray {
       if ($cond eq "on" && $gen1 > $h->{$key}) {
           next if($gen2 < $h->{$key});
           next if($gen3 < $h->{$key});
-          storeReading ("${tname}_${knum}", 'on') if(ReadingsVal($name, "${tname}_${knum}", "off") eq "off");
+          storeReading ("${tname}_${knum}", 'on') if(ReadingsVal($name, "${tname}_${knum}", 'off') eq 'off');
       }
 
       if ($cond eq "off" && $gen1 < $h->{$key}) {
           next if($gen2 > $h->{$key});
           next if($gen3 > $h->{$key});
-          storeReading ("${tname}_${knum}", 'off') if(ReadingsVal($name, "${tname}_${knum}", "on") eq "on");
+          storeReading ("${tname}_${knum}", 'off') if(ReadingsVal($name, "${tname}_${knum}", 'on') eq 'on');
       }
   }
 
@@ -15697,6 +15716,7 @@ sub _genSpecialReadings {
       readingsDelete    ($hash, $prpo.'_'.$item);
       deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'todayConsumptionForecast');
       deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'tomorrowConsumptionForecast');
+      deleteReadingspec ($hash, $prpo.'_'.$item.'_.*') if($item eq 'BatRatio');
   }
 
   return if(!@csr);
@@ -15751,6 +15771,14 @@ sub _genSpecialReadings {
               $bsum   .= $bsum eq $def ? '' : $hcsr{$kpi}{unit};
 
               storeReading ($prpo.'_'.$kpi, $bsum);
+          }
+          elsif ($kpi eq 'BatRatio') {    
+              for my $bn (1..MAXBATTERIES) {                                                          # für jede Batterie
+                  $bn       = sprintf "%02d", $bn;
+                  my $ratio = &{$hcsr{$kpi}{fn}} ($name, $hcsr{$kpi}{par}.$bn, $def);
+                  
+                  storeReading ($prpo.'_'.$kpi.'_'.$bn, sprintf ("%.0f", $ratio)) if($ratio ne '-');
+              }
           }
           elsif ($kpi =~ /daysUntilBatteryCare_/xs) {
               my $bn = (split "_", $kpi)[1];                                                          # Batterienummer extrahieren
@@ -28155,6 +28183,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="27%"> <col width="73%"> </colgroup>
             <tr><td> <b>BatPowerIn_Sum</b>                   </td><td>the sum of the current battery charging power of all defined battery devices                                                </td></tr>
             <tr><td> <b>BatPowerOut_Sum</b>                  </td><td>the sum of the current battery discharge power of all defined battery devices                                               </td></tr>
+            <tr><td> <b>BatRatio</b>                         </td><td>The ratio of PV surplus/required charging energy to the battery's charging target (loadTarget)                              </td></tr>
             <tr><td> <b>BatWeightedTotalSOC</b>              </td><td>the resulting (weighted) SOC across all installed batteries in %                                                            </td></tr>
             <tr><td> <b>allStringsFullfilled</b>             </td><td>Fulfillment status of error-free generation of all strings                                                                  </td></tr>
             <tr><td> <b>conForecastComingNight</b>           </td><td>Consumption forecast from the coming sunset to the coming sunrise. If the sunset has already passed,                        </td></tr>
@@ -30939,6 +30968,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="27%"> <col width="73%"> </colgroup>
             <tr><td> <b>BatPowerIn_Sum</b>                   </td><td>die Summe der momentanen Batterieladeleistung aller definierten Batterie Geräte                                 </td></tr>
             <tr><td> <b>BatPowerOut_Sum</b>                  </td><td>die Summe der momentanen Batterieentladeleistung aller definierten Batterie Geräte                              </td></tr>
+            <tr><td> <b>BatRatio</b>                         </td><td>das Verhältnis (Ratio) von PV-Überschuß / benötigter Ladeenergie zum Ladeziel (loadTarget) der Batterie(n)      </td></tr>
             <tr><td> <b>BatWeightedTotalSOC</b>              </td><td>der resultierende (gewichtete) SOC über alle installierten Batterien in %                                       </td></tr>
             <tr><td> <b>allStringsFullfilled</b>             </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                                     </td></tr>
             <tr><td> <b>conForecastComingNight</b>           </td><td>Verbrauchsprognose vom kommenden Sonnenuntergang bis zum kommenden Sonnenaufgang. Ist der Sonnenuntergang       </td></tr>
