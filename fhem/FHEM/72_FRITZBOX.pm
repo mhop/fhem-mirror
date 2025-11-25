@@ -46,34 +46,44 @@ use Blocking;
 use HttpUtils;
 use feature 'state';
 
-my $ModulVersion = "08.20.07a";
+my $ModulVersion = "08.20.08";
 my $missingModul = "";
+my $missingXML = "";
 my $FRITZBOX_TR064pwd;
 my $FRITZBOX_TR064user;
 
-eval "use URI::Escape;1"  or $missingModul .= "URI::Escape ";
-eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
-eval "use IO::Socket;1"   or $missingModul .= "IO::Socket ";
-eval "use Net::Ping;1"    or $missingModul .= "Net::Ping ";
+my $json_doc;
+my $json_level;
+my @json_stack;
+my $need_comma;
+my $element_string;
+my $crlf = 1;
 
-use FritzBoxUtils; ## only for web access login
+my $fullHASH=1;
 
-#sudo apt-get install libjson-perl
-eval "use JSON;1" or $missingModul .= "JSON ";
+# eval "use XML::Simple;1"    or $missingXML   .= "XML::Simple ";     # should be in standard Fhem installation
+
+eval "use URI::Escape;1"    or $missingModul .= "URI::Escape ";
+eval "use MIME::Base64;1"   or $missingModul .= "MIME::Base64 ";
+eval "use IO::Socket;1"     or $missingModul .= "IO::Socket ";
+eval "use Net::Ping;1"      or $missingModul .= "Net::Ping ";
+
+eval "use JSON;1"           or $missingModul .= "JSON ";             # sudo apt-get install libjson-perl
 eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
 
-eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
-# sudo apt-get install libsoap-lite-perl
-eval "use SOAP::Lite;1" or $missingModul .= "Soap::Lite ";
+eval "use URI::Escape;1"    or $missingModul .= "URI::Escape ";
+eval "use SOAP::Lite;1"     or $missingModul .= "Soap::Lite ";       # sudo apt-get install libsoap-lite-perl
 
 # $Data::Dumper::Terse = 1;
 # $Data::Dumper::Purity = 1;
 # $Data::Dumper::Sortkeys = 1;
-eval "use Data::Dumper;1" or $missingModul .= "Data::Dumper ";
+eval "use Data::Dumper;1"   or $missingModul .= "Data::Dumper ";
 
 #use JSON::Parse 'parse_json';
 #use HTML::Make;
 #binmode STDOUT, ":encoding(utf8)";
+
+use FritzBoxUtils; ## only for web access login
 
 sub FRITZBOX_Log($$$);
 sub FRITZBOX_DebugLog($$$$;$);
@@ -167,6 +177,7 @@ sub FRITZBOX_Helper_read_Password($);
 sub FRITZBOX_Helper_Url_Regex;
 sub FRITZBOX_Helper_Dumper($$;@);
 # sub FRITZBOX_Helper_Json2HTML($);
+sub FRITZBOX_Helper_encode_json;
 
 my %IGD064   = (
         WANCommonInterfaceConfig1  => { service => "WANCommonInterfaceConfig:1",
@@ -1099,7 +1110,10 @@ sub FRITZBOX_Initialize($)
                                 ."dectID_manufacturer,dectID_model,dectID_NoRingWithNightSetting,dectID_radio,dectID_NoRingTime,"
                                 ."shdeviceID_battery,shdeviceID_category,shdeviceID_device,shdeviceID_firmwareVersion,shdeviceID_manufacturer,"
                                 ."shdeviceID_model,shdeviceID_status,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_type,"
-                                ."shdeviceID_voltage,shdeviceID_powerPerHour,shdeviceID_currentInAmp,shdeviceID_powerInWatt,shdeviceSD_ledState,shdeviceSH_state "
+                                ."shdeviceID_voltage,shdeviceID_powerPerHour,shdeviceID_currentInAmp,shdeviceID_powerInWatt,shdeviceSD_ledState,shdeviceSH_state,"
+                                ."shdeviceID_buttonLocked,shdeviceID_externalLocked,shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
+                                ."shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_currentState,shdeviceID_currentStateAction,"
+                                ."shdeviceID_currentStateEndTime,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_targetTemp,shdeviceID_mode,shdeviceID_modeNextChangeTime "
                 ."enableBoxReadings:multiple-strict,"
                                 ."box_energyMode,box_globalFilter,box_led,box_vdsl,box_dns,box_pwr,box_guestWlan,box_usb,box_notify "
                 ."enableLogReadings:multiple-strict,"
@@ -1815,6 +1829,14 @@ sub FRITZBOX_Attr($@)
 } # end FRITZBOX_Attr
 
 ###############################################################################
+sub FRITZBOX_Helper_encode_json {
+#  use JSON::PP 'encode_json'; # no encode_json
+#  state $encoder = JSON::PP->new->utf8->canonical->pretty;
+  state $encoder = JSON->new->utf8->canonical->pretty;
+  return $encoder->encode($_[0]);
+}
+
+###############################################################################
 # retMsgbySet:all,error,none
 #
 sub FRITZBOX_Helper_retMsg($$;@) {
@@ -2010,6 +2032,9 @@ sub FRITZBOX_Set($$@)
               .  " smartHome"
               if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721);
 
+     $list    .= " smartHome"
+              if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box|Smart") && ($hash->{fhem}{fwVersion} >= 721);
+
      $list    .= " ledSetting"
               if ($hash->{LUADATA} == 1) && ($hash->{fhem}{fwVersion} >= 721);
 
@@ -2113,6 +2138,7 @@ sub FRITZBOX_Set($$@)
                       || ($action =~ /tmpAdjust/  && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$/ )
                       || ($action =~ /tmpAdjust/  && $actionVal =~ /^(([8-9]|1[0-9]|2[0-7])(\.[05]))$/ )
                       || ($action =~ /tmpPerm/    && $actionVal =~ /^[01]$/ )
+                      || ($action =~ /boost/      && $actionVal >= 0 && $actionVal <= 120 && $actionVal =~ /\d{1,3}/)
                       || ($action =~ /switch/     && $actionVal =~ /^[01]$/ )
                       || ($action =~ /automatic/  && $actionVal =~ /^[01]$/ )
                       || ($action =~ /preDefSave/ && $actionVal =~ /^[-\w]+$/ )
@@ -2121,9 +2147,10 @@ sub FRITZBOX_Set($$@)
                     ) {
 
                  $retMsg = "ERROR: second parameter not valid:\n"
-                                   . "    <tempOffset:value> Value steps 0.5\n"
-                                   . " or <tmpAdjust:[8 .. 28]> Value steps 0.5\n" 
+                                   . "    <tempOffset:degrees> steps 0.5\n"
+                                   . " or <tmpAdjust:[8 .. 28]> degrees steps 0.5\n" 
                                    . " or <tmpPerm:0|1>\n"
+                                   . " or <boost:[0..120] minutes\n"
                                    . " or <switch:0|1>\n"
                                    . " or <automatic:0|1>\n"
                                    . " or <preDefSave:name>\n"
@@ -2138,6 +2165,7 @@ sub FRITZBOX_Set($$@)
                       || ($action =~ /tmpAdjust/  && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$/ )
                       || ($action =~ /tmpAdjust/  && $actionVal =~ /^(([8-9]|1[0-9]|2[0-7])(\.[05]))$/ )
                       || ($action =~ /tmpPerm/    && $actionVal =~ /^[01]$/ )
+                      || ($action =~ /boost/      && $actionVal >= 0 && $actionVal <= 120 && $actionVal =~ /\d{1,3}/)
                       || ($action =~ /switch/     && $actionVal =~ /^[01]$/ )
                       || ($action =~ /automatic/  && $actionVal =~ /^[01]$/ )
                       || ($action =~ /preDefSave/ && $actionVal =~ /^[-\w]+$/ )
@@ -2149,16 +2177,17 @@ sub FRITZBOX_Set($$@)
                     ) {
 
                  $retMsg = "ERROR: second parameter not valid:\n"
-                                   . "    <tempOffset:value> Value steps 0.5\n"
-                                   . " or <tmpAdjust:[8 .. 28]> Value steps 0.5\n" 
+                                   . "    <tempOffset:degrees> steps 0.5\n"
+                                   . " or <tmpAdjust:[8 .. 28]> degrees steps 0.5\n" 
                                    . " or <tmpPerm:0|1>\n"
+                                   . " or <boost:[0..120] minutes\n"
                                    . " or <switch:0|1>\n"
                                    . " or <automatic:0|1>\n"
                                    . " or <preDefSave:name>\n"
                                    . " or <preDefDel:name>\n"
                                    . " or <preDefLoad:[id:]name[:A|:G]>\n"
-                                   . " or <minTemp:[7.5 .. 28.5]> Value steps 0.5\n"
-                                   . " or <maxTemp:[7.5 .. 28.5]> Value steps 0.5\n"
+                                   . " or <minTemp:[7.5 .. 28.5]> degrees steps 0.5\n"
+                                   . " or <maxTemp:[7.5 .. 28.5]> degrees steps 0.5\n"
                                    . " or <mimaRange:0|1>\n";
 
                return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
@@ -2170,6 +2199,22 @@ sub FRITZBOX_Set($$@)
          # return "Testausgabe1: $val[0] - $val[1]";
 
          $preDefDevice = $val[0];
+
+         my $smartCat  = ReadingsVal($name, "shdevice" .$preDefDevice. "_category", "other");
+         if($smartCat ne "THERMOSTAT") {
+           $retMsg = "ERROR: first parameter: $preDefDevice not a valid reference for a SmartHome THERMOSTAT\n";
+           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
+         }
+
+         my $smartAIN  = ReadingsVal($name, "shdevice" .$preDefDevice. "_uid", undef);
+
+         if(!defined($smartAIN)) {
+           $retMsg = "ERROR: first parameter: $preDefDevice not a valid reference for a SmartHome AIN\n";
+           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
+         }
+         $smartAIN =~ s/ //g;
+
+         my $smartName = ReadingsVal($name, "shdevice" .$preDefDevice, undef);
 
          if (      $action =~ /tempOffset/ && $actionVal =~ /^(-?\d+(\.\d+)?)$/ ) {
            $preDefName = "Offset";
@@ -2208,6 +2253,21 @@ sub FRITZBOX_Set($$@)
            $preDefDevice = $1;
            $preDefName   = $2;
            $preDefWeb    = $3 if $3;
+         } elsif ( $action =~ /boost/      && $actionVal >= 0 && $actionVal <= 120 && $actionVal =~ /(\d{1,3})/ ) {
+           my $timeAdd = $1 * 60;
+           my $endtimestamp = time() + $timeAdd;
+           my $luaPara = 'webservices/homeautoswitch.lua?ain=' .$smartAIN. '&switchcmd=sethkrboost&endtimestamp=' . $endtimestamp;
+
+           FRITZBOX_Log $hash, 3, "para luaFunction: " . $luaPara;
+           my $returnData = FRITZBOX_call_Lua_Query( $hash, $luaPara, "", "luaCall") ;
+
+           # return Dumper $returnData;
+           if (defined ($returnData->{result}) && $returnData->{result} =~ /200 OK/) {
+             $retMsg = "boost for $smartName with ID: $preDefDevice " . ($timeAdd ? "applied" : "canceld");
+           } else {
+             $retMsg = "ERROR: boost for $smartName with ID: $preDefDevice not " . ($timeAdd ? "applied" : "canceld");
+           }
+           return FRITZBOX_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
          $preDefWeb =~ s/\://gs;
@@ -2428,7 +2488,7 @@ sub FRITZBOX_Set($$@)
            return FRITZBOX_Helper_retMsg($hash, $analyse, $retMsgbySet);
          }
 
-         if($result->{data}->{done}) {
+         if(defined $result->{data}->{done}) {
            if ($result->{data}->{done}) {
 
              my $msg = "ID:$val[0] - $newValue";
@@ -2436,8 +2496,14 @@ sub FRITZBOX_Set($$@)
                 $msg .= ": " . $result->{data}->{temperature} if $result->{data}->{temperature};
 
              readingsSingleUpdate($hash, "retStat_smartHome", $msg, 1);
-             readingsSingleUpdate($hash, "shdevice" . $val[0] . "_state", $newValue, 1) if $action =~ /switch/;
-             readingsSingleUpdate($hash, "shdevice" . $val[0] . "_tempOffset", $newValue, 1) if $action =~ /tmpAdjust|tmpPerm/;
+             if ($action =~ /switch/) {
+               readingsSingleUpdate($hash, "shdevice" . $val[0] . "_state", $newValue, 1);
+             } elsif ($action =~ /tmpAdjust/) {
+               readingsSingleUpdate($hash, "shdevice" . $val[0] . "_targetTemp", $newValue, 1);
+             } elsif ($action =~ /tmpPerm/) {
+               readingsSingleUpdate($hash, "shdevice" . $val[0] . "_tempOffset", $newValue, 1);
+             } else {
+             }
 
              return FRITZBOX_Helper_retMsg($hash, $msg, $retMsgbySet);
 
@@ -3810,11 +3876,6 @@ sub FRITZBOX_Set($$@)
 
 } # end FRITZBOX_Set
 
-sub FRITZBOX_encode_json {
-  use JSON::PP 'encode_json'; # no encode_json
-  state $encoder = JSON::PP->new->utf8->canonical->pretty;
-  return $encoder->encode($_[0]);
-}
 ###############################################################################
 sub FRITZBOX_Get($@)
 {
@@ -3926,18 +3987,26 @@ sub FRITZBOX_Get($@)
        return $returnStr . $tmp;
 
      } elsif( lc $cmd eq "luafunction" && $hash->{LUAQUERY} == 1) {
+       # webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos
+       # js3/views/dialogs/start-page/notification-center-details.js
+
        FRITZBOX_Log $hash, 3, "get $name $cmd " . join(" ", @val);
 
        return "Wrong number of arguments, usage: get $name luafunction <query>" if int @val !=1;
 
-       $returnStr  = "Result of function call '$val[0]' \n";
+       $returnStr  = "<!DOCTYPE html><html><body>";
+       $returnStr .= "Result of function call '$val[0]' \n";
        $returnStr .= "----------------------------------------------------------------------\n";
 
        my $result = FRITZBOX_call_Lua_Query( $hash, $val[0], "", "luaCall") ;
 
        my $tmp = FRITZBOX_Helper_analyse_Lua_Result($hash, $result);
 
-       return $returnStr . $tmp;
+       FRITZBOX_Log $hash, 3, "result luaFunction: \n" . $tmp;
+
+       my $outhash = XMLin($tmp, StrictMode => 0, KeyAttr => []);
+
+       return $returnStr . FRITZBOX_Helper_encode_json($outhash);
 
      } elsif( lc $cmd eq "luadata" && $hash->{LUADATA} == 1) {
        FRITZBOX_Log $hash, 3, "get $name $cmd [" . int(@val) . "] " . join(" ", @val);
@@ -3945,7 +4014,7 @@ sub FRITZBOX_Get($@)
        my $mode = "";
 
        if ($val[0] =~ /json|pretty/) {
-         return "Wrong number of arguments, usage: get $name json argName1 argValue1 [argName2 argValue2] ..." if int @val < 3 || (int(@val) - 1) %2 == 1;
+         return "Wrong number of arguments, usage: get $name json or pretty argName1 argValue1 [argName2 argValue2] ..." if int @val < 3 || (int(@val) - 1) %2 == 1;
          $mode = shift (@val); # remove 1st element and store it.
        } else {
          return "Wrong number of arguments, usage: get $name argName1 argValue1 [argName2 argValue2] ..." if int @val < 2 || int(@val) %2 == 1;
@@ -3968,8 +4037,6 @@ sub FRITZBOX_Get($@)
 
        my $result = FRITZBOX_call_LuaData($hash, "fnget", \@webCmdArray) ;
 
-       my $toJSON = to_json( $result, { pretty => 0 } );
-
        if ($mode eq "json") {
          return to_json( $result, { pretty => 0 } );
        }
@@ -3978,7 +4045,7 @@ sub FRITZBOX_Get($@)
        $returnStr .= "----------------------------------------------------------------------\n";
 
        if ($mode eq "pretty") {
-         my $printJSON = FRITZBOX_encode_json($result);
+         my $printJSON = FRITZBOX_Helper_encode_json($result);
          return $returnStr . $printJSON;
        }
 
@@ -6748,6 +6815,7 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
              for(my $i = 0; $i <= $nbViews - 1; $i++) {
                my $id = $resultData->{data}->{devices}->[$i]->{id};
                FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id,                      $resultData->{data}->{devices}->[$i]->{displayName};
+               FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_uid",             $resultData->{data}->{devices}->[$i]->{uid};
                FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_device",          $resultData->{data}->{devices}->[$i]->{id};
                FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_type",            $resultData->{data}->{devices}->[$i]->{type};
                FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_category",        $resultData->{data}->{devices}->[$i]->{category};
@@ -6760,10 +6828,70 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
                  my $units = $resultData->{data}->{devices}->[$i]->{units};
                  for my $unit (0 .. scalar @{$units} - 1) {
                    if( $units->[$unit]->{'type'} eq 'THERMOSTAT' ) {
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_buttonLocked",   $units->[$unit]->{interactionControls}->[0]->{isLocked};
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_externalLocked", $units->[$unit]->{interactionControls}->[1]->{isLocked};
+
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_mode",       $units->[$unit]->{skills}->[0]->{mode};
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_targetTemp", $units->[$unit]->{skills}->[0]->{targetTemp};
+
+                     if ($units->[$unit]->{skills}->[0]->{nextChange}->{timeSetting}) {
+                       my $chgTime  = $units->[$unit]->{skills}->[0]->{nextChange}->{timeSetting}->{startDate};
+                          $chgTime .= " ";
+                          $chgTime .= $units->[$unit]->{skills}->[0]->{nextChange}->{timeSetting}->{startTime};
+                       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_modeNextChangeTime", $chgTime;
+                     }
+
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_adaptivHeatingActive",    $units->[$unit]->{skills}->[0]->{adaptivHeating}->{active};
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_adaptivHeatingEnabled",   $units->[$unit]->{skills}->[0]->{adaptivHeating}->{isEnabled};
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_adaptivHeatingSupported", $units->[$unit]->{skills}->[0]->{adaptivHeating}->{supported};
+
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_temperatureDropMinutes",  $units->[$unit]->{skills}->[0]->{temperatureDropDetection}->{doNotHeatOffsetInMinutes};
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_temperatureDropSens",     $units->[$unit]->{skills}->[0]->{temperatureDropDetection}->{sensitivity};
+
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_timeControl",  $units->[$unit]->{skills}->[0]->{timeControl}->{isEnabled};
+
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_currentState", $units->[$unit]->{skills}->[0]->{state}->{current};
+                     if ($units->[$unit]->{skills}->[0]->{state}->{current} ne "DEFAULT") {
+
+                       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_currentStateAction", $units->[$unit]->{skills}->[0]->{state}->{timeControl}->{description}->{action};
+
+                       my $endTime  = $units->[$unit]->{skills}->[0]->{state}->{timeControl}->{timeSetting}->{endDate};
+                          $endTime .= " ";
+                          $endTime .= $units->[$unit]->{skills}->[0]->{state}->{timeControl}->{timeSetting}->{endTime};
+                       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_currentStateEndTime", $endTime;
+                     } else {
+                       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_currentStateAction", "n/a";
+                       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_currentStateEndTime", "n/a";
+                     }
+
+                     # find needed time schedule
+                     if ($units->[$unit]->{skills}->[0]->{timeControl}->{timeSchedules}) {
+
+                       my $allTimeSchedules = $units->[$unit]->{skills}->[0]->{'timeControl'}{'timeSchedules'};
+
+                       for my $ts (0 .. scalar @{$allTimeSchedules} - 1) {
+                         if( $allTimeSchedules->[$ts]{'name'} eq 'SUMMER_TIME' ) {
+                           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_summerTimeAction", $allTimeSchedules->[$ts]{'actions'}->[0]->{description}->{action};
+                           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_summerTimeEnabled", ( ( $allTimeSchedules->[$ts]{'actions'}->[0]->{'isEnabled'} ) ? 1 : 0 );
+
+                           my $stPeriod = $allTimeSchedules->[$ts]{'actions'}->[0]->{timeSetting}->{startDate};
+                              $stPeriod .= " - ";
+                              $stPeriod .= $allTimeSchedules->[$ts]{'actions'}->[0]->{timeSetting}->{endDate};
+                              $stPeriod =~ s/\d\d\d\d\-//g;
+                              $stPeriod =~ /(\d\d)\-(\d\d) \- (\d\d)\-(\d\d)/;
+                              $stPeriod = $2 .'.'. $1 .' - '. $4 .'.'. $3;
+
+                           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_summerTimePeriod", $stPeriod;
+                           FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_summerTimeRepetition", $allTimeSchedules->[$ts]{'actions'}->[0]->{timeSetting}->{repetition};
+
+                         }
+                       }
+                     }
 
                    } elsif ( $units->[$unit]->{'type'} eq 'TEMPERATURE_SENSOR' ) {
-                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_temperature", $units->[$unit]->{skills}->[0]->{currentInCelsius};
-                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_tempOffset",  $units->[$unit]->{skills}->[0]->{offset};
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_temperature",   $units->[$unit]->{skills}->[0]->{currentInCelsius};
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_tempOffset",    $units->[$unit]->{skills}->[0]->{offset};
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_assignedGroup", $units->[$unit]->{assignedGroup}->{displayName} if $units->[$unit]->{assignedGroup};
 
                    } elsif ( $units->[$unit]->{'type'} eq 'HUMIDITY_SENSOR' ) {
                      FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_humidity",    $units->[$unit]->{skills}->[0]->{currentInPercent};
@@ -6789,7 +6917,56 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
                }
              }
            }
+
+           my $XMLresult = FRITZBOX_call_Lua_Query( $hash, "webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos", "", "luaCall") ;
+
+           my $XMLtmp = FRITZBOX_Helper_analyse_Lua_Result($hash, $XMLresult);
+
+           FRITZBOX_Log $hash, 4, "SmartHome - start getting XML data: $SmartHome";
+           my $outhash;
+
+           eval {
+             $outhash = XMLin($XMLtmp, StrictMode => 0, KeyAttr => []);
+           };
+           if ($@) {
+             FRITZBOX_Log $hash, 3, "ERROR: SmartHome - getting XML data: $SmartHome";
+           }
+
+           $nbViews = 0;
+           if (defined $outhash->{devicelist}->{device}) {
+             $views = $outhash->{devicelist}->{device};
+             if (ref($views) eq "ARRAY") {
+               $nbViews = scalar @$views;
+
+               if ($nbViews > 0) {
+                 for(my $i = 0; $i <= $nbViews - 1; $i++) {
+                   my $id = $outhash->{devicelist}->{device}->[$i]->{id};
+
+                   if (defined $outhash->{devicelist}->{device}->[$i]->{batterylow}) {
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_batteryLow", $outhash->{devicelist}->{device}->[$i]->{batterylow};
+                   }
+
+                   if (defined $outhash->{devicelist}->{device}->[$i]->{hkr}->{summeractive}) {
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayactive", $outhash->{devicelist}->{device}->[$i]->{hkr}->{holidayactive};
+                   }
+                 }
+               }
+             } else {
+               my $id = $outhash->{devicelist}->{device}->{id};
+
+               if (defined $outhash->{devicelist}->{device}->{batterylow}) {
+                 FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_batteryLow", $outhash->{devicelist}->{device}->{batterylow};
+               }
+
+               if (defined $outhash->{devicelist}->{device}->{hkr}->{summeractive}) {
+                 FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayactive", $outhash->{devicelist}->{device}->{hkr}->{holidayactive};
+               }
+             }
+           }
+
+           FRITZBOX_Log $hash, 4, "SmartHome - end getting XML data: $SmartHome";
          }
+
          # Remove inactive or non existing sip-readings in two steps
 
          foreach ( keys %oldSmartDevice) {
@@ -8328,9 +8505,9 @@ sub FRITZBOX_Readout_Process($$)
       return;
    }
 
-   my $startTime = time();
-
-   my $name = $hash->{NAME};
+   my $startTime  = time();
+   my $name       = $hash->{NAME};
+   my $newState = "WLAN: n/a";
 
    if (substr($string, -1) eq "|") {
      $string .= "&#eof";
@@ -8355,6 +8532,7 @@ sub FRITZBOX_Readout_Process($$)
    if ( defined $values{Error} ) {
      readingsBulkUpdate( $hash, "retStat_lastReadoutError", $values{Error} );
      readingsBulkUpdate( $hash, "state", $values{Error} );
+     $newState = $values{Error};
    }
 
    # Statistics
@@ -8451,8 +8629,10 @@ sub FRITZBOX_Readout_Process($$)
        
        delete ($hash->{HINWEIS_BOXUSER}) if $rName2 eq "HINWEIS_BOXUSER" && $rValue eq "";
        delete ($hash->{HINWEIS_PASSWORD}) if $rName2 eq "HINWEIS_PASSWORD" && $rValue eq "";
-       readingsBulkUpdate( $hash, "state", "check API done" ) if $rName2 eq "APICHECKED";
-       
+       if ($rName2 eq "APICHECKED") {
+         readingsBulkUpdate( $hash, "state", "check API done" ) ;
+         $newState = "check API done";
+       }
      }
 
      elsif ($rName eq "-<fhem") {
@@ -8467,6 +8647,7 @@ sub FRITZBOX_Readout_Process($$)
      elsif ( $rName eq "Error" ) {
        readingsBulkUpdate( $hash, "retStat_lastReadoutError", $rValue );
        readingsBulkUpdate( $hash, "state", $rValue );
+       $newState = $rValue;
      }
  
      elsif ($rName eq "box_model") {
@@ -8520,7 +8701,10 @@ sub FRITZBOX_Readout_Process($$)
                                 ."dectID_manufacturer,dectID_model,dectID_NoRingWithNightSetting,dectID_radio,dectID_NoRingTime,"
                                 ."shdeviceID_battery,shdeviceID_category,shdeviceID_device,shdeviceID_firmwareVersion,shdeviceID_manufacturer,"
                                 ."shdeviceID_model,shdeviceID_status,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_type,"
-                                ."shdeviceID_voltage,shdeviceID_powerPerHour,shdeviceID_currentInAmp,shdeviceID_powerInWatt,shdeviceID_ledState,shdeviceID_state "
+                                ."shdeviceID_voltage,shdeviceID_powerPerHour,shdeviceID_currentInAmp,shdeviceID_powerInWatt,shdeviceID_ledState,shdeviceID_state,"
+                                ."shdeviceID_buttonLocked,shdeviceID_externalLocked,shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
+                                ."shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_currentState,shdeviceID_currentStateAction,"
+                                ."shdeviceID_currentStateEndTime,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_targetTemp,shdeviceID_mode,shdeviceID_modeNextChangeTime "
                   ."enableBoxReadings:multiple-strict,"
                                 ."box_energyMode,box_globalFilter,box_led,box_dns,box_pwr,box_guestWlan,box_usb,box_notify "
                   ."enableLogReadings:multiple-strict,"
@@ -8563,24 +8747,27 @@ sub FRITZBOX_Readout_Process($$)
    }
 
    my @wNames = split(" ", $hash->{fhem}{multiple_wlan}{names});
-   my $newState = "WLAN: off";
+
    for( my $i = 0; $i < @wNames; $i++) {
 
      $wNames[$i]  = "box_wlanBand_" . substr($wNames[$i], 4) . "GHz";
      $wNames[$i] .= "_active" if ($hash->{fhem}{fwVersion} >= 750);
 
-     if ( defined $values{"$wNames[$i]"} && $values{"$wNames[$i]"} eq "on" ) {
-       $newState = "WLAN: on";
+     if ( defined $values{"$wNames[$i]"} ) {
+       $newState = "WLAN: off";
+       if( $values{"$wNames[$i]"} eq "on" ) {
+         $newState = "WLAN: on";
 
-       $newState .=" gWLAN: " .$values{box_guestWlan} ;
-       $newState .=" (Remain: " .$values{box_guestWlanRemain}. " min)" if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} > 0;
+         $newState .=" gWLAN: " .$values{box_guestWlan} ;
+         $newState .=" (Remain: " .$values{box_guestWlanRemain}. " min)" if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} > 0;
 
-       readingsBulkUpdate( $hash, "state", $newState);
-       FRITZBOX_Log $hash, 4, "SET state = '$newState'";
-
-       last;
+         last;
+       }
      }
    }
+
+   readingsBulkUpdate( $hash, "state", $newState);
+   FRITZBOX_Log $hash, 4, "SET state = '$newState'";
 
    my $TR064_chg = 0;
 
@@ -12859,8 +13046,9 @@ sub FRITZBOX_Get_SmartHome_Devices_List($@) {
                    $ret{SummerEndMonth}   = $endDate;
                    $ret{SummerEndMonth}   =~ s/([0-9]{4})-([0-9]{2})-([0-9]{2})/$2/;
                
-                   $ret{SummerEnabled}    = ( ( $timeSchedule->[$i]{'timeSetting'}{'isEnabled'} ) ? 1 : 0 );
                  }
+
+                 $ret{SummerEnabled}    = ( ( $allTimeSchedules->[$ts]{'isEnabled'} ) ? 1 : 0 );
 
                }
              }
@@ -15087,8 +15275,20 @@ sub FRITZBOX_call_Lua_Query($$@)
    if ( $f_lua eq "luaQuery") {
      $url .= '/query.lua?sid=' . $result->{sid} . $queryStr;
    } elsif ( $f_lua eq "luaCall") {
-     $url .= '/' . $queryStr;
-     $url .= '?sid=' . $result->{sid} if $queryStr ne "login_sid.lua";
+
+     if ($queryStr =~ /\?/) {
+
+        $url .= '/' . $queryStr;
+        $url .= '&sid=' . $result->{sid} if $queryStr ne "login_sid.lua";
+
+     } else {
+
+       $url .= '/' . $queryStr;
+       $url .= '?sid=' . $result->{sid} if $queryStr ne "login_sid.lua";
+
+     }
+     FRITZBOX_Log $hash, 4, "luaFunction call: " . $url;
+
    } else {
      FRITZBOX_Log $hash, 2, "Wrong function name. function_name: " . $f_lua;
      my %retHash = ( "Error" => "Wrong function name", "function_name" => $f_lua ) ;
@@ -15102,29 +15302,44 @@ sub FRITZBOX_call_Lua_Query($$@)
 
    $response = $agent->get ( $url );
 
-   FRITZBOX_Log $hash, 5, "Response: " . $response->status_line . "\n" . $response->content;
+   FRITZBOX_Log $hash, 4, "Response: " . $response->content . "\n" . $response->content;
 
-   unless ($response->is_success) {
-      my %retHash = ("Error" => $response->status_line, "ResetSID" => "1");
-      FRITZBOX_Log $hash, 2, "" . $response->status_line;
-      return \%retHash;
-   }
 
 #################
 #     FRITZBOX_Log $hash, 5, "Response: " . $response->content;
 #################
-
    my $jsonResult ;
 
    if ( $f_lua ne "luaCall") {
 
-     return FRITZBOX_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+     unless ($response->is_success) {
+       my %retHash = ("Error" => $response->status_line, "ResetSID" => "1");
+       FRITZBOX_Log $hash, 2, "" . $response->status_line;
+       return \%retHash;
+     } else {
+       return FRITZBOX_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+     }
 
    } else {
+
+     unless ($response->is_success) {
+       $jsonResult->{result}  = '<response status="' .$response->status_line. '"></response>';
+       return $jsonResult;
+     }
+
      $jsonResult->{sid}     = $result->{sid};
      $jsonResult->{sidNew}  = $sidNew;
-     $jsonResult->{result}  = $response->status_line  if defined $response->status_line;
-     $jsonResult->{result} .= ", " . $response->content  if defined $response->content;
+     if (defined $response->status_line) {
+       $jsonResult->{result}  = '<response status="' . $response->status_line . '">';
+       $jsonResult->{result} .= $response->content  if defined $response->content;
+       $jsonResult->{result} .= '</response>';
+     } else {
+       if (defined $response->content && $response->content ne "") {
+         $jsonResult->{result} = $response->content;
+       } else {
+         $jsonResult->{result}  = '<response status="no data"></response>';
+       }
+     }
    }
 
    return $jsonResult;
@@ -16052,19 +16267,27 @@ sub FRITZBOX_Helper_analyse_Lua_Result($$;@)
    if (ref ($result->{result}) eq "ARRAY" || ref ($result->{data}) eq "HASH" ){
      $result->{data}->{noJSONdocument} = decode_base64($result->{data}->{noJSONdocument}) if defined ($result->{data}->{noJSONdocument});
      $tmp = FRITZBOX_Helper_Dumper($hash, $result);
+
+     FRITZBOX_Log $name, 5, "result is array/hash: " . $tmp;
+
      # $tmp = "\n";
    }
    elsif (defined $result->{result} ) {
      $tmp = $result->{result};
+
+     FRITZBOX_Log $name, 5, "result is text: " . $tmp;
+
      # $tmp = "\n";
    }
    elsif (defined $result->{pid} ) {
      $tmp = "$result->{pid}";
      if (ref ($result->{data}) eq "ARRAY" || ref ($result->{data}) eq "HASH" ) {
        $tmp .= "\n" . FRITZBOX_Helper_Dumper($hash, $result) if $retData == 1;
+       FRITZBOX_Log $name, 5, "data is array/hash: " . $tmp;
      }
      elsif (defined $result->{data} ) {
        $tmp .= "\n" . $result->{data} if $retData == 1;
+       FRITZBOX_Log $name, 5, "data is text: " . $tmp;
      }
    }
    elsif (defined $result->{sid} ) {
@@ -16077,6 +16300,7 @@ sub FRITZBOX_Helper_analyse_Lua_Result($$;@)
    return $tmp;
 
 } # end FRITZBOX_Helper_analyse_Lua_Result
+
 ###############################################################################
 # loads internal and online phonebooks from extern FritzBox via web interface (http)
 sub FRITZBOX_Phonebook_readRemote($$)
@@ -16538,6 +16762,352 @@ sub FRITZBOX_Helper_Dumper($$;@) {
 #}
 #
 
+###############################################################################
+# Help do the pretty printing to ident text with spaces
+# https://services.packetizer.com/code/xml2json/xml2json
+#
+#       # Parse the XML document
+#       use XML::Parser;
+#
+#       my $parser = XML::Parser->new(ErrorContext => 2);
+#       $parser->setHandlers(Init  => \&init_handler,
+#                         Final => \&final_handler,
+#                         Start => \&start_handler,
+#                         End   => \&end_handler,
+#                         Char  => \&char_handler);
+#
+#       eval { $parser->parse($tmp); };
+#       if ($@) {
+#         $returnStr .= $tmp;
+#       } else {
+#         $json_doc =~ s/\n//g;
+#         $result = FRITZBOX_Helper_process_JSON($hash, $json_doc, "12345678", undef, 0);
+#         return Dumper $result;
+#         $returnStr .= $json_doc;
+#       }
+
+sub json_indent_string
+{
+    # How many levels to indent?
+    my $indent_string = "";
+    for(my $i = 0; $i < $json_level; $i++)
+    {
+        $indent_string .= "    ";
+    }
+
+    return $indent_string;
+}
+
+# Escape strings as per json.org
+sub json_char_escape
+{
+    my $string = shift;
+
+    $string =~ s/\\/\\\\/g;
+    $string =~ s/"/\\"/g;
+    #$string =~ s/\b/\\b/g;  # Says json.org.  What character is \b?
+                             # Does not map to Perl
+    $string =~ s/\f/\\f/g;   # Valid in XML 1.1
+    $string =~ s/\n/\\n/g;
+    $string =~ s/\r/\\r/g;
+    $string =~ s/\t/\\t/g;
+    $string =~ s/([^ -~])/sprintf("\\u%04X", ord($1))/eg;
+
+    return $string;
+}
+
+# Handle start of the document
+sub init_handler
+{
+    $json_doc = "{\n";
+    $json_level = 1;
+    @json_stack = ();
+    $need_comma = 0;
+}
+
+# Handle the end of the document
+sub final_handler
+{
+    $json_doc .= "\n" if $crlf;
+    $json_doc .= "}";
+    $json_doc .= "\n" if $crlf;
+}
+
+# XML Parsing call-back routines
+sub start_handler
+{
+    my($expat, $element, %attrs) = @_;
+    my $i;
+
+    # Do we need a comma to separate?
+    if ($need_comma)
+    {
+        $json_doc .= ",";
+        $json_doc .= "\n" if $crlf;
+    }
+    elsif ($json_level > 1)
+    {
+        $json_doc .= "\n" if $crlf;
+    }
+
+    # Append the element block start
+    $json_doc .= json_indent_string() . '"' . $element . '" : {';
+    $json_level++;
+
+    $i = 0;
+    while( my ($key, $value) = each(%attrs) )
+    {
+        if ($i)
+        {
+            $json_doc .= ",";
+            $json_doc .= "\n" if $crlf;
+        }
+        else
+        {
+            $json_doc .= "\n" if $crlf;
+            $i = 1;
+        }
+        $key = json_char_escape($key);
+        $json_doc .= json_indent_string() . '"' . $key . '" : "' .
+                     $value . '"';
+    }
+
+    if ($i)
+    {
+        $need_comma = 1;
+    }
+    else
+    {
+        $need_comma = 0;
+    }
+
+    $element_string = "";
+
+    push(@json_stack, $need_comma);
+}
+
+sub char_handler
+{
+    my ($expat, $chardata) = @_;
+
+    $element_string .= $chardata;
+}
+
+sub end_handler
+{
+    my ($expat, $element) = @_;
+
+    # Do we need a comma?
+    $need_comma = pop(@json_stack);
+
+    # Remove any leading or tailing whitespace on element string
+    $element_string =~ s/^[ \t\r\n]*//;
+    $element_string =~ s/[ \t\r\n]*$//;
+
+    # Escape certain characters
+    $element_string = json_char_escape($element_string);
+
+    if (length($element_string) > 0)
+    {
+        # If we need a comma, insert one
+        if ($need_comma) 
+        {
+            $json_doc .= ",";
+            $json_doc .= "\n" if $crlf;
+        }
+        else
+        {
+            $json_doc .= "\n" if $crlf;
+        }
+
+        $json_doc .= json_indent_string() . '"value" : "' .
+                     $element_string . '"';
+        $json_doc .= "\n" if $crlf;
+    }
+    else
+    {
+        $json_doc .= "\n" if $crlf;
+    }
+
+    # End of element
+    $element_string = "";
+    $json_level--;
+    $json_doc .= json_indent_string() . "}";
+    $need_comma = 1;
+}
+# Help do the pretty printing to ident text with spaces
+###############################################################################
+
+###############################################################################
+# https://github.com/meirm/xml2hash/tree/master
+sub XMLin{
+
+  my($in)=@_;
+
+  $in =~s /\n//g;
+  $in =~s /<!--.*?-->//g;
+  $in =~s />\s*</>\n</g;
+
+  my @lines = split("\n",$in);
+  my $hash  = XMLinArray(@lines);
+  my @root  = keys %{$hash};
+
+  return \%{$hash->{$root[0]}};
+}
+
+sub XMLinArray{
+
+  my @lines;
+  my %hash;
+
+  @lines = @_;
+  @lines = &reformat(@lines);
+
+  &removeComments(\@lines);
+
+  &insertbranch(\%hash, \@lines) while @lines;
+
+  &simplify(\%hash);
+
+  return \%hash;
+}
+
+sub removeComments{
+
+  my ($lineref) = @_;
+  my $in        = 0;
+
+  foreach(@{$lineref}){
+
+    if(m/<!--/){
+      $in = 1;
+    }
+
+    if (m/-->/){
+      $in = 0;
+      $_  = "";
+    }	
+
+    $_ = "" if $in == 1;
+  }
+}
+
+sub simplify{
+
+  my($hashref) = @_;
+  
+  if (ref($hashref) =~  m/^(HASH|ARRAY)$/){
+  
+    foreach (keys %{$hashref}){
+      if (ref($hashref->{$_}) eq 'ARRAY'){
+
+        if (@{$hashref->{$_}} == 1){
+          $hashref->{$_}=$hashref->{$_}[0];
+
+          if (ref($hashref->{$_}) =~  m/^(HASH|ARRAY)$/){
+            &simplify(\%{$hashref->{$_}});
+          }
+        } else {
+
+          foreach(@{$hashref->{$_}}){
+            if (ref($_) =~  m/^(HASH|ARRAY)$/) {
+              &simplify($_);
+            }
+          }
+        }
+      } else {
+        if (ref($hashref->{$_}) eq 'HASH'){
+          &simplify(\%{$hashref->{$_}});
+        }
+      }
+    }
+  }
+}
+
+sub insertbranch{
+
+  my($hashref, $linesref) = @_;
+
+  my $keyline = shift @{$linesref};
+
+  return if $keyline =~ m/^\s*$/;
+
+  while ($keyline =~ m#<(.*)>(.*)</\1>#){
+    push @{$hashref->{$1}},$2;
+
+    return unless @{$linesref};
+
+    $keyline = shift @{$linesref};
+  }
+
+   while (defined ($keyline) && $keyline =~ m#<([^/]+)>#){
+     my $key = $1;
+     my (@temparray) = &removeAfA($key, $linesref);
+     push @{$hashref->{$key}}, undef;
+     &insertbranch(\%{$hashref->{$key}[-1]}, \@temparray) while @temparray;
+
+     return unless @{$linesref};
+     $keyline = shift @{$linesref};
+  }
+}
+
+
+sub removeAfA{
+
+  my($key, $linesref) = @_;
+  my @temparray;
+
+  while(@{$linesref}){
+    $_=shift @{$linesref};
+
+    return @temparray if m#</$key>#;
+
+    push @temparray,$_;
+  }
+  return @temparray; 
+}
+
+sub reformat{
+
+  my(@lineref) = @_;
+  my @lines;
+
+  foreach (@lineref){
+    chomp;
+    s/^\s*(.*?)\s*$/$1/;
+
+    next if m/^\s*$/;
+
+    if (($_ !~ m#</#) && (m#<(.*?)\s+(.*)>#)){
+      my $key    = $1;
+      my $params = $2;
+      push @lines, "<$key>";
+
+      while ($params=~ s/\s*(.*?)\s*=\s*"(.*?)"\s*//){
+        push @lines, "<$1>$2</$1>";
+      }
+
+      next;
+    } elsif (m#<(.*)\s(.*)>(.*)</\1>#){
+      push @lines, "<$1>", "<content>$3</content>";
+      my $key    = $1;
+      my $params = $2;
+
+      while ($params =~ s/\s*(.*?)\s*=\s*"(.*?)"\s*//){
+        push @lines,"<$1>$2</$1>";
+      }
+
+      push @lines,"</$key>";
+
+      next;
+    }
+    push @lines,$_;
+  }
+  return @lines;
+}
+# https://github.com/meirm/xml2hash/tree/master
+###############################################################################
+
 1;
 
 =pod
@@ -16828,6 +17398,9 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          <br>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpPerm:0|1&gt;</code></dt>
          <dd>sets the radiator controller to permanently off or on.</dd>
+         <br>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;boost:0..120&gt;</code></dt>
+         <dd>sets the radiator thermostat to boost for 1 to 120 minutes. boost:0 deactivates boost mode</dd>
          <br>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;switch:0|1&gt;</code></dt>
          <dd>switches the socket adapter off or on.</dd>
@@ -17617,6 +18190,22 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       <li><b>shdevice</b><i>n</i><b>_powerPerHour</b> - </li> 
       <li><b>shdevice</b><i>n</i><b>_currentInAmp</b> - </li> 
       <li><b>shdevice</b><i>n</i><b>_powerInWatt</b> - </li> 
+      <li><b>shdevice</b><i>n</i><b>_buttonLocked</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_externalLocked</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_adaptivHeatingActive</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_adaptivHeatingEnabled</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_adaptivHeatingSupported</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperatureDropMinutes</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperatureDropSens</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_timeControl</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_currentState</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_currentStateAction</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_currentStateEndTime</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeAction</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeEnabled</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_targetTemp</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_mode</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_modeNextChangeTime</b> - </li>
       <br> 
       <li><b>retStat_blockIncomingPhoneCall</b> - Return Status: set &lt;name&gt; blockIncomingPhoneCall ...</li> 
       <li><b>retStat_chgProfile</b> - Return Status: set &lt;name&gt; chgProfile &lt;number&gt; &lt;filtprofn&gt;</li> 
@@ -17961,7 +18550,7 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="smartHome"></a>
-         <dt><code>set &lt;name&gt; smartHome &lt;apply&gt; &lt;scenario:ID|template:ID&gt; or &lt;routine&gt; &lt;enable:ID | disable:ID&gt; or &lt;deviceID&gt; &lt;tempOffset:value | tmpAdjust:value | tmpPerm:0|1 | switch:0|1 | automatic:0|1  | preDefSave:name | preDefDel:name| preDefLoad[:deviceID]:name[:A|:G]&gt;</code></dt>
+         <dt><code>set &lt;name&gt; smartHome &lt;apply&gt; &lt;scenario:ID|template:ID&gt; or &lt;routine&gt; &lt;enable:ID | disable:ID&gt; or &lt;deviceID&gt; &lt;tempOffset:degrees | tmpAdjust:degrees | tmpPerm:0|1 | boost:minutes | switch:0|1 | automatic:0|1  | preDefSave:name | preDefDel:name| preDefLoad[:deviceID]:name[:A|:G]&gt;</code></dt>
          <ul>
          <dt><code>set &lt;name&gt; smartHome &lt;apply&gt; &lt;scenario:ID|template:ID&gt;</code></dt>
          <dd>wendet das Scenarium/Template mit der ID &lt;ID&gt; an</dd>
@@ -17990,6 +18579,9 @@ sub FRITZBOX_Helper_Dumper($$;@) {
          <br>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpPerm:0|1&gt;</code></dt>
          <dd>setzt den Heizköperregeler auf permanent aus|an.</dd>
+         <br>
+         <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;boost:0..120&gt;</code></dt>
+         <dd>setzt den Heizköperregeler auf boost für 1..120 Minuten. boost:0 deaktiviert den Boost-Modus</dd>
          <br>
          <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;switch:0|1&gt;</code></dt>
          <dd>schaltet den Steckdosenadapter aus|an.</dd>
@@ -18774,6 +19366,22 @@ sub FRITZBOX_Helper_Dumper($$;@) {
       <li><b>shdevice</b><i>n</i><b>_powerPerHour</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_currentInAmp</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_powerInWatt</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_buttonLocked</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_externalLocked</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_adaptivHeatingActive</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_adaptivHeatingEnabled</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_adaptivHeatingSupported</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperatureDropMinutes</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperatureDropSens</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_timeControl</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_currentState</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_currentStateAction</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_currentStateEndTime</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeAction</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeEnabled</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_targetTemp</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_mode</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_modeNextChangeTime</b> - </li>
       <br>
       <li><b>retStat_blockIncomingPhoneCall</b> - Return Status: set &lt;name&gt; blockIncomingPhoneCall ...</li>
       <li><b>retStat_chgProfile</b> - Return Status: set &lt;name&gt; chgProfile &lt;number&gt; &lt;filtprofn&gt;</li>
