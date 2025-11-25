@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 72_FRITZBOX: Fehlerkorrekturen
+ - feature: 72_FRITZBOX: zusätzliche Readings für SmartHome
+                         set <name> smartHome <deviceID> <boost:0..120>
  - feature: 76_SolarForecast: new special Reading BatRatio
  - bugfix: 76_SolarForecast: fix consumption till sunset,SOC use of consumption
  - feature: 76_SolarForecast: Version 1.60.5
