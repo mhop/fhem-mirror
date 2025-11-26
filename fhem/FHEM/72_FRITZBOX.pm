@@ -46,7 +46,7 @@ use Blocking;
 use HttpUtils;
 use feature 'state';
 
-my $ModulVersion = "08.20.08a";
+my $ModulVersion = "08.20.08c";
 my $missingModul = "";
 my $missingXML = "";
 my $FRITZBOX_TR064pwd;
@@ -4005,7 +4005,7 @@ sub FRITZBOX_Get($@)
 
        my $tmp = FRITZBOX_Helper_analyse_Lua_Result($hash, $result);
 
-       FRITZBOX_Log $hash, 3, "result luaFunction: \n" . $tmp;
+       FRITZBOX_Log $hash, 4, "result luaFunction: \n" . $tmp;
 
        my $outhash = XMLin($tmp, StrictMode => 0, KeyAttr => []);
 
@@ -6945,24 +6945,36 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
                  for(my $i = 0; $i <= $nbViews - 1; $i++) {
                    my $id = $outhash->{devicelist}->{device}->[$i]->{id};
 
-                   if (defined $outhash->{devicelist}->{device}->[$i]->{batterylow}) {
-                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_batteryLow", $outhash->{devicelist}->{device}->[$i]->{batterylow};
+                   if (defined $views->[$i]->{batterylow}) {
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_batteryLow", $views->[$i]->{batterylow};
                    }
 
-                   if (defined $outhash->{devicelist}->{device}->[$i]->{hkr}->{summeractive}) {
-                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayActive", $outhash->{devicelist}->{device}->[$i]->{hkr}->{summeractive}->{holidayactive};
+                   if (ref($views->[$i]->{hkr}->{summeractive}) eq "HASH") {
+                     if (defined $views->[$i]->{hkr}->{summeractive}->{holidayactive}) {
+                       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayActive", $views->[$i]->{hkr}->{summeractive}->{holidayactive};
+                     }
+                   } else {
+                     if (defined $views->[$i]->{hkr}->{holidayactive}) {
+                       FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayActive", $views->[$i]->{hkr}->{holidayactive};
+                     }
                    }
                  }
                }
              } else {
-               my $id = $outhash->{devicelist}->{device}->{id};
+               my $id = $views->{id};
 
-               if (defined $outhash->{devicelist}->{device}->{batterylow}) {
-                 FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_batteryLow", $outhash->{devicelist}->{device}->{batterylow};
+               if (defined $views->{batterylow}) {
+                 FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_batteryLow", $views->{batterylow};
                }
 
-               if (defined $outhash->{devicelist}->{device}->{hkr}->{summeractive}) {
-                 FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayActive", $outhash->{devicelist}->{device}->{hkr}->{summeractive}->{holidayactive};
+               if (ref($views->{hkr}->{summeractive}) eq "HASH") {
+                 if (defined $views->{hkr}->{summeractive}->{holidayactive}) {
+                   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayActive", $views->{hkr}->{summeractive}->{holidayactive};
+                 }
+               } else {
+                 if (defined $views->{hkr}->{holidayactive}) {
+                   FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayActive", $views->{hkr}->{holidayactive};
+                 }
                }
              }
            }
