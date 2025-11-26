@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 72_FRITZBOX: Fehlerkorrektur Reading shdevice<id>_holidayActive
+                        commadRef
  - bugfix: 72_FRITZBOX: Fehlerkorrekturen
  - feature: 72_FRITZBOX: zusätzliche Readings für SmartHome
                          set <name> smartHome <deviceID> <boost:0..120>
