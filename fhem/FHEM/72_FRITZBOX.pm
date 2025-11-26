@@ -46,7 +46,7 @@ use Blocking;
 use HttpUtils;
 use feature 'state';
 
-my $ModulVersion = "08.20.08";
+my $ModulVersion = "08.20.08a";
 my $missingModul = "";
 my $missingXML = "";
 my $FRITZBOX_TR064pwd;
@@ -1101,23 +1101,26 @@ sub FRITZBOX_Initialize($)
                 ."enableUserInfo:0,1 "
                 ."enableWLANneighbors:0,1 "
                 ."enableXtamInfo:0,1 "
-
-
                 ."enableSIP:0,1 "
+
                 ."enableSmartHome:off,all,group,device "
                 ."enableReadingsFilter:multiple-strict,"
                                 ."dectID_alarmRingTone,dectID_custRingTone,dectID_device,dectID_fwVersion,dectID_intern,dectID_intRingTone,"
                                 ."dectID_manufacturer,dectID_model,dectID_NoRingWithNightSetting,dectID_radio,dectID_NoRingTime,"
-                                ."shdeviceID_battery,shdeviceID_category,shdeviceID_device,shdeviceID_firmwareVersion,shdeviceID_manufacturer,"
-                                ."shdeviceID_model,shdeviceID_status,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_type,"
-                                ."shdeviceID_voltage,shdeviceID_powerPerHour,shdeviceID_currentInAmp,shdeviceID_powerInWatt,shdeviceSD_ledState,shdeviceSH_state,"
-                                ."shdeviceID_buttonLocked,shdeviceID_externalLocked,shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
-                                ."shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_currentState,shdeviceID_currentStateAction,"
-                                ."shdeviceID_currentStateEndTime,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_targetTemp,shdeviceID_mode,shdeviceID_modeNextChangeTime "
+                                ."shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
+                                ."shdeviceID_battery,shdeviceID_batteryLow,shdeviceID_buttonLocked,"
+                                ."shdeviceID_category,shdeviceID_currentInAmp,shdeviceID_currentState,shdeviceID_currentStateAction,shdeviceID_currentStateEndTime,"
+                                ."shdeviceID_device,shdeviceID_externalLocked,shdeviceID_firmwareVersion,shdeviceID_holidayActive,"
+                                ."shdeviceID_ledState,shdeviceID_manufacturer,shdeviceID_mode,shdeviceID_modeNextChangeTime,shdeviceID_model,"
+                                ."shdeviceID_powerPerHour,shdeviceID_powerInWatt,"
+                                ."shdeviceID_state,shdeviceID_status,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_summerTimePeriod,shdeviceID_summerTimeRepetition,"
+                                ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
+                                ."shdeviceID_uid,shdeviceID_voltage "
                 ."enableBoxReadings:multiple-strict,"
                                 ."box_energyMode,box_globalFilter,box_led,box_vdsl,box_dns,box_pwr,box_guestWlan,box_usb,box_notify "
                 ."enableLogReadings:multiple-strict,"
                                 ."box_sys_Log,box_wlan_Log,box_fon_Log "
+
                 ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,statIP,_noDefInf_ "
                 ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
                 ."FhemLog3Std:0,1 "
@@ -6947,7 +6950,7 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
                    }
 
                    if (defined $outhash->{devicelist}->{device}->[$i]->{hkr}->{summeractive}) {
-                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayactive", $outhash->{devicelist}->{device}->[$i]->{hkr}->{holidayactive};
+                     FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayActive", $outhash->{devicelist}->{device}->[$i]->{hkr}->{summeractive}->{holidayactive};
                    }
                  }
                }
@@ -6959,7 +6962,7 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
                }
 
                if (defined $outhash->{devicelist}->{device}->{hkr}->{summeractive}) {
-                 FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayactive", $outhash->{devicelist}->{device}->{hkr}->{holidayactive};
+                 FRITZBOX_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_holidayActive", $outhash->{devicelist}->{device}->{hkr}->{summeractive}->{holidayactive};
                }
              }
            }
@@ -8699,12 +8702,15 @@ sub FRITZBOX_Readout_Process($$)
                   ."enableReadingsFilter:multiple-strict,"
                                 ."dectID_alarmRingTone,dectID_custRingTone,dectID_device,dectID_fwVersion,dectID_intern,dectID_intRingTone,"
                                 ."dectID_manufacturer,dectID_model,dectID_NoRingWithNightSetting,dectID_radio,dectID_NoRingTime,"
-                                ."shdeviceID_battery,shdeviceID_category,shdeviceID_device,shdeviceID_firmwareVersion,shdeviceID_manufacturer,"
-                                ."shdeviceID_model,shdeviceID_status,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_type,"
-                                ."shdeviceID_voltage,shdeviceID_powerPerHour,shdeviceID_currentInAmp,shdeviceID_powerInWatt,shdeviceID_ledState,shdeviceID_state,"
-                                ."shdeviceID_buttonLocked,shdeviceID_externalLocked,shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
-                                ."shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_currentState,shdeviceID_currentStateAction,"
-                                ."shdeviceID_currentStateEndTime,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_targetTemp,shdeviceID_mode,shdeviceID_modeNextChangeTime "
+                                ."shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
+                                ."shdeviceID_battery,shdeviceID_batteryLow,shdeviceID_buttonLocked,"
+                                ."shdeviceID_category,shdeviceID_currentInAmp,shdeviceID_currentState,shdeviceID_currentStateAction,shdeviceID_currentStateEndTime,"
+                                ."shdeviceID_device,shdeviceID_externalLocked,shdeviceID_firmwareVersion,shdeviceID_holidayActive,"
+                                ."shdeviceID_ledState,shdeviceID_manufacturer,shdeviceID_mode,shdeviceID_modeNextChangeTime,shdeviceID_model,"
+                                ."shdeviceID_powerPerHour,shdeviceID_powerInWatt,"
+                                ."shdeviceID_state,shdeviceID_status,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_summerTimePeriod,shdeviceID_summerTimeRepetition,"
+                                ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
+                                ."shdeviceID_uid,shdeviceID_voltage "
                   ."enableBoxReadings:multiple-strict,"
                                 ."box_energyMode,box_globalFilter,box_led,box_dns,box_pwr,box_guestWlan,box_usb,box_notify "
                   ."enableLogReadings:multiple-strict,"
@@ -18176,36 +18182,43 @@ sub reformat{
       <li><b>sip_inactive</b> - Shows the number of inactive SIP connections.</li>
       <li><b>sip_error</b> - Shows the number of faulty SIP connections. 0 == everything OK.</li> 
       <br> 
-      <li><b>shdevice</b><i>n</i><b>_battery</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_category</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_device</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_firmwareVersion</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_manufacturer</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_model</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_status</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_tempOffset</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_temperature</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_type</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_voltage</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_powerPerHour</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_currentInAmp</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_powerInWatt</b> - </li> 
-      <li><b>shdevice</b><i>n</i><b>_buttonLocked</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_externalLocked</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingActive</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingEnabled</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingSupported</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_temperatureDropMinutes</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_temperatureDropSens</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_timeControl</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_battery</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_batteryLow</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_buttonLocked</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_category</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_currentInAmp</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_currentState</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_currentStateAction</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_currentStateEndTime</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_summerTimeAction</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_summerTimeEnabled</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_targetTemp</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_device</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_externalLocked</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_firmwareVersion</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_holidayActive</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_ledState</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_manufacturer</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_mode</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_modeNextChangeTime</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_model</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_powerPerHour</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_powerInWatt</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_state</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_status</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeAction</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeEnabled</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimePeriod</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeRepetition</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_targetTemp</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_tempOffset</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperature</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperatureDropMinutes</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperatureDropSens</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_timeControl</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_type</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_uid</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_voltage</b> - </li>
       <br> 
       <li><b>retStat_blockIncomingPhoneCall</b> - Return Status: set &lt;name&gt; blockIncomingPhoneCall ...</li> 
       <li><b>retStat_chgProfile</b> - Return Status: set &lt;name&gt; chgProfile &lt;number&gt; &lt;filtprofn&gt;</li> 
@@ -19352,36 +19365,43 @@ sub reformat{
       <li><b>sip_inactive</b> - zeigt die Anzahl inaktiver SIP.</li>
       <li><b>sip_error</b> - zeigt die Anzahl fehlerhafter SIP. 0 == alles Ok.</li>
       <br>
-      <li><b>shdevice</b><i>n</i><b>_battery</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_category</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_device</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_firmwareVersion</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_manufacturer</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_model</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_status</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_tempOffset</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_temperature</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_type</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_voltage</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_powerPerHour</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_currentInAmp</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_powerInWatt</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_buttonLocked</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_externalLocked</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingActive</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingEnabled</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingSupported</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_temperatureDropMinutes</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_temperatureDropSens</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_timeControl</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_battery</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_batteryLow</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_buttonLocked</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_category</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_currentInAmp</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_currentState</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_currentStateAction</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_currentStateEndTime</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_summerTimeAction</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_summerTimeEnabled</b> - </li>
-      <li><b>shdevice</b><i>n</i><b>_targetTemp</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_device</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_externalLocked</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_firmwareVersion</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_holidayActive</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_ledState</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_manufacturer</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_mode</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_modeNextChangeTime</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_model</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_powerPerHour</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_powerInWatt</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_state</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_status</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeAction</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeEnabled</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimePeriod</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_summerTimeRepetition</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_targetTemp</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_tempOffset</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperature</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperatureDropMinutes</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_temperatureDropSens</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_timeControl</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_type</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_uid</b> - </li>
+      <li><b>shdevice</b><i>n</i><b>_voltage</b> - </li>
       <br>
       <li><b>retStat_blockIncomingPhoneCall</b> - Return Status: set &lt;name&gt; blockIncomingPhoneCall ...</li>
       <li><b>retStat_chgProfile</b> - Return Status: set &lt;name&gt; chgProfile &lt;number&gt; &lt;filtprofn&gt;</li>
