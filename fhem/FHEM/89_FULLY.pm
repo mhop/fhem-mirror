@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 2.3
+#  89_FULLY.pm
 #
 #  $Id$
 #
@@ -34,7 +34,7 @@ use HttpUtils;
 use JSON;
 use SetExtensions;
 
-my $FULLY_VERSION = '2.3';
+my $FULLY_VERSION = '2.4';
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
@@ -78,26 +78,28 @@ sub FULLY_Initialize ($)
 # Define device
 ######################################################################
 
-sub FULLY_Define ($$)
+sub FULLY_Define
 {
-    my ($hash, $def) = @_;
-    my @a = split( "[ \t][ \t]*", $def);
-    my $name = $a[0];
+    my $hash = shift // return;
+    my $def = shift // return;
+    my @arr = split m{\s+}xms, $def;
+
+    my $name = $arr[0];
     my $host = '';
 
-    return "Usage: define devname FULLY [http|https]://IP_or_Hostname [password] [poll-interval]"
-        if (@a < 3);
+    return 'Usage: define devname FULLY [http|https]://IP_or_Hostname [password] [poll-interval]'
+        if (@arr < 3);
 
-    if ($a[2] =~ /^(https?):\/\/(.+)/) {
+    if ($arr[2] =~ m/^(https?):\/\/(.+)/) {
         $hash->{prot} = $1;
         $host = $2;
     }
     else {
         $hash->{prot} = $FULLY_DEFAULT_PROT;
-        $host = $a[2];
+        $host = $arr[2];
     }
 
-    if ($host =~ /^([^:]+):([0-9]+)$/) {
+    if ($host =~ m/^([^:]+):([0-9]+)$/) {
         $hash->{host} = $1;
         $hash->{port} = $2;
     }
@@ -112,17 +114,17 @@ sub FULLY_Define ($$)
     $hash->{nextUpdate}      = 'off';
     $hash->{fully}{schedule} = 0;
 
-    if (@a == 4) {
-        if ($a[3] =~ /^[0-9]+$/) {
-            $hash->{fully}{interval} = $a[3];
+    if (@arr == 4) {
+        if ($arr[3] =~ m/^[0-9]+$/) {
+            $hash->{fully}{interval} = $arr[3];
         }
         else {
-            $hash->{fully}{password} = $a[3];
+            $hash->{fully}{password} = $arr[3];
         }
     }
-    elsif (@a == 5) {
-        $hash->{fully}{password} = $a[3];
-        $hash->{fully}{interval} = $a[4];
+    elsif (@arr == 5) {
+        $hash->{fully}{password} = $arr[3];
+        $hash->{fully}{interval} = $arr[4];
     }
 
     if (!exists($hash->{fully}{password})) {
@@ -131,12 +133,12 @@ sub FULLY_Define ($$)
             $hash->{fully}{password} = FULLY_Decrypt ($encpass);
         }
         else {
-            FULLY_Log ($hash, 2, "Fully password not defined");
+            FULLY_Log ($hash, 2, 'Fully password /not defined');
         }
     }
 
     if (!$init_done && exists($hash->{fully}{password})) {
-        FULLY_Log ($hash, 1, "Version $FULLY_VERSION Opening device ".$hash->{host});
+        FULLY_Log ($hash, 1, "Version $FULLY_VERSION Opening device $hash->{host}");
         FULLY_GetDeviceInfo ($name);
         if (exists($hash->{fully}{interval})) {
             FULLY_SetPolling ($hash, 1, $hash->{fully}{interval});
@@ -147,17 +149,17 @@ sub FULLY_Define ($$)
         asyncOutput ($hash->{CL}, "Please use command 'set $name authentication' to set the Fully password");
     }
 
-    return undef;
+    return;
 }
 
 ######################################################################
 # Set or delete attribute
 ######################################################################
 
-sub FULLY_Attr ($@)
+sub FULLY_Attr
 {
     my ($cmd, $name, $attrname, $attrval) = @_;
-    my $hash = $defs{$name};
+    my $hash = $defs{$name} // return;
 
     if ($cmd eq 'set') {
         if ($attrname eq 'pollInterval') {
@@ -198,18 +200,20 @@ sub FULLY_Attr ($@)
         }
     }
 
-    return undef;
+    return;
 }
 
 ######################################################################
 # Set polling on or off
 ######################################################################
 
-sub FULLY_SetPolling ($$;$)
+sub FULLY_SetPolling
 {
-    my ($hash, $mode, $interval) = @_;
+    my $hash = shift // return;
+    my $mode = shift // return;
+    my $interval = shift;
 
-    return if (!$init_done);
+    return if !$init_done;
 
     my $name = $hash->{NAME};
     $interval //= AttrVal ($name, 'pollInterval', $hash->{fully}{interval} // $FULLY_POLL_INTERVAL);
@@ -239,26 +243,26 @@ sub FULLY_SetPolling ($$;$)
 # Delete device
 ######################################################################
 
-sub FULLY_Undef ($$)
+sub FULLY_Undef
 {
-    my ($hash, $arg) = @_;
+    my $hash = shift // return;
 
     RemoveInternalTimer ($hash);
 
-    return undef;
+    return;
 }
 
 ######################################################################
 # Shutdown FHEM
 ######################################################################
 
-sub FULLY_Shutdown ($)
+sub FULLY_Shutdown
 {
-    my ($hash) = @_;
+    my $hash = shift // return;
 
     RemoveInternalTimer ($hash);
 
-    return undef;
+    return;
 }
 
 ######################################################################
@@ -334,6 +338,8 @@ sub FULLY_Set ($@)
         "stopVideo"       => "stopVideo",
         "foreground"      => "toForeground"
     );
+
+    return "FULLY: Unknown argument $opt, choose one of ".$options if $opt eq '?';
 
     my @c = ();
     my @p = ();
@@ -505,7 +511,7 @@ sub FULLY_Set ($@)
     }
     FULLY_ExecuteNB ($hash, \@c, \@p, 1) if (scalar (@c) > 0);
 
-    return undef;
+    return;
 }
 
 ######################################################################
@@ -535,7 +541,7 @@ sub FULLY_Get ($@)
         return "FULLY: Unknown argument $opt, choose one of ".$options;
     }
 
-    return undef;
+    return;
 }
 
 ######################################################################
@@ -576,7 +582,7 @@ sub FULLY_Execute ($$$$)
     my $url = $hash->{prot}.'://'.$hash->{host}.':'.$hash->{port}."/?cmd=$command";
 
     if (defined ($param)) {
-        foreach my $parname (keys %$param) {
+        for my $parname (keys %$param) {
             if (defined($param->{$parname})) {
                 $url .= "&$parname=".$param->{$parname};
             }
@@ -636,7 +642,7 @@ sub FULLY_ExecuteNB ($$$$)
         my $url = $hash->{prot}.'://'.$hash->{host}.':'.$hash->{port}."/?cmd=".$$command[$i];
 
         if (defined ($param) && defined ($$param[$i])) {
-            foreach my $parname (keys %{$$param[$i]}) {
+            for my $parname (keys %{$$param[$i]}) {
                 if (defined ($$param[$i]->{$parname})) {
                     $url .= "&$parname=".$$param[$i]->{$parname};
                 }
@@ -665,7 +671,7 @@ sub FULLY_ExecuteNB ($$$$)
     };
 
     FULLY_Log ($hash, 4, "Executing command ".$urllist[0]);
-    HttpUtils_NonblockingGet ($reqpar);
+    return HttpUtils_NonblockingGet ($reqpar);
 }
 
 ######################################################################
@@ -767,6 +773,7 @@ sub FULLY_ExecuteCB ($$$)
             FULLY_Log ($hash, 2, "Error during request $param->{orgurl}. $err");
         }
     }
+    return;
 }
 
 ######################################################################
@@ -781,6 +788,7 @@ sub FULLY_ScreenOff ($)
     my @p = ({ "key" => "keepScreenOn", "value" => "false" }, undef);
     FULLY_ExecuteNB ($hash, \@c, \@p, 1);
     $hash->{onForTimer} = 'off';
+    return;
 }
 
 ######################################################################
@@ -794,7 +802,7 @@ sub FULLY_UpdateDeviceInfo ($)
     return if (AttrVal ($hash->{NAME}, 'disable', 0) == 1);
 
     FULLY_ExecuteNB ($hash, ['deviceInfo'], undef, 1);
-    FULLY_SetPolling ($hash, 1);
+    return FULLY_SetPolling ($hash, 1);
 }
 
 ######################################################################
@@ -806,7 +814,7 @@ sub FULLY_GetDeviceInfo ($)
     my ($name) = @_;
     my $hash = $defs{$name};
 
-    FULLY_ExecuteNB ($hash, ['deviceInfo'], undef, 1);
+    return FULLY_ExecuteNB ($hash, ['deviceInfo'], undef, 1);
 }
 
 ######################################################################
@@ -841,12 +849,12 @@ sub FULLY_UpdateReadings ($$)
     );
 
     readingsBeginUpdate ($hash);
-    foreach my $rn (keys %$result) {
+    for my $rn (keys %$result) {
         my $key = lc($rn);
         next if (exists($readings{$key}) && $readings{$key} eq 'ignore');
         if (ref($result->{$rn}) eq 'ARRAY') {
             if ($key eq 'sensorinfo') {
-                foreach my $e (@{$result->{$rn}}) {
+                for my $e (@{$result->{$rn}}) {
                     $key = lc($e->{name});
                     $key =~ s/ /_/g;
                     my $rv = ref($e->{values}) eq 'ARRAY' ? join(',', @{$e->{values}}) : $e->{values};
@@ -870,7 +878,7 @@ sub FULLY_UpdateReadings ($$)
             $hash->{fully}{versionWarn} = 1;
         }
     }
-    readingsEndUpdate ($hash, 1);
+    return readingsEndUpdate ($hash, 1);
 }
 
 ######################################################################
@@ -886,7 +894,7 @@ sub FULLY_Encrypt ($)
     return '' if ($id eq '');
 
     my $key = $id;
-    foreach my $c (split //, $istr) {
+    for my $c (split //, $istr) {
         my $k = chop($key);
         if ($k eq '') {
             $key = $id;
@@ -902,9 +910,9 @@ sub FULLY_Encrypt ($)
 # Decrypt string with FHEM unique ID
 ######################################################################
 
-sub FULLY_Decrypt ($)
+sub FULLY_Decrypt
 {
-    my ($istr) = @_;
+    my $istr =shift // return;
     my $ostr = '';
 
     my $id = getUniqueId() // '';
@@ -958,7 +966,6 @@ sub FULLY_Ping ($$)
 
     return $temp;
 }
-
 
 1;
 

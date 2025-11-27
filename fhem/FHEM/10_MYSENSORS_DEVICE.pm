@@ -1345,7 +1345,7 @@ __END__
 
 <a id="MYSENSORS_DEVICE-define"></a>
 <h4>Define</h4>
-<p><code>define &lt;name&gt; MYSENSORS_DEVICE &lt;Sensor-type&gt; &lt;node-id&gt;</code>
+<p><code>define &lt;name&gt; MYSENSORS_DEVICE &lt;Sensor-type&gt; &lt;node-id&gt;</code></p>
 <p>Specifies the MYSENSOR_DEVICE device.</p>
 
 <a id="MYSENSORS_DEVICE-set"></a>
