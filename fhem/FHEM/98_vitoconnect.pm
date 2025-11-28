@@ -97,6 +97,9 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.0.0"  => "28.11.2025  power reading fixed again",
+  "0.9.9"  => "28.11.2025  EOL from v1 API on 17.11.2025 changed to v2",
+  "0.9.8"  => "28.11.2025  power reading fixed",
   "0.9.7"  => "02.11.2025  order of lists fixed",
   "0.9.6"  => "31.10.2025  One Base Message lists and translations",
   "0.9.5"  => "15.10.2025  Fix duplicate timer in case of password update (getCode)",
@@ -150,8 +153,8 @@ my $client_secret = "2e21faa1-db2c-4d0b-a10f-575fd372bc8c-575fd372bc8c";
 my $callback_uri  = "http://localhost:4200/";
 my $apiBaseURL    = "https://api.viessmann-climatesolutions.com";
 my $iamBaseURL    = "https://iam.viessmann-climatesolutions.com";
-my $iotURL_V1     = "$apiBaseURL/iot/v1/equipment/";
-my $iotURL_V2     = "$apiBaseURL/iot/v2/features/";
+my $equipmentURL  = "$apiBaseURL/iot/v2/equipment/";
+my $featureURL     = "$apiBaseURL/iot/v2/features/";
 my $authorizeURL  = "$iamBaseURL/idp/v2/authorize";
 my $tokenURL      = "$iamBaseURL/idp/v2/token";
 my $errorURL_V3   = "$apiBaseURL/service-documents/v3/error-database";
@@ -3423,7 +3426,7 @@ sub vitoconnect_getGw {
     my $name         = $hash->{NAME};
     my $access_token = $hash->{".access_token"};
     my $param        = {
-        url      => $iotURL_V1
+        url      => $equipmentURL
         ."gateways",
         hash     => $hash,
         header   => "Authorization: Bearer ".$access_token,
@@ -3555,7 +3558,7 @@ sub vitoconnect_getInstallation {
     my $name         = $hash->{NAME};
     my $access_token = $hash->{".access_token"};
     my $param        = {
-        url      => $iotURL_V1
+        url      => $equipmentURL
         ."installations",
         hash     => $hash,
         header   => "Authorization: Bearer ".$access_token,
@@ -3623,7 +3626,7 @@ sub vitoconnect_getInstallationFeatures {
     
     # installation features      #Fixme call only once
     my $param = {
-        url     => $iotURL_V2
+        url     => $featureURL
         ."installations/".$installation."/features",
         hash    => $hash,
         header  => "Authorization: Bearer ".$access_token,
@@ -3687,7 +3690,7 @@ sub vitoconnect_getDevice {
     Log(5,$name.", --getDevice gw for call set: ".$gw);
 
     my $param        = {
-        url     => $iotURL_V1
+        url     => $equipmentURL
         ."installations/".$installation."/gateways/".$gw."/devices",
         hash    => $hash,
         header  => "Authorization: Bearer ".$access_token,
@@ -3765,7 +3768,7 @@ sub vitoconnect_getFeatures {
 
 # Gateway features
     my $param = {
-        url    => $iotURL_V2
+        url    => $featureURL
         ."installations/".$installation."/gateways/".$gw."/features",
         hash   => $hash,
         header => "Authorization: Bearer ".$access_token,
@@ -3840,7 +3843,7 @@ sub vitoconnect_getResource {
         return;
     }
     my $param = {
-        url => $iotURL_V2
+        url => $featureURL
         ."installations/".$installation."/gateways/".$gw."/devices/".$dev."/features",
         hash     => $hash,
         gw       => $gw,
@@ -4065,44 +4068,44 @@ sub vitoconnect_getResourceCallback {
 sub vitoconnect_getPowerLast {
     my ($hash, $name, $Reading) = @_;
 
-    # entferne alles hinter dem letzten Punkt
+    # Basename ohne letztes Suffix
     $Reading =~ s/\.[^.]*$//;
-    
-    # Liste der Stromwerte
-    my @values = split(",", ReadingsVal($name,$Reading.".day","")); #(1.2, 76.7, 52.6, 40.9, 40.4, 30, 33.9, 75);
 
-    # Zeitpunkt des ersten Wertes
-    my $timestamp = ReadingsVal($name,$Reading.".dayValueReadAt",""); #'2024-11-29T11:28:56.915Z';
+    # Werte-Liste (robust gegen Leerzeichen, in Zahlen casten)
+    my $raw = ReadingsVal($name, $Reading.".day", "");
+    my @values = map { 0+$_ } split(/\s*,\s*/, $raw);
 
-    if (!defined($timestamp)) {
-        return;
-    }
+    # Basisdatum = dayValueReadAt (Kalendertag der Ablesung)
+    my $timestamp = ReadingsVal($name, $Reading.".dayValueReadAt", "");
+    return if (!$timestamp || $timestamp eq "");
+    my $baseDate = Time::Piece->strptime(substr($timestamp, 0, 10), '%Y-%m-%d');
+    my $one_day  = 24 * 60 * 60;
 
-    # Datum extrahieren und in ein Time::Piece Objekt umwandeln
-    my $date = Time::Piece->strptime(substr($timestamp, 0, 10), '%Y-%m-%d');
-
-    # Anzahl der Sekunden in einem Tag
-    my $one_day = 24 * 60 * 60;
-    
-    # Hash für die Key-Value-Paare
-    my %data;
-    my $readingLastTimestamp = ReadingsTimestamp($name,$Reading.".day.asSingleValue","0000000000");
-    #my $lastTS = "0000000000";
-    #if ($readingLastTimestamp ne "") {
+    # Zielreading und letzter gespeicherter Zeitstempel
+    my $targetReading = $Reading.".day.asSingleValue";
+    my $readingLastTimestamp = ReadingsTimestamp($name, $targetReading, "0000-00-00 00:00:00");
     my $lastTS = time_str2num($readingLastTimestamp);
-    #}
-    Log(5,$name.", -setpower: readinglast: $readingLastTimestamp lastTS $lastTS");
-    
-    # Werte den entsprechenden Tagen zuordnen, start mit 1, letzten Tag ausschließen weil unvollständig
-    for (my $i = $#values; $i >= 1; $i--) {
-        my $current_date = $date - ($one_day * $i);
-        Log3($name, 5, ", -setpower: date:$current_date value:$values[$i] ($i)");
-        my $readingDate = $current_date->ymd . " 23:59:59";
-        my $readingTS = time_str2num($readingDate);
-        Log(5,$name.", -setpower: date $readingDate lastdate $readingLastTimestamp");
+
+    Log3($name, 5, "$name -setpower: target=$targetReading lastTS='$readingLastTimestamp' (num=$lastTS), baseDate=".$baseDate->ymd);
+
+    # Index 0 = aktueller Tag (unvollständig) -> überspringen
+    # Korrekte Zuordnung: Tag(i) = baseDate - i Tage für i=1..$#values
+    for (my $i = 1; $i <= $#values; $i++) {
+        my $dayDate     = $baseDate - ($one_day * $i);
+        my $readingDate = $dayDate->ymd . " 23:59:59";
+        my $readingTS   = time_str2num($readingDate);
+        my $newVal      = $values[$i];
+
+        Log3($name, 3, "$name - candidate i=$i date=$readingDate val=$newVal lastTS=$lastTS");
+
+        # Nur schreiben, wenn der Zeitstempel wirklich vorwärts geht
         if ($readingTS > $lastTS) {
-         readingsBulkUpdate ($hash, $Reading.".day.asSingleValue", $values[$i], undef, $readingDate);
-         Log(4,$name.", -setpower: readingsBulkUpdate ($hash, $Reading.day.asSingleValue, $values[$i], undef, $readingDate");
+            readingsBulkUpdate($hash, $targetReading, $newVal, undef, $readingDate);
+            Log3($name, 3, "$name -setpower: update $targetReading -> $newVal ($readingDate)");
+            # Fortschritt sichern: lastTS auf genau diesen Zeitstempel setzen
+            $lastTS = $readingTS;
+        } else {
+            Log3($name, 4, "$name -setpower: skip (not newer) dayTS=$readingTS <= lastTS=$lastTS");
         }
     }
 
@@ -4283,7 +4286,7 @@ sub vitoconnect_action {
     my $retry_count = $hash->{".action_retry_count"} // 0;
 
     my $param = {
-        url => $iotURL_V2."installations/$installation/gateways/$gw/devices/$dev/features/$feature",
+        url => $featureURL."installations/$installation/gateways/$gw/devices/$dev/features/$feature",
         hash   => $hash,
         header => "Authorization: Bearer $access_token\r\nContent-Type: application/json",
         data    => $data,
