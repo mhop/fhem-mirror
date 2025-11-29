@@ -97,6 +97,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.0.1"  => "29.11.2025  fix power reading logging",
   "1.0.0"  => "28.11.2025  power reading fixed again",
   "0.9.9"  => "28.11.2025  EOL from v1 API on 17.11.2025 changed to v2",
   "0.9.8"  => "28.11.2025  power reading fixed",
@@ -4096,7 +4097,7 @@ sub vitoconnect_getPowerLast {
         my $readingTS   = time_str2num($readingDate);
         my $newVal      = $values[$i];
 
-        Log3($name, 3, "$name - candidate i=$i date=$readingDate val=$newVal lastTS=$lastTS");
+        Log3($name, 4, "$name - candidate i=$i date=$readingDate val=$newVal lastTS=$lastTS");
 
         # Nur schreiben, wenn der Zeitstempel wirklich vorwärts geht
         if ($readingTS > $lastTS) {
