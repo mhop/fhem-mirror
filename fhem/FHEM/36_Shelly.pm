@@ -172,6 +172,7 @@
 # 6.04.4    fix: accept set rgbw .. (ShellyPlusRGBWpm)
 # 6.04.5    new: add "less than an hour" to uptime reading
 #           fix: do not format incoming values als float for set power ... etc.
+# 6.04.6    add: voltmeter for ShellyPlusUni
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -4673,6 +4674,8 @@ sub Shelly_status2G {
             $id -=100;
             Shelly_readingsBulkUpdate($hash,"temperature\_$id",$temperature,"tempC" );
         }
+        my $voltmeter=$jhash->{"voltmeter:100"}{voltage}; #qqq
+        Shelly_readingsBulkUpdate($hash,"voltmeter",$voltmeter,"voltage" )  if( defined($voltmeter) );        
     }
     # set state of 'input-only' devices to OK  (may have state 'error')
     readingsBulkUpdateMonitored($hash,"state","OK") if( $model eq "shellyplusi4" );
@@ -5233,7 +5236,7 @@ sub Shelly_settings2G {
            }elsif( $sc == 0 ){
                fhem("attr -silent $name slat_control disabled");
            }
-           Log3 $name,3,"[Shelly_settings2G:config] $name: slat control is $sc";  #3
+           Log3 $name,4,"[Shelly_settings2G:config] $name: slat control is $sc";  #4
         }else{
           ### looking for auto_on & auto_off (components: switch & light)
           my @comps= ( "switch", "cover", "light" );
