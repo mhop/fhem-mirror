@@ -68,7 +68,7 @@ use warnings;
 use GPUtils qw(:all);
 
 use Net::MQTT::Constants;
-use SetExtensions qw/ :all /;
+use SetExtensions;
 
 BEGIN {
   MQTT->import(qw(:all));
