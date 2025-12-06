@@ -137,7 +137,7 @@ sub CommandHelp {
 
 #    cref_search_cmd(undef);
 
-    my $str = "Possible commands:\n\n" .
+    my $str = "<html>Possible commands:\n\n" .
 		"Command        Parameter\n" .
 		"               Description\n" .
 	    "----------------------------------------------------------------------\n";
@@ -156,7 +156,7 @@ sub CommandHelp {
 #      $a[1] =~ s/>/&gt;/g;
       $str .= sprintf("%-15s%-50s\n%s\n", $cmd, $a[0], $a[1]);
     }
-
+    $str .= "</html>";
     return $str;
 
   }
