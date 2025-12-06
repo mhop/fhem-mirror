@@ -1,4 +1,4 @@
-FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.2.5 schwatter $";
+FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.2.6 schwatter $";
 FW_widgets['controlminidash'] = { createFn: controlMiniDashCreate };
 
 function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -748,3 +748,18 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
 
     return wrapper[0];
 }
+
+/*
+=pod
+
+=begin html
+
+  <li>controlminidash,&lt;measured-temp&gt;,&lt;humidity&gt;,&lt;desired-temp&gt;,&lt;info&gt;,
+      &lt;btn1&gt;,&lt;btn2&gt;,&lt;btn3&gt;,&lt;btn4&gt;,&lt;btn5&gt;,&lt;btn6&gt;
+      - create a compact mini dashboard for a device<br>
+      see <a href='https://wiki.fhem.de/wiki/FHEMWEB/ControlMiniDash'>FHEMWEB/ControlMiniDash</a> for documentation and examples.</li><br>
+
+=end html
+
+=cut
+*/
