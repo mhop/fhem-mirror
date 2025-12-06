@@ -41,7 +41,7 @@ use HTML::Entities;
 use URI::Escape;
 use LWP::UserAgent;
 
-my $fbtam_version = "1.0";
+my $fbtam_version = "1.1";
 
 #########################################################################################
 #
@@ -552,7 +552,7 @@ sub FBTAM_renderMsgTable($) {
   
   #-- header
   my $html = "<html>";
-  #$html .= qq{<span style="display:none;">&lt;script src="/fhem/pgm2/fbtam.js"&gt;&lt;/script&gt;</span>};
+  #$html .= qq{<span style="display:none;">&lt;script src="/fhem/www/pgm2/fbtam.js"&gt;&lt;/script&gt;</span>};
   $html .=  "<div><b>$tamName ($tamState): $newMsg neue / $oldMsg alte Nachrichten</b></div>";
 
   
@@ -612,7 +612,7 @@ sub FBTAM_renderMsgTable($) {
     my $delBtn   = "<input type=\"button\" value=\"&#128465;Löschen\" style=\"width:100px;\" onclick=\"callTAMAction('deleteMsg',   '$name', $index); return false;\"/>";
     my $dlBtn    = "<input type=\"button\" value=\"&#11015;Download\" style=\"width:100px;\" onclick=\"callTAMAction('downloadMsg', '$name', $index); return false;\"/>";
     #-- buttons in output
-    $html .= "<script src=\"/fhem/pgm2/fbtam.js\"></script>";
+    $html .= "<script src=\"/fhem/www/pgm2/fbtam.js\"></script>";
     $html .= "<tr>
                 <td>$index ".(($fnew == 1)?"*":"")."</td>
                 <td>$d<br><small>$t (Dauer: $dur)</small></td>
