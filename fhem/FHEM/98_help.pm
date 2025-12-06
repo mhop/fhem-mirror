@@ -3,7 +3,7 @@
 package main;
 use strict;
 use warnings;
-use Data::Dumper;
+#use Data::Dumper;
 
 my $ret;
 
@@ -163,7 +163,8 @@ sub CommandHelp {
 }
 
 sub cref_internals {
-   my $mod = "./docs/commandref_frame.html";
+   my $modPath = AttrVal('global','modpath','.');
+   my $mod = "$modPath/docs/commandref_frame.html";
    my $output = "";
    my ($err,@text) = FileRead({FileName => $mod, ForceType => 'file'});
    return $err if $err;
@@ -204,7 +205,8 @@ sub cref_search {
 
 sub cref_search_cmd {
    my $skip = 1;
-   my $mod = "./docs/commandref_frame.html";
+   my $modPath = AttrVal('global','modpath','.');
+   my $mod = "$modPath/docs/commandref_frame.html";
    my ($err,@text) = FileRead({FileName => $mod, ForceType => 'file'});
    return $err if $err;
    foreach my $l (@text) {
