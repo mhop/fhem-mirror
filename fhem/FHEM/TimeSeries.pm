@@ -110,7 +110,11 @@ sub new() {
     _M => undef,	# see below
     _S => undef,	# see below
   }; # we are a hash reference
-  $self->{method}= "none" unless($self->{method} ~~ @METHODS);
+
+# 2025-12-07 (betateilchen)
+# interims modification because of deprecated feature "smartmatch" #142986
+#  $self->{method}= "none" unless($self->{method} ~~ @METHODS);
+  $self->{method}= "none" unless(contains_string($self->{method}, @METHODS));
   return bless($self, $class); # make $self an object of class $class
 }
 
