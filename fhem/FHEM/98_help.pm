@@ -27,8 +27,8 @@ sub CommandHelp {
   my ($cl, $arg) = @_;
 
   my ($mod,$lang) = split(" ",$arg);
-  
-  if (lc($mod) eq 'fhem.pl') {
+
+  if ($mod && lc($mod) eq 'fhem.pl') {
     return "<html><b>Module:</b> fhem.pl <b>Maintainer:</b> rudolfkoenig <b>Forum:</b> Sonstiges</html>";
   }
   
@@ -311,7 +311,7 @@ sub cref_findInfo {
          <ul>
          <li>valid parameter &lt;language&gt; given</li>
          <li>global attribute language</li>
-         <li>nothing founde: return english</li>
+         <li>nothing found: return english</li>
          </ul>
       </li>
     </ul>
