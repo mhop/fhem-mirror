@@ -1,4 +1,4 @@
-FW_version["fhemweb_minichart.js"] = "$Id: fhemweb_minichart.js 0.6.2 schwatter $";
+FW_version["fhemweb_minichart.js"] = "$Id: fhemweb_minichart.js 0.6.3 schwatter $";
 FW_widgets['minichart'] = { createFn: miniChartCreate };
 
 function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -254,3 +254,20 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
     console.log("[minichart] initialized for", dev);
     return wrapper[0];
 }
+
+/*
+=pod
+=begin html
+  <li>minichart,&lt;label1@reading1@unit1&gt;,&lt;label2@reading2@unit2&gt;,&lt;label3@reading3@unit3&gt;,
+      &lt;chart-reading&gt;,&lt;chart-type@color-pos@color-neg&gt;
+      - compact widget with three values and a small trend chart.<br>
+      See <a href='https://wiki.fhem.de/wiki/FHEMWEB/MiniChart'>FHEMWEB/MiniChart</a> for documentation and examples.</li><br>
+=end html
+=begin html_DE
+  <li>minichart,&lt;label1@reading1@unit1&gt;,&lt;label2@reading2@unit2&gt;,&lt;label3@reading3@unit3&gt;,
+      &lt;chart-reading&gt;,&lt;chart-type@color-pos@color-neg&gt;
+      - kompaktes Widget mit drei Werten und kleinem Trenddiagramm.<br>
+      Siehe <a href='https://wiki.fhem.de/wiki/FHEMWEB/MiniChart'>FHEMWEB/MiniChart</a> für Dokumentation und Beispiele.</li><br>
+=end html_DE
+=cut
+*/
