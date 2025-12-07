@@ -23,7 +23,8 @@
 
 #
 #   ToDo / Ideas 
-#                   use group attrs in doRequest to group registers for set / get
+#                   own Log3 wrapper for debug that inludes devicename and function name?
+#   
 #                   verify that nextOpenDelay is integer and >= 1
 #                   set 'active' results in error when tcp is already open
 #                   enforce nextOpenDelay even if slave immediately closes
@@ -177,15 +178,16 @@ package Modbus;
 use strict;
 use warnings;
 use GPUtils         qw(:all);
-use SetExtensions   qw(:all);
+use SetExtensions;
 use Time::HiRes     qw(gettimeofday tv_interval sleep);     # work with floats, not just full seconds
 use POSIX           qw(strftime);
 use Encode          qw(decode encode);
 use Scalar::Util    qw(looks_like_number);
-use TcpServerUtils  qw(:all);
+use TcpServerUtils;
 use DevIo;
 use FHEM::HTTPMOD::Utils qw(:all);
 use Scalar::Util qw(weaken);                # needed for backlinks in queue structures (see chapter 11 in PBP / memory leak reported with relays)
+use Data::Dumper; # only for debugging
 
 use Exporter ('import');
 our @EXPORT_OK = qw();
@@ -255,16 +257,16 @@ BEGIN {                         # functions / variables needed from package main
 
     # special case to be used by legacy Fhem modules built on Modbus ...
     *main::ModbusLD_Initialize = *Modbus::InitializeLD;
-    *main::ModbusLD_Define = *Modbus::DefineLDFn;
-    *main::ModbusLD_Undef = *Modbus::UndefLDFn;
-    *main::ModbusLD_Set = *Modbus::SetLDFn;
-    *main::ModbusLD_Get = *Modbus::GetLDFn;
-    *main::ModbusLD_Attr = *Modbus::AttrLDFn;
-    *main::Modbus_Notify = *Modbus::NotifyFn;
+    *main::ModbusLD_Define     = *Modbus::DefineLDFn;
+    *main::ModbusLD_Undef      = *Modbus::UndefLDFn;
+    *main::ModbusLD_Set        = *Modbus::SetLDFn;
+    *main::ModbusLD_Get        = *Modbus::GetLDFn;
+    *main::ModbusLD_Attr       = *Modbus::AttrLDFn;
+    *main::Modbus_Notify       = *Modbus::NotifyFn;
 
 };
 
-my $Module_Version = '4.5.6 - 7.11.2023';
+my $Module_Version = '5.0.1 - 7.12.2025';
 
 my $PhysAttrs = join (' ', 
         'queueDelay',
@@ -307,89 +309,94 @@ my $LogAttrs = join (' ',
 my $CommonAttrs = 
         'disable:0,1';
         
-my $ObjAttrs = join (' ', 
-        'obj-[cdih][0-9]+-reading',
-        'obj-[cdih][0-9]+-name',
-        'obj-[cdih][0-9]+-min',
-        'obj-[cdih][0-9]+-max',
-        'obj-[cdih][0-9]+-hint',
-        'obj-[cdih][0-9]+-map',
-        'obj-[cdih][0-9]+-mapDefault',
-        'obj-[cdih][0-9]+-rmapDefault',
-        'obj-[cdih][0-9]+-set',
-        'obj-[cdih][0-9]+-setexpr',
-        'obj-[cdih][0-9]+-textArg',
-        'obj-[cdih][0-9]+-noArg',
-        'obj-[cdih][0-9]+-revRegs',
-        'obj-[cdih][0-9]+-bswapRegs',
-        'obj-[cdih][0-9]+-len',
-        'obj-[cdih][0-9]+-unpack',
-        'obj-[cdih][0-9]+-decode',
-        'obj-[cdih][0-9]+-encode',
-        'obj-[cdih][0-9]+-expr',
-        'obj-[cdih][0-9]+-ignoreExpr',
-        'obj-[cdih][0-9]+-format',
-        'obj-[cdih][0-9]+-type',
-        'obj-[cdih][0-9]+-showGet',
-        'obj-[cdih][0-9]+-allowWrite',
-        'obj-[cdih][0-9]+-group',
-        'obj-[cdih][0-9]+-poll',
-        'obj-[cdih][0-9]+-polldelay',
-        'obj-[cdih][0-9]+-overrideFCread',      # override fc for read operation
-        'obj-[cdih][0-9]+-overrideFCwrite'      # override fc for write operation
-        );
-        
+
+my @ObjAttrWords = qw(
+        reading
+        name
+        min
+        max
+        hint
+        map
+        mapDefault
+        rmapDefault
+        set
+        setexpr
+        textArg
+        noArg
+        revRegs
+        bswapRegs
+        len
+        unpack
+        decode
+        encode
+        expr
+        ignoreExpr
+        format
+        type
+        showGet
+        allowWrite
+        group
+        setGroup
+        poll
+        polldelay
+        overrideFCread
+        overrideFCwrite
+);
+
+
+# e.g. dev-timing-timout
+my @DevTimingWords = qw(
+        timeout
+        serverTimeout
+        serverTimeoutAbs
+        sendDelay
+        commDelay
+);
+
+# e.g. dev-type-unsigned-unpack 
+my @DevTypeWords = qw(
+        unpack
+        len
+        encode
+        decode
+        revRegs
+        bswapRegs
+        format
+        expr
+        map
+        hint
+        set
+        setexpr
+);
+
+# e.g. dev-h-read
+my @DevAttrWords = qw(
+        read
+        write
+        combine
+        allowShortResponses
+        addressErrCode
+        valueErrCode
+        notAllowedErrCode
+);
+
+# e.g. dev-h-brokenFC2 used for checking in AttrFn
+my @DevBrokenWords = qw(
+        brokenFC2
+        brokenFC3
+        brokenFC5
+);
+
+my @DevDefaultWords;    # filled in Initialize
+
+# used for attr list
 my $DevAttrs = join (' ',
-        'dev-([cdih]-)?read',                   # override fc for type and read
-        'dev-([cdih]-)?write',                  # override fc for type and qrite
-        'dev-([cdih]-)?combine',
-        'dev-([cdih]-)?allowShortResponses',
-        'dev-([cdih]-)?addressErrCode',
-        'dev-([cdih]-)?valueErrCode',
-        'dev-([cdih]-)?notAllowedErrCode',
-        
-        'dev-([cdih]-)?defRevRegs',
-        'dev-([cdih]-)?defBswapRegs',
-        'dev-([cdih]-)?defLen',
-        'dev-([cdih]-)?defUnpack',
-        'dev-([cdih]-)?defDecode',
-        'dev-([cdih]-)?defEncode',
-        'dev-([cdih]-)?defExpr',
-        'dev-([cdih]-)?defSet',
-        'dev-([cdih]-)?defHint',
-        'dev-([cdih]-)?defSetexpr',
-        'dev-([cdih]-)?defIgnoreExpr',
-        'dev-([cdih]-)?defFormat',
-        'dev-([cdih]-)?defShowGet',
-        'dev-([cdih]-)?defAllowWrite',
-        'dev-([cdih]-)?defPoll',
-        'dev-([cdih]-)?defPolldelay',
         'dev-h-brokenFC3',
         'dev-d-brokenFC2',
         'dev-c-brokenFC5',
-        
-        'dev-type-[A-Za-z0-9_]+-unpack',
-        'dev-type-[A-Za-z0-9_]+-len',
-        'dev-type-[A-Za-z0-9_]+-encode',
-        'dev-type-[A-Za-z0-9_]+-decode',
-        'dev-type-[A-Za-z0-9_]+-revRegs',
-        'dev-type-[A-Za-z0-9_]+-bswapRegs',
-        'dev-type-[A-Za-z0-9_]+-format',
-        'dev-type-[A-Za-z0-9_]+-expr',
-        'dev-type-[A-Za-z0-9_]+-map',
-        'dev-type-[A-Za-z0-9_]+-hint',
-        'dev-type-[A-Za-z0-9_]+-set',
-
-        'dev-timing-timeout',
-        'dev-timing-serverTimeout',
-        'dev-timing-serverTimeoutAbs',      # just for testing
-        'dev-timing-sendDelay',
-        'dev-timing-commDelay',
-
         'dev-fc[\d]+Response-unpack',               # custom function codes
         'dev-fc[\d]+Response-fieldList',            # $response hash keys like ADR, LEN, VALUES
         'dev-fc[\d]+Response-fieldExpr-.*',         # expression for above fields
-
         'dev-fc[\d]+Request-unpack',                # custom function codes
         'dev-fc[\d]+Request-fieldList',             # $request hash keys like ADR, LEN, VALUES
         'dev-fc[\d]+Request-fieldExpr-.*',          # expression for above fields
@@ -456,6 +463,8 @@ my %fcMap = (
 );
 
 
+# maps from objAttrs to the DevAttr that defines a default 
+# also adds this default attr to the attribute list
 my %attrDefaults = (
     'allowWrite'    => { devDefault => 'defAllowWrite',
                          default    => 0},
@@ -488,11 +497,15 @@ my %attrDefaults = (
                          default    => 'n'},
 );
 
-
+# built in types can contain spaces. custome ones can not (attr name can not have spaces)
 my %builtInType = (
     'signed short'                  =>  'signed short big',     # 16 bits signed integer big endian (high, low)
     'signed short big'              => { len        => 1,
                                          unpack     => 's>'},   
+    'signed short tenth'            => { len        => 1,
+                                         expr       => '$val/10',
+                                         setexpr    => '$val*10',
+                                         unpack     => 's>'},
     'unsigned short'                => 'unsigned short big',    # 16 bits unsigned big endian
     'unsigned short big'            => { len        => 1,
                                          unpack     => 'n'},    
@@ -580,8 +593,26 @@ sub InitializeLD {
         $CommonAttrs,
         $main::readingFnAttributes);
 
-    $modHash->{ObjAttrList} = $ObjAttrs;
-    $modHash->{DevAttrList} = $DevAttrs;
+    # ModbusAttr later combines the attribute lists into $hash->{AttrList}
+    $modHash->{ObjAttrList} = join (' ', map {'obj-[cdih][0-9]+-' . $_} @ObjAttrWords);
+    $modHash->{ObjAttrList} .= ' obj-[cdih][0-9]+';
+    $modHash->{DevAttrList} = $DevAttrs 
+        . ' ' . join (' ', map {'dev-([cdih]-)?' . $_} @DevAttrWords) 
+        . ' ' . join (' ', map {'dev-timing-' . $_} @DevTimingWords)
+        . ' ' . join (' ', map {'dev-type-[A-Za-z0-9_]+-' . $_} @DevTypeWords)
+        . ' dev-([cdih])$'
+        . ' dev-timing$'
+        . ' dev-type-[A-Za-z0-9_]+$';
+    # add default attrs
+    @DevDefaultWords = ();
+    foreach my $key (sort keys %attrDefaults) {
+        if (exists ($attrDefaults{$key}{devDefault})) {
+            if ($attrDefaults{$key}{devDefault}) {
+                $modHash->{DevAttrList} .= ' dev-([cdih]-)?' . $attrDefaults{$key}{devDefault};
+                push @DevDefaultWords, $attrDefaults{$key}{devDefault};
+            } 
+        }
+    }
     return;            
 }
 
@@ -841,7 +872,7 @@ sub AttrLDFn {
                 return "Invalid pack / unpack code $aVal in attr $aName";
             }
         } 
-        elsif ($aName =~ /dev-fc[\d]+.*-fieldExpr-(.*)/) {
+        elsif ($aName =~ /^dev-fc[\d]+.*-fieldExpr-(.*)/) {
             #Log3 $name, 3, "$name: checking custom fc field expr for $1: $aVal";
             if (!grep /^$1$/, @pduFields) {
                 return "invalid field $1 in attr $aName";
@@ -853,7 +884,7 @@ sub AttrLDFn {
                 if (!EvalExpr($hash, {expr => $aVal, '$request' => $request, '$pduHash' => $pduHash, '$response' => $response, 
                     checkOnly => 1, action => "attr $aName"} ));
         }
-        elsif ($aName =~ /dev-fc[\d]+.*-fieldList/) {
+        elsif ($aName =~ /^dev-fc[\d]+.*-fieldList/) {
             #Log3 $name, 3, "$name: checking custom fc field list $aVal";
             my @flist = split ', ', $aVal;
             foreach my $fld (@flist) {
@@ -910,7 +941,7 @@ sub AttrLDFn {
                 return "attribute $aName is only valid for physical Modbus devices or Modbus TCP - please use this attribute for your physical IO device" . ($hash->{IODev}{NAME} ? ' ' . $hash->{IODev}{NAME} : "");
             }
         } 
-        elsif ($aName =~ /^(obj-[cdih])[0-9]+-reading/) {
+        elsif ($aName =~ /^obj-[cdih][0-9]+-reading/) {
             return "unsupported character in reading name $aName ".
                 "(not A-Za-z/\\d_\\.-)" if(!goodReadingName($aName));
         } 
@@ -925,8 +956,40 @@ sub AttrLDFn {
                 Log3 $name, 4, "$hash->{NAME} start_SSL: $ret" if($ret);
             }
         }
+        if ($aName =~ /^obj-[cdih][0-9]+$/) {         # new compact style obj attrs
+            my ($reading, undef, $rest) = ($aVal =~ /^([^\,\s]+)\s*(\,\s*(.*))*$/);            
+            if(!$reading) {
+                Log3 $name, 3, "$name: compact attr $aName contains illegal value $aVal";
+                return "compact attr $aName contains illegal value $aVal";
+            }
+            $rest = '' if (!$rest);
+            Log3 $name, 5, "$name: compact attr $aName value is split into reading $reading and rest $rest";
+            
+            return "unsupported character in reading name $reading ".
+                "(not A-Za-z/\\d_\\.-)" if(!goodReadingName($reading));
+            Log3 $name, 5, "$name: compact attr $aName is now checked against list " . join (',', @ObjAttrWords);
+
+            my $err = KVCheck($hash, $rest, \@ObjAttrWords);
+            return "attr $aName $aVal $err" if ($err)            
+        }
         
-        if ($aName =~ /^(obj-[cdih])(0+([0-9]+))-/) {
+        if ($aName =~ /^dev-[cdih]$/) {           # new compact style dev attrs
+            my @combined = (@DevAttrWords, @DevBrokenWords, @DevDefaultWords);
+            my $err = KVCheck($hash, $aVal, \@combined);
+            return "attr $aName $aVal $err" if ($err);
+        }
+
+        if ($aName eq 'dev-timing') {                   # new compact style dev-timing attrs
+            my $err = KVCheck($hash, $aVal, \@DevTimingWords);
+            return "attr $aName $aVal $err" if ($err);
+        }
+
+        if ($aName =~ /^dev-type-[\w]+$/) {         # new compact style dev-tape attrs
+            my $err = KVCheck($hash, $aVal, \@DevTypeWords);
+            return "attr $aName $aVal $err" if ($err);
+        }
+            
+        if ($aName =~ /^(obj-[cdih])(0+([0-9]+))/) {
             # leading zero in obj-Attr detected
             if (length($2) > 5) {
                 my $new = $1 . substr("00000", 0, 5 - length ($3)) . $3;
@@ -943,7 +1006,7 @@ sub AttrLDFn {
     elsif ($cmd eq 'del') {    
         #Log3 $name, 5, "$name: attr del $aName";
         if ($aName =~ /obj-[cdih]0[0-9]+-/) {
-            if (!(grep {!/$aName/} grep {/obj-[cdih]0[0-9]+-/} keys %{$attr{$name}})) {
+            if (!(grep {!/$aName/} grep {/obj-[cdih]0[0-9]+/} keys %{$attr{$name}})) {
                 delete $hash->{LeadingZeros};   # no more leading zeros            
             }
         } 
@@ -960,8 +1023,10 @@ sub AttrLDFn {
 
     if ($aName =~ /(^obj-)|(^dev-)/) {
         delete $hash->{UPDATECACHE};            # cached update hash needs to be recalculated when obj / dev info changes
-        delete $hash->{PICACHE};                # cached ObjInfo and DevInfo results
+        delete $hash->{OICACHE};                # cached ObjInfo and DevInfo results
         delete $hash->{DICACHE};                # cached DevInfo results for custom FCs
+        delete $hash->{TYPELIST};               # cached list of Types
+        delete $hash->{TYCACHE};                # cached type information
     }
     $hash->{'.updateSetGet'} = 1;
     #Log3 $name, 5, "$name: attr change set updateGetSetList to 1";
@@ -987,11 +1052,11 @@ sub UpdateGetSetList {
     my $name      = $hash->{NAME};
     my $modHash   = $modules{$hash->{TYPE}};
     my $parseInfo = $hash->{parseInfo}  // $modHash->{parseInfo};
-    my $devInfo   = $hash->{deviceInfo} // $modHash->{deviceInfo};
     $hash->{'.getList'}  = '';
     $hash->{'.setList'}  = '';
     if (AttrVal($name, "enableControlSet", 1)) {            # special sets active (since 4.0 1 by default)
-        $hash->{'.setList'}  = "reconnect:noArg saveAsModule createAttrsFromParseInfo ";
+        $hash->{'.setList'}  = "reconnect:noArg saveAsModule createAttrsFromParseInfo:noArg ";
+        $hash->{'.setList'} .= "upgradeAttributes:noArg removeAttrsWithParseInfo:noArg ";
         if ($hash->{MODE} && $hash->{MODE} eq 'master') {
             $hash->{'.setList'} .= "interval reread:noArg stop:noArg start:noArg close:noArg ";
             $hash->{'.setList'} .= "scanStop:noArg scanModbusObjects sendRaw ";
@@ -1004,32 +1069,65 @@ sub UpdateGetSetList {
     if ($hash->{MODE} && $hash->{MODE} eq 'master') {
         my @ObjList = keys (%{$parseInfo});
         foreach my $at (keys %{$attr{$name}}) {
-            if ($at =~ /^obj-(.*)-reading$/) {
+            #Log3 $name, 5, "$name: UpdateGetSetList looks at $at";
+            if ($at =~ /^obj-(.*)-reading$/ || $at =~ /^obj-([^-]*)$/) {
+                #Log3 $name, 5, "$name: UpdateGetSetList adds $1";
                 push @ObjList, $1 if (!$parseInfo->{$1});
             }
         }
         #Log3 $name, 5, "$name: UpdateGetSetList full object list: " . join (" ",  @ObjList);
         
         foreach my $objCombi (sort @ObjList) {
-            my $reading = ObjInfo($hash, $objCombi, 'reading');
-            my $showget = ObjInfo($hash, $objCombi, 'showGet');
-            my $set     = ObjInfo($hash, $objCombi, 'set'); 
-            my $map     = ObjInfo($hash, $objCombi, 'map');
-            my $hint    = ObjInfo($hash, $objCombi, 'hint');
+            my $oi = GetOICache($hash, $objCombi);  # cached for this objCombi until attrs change
             my $setopt;
-            $hash->{'.getList'} .= "$reading:noArg " if ($showget); # sichtbares get
+            $hash->{'.getList'} .= "$oi->{'reading'}:noArg " if ($oi->{'showget'}); # sichtbares get
     
-            if ($set) {                 # gibt es für das Reading ein SET?
-                $setopt = $reading . ($map ? ':' . MapToHint($map) : '');
-                $setopt = $reading . ':' . $hint if ($hint);
+            #Log3 $name, 5, "$name: UpdateGetSetList check set for $objCombi ($oi->{set})";
+            if ($oi->{set}) {                 # gibt es für das Reading ein SET?
+                $setopt = $oi->{reading} . ($oi->{map} ? ':' . MapToHint($oi->{map}) : '');
+                $setopt = $oi->{reading} . ':' . $oi->{hint} if ($oi->{hint});
                 $hash->{'.setList'} .= "$setopt ";              # add set option
+                #Log3 $name, 5, "$name: UpdateGetSetList adds $setopt to setlist";
             }
         }
     }
-    Log3 $name, 5, "$name: UpdateSetList: setList=$hash->{'.setList'}";
-    Log3 $name, 5, "$name: UpdateSetList: getList=$hash->{'.getList'}";
+    #Log3 $name, 5, "$name: UpdateSetList: setList=$hash->{'.setList'}";
+    #Log3 $name, 5, "$name: UpdateSetList: getList=$hash->{'.getList'}";
     $hash->{'.updateSetGet'} = 0;
     return;
+}
+
+
+#############################################################
+# create a hash with all objects grouped for a given objCombi
+# called from GetLDFn
+sub CreateGetGroupHash {
+    my $hash       = shift;
+    my $oi0        = shift;
+    my $name       = $hash->{NAME};
+    my @RawObjList = CreateRawObjList($hash);
+    my $obj0Text   = "$oi0->{objCombi} len $oi0->{len} $oi0->{reading}";
+    my $grpHash    = {};
+    my $included;
+    
+    Log3 $name, 5, "$name: CreateGetGroupHash called for $obj0Text";
+    return if (!$oi0->{group} || $oi0->{group} !~ /(\d+)-(\d+)/);       # obj0 is not part of a group
+    my $groupNr = $1;
+
+    foreach my $objCombi (sort compObjCombi @RawObjList) {              # sorted by type+adr
+        my $oi      = GetOICache($hash, $objCombi);                 
+        my $objText = "$objCombi len $oi->{len} $oi->{reading}";
+        Log3 $name, 5, "$name: CreateGetGroupHash check $objText";
+        if ($oi->{group} && $oi->{group} =~ /${groupNr}-(\d+)/) {       # objCombi is part of the same group
+            Log3 $name, 5, "$name: CreateGetGroupHash try to add $objText";
+            if (CheckAndAddToGroup($hash, $grpHash, $groupNr, $oi)) {   # add group members if possible (adr, len, type, groupInfo)
+                $included = 1 if ($objCombi eq $oi0->{objCombi});       # initial object is part of group
+            }
+        }
+    }
+    return $grpHash if ($included);     # original object was included in group
+    Log3 $name, 3, "$name: CreateGetGroupHash failed to include $obj0Text in its group. Ignore grouping";
+    return;                             # grouping not possible
 }
 
 
@@ -1043,6 +1141,7 @@ sub GetLDFn {
     my $getVal    = join(' ', @getValArr);  # optional value after get name
     my $objCombi  = ObjKey($hash, $getName);
     my $async     = AttrVal($name, "nonPrioritizedGet", 0);
+    my $info      = "get $getName";
     return "\"get $name\" needs at least one argument" if (!$getName);
     Log3 $name, 4, "$name: get called with $getName " . ($objCombi ? "($objCombi)" : '') if ($getName ne '?');
 
@@ -1052,14 +1151,19 @@ sub GetLDFn {
         return "Unknown argument $getName, choose one of $hash->{'.getList'}";
     }
     my $msg = GetSetChecks($hash, $async);
-    return $msg if ($msg);                                      # no other action because io device is not usable anyway
-    
-    my $type = substr($objCombi, 0, 1);
-    my $adr  = substr($objCombi, 1);
+    return $msg if ($msg);                              # no other action because io device is not usable anyway
+
     delete $hash->{gotReadings};
-	DoRequest($hash, {TYPE => $type, ADR => $adr, OPERATION => 'read', DBGINFO => "get $getName", FORCE => !$async});
-    # doRequest calls queueRequest and then either processRequestQueue diretly or sets timer so no further startQueueTimer necessary
-    #StartQueueTimer($hash, \&Modbus::ProcessRequestQueue, {delay => 0});    # call processRequestQueue at next possibility (others waiting?)
+    my $oi = GetOICache($hash, $objCombi);
+    my $oRef = $oi;
+
+    my $group = CreateGetGroupHash($hash, $oi);         # is this obj in a group?
+    if ($group) {
+        $oRef  = $group;                                # change ref to point to $group for creating request
+        $info  = "grouped $group->{groupInfo}";
+    }
+  	DoRequest($hash, {TYPE => $oRef->{type}, ADR => $oRef->{adr}, LEN => $oRef->{len}, 
+                      OPERATION => 'read', DBGINFO => $info, FORCE => !$async});      # queue request and use timer to process it asap
     if (!$async) {
         my $err = ReadAnswer(GetIOHash($hash));
         return $err if ($err);
@@ -1073,50 +1177,107 @@ sub GetLDFn {
 # called from setLDFn
 sub FormatSetVal {
     my $hash     = shift;
-    my $objCombi = shift;
+    my $oi       = shift;
     my $setVal   = shift;
     my $name     = $hash->{NAME};
-
-    my $unpack   = ObjInfo($hash, $objCombi, 'unpack');   
-    my $len      = ObjInfo($hash, $objCombi, 'len'); 
-    my $type     = substr($objCombi, 0, 1);
-    my $adr      = substr($objCombi, 1);
-    my $fCode    = GetFC($hash, {TYPE => $type, ADR => $adr, LEN => $len, OPERATION => 'write'});
+    my $fCode    = GetFC($hash, {TYPE => $oi->{type}, ADR => $oi->{adr}, LEN => $oi->{len}, OPERATION => 'write'});
     my $rawVal   = $setVal;
 
     # 1. step: use reverse map if defined, return error if no match
-    $rawVal = MapConvert ($hash, {map => ObjInfo($hash, $objCombi, 'map'), 
-                                  default => ObjInfo($hash, $objCombi, 'rmapDefault'),  # default for rmapDefault is undef
+    $rawVal = MapConvert ($hash, {map => $oi->{map}, default => $oi->{rmapDefault},  # default for rmapDefault is undef
                                   val => $rawVal, reverse => 1, undefIfNoMatch => 1});
-    return (undef, "set value $setVal did not match defined map") if (!defined($rawVal));
+    return (undef, "set value $setVal did not match defined map for $oi->{objCombi} in FormatSetVal") if (!defined($rawVal));
     
     # 2. step: check min / max if defined
-    if (!CheckRange($hash, {val => $rawVal, min => ObjInfo($hash, $objCombi, 'min'), max => ObjInfo($hash, $objCombi, 'max')} ) ) {
-        return (undef, "value $rawVal is not within defined min/max range");
+    if (!CheckRange($hash, {val => $rawVal, min => $oi->{min}, max => $oi->{max}} ) ) {
+        return (undef, "value $rawVal is not within defined min/max range for $oi->{objCombi} in FormatSetVal");
     }
-    if (!looks_like_number $rawVal && !ObjInfo($hash, $objCombi, 'textArg')) {
-        Log3 $name, 3, "$name: set value $rawVal is not numeric and textArg not specified";
-        return (undef, "Set Value $rawVal is not numeric and textArg not specified");
+    if (!looks_like_number $rawVal && !$oi->{textArg}) {
+        Log3 $name, 3, "$name: set value $rawVal is not numeric and textArg not specified for $oi->{objCombi} in FormatSetVal";
+        return (undef, "Set Value $rawVal is not numeric and textArg not specified for $oi->{objCombi} in FormatSetVal");
     }
-    
+    Log3 $name, 5, "$name: formatSetVal rawVal is $rawVal";
+
     # 3. step: convert using setexpr if defined
-    $rawVal = EvalExpr($hash, {expr => ObjInfo($hash, $objCombi, 'setexpr'), val => $rawVal});
+    $rawVal = EvalExpr($hash, {expr => $oi->{setexpr}, val => $rawVal});
     
     # 4. step: pack value
     my $packedVal;
-    if ($type eq 'c' && $fCode == 5) {                      # special treatment when writing one coil (unless fc5 comes from overriding another type)
+    if ($oi->{type} eq 'c' && $fCode == 5) {                      # special treatment when writing one coil (unless fc5 comes from overriding another type)
         my $oneCode = uc DevInfo($hash, 'c', 'brokenFC5', 'FF00');
         $packedVal = pack ('H4', ($rawVal ? $oneCode : '0000'));
-        Log3 $name, 5, "$name: set packed coil to hex " . unpack ('H*', $packedVal);
+        Log3 $name, 5, "$name: formatSetVal packed coil to hex " . unpack ('H*', $packedVal);
     } 
     else {                                                  # other type or function code
-        $packedVal = pack ($unpack, $rawVal);   
-        Log3 $name, 5, "$name: set packed hex " . unpack ('H*', $rawVal) . " with $unpack to hex " . unpack ('H*', $packedVal);
+        $packedVal = pack ($oi->{unpack}, $rawVal);   
+        Log3 $name, 5, "$name: formatSetVal packed hex " . unpack ('H*', $rawVal) . " with $oi->{unpack} to hex " . unpack ('H*', $packedVal);
     }
     # 5. step: RevRegs / SwapRegs if needed
-    $packedVal = ReverseWordOrder($hash, $packedVal, $len) if (ObjInfo($hash, $objCombi, 'revRegs'));
-    $packedVal = SwapByteOrder($hash, $packedVal, $len) if (ObjInfo($hash, $objCombi, 'bswapRegs'));
+    $packedVal = ReverseWordOrder($hash, $packedVal, $oi->{len}) if ($oi->{revRegs});
+    $packedVal = SwapByteOrder($hash, $packedVal, $oi->{len}) if ($oi->{bswapRegs});
     return ($packedVal, undef);
+}
+
+
+#############################################################
+# create a hash with all objects grouped for a given objCombi
+# to be called Set
+sub CreateSetGroupHash {
+    my $hash       = shift;
+    my $oi0        = shift;
+    my $setVal     = shift;
+    my $name       = $hash->{NAME};
+    my @RawObjList = CreateRawObjList($hash);
+    my $obj0Text   = "$oi0->{objCombi} len $oi0->{len} $oi0->{reading}";
+    my $grpHash    = {};
+    my $packed     = '';
+    my $included;
+    my $startAdr;
+    
+    if (!$oi0->{setGroup}) {                                            # obj0 is not part of a group
+        Log3 $name, 5, "$name: CreateSetGroupHash called for $obj0Text, but this object is not part of a setGroup";
+        return;
+    }
+    my $groupNr = $oi0->{setGroup};
+    Log3 $name, 5, "$name: CreateSetGroupHash called for $obj0Text, group $groupNr";
+
+    use bytes;
+    foreach my $objCombi (sort compObjCombi @RawObjList) {              # sorted by type+adr
+        my $oi      = GetOICache($hash, $objCombi);                 
+        my $objText = "$objCombi len $oi->{len} $oi->{reading}";
+        Log3 $name, 5, "$name: CreateSetGroupHash check $objText";
+        if ($oi->{setGroup} && $oi->{setGroup} eq $groupNr) {           # objCombi is part of the same group
+            Log3 $name, 5, "$name: CreateSetGroupHash try to add $objText to setGroup $groupNr";
+            if (CheckAndAddToGroup($hash, $grpHash, $groupNr, $oi)) {   # add group members if possible (adr, len, type, groupInfo)
+                if (!defined($startAdr)) {
+                    $startAdr = $oi->{adr};        # first adr assignment is starting address
+                } else {
+                    my $gap = $oi->{adr} * 2 - ($startAdr * 2 + length($packed));             # potential gap between objects packed so far and this adr
+                    Log3 $name, 5, "$name: CreateSetGroupHash gap from $startAdr is $gap";
+                    $packed .= pack ("x$gap") if ($gap);                    # fill gap with \0 bytes
+                }
+                my $val;
+                if ($objCombi eq $oi0->{objCombi}) {                    # this is the original object -> compatible with its group
+                    $included = 1;                                      
+                    $val = $setVal;                                     # value to set
+                }
+                else {
+                    $val = ReadingsVal($name, $oi->{reading}, '');      # initial value of other object in group comes from reading
+                };
+                my ($pVal, $error) = FormatSetVal($hash, $oi, $val);    # apply map, setexpr, unpack and check min/max
+                if ($error) {                                            # grouping not possible
+                    Log3 $name, 5, "$name: CreateSetGroupHash got error from FormatSetVal and returns";
+                    return;
+                }
+                Log3 $name, 5, "$name: CreateSetGroupHash packed value " . unpack ('H*', $packed) . " + " . unpack ('H*', $pVal);
+                $packed .= $pVal;
+                $grpHash->{values} = $packed;
+            }
+        }
+    }
+    return $grpHash if ($included);     # original object was included in group
+    Log3 $name, 3, "$name: CreateSetGroupHash failed to include $obj0Text in its group. Ignore grouping";
+    return;                             # grouping not possible
 }
 
 
@@ -1129,6 +1290,7 @@ sub SetLDFn {
     my $setName   = shift @setValArr;       # name of the set option
     my $setVal    = @setValArr ? join(' ', @setValArr) : undef;  # set values as one string   
     my $async     = AttrVal($name, 'nonPrioritizedSet', 0);
+    my $info      = "set $setName";
 
     return "\"set $name\" needs at least an argument" if (!$setName);
     
@@ -1140,16 +1302,17 @@ sub SetLDFn {
     }
     
     my $objCombi = ObjKey($hash, $setName);
-
     Log3 $name, 4, "$name: set called with $setName " . ($objCombi ? "($objCombi) " : ' ') . 
             (defined($setVal) ? "setVal = $setVal" :'') if ($setName ne '?');
     
     if (!$objCombi) {
         UpdateGetSetList($hash) if ($hash->{'.updateSetGet'});
-        #Log3 $name, 5, "$name: set $setName not found, return list $hash->{'.setList'}" if ($setName ne '?');
+        Log3 $name, 5, "$name: set $setName not found, return list $hash->{'.setList'}" if ($setName ne '?');
         return "Unknown argument $setName, choose one of $hash->{'.setList'}";
     }
-    if (ObjInfo($hash, $objCombi, 'noArg')) {
+    my $oi0  = GetOICache($hash, $objCombi);  # cached for this objCombi until attrs change
+    my $oRef = $oi0;
+    if ($oi0->{noArg}) {
         $setVal = 1;                            # dummy value for noArg
         Log3 $name, 4, "$name: set with noArg for $setName, using value 1";
     } 
@@ -1160,18 +1323,23 @@ sub SetLDFn {
     
     my $msg = GetSetChecks($hash, $async);
     return $msg if ($msg);                              # no other action because io device is not usable anyway
-    
-    my ($packedVal, $error) = FormatSetVal($hash, $objCombi, $setVal);
-    return $error if ($error);
 
-    my $type   = substr($objCombi, 0, 1);
-    my $adr    = substr($objCombi, 1);
-    my $len    = ObjInfo($hash, $objCombi, 'len');
-    my $fCode  = GetFC($hash, {TYPE => $type, ADR => $adr, LEN => $len, OPERATION => 'write'});
+    my ($packedVal, $error);
+    my $group = CreateSetGroupHash($hash, $oi0, $setVal);        # is this obj in a group?
+    if ($group) {
+        $oRef  = $group;                                # change ref to point to $group for creating request
+        $info  = "grouped $group->{groupInfo}";
+        $packedVal = $group->{values};
+    }
+    else {
+        ($packedVal, $error) = FormatSetVal($hash, $oi0, $setVal);  # apply map, setexpr, unpack and check min/max
+        return $error if ($error);
+    }
+
+    my $fCode  = GetFC($hash, {TYPE => $oRef->{type}, ADR => $oRef->{adr}, LEN => $oRef->{len}, OPERATION => 'write'});
     my $ioHash = GetIOHash($hash);                      # ioHash has been checked in GetSetChecks above already
-    DoRequest($hash, {TYPE => $type, ADR => $adr, LEN => $len, OPERATION => 'write', VALUES => $packedVal, FORCE => !$async, DBGINFO => "set $setName"});
-    # StartQueueTimer($hash, \&Modbus::ProcessRequestQueue, {delay => 0});    # call processRequestQueue at next possibility (others waiting?)
-    # DoRequest should call QueueRequest which calls StartQueueTimer without delay ...
+    DoRequest($hash, {TYPE => $oRef->{type}, ADR => $oRef->{adr}, LEN => $oRef->{len}, OPERATION => 'write', 
+            VALUES => $packedVal, FORCE => !$async, DBGINFO => $info});    # queue und set queue timer to asap
     
     if (!$async) {
         my $err = ReadAnswer($ioHash);                  # wait for the response
@@ -1179,7 +1347,15 @@ sub SetLDFn {
     }
     if ($fCode == 15 || $fCode == 16) {                 # read after write
         Log3 $name, 5, "$name: set is sending read after write";
-        DoRequest($hash, {TYPE => $type, ADR => $adr, OPERATION => 'read', FORCE => !$async, DBGINFO => "set $setName Rd"});
+        $info = "read after set $setName";
+        $group = CreateGetGroupHash($hash, $oi0);       # is this obj in a group?
+        $oRef = $oi0;
+        if ($group) {
+            $oRef  = $group;                            # change $oi0 ref to point to $group for creating request
+            $info  = "read after set for grouped $group->{groupInfo}";
+        }
+        DoRequest($hash, {TYPE => $oRef->{type}, ADR => $oRef->{adr}, LEN => $oRef->{len}, 
+                        OPERATION => 'read', DBGINFO => $info, FORCE => !$async});      # queue request and use timer to process it asap
         if (!$async) {
             my $err = ReadAnswer($ioHash);
             return "$err (in read after write for FCode $fCode)" if ($err);          
@@ -1262,18 +1438,12 @@ sub ControlSet {
         return $msg if ($msg);
         return 'set sendRaw is only allowed when Fhem is Modbus master' if ($hash->{MODE} ne 'master');
         
-        my %requestData;                        # create new request structure
+        my %requestData = (
+            MODBUSID => $hash->{MODBUSID}, READING => 'dummy', TYPE => '',
+            ADR => 0, LEN => 0, VALUES => $setVal, MASTERHASH => $hash,
+            FCODE => 999 );
+        $requestData{TID} = int(rand(255)) if ($hash->{PROTOCOL} eq 'TCP');    # transaction id for Modbus TCP
         my $request = \%requestData;
-
-        $request->{MODBUSID}   = $hash->{MODBUSID};
-        $request->{READING}    = 'dummy';
-        $request->{TYPE}       = '';
-        $request->{ADR}        = 0;
-        $request->{LEN}        = 0;
-        $request->{VALUES}     = $setVal;
-        $request->{MASTERHASH} = $hash;                                             # logical device in charge
-        $request->{TID}        = int(rand(255)) if ($hash->{PROTOCOL} eq 'TCP');    # transaction id for Modbus TCP
-        $request->{FCODE}      = 999;           # dummy for raw sending
         weaken $request->{MASTERHASH};
 
         my $ioHash   = GetIOHash($hash);        # send queue is at physical hash
@@ -1283,10 +1453,10 @@ sub ControlSet {
     } 
 
     if ($setName eq 'scanStop') {
-        Log3 $name, 4, '$name: scanStop - try asyncOutput to $hash';
-        my $cl = $hash->{CL};
-        asyncOutput($cl, 'Hallo <b>Du</b>');
-        
+        #Log3 $name, 4, '$name: scanStop - try asyncOutput to $hash';
+        #my $cl = $hash->{CL};
+        #asyncOutput($cl, 'Hallo <b>Du</b>');
+    
         my $msg = CheckDisable($hash);
         return $msg if ($msg);
         return "set scanStop is only allowed when Fhem is Modbus master" if ($hash->{MODE} ne 'master');
@@ -1355,10 +1525,16 @@ sub ControlSet {
         return '0';
     } 
     if ($setName eq 'saveAsModule') {         
-        return SaveAsModule ($hash, $setVal);
+        return SaveAsModule($hash, $setVal);
     }
     if ($setName eq 'createAttrsFromParseInfo') {         
-        return createAttrsFromParseInfo ($hash);
+        return createAttrsFromParseInfo($hash);
+    }
+    if ($setName eq 'upgradeAttributes') {         
+        return upgradeAttributes($hash);
+    }
+    if ($setName eq 'removeAttrsWithParseInfo') {         
+        return removeAttrsWithParseInfo($hash);
     }
 
     return;   # no control set identified - continue with other sets
@@ -1366,48 +1542,84 @@ sub ControlSet {
 
 
 ####################################################################
-# create a Fhem module file based on the current configuration 
-# in attributes
+# create attributes from the parseinfo hash
 sub createAttrsFromParseInfo {
     my $hash      = shift;
     my $name      = $hash->{NAME};
     my $modHash   = $modules{$hash->{TYPE}};
-    my $parseInfo = $modHash->{parseInfo};
-    my $devInfo   = $modHash->{deviceInfo};
-    my $last      = 'x';
+    my $sub       = FhemCaller(0);
+    my $parseInfo = $hash->{parseInfo}  // $modHash->{parseInfo};
+    my $devInfo   = $hash->{deviceInfo} // $modHash->{deviceInfo};
 
-    #Log3 $name, 3, "$name: createAttrsFromParseInfo called, TYPE $hash->{TYPE}, parseInfo $parseInfo";
-    foreach my $a (sort keys %{$parseInfo}) {
-        if ($a =~ /([ihcd])(\d+)/) {
-            my $type = $1;
-            my $adr  = $2;
-            foreach my $k (sort keys %{$parseInfo->{$a}}) {
-                my $attrName = "obj-$type$adr-$k";
-                my $val      = $parseInfo->{$a}{$k};
-                #Log3 $name, 3, "$name: createAttrsFromParseInfo working on $attrName $val";
-                if (exists $attr{$name}{$attrName}) {
-                    if ($attr{$name}{$attrName} ne $val) {
-                        return "createAttrsFromParseInfo aborted because attr $attrName already exists with value $attr{$name}{$attrName} (parseInfo contains $val)";
+    #Log3 $name, 3, "$name: $sub called, TYPE $hash->{TYPE}, parseInfo $parseInfo";
+
+    # create obj attrs
+    foreach my $objCombi (sort keys %{$parseInfo}) {
+        my %compactKey;
+        if ($objCombi =~ /([ihcd])(\d+)/) {
+            Log3 $name, 5, "$name: $sub looking at obj $objCombi";
+            if (defined($parseInfo->{$objCombi}{reading})) {
+                my $aName = "obj-$objCombi";
+                my $val   = $parseInfo->{$objCombi}{reading};
+                $compactKey{reading} = 1;
+                Log3 $name, 5, "$name: $sub compact style attr starts with $aName $val";
+
+                foreach my $key (sort keys %{$parseInfo->{$objCombi}}) {
+                    if ($key ne 'reading' && $parseInfo->{$objCombi}{$key} !~ /,/) {
+                        $val .= ", $key=" . $parseInfo->{$objCombi}{$key};  # add key=value to compact attr
+                        $compactKey{$key} = 1;                              # this key will be created within compact attr
                     }
                 }
-                CommandAttr(undef, "$name $attrName $val");
+                my $ret = setAttrIfNew($hash, $aName, $val, 'new compact obj attr');
+                return $ret if ($ret);
             }
-        }
-    }
-    foreach my $a (sort keys %{$devInfo}) {
-        foreach my $k (sort keys %{$devInfo->{$a}}) {
-            my $attrName = "dev-$a-$k";
-            my $val      = $devInfo->{$a}{$k};
-            #Log3 $name, 3, "$name: createAttrsFromParseInfo working on $attrName $val";
-            if (exists $attr{$name}{$attrName}) {
-                if ($attr{$name}{$attrName} ne $val) {
-                    return "createAttrsFromParseInfo aborted because attr $attrName already exists with value $attr{$name}{$attrName} (devInfo contains $val)";
+
+            # any other parseInfo keys that have not been included above? (e.g. because of a comma)
+            foreach my $key (sort keys %{$parseInfo->{$objCombi}}) {
+                if (!$compactKey{$key}) {                                   # skip the ones already in compact style
+                    my $ret = setAttrIfNew($hash, "obj-$objCombi-$key", $parseInfo->{$objCombi}{$key}, 'new classic obj attr');
+                    return $ret if ($ret);
                 }
             }
-            CommandAttr(undef, "$name $attrName $val");
+        }
+        else {
+            Log3 $name, 3, "$name: $sub unknown parseInfo hash key $objCombi"
         }
     }
-    Log3 $name, 4, "$name: createAttrsFromParseInfo done";
+
+    # create dev-[cdhi] attrs
+    foreach my $dType (sort keys %{$devInfo}) {
+        my %compactKey;
+        if ($dType =~ /^[cdhi]$|^type|^timing$/) {                                   # dType in DevInfo hash is e.g. type-PM10 so regex matches
+            Log3 $name, 5, "$name: $sub looking at dType $dType";
+            my $val;
+
+            foreach my $key (sort keys %{$devInfo->{$dType}}) {
+                if ($devInfo->{$dType}{$key} !~ /,/) {
+                    $val .= ($val ? ', ' : '') . "$key=" . $devInfo->{$dType}{$key};    # add key=value to compact attr
+                    $compactKey{$key} = 1;                                              # this key will be created within compact attr
+                }
+            }
+            my $ret = setAttrIfNew($hash, "dev-$dType", $val, 'new compact dev attr');
+            return $ret if ($ret);
+
+            # remaining keys that could not be added because of commas 
+            foreach my $key (sort keys %{$devInfo->{$dType}}) {
+                if (!$compactKey{$key}) {    
+                    my $ret = setAttrIfNew($hash, "dev-$dType-$key", $devInfo->{$dType}{$key}, 'new classic dev attr');
+                    return $ret if ($ret);
+                }
+            }
+        }
+        else {
+            Log3 $name, 5, "$name: $sub other devInfo hash key $dType";    # others like fcxx for custom function codes
+            foreach my $key (sort keys %{$devInfo->{$dType}}) {                
+                my $ret = setAttrIfNew($hash, "dev-$dType-$key", $devInfo->{$dType}{$key}, 'new other classic dev attr');
+                return $ret if ($ret);
+            }
+        }
+    }
+    Log3 $name, 4, "$name: $sub done";
     return '0';
 }
 
@@ -1419,67 +1631,618 @@ sub SaveAsModule {
     my $hash  = shift;
     my $fName = shift;
     my $name  = $hash->{NAME};
+    my $sub   = FhemCaller(0);
     my $tFile = 'lib/FHEM/Modbus/modTemplate';
-    my $oFile = "/tmp/98_ModbusGen$fName.pm";
+    my $oFile;
+    
+    if ($fName =~ /\//) {
+        $oFile = $fName;
+    } else {
+        $oFile = "/tmp/98_ModbusGen$fName.pm";
+    }
+
     my $tmpl;
     if (!open($tmpl, "<", $tFile)) {
-        Log3 $name, 3, "$name: Cannot open template file $tFile";
+        Log3 $name, 3, "$name: $sub can not open template file $tFile";
         return "cannot open $tFile";
-    };
+    }
     my $content = '';
     while (<$tmpl>) {
         $content .= $_;
     }
     close $tmpl;
-    Log3 $name, 4, "$name: template file $tFile read successfully";
+    Log3 $name, 4, "$name: $sub successfully read template file $tFile";
 
     my $t     = '';
     my $last  = 'x';
-    foreach my $a (sort keys %{$attr{$name}}) {
-        if ($a =~ /^obj-([^\-]+)-(.*)$/) {
-            my $adr = $1;
-            my $key = $2;
-            if ($1 ne $last) {
-                $t .= sprintf "%26s", "},\n" if ($last ne "x"); 
-                $t .= sprintf "%2s", " " . sprintf "%16s%s", "\"$adr\"", " =>  { ";
-                $last = $adr;
-            } else {
-                $t .= sprintf "%25s", " ";
+    my %compactKey;
+
+    # compact style obj-Attribute
+    foreach my $a (sort grep /^obj-/, keys %{$attr{$name}}) {   # gehe sortiert durch alle obj- Attribute
+        if ($a =~ /^obj-([^\-]+)$/) {                           # compact mode Attribute (one attr to many parsinfo lines)
+            my $objCombi = $1;                                  # Adresse
+            my $compact  = $attr{$name}{$a} // '';
+            
+            if ($objCombi ne $last) {                           # neues Objekt beginnt
+                %compactKey = ();
             }
+            Log3 $name, 5, "$name: $sub compact attr $a, $compact";
+            if ($compact =~ /^([^,\s]+)\s*([\,]|$)\s*(.*)/) {   # reading name in new compact definition attr
+                my $reading = $1;
+                my $rest = $3;
+                Log3 $name, 5, "$name: $sub split compact definition $a into reading $1 and rest $rest";
+
+                if ($objCombi ne $last) {                       # neues Objekt beginnt
+                    Log3 $name, 5, "$name: $sub new object";
+                    $t .= sprintf "%25s", "},\n" if ($last ne "x");                             # altes Objekt abschließen, Klammer zu, Umbruch
+                    $t .= sprintf "%2s", " " . sprintf "%16s%s", "\"$objCombi\"", " =>  { ";    # Mit Adresse beginnen
+                    $last = $objCombi;
+                } else {                                
+                    $t .= sprintf "%25s", " ";                  # weiterer Key zum selben Objekt
+                }
+                $t .= sprintf "%15s%s", "\'reading\'", " => \'$reading\',\n";
+
+                my $kv = KVSplit($hash, $rest);
+                if ($kv) {
+                    foreach my $key (sort keys %{$kv}) {
+                        $t .= sprintf("%39s", "\'${key}\'") . " => \'" . $kv->{$key} . "\',\n";            # put key = value in text
+                        $compactKey{$key} = 1;
+                        Log3 $name, 5, "$name: $sub set compactKey $key to 1";
+                    }
+                }
+            }
+        }
+
+        # klassisches obj-Attribute (1:1 mit Parseinfo)
+        if ($a =~ /^obj-([^\-]+)-(.*)$/) {
+            my $objCombi = $1;                      # Adresse
+            my $key  = $2;                          # name, reading, unpack, ...
             my $aVal = $attr{$name}{$a};
+            if ($objCombi ne $last) {               # neues Objekt beginnt
+                %compactKey = ();
+            }
+            Log3 $name, 5, "$name: $sub classic attr $a, key $key, val $aVal" 
+                . ($compactKey{$key} ? ", saved compact: $compactKey{$key}" : '');
+            if ($compactKey{$key}) {
+                return "duplicate $key for $objCombi - save canceled";
+            }
+            if ($objCombi ne $last) {               # neues Objekt beginnt
+                $t .= sprintf "%25s", "},\n" if ($last ne "x");                         # altes Objekt abschließen, Klammer zu, Umbruch
+                $t .= sprintf "%2s", " " . sprintf "%16s%s", "\"$objCombi\"", " =>  { ";     # Mit Adresse beginnen
+                $last = $objCombi;
+            } else {                                
+                $t .= sprintf "%24s", " ";          # weiterer key zum selben Objekt
+            }
             $aVal =~ s/\'/\\\'/g;
             $t .= sprintf "%15s%s", "\'".$key."\'", " => \'$aVal\',\n";
         }
     }
     $t .= sprintf "%28s", "}\n);\n\n" if ($last ne 'x');
 
+    # Compact Dev-Attribute
     $t .= "my %ModbusGen${fName}deviceInfo = (\n";
     $last = "x";
-    foreach my $a (sort keys %{$attr{$name}}) {
-        if ($a =~ /^dev-((type-)?[^\-]+)-(.*)$/) {
-            if ($1 ne $last) {
-                $t .= sprintf "%26s", "},\n" if ($last ne "x");
-                $t .= sprintf "%2s", " " . sprintf "%16s%s", "\"$1\"", " =>  { ";
-                $last = $1;
-            } else {
-                $t .= sprintf "%25s", " ";
+    foreach my $a (sort grep /dev-/, keys %{$attr{$name}}) {     # gehe durch alle dev- Attribute
+
+        if ($a =~ /^dev-([^\-]+)$/ || $a =~ /^dev-(type-[^\-]+)$/) {    # compact mode dev Attribute (one attr to many devinfo lines)
+            Log3 $name, 5, "$name: $sub now looking at attr $a";
+            my $dType = $1;                                             # h, timing, type-xx, fc...
+            my $compact = $attr{$name}{$a} // '';
+
+            if ($dType ne $last) {                                      # neuer dType beginnt
+                %compactKey = ();
+                $t .= sprintf "%25s", "},\n" if ($last ne "x");                         # alten type abschließen, Klammer zu, Umbruch
+                $t .= sprintf "%2s", " " . sprintf "%16s%s", "\"$dType\"", " =>  {\n";  # Mit neuem type beginnen
+                $last = $dType;
             }
-            $t .= sprintf "%15s%s", "\'".$3."\'", " => \'$attr{$name}{$a}\',\n";
+ 
+            my $kv = KVSplit($hash, $compact);
+            if ($kv) {
+                foreach my $key (sort keys %{$kv}) {
+                    $t .= sprintf("%39s", "\'${key}\'") . " => \'" . $kv->{$key} . "\',\n";            # put key = value in text
+                    $compactKey{$key} = 1;
+                    Log3 $name, 5, "$name: $sub set compactKey $key to 1";
+                }
+            }
+        } 
+
+        # klassisches dev-Attribute (1:1 mit Parseinfo)
+        elsif ($a =~ /^dev-(type-[^\-]+)-(.*)/ || $a =~ /^dev-([^\-]+)-([^,]+)/) {
+            my $dType = $1;                     # dType
+            my $key   = $2;                     # name, reading, unpack, ...
+            my $aVal  = $attr{$name}{$a};
+            Log3 $name, 5, "$name: $sub classic dev attr $a, type $dType, key $key, val $aVal";
+
+            if ($dType ne $last) {              # neues Objekt beginnt
+                $t .= sprintf "%25s", "},\n" if ($last ne "x");                         # altes Objekt abschließen, Klammer zu, Umbruch
+                $t .= sprintf "%2s", " " . sprintf "%16s%s", "\"$dType\"", " =>  {\n";  # Mit Adresse beginnen
+                $last = $dType;
+                %compactKey = ();
+            } 
+            if ($compactKey{$key}) {
+                return "duplicate key $key for dev-$dType - save canceled";
+            }
+
+            $aVal =~ s/\'/\\\'/g;               # escape single quotes
+            $t .= sprintf "%39s%s", "\'".$key."\'", " => \'$aVal\',\n";
         }
     }
     $t .= sprintf "%28s", "}\n);\n\n" if ($last ne 'x');
 
+
     $content =~ s/(\$\{.*\})/$1/gee;
-    my $out;
-    if (!open($out, '>', $oFile)) {         ## no critic 
-        Log3 $name, 3, "$name: set saveAsModule cannot create output file $oFile";
-        return "saveAsModule cannot create output file $oFile";
+    if ($fName eq 'LogOnly') {
+        Log3 $name, 3, "$name: $sub creates\n$content"
     }
-    print $out $content;
-    close $out;
-    Log3 $name, 3, "$name: set saveAsModule created $oFile";
+    else {
+        my $out;
+        if (!open($out, '>', $oFile)) {         ## no critic 
+            Log3 $name, 3, "$name: $sub can not create output file $oFile";
+            return "saveAsModule cannot create output file $oFile";
+        }
+        print $out $content;
+        close $out;
+        Log3 $name, 3, "$name: $sub created $oFile";
+    }
     return "0"; 
 }
+
+
+####################################################################
+# convert Attributes to the compact style if possible
+# todo: use type if other properties match a type
+sub upgradeAttributes {
+    my $hash      = shift;
+    my $name      = $hash->{NAME};
+    my $sub       = FhemCaller(0);
+    my $modHash   = $modules{$hash->{TYPE}};
+    my $parseInfo = $hash->{parseInfo}  // $modHash->{parseInfo};
+    my $typeList  = GetTypeList($hash);
+    my $typeCache = GetTypeCache($hash);
+    my $last      = 'x';
+    my %compactKey;
+    my %otherKey;
+
+    Log3 $name, 5, "$name: $sub called";
+    my @list = sort grep /^obj-/, keys %{$attr{$name}};
+    push @list, 'obj-z';                        # fake last attr to finish the real last one
+    foreach my $a (@list) {                     # check all attributes (now looking for obj-)
+
+        if ($a =~ /^obj-([^\-]+)/) {            # get objCombi and then check if new object starts
+            my $objCombi = $1;                  # Type & Addr
+            if ($objCombi ne $last) {           # new object begins -> modify attrs
+                if (!$compactKey{'reading'} && $last ne 'x') {
+                    Log3 $name, 5, "$name: $sub no reading for $last, check parseInfo";
+                    if (exists($parseInfo->{$last}{'reading'})) {
+                        Log3 $name, 5, "$name: $sub take reading name for $last from parseInfo";
+                        $compactKey{reading} = $parseInfo->{$last}{reading};
+                    }
+                }
+                $compactKey{reading} = "unnamed-reading-$last" if (!$compactKey{reading} && $last ne 'x');
+                if ($compactKey{reading}) {
+                    Log3 $name, 5, "$name: $sub final handling of $last";
+                    
+                    # optimize Types                    
+                    if (!$compactKey{'type'} && $compactKey{'unpack'} && $compactKey{'len'}) {
+                        my $bestMatch = 0;
+                        my $bestType = '';
+                        Log3 $name, 5, "$name: $sub check potential type for $last with unpack $compactKey{'unpack'} and len $compactKey{'len'}";
+                        foreach my $t (sort @{$typeList}) {
+                            #Log3 $name, 5, "$name: $sub check potential type $t with unpack $typeCache->{$t}{'unpack'} and len $typeCache->{$t}{'len'}";
+                            if ($typeCache->{$t}{'unpack'} && $typeCache->{$t}{'len'} && 
+                                $typeCache->{$t}{'unpack'} eq $compactKey{'unpack'} 
+                                && $typeCache->{$t}{'len'} eq $compactKey{'len'}) {
+                                    my $count  = 0;
+                                    my $count2 = 0;
+                                    foreach my $tk (@DevTypeWords) {
+                                        if ($typeCache->{$t}{$tk} && $compactKey{$tk} &&
+                                            $typeCache->{$t}{$tk} eq $compactKey{$tk}) {
+                                                $count++;
+                                        }
+                                        if ($typeCache->{$t}{$tk} && !$compactKey{$tk}) {
+                                                $count2++;
+                                        }
+
+                                    }
+                                    if ($count > $bestMatch && !$count2) {
+                                        $bestMatch = $count;
+                                        $bestType  = $t;
+                                    }
+                                    Log3 $name, 5, "$name: $sub potential type $t matchcount $count, best is $bestType";
+                            }
+                        }
+                        if ($bestType) {
+                            $compactKey{'type'} = $bestType;
+                            foreach my $tk (keys %{$typeCache->{$bestType}}) {
+                                Log3 $name, 5, "$name: $sub remove compactKey{$tk}";
+                                delete $compactKey{$tk};
+                                removeAttr ($hash, "obj-$last-$tk", "old style attr");
+                            }
+                        }
+                    }
+
+                    my $attrBase = "obj-$last";
+                    foreach my $key (sort keys %compactKey) {   # old style attr replaced by compact one
+                        removeAttr ($hash, "$attrBase-$key", "old style attr");
+                    }
+                    my $aVal = "$compactKey{reading}, " . join (', ', 
+                          sort map {$_ . '=' . $compactKey{$_}} grep !/reading/, keys %compactKey);
+                    setAttr($hash, $attrBase, $aVal, 'new compact attr');
+                    foreach my $key (sort keys %otherKey) {
+                        Log3 $name, 5, "$name: $sub keep additional classic attr: attr $name obj-$last-$key $otherKey{$key}";
+                    }
+                }
+                elsif ($last ne 'x') {
+                    Log3 $name, 5, "$name: $sub ignore $last - no reading name";
+                    # todo: invent reading name from objCombi in this case
+                }
+                Log3 $name, 5, "$name: $sub clear hashes and move to $objCombi" if ($last ne 'x');
+                %compactKey = ();
+                %otherKey   = ();
+                $last       = $objCombi;
+            }
+        }
+
+        if ($a =~ /^obj-([^\-]+)$/) {               # already compact mode Attribute (many keys)
+            my $objCombi = $1;                      # Type & Address
+            my $aVal = $attr{$name}{$a} // '';      # Compact def string    # todo: remove? (overwritten)
+
+            if ($aVal =~ /^([^,\s]+)\s*([\,]|$)\s*(.*)/) {  # reading name in new compact attr
+                $compactKey{'reading'} = $1;
+                Log3 $name, 5, "$name: $sub set reading to $1 from compact definition";
+                my $kv = KVSplit($hash, $3);
+                if ($kv) {
+                    foreach my $key (sort keys %{$kv}) {
+                        $compactKey{$key} = $kv->{$key};        # set compactKey hash to keep as compact
+                        Log3 $name, 5, "$name: $sub: set compactKey $key to $kv->{$key}";
+                    }
+                }
+            }
+        }
+
+        elsif ($a =~ /^obj-([^\-]+)-(.*)$/) {       # klassisches Attribute (1 Parameter)
+            my $objCombi = $1;                      # Adresse
+            my $key = $2;                           # name, reading, unpack, ...
+            my $aVal = $attr{$name}{$a} // '';      # attribute value
+            Log3 $name, 5, "$name: $sub: look at existing classic attr $a, $aVal";
+            if ($compactKey{$key} && $compactKey{$key} ne $aVal) {
+                return "duplicate conflicting values for $key and $objCombi - $sub canceled";
+            }
+            if ($aVal !~ /,/) {                     # value doesn't contain comma (reading never does)
+                $compactKey{$key} = $aVal;          # replace classic attr with compact key=val
+            } 
+            else {
+                $otherKey{$key} = $aVal;            # keep as individual attr
+                Log3 $name, 5, "$name: $sub: value contains comma - keep separate"; 
+            }
+        }
+    }
+
+    $last       = 'x';
+    %compactKey = ();
+    %otherKey   = ();
+    Log3 $name, 5, "$name: $sub now does dev-attrs";
+
+    @list = sort grep /^dev-/, keys %{$attr{$name}};
+    push @list, 'dev-z';                        # fake last attr to finish the real last one
+    foreach my $a (@list) {                     # go through all dev- attributes
+        Log3 $name, 5, "$name: $sub: next attr is $a, last is $last";
+        next if ($a =~ /^dev-fc/);              # skip user defined function codes, compact style doesn't make sense for them
+
+        if ($a =~ /^dev-(type-[^\-]+)/ || $a =~ /^dev-([^\-]+)/ ) {    # get type, compact or classic
+            my $dType = $1;                         # dev-$dType 
+            Log3 $name, 5, "$name: $sub: dType is $dType";
+
+            if ($dType ne $last) {   # new dev-dType begins -> modify attrs
+                if ($last ne 'x') {
+                    my $attrBase = "dev-$last";
+                    foreach my $key (sort keys %compactKey) {
+                        removeAttr ($hash, "$attrBase-$key", "old style attr");
+                    }
+                    my $aVal = join (', ', sort map {$_ . '=' . $compactKey{$_}} keys %compactKey);
+                    setAttr($hash, $attrBase, $aVal, 'new compact attr');
+                    foreach my $key (sort keys %otherKey) {
+                        Log3 $name, 5, "$name: $sub keep additional classic attr: attr $name obj-$last-$key $otherKey{$key}";
+                    }
+                    Log3 $name, 5, "$name: $sub clear hashes and move to dType $dType";
+                }
+                %compactKey = ();
+                %otherKey   = ();
+                $last       = $dType;
+            }
+        }
+
+        # compact mode attrs will be before classic ones (sorting)
+        # todo: fehlen hier compact types? /^dev-(type-([^\-]+)$/
+        if ($a =~ /^dev-([^\-]+)$/ || $a =~ /^dev-(type-([^\-]+))$/ ) {      # already compact mode Attribute
+            my $dType = $1;                         # dev-$dType
+            my $aVal = $attr{$name}{$a} // '';      # Compact def string
+            my $kv = KVSplit($hash, $aVal);
+            if ($kv) {
+                foreach my $key (sort keys %{$kv}) {
+                    $compactKey{$key} = $kv->{$key};
+                    Log3 $name, 5, "$name: $sub: set compactKey $key to $kv->{$key}";
+                }
+            }
+        }
+        elsif ($a =~ /^dev-(type-[^\-]+)-(.*)$/ || $a =~ /^dev-([^\-]+)-(.*)$/) {   # klassisches Attribut
+            my $dType = $1;                         # Adresse
+            my $key = $2;                           # timing, h, ...
+            my $aVal = $attr{$name}{$a} // '';      # attribute value
+            Log3 $name, 5, "$name: $sub: look at existing classic attr $a $aVal";
+            if ($compactKey{$key} && $compactKey{$key} ne $aVal) {
+                return "duplicate conflicting values for $key and $dType - $sub canceled";
+            }
+            if ($aVal !~ /,/) {                     # value doesn't contain comma (reading never does)
+                $compactKey{$key} = $aVal;          # replace classic attr with compact one
+            } 
+            else {
+                $otherKey{$key} = $aVal;            # keep as individual attr
+                Log3 $name, 5, "$name: $sub: value contains comma - keep separate"; 
+            }
+        }
+    }
+    Log3 $name, 4, "$name: $sub done";
+    return '0';
+}
+
+
+####################################################################
+# check if key / value is alread in parseInfo
+sub checkParseInfo {
+    my $hash      = shift;
+    my $objCombi  = shift;
+    my $key       = shift;
+    my $val       = shift;
+    my $name      = $hash->{NAME};
+    my $sub       = FhemCaller();
+    my $modHash   = $modules{$hash->{TYPE}};
+    my $parseInfo = $hash->{parseInfo}  // $modHash->{parseInfo};
+
+    if (exists($parseInfo->{$objCombi}) && exists($parseInfo->{$objCombi}{$key})) {
+        if ($val eq $parseInfo->{$objCombi}{$key}) {
+            Log3 $name, 5, "$name: $sub: $key for $objCombi is the same in parseInfo";
+            return 1;
+        }
+        Log3 $name, 5, "$name: $sub: $key for $objCombi changed from parseInfo";            
+        return;
+    }
+    Log3 $name, 5, "$name: $sub: $key for $objCombi is not in parseInfo";            
+    return;
+}
+
+
+####################################################################
+# check if key / value is alread in deviceInfo hash
+sub checkDeviceInfo {
+    my $hash       = shift;
+    my $type       = shift;
+    my $key        = shift;
+    my $val        = shift;
+    my $name       = $hash->{NAME};
+    my $sub        = FhemCaller();
+    my $modHash    = $modules{$hash->{TYPE}};
+    my $deviceInfo = $hash->{deviceInfo}  // $modHash->{deviceInfo};
+
+    if (exists($deviceInfo->{$type}) && exists($deviceInfo->{$type}{$key})) {
+        if ($val eq $deviceInfo->{$type}{$key}) {
+            Log3 $name, 5, "$name: $sub: $key for $type is the same in deviceInfo";
+            return 1;
+        }
+        Log3 $name, 5, "$name: $sub: $key for $type changed from deviceInfo";            
+        return;
+    }
+    Log3 $name, 5, "$name: $sub: $key for $type is not in deviceInfo";            
+    return;
+}
+
+
+####################################################################
+# compare attrs with parseInfo and remove redundant attrs
+# remove attr if no key changes the parseInfo Def
+# if one like unpack changes then only keep this one in compact style with reading name from parseinfo
+# if reading name changes keep compact attr with only reading name
+
+# todo: detect type = individual-setting?
+
+sub removeAttrsWithParseInfo {
+    my $hash      = shift;
+    my $name      = $hash->{NAME};
+    my $sub       = FhemCaller(0);
+    my $modHash   = $modules{$hash->{TYPE}};
+    my $parseInfo = $hash->{parseInfo}  // $modHash->{parseInfo};
+    my $last      = 'x';
+    my $reading   = '';
+    my %compactKey;             # keys to add to a compact attr
+    my %removeKey;              # things to be removed
+
+    Log3 $name, 5, "$name: $sub called";
+
+    my @list = sort grep /^obj-/, keys %{$attr{$name}};
+    push @list, 'z';                                      
+    foreach my $a (@list) {                             # main loop - go through all attrs
+
+        if ($a =~ /^obj-([^\-]+)/ || $a =~ /^(z)$/) {   # get objCombi or fake last element
+            my $objCombi = $1;
+            if ($objCombi ne $last) {                   # new object begins -> modify attrs
+                if ($last ne 'x') {
+                    my $attrBase = "obj-$last";
+                    Log3 $name, 5, "$name: $sub no more attrs for $last, reading is " 
+                        . ($reading // 'undef') . ', ' . keys(%compactKey) . " keys for compact attr";
+                    
+                    if (!$reading) {
+                        Log3 $name, 5, "$name: $sub no reading for $last, check parseInfo";
+                        if (exists($parseInfo->{$last}{reading})) {
+                            Log3 $name, 5, "$name: $sub take reading name for $last from parseInfo";
+                            $reading = $parseInfo->{$last}{reading};
+                        }
+                    }
+                    if (%removeKey) {
+                        foreach my $key (sort keys %removeKey) {
+                            if ($key eq 'compactAttr') {
+                                removeAttr ($hash, $attrBase, "redundant compact style attr");
+                            } else {
+                                removeAttr ($hash, "$attrBase-$key", "old classic attr");
+                            }
+                        }
+                    }
+                    if (%compactKey) {
+                        my $compact = '';
+                        foreach my $key (keys %compactKey) {
+                            $compact .= ", $key=$compactKey{$key}" if ($key ne 'reading');
+                        }
+                        setAttr($hash, $attrBase, $reading . $compact, 'new compact attr');
+                    }
+                    Log3 $name, 5, "$name: $sub clear hashes and move to $objCombi";
+                }
+                %compactKey = ();
+                %removeKey  = ();
+                $reading    = undef;
+                $last       = $objCombi;
+            }
+        }
+
+        if ($a =~ /^obj-([^\-]+)$/) {               # already compact mode Attribute (one attr to many parameters)
+            my $objCombi = $1;                      # Type & Address
+            my $aVal     = $attr{$name}{$a} // '';  # Compact def string
+
+            if ($aVal =~ /^([^,\s]+)\s*([\,]|$)\s*(.*)/) {   # reading name in new compact definition attr
+                $reading = $1;
+                my $rest    = $3;
+
+                Log3 $name, 5, "$name: $sub split compact definition for $objCombi into reading $reading and rest $rest";
+
+                if (!checkParseInfo($hash, $objCombi, 'reading', $1)) {     # reading name changed
+                    $compactKey{reading} = $reading;
+                }
+
+                my $kv = KVSplit($hash, $rest);
+                if ($kv) {
+                    foreach my $key (sort keys %{$kv}) {
+                        Log3 $name, 5, "$name: $sub: $key = $kv->{$key} for $objCombi";
+                        if (!checkParseInfo($hash, $objCombi, $key, $kv->{$key})) { 
+                            $compactKey{$key} = $kv->{$key};
+                            Log3 $name, 5, "$name: $sub: set modified compactKey $key to $kv->{$key} for $objCombi";
+                        }
+                    }
+                }
+                if (!%compactKey) {
+                    Log3 $name, 5, "$name: $sub: no key of the compact style attr for $objCombi changes parseInfo -> remove";
+                    $removeKey{compactAttr} = 1;
+                }
+            }
+        }
+        elsif ($a =~ /^obj-([^\-]+)-(.*)$/) {       # klassisches Attribute (1 Parameter)
+            my $objCombi = $1;                      # Adresse
+            my $key = $2;                           # name, reading, unpack, ...
+            my $val = $attr{$name}{$a} // '';       # attribute value
+            Log3 $name, 5, "$name: $sub: look at existing classic attr $a, $val";
+            if ($compactKey{$key} && $compactKey{$key} ne $val) {
+                return "duplicate conflicting values for $key and $objCombi - $sub canceled";
+            }
+            if (checkParseInfo($hash, $objCombi, $key, $val)) {
+                $removeKey{$key} = $key;
+            }
+            else {  # not same in parseInfo
+                if ($val !~ /,/) {                  # value doesn't contain comma (reading never does)
+                    if ($key eq 'reading') {
+                        $reading = $val;            # remember reading name
+                        Log3 $name, 5, "$name: $sub: reading name for $objCombi is $reading"; 
+                    }
+                    $compactKey{$key} = $val;       # add to compact style attr (check if key is reading will be done later)
+                    $removeKey{$key} = $key;        # remove old classic attr -> becomes compact style
+                } 
+                else {
+                    Log3 $name, 5, "$name: $sub: value $val for $objCombi contains comma - keep separate"; 
+                }
+            }
+        }
+    }
+
+    $last       = 'x';
+    %compactKey = ();
+    %removeKey  = ();
+    @list = sort grep /^dev-/, keys %{$attr{$name}};
+    push @list, 'z';                                      
+    foreach my $a (@list) {                         # main loop for dev- go through all attrs again
+
+        if ($a =~ /^dev-(type-[^\-]+)/ || $a =~ /^dev-([^\-]+)/ || $a =~ /^(z)$/) {   # get dType or fake last element
+            my $dType = $1;
+            if ($dType ne $last) {                   # new dType begins -> modify attrs
+                if ($last ne 'x') {
+                    my $attrBase = "dev-$last";
+                    Log3 $name, 5, "$name: $sub no more dev attrs for $last, " 
+                        . keys(%compactKey) . " keys for compact attr";
+                    
+                    if (%removeKey) {
+                        foreach my $key (sort keys %removeKey) {
+                            if ($key eq 'compactAttr') {
+                                removeAttr ($hash, $attrBase, "redundant compact style attr");
+                            } else {
+                                removeAttr ($hash, "$attrBase-$key", "old casslic attr");
+                            }
+                        }
+                    }
+                    if (%compactKey) {
+                        my $compact = '';
+                        foreach my $key (keys %compactKey) {
+                            $compact .= ', ' if ($compact);
+                            $compact .= "$key=$compactKey{$key}";
+                        }
+                        setAttr($hash, $attrBase, $compact, 'new compact attr');
+                    }
+                    Log3 $name, 5, "$name: $sub clear hashes and move to $dType";
+                }
+                %compactKey = ();
+                %removeKey  = ();
+                $last       = $dType;
+            }
+        }
+
+        if ($a =~ /^dev-(type-[^\-]+)$/ || $a =~ /^dev-([^\-]+)$/) {    # already compact mode Attribute (one attr to many parameters)
+            my $dType = $1;                         # dType
+            my $aVal  = $attr{$name}{$a} // '';     # Compact def string
+            my $kv = KVSplit($hash, $aVal);
+            if ($kv) {
+                foreach my $key (sort keys %{$kv}) {
+                    Log3 $name, 5, "$name: $sub: $key = $kv->{$key} for $dType";
+                    if (!checkDeviceInfo($hash, $dType, $key, $kv->{$key})) { 
+                        $compactKey{$key} = $kv->{$key};
+                        Log3 $name, 5, "$name: $sub: set modified compactKey $key to $kv->{$key} for $dType";
+                    }
+                }
+            }
+            if (!%compactKey) {
+                Log3 $name, 5, "$name: $sub: no key of the compact style attr for $dType changes parseInfo -> remove";
+                $removeKey{compactAttr} = 1;
+            }
+        }
+        elsif ($a =~ /^dev-(type-[^\-]+)-(.*)$/ || $a =~ /^dev-([^\-]+)-(.*)$/) {       # klassisches Dev-Attribute (1 Parameter)
+            my $dType = $1;                         # dType
+            my $key = $2;                           # name, reading, unpack, ...
+            my $val = $attr{$name}{$a} // '';       # attribute value
+            Log3 $name, 5, "$name: $sub: look at existing classic dev attr $a, $val";
+            if ($compactKey{$key} && $compactKey{$key} ne $val) {
+                return "duplicate conflicting values for $key and $dType - $sub canceled";
+            }
+            if (checkDeviceInfo($hash, $dType, $key, $val)) {
+                $removeKey{$key} = $key;
+            } 
+            else {
+                if ($val !~ /,/) {                  # value doesn't contain comma (reading never does)
+                    $compactKey{$key} = $val;       # add to compact style attr (check if key is reading will be done later)
+                    $removeKey{$key} = $key;        # remove old classic attr -> becomes compact style
+                } 
+                else {
+                    Log3 $name, 5, "$name: $sub: value $val for $dType contains comma - keep separate"; 
+                }
+            }
+        }
+    }
+    Log3 $name, 4, "$name: $sub done";
+    return '0';
+}
+
 
 
 ###############################################################
@@ -1636,7 +2399,7 @@ sub NotifyFn {
         my $reIOHash = GetRelayIO($hash);
         Log3 $name, 4, "$name: Notify / Init: " . ($reIOHash ? "using $reIOHash->{NAME}" : "no device") . " as Modbus relay device (master)";
     }
-    #Log3 $name, 3, '$name: _Notify done';
+    #Log3 $name, 5, '$name: _Notify done';
     return;
 }
 
@@ -2381,7 +3144,7 @@ sub HandleResponse {
                 Log3 $name, 5, "$name: now parsing response data objects, master is " . 
                     ($masterHash ? $masterHash->{NAME} : 'undefined') . " relay is " .
                     ($relayHash ? $relayHash->{NAME} : 'undefined');
-                ParseDataString($masterHash, $response) if ($masterHash);
+                ParseDataString($masterHash, $response) if ($masterHash);   # split into objects and create readings
                 ParseDataString($relayHash, $response) if ($relayHash);
             } elsif ($request->{FCODE} == 999) {
                 my $hexData = unpack ('H*', $frame->{DATA});
@@ -2778,24 +3541,24 @@ sub arrayEncoding {
 }
 
 
-##################################################
-# slave got data to write from its master
+#######################################################
+# slave got data into readings to write from its master
+# called from CreateDataObjects
 sub WriteObject {
     my $hash     = shift;
     my $transPtr = shift;
-    my $type     = shift;
-    my $adr      = shift;
+    my $oi       = shift;
     my $val      = shift;
     my $name     = $hash->{NAME};
-    my $objCombi = $type . $adr;   
-    my $reading  = ObjInfo($hash, $objCombi, 'reading');     # '' if nothing specified
-    Log3 $name, 5, "$name: WriteObject called for $objCombi form " . FhemCaller();
+    my $type     = $transPtr->{TYPE};
+    my $reading  = $oi->{reading};     # '' if nothing specified
+    Log3 $name, 5, "$name: WriteObject called for $oi->{objCombi} form " . FhemCaller();
     if (!$reading) {                        # no parse information -> skip to next object
-        Log3 $name, 5, "$name: WriteObject has no information about handling $objCombi";
+        Log3 $name, 5, "$name: WriteObject has no information about handling $oi->{objCombi}";
         $transPtr->{ERRCODE} = DevInfo($hash, $type, 'addressErrCode', 2);
         return;
     }
-    if (!ObjInfo($hash, $objCombi, 'allowWrite', 'defAllowWrite', 0)) { # write allowed. 
+    if (!$oi->{allowWrite}) {                         # write allowed. 
         Log3 $name, 4, "$name: WriteObject refuses to set reading $reading (allowWrite not set)";
         $transPtr->{ERRCODE} = DevInfo($hash, $type, 'notAllowedErrCode', 1);
         return;
@@ -2810,7 +3573,7 @@ sub WriteObject {
         $dev    = $defs{$device};
     }
             
-    if (!CheckRange($hash, {val => $val, min => ObjInfo($hash, $objCombi, 'min'), max => ObjInfo($hash, $objCombi, 'max')} ) ) {
+    if (!CheckRange($hash, {val => $val, min => $oi->{min}, max => $oi->{max}} ) ) {
         Log3 $name, 4, "$name: WriteObject ignores value $val because it is out of bounds for reading $rname of device $device";
         $transPtr->{ERRCODE} = DevInfo($hash, $type, 'valueErrCode', 1);    # for slave write processing
         next OBJLOOP;
@@ -2823,7 +3586,7 @@ sub WriteObject {
             readingsSingleUpdate($dev, $rname, $val, 1);    # assign value to reading - another Fhem device
         }
     }
-    $hash->{gotReadings}{$reading} = $val;
+    $hash->{gotReadings}{$reading} = $val;                  # for logging at the end of ParseDataString
     return;
 }
 
@@ -2855,79 +3618,45 @@ sub SplitDataString {
     }
 
     use bytes;
-    my ($reading, $unpack, $objLen, $byteLen, $expr);
+    my ($objLen, $byteLen);                     # needed in CONTINUE
     OBJLOOP:
     while (length($dataStr) > 0) {              # parse every field / object passed in $transPtr structure
-        my $objCombi  = $type . $startAdr;
-        $reading = ObjInfo($hash, $objCombi, 'reading');     # '' if nothing specified
-        if ($type =~ '[cd]') {                  # coils or digital inputs
-            $unpack  = 'a';                     # for coils just take the next byte with 0/1 from the string. 
-            $objLen  = 1;                       # to be used in continue block (go to next coil/input in unpacked bit string)
-            $byteLen = 1;                       # just take one byte from $dataStr
-        } 
-        else {                                  # holding / input register
-            if ($op =~ /^scan/) {               # special handling / presentation if scanning
-                $objLen  = length($dataStr) / 2;   # length of rest as number of registers when scanning
-                $objLen  = 1 if ($objLen < 1);  # just to be sure
-                $unpack  = 'a' . $objLen*2;     # for Modbus::ScanFormat
-                $reading = ScanReadingName ($hash, $reading, $type, $startAdr, $op);
-            }
-            else {                              # not scanning - use unpack, len and expr from attributes
-                $objLen  = ObjInfo($hash, $objCombi, 'len');             # default to 1 (1 Reg / 2 Bytes) with global attrDefaults
-                $unpack  = ObjInfo($hash, $objCombi, 'unpack'); 
-            }
-            $byteLen = $objLen * 2;             # one register is two bytes from $dataStr
+        my $objCombi = $type . $startAdr;
+        my $oi       = GetOICache($hash, $objCombi);  # cached for this objCombi until attrs change
+        my %obj      = %{$oi};                  # initialize with all ObjInfo as copy so it can be used directly later        
+        $objLen      = $obj{len};               # default to 1 (1 Reg / 2 Bytes) with global attrDefaults
+        $byteLen     = $objLen * 2;             # one register is two bytes from $dataStr
+        #Log3 $name, 5, "$name: SplitDataString looks at $objCombi, objinfo len $obj{len}";
+
+        if ($op =~ /^scan/) {                   # special handling / presentation if scanning
+            $objLen       = length($dataStr) / 2;   # length of rest as number of registers when scanning
+            $objLen       = 1 if ($objLen < 1);     # just to be sure
+            $byteLen      = $objLen * 2;            # one register is two bytes from $dataStr
+            $obj{unpack}  = 'a' . $byteLen;         # for Modbus::ScanFormat
+            $obj{reading} = ScanReadingName ($hash, $obj{reading}, $type, $startAdr, $op);
+            #Log3 $name, 5, "$name: SplitDataString changed len for $objCombi to $objLen / $byteLen";
         }
-        if (!$reading) {                        # no parse information -> skip to next object
+        if ($type =~ '[cd]') {                  # overwrites for coils or digital inputs 
+            $obj{unpack}  = 'a';                # for coils just take the next byte with 0/1 from the string. 
+            $byteLen = 1;                       # just take one byte from $dataStr
+            $objLen  = 1;
+        } 
+        if (!$obj{reading}) {                   # no parse information -> skip to next object
             Log3 $name, 5, "$name: SplitDataString has no information about handling $objCombi";
             $transPtr->{ERRCODE} = DevInfo($hash, $type, 'addressErrCode', 2) if ($hash->{MODE} eq 'slave');
             next OBJLOOP;
         }
-        my %obj;
-        $obj{objCombi}   = $objCombi;
-        $obj{reading}    = $reading;
-        $obj{unpack}     = $unpack;
-        $obj{adr}        = $startAdr;
-        $obj{len}        = $objLen;
-        $obj{data}       = substr($dataStr, 0, $byteLen);
-        $obj{group}      = ObjInfo($hash, $objCombi, 'group');
+        $obj{data} = substr($dataStr, 0, $byteLen); 
+        $obj{len}  = $objLen;                   # write back overwritten data
         push @objList, \%obj;
     }
-    continue {                                                      # take next object in data string
-        if ($type =~ '[cd]') {
-            $startAdr++;
-            $dataStr = (length($dataStr) > 1 ? substr($dataStr, 1) : '');
-            last OBJLOOP if ($lastAdr && $startAdr > $lastAdr);     # only set for unpacked coil / input bit string
-        } 
-        else {
-            $startAdr += $objLen;            
-            $dataStr = (length($dataStr) > ($byteLen) ? substr($dataStr, $byteLen) : '');
-        }
-        #Log3 $name, 5, "$name: SplitDataString moves to next object, skip $objLen to $type$startAdr" if ($dataStr);
+    continue {                                  # take next object in data string
+        $startAdr += $objLen;
+        $dataStr = (length($dataStr) > $byteLen ? substr($dataStr, $byteLen) : '');
+        last OBJLOOP if ($type =~ '[cd]' && $lastAdr && $startAdr > $lastAdr);     # only set for unpacked coil / input bit string
+        Log3 $name, 5, "$name: SplitDataString moves to next object, skip $objLen objects / $byteLen bytes to $type$startAdr" if ($dataStr);
     }
     return \@objList;
-}
-
-
-sub CreateParseInfoCache {
-    my $hash     = shift;
-    my $objCombi = shift;
-    my $name     = $hash->{NAME};
-    Log3 $name, 5, "$name: CreateParseInfoCache called";
-    $hash->{PICACHE}{$objCombi} = 
-        {   'revRegs'     => ObjInfo($hash, $objCombi, 'revRegs'),
-            'bswapRegs'   => ObjInfo($hash, $objCombi, 'bswapRegs'),
-            'decode'      => ObjInfo($hash, $objCombi, 'decode'),
-            'encode'      => ObjInfo($hash, $objCombi, 'encode'),
-            'ignoreExpr'  => ObjInfo($hash, $objCombi, 'ignoreExpr'),
-            'expr'        => ObjInfo($hash, $objCombi, 'expr'),
-            'map'         => ObjInfo($hash, $objCombi, 'map'),
-            'mapDefault'  => ObjInfo($hash, $objCombi, 'mapDefault'),
-            'rmapDefault' => ObjInfo($hash, $objCombi, 'rmapDefault'),
-            'format'      => ObjInfo($hash, $objCombi, 'format'),
-        };
-    
-    return;
 }
 
 
@@ -2936,33 +3665,23 @@ sub CreateParseInfoCache {
 # with unpack, map, format and so on
 # called from ParseDataString which is called from HandleResponse
 sub CreateDataObjects {
-    my $hash     = shift;
-    my $objList  = shift;
-    my $transPtr = shift;                       # $transPtr can be response (mode master) or request (mode slave and write request)
+    my $hash     = shift;               # logical device hash
+    my $objList  = shift;               # list with obj hashes containig split data and parse info
+    my $transPtr = shift;               # can be response (mode master) or request (mode slave and write request)
     my $name     = $hash->{NAME};
-
-    Log3 $name, 5, "$name: CreateDataObjects called from " . FhemCaller() . " with objList " 
-        . join ',', map {$_->{objCombi}} @{$objList};
-    my @sortedList = sort compObjGroups @{$objList};        # sorted by group and pos in group, then type / adr
-    Log3 $name, 5, "$name: CreateDataObjects sortedList " 
-        . join ',', map {$_->{objCombi}} @sortedList;
+    my @sortList = sort compObjGroups @{$objList};        # sorted by group and pos in group, then type / adr
+    
+    Log3 $name, 5, "$name: CreateDataObjects called from " . FhemCaller() . " with sorted List " 
+        . join ',', map {$_->{objCombi}} @sortList;
 
     readingsBeginUpdate($hash);
     OBJLOOP:
-    foreach my $obj (@sortedList) {
-        my $objCombi = $obj->{objCombi};
-        my $objData  = $obj->{data};
+    foreach my $obj (@sortList) {
+        my $objData  = $obj->{data};                    # initial value
+        Log3 $name, 5, "$name: CreateDataObjects looks at $obj->{objCombi}, len $obj->{len}";
 
-        if ($hash->{PICACHE}{$objCombi}) {
-            #Log3 $name, 5, "$name: Cached parse info exists for $objCombi";
-            CreateParseInfoCache($hash, $objCombi) if (!AttrVal($name, 'cacheParseInfo', 0));
-        } else {
-            CreateParseInfoCache($hash, $objCombi);     # no entry -> recreate for this objCombi
-        }
-        my $pi = $hash->{PICACHE}{$objCombi};           # cached for this objCombi until attrs change
-
-        $objData = ReverseWordOrder($hash, $objData, $obj->{len}) if ($pi->{'revRegs'});
-        $objData = SwapByteOrder   ($hash, $objData, $obj->{len}) if ($pi->{'bswapRegs'});
+        $objData = ReverseWordOrder($hash, $objData, $obj->{len}) if ($obj->{revRegs});
+        $objData = SwapByteOrder   ($hash, $objData, $obj->{len}) if ($obj->{bswapRegs});
 
         my @val = unpack ($obj->{unpack}, $objData);    # fill @val array in case unpack contains codes for more fields, other elements can be used in expr later.
         if (!defined($val[0])) {                        # undefined value as result of unpack -> skip to next object
@@ -2971,34 +3690,34 @@ sub CreateDataObjects {
             next OBJLOOP;
         } 
         Log3 $name, 5, "$name: CreateDataObjects unpacked " . unpack ('H*', $objData) . " with $obj->{unpack} to " . ReadableArray(\@val);
-        arrayEncoding($hash, \@val, $pi->{'decode'}, $pi->{'encode'}) if ($pi->{'decode'} || $pi->{'encode'});
+        arrayEncoding($hash, \@val, $obj->{decode}, $obj->{encode}) if ($obj->{decode} || $obj->{encode});
         my $val = $val[0];
 
-        next OBJLOOP if ($pi->{'ignoreExpr'} && EvalExpr($hash,         # ignore exp results true -> skip to next object
-            {expr => $pi->{'ignoreExpr'}, val => $val, '@val' => \@val, 
+        next OBJLOOP if ($obj->{ignoreExpr} && EvalExpr($hash,         # ignore exp results true -> skip to next object
+            {expr => $obj->{ignoreExpr}, val => $val, '@val' => \@val, 
              nullIfNoExp => 1, action => "ignoreExpr for $obj->{reading}"}));
 
         if ($transPtr->{OPERATION} && $transPtr->{OPERATION} =~ /^scan/) {
             $val = ScanFormat($hash, $val);                             # interpretations with diferent unpack codes
         } 
         else {
-            $val = EvalExpr($hash,   {val => $val, expr => $pi->{'expr'}, '%val' => \@val})     if ($pi->{'expr'});
-            $val = MapConvert($hash, {val => $val, map => $pi->{'map'}, 
-                                        default => $pi->{'mapDefault'}, 
-                                        undefIfNoMatch => 0})                                   if ($pi->{'map'});
-            $val = FormatVal($hash,  {val => $val, format => $pi->{'format'}})                  if ($pi->{'format'});
+            $val = EvalExpr($hash,   {val => $val, expr => $obj->{expr}, '%val' => \@val})     if ($obj->{expr});
+            $val = MapConvert($hash, {val => $val, map => $obj->{map}, 
+                                        default => $obj->{mapDefault}, 
+                                        undefIfNoMatch => 0})                                  if ($obj->{map});
+            $val = FormatVal($hash,  {val => $val, format => $obj->{format}})                  if ($obj->{format});
         }
 
         if ($hash->{MODE} eq 'slave') {
-            WriteObject($hash, $transPtr, $transPtr->{TYPE}, $obj->{adr}, $val);     # do slave write
+            WriteObject($hash, $transPtr, $obj, $val);    # do slave write
         }
         else {
             if (!TryCall($hash, 'ModbusReadingsFn', $obj->{reading}, $val)) {       # unless a user module defined ModbusReadingsFn
                 Log3 $name, 4, "$name: CreateDataObjects assigns value $val to $obj->{reading}";
                 readingsBulkUpdate($hash, $obj->{reading}, $val);
             }
-            $hash->{gotReadings}{$obj->{reading}} = $val;
-            $hash->{lastRead}{$objCombi} = gettimeofday();     # used for pollDelay checking by getUpdate (mode master)
+            $hash->{gotReadings}{$obj->{reading}} = $val;           # for logging at the end of parseDataStrong or return value in GetLDFn
+            $hash->{lastRead}{$obj->{objCombi}} = gettimeofday();   # used for pollDelay checking by getUpdate (mode master)
         }
     }
     readingsEndUpdate($hash, 1);
@@ -3012,12 +3731,12 @@ sub CreateDataObjects {
 # with logical device hash, data string and the object type/adr to start with
 sub ParseDataString {
     my $hash     = shift;
-    my $transPtr = shift;                       # $transPtr can be response (mode master) or request (mode slave and write request)
+    my $transPtr = shift;                           # $transPtr can be response (mode master) or request (mode slave and write request)
     my $name     = $hash->{NAME};
 
     Log3 $name, 5, "$name: ParseDataString called from " . FhemCaller() . " with data hex " . unpack ('H*', $transPtr->{VALUES}) . 
                 ", type $transPtr->{TYPE}, adr $transPtr->{ADR}" . ($transPtr->{OPERATION} ? ", op $transPtr->{OPERATION}" : '');
-    delete $hash->{gotReadings};                # will be filled later and queried by caller. Used for logging and return value in get-command
+    delete $hash->{gotReadings};                    # will be filled later and queried by caller. Used for logging and return value in get-command
 
     my $obj = SplitDataString($hash, $transPtr);    # split value string into objects in a new hash with its parameters from attrs
     if ($transPtr->{ERRCODE}) {
@@ -3506,11 +4225,9 @@ sub GetFC {
 # get, set, scan etc. with logical device hash. 
 # Create request and call QueueRequest
 
-# todo: use group definitions here as well if objects need to be requested together
-
 sub DoRequest {
     my $hash     = shift;
-    my $request  = shift;
+    my $request  = shift;                   # request hash, also contains packed value
     my $name     = $hash->{NAME};           # name of logical device
     my $ioHash   = GetIOHash($hash);        # send queue is at physical hash
     my $qlen     = ($ioHash->{QUEUE} ? scalar(@{$ioHash->{QUEUE}}) : 0);
@@ -3519,9 +4236,11 @@ sub DoRequest {
     #Log3 $name, 4, "$name: DoRequest called from " . FhemCaller() . ' ' . RequestText($request);
     return if (CheckDisable($hash));        # returns if there is no io device
     
+    my $oi = GetOICache($hash, $objCombi);  # cached for this objCombi until attrs change
+    
     $request->{MODBUSID}   = $request->{OPERATION} =~ /^scanid([0-9]+)/ ? $1 : $hash->{MODBUSID};
-    $request->{READING}    = ObjInfo($hash, $objCombi, 'reading');
-    $request->{LEN}        = ObjInfo($hash, $objCombi, 'len') if (not exists $request->{LEN});
+    $request->{READING}    = $oi->{reading};
+    $request->{LEN}        = $oi->{len} if (not exists $request->{LEN});
     $request->{MASTERHASH} = $hash;                                             # logical device in charge
     $request->{TID}        = int(rand(255)) if ($hash->{PROTOCOL} eq 'TCP');    # transaction id for Modbus TCP
     $request->{FCODE}      = GetFC($hash, $request);
@@ -3529,7 +4248,7 @@ sub DoRequest {
     return if (!$request->{FCODE});
 
     # check if defined unpack code matches a corresponding len and log warning if appropriate
-    my $unpack = ObjInfo($hash, $objCombi, 'unpack'); 
+    my $unpack = $oi->{unpack}; 
     Log3 $name, 3, "$name: DoRequest with unpack $unpack but len < 2 - please set obj-${objCombi}-Len!" 
         if ($request->{LEN} < 2 && $unpack =~ /[lLIqQfFNVD]/);
 
@@ -3809,7 +4528,7 @@ sub ProcessRequestQueue {
 
 ###########################################################
 # Pack holding / input register / coil Data for a response, 
-# only called from createResponse which is only called from HandleRequest (slave mode)
+# only called from CreateResponse which is only called from HandleRequest (slave mode)
 # with logical device hash and the response hash
 #
 # two lengths:
@@ -3834,20 +4553,14 @@ sub PackObj {
     
     while ($counter < $valuesLen) {
         # einzelne Felder verarbeiten
-        my $objCombi = $type . $startAdr;
-        #Log3 $name, 5, "$name: PackObj at $objCombi, counter $counter, valuesLen $valuesLen";
-        my $reading  = ObjInfo($logHash, $objCombi, 'reading');     # is data coming from a reading
-        my $expr     = ObjInfo($logHash, $objCombi, 'setexpr');     # or a setexpr (convert to register data)
-        my $unpack   = ObjInfo($logHash, $objCombi, 'unpack');      # pack code to use, defaults to n
-        my $len      = ObjInfo($logHash, $objCombi, 'len');         # default to 1 Reg / 2 Bytes
-        my $decode   = ObjInfo($logHash, $objCombi, 'decode');      # character decoding 
-        my $encode   = ObjInfo($logHash, $objCombi, 'encode');      # character encoding 
-        my $revRegs  = ObjInfo($logHash, $objCombi, 'revRegs');     # do not reverse register order by default
-        my $swpRegs  = ObjInfo($logHash, $objCombi, 'bswapRegs');   # dont reverse bytes in registers by default
-        #Log3 $name, 5, "$name: PackObj at $objCombi, counter $counter, valuesLen $valuesLen, reading $reading";
+        my $objCombi = $type . $startAdr;        
+        my $oi  = GetOICache($logHash, $objCombi);  # cached for this objCombi until attrs change        
+        my $len = $oi->{len};         # default to 1 Reg / 2 Bytes
+        my $val = 0;
         $len = 1 if ($type =~ /[cd]/);
+        #Log3 $name, 5, "$name: PackObj at $objCombi, counter $counter, valuesLen $valuesLen, reading $reading";
         
-        if (!$reading && !$expr) {
+        if (!$oi->{reading} && !$oi->{setexpr}) {
             Log3 $name, 5, "$name: PackObj doesn't have reading or expr information for $objCombi";
             my $code = DevInfo($logHash, $type, 'addressErrCode', 2); 
             if ($code) {
@@ -3857,11 +4570,9 @@ sub PackObj {
             }
         } 
         
-        my $val = 0;    
-        # value from defined reading
-        if ($reading) {                                         # Reading as source of value
+        if ($oi->{reading}) {                                   # Reading as source of value
             my $device = $name;                                 # default device is myself
-            my $rname  = $reading;                              # given name as reading name
+            my $rname  = $oi->{reading};                        # given name as reading name
             if ($rname =~ /^([^\:]+):(.+)$/) {                  # can we split given name to device:reading?
                 $device = $1;
                 $rname  = $2;
@@ -3870,14 +4581,14 @@ sub PackObj {
             Log3 $name, 4, "$name: PackObj for $objCombi is using reading $rname of device $device with value $val";
         }
 
-        $val = EvalExpr($logHash,   {expr => $expr, val => $val, '$type' => $type, '$startAdr' => $startAdr} );
-        $val = FormatVal($logHash,  {val => $val, format => ObjInfo($logHash, $objCombi, 'format')});        
-        $val = MapConvert($logHash, {map => ObjInfo($logHash, $objCombi, 'map'),        # convert with reverse map
-                                     default => ObjInfo($logHash, $objCombi, 'rmapDefault'), 
+        $val = EvalExpr($logHash,   {expr => $oi->{setexpr}, val => $val, '$type' => $type, '$startAdr' => $startAdr} );
+        $val = FormatVal($logHash,  {val => $val, format => $oi->{format}});        
+        $val = MapConvert($logHash, {map => $oi->{map},        # convert with reverse map
+                                     default => $oi->{rmapDefault}, 
                                      val => $val, reverse => 1, undefIfNoMatch => 1});  # undef if no match and no default
         $val = 0 if (!defined($val));                           # avoid working with undef when reverse map did not match
-        $val = decode($decode, $val) if ($decode);              # decode
-        $val = encode($encode, $val) if ($encode);              # encode again
+        $val = decode($oi->{decode}, $val) if ($oi->{decode});  # decode
+        $val = encode($oi->{encode}, $val) if ($oi->{encode});  # encode again
 
         if ($type =~ /[cd]/) {
             $data .= ($val ? '1' : '0');
@@ -3886,15 +4597,15 @@ sub PackObj {
         else {
             my $valLog = (defined ($val) ? "value $val" : "undefined value");
             local $SIG{__WARN__} = sub { Log3 $name, 3, "$name: PackObj pack for $objCombi " .
-                "$valLog with code $unpack created warning: @_"; };
-            my $dataPart = pack ($unpack, $val);                # use unpack code, might create warnings
-            Log3 $name, 5, "$name: PackObj packed $valLog with pack code $unpack to " . unpack ('H*', $dataPart);
+                                            "$valLog with code $oi->{unpack} created warning: @_"; };
+            my $dataPart = pack ($oi->{unpack}, $val);                # use unpack code, might create warnings
+            Log3 $name, 5, "$name: PackObj packed $valLog with pack code $oi->{unpack} to " . unpack ('H*', $dataPart);
             $dataPart =  substr ($dataPart . pack ('x' . $len * 2, undef), 0, $len * 2);    # pad with \0 bytes created by pack
             Log3 $name, 5, "$name: PackObj padded / cut object to " . unpack ('H*', $dataPart);
             $counter += $len; 
-            Log3 $name, 5, "$name: PackObj revRegs = $revRegs, dplen = " . length($dataPart);
-            $dataPart = ReverseWordOrder($logHash, $dataPart, $len) if ($revRegs && length($dataPart) > 3);
-            $dataPart = SwapByteOrder($logHash, $dataPart, $len) if ($swpRegs);
+            Log3 $name, 5, "$name: PackObj revRegs = $oi->{revRegs}, dplen = " . length($dataPart);
+            $dataPart = ReverseWordOrder($logHash, $dataPart, $len) if ($oi->{revRegs} && length($dataPart) > 3);
+            $dataPart = SwapByteOrder($logHash, $dataPart, $len) if ($oi->{bswapRegs});
             $data .= $dataPart;
         }
         $startAdr += $len;                                      # go to the next object
@@ -4013,7 +4724,7 @@ sub PackRequest {
 #########################################################################
 # Pack response pdu from fCode, adr, len and the packed values 
 # or an error pdu if $response->{ERRCODE} contains something
-# called from createResponse which is called from HandleRequest as slave
+# called from CreateResponse which is called from HandleRequest as slave
 # and relayRequest (for error replies)
 sub PackResponse {
     my $ioHash   = shift;
@@ -4156,90 +4867,117 @@ sub SendFrame {
 }
 
 
-###########################################################
-# create a hash with all objects / groups to be requested
-sub CreateUpdateHash {
+#########################################################
+# create a list with all objects from attrs and parseInfo
+sub CreateRawObjList {
     my $hash      = shift;
     my $name      = $hash->{NAME};
     my $modHash   = $modules{$hash->{TYPE}};    # module hash
-    my $parseInfo = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
-    my $devInfo   = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
-    my $intvl     = $hash->{Interval};
-    my $now       = gettimeofday();
-    my $ignDelay  = AttrVal($name, 'cacheUpdateHash', 0);
+    my $parseInfo = $hash->{parseInfo}  // $modHash->{parseInfo};
 
     my @RawObjList;
-    foreach my $attribute (keys %{$attr{$name}}) {     # add all reading attributes to a list unless they are also in parseInfo
-        if ($attribute =~ /^obj-(.*)-reading$/) {
-            push @RawObjList, $1 if (!$parseInfo->{$1});
+    foreach my $attribute (keys %{$attr{$name}}) {          # add all reading attributes to a list unless they are also in parseInfo
+        if ($attribute =~ /^obj-(.+)-reading$/ 
+            || $attribute =~ /^obj-([^-]+)$/) {             # old or compact notation
+            push @RawObjList, $1 if (!$parseInfo->{$1});    # only if not in parseInfo as well (then added later)
+            #Log3 $name, 5, "$name: added attr $attribute to RawObjList as $1";
         }
     };
-    push @RawObjList, keys (%{$parseInfo});     # add all parseInfo readings to the list
-    Log3 $name, 5, "$name: CreateUpdateHash full object list: " . join (' ',  sort @RawObjList);
+    push @RawObjList, keys (%{$parseInfo});                 # add all parseInfo readings to the list
+    Log3 $name, 5, "$name: CreateRawObjList: " . join (' ',  sort @RawObjList);
+    return @RawObjList;
+}
 
-    my @objList;
-    my %objHash;
-    my %grpHash;
+
+###########################################################
+# check if new object can be added to group
+# called from CreateUpdateHash, CreateGetGroupHash
+# and CreateSetGroupHash
+sub CheckAndAddToGroup {
+    my $hash      = shift;
+    my $grpRef    = shift;
+    my $groupNr   = shift;
+    my $oi        = shift;
+    my $name      = $hash->{NAME};
+    my $objCombi  = $oi->{objCombi};
+
+    my $maxLen    = DevInfo($hash, $oi->{type}, 'combine', 0);
+    my $objText   = "$objCombi len $oi->{len} $oi->{reading}";
+    $maxLen       = 125 if ($maxLen > 125 && $oi->{type} =~ /[hi]/);                 # max allowed combine for modbus holding registers or input
+    $maxLen       = 2000 if ($maxLen > 2000 && $oi->{type} =~ /[cd]/);               # max allowed combine for coils / digital inputs
+
+    $grpRef->{adr} = $oi->{adr} if (!$grpRef->{adr});
+    $grpRef->{len} = $oi->{len} if (!$grpRef->{len});
+    $grpRef->{type} = $oi->{type} if (!$grpRef->{type});
+
+    my $span = $oi->{adr} - $grpRef->{adr} + $oi->{len};
+    if ($grpRef->{type} ne $oi->{type}) {
+        Log3 $name, 3, "$name: CheckAndAddToGroup found incompatible types in group $groupNr (so far $grpRef->{type}, now $oi->{type}";
+        return 0;
+    } 
+    elsif ($grpRef->{adr} > $oi->{adr}) {
+        Log3 $name, 3, "$name: CheckAndAddToGroup found wrong adr sorting in group $groupNr. Old $grpRef->{adr}, new $oi->{adr}. Please report this bug";
+        return 0;
+    } 
+    elsif ($maxLen && $span > $maxLen) {
+        Log3 $name, 3, "$name: CheckAndAddToGroup found group $groupNr span $span is longer than defined maximum $maxLen";
+        return 0;
+    } 
+    $grpRef->{len} = $span;     # add to group by increasing len
+    $grpRef->{groupInfo} .= ($grpRef->{groupInfo} ? ' and ' : '') . $objText;
+    #Log3 $name, 5, "$name: CheckAndAddToGroup adds $objText to group $groupNr";
+    return 1;
+}
+
+
+###########################################################
+# create a hash with all objects / groups to be requested
+sub CreateUpdateHash {
+    my $hash       = shift;
+    my $name       = $hash->{NAME};
+    my $intvl      = $hash->{Interval};
+    my $now        = gettimeofday();
+    my $ignDelay   = AttrVal($name, 'cacheUpdateHash', 0);      # ignore Polldelay when caching update hash
+    my @RawObjList = CreateRawObjList($hash);
+    my %objHash;            # all objects and groups to be requested
+    my %grpHash;            # info about the groups - added to objHash
     foreach my $objCombi (sort compObjCombi @RawObjList) {   # sorted by type+adr
-        my $reading    = ObjInfo($hash, $objCombi, 'reading');
-        my $poll       = ObjInfo($hash, $objCombi, 'poll');
-        my $group      = ObjInfo($hash, $objCombi, 'group');
-        my $len        = ObjInfo($hash, $objCombi, 'len');
+        my $oi         = GetOICache($hash, $objCombi);  # cached for this objCombi until attrs change       
+        my $reading    = $oi->{reading};
         my $lastRead   = $hash->{lastRead}{$objCombi} // 0;
-        my $type       = substr($objCombi, 0, 1);
-        my $adr        = substr($objCombi, 1);
-        my $maxLen     = DevInfo($hash, $type, 'combine', 0);
-        my $objText    = "$objCombi len $len $reading";
-        my $delay      = ($ignDelay ? 0 : ObjInfo($hash, $objCombi, 'polldelay'));  # ignore Polldelay when caching update hash
-        $maxLen        = 125 if ($maxLen > 125 && $type =~ /[hi]/);                 # max allowed combine for modbus holding registers or input
-        $maxLen        = 2000 if ($maxLen > 2000 && $type =~ /[cd]/);               # max allowed combine for coils / digital inputs
-        
-        #Log3 $name, 5, "$name: CreateUpdateHash check $objCombi reading $reading, poll = $poll, polldelay = $delay, last = $lastRead";
+        my $objText    = "$objCombi len $oi->{len} $reading";
+        my $delay      = ($ignDelay ? 0 : $oi->{polldelay});    # ignore Polldelay when caching update hash
         my $groupNr;
-        $groupNr = $1 if ($group && $group =~ /(\d+)-(\d+)/);
-        if ($groupNr) {                                 # handle group - objects to be requested together
-            my $objRef = $grpHash{'g'.$groupNr};
-            my $span   = 0;
-            if ($objRef) {
-                $span = $adr - $objRef->{adr} + $len;
-                if ($objRef->{type} ne $type) {
-                    Log3 $name, 3, "$name: CreateUpdateHash found incompatible types in group $groupNr (so far $objRef->{type}, now $type";
-                } 
-                elsif ($objRef->{adr} > $adr) {
-                    Log3 $name, 3, "$name: CreateUpdateHash found wrong adr sorting in group $groupNr. Old $objRef->{adr}, new $adr. Please report this bug";
-                } 
-                elsif ($maxLen && $span > $maxLen) {
-                    Log3 $name, 3, "$name: CreateUpdateHash found group $groupNr span $span is longer than defined maximum $maxLen";
-                } 
-                else {              # add to group
-                    $objRef->{len} = $span;
-                    $objRef->{groupInfo} .= ($objRef->{groupInfo} ? ' and ' : '') . $objText;
-                    #Log3 $name, 5, "$name: CreateUpdateHash adds $objText to group $groupNr";
-                }
+        Log3 $name, 5, "$name: CreateUpdateHash check $objCombi reading $reading, poll = $oi->{poll}, polldelay = $delay, last = $lastRead";
+
+        $groupNr = $1 if ($oi->{group} && $oi->{group} =~ /(\d+)-(\d+)/);
+        if ($groupNr) {                         # handle group - objects to be requested together
+            if ($grpHash{$groupNr}) {           # group already exists -> try to add by increasing len of group entry
+                $groupNr = undef                # reset groupNr if adding to group is not possible
+                    if (!CheckAndAddToGroup($hash, $grpHash{$groupNr}, $groupNr, $oi));
             } 
-            else {                  # new object for group
+            else {                              # new object for group, create new group entry
                 #Log3 $name, 5, "$name: CreateUpdateHash creates new hash for group $groupNr with $objText";
-                $objRef = {type => $type, adr => $adr, len => $len, reading => $reading, 
-                        groupInfo => $objText, group => $group, objCombi => 'g'.$groupNr};
-                $grpHash{'g'.$groupNr} = $objRef;
+                $grpHash{$groupNr} = {type => $oi->{type}, adr => $oi->{adr}, len => $oi->{len}, reading => $reading, 
+                        groupInfo => $objText, group => $oi->{group}, objCombi => 'g'.$groupNr};
             }
         }
-        if (($poll && $poll ne 'once') || ($poll eq 'once' && !$lastRead)) {        # this was wrongly implemented (once should be specified as delay). Keep for backward compatibility
+        if (($oi->{poll} && $oi->{poll} ne 'once') || ($oi->{poll} eq 'once' && !$lastRead)) {        # this was wrongly implemented (once should be specified as delay). Keep for backward compatibility
             if (!$delay || ($delay && $delay ne 'once') || ($delay eq 'once' && !$lastRead)) {
                 $delay = 0 if ($delay eq 'once' || !$delay);
                 $delay = $1 * ($intvl ? $intvl : 1) if ($delay =~ /^x([0-9]+)/);    # delay as multiplyer if starts with x
                 if ($now >= $lastRead + $delay) {               # this object is due to be requested
-                    if ($groupNr) {
-                        $objHash{'g'.$groupNr} = $grpHash{'g'.$groupNr};
+                    if ($groupNr) {                             # it is part of a group: add group hash to objHash
+                        $objHash{'g'.$groupNr} = $grpHash{$groupNr};
                         Log3 $name, 5, "$name: CreateUpdateHash will request group $groupNr because of $objText";
                     } 
-                    else {                                      # no group
-                        $objHash{$objCombi} = {objCombi => $objCombi, type => $type, adr => $adr, reading => $reading, len => $len};
+                    else {                                      # no group: add new objHash entry
+                        $objHash{$objCombi} = {objCombi => $objCombi, type => $oi->{type}, adr => $oi->{adr}, reading => $reading, len => $oi->{len}};
                         Log3 $name, 5, "$name: CreateUpdateHash will request $objText";
                     }
                 }
-                else {                                          # delay not over
-                    if ($groupNr && $objHash{'g'.$groupNr}) {   # but part of a group to be requested
+                else {                                          # delay not over, just log what is happening
+                    if ($groupNr && $objHash{'g'.$groupNr}) {   # but part of a group that has been addde to be requested
                         Log3 $name, 5, "$name: CreateUpdateHash will request $reading because it is part of group $groupNr";
                     } 
                     else {                                      # delay not over and not in a group to be requested
@@ -4254,8 +4992,9 @@ sub CreateUpdateHash {
 }
 
 
-###################################
-# combine objects to be requested
+##################################################################
+# combine objects or groups to be requested until max combine.
+# grouped objects are already combined in createUpdateHash
 sub CombineUpdateHash {
     my $hash     = shift;
     my $objHash  = shift;
@@ -4267,8 +5006,15 @@ sub CombineUpdateHash {
     my $lastObj;
     my $maxLen;
 
-    Log3 $name, 4, "$name: CombineUpdateHash objHash keys before combine: " . join ',', keys %{$objHash};
-    Log3 $name, 5, "$name: CombineUpdateHash tries to combine read commands";
+    my $objCount = keys %{$objHash};  
+    if ($objCount < 1) {
+        Log3 $name, 4, "$name: CombineUpdateHash called but no objects to request during update cycle";
+        Log3 $name, 4, "$name: Did you forget to use the -poll attribute for objects or the attribute dev-h-defPoll 1?";
+    } 
+    else {
+        Log3 $name, 4, "$name: CombineUpdateHash objHash keys before combine: " . join ',', keys %{$objHash};
+        Log3 $name, 5, "$name: CombineUpdateHash tries to combine read commands";
+    }
 
     COMBINELOOP:
     foreach my $nextObj (sort compObjTA values %{$objHash}) {       # sorting type/adr 
@@ -4305,14 +5051,21 @@ sub CombineUpdateHash {
             $lastObj = $nextObj ;        # point last obj to next so combination can start with the next one
         }
     }
-    Log3 $name, 5, "$name: CombineUpdateHash keys are now " . join ',', keys %{$objHash};
+    if ($objCount) {
+        Log3 $name, 5, "$name: CombineUpdateHash keys are now " . join ',', keys %{$objHash};
+    }
     my $logMsg = '';
     foreach my $obj (sort compObjTA values %{$objHash}) {
         #Log3 $name, 5, "$name: CombineUpdateHash logmsg obj = $obj->{objCombi} span $obj->{span} reading $obj->{reading}";
         $logMsg = ($logMsg ? "$logMsg, " : '') . "$obj->{objCombi} len $obj->{span} " . 
                     ($obj->{combine} ? "(combined $obj->{combine})" : "($obj->{reading})");
     }
-    Log3 $name, 4, "$name: GetUpdate will now create requests for $logMsg" ;    
+    if ($objCount) {
+        Log3 $name, 4, "$name: GetUpdate will now create requests for $logMsg" ;    
+    } 
+    else {
+        Log3 $name, 4, "$name: GetUpdate will not create requests" ;    
+    }
     return;
 }    
 
@@ -4342,8 +5095,8 @@ sub GetUpdate {
     
     my $objHash;
     if (!AttrVal($name, 'cacheUpdateHash', 0) || !$hash->{UPDATECACHE}) {
-        $objHash = CreateUpdateHash($hash);    
-        CombineUpdateHash($hash, $objHash);
+        $objHash = CreateUpdateHash($hash);     # collect objects for next update, already combine groups
+        CombineUpdateHash($hash, $objHash);     # combine objects / groups until max combine
         $hash->{UPDATECACHE} = $objHash;
     }
     else {
@@ -4351,11 +5104,11 @@ sub GetUpdate {
         $objHash = $hash->{UPDATECACHE};
     }
 
-    # now create the requests
-    foreach my $obj (sort compObjTA values %{$objHash}) {       # sorted by type / adr
+    # now create the requests, objHash is already combined / grouped
+    foreach my $obj (sort compObjTA values %{$objHash}) {       # sorted by type / adr, already combined / grouped
         next if !$obj;  
         my $span = $obj->{span};
-        DoRequest($hash, {TYPE => $obj->{type}, ADR => $obj->{adr}, OPERATION => 'read', LEN => $span, 
+        DoRequest($hash, {TYPE => $obj->{type}, ADR => $obj->{adr}, OPERATION => 'read', (defined $span ? (LEN => $span) : ()), 
                         DBGINFO => "getUpdate for " . 
                         ($obj->{combine} ? "combined $obj->{combine}" : "$obj->{reading} len $obj->{len}")});
     }
@@ -5269,6 +6022,7 @@ sub ObjAttr {
     my $oName = shift;
     my $name  = $hash->{NAME};
     my $aName = 'obj-'.$key.'-'.$oName;
+    $aName = 'obj-'.$key if (!$oName);
     return $attr{$name}{$aName} if (defined($attr{$name}{$aName}));
     if ($hash->{LeadingZeros}) {    
         if ($key =~ /([cdih])0*([0-9]+)/) {
@@ -5276,7 +6030,8 @@ sub ObjAttr {
             my $adr  = $2;
             while (length($adr) <= 5) {             
                 $aName = 'obj-'.$type.$adr.'-'.$oName;
-                #Log3 $name, 5, "$name: ObjInfo check $aName";
+                $aName = 'obj-'.$type.$adr if (!$oName);
+                #Log3 $name, 5, "$name: ObjAttr check $aName";
                 return $attr{$name}{$aName} 
                     if (defined($attr{$name}{$aName}));
                 $adr = '0' . $adr;
@@ -5286,7 +6041,88 @@ sub ObjAttr {
     return;
 }
 
-    
+
+###########################################################
+# get and optionally fill ObjInfo Cache
+sub GetOICache {
+    my $hash     = shift;
+    my $objCombi = shift;
+    my $name     = $hash->{NAME};
+    my $doCache  = AttrVal($name, 'cacheParseInfo', 0);
+    #Log3 $name, 5, "$name: GetOICache called for $objCombi";
+    if (!$hash->{OICACHE}{$objCombi} || !$doCache)  {
+        my %oiHash;
+        #Log3 $name, 5, "$name: GetOICache creates hash for $objCombi";
+        foreach my $word (@ObjAttrWords) {
+            $oiHash{$word} = ObjInfo($hash, $objCombi, $word);
+        }
+        $oiHash{objCombi} = $objCombi;
+        $oiHash{type}     = substr($objCombi, 0, 1);
+        $oiHash{adr}      = substr($objCombi, 1);
+        $hash->{OICACHE}{$objCombi} = \%oiHash if ($doCache);
+        return \%oiHash;        # needed if not caching
+    }
+    return $hash->{OICACHE}{$objCombi};
+}
+
+
+########################
+sub GetTypeList {
+    my $hash = shift;
+    my $name = $hash->{NAME};
+    if (!$hash->{TYPELIST})  {
+        my %typeNames;
+        
+        # start with predefined types
+        foreach my $t (keys %builtInType) {
+            if (ref($builtInType{$t}) eq 'HASH') {  # ignore links
+                $typeNames{$t} = 1;
+            }
+        }
+        my @list = sort grep /^dev-type-/, keys %{$attr{$name}};
+        foreach my $a (@list) {                         # go through all dev- attributes
+            if ($a =~ /^dev-type-([^\-]+)$/) {          # compact mode Attribute
+                $typeNames{$1} = 1;
+            } 
+            elsif ($a =~ /^dev-(type-[^\-]+)-(.*)$/) {  # klassisches type-Attribut
+                 $typeNames{$1} = 1;
+            }
+        }
+        my @typeList = keys %typeNames;
+        $hash->{TYPELIST} = \@typeList;
+        return \@typeList;
+    }
+    return $hash->{TYPELIST};
+}
+
+
+########################
+sub GetTypeCache {
+    my $hash = shift;
+    my $name = $hash->{NAME};
+    if (!$hash->{TYCACHE})  {
+        my %typeCache;
+        my $typeList = GetTypeList($hash);
+        
+        foreach my $t (sort @{$typeList}) {
+            foreach my $key (sort @DevTypeWords) {
+                my $typeSpec = DevInfo($hash, "type-$t", $key, '***NoTypeInfo***');
+                if ($typeSpec ne '***NoTypeInfo***') {
+                    $typeCache{$t}{$key} = $typeSpec;
+                }
+                elsif ($builtInType{$t}{$key}) {
+                    $typeCache{$t}{$key} = $builtInType{$t}{$key};
+                }
+                #Log3 $name, 5, "$name: GetTypeCache for $t $key is $typeCache{$t}{$key}, builtIn $builtInType{$t}{$key}";
+            }
+        }
+        $hash->{TYCACHE} = \%typeCache;
+        return \%typeCache;
+    }
+    return $hash->{TYCACHE};
+}
+
+
 ################################################
 # Get Object Info from Attributes,
 # parseInfo Hash or default from deviceInfo Hash
@@ -5294,38 +6130,51 @@ sub ObjInfo {
     my $hash        = shift;        # device hash
     my $key         = shift;        # objCombi like h123
     my $oName       = shift;        # requested 
-   
-    my $defName     = $attrDefaults{$oName}{devDefault};
-    
-    $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});     # take info from parent device if TCP conn (TCP slave)
+    my $defName     = $attrDefaults{$oName}{devDefault};    
+    $hash           = $hash->{CHILDOF} if ($hash->{CHILDOF});     # take info from parent device if TCP conn (TCP slave)
     my $name        = $hash->{NAME};
     my $modHash     = $modules{$hash->{TYPE}};
-    my $parseInfo   = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
-    #Log3 $name, 5, "$name: ObjInfo called from " . FhemCaller() . " for $key, object $oName" . 
-    #   ($defName ? ", defName $defName" : '');
+    my $parseInfo   = $hash->{parseInfo}  // $modHash->{parseInfo};
+    #Log3 $name, 5, "$name: ObjInfo called from " . FhemCaller() . " for $key, object $oName" . ($defName ? ", defName $defName" : '');
         
     my $reading = ObjAttr($hash, $key, 'reading');
-    if (!defined($reading) && $parseInfo->{$key} && $parseInfo->{$key}{reading}) {
-        $reading = $parseInfo->{$key}{reading};
+    my $cAttr   = ObjAttr($hash, $key, '') // '';
+    my ($compactReading, $rest) = ($cAttr =~ /([^\,]+)[\,\s]*(.*)/);      # attributname ohne -Zusatz
+    if($compactReading) {
+        #Log3 $name, 5, "$name: ObjInfo: compact attr $key value is split into $compactReading and rest $rest";
+        my $kvHash = KVSplit($hash, $rest);
+        $reading = $compactReading;
+        return $reading if ($oName eq 'reading');           # short cut for reading name
+        if ($kvHash->{$oName}) {
+            #Log3 $name, 5, "$name: ObjInfo returns $kvHash->{$oName} for $oName from compact definition";    
+            return $kvHash->{$oName};
+        } else {
+            #Log3 $name, 5, "$name: ObjInfo has no info for $oName from compact definition";    
+        }
     }
-    if (!defined($reading)) {   # not even a reading attr for this key / obj
-        return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
-        #$reading = "unnamed-$key";          # continuing with a default reading name will result in returning the dev defaults for e.g. len which breaks splitting etc...
+
+    if (!defined($reading)) {                               # Try to get a reading name as first step
+        if ($parseInfo->{$key} && $parseInfo->{$key}{reading}) {
+            $reading = $parseInfo->{$key}{reading};
+        }
+        if (!defined($reading)) {   # not even a reading attr for this key / obj
+            #Log3 $name, 5, "$name: ObjInfo has no attr for reading name - return default or null string";
+            return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
+            #$reading = "unnamed-$key";        # continuing with a default reading name will result in returning the dev defaults for e.g. len which breaks splitting etc...
+        }
     }
     
     #Log3 $name, 5, "$name: ObjInfo now looks at attrs for oName $oName / reading $reading / $key";
-    if (defined($attr{$name})) {
-        # check for explicit attribute for this object
+    if (defined($attr{$name})) {                            # check for explicit attribute for this object
         my $value = ObjAttr($hash, $key, $oName);
         return $value if (defined($value));
-        
         # check for special case: attribute can be name of reading with prefix like poll-reading
         return $attr{$name}{$oName.'-'.$reading} 
             if (defined($attr{$name}{$oName.'-'.$reading}));
     }
     
     # parseInfo for object $oName if special Fhem module using parseinfoHash
-    return $parseInfo->{$key}{$oName}
+    return $parseInfo->{$key}{$oName}                   
         if (defined($parseInfo->{$key}) && defined($parseInfo->{$key}{$oName}));
 
     # returning unnamed here creates problems because we don't know 
@@ -5337,7 +6186,7 @@ sub ObjInfo {
     #    return "unnamed-$key";                  # if no attr and no parseinfo matche before
     #}
 
-    # check for type entry / attr ...
+    # check for type entry / attr with this address ...
     if ($oName ne 'type') {
         #Log3 $name, 5, "$name: ObjInfo checking types";
         my $dType = ObjInfo($hash, $key, 'type');           # default (from %atrDefaults) is ***NoTypeInfo***
@@ -5366,21 +6215,25 @@ sub ObjInfo {
         my $type = substr($key, 0, 1);
         if (defined($attr{$name})) {
             # check for explicit attribute for this object type
-            my $daName    = 'dev-'.$type.'-'.$defName;
+            my $daName    = 'dev-'.$type.'-'.$defName;          
             #Log3 $name, 5, "$name: ObjInfo checking $daName";
             return $attr{$name}{$daName} 
-                if (defined($attr{$name}{$daName}));
+                if (defined($attr{$name}{$daName}));            # explicit default aus dev-type- attr
             
             # check for default attribute for all object types
             my $dadName   = 'dev-'.$defName;
             #Log3 $name, 5, "$name: ObjInfo checking $dadName";
             return $attr{$name}{$dadName} 
-                if (defined($attr{$name}{$dadName}));
+                if (defined($attr{$name}{$dadName}));           # generic default aus dev-type- attr
         }
-        my $devInfo = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
+        my $devInfo = $hash->{deviceInfo} // $modHash->{deviceInfo};
         return $devInfo->{$type}{$defName}
-            if (defined($devInfo->{$type}) && defined($devInfo->{$type}{$defName}));
+            if (defined($devInfo->{$type}) 
+                && defined($devInfo->{$type}{$defName}));       # default aus devInfo Hash
     }
+    return 1 if ($compactReading && $oName eq 'poll');          # new default for poll with compact definition is 1
+    return 1 if ($compactReading && $oName eq 'showGet');       # new default for showGet with compact definition is 1
+
     return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
 }
 
@@ -5398,13 +6251,26 @@ sub DevInfo {
     $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                 # take info from parent if TCP server conn
     my $name        = $hash->{NAME};
     my $modHash     = $modules{$hash->{TYPE}};
-    my $devInfo     = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
-    my $aName       = 'dev-'.$type.'-'.$oName;
-    my $adName      = 'dev-'.$oName;
-    
+    my $devInfo     = $hash->{deviceInfo} // $modHash->{deviceInfo};    
+    my $aName       = 'dev-'.$type.'-'.$oName;                      # dev-type-detail
+    my $adName      = 'dev-'.$oName;                                # dev-detail
+
     if (defined($attr{$name})) {
-        return $attr{$name}{$aName} if (defined($attr{$name}{$aName}));     # explicit attribute for this type
-        return $attr{$name}{$adName} if (defined($attr{$name}{$adName}));   # default attribute for all types
+        my $cAttrNa = "dev-$type";
+        my $compact = $attr{$name}{$cAttrNa} 
+            if (defined($attr{$name}{$cAttrNa}));                   # compact attribute for this type
+        #Log3 $name, 5, "$name: DevInfo called with $type and $oName checks compact definition for $type in attr $cAttrNa, value " . ($compact // 'undef');
+        if($compact) {
+            my $kvHash = KVSplit($hash, $compact);
+            if ($kvHash->{$oName}) {
+                #Log3 $name, 5, "$name: DevInfo returns $kvHash->{$oName} for $oName from compact definition";    
+                return $kvHash->{$oName};
+            } else {
+                #Log3 $name, 5, "$name: DevInfo has no info for $oName from compact definition";    
+            }
+        }
+        return $attr{$name}{$aName}  if (defined($attr{$name}{$aName}));    # explicit attribute for this type
+        return $attr{$name}{$adName} if (defined($attr{$name}{$adName}));   # default attribute for all types [cdih] (doesn't make sense and probably nobody is using this)
     }
     # default for object type in deviceInfo
     return $devInfo->{$type}{$oName} if (defined($devInfo->{$type}) && defined($devInfo->{$type}{$oName}));
@@ -5422,12 +6288,17 @@ sub ObjKey {
     return if ($reading eq '?');
     $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                     # take info from parent device if TCP server conn   
     my $name      = $hash->{NAME};
-    my $modHash   = $modules{$hash->{TYPE}};    
-    my $parseInfo = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
+    my $modHash   = $modules{$hash->{TYPE}};
+    my $parseInfo = $hash->{parseInfo}  // $modHash->{parseInfo};
     
     foreach my $a (keys %{$attr{$name}}) {
-        if ($a =~ /obj-([cdih][0-9]+)-reading/ && $attr{$name}{$a} eq $reading) {
-            return $1;
+        return $1 if ($a =~ /obj-([cdih][0-9]+)-reading/ && $attr{$name}{$a} eq $reading);
+        if ($a =~ /obj-([cdih][0-9]+)$/) {
+            my $ok = $1;
+            if ($attr{$name}{$a} =~ /^${reading}([\,]|$)/) {
+                #Log3 $name, 5, "$name: ObjKey for reading $reading is $ok";
+                return $ok;
+            }
         }
     }
     foreach my $k (keys %{$parseInfo}) {
@@ -5457,6 +6328,7 @@ sub TryCall {
     }
     return;
 }
+
 
 1;
 

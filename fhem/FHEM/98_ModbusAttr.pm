@@ -123,6 +123,15 @@ sub Initialize {
         or <br>
         <ul><code>define WP ModbusAttr 3 60 192.168.1.122:8000 RTU</code></ul><br>
         to talk Modbus RTU over TCP and use the port number 8000<br>
+        <ul><code>
+        define ModbusTCPLine Modbus 192.168.1.122:502 TCP<br>
+        define WP1 ModbusAttr 1 60
+        attr WP1 IODev ModbusTCPLine
+        define WP2 ModbusAttr 1 60
+        attr WP2 IODev ModbusTCPLine
+        </code></ul><br>
+        Defines two Modbus master devices that share a common Modbus-TCP connection through ModbusTCPLine<br>
+        or <br>
     </ul>
     <br>
 
@@ -432,10 +441,21 @@ sub Initialize {
             <li><code>scanStop</code></li>
                 stops any running scans.
             <li><code>saveAsModule &lt;name&gt;</code></li>
-                experimental: saves the definitions of obj- and dev- attributes in a new fhem module file as /tmp/98_ModbusGen&lt;name&gt;.pm.<br>
+                saves the definitions of obj- and dev- attributes in a new fhem module file as /tmp/98_ModbusGen&lt;name&gt;.pm.<br>
                 if this file is copied into the fhem module subdirectory (e.g. /opt/fhem/FHEM) and fhem is restarted then instead of defining a device
                 as ModbusAttr with all the attributes to define objects, you can just define a device of the new type ModbusGen&lt;name&gt; and all the 
-                objects will be there by default. However all definitions can still be changed / overriden with the attribues defined in ModbusAttr if needed.
+                objects will be there by default. However all definitions can still be changed / overritten with the attribues as documented in ModbusAttr if needed.
+            <li><code>createAttrsFromParseInfo &lt;name&gt;</code></li>
+                this is the opposite of saveAsModule. If you use this set command on a device that is based on Modbus and already contains all the object definitions 
+                (e.g. ModbusSET) then attributes are created that correspond to the already defined objects and device settings.<br>
+                This makes it easier to understand what definitions are in such a Module and to change definitions.
+            <li><code>removeAttrsWithParseInfo &lt;name&gt;</code></li>
+                this removes all attributes that are redundant and typically have been created by set createAttrsFromParseInfo. 
+                It keeps the attributes that overwrite a built in setting.<br>
+                This feature is still experimental. Use only if you have backed up your configuration.
+            <li><code>upgradeAttributes &lt;name&gt;</code></li>
+                this puts the attributes in the new compact format introduced 2025 and also tries to apply types to objects instead of repeated unpack, len and similar attributes.
+                This feature is still experimental. Use only if you have backed up your configuration.                
         </ul>
     </ul>
     <br>
@@ -533,6 +553,11 @@ sub Initialize {
         the following list of attributes can be applied to any data object by specifying the objects type and address in the variable part. 
         For many attributes you can also specify default values per object type (see dev- attributes later) or you can specify an object attribute without type and address 
         (e.g. obj-len) which then applies as default for all objects:
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+" data-pattern="obj-[cdih][0-9]+">obj-[cdih][0-9]+</a><br> 
+            define the name of a reading that corresponds to the modbus data object of type c,d,i or h and a decimal address (e.g. obj-h225-reading).<br>
+            For master or passive operation this reading name will be used to create a reading for the modbus device itself. <br>
+            For slave operation this can also be specified as deviceName:readingName to refer to the reading of another device inside Fhem whose value can be queried by an external Modbus master with the goven type and address.<br>
+        </li>
         <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-reading" data-pattern="obj-.*-reading">obj-[cdih][0-9]+-reading</a><br> 
             define the name of a reading that corresponds to the modbus data object of type c,d,i or h and a decimal address (e.g. obj-h225-reading).<br>
             For master or passive operation this reading name will be used to create a reading for the modbus device itself. <br>
@@ -709,11 +734,53 @@ sub Initialize {
             register 102 will be processed first so when register 100 is processed, its value can be multipied with the already updated reading for register 102.<br>
             This is helpful for devices where readings need to be computed out of several registers that need to be requested together and where the order of processing is important.
         </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-setGroup" data-pattern="obj-.*-setGroup">obj-[cdih][0-9]+-setGroup</a><br> 
+            Allows control over the way how objects are combined in one request when they are written to the device<br>
+            example:<br>
+            <pre>            
+            attr MyMaster obj-h100-reading Temp
+            attr MyMaster obj-h100-unpack f>
+            attr MyMaster obj-h100-len 2
+            attr MyMaster obj-h100-setGroup 1
+            attr MyMaster obj-h102-reading TempMultiplyer
+            attr MyMaster obj-h102-unpack f>
+            attr MyMaster obj-h102-len 2
+            attr MyMaster obj-h102-setGroup 1
+            attr MyMaster dev-h-combine 8
+            </pre><br>
+            this will cause the holding registers 100 and 102 to be written together. When e.g. a command like 
+            <pre>
+            set MyMaster Temp 22
+            </pre>
+            is issued, then the fhem will create a request with function code 16 to write holding registers 100,101,102 and 103 together. 
+            The value for registers 100 and 101 will come from the set command (22) and 
+            the value for registers 102 and 103 will come from the current reading of TempMultiplyer and can be manipulated in a setExpr.
+        </li>
         <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-overrideFCread" data-pattern="obj-.*-overrideFC.*">obj-[cdih][0-9]+-overrideFCread and obj-[cdih][0-9]+-overrideFCwrite</a><br>
             allow overwriting a function call number to be used when reading or writing an individual object.<br>
             Please do not use this attribute unless you understand the modbus protocol and its function codes.
-
         </li>
+
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+">obj-[cdih][0-9]+</a><br> 
+            defines an object with reading name, type and additional parameters in a new compact notation.<br>
+            e.g.:<br>
+            <code>
+            attr MyMaster obj-h100 Temp, type=float<br>
+            </code>
+            would be equivalent to the old style<br>
+            <code>
+            attr MyMaster obj-h100-reading Temp<br>
+            attr MyMaster obj-h100-type float<br>
+            </code>
+            which would be equivalent to <br>
+            <code>
+            attr MyMaster obj-h100-reading Temp<br>
+            attr MyMaster obj-h100-len 2<br>
+            attr MyMaster obj-h100-unpack f><br>
+            </code>
+            when no predefined types are used<br>
+        </li>
+
         <li><a id="ModbusAttr-attr-dev-([cdih]-)?read" data-pattern="dev-.*read">dev-([cdih]-)?read</a><br> 
             specifies the function code to use for reading this type of object in master mode.
             The default is 3 for holding registers, 1 for coils, 2 for discrete inputs and 4 for input registers.<br>
