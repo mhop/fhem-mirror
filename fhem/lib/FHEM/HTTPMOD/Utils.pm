@@ -59,6 +59,8 @@ our @EXPORT_OK = qw(UpdateTimer FhemCaller
                     setAttr
                     setAttrIfNew
                     removeAttr
+                    KVSplit
+                    KVCheck
                     );
 
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -648,7 +650,7 @@ sub JsonFlatter {
     my $prefix = shift // '';       # prefix string for resulting key
     my $name   = $hash->{NAME};     # Fhem device name
 
-    Log3 $name, 5, "$name: JSON Flatter called : prefix $prefix, ref is $ref";
+    #Log3 $name, 5, "$name: JSON Flatter called : prefix $prefix, ref is $ref";
     if (ref($ref) eq "ARRAY" ) { 
         my $key = 0;
         foreach my $value (@{$ref}) {
@@ -659,8 +661,7 @@ sub JsonFlatter {
             } 
             else { 
                 if (defined ($value) or 1) {             
-                    Log3 $name, 5, "$name: JSON Flatter sets $prefix$key to "
-                        . ($value // 'empty string');
+                    #Log3 $name, 5, "$name: JSON Flatter sets $prefix$key to " . ($value // 'empty string');
                     $hash->{ParserData}{JSON}{$prefix.$key} = ($value // '');
                 }
             }
@@ -669,15 +670,14 @@ sub JsonFlatter {
     } 
     elsif (ref($ref) eq "HASH" ) {
         while( my ($key,$value) = each %{$ref}) {                                       
-            Log3 $name, 5, "$name: JSON Flatter in hash while, key = $key, value = " . ($value // 'undef');
+            #Log3 $name, 5, "$name: JSON Flatter in hash while, key = $key, value = " . ($value // 'undef');
             if(ref($value) eq "HASH" or ref($value) eq "ARRAY") {                                                        
-                Log3 $name, 5, "$name: JSON Flatter doing recursion because value is a " . ref($value);
+                #Log3 $name, 5, "$name: JSON Flatter doing recursion because value is a " . ref($value);
                 JsonFlatter($hash, $value, $prefix.$key."_");
             } 
             else { 
                 if (defined ($value) or 1) {             
-                    Log3 $name, 5, "$name: JSON Flatter sets $prefix$key to "
-                        . ($value // 'empty string');
+                    #Log3 $name, 5, "$name: JSON Flatter sets $prefix$key to " . ($value // 'empty string');
                     $hash->{ParserData}{JSON}{$prefix.$key} = ($value // '');
                 }
             }                                                                          
@@ -1052,6 +1052,57 @@ sub setAttrIfNew {
     CommandAttr(undef, "$name $attr $val");
     return;
 }
+
+
+############################################################
+# split a string with key=value, key=value, key into a hash
+sub KVSplit {
+    my $hash   = shift;
+    my $string = shift;
+    my $name   = $hash->{NAME};
+    my $sub    = FhemCaller(0);
+    my @list   = split (/\s*\,\s*/, $string);
+    my %kv;
+    foreach my $pair (@list) {
+        if ($pair =~ /\s*(\w+)\s*(=\s*([^\,]+)|$)/) {
+            $kv{$1} = $3;
+            $kv{$1} = 1 if (!$2);                       # default 1 if no equal sign
+        }
+        else {
+            Log3 $name, 3, "$name: $sub can not parse key $pair";
+            return;
+        }
+    }
+    return \%kv;
+}
+
+
+##############################################################
+# check key value list string against list of allowed keywords
+sub KVCheck {
+    my $hash   = shift;                   # device hash for logging
+    my $string = shift;                   # key/value list string to be validated
+    my $list   = shift;                   # list of allowed keys as reference
+    my $name   = $hash->{NAME};      
+    my $sub    = FhemCaller(0);     
+    my $caller = FhemCaller();
+    
+    Log3 $name, 5, "$name: $sub called from $caller with string $string and list " . join(',', @{$list});
+    my %allowed = map { $_ => 1 } @{$list};
+    my $kv = KVSplit($hash, $string);       # convert to hash for easier checking
+    return "error" if (!$kv);
+        
+    foreach my $key (keys %{$kv}) {
+        my $val = $kv->{$key} // 1;
+        #Log3 $name, 5, "$name: $sub key $key value $val";
+        if(!exists($allowed{$key})) {
+            Log3 $name, 5, "$name: $sub found illegal key $key";
+            return "illegal key $key";
+        }
+    }
+    return;
+}
+
 
 
 
