@@ -6084,9 +6084,9 @@ sub __getaiNeuroNetConState {            ## no critic "not used"
   my $head  = '<h4><b><u>Informationen zum neuronalen Netz der Verbrauchsvorhersage</b></u></h4>';
   
   my $model = '<b>=== Modellparameter ===</b>'."\n\n";
-  $model   .= "<b>Trainingsdaten:</b> $dsnum (Training=$trdnum, Validierung=$tednum)"."\n";
+  $model   .= (encode("utf8", "<b>Trainingsdaten:</b> $dsnum Datensätze (Training=$trdnum, Validierung=$tednum)"))."\n";
   $model   .= "<b>Architektur:</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum"."\n";
-  $model   .= "<b>Hyperparameter:</b> LR=0.010, Momentum=0.9, BitFail-Limit=0.35"."\n";
+  $model   .= "<b>Hyperparameter:</b> Learning Rate=0.010, Momentum=0.9, BitFail-Limit=0.35"."\n";
   $model   .= "<b>Aktivierungen:</b> Hidden=Sigmoid, Output=Linear"."\n";
   
   my $keyfig = '<b>=== Trainingsmetriken ===</b>'."\n\n";
@@ -6126,7 +6126,7 @@ sub __getaiNeuroNetConState {            ## no critic "not used"
   
   $note    .= (encode('utf8', '<b>MAE</b> (Mean Absolute Error) → mittlere absolute Abweichung in Wh. Richtwerte bei typischem Verbrauch 500–1500 Wh:'))."\n";
   $note    .= $spc3.(encode('utf8', '< 100 Wh → sehr gut'))."\n";
-  $note    .= $spc3.(encode('utf8', '100–300 Wh → brauchbar'))."\n";
+  $note    .= $spc3.(encode('utf8', '100–300 Wh → gut'))."\n";
   $note    .= $spc3.(encode('utf8', '> 300 Wh → schwach'))."\n";
   $note    .= "\n";
   
@@ -11858,11 +11858,15 @@ sub _batSocTarget {
 
       $paref->{batnmb}    = $bn;
       $paref->{careCycle} = $careCycle;
+      $paref->{soc}       = $soc;
+      $paref->{maxSoc}    = $maxSoc;
 
-      __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $soc >= $maxSoc || $soc >= MAXSOCDEF || $oldd2care < 0);
+      __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $soc >= $maxSoc || $oldd2care < 0);
 
       delete $paref->{batnmb};
       delete $paref->{careCycle};
+      delete $paref->{soc};
+      delete $paref->{maxSoc};
 
       my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
       my $target     = $lowSoc;
@@ -11917,11 +11921,15 @@ sub _batSocTarget {
       if ($t > $delayts || $pvexpect < $whneed || !$days2care) {
           $paref->{batnmb}    = $bn;
           $paref->{days2care} = $days2care;
+          $paref->{soc}       = $soc;
+          $paref->{maxSoc}    = $maxSoc;
 
           __batSaveSocKeyFigures ($paref);
 
           delete $paref->{days2care};
           delete $paref->{batnmb};
+          delete $paref->{soc};
+          delete $paref->{maxSoc};
 
           $careSoc = $maxSoc - ($days2care * $stepSoc);                                        # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei $stepSoc % Steigerung pro Tag
           $careSoc = $careSoc < $lowSoc ? $lowSoc : $careSoc;
@@ -12053,14 +12061,18 @@ sub __batSaveSocKeyFigures {
   my $bn        = $paref->{batnmb};                                                       # Batterienummer (01, 02, ...)
   my $t         = $paref->{t};                                                            # aktuelle Zeit
   my $careCycle = $paref->{careCycle};
+  my $days2care = $paref->{days2care};
+  my $soc       = $paref->{soc}    // 0;
+  my $maxSoc    = $paref->{maxSoc} // 100;
 
-  if (defined $paref->{days2care}) {
+  if (defined $days2care) {
       $data{$name}{circular}{99}{'days2care'.$bn} = $paref->{days2care};                  # verbleibende Tage bis zum Pflege-SoC erreicht werden soll
-      return;
   }
 
-  $data{$name}{circular}{99}{'lastTsMaxSocRchd'.$bn} = $t;                                # Timestamp des letzten Erreichens von >= maxSoC
-  $data{$name}{circular}{99}{'nextTsMaxSocChge'.$bn} = $t + (86400 * $careCycle);         # Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
+  if (defined $careCycle && $soc >= $maxSoc) {
+      $data{$name}{circular}{99}{'lastTsMaxSocRchd'.$bn} = $t;                            # Timestamp des letzten Erreichens von >= maxSoC
+      $data{$name}{circular}{99}{'nextTsMaxSocChge'.$bn} = $t + (86400 * $careCycle);     # Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
+  }
 
 return;
 }
@@ -21325,8 +21337,6 @@ sub aiNeuroNetTrain {
   my $cst    = $paref->{cst};                     # Train Startzeit
   my $debug  = $paref->{debug};
   
-  #Log3 ($name, 3, qq{$name - Traings Data: \n}.Dumper $tdref);
-  
   # Parameter
   #############   
   my $hidden_layers             = '50-25';                                       # Hidden Layers in String Notation
@@ -21457,8 +21467,8 @@ sub aiNeuroNetTrain {
       ##################
       if ($since_improve >= $patience) {
           Log3 ($name, 1,
-                sprintf "%s DEBUG> Early stopping bei Epoche %d: Validation MSE=%.6f (no improvement since %d epochs)",
-                $name, $epoch, $mse_val, $patience
+                sprintf "%s DEBUG> Early stopping bei Epoche %d (no improvement since %d epochs)",
+                $name, $epoch, $patience
                );
         
           last;
