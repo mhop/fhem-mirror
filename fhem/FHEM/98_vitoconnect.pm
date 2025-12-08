@@ -97,6 +97,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.0.2"  => "08.12.2025  Power reading asSingleValue finally fixed",
   "1.0.1"  => "29.11.2025  fix power reading logging",
   "1.0.0"  => "28.11.2025  power reading fixed again",
   "0.9.9"  => "28.11.2025  EOL from v1 API on 17.11.2025 changed to v2",
@@ -4072,7 +4073,7 @@ sub vitoconnect_getPowerLast {
     # Basename ohne letztes Suffix
     $Reading =~ s/\.[^.]*$//;
 
-    # Werte-Liste (robust gegen Leerzeichen, in Zahlen casten)
+    # Werte-Liste (robust gegen Leerzeichen, als Zahl)
     my $raw = ReadingsVal($name, $Reading.".day", "");
     my @values = map { 0+$_ } split(/\s*,\s*/, $raw);
 
@@ -4089,22 +4090,20 @@ sub vitoconnect_getPowerLast {
 
     Log3($name, 5, "$name -setpower: target=$targetReading lastTS='$readingLastTimestamp' (num=$lastTS), baseDate=".$baseDate->ymd);
 
-    # Index 0 = aktueller Tag (unvollständig) -> überspringen
-    # Korrekte Zuordnung: Tag(i) = baseDate - i Tage für i=1..$#values
-    for (my $i = 1; $i <= $#values; $i++) {
-        my $dayDate     = $baseDate - ($one_day * $i);
+    # Älteste -> Neueste, Index 0 (aktueller Tag) wird implizit übersprungen
+    for (my $i = $#values; $i >= 1; $i--) {
+        my $dayDate     = $baseDate - ($one_day * $i);   # i Tage vor baseDate
         my $readingDate = $dayDate->ymd . " 23:59:59";
         my $readingTS   = time_str2num($readingDate);
         my $newVal      = $values[$i];
 
         Log3($name, 4, "$name - candidate i=$i date=$readingDate val=$newVal lastTS=$lastTS");
 
-        # Nur schreiben, wenn der Zeitstempel wirklich vorwärts geht
-        if ($readingTS > $lastTS) {
+        # Nur schreiben, wenn wirklich neuer Tag
+        if ($readingTS > $lastTS || ($i == 1 && $readingTS == $lastTS && $newVal != ReadingsVal($name,$targetReading,''))) {
             readingsBulkUpdate($hash, $targetReading, $newVal, undef, $readingDate);
-            Log3($name, 3, "$name -setpower: update $targetReading -> $newVal ($readingDate)");
-            # Fortschritt sichern: lastTS auf genau diesen Zeitstempel setzen
-            $lastTS = $readingTS;
+            Log3($name, 4, "$name -setpower: update $targetReading -> $newVal ($readingDate)");
+            $lastTS = $readingTS;  # Schrittweise nach vorne gehen
         } else {
             Log3($name, 4, "$name -setpower: skip (not newer) dayTS=$readingTS <= lastTS=$lastTS");
         }
