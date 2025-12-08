@@ -247,7 +247,6 @@ attr EVU_Tibber_connect15 get02-93Name fc0_0515_total
 attr EVU_Tibber_connect15 get02-97Name fc0_0530_total
 attr EVU_Tibber_connect15 get02Data { "query": "{viewer {home(id:\"%%homeID%%\") {currentSubscription {priceInfo (resolution: QUARTER_HOURLY)  {current {total startsAt} today {total startsAt} tomorrow {total startsAt}}}}}}" }
 attr EVU_Tibber_connect15 get02DeleteIfUnmatched 1
-attr EVU_Tibber_connect15 get02FollowGet 01_priceInfo
 attr EVU_Tibber_connect15 get02Header01 Content-Type: application/json
 attr EVU_Tibber_connect15 get02Header02 Authorization: Bearer %%token%%
 attr EVU_Tibber_connect15 get02Name 02_priceAll
@@ -1359,9 +1358,10 @@ for (my $loop_fc = 0;; $loop_fc <= 1;; $loop_fc++) {\
     if (ReadingsVal("$NAME","fc".$loop_fc."_0000_startsAt","null") eq ReadingsVal("$NAME","fc".$loop_fc_next."_0000_startsAt","null")) {\
       fhem("deletereading $NAME fc".$loop_fc_next."_.*");;\
     }\
-  } else {\
-      fhem("deletereading $NAME fc1_\\d.*");;\
   }\
+## else {\
+##      fhem("deletereading $NAME fc1_\\d.*");;\
+##  }\
 }\
 ReadingsTimestamp("$NAME","fc0_0000_startsAt","null");;\
 },\
