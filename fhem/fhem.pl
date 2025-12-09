@@ -24,7 +24,6 @@
 
 use strict;
 use warnings;
-use lib '.';
 use IO::Socket;
 use IO::Socket::INET;
 use Time::HiRes qw(gettimeofday time);
@@ -586,6 +585,7 @@ doGlobalDef($ARGV[0]);
 
 if(configDBUsed()) {
   eval "use configDB";
+  eval "use lib '.'; use configDB" if ($@);
   Log 1, $@ if($@);
   cfgDB_Init();
 }
