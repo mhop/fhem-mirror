@@ -1281,9 +1281,15 @@ FW_addLinks($)
 {
   my ($txt) = @_;
   return undef if(!defined($txt));
-  $txt =~ s,(?<=\n|\r|\s|^)([a-z0-9._]+)(?=\n|\r|\s|$), #143241
-            $defs{$1} ? "<a href='$FW_ME$FW_subdir?detail=$1'>$1</a>" :
-            "$1",gei;
+  if($] >= 5.030) { # Variable length lookbehind implemented in 5.030
+    $txt =~ s,(?<=\n|\r|\s|^)([a-z0-9._]+)(?=\n|\r|\s|$), #143241
+              $defs{$1} ? "<a href='$FW_ME$FW_subdir?detail=$1'>$1</a>" :
+              "$1",gei;
+  } else { # buggy in help if there is an instance named lt
+    $txt =~ s,\b([a-z0-9._]+)\b,
+              $defs{$1} ? "<a href='$FW_ME$FW_subdir?detail=$1'>$1</a>" :
+              "$1",gei;
+  }
   return $txt;
 }
 
