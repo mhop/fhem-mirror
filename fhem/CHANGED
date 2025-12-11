@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix: 98_vitoconnect: asSingleValue fixed – this time for real
  - new:    59_ECOWITT_GW.pm: read weather sensor data from ECOWITT gateways
  - bugfix: 98_vitoconnect:Power reading asSingleValue finally fixed
  - new:    fhemweb_controlminidash: widget for fhemweb
