@@ -173,6 +173,7 @@
 # 6.04.5    new: add "less than an hour" to uptime reading
 #           fix: do not format incoming values als float for set power ... etc.
 # 6.04.6    add: voltmeter for ShellyPlusUni
+# 6.04.7    add: shelly1LG3, shelly2LG3
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -197,7 +198,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.04.5 03.11.2025";
+my $version = "6.04.7 11.12.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -335,6 +336,8 @@ my %shelly_vendor_ids = (
     "S3SW-001X16EU"   => ["shellyplus1",    "Shelly 1 Gen3",           0x1018],   ##new
     "S3SW-001P16EU"   => ["shellyplus1pm",  "Shelly 1PM Gen3",         0x1019],   ##new
     "S3SW-002P16EU"   => ["shellyplus2pm",  "Shelly 2PM Gen3",         0x1005],   # added 10/2024
+    "S3SW-0A1X1EUL"   => ["shelly1LG3",     "Shelly 1L Gen3",          0x1014],   # added 12/2025   two inputs
+    "S3SW-0A2X4EUL"   => ["shelly2LG3",     "Shelly 2L Gen3",          0x1013],   # added 12/2025
     "S3SN-0024X"      => ["shellyplusi4",   "Shelly i4 Gen3",          0x1812],   ## (AC), new
     "S3SN-0U12A"      => ["generic",        "Shelly H&T Gen3",         0x1809],   ## new, not yet implemented
     "S3DM-0010WW"     => ["shellyplus010v", "Shelly Dimmer 0/1-10V PM Gen3",0x1072], ## new
@@ -458,6 +461,8 @@ my %shelly_models = (
     "shellyprodual" => [0,2,0, 4,1,4,  0,0,0],
     "shellyprorgbwpm"=>[0,0,5, 5,2,5,  0,1,4],    # profiles:  light,rgbcct,cctx2,rgbx2light // not really supported yet
     #-- 3rd generation devices (Gen3)
+    "shelly1LG3"    => [1,0,0, 0,3,2,  0,0,0],    # two inputs
+    "shelly2LG3"    => [2,0,0, 0,3,2,  0,0,0],  
     "shellypmmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to ShellyPlusPM
     "shellyemG3"    => [1,0,0, 0,3,0,  2,0,0],    # similar to 'shellyproem50'
     "shelly3emG3"   => [0,0,0, 0,3,0,  3,0,2],    # similar to 'shellypro3em'
