@@ -97,6 +97,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.0.3"  => "11.12.2025  asSingleValue fixed – this time for real",
   "1.0.2"  => "08.12.2025  Power reading asSingleValue finally fixed",
   "1.0.1"  => "29.11.2025  fix power reading logging",
   "1.0.0"  => "28.11.2025  power reading fixed again",
@@ -4032,10 +4033,10 @@ sub vitoconnect_getResourceCallback {
                 }
                 
                 # Store power readings as asSingleValue
-                if ($Reading =~ m/dayValueReadAt$/) {
-                 Log(5,$name.", -call setpower $Reading");
-                 vitoconnect_getPowerLast ($hash,$name,$Reading);
-                }
+                #if ($Reading =~ m/dayValueReadAt$/) {
+                # Log(5,$name.", -call setpower $Reading");
+                # vitoconnect_getPowerLast ($hash,$name,$Reading);
+                #}
                 
                 # Get error codes from API
                 if ($Reading =~ /^device\.messages\.(\w+)\.raw\.entries$/) {
@@ -4051,6 +4052,14 @@ sub vitoconnect_getResourceCallback {
 
         readingsBulkUpdate($hash,"state","last update: ".TimeNow().""); # Reading 'state'
         readingsEndUpdate( $hash, 1 );  # Readings schreiben
+        
+        # NEU: jetzt alle relevanten Readings finden und Sub wie früher aufrufen
+        foreach my $Reading (keys %{ $hash->{READINGS} }) {
+         if ($Reading =~ m/dayValueReadAt$/) {
+           Log(4,$name.", -call setpower $Reading");
+           vitoconnect_getPowerLast($hash,$name,$Reading);
+         }
+        }
     }
     else {
         Log3($name,1,$name." - An error occured: ".$err);
@@ -4090,6 +4099,8 @@ sub vitoconnect_getPowerLast {
 
     Log3($name, 5, "$name -setpower: target=$targetReading lastTS='$readingLastTimestamp' (num=$lastTS), baseDate=".$baseDate->ymd);
 
+    readingsBeginUpdate($hash);
+    
     # Älteste -> Neueste, Index 0 (aktueller Tag) wird implizit übersprungen
     for (my $i = $#values; $i >= 1; $i--) {
         my $dayDate     = $baseDate - ($one_day * $i);   # i Tage vor baseDate
@@ -4108,7 +4119,8 @@ sub vitoconnect_getPowerLast {
             Log3($name, 4, "$name -setpower: skip (not newer) dayTS=$readingTS <= lastTS=$lastTS");
         }
     }
-
+    
+    readingsEndUpdate($hash, 1);
     return;
 }
 
