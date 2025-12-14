@@ -162,7 +162,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.0.0"  => "06.12.2025  initial implementation of neural network for consumption forecasting with AI::FANN ",
+  "2.0.0"  => "10.12.2025  initial implementation of neural network for consumption forecasting with AI::FANN ".
+                           "aiControl: more keys for aiCon... ".
+                           "edit commandRef, remove __batSaveSocKeyFigures ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
   "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ".
@@ -753,7 +755,6 @@ my %hset = (                                                                  # 
   operatingMemory           => { fn => \&_setoperatingMemory           },
   vrmCredentials            => { fn => \&_setVictronCredentials        },
   aiDecTree                 => { fn => \&_setaiDecTree                 },
-  aiNeuralNet               => { fn => \&_setaiNeuralNetwork           },
 );
 
 my %hget = (                                                                      # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
@@ -1100,6 +1101,8 @@ my %hqtxt = (                                                                # H
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Modus:&nbsp;<mode><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden} },
   dmgsig => { EN => qq{Read messages are not signaled again until a FHEM restart, but are retained if they are relevant.},
               DE => qq{Gelesene Mitteilungen werden bis zu einem FHEM Neustart nicht wieder signalisiert, bleiben bei Relevanz jedoch erhalten.}                                             },
+  nnnact => { EN => qq{the neural network for consumption forecasting is not activated \nswitch on with: attr <NAME> aiControl aiConActivate=1},
+              DE => qq{das neuronale Netz zur Verbrauchsprognose ist nicht aktiviert \neinschalten mit: attr <NAME> aiControl aiConActivate=1}                                               },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -1695,9 +1698,7 @@ my %hfspvh = (
 # $data{$name}{consumers}                                                     # Consumer Daten
 # $data{$name}{aidectree}{aitrained}                                          # AI Decision Tree trainierte Daten
 # $data{$name}{aidectree}{airaw}                                              # Rohdaten für AI Input = Raw Trainigsdaten
-# $data{$name}{neuralnet}{conweights}                                         # neuronales Netz - Wichtungen (Consumption)
-# $data{$name}{neuralnet}{conmeans}                                           # neuronales Netz - Mittelwerte pro Feature (Consumption)
-# $data{$name}{neuralnet}{constds}                                            # neuronales Netz - Standardabweichungen pro Feature (Consumption)
+# $data{$name}{neuralnet}                                                     # neuronales Netz AI::FANN
 
 # temporäre Daten die pro Zyklus neu erstellt werden:
 # $data{$name}{current}                                                       # temporärer Speicher Current Daten (enthält beim Lesen Cachefiles geladene Statusdaten)
@@ -1943,6 +1944,7 @@ sub Set {
   ## allg. gültige Setter
   #########################
   $setlist = "Unknown argument $opt, choose one of ".
+             "Select...:noArg ".
              "consumerImmediatePlanning:$coms ".
              "consumerNewPlanning:$coms ".
              "cycleInterval ".
@@ -1968,15 +1970,15 @@ sub Set {
                   ;
   }
 
-  ## KI Dectree spezifische Setter
-  ##################################
-  if ($ipai) {
-      $setlist .= "aiDecTree:addInstAndTrain,addRawData,rawDataGHIreplace ";
-  }
+  ## KI/Neuronal Network spezifische Setter
+  ###########################################
+  my @aiopt;
+  push @aiopt, 'addInstAndTrain' if($ipai);
+  push @aiopt, 'addRawData';
+  push @aiopt, 'rawDataGHIreplace';
+  push @aiopt, 'runConTrain';
   
-  ## Neuronal Network spezifische Setter
-  ########################################
-  $setlist .= "aiNeuralNet:runConTrain ";
+  $setlist .= "aiDecTree:".(join ",", @aiopt)." ";
 
   ## Batterie spezifische Setter
   ################################
@@ -1988,6 +1990,10 @@ sub Set {
   ####################################
   if ((controller($name))[2]) {
       $setlist = "operationMode:active,inactive ";
+  }
+  
+  if ($opt eq 'Select...') {
+      return "Select the action you want from the Drop-Down list";
   }
 
   my $params = {
@@ -2925,22 +2931,9 @@ sub _setaiDecTree {                   ## no critic "not used"
   elsif ($prop eq 'rawDataGHIreplace') {
       __getopenMeteoGHIreplace ($paref);
   }
-
-return;
-}
-
-################################################################
-#        Setter Neuronales Netzwerk
-################################################################
-sub _setaiNeuralNetwork {              ## no critic "not used"
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return;
-
-  if ($prop eq 'runConTrain') {
-      return "Perl Modul AI::FANN is missing. Install it first with e.g. 'cpan AI::FANN' or 'cpanm AI::FANN'" if($aifannabs);
-
-      aiNeuroNetEnterTraining ($paref);
+  elsif ($prop eq 'runConTrain') {
+      my $err = aiNeuroNetEnterTraining ($paref);
+      return $err;
   }
 
 return;
@@ -2976,6 +2969,7 @@ sub Get {
   my $str  = join ",", @vst;
 
   my $getlist = "Unknown argument $opt, choose one of ".
+                "Select...:noArg ".
                 "valBattery:#,$bal ".
                 "valConsumerMaster:#,$cml ".
                 "valInverter:#,$inl ".
@@ -3009,6 +3003,10 @@ sub Get {
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
+  
+  if ($opt eq 'Select...') {
+      return "Select the action you want from the Drop-Down list";
+  }
 
   my $t      = int time;
   my $params = {
@@ -4988,7 +4986,7 @@ sub __openMeteoDWD_ApiResponse {
               }
           }
 
-          ## Refill GHI Strahlungsdaten
+          ## (Re)fill GHI Strahlungsdaten
           ###############################
           if ($submodel eq 'HistoricalData') {
               if ($requestmode eq 'GHIREFILL') {
@@ -5056,6 +5054,10 @@ sub __openMeteoDWD_ApiResponse {
           }
 
           $k++;
+      }
+      
+      if ($submodel eq 'HistoricalData' && $requestmode eq 'GHIREFILL') {
+          debugLog ($paref, 'apiProcess', "Open-Meteo API - Number of Global Radiation GHI replaced: $nghi ".(!$nghi ? '(there may be no old values available)' : ''));
       }
 
       ## Tageswerte (Sonnenauf- und untergang)
@@ -6064,36 +6066,55 @@ sub __getaiNeuroNetConState {            ## no critic "not used"
   my $spc3  = '&nbsp;' x 3;
   my $spc6  = '&nbsp;' x 6;
   
-  my $dsnum  = AiNeuralVal ($name, 'conNumDatasets',  '-'); 
-  my $trdnum = AiNeuralVal ($name, 'conNumTraindata', '-');
-  my $tednum = AiNeuralVal ($name, 'conNumTestdata',  '-'); 
-  my $inpnum = AiNeuralVal ($name, 'conNumInputs',    '-');
-  my $hidlay = AiNeuralVal ($name, 'conHiddenLayers', '-');
-  my $outnum = AiNeuralVal ($name, 'conNumOutputs',   '-');
-  my $bstmod = AiNeuralVal ($name, 'conTrainEpoches', '-');
-  my $tramse = AiNeuralVal ($name, 'conTrainMse',     '-');
-  my $valmse = AiNeuralVal ($name, 'conValidationMse','-');
-  my $bitfai = AiNeuralVal ($name, 'conBitFail',      '-');
-  my $conmae = AiNeuralVal ($name, 'conMae',          '-');
-  my $comdae = AiNeuralVal ($name, 'conMedae',        '-');
-  my $cormse = AiNeuralVal ($name, 'conRmse',         '-');
-  my $comape = AiNeuralVal ($name, 'conMape',         '-');
-  my $codape = AiNeuralVal ($name, 'conMdape',        '-');
-  my $conr2  = AiNeuralVal ($name, 'conR2',           '-');
+  my $dsnum  = AiNeuralVal ($name, 'con', 'NumDatasets',    '-'); 
+  my $trdnum = AiNeuralVal ($name, 'con', 'NumTraindata',   '-');
+  my $tednum = AiNeuralVal ($name, 'con', 'NumTestdata',    '-'); 
+  my $inpnum = AiNeuralVal ($name, 'con', 'NumInputs',      '-');
+  my $hidlay = AiNeuralVal ($name, 'con', 'HiddenLayers',   '-');
+  my $hidste = AiNeuralVal ($name, 'con', 'HiddSteepness',  '-');
+  my $outnum = AiNeuralVal ($name, 'con', 'NumOutputs',     '-');
+  my $bstmod = AiNeuralVal ($name, 'con', 'TrainEpoches',   '-');
+  my $tramse = AiNeuralVal ($name, 'con', 'TrainMse',       '-');
+  my $valmse = AiNeuralVal ($name, 'con', 'ValidationMse',  '-');
+  my $bitfai = AiNeuralVal ($name, 'con', 'BitFail',        '-');
+  my $conmae = AiNeuralVal ($name, 'con', 'Mae',            '-');
+  my $comdae = AiNeuralVal ($name, 'con', 'Medae',          '-');
+  my $cormse = AiNeuralVal ($name, 'con', 'Rmse',           '-');
+  my $comape = AiNeuralVal ($name, 'con', 'Mape',           '-');
+  my $codape = AiNeuralVal ($name, 'con', 'Mdape',          '-');
+  my $conr2  = AiNeuralVal ($name, 'con', 'R2',             '-');
+  my $conhaf = AiNeuralVal ($name, 'con', 'HiddActFunc',    '-');
+  my $conoaf = AiNeuralVal ($name, 'con', 'OutActFunc',     '-');
+  my $retran = AiNeuralVal ($name, 'con', 'RetrainQuality', '-');
+  my $valstd = AiNeuralVal ($name, 'con', 'StdDevValidMse', '-');
+  my $valavg = AiNeuralVal ($name, 'con', 'AvgValidMse',    '-');    
+  my $attemp = AiNeuralVal ($name, 'con', 'Attempt',        '-');
+  my $shmode = AiNeuralVal ($name, 'con', 'ShuffleMode',    '-');
+  my $shperi = AiNeuralVal ($name, 'con', 'ShufflePeriod',  '-');
+  my $lrnmom = AiNeuralVal ($name, 'con', 'LearnMomentum',  '-');
+  my $lrnrte = AiNeuralVal ($name, 'con', 'LearnRate',      '-');
+   
+  $valstd = sprintf "%0.6f", $valstd if($valstd ne '-');
+  $valavg = sprintf "%0.6f", $valavg if($valstd ne '-');
+  $tramse = sprintf "%0.3f", $tramse if($valstd ne '-');
+  $valmse = sprintf "%0.3f", $valmse if($valstd ne '-');
 
   my $head  = '<h4><b><u>Informationen zum neuronalen Netz der Verbrauchsvorhersage</b></u></h4>';
   
   my $model = '<b>=== Modellparameter ===</b>'."\n\n";
   $model   .= (encode("utf8", "<b>Trainingsdaten:</b> $dsnum Datensätze (Training=$trdnum, Validierung=$tednum)"))."\n";
   $model   .= "<b>Architektur:</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum"."\n";
-  $model   .= "<b>Hyperparameter:</b> Learning Rate=0.010, Momentum=0.9, BitFail-Limit=0.35"."\n";
-  $model   .= "<b>Aktivierungen:</b> Hidden=Sigmoid, Output=Linear"."\n";
+  $model   .= "<b>Hyperparameter:</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=0.35"."\n";
+  $model   .= "<b>Aktivierungen:</b> Hidden=$conhaf, Steilheit=$hidste, Output=$conoaf"."\n";
+  $model   .= "<b>Zufallsgenerator:</b> Mode=$shmode, Periode=$shperi"."\n";
   
   my $keyfig = '<b>=== Trainingsmetriken ===</b>'."\n\n";
   $keyfig   .= "<b>bestes Modell bei Epoche:</b> $bstmod (von max. 15000)"."\n";
   $keyfig   .= "<b>Training MSE:</b> $tramse"."\n";
   $keyfig   .= "<b>Validation MSE:</b> $valmse"."\n";
   $keyfig   .= "<b>Validation Bit_Fail:</b> $bitfai"."\n";
+  $keyfig   .= "<b>bester Trainingslauf:</b> $attemp"."\n";
+  $keyfig   .= "<b>Trainingsbewertung:</b> $retran (Val MSE Standard Deviation=$valstd, Val MSE Avg=$valavg)"."\n";
   
   my $ermsr  = '<b>=== '.(encode('utf8', 'Fehlermaße der Prognosen')).' ===</b>'."\n\n";
   $ermsr    .= "<b>MAE:</b> $conmae Wh"."\n";
@@ -6113,7 +6134,7 @@ sub __getaiNeuroNetConState {            ## no critic "not used"
   my $note  = (encode('utf8', '<h4><b><u> Erläuterung der Kennzahlen </b></u></h4>'));
   $note    .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
   $note    .= $spc3.(encode('utf8', 'MSE < 0.01 → sehr gut'))."\n";
-  $note    .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → brauchbar'))."\n";
+  $note    .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → gut'))."\n";
   $note    .= $spc3.(encode('utf8', 'MSE > 0.1 → schwach'))."\n";
   $note    .= $spc3.(encode('utf8', '<b>Interpretation Verhältnis Train MSE zu Validation MSE:</b>'))."\n";
   $note    .= $spc6.(encode('utf8', 'Validation ≈ Train → gute Generalisierung'))."\n";
@@ -6166,7 +6187,7 @@ sub __getaiNeuroNetConState {            ## no critic "not used"
   $note    .= (encode('utf8', '<b>R²</b> (Bestimmtheitsmaß) → Maß für die Erklärungskraft des Modells. Je näher R² an 1 liegt, desto besser.'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² = 1.0 → perfekte Vorhersage, alle Punkte liegen exakt auf der Regressionslinie'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² > 0.8 → sehr gut - Modell erfasst den Großteil der Streuung → sehr zuverlässige Prognosen'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² = 0.6 – 0.8 → brauchbar - Modell erklärt einen soliden Teil der Varianz → brauchbar für viele Anwendungen'))."\n";
+  $note    .= $spc3.(encode('utf8', 'R² = 0.6 – 0.8 → gut - Modell erklärt einen soliden Teil der Varianz → brauchbar für viele Anwendungen'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² = 0.5–0.6 → mäßig / grenzwertig - Modell liegt knapp über „zufällig“ → Muster erkannt, Prognosen nur eingeschränkt nützlich'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² < 0.5 → schwach - Modell erklärt weniger als die Hälfte der Varianz → deutlicher Verbesserungsbedarf'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² = 0.0 → Modell erklärt gar nichts, es ist nicht besser als der Mittelwert der Daten'))."\n";
@@ -6180,7 +6201,7 @@ sub __getaiNeuroNetConState {            ## no critic "not used"
   $rs .= $model."\n";
   $rs .= $keyfig."\n";
   $rs .= $ermsr."\n";
-  $rs .=  $note;
+  $rs .= $note;
 
 return $rs;
 }
@@ -7096,9 +7117,18 @@ sub _attraiControl {                     ## no critic "not used"
   my $cmd   = $paref->{cmd};
 
   my $valid = {
-      aiStorageDuration => { comp => '\d+',                        act => 0 },
-      aiTrainStart      => { comp => '(1?[1-9]|10|2[0-3])',        act => 0 },
-      aiTreesPV         => { comp => '(1?[1-9]|10|[2-4][0-9]|50)', act => 0 },
+      aiStorageDuration  => { comp => '\d+',                                               act => 0 },
+      aiTrainStart       => { comp => '(1?[1-9]|10|2[0-3])',                               act => 0 },
+      aiTreesPV          => { comp => '(1?[1-9]|10|[2-4][0-9]|50)',                        act => 0 },
+      aiConActivate      => { comp => '(0|1)',                                             act => 0 },
+      aiConHiddenLayers  => { comp => '(?:[1-9]\d{1,2}-[1-9]\d{1,2}(?:-[1-9]\d{1,2})?)',   act => 0 },
+      aiConTrainAlgo     => { comp => '(RPROP|INCREMENTAL)',                               act => 0 },
+      aiConLearnRate     => { comp => '(0\.01|0\.05|0\.001|0\.005)',                       act => 0 },
+      aiConMomentum      => { comp => '(0\.[2-9])',                                        act => 0 },
+      aiConShuffleMode   => { comp => '[0-2]',                                             act => 0 },
+      aiConShufflePeriod => { comp => '(10|15|20|25|30)',                                  act => 0 },
+      aiConActFunc       => { comp => '(SIGMOID|SIGMOID_SYMMETRIC)',                       act => 0 },
+      aiConSteepness     => { comp => '(0\.[1-9]|1\.0)',                                   act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -8792,17 +8822,17 @@ sub readCacheFile {
           $data{$name}{neuralnet} = $net;
           
           if (!$aifannabs) {
-              my $blob    = $data{$name}{neuralnet}{conFannBlob};                                 # String aus Hash holen und zurückschreiben in temporäre Datei
+              my $blob    = $data{$name}{neuralnet}{con}{FannBlob};                                 # String aus Hash holen und zurückschreiben in temporäre Datei
               my $tmpfile = $neuralnet.'fannmodel_'.$name; 
               
               if (defined $blob) { $err = write_blob ($tmpfile, $blob); } 
               else               { $err = $hqtxt{aifane}{$lang}; }              
               
               if (!$err) {
-                  delete $data{$name}{neuralnet}{conFannModel};                                   # evtl. altes Modell löschen
-                  $data{$name}{neuralnet}{conFannModel} = AI::FANN->new_from_file ($tmpfile);     # im Hash ablegen für direkten Zugriff
+                  delete $data{$name}{neuralnet}{con}{FannModel};                                   # evtl. altes Modell löschen
+                  $data{$name}{neuralnet}{con}{FannModel} = AI::FANN->new_from_file ($tmpfile);     # im Hash ablegen für direkten Zugriff
                   
-                  if ( eval { $data{$name}{neuralnet}{conFannModel}->MSE(); 1 } ) {
+                  if ( eval { $data{$name}{neuralnet}{con}{FannModel}->MSE(); 1 } ) {
                       $data{$name}{current}{neuralNetConTrainstate} = 'ok';
                       Log3 ($name, 3, qq{$name - cached data "$title" restored});
                   }
@@ -9357,7 +9387,7 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ########################################################################################################################
-  #for my $hodc (25..38) {
+  #for my $hodc (1..9) {
   #    delete $data{$name}{circular}{$hodc};
   #}
 
@@ -9376,7 +9406,8 @@ sub centralTask {
       $bn = sprintf "%02d", $bn;
       readingsDelete ($hash, 'Battery_ChargeRecommended_'.$bn);
   }
-
+  
+  #Log3 ($name, 1, "$name - Circular: \n".Dumper $data{$name}{circular}) if($name eq 'openMeteo');
   ##########################################################################################################################
 
   if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -9451,8 +9482,7 @@ sub centralTask {
   _batChargeMgmt              ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
 
-  _calcConsForecast_circular  ($centpars);                                            # neue Verbrauchsprognose über pvCircular
-  aiNeuroNetGetConResult      ($centpars);                                            # Verbrauchsprognose via neuronales Netz
+  _calcConsForecast           ($centpars);                                            # Verbrauchsprognose
   
   _evaluateTrigger            ($centpars);                                            # Schwellenwerte der Trigger bewerten und signalisieren
   _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
@@ -11856,17 +11886,29 @@ sub _batSocTarget {
       my $ltsmsr    = CircularVal ($name, 99, 'lastTsMaxSocRchd'.$bn, undef);
       my $soc       = BatteryVal  ($name, $bn, 'bcharge',                 0);                   # aktuelle Ladung in %
 
-      $paref->{batnmb}    = $bn;
-      $paref->{careCycle} = $careCycle;
-      $paref->{soc}       = $soc;
-      $paref->{maxSoc}    = $maxSoc;
+      #$paref->{batnmb}    = $bn;
+      #$paref->{careCycle} = $careCycle;
+      #$paref->{soc}       = $soc;
+      #$paref->{maxSoc}    = $maxSoc;
+       
+      if (!$ltsmsr || $soc >= $maxSoc) {
+          $data{$name}{circular}{99}{'lastTsMaxSocRchd'.$bn} = $t;                              # Timestamp des letzten Erreichens von >= maxSoC
+          $data{$name}{circular}{99}{'nextTsMaxSocChge'.$bn} = $t + (86400 * $careCycle);       # Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
+      }
+      
+      if ($oldd2care < 0) {
+          $data{$name}{circular}{99}{'nextTsMaxSocChge'.$bn} = $t;
+      } 
+      
+      #if (!$ltsmsr || $soc >= $maxSoc || $oldd2care < 0) {
+      #__batSaveSocKeyFigures ($paref);
+      #    $data{$name}{circular}{99}{'days2care'.$bn} = $paref->{days2care};                    # verbleibende Tage bis zum Pflege-SoC erreicht werden soll
+      #}
 
-      __batSaveSocKeyFigures ($paref) if(!$ltsmsr || $soc >= $maxSoc || $oldd2care < 0);
-
-      delete $paref->{batnmb};
-      delete $paref->{careCycle};
-      delete $paref->{soc};
-      delete $paref->{maxSoc};
+      #delete $paref->{batnmb};
+      #delete $paref->{careCycle};
+      #delete $paref->{soc};
+      #delete $paref->{maxSoc};
 
       my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
       my $target     = $lowSoc;
@@ -11878,7 +11920,8 @@ sub _batSocTarget {
       $target = $batymaxsoc <  $maxSoc ? $batysetsoc + $stepSoc :
                 $batymaxsoc >= $maxSoc ? $batysetsoc - $stepSoc :
                 $batysetsoc;                                                                    # neuer Min SOC für den laufenden Tag
-
+      $target = min (100, $target);
+      
       ## erwartete PV ermitteln & Anteilsfaktor Bat anwenden
       ########################################################
       my $pvfctm   = ReadingsNum ($name, 'Tomorrow_PVforecast', 0);                             # PV Prognose morgen
@@ -11898,6 +11941,7 @@ sub _batSocTarget {
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> tomorrow -> PV fc: $pvfctm Wh, con till sunset: $constm Wh, Surp: $surptm Wh (".(PERCCONINSOC * 100)."% con)");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> selected energy for charging (the higher positive Surp value from above): $pvexpraw Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> expected energy for charging after application Share factor: $pvexpect Wh");
+          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> specified maxSoC: $maxSoc %");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - compare with SoC history -> preliminary new Target: $target %");
       }
 
@@ -11912,24 +11956,25 @@ sub _batSocTarget {
       my $careSoc = $target;
 
       my $ntsmsc    = CircularVal ($name, 99, 'nextTsMaxSocChge'.$bn, $t);
-      my $days2care = floor       (($ntsmsc - $t) / 86400);                                    # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
+      my $days2care = max (0, floor (($ntsmsc - $t) / 86400));                                 # verbleibende Tage bis der Batterie Pflege-SoC (default 95%) erreicht sein soll
       my $docare    = 0;                                                                       # keine Zwangsanwendung care SoC
 
       my $whneed    = ($maxSoc / 100 * $batinstcap) - ($soc / 100 * $batinstcap);              # benötigte Ladeenergie in Wh bis $maxSoc
       $whneed       = sprintf "%.0f", max (0, $whneed);
 
       if ($t > $delayts || $pvexpect < $whneed || !$days2care) {
-          $paref->{batnmb}    = $bn;
-          $paref->{days2care} = $days2care;
-          $paref->{soc}       = $soc;
-          $paref->{maxSoc}    = $maxSoc;
+          #$paref->{batnmb}    = $bn;
+          #$paref->{days2care} = $days2care;
+          #$paref->{soc}       = $soc;
+          #$paref->{maxSoc}    = $maxSoc;
+          
+          $data{$name}{circular}{99}{'days2care'.$bn} = $days2care;                            # verbleibende Tage bis zum Pflege-SoC erreicht werden soll
+          #__batSaveSocKeyFigures ($paref);
 
-          __batSaveSocKeyFigures ($paref);
-
-          delete $paref->{days2care};
-          delete $paref->{batnmb};
-          delete $paref->{soc};
-          delete $paref->{maxSoc};
+          #delete $paref->{days2care};
+          #delete $paref->{batnmb};
+          #delete $paref->{soc};                                                                
+          #delete $paref->{maxSoc};
 
           $careSoc = $maxSoc - ($days2care * $stepSoc);                                        # Pflege-SoC um rechtzeitig den $maxsoc zu erreichen bei $stepSoc % Steigerung pro Tag
           $careSoc = $careSoc < $lowSoc ? $lowSoc : $careSoc;
@@ -12050,31 +12095,6 @@ sub __parseAttrBatSoc {
   };
 
 return $parsed;
-}
-
-################################################################
-#          Batterie Kennzahlen speichern
-################################################################
-sub __batSaveSocKeyFigures {
-  my $paref     = shift;
-  my $name      = $paref->{name};
-  my $bn        = $paref->{batnmb};                                                       # Batterienummer (01, 02, ...)
-  my $t         = $paref->{t};                                                            # aktuelle Zeit
-  my $careCycle = $paref->{careCycle};
-  my $days2care = $paref->{days2care};
-  my $soc       = $paref->{soc}    // 0;
-  my $maxSoc    = $paref->{maxSoc} // 100;
-
-  if (defined $days2care) {
-      $data{$name}{circular}{99}{'days2care'.$bn} = $paref->{days2care};                  # verbleibende Tage bis zum Pflege-SoC erreicht werden soll
-  }
-
-  if (defined $careCycle && $soc >= $maxSoc) {
-      $data{$name}{circular}{99}{'lastTsMaxSocRchd'.$bn} = $t;                            # Timestamp des letzten Erreichens von >= maxSoC
-      $data{$name}{circular}{99}{'nextTsMaxSocChge'.$bn} = $t + (86400 * $careCycle);     # Timestamp bis zu dem die Batterie mindestens einmal maxSoC erreichen soll
-  }
-
-return;
 }
 
 ################################################################
@@ -15133,6 +15153,29 @@ return ($simpCstat, $starttime, $stoptime, $supplmnt);
 }
 
 ################################################################
+# Auswahl welches Modell die Verbrauchsprognose bereitstellt
+################################################################
+sub _calcConsForecast {                  ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+
+  debugLog ($paref, 'consumption|consumption_long', "################### Start Consumption forecast ###################");  
+  my ($rdy, $cause) = _aiNeuroNetConModelReady ($name);
+  
+  if ($rdy) {                                                                        # NN Verbrauch ist ready to use
+      aiNeuroNetGetConsResult ($paref);                                              # Verbrauchsprognose via neuronales Netz
+      return;
+  }
+  else {
+      debugLog ($paref, 'aiData|consumption_long', "The Neural Network for consumption forecast is not ready. Use legacy procedure ...");
+  }   
+  
+  _calcConsForecast_circular ($paref);                                               # legacy Verbrauchsprognose
+
+return;
+}
+
+################################################################
 #     Energieverbrauch Vorhersage kalkulieren (Median)
 ################################################################
 sub _calcConsForecast_circular {
@@ -15159,7 +15202,7 @@ sub _calcConsForecast_circular {
   my (@cona, $exconfc, $csme, %usage);
   $usage{tom}{con} = 0;
 
-  debugLog ($paref, 'consumption|consumption_long', "################### Start Consumption forecast ###################");
+  #debugLog ($paref, 'consumption|consumption_long', "################### Start Consumption forecast ###################");
   debugLog ($paref, 'consumption_long', "Basics - installed locale: ".LOCALE_TIME.", used scheme: $lct");
   debugLog ($paref, 'consumption_long', "Need number of stored days: $ncds, Number of days in History: $nhist => can calculate excludes/includes: ".($ncds <= $nhist ? 'yes' : 'no'));
 
@@ -15968,7 +16011,7 @@ sub _saveEnergyConsumption {
       writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $hod } );
       $data{$name}{circular}{99}{todayConsumption} = HistoryVal ($name, $day, '99', 'con', undef);
 
-      debugLog ($paref, 'consumption', "consumption calculated - day: $day, hod: $hod, con: $con Wh");
+      debugLog ($paref, 'consumption', "consumption since begin hour - day: $day, hod: $hod, con: $con Wh");
       debugLog ($paref, 'saveData2Cache|consumption', "write pvCircular consumption - hod: 99, todayConsumption: ".HistoryVal ($name, $day, '99', 'con', 'undef')." Wh");
   }
 
@@ -17578,10 +17621,11 @@ sub __createAiNNicon {
   my $name     = $paref->{name};
   my $lang     = $paref->{lang};
 
-  my $hash     = $defs{$name};
-  my $nntst    = CurrentVal  ($name, 'neuralNetConTrainstate', undef);
+  my $nntst    = CurrentVal ($name, 'neuralNetConTrainstate', undef);
+  my $aiconact = CurrentVal ($name, 'aiConActivate', 0);
 
-  my $nntit = !defined $nntst               ? $hqtxt{nnnini}{$lang} :   
+  my $nntit = !$aiconact                    ? $hqtxt{nnnact}{$lang} : 
+              !defined $nntst               ? $hqtxt{nnnini}{$lang} :
               $nntst eq 'is just retrained' ? $hqtxt{nncoit}{$lang} :
               $nntst eq 'ok'                ? $hqtxt{nncodw}{$lang} :
               q{};
@@ -17593,7 +17637,8 @@ sub __createAiNNicon {
   $ntf    = $hqtxt{nnlatr}{$lang}.' '.($ntf ? (timestampToTimestring ($ntf, $lang))[0] : '-');
   $nrt    = $hqtxt{nnlgrt}{$lang}.' '.($nrt ? ($nrt * 1000).' ms' : '-');
 
-  my $nnimg  = !defined $nntst               ? '-' : 
+  my $nnimg  = !$aiconact                    ? '-' : 
+               !defined $nntst               ? '-' :               
                $nntst eq 'is just retrained' ? FW_makeImage ('10px-kreis-gelb.png',  $hqtxt{nncoit}{$lang}.' &#10;'.$ntf) : 
                $nntst eq 'ok'                ? FW_makeImage ('10px-kreis-gruen.png', $hqtxt{nncodw}{$lang}.' &#10;'.$ntf.' &#10;'.$nrt) :
                FW_makeImage ('10px-kreis-rot.png', $nntst);
@@ -21172,12 +21217,16 @@ sub aiNeuroNetEnterTraining {
   my $paref = shift;
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
+  
+  return "Perl Modul AI::FANN is missing. Install it first with e.g. 'cpan AI::FANN' or 'cpanm AI::FANN'" if($aifannabs);
+  return "The neural network for consumption forecasting is not activated. \n".
+          "You can activate this AI with 'attr $name aiControl aiConActivate=1'. "  if(!CurrentVal ($name, 'aiConActivate', 0));
 
   delete $hash->{HELPER}{AINNTRAINBLOCKRUN} if(defined $hash->{HELPER}{AINNTRAINBLOCKRUN}{pid} && $hash->{HELPER}{AINNTRAINBLOCKRUN}{pid} =~ /DEAD/xs);
 
   if (defined $hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}) {
       Log3 ($name, 3, qq{$name - another Neural Netwwork Training for Consumption Forecast with PID "$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}" is already running ... start Training aborted});
-      return;
+      return "another Neural Netwwork Training for Consumption Forecast is already running";
   }
 
   $hash->{HELPER}{AINNTRAINBLOCKRUN} = BlockingCall ( "FHEM::SolarForecast::aiNeuroNetCreateTrainData",
@@ -21203,14 +21252,35 @@ return;
 ################################################################
 sub aiNeuroNetCreateTrainData {
   my $paref = shift;
-  my $name  = $paref->{name};           
+  my $name  = $paref->{name}; 
+  my $debug = $paref->{debug};  
 
-  my $cst = [gettimeofday];                                                              # Training Startzeit
-  my $serial;
-  my @training_data;
-  my (@temps, @wccs, @rr1cs, @pvrls);                                                    # Arrays für Min-Max Normalisierungsdaten
-  my @targets;
+  my $cst = [gettimeofday];                                                               # Training Startzeit
+  my (@training_data, @targets);
+  my (@temps, @wccs, @rr1cs, @pvrls);                                                     # Arrays für Min-Max Normalisierungsdaten
+  my (@lag1_values, @lag2_values, @delta_values, @register);                              # Lag + Delta-Features
+  
+  # einstellbare Parameter
+  ##########################
+  my $hidden_layers     = CurrentVal ($name, 'aiConHiddenLayers', '64-32-16');            # Hidden Layers in String Notation (64-32), (50-25), (64-32-16)
+  my $hidden_steepness  = CurrentVal ($name, 'aiConSteepness',           0.5);            # Empfindlichkeit der Neuronen. Niedrigere Werte glätten, höhere Werte schärfen
+  my $learning_rate     = CurrentVal ($name, 'aiConLearnRate',         0.005);            # Lernrate: zu klein → Netz kommt nicht aus dem Bias‑Plateau, zu groß -> Overshooting (0.01, 0.005)
+  my $learning_momentum = CurrentVal ($name, 'aiConMomentum',            0.7);            # Momentum (0.8, 0.9)
+  my $shuffle_mode      = CurrentVal ($name, 'aiConShuffleMode',           1);            # 0 = chronologisch, 1 = chronologischer Split und AI::FANN internes shuffle, 2 = shuffle vor dem Split und AI::FANN internes shuffle
+  my $talgo             = CurrentVal ($name, 'aiConTrainAlgo', 'INCREMENTAL');            # Trainingsalgorithmus (RPROP INCREMENTAL)
+  my $shuffle_period    = CurrentVal ($name, 'aiConShufflePeriod',        20);            # bei shuffle_mode -> alle X Epochen Trainingsdaten AI::FANN intern neu mischen
+  my $haf               = CurrentVal ($name, 'aiConActFunc',       'SIGMOID');            # Hidden Activation Function
+  my $oaf               = 'LINEAR';                                                       # Output Activation Function 
+  my $mse_error         = 0.001;                                                          # gewünschter Fehler (MSE-Schwelle)
+  my $maxRtyRetrain     = 3;                                                              # max. Trainingsretries bei Status "Retrain"
+  my $maxRtyBorderline  = 1;                                                              # max. Trainingsretries bei Status "Borderline"
+  
+  my $range  = $haf eq 'SIGMOID'           ? '01'  :
+               $haf eq 'SIGMOID_SYMMETRIC' ? '-11' :
+               undef;
 
+  # Trainingsdaten zusammenstellen
+  ##################################
   for my $idx (sort keys %{$data{$name}{aidectree}{airaw}}) {
       next if(!$idx || $idx !~ /^\d+$/xs);
 
@@ -21225,6 +21295,8 @@ sub aiNeuroNetCreateTrainData {
       my $month             = int (substr ($idx, 4, 2));                                # Monat aus Index extrahieren und numerisch wandeln (1..12)
       my $weekday           = defined $rec->{nod} ? $hwdmap{$rec->{nod}} : 0;           # Wochentag numerisch (1..7)                   
       my $hod               = int ($rec->{hod});                                        # Stunde des Tages numerisch (1..24)
+      my $hour_norm         = ($hod / 24);                                              # Stunde des Tages normiert 0..1
+      my $noon              = ($hod >= 12 && $hod < 14) ? 1 : 0;                        # Mittags-Flag
       my $sunaz             = $rec->{sunaz}  // 0;
       my $sunalt            = $rec->{sunalt} // 0;
       my $rr1c              = $rec->{rr1c}   // 0;
@@ -21234,16 +21306,25 @@ sub aiNeuroNetCreateTrainData {
       my $temp              = defined $rec->{temp} ? int ($rec->{temp}) : 0;      
       my $isday             = $sunalt > 0 ? 1 : 0;
       
-      # zyklische Daten
+      # Lag-Features & Differenzen
+      my ($con_t_minus1, $con_t_minus2) = _aiNeuroNetLagRegister ($con, \@register);
+      my $delta                         = $con - $con_t_minus1;
+      push @lag1_values,  $con_t_minus1;          
+      push @lag2_values,  $con_t_minus2;
+      push @delta_values, $delta; 
+      
+      # zyklische und -1|0..1 normierte Daten
       my @inputs = (
-          _aiNeuroNetEncodeCyclic ($month,  12),                                       # Monat, zyklische Struktur (Dezember <-> Januar)    
-          _aiNeuroNetEncodeCyclic ($hod,    24),                                       # Stunde des Tages zyklisch
-          _aiNeuroNetEncodeCyclic ($weekday, 7),                                       # Wochentag in zyklischer Struktur (0..6)
-          _aiNeuroNetEncodeCyclic ($sunaz, 360),                                       # Sonnenazimut zyklisch 
+          _aiNeuroNetEncodeCyclic ($month,  12, $range),                               # Monat, zyklische Struktur (Dezember <-> Januar)    
+          _aiNeuroNetEncodeCyclic ($hod,    24, $range),                               # Stunde des Tages zyklisch
+          _aiNeuroNetEncodeCyclic ($weekday, 7, $range),                               # Wochentag in zyklischer Struktur (0..6)
+          _aiNeuroNetEncodeCyclic ($sunaz, 360, $range),                               # Sonnenazimut zyklisch 
           $isday,                                                                      # Tag / Nacht (0|1)
+          $hour_norm,                                                                  # Stunde des Tages normiert 0..1
+          $noon,                                                                       # Mittagsflag                                                   
           ($isday  ? $hod / 24 : 0),                                                   # Tagstunden normiert, sonst 0
           (!$isday ? $hod / 24 : 0),                                                   # Nachtstunden normiert, sonst 0
-          _aiNeuroNetNormSunalt ($sunalt),                                             # Sonnenaltitude normalisieren im Bereich 0..+1
+          _aiNeuroNetNormSunalt ($sunalt, $range),                                     # Sonnenaltitude normalisieren im Bereich 0..+1
       );
       
       # Daten für Min-Max Normierung
@@ -21266,6 +21347,13 @@ sub aiNeuroNetCreateTrainData {
   my ($rr1c_norm,  $rr1min, $rr1max) = _aiNeuroNetNormalizeMinMax (\@rr1cs);
   my ($pvrl_norm,  $pvrmin, $pvrmax) = _aiNeuroNetNormalizeMinMax (\@pvrls); 
   
+  my ($lag1_norm,  $lag1min,  $lag1max)  = _aiNeuroNetNormalizeMinMax (\@lag1_values);
+  my ($lag2_norm,  $lag2min,  $lag2max)  = _aiNeuroNetNormalizeMinMax (\@lag2_values);
+  
+  my ($delta_norm, $deltamin, $deltamax) = ($haf eq 'SIGMOID_SYMMETRIC')
+                                           ? _aiNeuroNetNormalizeMinMaxSymmetric (\@delta_values)
+                                           : _aiNeuroNetNormalizeMinMax (\@delta_values);
+  
   for my $i (0 .. $#$temps_norm) {                                                     # Zusammenführen ins Training
       push @{ $training_data[$i] }, ( $temps_norm->[$i],
                                       $wcc_norm->[$i],
@@ -21279,23 +21367,39 @@ sub aiNeuroNetCreateTrainData {
   my @flat_targets                 = map { $_->[0] } @targets;                          # Flaches Array mit allen Zielwerten erzeugen
   my ($norm_ref, $conmin, $conmax) = _aiNeuroNetNormalizeMinMax (\@flat_targets);
   my @targets_norm                 = map { [$_] } @$norm_ref;                           # norm_ref ist ein Arrayref mit Zahlen
- 
-  # Übergabe
-  ############  
+     
+  # Fehlerrückgabe
+  ##################  
   if (!scalar @training_data) {
-      $serial = encode_base64 (Serialize ( { name                    => $name,
-                                             aiNeuroNetConTrainstate => "aiNeuroNetConTraining not performed due to no Raw data",
-                                           }
-                                         ), "");
+      my $serial = encode_base64 (Serialize ( { name                   => $name,
+                                                neuralNetConTrainstate => "aiNeuroNetConTraining not performed due to no Raw data",
+                                              }
+                                            ), "");
 
       return $serial;
   }
 
-  $paref->{cst}   = $cst;
+  # Übergabe
+  ############
+  $paref->{cst}    = $cst;
   $paref->{trdref} = \@training_data;
   $paref->{trgref} = \@targets_norm;
-  $paref->{conmin} = $conmin;
-  $paref->{conmax} = $conmax;
+  
+  $paref->{hidden_layers}     = $hidden_layers;
+  $paref->{hidden_steepness}  = $hidden_steepness;
+  $paref->{mse_error}         = $mse_error;
+  $paref->{learning_rate}     = $learning_rate;
+  $paref->{learning_momentum} = $learning_momentum;
+  $paref->{shuffle_mode}      = $shuffle_mode;
+  $paref->{shuffle_period}    = $shuffle_period;
+  $paref->{maxRtyRetrain}     = $maxRtyRetrain;
+  $paref->{maxRtyBorderline}  = $maxRtyBorderline;
+  $paref->{talgo}             = $talgo;
+  $paref->{haf}               = $haf;
+  $paref->{oaf}               = $oaf;
+  
+  $paref->{minval} = $conmin;
+  $paref->{maxval} = $conmax;
   $paref->{tmpmin} = $tmpmin;
   $paref->{tmpmax} = $tmpmax;
   $paref->{wccmin} = $wccmin;
@@ -21305,21 +21409,122 @@ sub aiNeuroNetCreateTrainData {
   $paref->{pvrmin} = $pvrmin;
   $paref->{pvrmax} = $pvrmax;
   
-  $serial = aiNeuroNetTrain ($paref);
+  my $serial = aiNeuroNetTrainstartAndRetry ($paref);
+
+return $serial;
+}
+
+################################################################
+# Training anstarten und qualitätsgesteuert ggf.
+# mehrfach ausführen - das beste Trainingsergebnis finalisieren
+################################################################
+sub aiNeuroNetTrainstartAndRetry {
+  my $paref = shift;
+  my $name  = $paref->{name}; 
+  my $debug = $paref->{debug};  
   
-  delete $paref->{conmin};
-  delete $paref->{conmax};
-  delete $paref->{tmpmin};
-  delete $paref->{tmpmax};
-  delete $paref->{wccmin};
-  delete $paref->{wccmax};
-  delete $paref->{rr1min};
-  delete $paref->{rr1max};
-  delete $paref->{pvrmin};
-  delete $paref->{pvrmax};
-  delete $paref->{tdref};
-  delete $paref->{trgref};
-  delete $paref->{cst};
+  #########################################################################################################
+  # mögliche Templates:
+  # -------------------
+  # 1. Architektur: 50-25    
+  #    Lernrate/Momentum: 0.01 / 0.9
+  #    Shuffling: Chronologischer Split, Shuffle jede Epoche
+  #    Erwartung: Baseline; stabile Konvergenz, ggf. Bias‑Plateaus (das Training „steht“ auf einem Plateau)
+  #
+  # 2. Architektur: 64-32   
+  #    Lernrate/Momentum: 0.01 / 0.8
+  #    Shuffling: Block-Shuffle nur im Trainingsfenster (shuffle_mode=1)
+  #    Trainingsalgorithmus: INCREMENTAL
+  #    Erwartung: Etwas mehr Kapazität (Netz hat durch mehr Neuronen/Layer mehr Freiheitsgrade, also 
+  #               mehr Parameter), bessere Muster, moderates Overfitting-Risiko
+  #
+  # 3. Architektur: 64-32-16   
+  #    Lernrate/Momentum: 0.005 / 0.8
+  #    Shuffling: Segment-Shuffle (DoW/Hour) im Training
+  #    Trainingsalgorithmus: INCREMENTAL
+  #    Erwartung: Tiefer (Netzwerk mit mehr Layern), vorsichtiger LR (bei tieferen Netzen muss die 
+  #               Lernrate kleiner gewählt werden); gute Feinmuster (tiefe Netze können subtile, 
+  #               nichtlineare Zusammenhänge besser erfassen), nur bei genug Daten
+  #
+  # 3. Architektur: 64-32 (RPROP)   
+  #    Lernrate/Momentum: – / –
+  #    Shuffling: Chronologischer Split, Shuffle jede Epoche
+  #    Erwartung: Oft stabiler Schritte, weniger Tuning, gute Generalisierung
+  #
+  #########################################################################################################
+
+  # Training starten
+  #################### 
+  my $retref = aiNeuroNetTrain ($paref);
+  
+  # Retry prüfen und ggf. ausführen
+  ###################################
+  my $neuralNetConTrainstate = $retref->{neuralNetConTrainstate};
+  my $retrainQuality         = $retref->{neuralNetConRetrainQuality}; 
+  my $attempt                = $retref->{neuralNetConAttempt}; 
+  my $r2                     = $retref->{neuralNetConR2};       
+  my $seed                   = $retref->{neuralNetConSeed};               
+  my $best_val_mse           = sprintf "%0.3f", $retref->{neuralNetConBestValMse};
+
+  if ($neuralNetConTrainstate eq 'ok') {
+      my $best_val_mse_final = $best_val_mse;  
+      my $best_seed          = $seed;
+      my $best_attempt       = $attempt;
+      my $best_r2            = $r2;
+
+      if ($retrainQuality eq "Retrain" || $retrainQuality eq "Borderline") {
+          my $max_retries = $retrainQuality eq "Retrain" ? $paref->{maxRtyRetrain} : $paref->{maxRtyBorderline};                  
+
+          for my $rt (1 .. $max_retries) {
+              my $new_seed = time() + $rt;
+              srand ($new_seed);
+
+              $retref = aiNeuroNetTrain ({ %$paref, seed => $new_seed, attempt => $rt });
+              
+              $attempt          = $retref->{neuralNetConAttempt};
+              my $retry_r2      = $retref->{neuralNetConR2};
+              my $retry_val_mse = sprintf "%0.3f", $retref->{neuralNetConBestValMse};             
+              
+              if ($retry_val_mse < $best_val_mse_final ||
+                  ($retry_val_mse == $best_val_mse_final && $retry_r2 > $best_r2) ) {        # bestes Modell auswählen
+                  
+                  $best_val_mse_final = $retry_val_mse;
+                  $best_r2            = $retry_r2;
+                  $best_seed          = $new_seed;
+                  $best_attempt       = $attempt;
+              }
+          }
+
+          if ($debug =~ /aiProcess/xs) {
+              Log3 ($name, 1, "$name DEBUG> Best model after retries comes from Attempt=$best_attempt with Seed=$best_seed, Val MSE=$best_val_mse_final");
+          }      
+      } 
+      else {
+          Log3 ($name, 1, "$name DEBUG> Training accepted - no retry needed") if($debug =~ /aiProcess/xs);
+      }  
+      
+      # Rückgabe vorbereiten: bestes Modell übernehmen
+      ##################################################
+      $data{$name}{neuralnet}{con} = ();
+      $data{$name}{neuralnet}{con} = $data{$name}{contemp}{$best_attempt}; 
+      $data{$name}{contemp}        = ();
+      
+      delete $data{$name}{contemp};
+
+      my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
+
+      if ($err) {
+          $retref->{neuralNetConTrainstate} = $err;
+          Log3 ($name, 1, "$name - ERROR while writing file: ".$neuralnet.$name);
+      }
+      else {
+          if ($debug =~ /aiProcess/xs) {
+              Log3 ($name, 1, "$name DEBUG> Neural Netwwork training data successfuly written to file: ".$neuralnet.$name);
+          }     
+      }  
+  }
+  
+  my $serial = encode_base64 ( Serialize ($retref), "");
 
 return $serial;
 }
@@ -21328,26 +21533,41 @@ return $serial;
 #            Neuronales Netz trainieren
 ################################################################
 sub aiNeuroNetTrain {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $tdref  = $paref->{trdref};                  # Arrayref Trainingsdaten
-  my $trgref = $paref->{trgref};                  # Arrayref Zielwert(e)
-  my $minval = $paref->{conmin}; 
-  my $maxval = $paref->{conmax}; 
-  my $cst    = $paref->{cst};                     # Train Startzeit
-  my $debug  = $paref->{debug};
+  my $paref             = shift;
+  my $name              = $paref->{name};
+  my $tdref             = $paref->{trdref};                                      # Arrayref Trainingsdaten
+  my $trgref            = $paref->{trgref};                                      # Arrayref Zielwert(e)
   
-  # Parameter
-  #############   
-  my $hidden_layers             = '50-25';                                       # Hidden Layers in String Notation
-  my @num_hidden                = map {$_} (split '-', $hidden_layers);          # Hidden Neuronen Layer Array
+  my $hidden_layers     = $paref->{hidden_layers};
+  my $mse_error         = $paref->{mse_error};
+  my $learning_rate     = $paref->{learning_rate};
+  my $learning_momentum = $paref->{learning_momentum};
+  my $hidden_steepness  = $paref->{hidden_steepness};                            # bestimmt, wie schnell die Aktivierungsfunktion von ihrem Minimum zum Maximum wechselt, Standard: 0.5
+  my $shuffle_mode      = $paref->{shuffle_mode};
+  my $shuffle_period    = $paref->{shuffle_period};
+  my $haf               = $paref->{haf};
+  my $oaf               = $paref->{oaf};
+  my $talgo             = $paref->{talgo};
+  my $seed              = $paref->{seed}    // time();                           # Seed setzen (falls übergeben, sonst Standardwert)
+  my $attempt           = $paref->{attempt} // 0;                                # Nummer des Durchlaufs
+  
+  my $minval            = $paref->{minval}; 
+  my $maxval            = $paref->{maxval};
+  my $tmpmin            = $paref->{tmpmin};
+  my $tmpmax            = $paref->{tmpmax};
+  my $wccmin            = $paref->{wccmin};
+  my $wccmax            = $paref->{wccmax};
+  my $rr1min            = $paref->{rr1min};
+  my $rr1max            = $paref->{rr1max};
+  my $pvrmin            = $paref->{pvrmin};
+  my $pvrmax            = $paref->{pvrmax};  
+  my $cst               = $paref->{cst};                                         # Train Startzeit
+  my $debug             = $paref->{debug};
+  
+  # feste Parameter
+  ###################
   my $num_epoch                 = 15000;                                         # max. Anzahl Epochen
   my $patience                  = int ($num_epoch / 5);                          # Schwelle Anzahl Epochen ohne Verbesserung für Early Stopping
-  my $mse_error                 = 0.001;                                         # gewünschter Fehler (MSE-Schwelle)
-  my $learning_rate             = 0.01;                                          # Lernrate: zu klein → Netz kommt nicht aus dem Bias‑Plateau, zu groß -> Overshooting
-  my $learning_momentum         = 0.9;
-  my $shuffle_data              = 0;                                             # 1 = shuffle, 0 = chronologisch
-  my $shuffle_period            = 200;                                           # alle X Epochen Trainingsdaten neu mischen
   my $model_save_threshold      = 0.01;                                          # Modell nur speichern wenn unter Fehlerschwelle 
   my $num_epoch_between_statmsg = 0;                                             # Anzahl der Epochen zwischen Statusmeldungen
   $num_epoch_between_statmsg    = 100 if($debug =~ /aiProcess/xs);
@@ -21356,7 +21576,53 @@ sub aiNeuroNetTrain {
   my $best_train_mse            = 1e9;
   my $best_train_epoch          = 1e9;
   my $training_portion          = 0.8;
-  my $snapshot                  = $neuralnet.'best_model_'.$name;      
+  my $window                    = 50;                                            # Anzahl der letzten Epochen für Stabilitätscheck
+  my $snapshot                  = $neuralnet.'best_model_'.$name;   
+  
+  my @hiddlays                  = map {$_} (split '-', $hidden_layers);          # Hidden Neuronen Layer Array
+  my $num_hidddenlays           = scalar (@hiddlays);
+                                          
+  srand($seed);                                                                  # Trick: Beim Erzeugen eines Netzes (new_standard) werden die Gewichte der Neuronen zufällig initialisiert.
+                                                                                 # Diese Zufallswerte kommen aus dem globalen Zufallszahlengenerator der Laufzeitumgebung (C/Perl).
+                                                                                 # Wenn man vorher srand($seed) setzt, bestimmt man den Startzustand dieses Generators
+                                                                                 # Startgewichte beeinflussen, wie schnell und wohin das Netz konvergiert                                                                                
+
+  # AI::FANN Aktivierungsfunktionen
+  ###################################
+  my %af_map = (                                                                        
+      LINEAR                     => AI::FANN::FANN_LINEAR(),
+      THRESHOLD                  => AI::FANN::FANN_THRESHOLD(),
+      THRESHOLD_SYMMETRIC        => AI::FANN::FANN_THRESHOLD_SYMMETRIC(),
+      SIGMOID                    => AI::FANN::FANN_SIGMOID(),
+      SIGMOID_STEPWISE           => AI::FANN::FANN_SIGMOID_STEPWISE(),
+      SIGMOID_SYMMETRIC          => AI::FANN::FANN_SIGMOID_SYMMETRIC(),
+      SIGMOID_SYMMETRIC_STEPWISE => AI::FANN::FANN_SIGMOID_SYMMETRIC_STEPWISE(),
+      GAUSSIAN                   => AI::FANN::FANN_GAUSSIAN(),
+      GAUSSIAN_SYMMETRIC         => AI::FANN::FANN_GAUSSIAN_SYMMETRIC(),
+      GAUSSIAN_STEPWISE          => AI::FANN::FANN_GAUSSIAN_STEPWISE(),
+      ELLIOT                     => AI::FANN::FANN_ELLIOT(),
+      ELLIOT_SYMMETRIC           => AI::FANN::FANN_ELLIOT_SYMMETRIC(),
+      LINEAR_PIECE               => AI::FANN::FANN_LINEAR_PIECE(),
+      LINEAR_PIECE_SYMMETRIC     => AI::FANN::FANN_LINEAR_PIECE_SYMMETRIC(),
+      SIN                        => AI::FANN::FANN_SIN(),
+      SIN_SYMMETRIC              => AI::FANN::FANN_SIN_SYMMETRIC(),
+      COS                        => AI::FANN::FANN_COS(),
+      COS_SYMMETRIC              => AI::FANN::FANN_COS_SYMMETRIC(),
+  );  
+  
+  # AI::FANN Trainingsalgorithmen
+  #################################
+  my %ta_map = (                                                                        
+      INCREMENTAL => AI::FANN::FANN_TRAIN_INCREMENTAL(),                            # klassisches Backpropagation mit Lernrate/Momentum
+      BATCH       => AI::FANN::FANN_TRAIN_BATCH(),
+      RPROP       => AI::FANN::FANN_TRAIN_RPROP(),                                  # Resilient Propagation (default), robust, kein Tuning von Lernrate/Momentum nötig bzw. möglich
+      QUICKPROP   => AI::FANN::FANN_TRAIN_QUICKPROP(),                              # Quickpropagation
+  ); 
+  
+  if ($debug =~ /aiProcess/xs) {
+      my $do = $attempt ? 'Retry' : 'First';
+      Log3 ($name, 1, "$name DEBUG> $do attempt $attempt with Seed=$seed");
+  }
   
   # Auteilung in Trainings- und Validierungs-Daten
   ##################################################
@@ -21366,6 +21632,7 @@ sub aiNeuroNetTrain {
   my @test_targets;
   
   my @indices     = (0 .. $#$tdref);                                                                    # Indizes vorbereiten                                                 
+  @indices        = shuffle (@indices) if($shuffle_mode == 2);
   my $split_index = int (@indices * $training_portion);                                                 # Split in Trainings- und Testdaten
   
   for my $i (0 .. $split_index-1) {
@@ -21384,43 +21651,68 @@ sub aiNeuroNetTrain {
   
   # Netz erzeugen
   #################
-  my $ann = AI::FANN->new_standard ($num_inputs, @num_hidden, $num_outputs);                      
+  my $ann = AI::FANN->new_standard ($num_inputs, @hiddlays, $num_outputs);                      
   
-  $ann->hidden_activation_function (AI::FANN::FANN_SIGMOID());
-  $ann->output_activation_function (AI::FANN::FANN_LINEAR());
-  $ann->learning_rate              ($learning_rate);
-  $ann->learning_momentum          ($learning_momentum);
-  $ann->bit_fail_limit             ($bit_fail_limit);
+  $ann->hidden_activation_function  ($af_map{$haf});
+  $ann->output_activation_function  ($af_map{$oaf});
+  $ann->training_algorithm          ($ta_map{$talgo});
+  $ann->learning_rate               ($learning_rate);
+  $ann->learning_momentum           ($learning_momentum);
+  $ann->bit_fail_limit              ($bit_fail_limit);
+  $ann->hidden_activation_steepness ($hidden_steepness);
+  
+  my @steepness = ($hidden_steepness, $hidden_steepness - 0.2, $hidden_steepness - 0.4);               # Hidden 1: schärfer, Hidden 2: glatter  ...
+  
+  for my $i (1..$num_hidddenlays) {
+      $ann->layer_activation_steepness($i, max(0.1, $steepness[$i-1]));
+  }
   
   my $lr = sprintf "%.5f", $ann->learning_rate;
   my $lm = sprintf "%.1f", $ann->learning_momentum;
+  my $ta = $ann->training_algorithm;
   
   if ($debug =~ /aiProcess/xs) {
-      my $mode = $shuffle_data ? 'with internal shuffle of training data' : '';
+      my $mode = $shuffle_mode == 1 
+                 ? 'chronological split and AI internal shuffle of training data' 
+                 : $shuffle_mode == 2 
+                 ? 'split after shuffle of training data and use AI internal shuffle'  
+                 : 'chronological split';
+      
       Log3 ($name, 1, "$name DEBUG> Neural Network Training started with Params:\n".
-                      "training datasets=$num_train_datasets, hidden Neurons=".
-                      (join ',',@num_hidden).", Epoches=$num_epoch, mse_error=$mse_error, learning rate=$lr, learning momentum=$lm, ".
-                      "Data sharing=chronological split (Train=$split_index, Test=".(scalar($#$tdref)-$split_index).") ".$mode);
+                      "training datasets=$num_train_datasets, \n".
+                      "training algo=$ta, \n".
+                      "output AF=$oaf, \n".
+                      "hidden AF=$haf, \n".
+                      "hidden Neurons=".(join ',',@hiddlays).", \n".
+                      "hidden steepness=$hidden_steepness, \n".
+                      "Epoches=$num_epoch, \n".
+                      "mse_error=$mse_error, \n".
+                      "learning rate=$lr, \n".
+                      "learning momentum=$lm, \n".
+                      "Data sharing=$mode (Train=$split_index, Test=".(scalar($#$tdref)-$split_index)."), \n".
+                      "Data shuffle=$shuffle_mode ".($shuffle_mode ? qq{(period=$shuffle_period)} : '') 
+                     );
   }
   
   # Trainings- und Validierungsdatenobjekte + Epochentraining
   #############################################################
   my $since_improve  = 0;
   my $snapshot_saved = 0;
+  my @val_history;
   
-  my $train_data = AI::FANN::TrainData->new (@train_pairs);                                             # Trainingsdatenobjekt bauen
-  $train_data->shuffle() if($shuffle_data);
+  my $train_data = AI::FANN::TrainData->new (@train_pairs);                                                 # Trainingsdatenobjekt bauen
+  $train_data->shuffle() if($shuffle_mode == 1);
   
   for my $epoch (1 .. $num_epoch) {
-      if ($shuffle_data && $epoch % $shuffle_period == 0) {                                             # Periodisches Shuffle
+      if ($shuffle_mode && $epoch % $shuffle_period == 0) {                                            # Periodisches Shuffle
           $train_data->shuffle();
-          Log3 ($name, 1, "$name DEBUG> Training data reshuffled again at epoch $epoch") if($debug =~ /aiProcess/xs);
+          #Log3 ($name, 1, "$name DEBUG> Training data reshuffled again at epoch $epoch") if($debug =~ /aiProcess/xs);
       }
     
-      $ann->train_epoch ($train_data);                                                                  # Einen Trainingsschritt ausführen
+      $ann->train_epoch ($train_data);                                                                      # Einen Trainingsschritt ausführen
 
-      my $mse_train = $ann->MSE();                                                                      # Aktuellen Fehler abfragen
-      my $bfail     = $ann->bit_fail();                                                                 # Anzahl der Ausgaben, die außerhalb einer vorgegebenen Toleranz liegen, Standardtoleranz: 0.35
+      my $mse_train = $ann->MSE();                                                                          # Aktuellen Fehler abfragen
+      my $bfail     = $ann->bit_fail();                                                                     # Anzahl der Ausgaben, die außerhalb einer vorgegebenen Toleranz liegen, Standardtoleranz: 0.35
 
       # Validierung
       ###############     
@@ -21437,27 +21729,32 @@ sub aiNeuroNetTrain {
       }
       
       my $mse_val = sprintf "%.6f", ( $sum_sq / scalar (@test_inputs) );                                    # MSE (Mean Squared Error)   
-
-      if ($num_epoch_between_statmsg && $epoch % $num_epoch_between_statmsg == 0) {                         # Logging alle X Epochen
+      push @val_history, $mse_val;                                                                          # Verlauf speichern
+      
+      if ($debug =~ /aiProcess/xs 
+          && $num_epoch_between_statmsg 
+          && $epoch % $num_epoch_between_statmsg == 0) {                                                    # Logging alle X Epochen
           Log3 ($name, 1, sprintf "%s DEBUG> Epoche %d: Train MSE=%.6f, Val MSE=%.6f .... Bit_Fail=%d", 
-                          $name, $epoch, $mse_train, $mse_val, $bfail);
+                          $name, $epoch, $mse_train, $mse_val, $bit_fail_val);
       }
       
       # Snapshot-Guard: nur speichern, wenn Validation-MSE sinnvoll ist
       ###################################################################
       if ($mse_val < $best_val_mse - 1e-6 && $mse_val < $model_save_threshold) {                            # durch Toleranz 1e-6 -> nur echte Verbesserungen werden gespeichert
           $best_val_mse     = $mse_val;
-          $best_train_mse   = sprintf "%.3f", $mse_train;
+          $best_train_mse   = $mse_train;
           $best_train_epoch = $epoch;
           $since_improve    = 0;
           
           $ann->save ($snapshot);                                                                           # Snapshot speichern, wenn besser
           $snapshot_saved = 1;
           
-          Log3 ($name, 1,
-                sprintf "%s DEBUG> Snapshot saved at epoch %d: Train MSE=%.6f, Val MSE=%.6f, Val Bit_Fail=%d",
-                $name, $epoch, $best_train_mse, $best_val_mse, $bit_fail_val
-               );
+          if ($debug =~ /aiProcess/xs) {
+              Log3 ($name, 1,
+                    sprintf "%s DEBUG> Snapshot saved at epoch %d: Train MSE=%.6f, Val MSE=%.6f, Val Bit_Fail=%d",
+                    $name, $epoch, $best_train_mse, $best_val_mse, $bit_fail_val
+                   );
+          }
       } 
       else {
           $since_improve++;
@@ -21466,10 +21763,12 @@ sub aiNeuroNetTrain {
       # Early Stopping
       ##################
       if ($since_improve >= $patience) {
-          Log3 ($name, 1,
-                sprintf "%s DEBUG> Early stopping bei Epoche %d (no improvement since %d epochs)",
-                $name, $epoch, $patience
-               );
+          if ($debug =~ /aiProcess/xs) {
+              Log3 ($name, 1,
+                    sprintf "%s DEBUG> Early stopping bei Epoche %d (no improvement since %d epochs)",
+                    $name, $epoch, $patience
+                   );
+          }
         
           last;
       }
@@ -21492,13 +21791,14 @@ sub aiNeuroNetTrain {
       Log3 ($name, 1, sprintf "%s DEBUG> Best Forecast Model reloaded with Train MSE=%.6f", $name, $best_train_mse);
   }
   
-  # AbschlußValidierung und Kennzahlen berechnen
+  # Abschlußvalidierung und Kennzahlen berechnen
   ################################################
-  my $sum_sq       = 0;                                                                     # für MSE/RMSE (normalisiert)
-  my $sum_y        = 0;
-  my $bit_fail_val = 0;
-  my $ss_tot       = 0;
-  my $ss_res       = 0;
+  my $sum_sq  = 0;                                                                          # für MSE/RMSE (normalisiert)
+  my $sum_z   = 0;
+  my $bitfail = 0;
+  my $ss_tot  = 0;
+  my $ss_res  = 0;
+  my $sum_err = 0;
   
   my @abs_errors;                                                                           # für MAE und MedAE (denormalisiert)
   my @pct_errors;                                                                           # für MAPE und MdAPE (denormalisiert)
@@ -21510,29 +21810,28 @@ sub aiNeuroNetTrain {
   for my $i (0 .. $#test_inputs) {                                                          # erste Schleife: Fehler sammeln
       my $prediction_norm = $ann->run ($test_inputs[$i])->[0];                              # Netz liefert Arrayref
       my $target_norm     = $test_targets[$i]->[0];                                         # Ziel ebenfalls Arrayref
-
+ 
       my $err_norm = $prediction_norm - $target_norm;                                       # Fehler im Normalisierungsraum
-      $sum_sq += $err_norm**2;                                                              # MSE im Normalisierungsraum
+      $sum_sq     += $err_norm**2;                                                          # MSE im Normalisierungsraum
     
-      # Für MAE/MAPE/R² weiterhin denormalisieren
-      my $prediction = _aiNeuroNetDenormMinMaxValue ($prediction_norm, $minval, $maxval);
+      my $prediction = _aiNeuroNetDenormMinMaxValue ($prediction_norm, $minval, $maxval);   # Für MAE/MAPE/R² weiterhin denormalisieren
       my $target     = _aiNeuroNetDenormMinMaxValue ($target_norm,     $minval, $maxval);
 
+      $sum_err += ($prediction - $target);
       my $pterr = $prediction - $target;
       
       push @abs_errors, abs ($pterr);                                                       # Fehler sammeln (denormalisiert)
       push @pct_errors, abs ($pterr / ($target || 1)) * 100;                                # Prozentfehler (denormalisiert)
       
-      $sum_y   += $target;
-      
-      $ss_res  += ($target - $prediction)**2;                                               # Residual Sum of Squares - Summe der quadrierten Abweichungen
+      $sum_z  += $target;
+      $ss_res += ($target - $prediction)**2;                                               # Residual Sum of Squares - Summe der quadrierten Abweichungen
 
       my $diff_norm = abs ($prediction_norm - $target_norm);
-      $bit_fail_val++ if($diff_norm > $bit_fail_limit);
+      $bitfail++ if($diff_norm > $bit_fail_limit);
   }
 
+  my $mean_error = $sum_err / scalar (@test_inputs);                                        # Bias in Originaleinheit (z.B. Wh)
   my $n          = scalar (@test_inputs);
-  
   my $mae        = sprintf "%.2f", (sum (@abs_errors) / $n);                                # MAE (Durchschnitt) Wh
   my @sorted_abs = sort { $a <=> $b } @abs_errors;                                          
   my $medae      = sprintf "%.2f", medianArray (\@sorted_abs);                              # MedAE (Median) Wh
@@ -21541,30 +21840,79 @@ sub aiNeuroNetTrain {
   my @sorted_pct = sort { $a <=> $b } @pct_errors;                                          
   my $mdape      = sprintf "%.3f", medianArray (\@sorted_pct);                              # MdAPE (Median) %
   
-  my $rmse     = sprintf "%.3f", (sqrt ($sum_sq / $n));                                     # RMSE im Normalisierungsraum
-  my $vali_mse = sprintf "%.3f", ($sum_sq / $n);                                            # MSE im Normalisierungsraum
-
-  my $mean_y   = $sum_y / $n;
+  my $rmse       = sprintf "%.3f", (sqrt ($sum_sq / $n));                                   # RMSE im Normalisierungsraum
+  my $vali_mse   = sprintf "%.3f", ($sum_sq / $n);                                          # MSE im Normalisierungsraum
+  my $mean_z     = $sum_z / $n;
   
   for my $i (0 .. $#test_inputs) {                                                          # zweite Schleife für R² (denormalisiert)
       my $target_norm = $test_targets[$i]->[0];
       my $target      = _aiNeuroNetDenormMinMaxValue ($target_norm, $minval, $maxval);
 
-      $ss_tot += ($target - $mean_y)**2;                                                    # Total Sum of Squares - Gesamtstreuung der Zielwerte um ihren Mittelwert
+      $ss_tot += ($target - $mean_z)**2;                                                    # Total Sum of Squares - Gesamtstreuung der Zielwerte um ihren Mittelwert
   }
   
   my $r2 = sprintf "%.3f", (1 - ($ss_res / ($ss_tot || 1)));
+  
+  # Validation Mittelwert und Standardabweichung berechnen
+  ########################################################################
+  # Windows prüft nur die Phase, die wirklich relevant ist → ob das 
+  # Modell am Ende stabil war.
+  # - Fenstergröße anpassen: Bei kurzen Trainingsläufen reichen 20–30 
+  #                          Epochen, bei langen eher 50–100.
+  ########################################################################
+  my $nvalhist = scalar (@val_history);
+  $window      = $nvalhist if($window > $nvalhist);                                         # falls weniger Epochen als Fenstergröße
+  my @val_tail = @val_history[-$window .. -1];                                              # nur die letzten N Werte
+                                                                                   
+  my $val_mean = sum (@val_tail) / @val_tail;                                               # val_mean = durchschnittlicher Validation-MSE über den gesamten Trainingslauf
+  my $sq_sum   = 0;
+  $sq_sum     += ($_ - $val_mean) ** 2 for @val_tail;
+  my $val_std  = sqrt ($sq_sum / @val_tail);                                                # val_std = Streuung der Validation-MSE
+    
+  # Einfache lineare Regression: Steigung berechnen
+  my $ntail  = scalar (@val_tail);
+  my $sum_x  = 0;
+  my $sum_y  = 0;
+  my $sum_xy = 0;
+  my $sum_x2 = 0;
 
+  for my $i (0 .. $ntail-1) {
+      $sum_x  += $i;
+      $sum_y  += $val_tail[$i];
+      $sum_xy += $i * $val_tail[$i];
+      $sum_x2 += $i * $i;
+  }
+
+  my $denom = ($ntail * $sum_x2 - $sum_x * $sum_x) || 1;
+  my $slope = ($ntail * $sum_xy - $sum_x * $sum_y) / $denom;
+  
+  
   if ($debug =~ /aiProcess/xs) {
       Log3 ($name, 1, sprintf "%s DEBUG> Validation finished - Best Training MSE=%.6f, ".
                                     "Validation MSE=%.6f, Validation Bit_Fail=%d",
-                                    $name, $best_train_mse, $vali_mse, $bit_fail_val);
+                                    $name, $best_train_mse, $vali_mse, $bitfail);
   }  
- 
   
-  # FANN-Objekt in TempFile speichern -> als String auslesen -> in Hash speichern
-  #################################################################################
-  my $serial;
+  # Retry-Indikator ausführen
+  #############################
+  my $retrainQuality = _aiNeuroNetRetrainIndicator ( { name           => $name, 
+                                                       best_train_mse => $best_train_mse, 
+                                                       best_val_mse   => $best_val_mse, 
+                                                       bitfail        => $bitfail, 
+                                                       valstd         => $val_std, 
+                                                       valmean        => $val_mean,
+                                                       rmse           => $rmse, 
+                                                       mae            => $mae,
+                                                       abserref       => \@abs_errors, 
+                                                       mean_error     => $mean_error,
+                                                       test_input_num => scalar (@test_inputs),
+                                                       slope          => $slope,                                                    
+                                                       debug          => $debug 
+                                                     } 
+                                                   );
+    
+  # FANN-Model in TempFile speichern -> als BLOB String auslesen 
+  #################################################################
   my $tmpfile = $neuralnet.'fannmodel_'.$name;
   
   $ann->save ($tmpfile);
@@ -21572,96 +21920,74 @@ sub aiNeuroNetTrain {
   my ($err, $blob) = read_blob ($tmpfile);
   unlink $tmpfile;
   
+  # Übergaben
+  #############
+  my $retref;
+  
   if ($err) {
-      $serial = encode_base64 (Serialize ( { name                    => $name,
-                                             aiNeuroNetConTrainstate => "aiNeuroNetConTraining performed, but error occurred while saving: $err",
-                                           }
-                                         ), "");
+      $retref = { name                   => $name,
+                  neuralNetConTrainstate => "aiNeuroNetConTraining performed, but error occurred while read_blob: $err",
+                };
 
-      return $serial;
-  }
+      return ($retref);
+  } 
   
-  setTimeTracking ($name, $cst, 'neuralNetConRuntimeTrain');                                            # Zyklus-Laufzeit ermitteln
+  setTimeTracking ($name, $cst, 'neuralNetConRuntimeTrain');                                         # Zyklus-Laufzeit ermitteln
 
-  $serial = encode_base64 (Serialize ( {name                          => $name,
-                                        neuralNetConTrainstate        => 'ok',
-                                        neuralNetConRuntimeTrain      => (sprintf "%.2f", CurrentVal ($name, 'neuralNetConRuntimeTrain', '')),
-                                        neuralNetConTrainLastFinishTs => int time,
-                                        neuralNetConOutMax            => $maxval,                       # Maximalwert Consumption aus Trainingsdaten
-                                        neuralNetConOutMin            => $minval,                       # Maximalwert Consumption aus Trainingsdaten
-                                        neuralNetContmpmin            => $paref->{tmpmin},
-                                        neuralNetContmpmax            => $paref->{tmpmax},
-                                        neuralNetConwccmin            => $paref->{wccmin},
-                                        neuralNetConwccmax            => $paref->{wccmax},
-                                        neuralNetConrr1min            => $paref->{rr1min},
-                                        neuralNetConrr1max            => $paref->{rr1max},
-                                        neuralNetConpvrmin            => $paref->{pvrmin},
-                                        neuralNetConpvrmax            => $paref->{pvrmax},
-                                        neuralNetConFannBlob          => $blob,                         # BLOB aus ann
-                                        
-                                        neuralNetConNumDatasets       => $num_train_datasets,
-                                        neuralNetConNumTraindata      => $split_index,
-                                        neuralNetConNumTestdata       => (scalar(@$tdref)-$split_index),
-                                        neuralNetConNumInputs         => $num_inputs,
-                                        neuralNetConHiddenLayers      => $hidden_layers,
-                                        neuralNetConNumOutputs        => $num_outputs,
-                                        neuralNetConTrainMse          => $best_train_mse,
-                                        neuralNetConValidationMse     => $vali_mse,
-                                        neuralNetConBitFail           => $bit_fail_val,
-                                        neuralNetConTrainEpoches      => $best_train_epoch,
-                                        neuralNetConMae               => $mae,
-                                        neuralNetConMedae             => $medae,                                        
-                                        neuralNetConRmse              => $rmse, 
-                                        neuralNetConMape              => $mape, 
-                                        neuralNetConMdape             => $mdape,
-                                        neuralNetConR2                => $r2,
-                                       }
-                                     )
-                                     , "");
-    
-  # ok - File schreiben zur Ladung bei Restart
-  ##############################################
-  delete $data{$name}{neuralnet}{conFannModel};  
-  $data{$name}{neuralnet}{conOutMax}        = $maxval;                                         # Maximalwert Consumption aus Trainingsdaten
-  $data{$name}{neuralnet}{conOutMin}        = $minval;                                         # Minimalwert Consumption aus Trainingsdaten
-  $data{$name}{neuralnet}{contmpMin}        = $paref->{tmpmin};
-  $data{$name}{neuralnet}{contmpMax}        = $paref->{tmpmax};
-  $data{$name}{neuralnet}{conwccMin}        = $paref->{wccmin};
-  $data{$name}{neuralnet}{conwccMax}        = $paref->{wccmax};
-  $data{$name}{neuralnet}{conrr1Min}        = $paref->{rr1min};
-  $data{$name}{neuralnet}{conrr1Max}        = $paref->{rr1max};
-  $data{$name}{neuralnet}{conpvrMin}        = $paref->{pvrmin};
-  $data{$name}{neuralnet}{conpvrMax}        = $paref->{pvrmax};
-  $data{$name}{neuralnet}{conFannBlob}      = $blob;                                           # BLOB im Hash ablegen
-  $data{$name}{neuralnet}{conNumDatasets}   = $num_train_datasets;
-  $data{$name}{neuralnet}{conNumTraindata}  = $split_index;
-  $data{$name}{neuralnet}{conNumTestdata}   = (scalar(@$tdref)-$split_index);
-  $data{$name}{neuralnet}{conNumInputs}     = $num_inputs;
-  $data{$name}{neuralnet}{conHiddenLayers}  = $hidden_layers;
-  $data{$name}{neuralnet}{conNumOutputs}    = $num_outputs;
-  $data{$name}{neuralnet}{conTrainMse}      = $best_train_mse;
-  $data{$name}{neuralnet}{conValidationMse} = $vali_mse;
-  $data{$name}{neuralnet}{conBitFail}       = $bit_fail_val;
-  $data{$name}{neuralnet}{conTrainEpoches}  = $best_train_epoch;
-  $data{$name}{neuralnet}{conMae}           = $mae; 
-  $data{$name}{neuralnet}{conMedae}         = $medae;
-  $data{$name}{neuralnet}{conRmse}          = $rmse; 
-  $data{$name}{neuralnet}{conMape}          = $mape; 
-  $data{$name}{neuralnet}{conMdape}         = $mdape; 
-  $data{$name}{neuralnet}{conR2}            = $r2;
-                                        
-  $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
-
-  if (!$err) {
-      if ($debug =~ /aiProcess/xs) {
-          Log3 ($name, 1, "$name DEBUG> Neural Netwwork training data successfuly written to file: ".$neuralnet.$name);
-      }
-  }
-  else {
-      Log3 ($name, 1, "$name - ERROR while writing file: ".$neuralnet.$name);
-  }                                     
+  # ok -> File schreiben zur Ladung bei Restart
+  ###############################################  
+  $data{$name}{contemp}{$attempt}{OutMin}         = $minval;                                         # Minimalwert Consumption aus Trainingsdaten  
+  $data{$name}{contemp}{$attempt}{OutMax}         = $maxval;                                         # Maximalwert Consumption aus Trainingsdaten
+  $data{$name}{contemp}{$attempt}{tmpMin}         = $tmpmin;
+  $data{$name}{contemp}{$attempt}{tmpMax}         = $tmpmax;
+  $data{$name}{contemp}{$attempt}{wccMin}         = $wccmin;
+  $data{$name}{contemp}{$attempt}{wccMax}         = $wccmax;
+  $data{$name}{contemp}{$attempt}{rr1Min}         = $rr1min;
+  $data{$name}{contemp}{$attempt}{rr1Max}         = $rr1max;
+  $data{$name}{contemp}{$attempt}{pvrMin}         = $pvrmin;
+  $data{$name}{contemp}{$attempt}{pvrMax}         = $pvrmax;
+  $data{$name}{contemp}{$attempt}{FannBlob}       = $blob;                                           # BLOB im Hash ablegen
   
-return $serial;
+  $data{$name}{contemp}{$attempt}{HiddActFunc}    = $haf;
+  $data{$name}{contemp}{$attempt}{OutActFunc}     = $oaf;
+  $data{$name}{contemp}{$attempt}{LearnMomentum}  = $learning_momentum;
+  $data{$name}{contemp}{$attempt}{LearnRate}      = $learning_rate;
+  $data{$name}{contemp}{$attempt}{NumDatasets}    = $num_train_datasets;
+  $data{$name}{contemp}{$attempt}{NumTraindata}   = $split_index;
+  $data{$name}{contemp}{$attempt}{NumTestdata}    = (scalar(@$tdref)-$split_index);
+  $data{$name}{contemp}{$attempt}{NumInputs}      = $num_inputs;
+  $data{$name}{contemp}{$attempt}{HiddenLayers}   = $hidden_layers;
+  $data{$name}{contemp}{$attempt}{HiddSteepness}  = $hidden_steepness;
+  $data{$name}{contemp}{$attempt}{NumOutputs}     = $num_outputs;
+  $data{$name}{contemp}{$attempt}{TrainMse}       = $best_train_mse;
+  $data{$name}{contemp}{$attempt}{ValidationMse}  = $vali_mse;
+  $data{$name}{contemp}{$attempt}{BitFail}        = $bitfail;
+  $data{$name}{contemp}{$attempt}{TrainEpoches}   = $best_train_epoch;
+  $data{$name}{contemp}{$attempt}{Mae}            = $mae; 
+  $data{$name}{contemp}{$attempt}{Medae}          = $medae;
+  $data{$name}{contemp}{$attempt}{Rmse}           = $rmse; 
+  $data{$name}{contemp}{$attempt}{Mape}           = $mape; 
+  $data{$name}{contemp}{$attempt}{Mdape}          = $mdape; 
+  $data{$name}{contemp}{$attempt}{R2}             = $r2;
+  $data{$name}{contemp}{$attempt}{AvgValidMse}    = $val_mean;
+  $data{$name}{contemp}{$attempt}{StdDevValidMse} = $val_std;
+  $data{$name}{contemp}{$attempt}{RetrainQuality} = $retrainQuality;
+  $data{$name}{contemp}{$attempt}{Attempt}        = $attempt;
+  $data{$name}{contemp}{$attempt}{ShuffleMode}    = $shuffle_mode;
+  $data{$name}{contemp}{$attempt}{ShufflePeriod}  = $shuffle_period;
+  
+  $retref = { name                          => $name,
+              neuralNetConTrainstate        => (!$err ? 'ok' : "aiNeuroNetConTraining performed, but error occurred while saving: $err"),
+              neuralNetConRuntimeTrain      => (sprintf "%.2f", CurrentVal ($name, 'neuralNetConRuntimeTrain', '')),
+              neuralNetConTrainLastFinishTs => int time,
+              neuralNetConRetrainQuality    => $retrainQuality,
+              neuralNetConAttempt           => $attempt,
+              neuralNetConR2                => $r2,
+              neuralNetConSeed              => $seed,
+              neuralNetConBestValMse        => $best_val_mse,
+            };                                  
+  
+return $retref;
 }
 
 ###############################################################
@@ -21675,65 +22001,20 @@ sub aiNeuroNetFinishTrain {
   my $hash  = $defs{$name};
   my $debug = getDebug ($hash);  
 
-  my $neuralNetConTrainstate        = $paref->{neuralNetConTrainstate};
-  my $neuralNetConRuntimeTrain      = $paref->{neuralNetConRuntimeTrain};
-  my $neuralNetConTrainLastFinishTs = $paref->{neuralNetConTrainLastFinishTs};
+  my $neuralNetConTrainstate = $paref->{neuralNetConTrainstate};
 
   if ($neuralNetConTrainstate eq 'ok') {
-      my $blob    = $paref->{neuralNetConFannBlob};                                                             # String aus Hash holen und zurückschreiben in temporäre Datei
-      my $tmpfile = $neuralnet.'fannmodel_'.$name; 
-      my $err     = write_blob ($tmpfile, $blob);
-
-      # Netz wiederherstellen
-      if (!$err) {
-          delete $data{$name}{neuralnet}{conFannModel};                                                         # evtl. altes Modell löschen
-          $data{$name}{neuralnet}{conFannModel} = AI::FANN->new_from_file ($tmpfile);                           # im Hash ablegen für direkten Zugriff
-          unlink $tmpfile;
-          
-          if (eval { $data{$name}{neuralnet}{conFannModel}->MSE(); 1 }) {
-              $data{$name}{current}{neuralNetConTrainstate}             = 'ok';
-              $data{$name}{circular}{99}{neuralNetConRuntimeTrain}      = $neuralNetConRuntimeTrain;      
-              $data{$name}{circular}{99}{neuralNetConTrainLastFinishTs} = $neuralNetConTrainLastFinishTs;  
-              $data{$name}{neuralnet}{conOutMin}                        = $paref->{neuralNetConOutMin};
-              $data{$name}{neuralnet}{conOutMax}                        = $paref->{neuralNetConOutMax};
-              $data{$name}{neuralnet}{contmpMin}                        = $paref->{neuralNetContmpmin};
-              $data{$name}{neuralnet}{contmpMax}                        = $paref->{neuralNetContmpmax};
-              $data{$name}{neuralnet}{conwccMin}                        = $paref->{neuralNetConwccmin};
-              $data{$name}{neuralnet}{conwccMax}                        = $paref->{neuralNetConwccmax};
-              $data{$name}{neuralnet}{conrr1Min}                        = $paref->{neuralNetConrr1min};
-              $data{$name}{neuralnet}{conrr1Max}                        = $paref->{neuralNetConrr1max};
-              $data{$name}{neuralnet}{conpvrMin}                        = $paref->{neuralNetConpvrmin};
-              $data{$name}{neuralnet}{conpvrMax}                        = $paref->{neuralNetConpvrmax};
-              
-              $data{$name}{neuralnet}{conNumDatasets}                   = $paref->{neuralNetConNumDatasets};
-              $data{$name}{neuralnet}{conNumTraindata}                  = $paref->{neuralNetConNumTraindata};
-              $data{$name}{neuralnet}{conNumTestdata}                   = $paref->{neuralNetConNumTestdata};
-              $data{$name}{neuralnet}{conNumInputs}                     = $paref->{neuralNetConNumInputs};
-              $data{$name}{neuralnet}{conHiddenLayers}                  = $paref->{neuralNetConHiddenLayers};
-              $data{$name}{neuralnet}{conNumOutputs}                    = $paref->{neuralNetConNumOutputs};
-              $data{$name}{neuralnet}{conTrainMse}                      = $paref->{neuralNetConTrainMse};
-              $data{$name}{neuralnet}{conValidationMse}                 = $paref->{neuralNetConValidationMse};
-              $data{$name}{neuralnet}{conBitFail}                       = $paref->{neuralNetConBitFail};
-              $data{$name}{neuralnet}{conTrainEpoches}                  = $paref->{neuralNetConTrainEpoches};
-              $data{$name}{neuralnet}{conMae}                           = $paref->{neuralNetConMae}; 
-              $data{$name}{neuralnet}{conMedae}                         = $paref->{neuralNetConMedae}; 
-              $data{$name}{neuralnet}{conRmse}                          = $paref->{neuralNetConRmse}; 
-              $data{$name}{neuralnet}{conMape}                          = $paref->{neuralNetConMape};
-              $data{$name}{neuralnet}{conMdape}                         = $paref->{neuralNetConMdape};                          
-              $data{$name}{neuralnet}{conR2}                            = $paref->{neuralNetConR2};
-          } 
-          else {
-              $data{$name}{current}{neuralNetConTrainstate} = $@;
-          }
-      }
-      else {
-          $data{$name}{current}{neuralNetConTrainstate} = $err;
-          Log3 ($name, 1, "$name - ERROR while writing BLOB to file: ".$tmpfile);
-      }
+      $data{$name}{circular}{99}{neuralNetConRuntimeTrain}      = $paref->{neuralNetConRuntimeTrain};    
+      $data{$name}{circular}{99}{neuralNetConTrainLastFinishTs} = $paref->{neuralNetConTrainLastFinishTs}; 
+      
+      readCacheFile ( {name => $name, file => $neuralnet.$name, cachename => 'neuralnet', title => 'NeuralNetwork' } );
+  }
+  else {
+      $data{$name}{current}{neuralNetConTrainstate} = $neuralNetConTrainstate;
   }
   
   if ($debug =~ /aiProcess/xs) {
-      Log3 ($name, 1, "$name DEBUG> Neural Netwwork Training BlockingCall PID '$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}' finished, state: $neuralNetConTrainstate");
+      Log3 ($name, 1, "$name DEBUG> Neural Netwwork Training BlockingCall PID '$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}' finished");
   }
   
   delete($hash->{HELPER}{AINNTRAINBLOCKRUN});
@@ -21763,68 +22044,74 @@ return;
 #  die Struktur des Datenarray muß mit dem Trainingsmodell 
 #  übereinstimmen
 ################################################################
-sub aiNeuroNetGetConResult {
+sub aiNeuroNetGetConsResult {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $chour = $paref->{chour};                                                        # aktuelle Stunde (00 .. 23)
+  my $chour = $paref->{chour};                                                           # aktuelle Stunde (00 .. 23)
   
   debugLog ($paref, 'aiData', "Start Neural Network consumption result check");
   
-  my ($rdy, $cause) = _aiNeuroNetConModelReady ($name);
-  if (!$rdy) {
-      debugLog ($paref, 'aiData', "the Neural Network for consumption forecast is not ready. Exiting...");
-      return;
-  }
+  my $haf    = 'SIGMOID';                                                                # Hidden Activation Function
+  my $oaf    = 'LINEAR';                                                                 # Output Activation Function
+  
+  my $range  = $haf eq 'SIGMOID'           ? '01'  :
+               $haf eq 'SIGMOID_SYMMETRIC' ? '-11' :
+               undef;
 
   for my $num (0..MAXNEXTHOURS) {
       my ($fd, $fh) = calcDayHourMove ($chour, $num);
       last if($fd > MAXNEXTDAYS);
       
-      my $cst = [gettimeofday];                                                       # Startzeit
+      my $cst = [gettimeofday];                                                             # Startzeit
       
-      my $nhtstr = 'NextHour'.(sprintf "%02d", $num);
+      my $nhstr = 'NextHour'.(sprintf "%02d", $num);
       
-      my $starttime = NexthoursVal ($name, $nhtstr, 'starttime', undef);
+      my $starttime = NexthoursVal ($name, $nhstr, 'starttime', undef);
       return 'no Neural Network decision delivered' if(!defined $starttime);
       
-      my $month   = int ((split '-', $starttime)[1]);
-      my $weekday = NexthoursVal ($name, $nhtstr, 'weekday', undef);
-      $weekday    = defined $weekday ? $hwdmap{$weekday} : 0;                          # Wochentag numerisch (1..7)
-      my $hod     = NexthoursVal ($name, $nhtstr, 'hourofday', 0);
-      $hod        = int ($hod);                                                        # Stunde des Tages numerisch (1..24)
-      my $sunaz   = NexthoursVal ($name, $nhtstr, 'sunaz',  0);
-      my $sunalt  = NexthoursVal ($name, $nhtstr, 'sunalt', 0);
-      my $rr1c    = NexthoursVal ($name, $nhtstr, 'rr1c',   0);
-      my $pvfc    = NexthoursVal ($name, $nhtstr, 'pvfc',   0);                        # Erstatzwert für pvrl
-      my $wcc     = NexthoursVal ($name, $nhtstr, 'wcc',    0);
-      $wcc        = int ($wcc);   
-      my $temp    = NexthoursVal ($name, $nhtstr, 'temp',   0);
-      $temp       = int ($temp);
-      my $isday   = NexthoursVal ($name, $nhtstr, 'DoN',    0);
+      my $month     = int ((split '-', $starttime)[1]);
+      my $weekday   = NexthoursVal ($name, $nhstr, 'weekday', undef);
+      $weekday      = defined $weekday ? $hwdmap{$weekday} : 0;                             # Wochentag numerisch (1..7)
+      my $hod       = NexthoursVal ($name, $nhstr, 'hourofday', 0);
+      $hod          = int ($hod);                                                           # Stunde des Tages numerisch (1..24)
+      my $hour_norm = ($hod / 24);                                                          # Stunde des Tages normiert 0..1
+      my $noon      = ($hod >= 12 && $hod < 14) ? 1 : 0;                                    # Mittags-Flag
+      my $sunaz     = NexthoursVal ($name, $nhstr, 'sunaz',  0);
+      my $sunalt    = NexthoursVal ($name, $nhstr, 'sunalt', 0);
+      my $rr1c      = NexthoursVal ($name, $nhstr, 'rr1c',   0);
+      my $pvfc      = NexthoursVal ($name, $nhstr, 'pvfc',   0);                            # Erstatzwert für pvrl
+      my $wcc       = NexthoursVal ($name, $nhstr, 'wcc',    0);
+      $wcc          = int ($wcc);   
+      my $temp      = NexthoursVal ($name, $nhstr, 'temp',   0);
+      $temp         = int ($temp);
+      my $isday     = NexthoursVal ($name, $nhstr, 'DoN',    0);
       
       # Daten für Min-Max Normierung
       my $temp_norm = _aiNeuroNetNormMinMaxValue ($temp,
-                                                  $data{$name}{neuralnet}{contmpMin},
-                                                  $data{$name}{neuralnet}{contmpMax});    # Temperatur, numerisch min-max normalisiert
+                                                  $data{$name}{neuralnet}{con}{tmpMin},
+                                                  $data{$name}{neuralnet}{con}{tmpMax});    # Temperatur, numerisch min-max normalisiert
       my $wcc_norm  = _aiNeuroNetNormMinMaxValue ($wcc,
-                                                  $data{$name}{neuralnet}{conwccMin},
-                                                  $data{$name}{neuralnet}{conwccMax});    # Bewölkung, numerisch min-max normalisiert
+                                                  $data{$name}{neuralnet}{con}{wccMin},
+                                                  $data{$name}{neuralnet}{con}{wccMax});    # Bewölkung, numerisch min-max normalisiert
       my $rr1c_norm = _aiNeuroNetNormMinMaxValue ($rr1c,
-                                                  $data{$name}{neuralnet}{conrr1Min},
-                                                  $data{$name}{neuralnet}{conrr1Max});    # Niederschlag, numerisch min-max normalisiert
+                                                  $data{$name}{neuralnet}{con}{rr1Min},
+                                                  $data{$name}{neuralnet}{con}{rr1Max});    # Niederschlag, numerisch min-max normalisiert
       my $pvfc_norm = _aiNeuroNetNormMinMaxValue ($pvfc,
-                                                  $data{$name}{neuralnet}{conpvrMin},
-                                                  $data{$name}{neuralnet}{conpvrMax});    # Erstatzwert für PV Ertrag min-max normalisiert
+                                                  $data{$name}{neuralnet}{con}{pvrMin},
+                                                  $data{$name}{neuralnet}{con}{pvrMax});    # Erstatzwert für PV Ertrag min-max normalisiert
+      
       
       my @new_input = (
-          _aiNeuroNetEncodeCyclic ($month,  12),                                       # Monat, zyklische Struktur (Dezember <-> Januar)    
-          _aiNeuroNetEncodeCyclic ($hod,    24),                                       # Stunde des Tages zyklisch
-          _aiNeuroNetEncodeCyclic ($weekday, 7),                                       # Wochentag in zyklischer Struktur (0..6)
-          _aiNeuroNetEncodeCyclic ($sunaz, 360),                                       # Sonnenazimut zyklisch 
+          _aiNeuroNetEncodeCyclic ($month,  12, $range),                               # Monat, zyklische Struktur (Dezember <-> Januar)    
+          _aiNeuroNetEncodeCyclic ($hod,    24, $range),                               # Stunde des Tages zyklisch
+          _aiNeuroNetEncodeCyclic ($weekday, 7, $range),                               # Wochentag in zyklischer Struktur (0..6)
+          _aiNeuroNetEncodeCyclic ($sunaz, 360, $range),                               # Sonnenazimut zyklisch 
           $isday,                                                                      # Tag / Nacht (0|1)
+          $hour_norm,                                                                  # Stunde des Tages normiert 0..1
+          $noon,
           ($isday  ? $hod / 24 : 0),                                                   # Tagstunden normiert, sonst 0
           (!$isday ? $hod / 24 : 0),                                                   # Nachtstunden normiert, sonst 0
-          _aiNeuroNetNormSunalt ($sunalt),                                             # Sonnenaltitude normalisieren im Bereich 0..+1
+          _aiNeuroNetNormSunalt ($sunalt, $range),                                     # Sonnenaltitude normalisieren im Bereich 0..+1
           $temp_norm,                                                                  # Temperatur, numerisch min-max normalisiert
           $wcc_norm,                                                                   # Bewölkung, numerisch min-max normalisiert
           $rr1c_norm,                                                                  # Niederschlag, numerisch min-max normalisiert
@@ -21832,11 +22119,22 @@ sub aiNeuroNetGetConResult {
       );
 
       my $prediction = sprintf '%.0f', _aiNeuroNetConPredict ($name, \@new_input);
+      $data{$name}{nexthours}{$nhstr}{confc} = $prediction;                            # prognostizierten Verbrauch speichern
+      
+      debugLog ($paref, 'aiData|consumption_long', "Neural Network - Start time: $starttime, hod: $hod -> consumption forecast: $prediction Wh");
 
-      my $confc = NexthoursVal ($name, $nhtstr, 'confc', 0);
-      debugLog ($paref, 'aiData', "Neural Network - hod: $hod -> consumption forecast: $prediction Wh, legacy value: $confc");
+      if (NexthoursVal ($name, $nhstr, 'today', 0)) {                                  # nur Werte des aktuellen Tags speichern
+          my $nhhr = sprintf "%02d", $hod;
+          $data{$name}{circular}{$nhhr}{confc} = $prediction;
+          writeToHistory ( { paref => $paref, key => 'confc', val => $prediction, hour => $nhhr } );
 
-      setTimeTracking ($name, $cst, 'neuralNetConLastGetResultTime');                 # Laufzeit ermitteln
+          debugLog ($paref, 'saveData2Cache|consumption_long', "store circular/history hod '$hod' confc: $prediction");
+      }
+      
+      #my $confc = NexthoursVal ($name, $nhstr, 'confc', 0);
+      #debugLog ($paref, 'aiData', "Neural Network - hod: $hod -> consumption forecast: $prediction Wh, legacy value: $confc");
+      
+      setTimeTracking ($name, $cst, 'neuralNetConLastGetResultTime');                  # Laufzeit ermitteln
   }
   
 return;
@@ -21849,10 +22147,15 @@ sub _aiNeuroNetConModelReady {
   my ($name) = @_;
 
   my $cause;
-  my $rdy   = 1;
-  my $nctst = CurrentVal  ($name, 'neuralNetConTrainstate', undef);
+  my $rdy      = 1;
+  my $nctst    = CurrentVal ($name, 'neuralNetConTrainstate', undef);
+  my $aiconact = CurrentVal ($name, 'aiConActivate', 0);
   
-  if ($aifannabs) { 
+  if (!$aiconact) { 
+      $cause = "the neural network for consumption forecasting is not activated"; 
+      $rdy   = 0;
+  }
+  elsif ($aifannabs) { 
       $cause = "Perl Modul AI::FANN is missing"; 
       $rdy   = 0;
   }
@@ -21872,6 +22175,26 @@ sub _aiNeuroNetConModelReady {
 return ($rdy, $cause);                                                                    
 }
 
+###############################################################
+#   Returniert die beiden Vorgänger von $val
+###############################################################     
+sub _aiNeuroNetLagRegister {
+    my ($val, $aref) = @_;
+
+    push  @$aref, $val;
+    shift @$aref if(scalar (@$aref) > 2);                              # falls mehr als 2 Elemente -> ältestes entfernen
+
+    my $cons_t_minus2 = 0;
+    my $cons_t_minus1 = 0;                                 
+    
+    if (@$aref == 2) {                                                # Werte extrahieren, wenn genügend vorhanden
+        $cons_t_minus2 = $aref->[0];                                  # ältester Wert
+        $cons_t_minus1 = $aref->[1];                                  # letzter Wert
+    }
+
+return ($cons_t_minus1, $cons_t_minus2);
+}
+
 ################################################################
 #            Neuronales Netz Verbrauchs-Vorhersage
 # $input = Arrayref mit Rohwerten
@@ -21880,16 +22203,20 @@ return ($rdy, $cause);
 sub _aiNeuroNetConPredict {
   my ($name, $input) = @_;
   
-  my $conOutMax    = $data{$name}{neuralnet}{conOutMax};
-  my $conOutMin    = $data{$name}{neuralnet}{conOutMin};
-  my $conFannModel = $data{$name}{neuralnet}{conFannModel};
+  my $conOutMax    = $data{$name}{neuralnet}{con}{OutMax};
+  my $conOutMin    = $data{$name}{neuralnet}{con}{OutMin};
+  my $conFannModel = $data{$name}{neuralnet}{con}{FannModel};
   
-  my $len = scalar (@$input);                                                         # Anzahl Features 
+  my $len = scalar (@$input);                                                             # Anzahl Features 
   my $out;
-  eval { $out = $conFannModel->run ($input) };                                        # Netz laufen lassen
+  eval { $out = $conFannModel->run ($input) };                                            # Netz laufen lassen
   
-  my $norm_val   = $out->[0];                                                         # Ergebnis ist Arrayref mit num_outputs Werten
-  #my $denorm_val = abs ($conOutMin + $norm_val * ($conOutMax - $conOutMin));          # Denormalisierung mit Min-Max
+  unless (defined $out && ref($out) eq 'ARRAY' && @$out) {                                # Härten: prüfen ob $out gültig ist
+      Log3 ($name, 1, qq{$name - FannModel->run() did not return a valid result, return value = 0});
+      return 0;
+  }
+  
+  my $norm_val   = $out->[0];                                                             # Ergebnis ist Arrayref mit num_outputs Werten
   my $denorm_val = abs _aiNeuroNetDenormMinMaxValue ($norm_val, $conOutMin, $conOutMax);  # Denormalisierung mit Min-Max
   
 #Log3 ($name, 1, qq{$name - conOutMin: $conOutMin, conOutMax: $conOutMax, norm_val: $norm_val, denorm_val: $denorm_val});
@@ -21904,27 +22231,42 @@ return $denorm_val;
 # z.B. Monat (1..12) wird in 2 sin/cos Werte umgewandelt
 # value  = aktueller Wert
 # period = Zykluslänge z.B. Monat 1..12
+# $range = Normalisierung -> 01: 0..1  für SIGMOID, 
+#                           -11: -1..1 für SIGMOID_SYMMETRIC
 ###############################################################   
 sub _aiNeuroNetEncodeCyclic {
-  my ($value, $period) = @_;                
+  my $value  = shift; 
+  my $period = shift;
+  my $range  = shift // '01';               
 
   my $angle = 2 * PI * $value / $period;
   my $sin   = sin ($angle);
   my $cos   = cos ($angle);
   
-  my $sin01 = ($sin + 1) / 2;                 # Verschieben von [-1,1] auf [0,1] für sigmoid Normalisierungen
-  my $cos01 = ($cos + 1) / 2;
-
-return ($sin01, $cos01);
+  if ($range eq '-11') {                                # Direkt im Bereich [-1,1] zurückgeben für SIGMOID_SYMMETRIC
+      return ($sin, $cos);
+  } 
+  else {                                                # Verschieben von [-1,1] auf [0,1] für SIGMOID Aktivierung
+      my $sin01 = ($sin + 1) / 2;
+      my $cos01 = ($cos + 1) / 2;
+      return ($sin01, $cos01);
+  }
 }
 
 ###############################################################
-#   Bereich [-90, +90] auf [0,1] verschieben
+#   Bereich [-90, +90] auf [0,1] verschieben für SIGMOID bzw.
+#   auf -1..1 normalisieren für SIGMOID_SYMMETRIC
 ###############################################################    
 sub _aiNeuroNetNormSunalt {
-    my ($sunalt) = @_;
-    
-return ($sunalt + 90) / 180;
+  my $sunalt = shift;
+  my $range  = shift // '01';
+  
+  if ($range eq '-11') {
+      return $sunalt / 90;                           # [-90,90] → [-1,1] für SIGMOID_SYMMETRIC
+  } 
+  else {
+      return ($sunalt + 90) / 180;                   # [-90,90] → [0,1] für SIGMOID
+  }
 }
 
 ###############################################################
@@ -21940,6 +22282,43 @@ sub _aiNeuroNetNormalizeMinMax {
   my $norm_ref    = [ map { ($_ - $min) / $range } @$data ];
 
 return ($norm_ref, $min, $max);
+}
+
+###############################################################
+#   Min-Max Normalisierung eines einzelnen Wertes 
+###############################################################    
+sub _aiNeuroNetNormMinMaxValue {
+  my ($val, $min, $max) = @_;
+  return 0 if $max == $min;                                      # Schutz gegen Division durch 0
+    
+return ($val - $min) / ($max - $min);
+}
+
+###############################################################
+#  Symmetrische Min-Max-Normierung für eindimensionale Arrays
+#  return - Arreyref normalisierter Daten im Bereich -1..1
+###############################################################
+sub _aiNeuroNetNormalizeMinMaxSymmetric {
+  my ($data) = @_;                      # Arrayref mit Werten eines Features
+
+  my ($min, $max) = _aiNeuroNetComputeMinMax ($data);
+  my $range       = $max - $min;
+  $range          = 1 if($range == 0);
+  my $norm_ref    = [ map { 2 * (($_ - $min) / $range) -1 } @$data ];
+
+return ($norm_ref, $min, $max);
+}
+
+###############################################################
+# Symmetrische Min-Max Normalisierung eines einzelnen Wertes 
+############################################################### 
+sub _aiNeuroNetNormMinMaxValueSymmetric {
+  my ($val, $min, $max) = @_;
+  
+  return 0 if $max == $min;
+  my $range = $max - $min;
+    
+return 2 * (($val - $min) / $range) - 1;
 }
 
 ###############################################################
@@ -21960,16 +22339,6 @@ return ($min, $max);
 }
 
 ###############################################################
-#   Min-Max Normalisierung eines einzelnen Wertes 
-###############################################################    
-sub _aiNeuroNetNormMinMaxValue {
-  my ($val, $min, $max) = @_;
-  return 0 if $max == $min;                                      # Schutz gegen Division durch 0
-    
-return ($val - $min) / ($max - $min);
-}
-
-###############################################################
 #   Min-Max Denormalisierung eines einzelnen Wertes 
 ###############################################################
 sub _aiNeuroNetDenormMinMaxValue {
@@ -21977,6 +22346,142 @@ sub _aiNeuroNetDenormMinMaxValue {
   return $min if $max == $min;                                   # Schutz gegen Division durch 0
   
   return $norm * ($max - $min) + $min;
+}
+
+################################################################################################
+#            Neuronales Netz Retrain-Indikator
+# Parameterisierung: Passe 2.0 / 1.5 / 0.005 / 0.003 an die 
+# Daten an. 
+# Indikator prüft: wenn die Streuung > 25% des 
+#                  Mittelwerts → Training instabil → Retrain
+# Kleine Standardabweichung: Validation‑MSE ist stabil → Training konsistent
+# Große Standardabweichung: Validation‑MSE schwankt stark → Training instabil, 
+#                           Retrain sinnvoll
+# 
+# Kennzahlen
+# -----------
+# - Verhältnis Train/Val‑MSE (ratio) und absolute Differenz (diff)
+# - Stabilität über Standardabweichung (valstd/valmean)
+# - BitFail absolut und relativ (bitfail, bitfail_rate)
+# - RMSE/MAE-Verhältnis (Ausreißer-Druck)
+# - Maximalfehler (max_abs_error)
+# - Perzentile P95/P99
+# - Bias über mean_error
+# - Grenzfälle für Borderline und harte Schwellen für Retrain
+# - Trend der Validierung (Slope): Prüfen, ob die letzten N Validierungs‑MSEs einen  
+#                                  positiven Trend haben → erkennt Divergenz/Übertraining
+#
+# Erläuterungen
+# --------------
+# - RMSE/MAE-Verhältnis:  Zeigt, ob Ausreißer die Fehler stark verzerren.
+#   Typische Schwellen:  >1.5 → Retrain, 1.3–1.5 → Borderline
+# 
+# - Maximaler absoluter Fehler: Schutz gegen extreme Einzelwerte (z.B. Verbrauchsspitzen)
+#   Typische Schwellen: >3×MAE oder über Domain‑Grenze → Retrain
+#
+# - Perzentile-Fehler (P95/P99): Prüft, ob viele Werte im oberen Bereich stark abweichen.
+#   Typische Schwellen: P95 >2×MAE oder P99 >3×MAE → Retrain
+#
+# - Bias (mittlerer Vorzeichenfehler): Zeigt systematische Über- oder Unterschätzung.
+#   Typische Schwellen: mean_error > 0.4×MAE → Retrain
+#
+# - BitFail-Rate: Anteil der Testwerte außerhalb der Toleranz. 
+#   Typische Schwellen: >10% → Retrain, 5–10% → Borderline
+#
+# - Trend der Validierung (Slope): Wenn Val‑MSE im Verlauf steigt → Übertraining oder Divergenz.
+#   Typische Schwellen: Steigung >0.0005 über letzte 50 Epochen → Retrain
+#
+# - Spannweite der letzten Val-MSEs: Prüft Stabilität der letzten Epochen.
+#   Typische Schwellen: (max_tail − min_tail) >0.5×val_mean → Retrain
+#
+################################################################################################
+sub _aiNeuroNetRetrainIndicator {
+  my $paref = shift;
+  my $name           = $paref->{name};
+  my $best_train_mse = $paref->{best_train_mse};
+  my $best_val_mse   = $paref->{best_val_mse};
+  my $bitfail        = $paref->{bitfail};
+  my $valstd         = $paref->{valstd};
+  my $valmean        = $paref->{valmean};
+  my $rmse           = $paref->{rmse};
+  my $mae            = $paref->{mae};
+  my $abserref       = $paref->{abserref};
+  my $mean_error     = $paref->{mean_error};
+  my $test_input_num = $paref->{test_input_num};
+  my $slope          = $paref->{slope};
+  my $debug          = $paref->{debug};  
+      
+  my @sorted_abs = sort { $a <=> $b } @$abserref;
+  
+  my $ratio = $best_train_mse > 0 ? ($best_val_mse / $best_train_mse) : 999;                # Verhältnis und Differenz
+  my $diff  = abs ($best_val_mse - $best_train_mse);
+  
+  $best_train_mse = sprintf "%.6f", $best_train_mse;
+  $best_val_mse   = sprintf "%.6f", $best_val_mse;
+  $ratio          = sprintf "%.6f", $ratio;
+  $diff           = sprintf "%.6f", $diff;
+  $valstd         = sprintf "%.6f", $valstd;
+  $valmean        = sprintf "%.6f", $valmean;
+  $slope          = sprintf "%.6f", $slope;
+  $mean_error     = sprintf "%.2f", $mean_error;
+  
+  my $rmse_mae_ratio = sprintf "%.4f", ($rmse / ($mae || 1));
+  my $max_abs_error  = sprintf "%.2f", max (@$abserref);
+  my $p95_error      = sprintf "%.4f", $sorted_abs[int (0.95 * scalar(@sorted_abs))];
+  my $p99_error      = sprintf "%.4f", $sorted_abs[int (0.99 * scalar(@sorted_abs))];
+  my $bitfail_rate   = sprintf "%.4f", ($bitfail / $test_input_num);
+  
+  # Limits
+  my $lim_ratio          = 2.5;
+  my $lim_diff           = 0.005;
+  my $lim_bitfail        = 5;
+  my $lim_valstd         = 0.25 * $valmean;
+  my $lim_rmse_mae_ratio = 1.5;
+  my $lim_max_abs_error  = 4 * $mae;
+  my $lim_bitfail_rate   = 0.10;
+  my $lim_mean_error     = 0.5 * $mae;
+  my $lim_slope          = 0.0005;
+  my $lim_p95_error      = 3 * $mae;
+  my $lim_p99_error      = 10 * $mae;
+  
+  # Bewertungstext
+  my $quality = "ok";
+  $quality    = "Borderline"  if ( ($rmse_mae_ratio > 1.3 && $rmse_mae_ratio <= 1.5) ||           # Grenzfälle
+                                   ($bitfail_rate   > 0.05 && $bitfail_rate <= 0.10) ||
+                                   ($ratio > 1.5 && $diff > 0.003)                   ||
+                                   $p95_error > $lim_p95_error                       ||           # 95%-Perzentil zu hoch
+                                   $p99_error > $lim_p99_error                                    # 99%-Perzentil zu hoch
+                                 );  
+                                
+  $quality    = "Retrain"     if ( $ratio            > $lim_ratio             ||           # Validation doppelt so groß wie Training
+                                   $diff             > $lim_diff              ||           # absolute Differenz zu groß
+                                   $bitfail          > $lim_bitfail           ||           # BitFail-Grenze absolut
+                                   $valstd           > $lim_valstd            ||           # Stabilitätscheck über letzte N Epochen
+                       
+                                   $rmse_mae_ratio   > $lim_rmse_mae_ratio    ||           # Ausreißer-Druck
+                                   #$max_abs_error    > $lim_max_abs_error     ||           # Extremfehler (z.B. Verbrauchsspitzen)
+                                   $bitfail_rate     > $lim_bitfail_rate      ||           # BitFail-Rate relativ
+                                   abs ($mean_error) > $lim_mean_error        ||           # systematischer Bias -> erkennt systematische Über- oder Unterschätzung
+                                   $slope            > $lim_slope                          # Steigung der Validierungs-MSE über die letzten Epochen -> sollte stabil bleiben
+                                 );
+  
+  if ($debug =~ /aiProcess/xs) {      
+      Log3 ($name, 1, "$name DEBUG> Retrain check: Train MSE=$best_train_mse, Val MSE=$best_val_mse, Val Mean=$valmean, MAE=$mae -> \n".
+                      "Ratio=$ratio (limit $lim_ratio), \n".
+                      "Diff=$diff (limit $lim_diff), \n".
+                      "ValStd=$valstd (limit $lim_valstd), \n".
+                      "BitFail=$bitfail (limit $lim_bitfail), \n".
+                      "BitFailRate=$bitfail_rate (limit $lim_bitfail_rate), \n".
+                      "RMSE/MAE=$rmse_mae_ratio (limit $lim_rmse_mae_ratio), \n".
+                      #"MaxAbs=$max_abs_error (limit $lim_max_abs_error), \n".
+                      "Bias=$mean_error (limit $lim_mean_error), \n".
+                      "Slope=$slope (limit $lim_slope) \n".
+                      "P95=$p95_error (limit $lim_p95_error), \n".
+                      "P99=$p99_error (limit $lim_p99_error), \n".
+                      "-> $quality");
+  }                            
+
+return $quality;
 }
 
 #####################################################################
@@ -26785,7 +27290,7 @@ return $dstr;
 #                   Daten Serialisieren
 ###############################################################
 sub Serialize {
-  my $dat  = shift;                           # Hash-Referenz der Daten
+  my $dat  = shift;                   # Hash-Referenz der Daten
   my $name = $dat->{name};
 
   my $serial = eval { freeze ($dat)
@@ -27328,11 +27833,13 @@ return $def;
 # Usage:
 # AiNeuralVal ($hash or $name, key, $def)
 #
+# mode:  con = consumption forecast
 # key:   den zu liefernden KI Wert
 # $def:  Defaultwert
 ###################################################################################################
 sub AiNeuralVal {
   my $name = shift;
+  my $mode = shift;
   my $key  = shift;
   my $def  = shift;
 
@@ -27340,9 +27847,10 @@ sub AiNeuralVal {
       $name = $name->{NAME};
   }
 
-  if (defined $data{$name}{neuralnet}        &&
-      defined $data{$name}{neuralnet}{$key}) {
-      return  $data{$name}{neuralnet}{$key};
+  if (defined $data{$name}{neuralnet}               &&
+      defined $data{$name}{neuralnet}{$mode}        &&
+      defined $data{$name}{neuralnet}{$mode}{$key}) {
+      return  $data{$name}{neuralnet}{$mode}{$key};
   }
 
 return $def;
@@ -27899,23 +28407,25 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-set-aiDecTree"></a>
       <li><b>aiDecTree </b> <br><br>
 
-      If AI support is enabled in the SolarForecast Device, various AI actions can be performed manually.
-      The manual execution of the AI actions is generally not necessary, since the processing of all necessary steps is
-      already performed automatically in the module.
+      Various AI actions can be performed manually to use the PV forecast AI or consumption forecast AI.
+      Manual execution of the actions is generally not necessary, as all necessary steps are already processed automatically in the module.
       <br><br>
 
       <ul>
        <table>
        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-          <tr><td> <b>addInstAndTrain</b>  </td><td>The AI is enriched with the currently available PV, radiation and environmental data.                                       </td></tr>
-          <tr><td>                         </td><td>The AI is then trained using the historical data.                                                                           </td></tr>
-          <tr><td>                         </td><td>Successfully generated decision trees are saved in the file system.                                                         </td></tr>
+          <tr><td> <b>addInstAndTrain</b>  </td><td>The AI instance for PV forecasting is enriched with the currently available PV, radiation and environmental data.           </td></tr>
+          <tr><td>                         </td><td>This AI is then trained. Successfully generated decision trees are saved in the file system.                                </td></tr>
           <tr><td>                         </td><td>                                                                                                                            </td></tr>
           <tr><td> <b>addRawData</b>       </td><td>Relevant PV, radiation and environmental data are extracted and stored for later use.                                       </td></tr>
+          <tr><td>                         </td><td>This raw data is used by both the PV prediction AI and the consumption prediction AI.                                       </td></tr>
           <tr><td>                         </td><td>                                                                                                                            </td></tr>
-          <tr><td><b>rawDataGHIreplace</b> </td><td>Historical GHI (Global Horizontal Irradiance) values are retrieved from the Open-Meteo service and the values in aiRawData  </td></tr>
-          <tr><td>                         </td><td>(see  <a href="#SolarForecast-get-valDecTree">get ... valDecTree aiRawData</a>) replaces existing values 'rad1h'
-                                                     or adds them if they are not available.                                                                                    </td></tr>
+          <tr><td><b>rawDataGHIreplace</b> </td><td>Historical GHI (Global Horizontal Irradiance) values are retrieved from the Open-Meteo service and the values present in    </td></tr>
+          <tr><td>                         </td><td>the raw data (see  <a href="#SolarForecast-get-valDecTree">get ... valDecTree aiRawData</a>) “rad1h” are replaced.          </td></tr>
+          <tr><td>                         </td><td>                                                                                                                            </td></tr>
+          <tr><td><b>runConTrain</b>       </td><td>Start training the consumption prediction AI.                                                                               </td></tr>
+          <tr><td>                         </td><td>(The Perl module AI::FANN must be installed.)                                                                               </td></tr>
+          <tr><td>                         </td><td>                                                                                                                            </td></tr>
          </table>
       </ul>
     </li>
@@ -28747,7 +29257,7 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      Display of relevant data from the solar forecast and consumption forecast AI.
+      Display of relevant data from the solar forecast-AI and consumption forecast-AI. <br>
       The available display options depend on the available and activated AI support level.
       <br><br>
 
@@ -28755,7 +29265,7 @@ to ensure that the system configuration is correct.
        <table>
        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
           <tr><td> <b>aiRawData</b>            </td><td>Display of the PV, radiation and environmental data currently saved for an AI evaluation.   </td></tr>
-          <tr><td>                             </td><td>The data is used by solar forecasting and consumption forecasting AI.                       </td></tr>
+          <tr><td>                             </td><td>The data is used by solar forecasting AI and consumption forecasting AI.                    </td></tr>
           <tr><td>                             </td><td>                                                                                            </td></tr>
           <tr><td> <b>aiRuleStrings</b>        </td><td>Returns a list describing the decision tree of the solar forecast AI in the form of rules.  </td></tr>
           <tr><td>                             </td><td><b>Note:</b> While the order of the rules is not predictable, the                           </td></tr>
@@ -28848,8 +29358,8 @@ to ensure that the system configuration is correct.
      <ul>
        <a id="SolarForecast-attr-aiControl"></a>
        <li><b>aiControl &lt;Key=Value&gt; &lt;Key=Value&gt; ... </b><br>
-         By optionally specifying the following key=value pairs, various properties of the AI support can be
-         properties of the AI support can be influenced. <br>
+         By optionally specifying the key=value pairs listed below, various properties of the PV prediction AI support and 
+         consumption prediction AI can be influenced. <br>
          AI support for PV forecast autocorrection is activated with the set command
          <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> switched on. <br>
          The entry can be made in several lines.
@@ -28858,16 +29368,16 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="26%"> <col width="74%"> </colgroup>
-            <tr><td> <b>aiTrainStart</b>      </td><td>Daily training takes place when using the internal AI.                                                                        </td></tr>
+            <tr><td> <b>aiTrainStart</b>      </td><td>When using the internal PV forecast AI, daily training takes place.                                                           </td></tr>
             <tr><td>                          </td><td>Training starts approx. 15 minutes after the hour specified in this key.                                                      </td></tr>
             <tr><td>                          </td><td>For example, with a set value of '3', training would start at around 03:15.                                                   </td></tr>
             <tr><td>                          </td><td>Value: <b>1 ... 23</b>, default: 2                                                                                            </td></tr>
             <tr><td>                          </td><td>                                                                                                                              </td></tr>
-            <tr><td> <b>aiStorageDuration</b> </td><td>Training data is collected and stored for the module's internal AI.                                                           </td></tr>
+            <tr><td> <b>aiStorageDuration</b> </td><td>The module collects and stores training data for PV prediction AI and consumption prediction AI.                              </td></tr>
             <tr><td>                          </td><td>This data is deleted when it has exceeded the specified holding period (days).                                                </td></tr>
             <tr><td>                          </td><td>Value: <b>Integer</b>, default: 1825                                                                                          </td></tr>
             <tr><td>                          </td><td>                                                                                                                              </td></tr>
-            <tr><td> <b>aiTreesPV</b>         </td><td>Defines the number of AI decision trees (random forests). A higher number increases the                                       </td></tr>
+            <tr><td> <b>aiTreesPV</b>         </td><td>PV forecast AI: Defines the number of AI decision trees (random forests). A higher number increases the                       </td></tr>
             <tr><td>                          </td><td>accuracy and robustness of AI prediction, but requires more CPU and RAM resources.                                            </td></tr>
             <tr><td>                          </td><td><b>Note:</b> Only carry out an increase in small steps and in consideration of the performance of the hardware!               </td></tr>
             <tr><td>                          </td><td>                                                                                                                              </td></tr>
@@ -28877,7 +29387,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3
+         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 aiConHiddenLayers=50-25
        </ul>
 
        </li>
@@ -30679,23 +31189,26 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-set-aiDecTree"></a>
       <li><b>aiDecTree </b> <br><br>
 
-      Ist der KI Support im SolarForecast Device aktiviert, können verschiedene KI-Aktionen manuell ausgeführt werden.
-      Die manuelle Ausführung der KI Aktionen ist im Allgemeinen nicht notwendig, da die Abarbeitung aller nötigen Schritte
+      Zur Nutzung der PV-Vorhersage KI bzw. Verbrauchsvorhersage KI können verschiedene KI-Aktionen manuell ausgeführt werden.
+      Die manuelle Ausführung der Aktionen ist im Allgemeinen nicht notwendig, da die Abarbeitung aller nötigen Schritte
       bereits automatisch im Modul vorgenommen wird.
       <br><br>
 
       <ul>
        <table>
        <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-          <tr><td><b>addInstAndTrain</b>   </td><td>Die KI wird mit den aktuell vorhandenen PV-, Strahlungs- und Umweltdaten angereichert.                                  </td></tr>
-          <tr><td>                         </td><td>Anschließend wird die KI mit den historischen Daten trainiert.                                                          </td></tr>
-          <tr><td>                         </td><td>Erfolgreich generierte Entscheidungsbäume werden im Filesystem gespeichert.                                             </td></tr>
+          <tr><td><b>addInstAndTrain</b>   </td><td>Die KI-Instanz zur PV-Vorhersage wird mit den aktuell vorhandenen PV-, Strahlungs- und Umweltdaten angereichert.        </td></tr>
+          <tr><td>                         </td><td>Anschließend wird diese KI trainiert. Erfolgreich generierte Entscheidungsbäume werden im Filesystem gespeichert.       </td></tr>
           <tr><td>                         </td><td>                                                                                                                        </td></tr>
           <tr><td><b>addRawData</b>        </td><td>Relevante PV-, Strahlungs- und Umweltdaten werden extrahiert und für die spätere Verwendung gespeichert.                </td></tr>
+          <tr><td>                         </td><td>Diese Rohdaten werden sowohl von der PV-Vorhersage KI als auch Verbrauchsvorhersage KI verwendet.                       </td></tr>
           <tr><td>                         </td><td>                                                                                                                        </td></tr>
-          <tr><td><b>rawDataGHIreplace</b> </td><td>Es werden historische GHI (Global Horizontal Irradiance) Werte vom Open-Meteo Dienst abgerufen und die in aiRawData     </td></tr>
-          <tr><td>                         </td><td>(siehe <a href="#SolarForecast-get-valDecTree">get ... valDecTree aiRawData</a>) vorhandenen Werte 'rad1h' ersetzt bzw.
-                                                     ergänzt wenn sie nicht vorhanden sind.                                                                                 </td></tr>
+          <tr><td><b>rawDataGHIreplace</b> </td><td>Es werden historische GHI (Global Horizontal Irradiance) Werte vom Open-Meteo Dienst abgerufen und die in den Rohdaten  </td></tr>
+          <tr><td>                         </td><td>(siehe <a href="#SolarForecast-get-valDecTree">get ... valDecTree aiRawData</a>) vorhandenen Werte 'rad1h' ersetzt.     </td></tr>
+          <tr><td>                         </td><td>                                                                                                                        </td></tr>
+          <tr><td><b>runConTrain</b>       </td><td>Startet das Training der Verbrauchsvorhersage KI.                                                                       </td></tr>
+          <tr><td>                         </td><td>(Es muß das Perl Modul AI::FANN installiert sein)                                                                       </td></tr>
+          <tr><td>                         </td><td>                                                                                                                        </td></tr>
         </table>
       </ul>
     </li>
@@ -31535,7 +32048,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <a id="SolarForecast-get-valDecTree"></a>
       <li><b>valDecTree </b> <br><br>
 
-      Anzeige von relevanten Daten der Solarprognose und Verbrauchsprognose KI.
+      Anzeige von relevanten Daten der Solarprognose-KI und Verbrauchsprognose-KI. <br>
       Die verfügbaren Anzeigeoptionen sind abhängig vom verfügbaren und aktivierten KI Unterstützungslevel.
       <br><br>
 
@@ -31543,7 +32056,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <table>
        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
           <tr><td> <b>aiRawData</b>            </td><td>Anzeige der aktuell für eine KI-Auswertung gespeicherten PV-, Strahlungs- und Umweltdaten.               </td></tr>
-          <tr><td>                             </td><td>Die Daten werden von Solarprognose und Verbrauchsprognose KI genutzt.                                    </td></tr>
+          <tr><td>                             </td><td>Die Daten werden von Solarprognose-KI und Verbrauchsprognose-KI genutzt.                                 </td></tr>
           <tr><td>                             </td><td>                                                                                                         </td></tr>
           <tr><td> <b>aiRuleStrings</b>        </td><td>Gibt eine Liste zurück, die den Entscheidungsbaum der Solarprognose KI in Form von Regeln beschreibt.    </td></tr>
           <tr><td>                             </td><td><b>Hinweis:</b> Die Reihenfolge der Regeln ist zwar nicht vorhersehbar, die                              </td></tr>
@@ -31551,7 +32064,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
           <tr><td>                             </td><td>wider, in der die Kriterien bei der Entscheidungsfindung geprüft werden.                                 </td></tr>
           <tr><td>                             </td><td>(verfügbar wenn ein KI kompatibles SolarForecast MODEL der PV Vorhersage aktiviert ist)                  </td></tr>
           <tr><td>                             </td><td>                                                                                                         </td></tr>
-          <tr><td> <b>aiNeuralNetConState</b>  </td><td>Zeigt den Status und aktuelle Kennzahlen der Verbrauchsprognose KI.                                      </td></tr>
+          <tr><td> <b>aiNeuralNetConState</b>  </td><td>Zeigt den Status und aktuelle Kennzahlen der Verbrauchsprognose-KI.                                      </td></tr>
           <tr><td>                             </td><td>                                                                                                         </td></tr>
         </table>
       </ul>
@@ -31636,7 +32149,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <a id="SolarForecast-attr-aiControl"></a>
        <li><b>aiControl &lt;Schlüssel=Wert&gt; &lt;Schlüssel=Wert&gt; ... </b><br>
          Durch die optionale Angabe der nachfolgend aufgeführten Schlüssel=Wert Paare können verschiedene
-         Eigenschaften der KI Unterstützung beeinflusst werden. <br>
+         Eigenschaften der PV-Vorhersage KI Unterstützung und Verbrauchsvorhersage KI beeinflusst werden. <br>
          Die KI Unterstützung der PV Prognose Autokorrektur wird mit dem Set-Befehl
          <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> eingeschaltet. <br>
          Die Eingabe kann mehrzeilig erfolgen.
@@ -31645,26 +32158,95 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="26%"> <col width="74%"> </colgroup>
-            <tr><td> <b>aiTrainStart</b>      </td><td>Bei Nutzung der internen KI erfolgt ein tägliches Training.                                                                   </td></tr>
-            <tr><td>                          </td><td>Der Start des Trainings erfolgt ca. 15 Minuten nach der in diesem Schlüssel festgelegten vollen Stunde.                       </td></tr>
-            <tr><td>                          </td><td>Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten.                                    </td></tr>
-            <tr><td>                          </td><td>Wert: <b>1 ... 23</b>, default: 2                                                                                             </td></tr>
-            <tr><td>                          </td><td>                                                                                                                              </td></tr>
-            <tr><td> <b>aiStorageDuration</b> </td><td>Es werden Trainingsdaten für die modulinterne KI gesammelt und gespeichert.                                                   </td></tr>
-            <tr><td>                          </td><td>Diese Daten werden gelöscht, wenn sie die angegebene Haltedauer (Tage) überschritten haben.                                   </td></tr>
-            <tr><td>                          </td><td>Wert: <b>Ganzzahl</b>, default: 1825                                                                                          </td></tr>
-            <tr><td>                          </td><td>                                                                                                                              </td></tr>
-            <tr><td> <b>aiTreesPV</b>         </td><td>Legt die Anzahl der KI-Entscheidungsbäume (Random Forests) fest. Eine höhere Anzahl steigert die                              </td></tr>
-            <tr><td>                          </td><td>Genauigkeit und Robustheit der KI Vorhersage, erfordert aber mehr CPU und RAM Ressourcen.                                     </td></tr>
-            <tr><td>                          </td><td><b>Hinweis:</b> Eine Erhöhung nur in kleinen Schritten und unter Beachtung der Leistungsfähigkeit der Hardware durchführen!   </td></tr>
-            <tr><td>                          </td><td>                                                                                                                              </td></tr>
-            <tr><td>                          </td><td>Wert: <b>1 ... 50</b>, default: 10                                                                                            </td></tr>
+            <tr><td> <b>aiStorageDuration</b> </td><td>Im Modul werden Trainingsdaten für die PV-Vorhersage KI und Verbrauchsvorhersage KI gesammelt und gespeichert.                           </td></tr>
+            <tr><td>                          </td><td>Diese Daten werden gelöscht, wenn sie die angegebene Haltedauer (Tage) überschritten haben.                                              </td></tr>
+            <tr><td>                          </td><td>Wert: <b>Ganzzahl</b>, default: 1825                                                                                                     </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                         </td></tr>
+         </table>
+         
+         <br><br>         
+         Nachfolgende Parameter beziehen sich auf die <b>PV-Vorhersage KI:</b> 
+         <br><br>
+         
+         <table>
+         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
+            <tr><td> <b>aiTrainStart</b>      </td><td>Bei Nutzung der internen PV-Vorhersage KI erfolgt ein tägliches Training.                                                                </td></tr>
+            <tr><td>                          </td><td>Der Start des Trainings erfolgt ca. 15 Minuten nach der in diesem Schlüssel festgelegten vollen Stunde.                                  </td></tr>
+            <tr><td>                          </td><td>Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten.                                               </td></tr>
+            <tr><td>                          </td><td>Wert: <b>1 ... 23</b>, default: 2                                                                                                        </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                         </td></tr>
+            <tr><td> <b>aiTreesPV</b>         </td><td>Legt die Anzahl der KI-Entscheidungsbäume (Random Forests) fest. Eine höhere Anzahl steigert die                                         </td></tr>
+            <tr><td>                          </td><td>Genauigkeit und Robustheit der KI Vorhersage, erfordert aber mehr CPU und RAM Ressourcen.                                                </td></tr>
+            <tr><td>                          </td><td><b>Hinweis:</b> Eine Erhöhung nur in kleinen Schritten und unter Beachtung der Leistungsfähigkeit der Hardware durchführen!              </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                         </td></tr>
+            <tr><td>                          </td><td>Wert: <b>1 ... 50</b>, default: 10                                                                                                       </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                         </td></tr>
+         </table>
+
+         <br><br>
+         Nachfolgende Parameter beziehen sich auf die <b>Verbrauchsvorhersage KI: </b> 
+         <br><br>
+         
+         <table>
+         <colgroup> <col width="26%"> <col width="74%"> </colgroup>            
+            <tr><td> <b>aiConActivate</b>     </td><td>Aktiviert die Verwendung des neuronalen Netzes für die Verbrauchsvorhersage.                                                                         </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0 | 1 </b>, default: 0                                                                                                                     </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td> <b>aiConActFunc</b>      </td><td>Auswahl der Aktivierungsfunktion für die Hidden Layer.                                                                                               </td></tr>
+            <tr><td>                          </td><td><ul> * SIGMOID - eher verwenden bei rein positiven Lernwerten / Inputs (z.B. Verbrauch, PV, Temperatur). </ul>                                       </td></tr>
+            <tr><td>                          </td><td><ul> * SIGMOID_SYMMETRIC - sinnvoll für eine bessere Lernbarkeit für symmetrische Muster (z.B. Tag/Nacht-Wechsel) </ul>                              </td></tr>
+            <tr><td>                          </td><td>Werte:<b> SIGMOID | SIGMOID_SYMMETRIC </b>, default: SIGMOID                                                                                         </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td> <b>aiConHiddenLayers</b> </td><td>Stellt die Architektur (verborgene Schichten) des neuronalen Netzes ein.                                                                             </td></tr>
+            <tr><td>                          </td><td>Die Architektur bestimmt, wie viele Schichten und Neuronen das Netz hat.                                                                             </td></tr>
+            <tr><td>                          </td><td><ul> * kleine Netze (z.B. 50-25) sind schnell und einfach, aber weniger genau  </ul>                                                                 </td></tr>
+            <tr><td>                          </td><td><ul> * mittlere Netze (64-32) bieten einen guten Kompromiss aus Geschwindigkeit und Genauigkeit  </ul>                                               </td></tr>
+            <tr><td>                          </td><td><ul> * tiefe Netze (64-32-16) erkennen komplexe Muster besser, sind aber empfindlicher gegenüber Ausreißern  </ul>                                   </td></tr>
+            <tr><td>                          </td><td>Wertebereich:<b> XX[X]-XX[X]-XX[X] (X = 1-9) </b>, default: 64-32-16                                                                                 </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td> <b>aiConLearnRate</b>    </td><td>Bestimmt, wie stark die Gewichte des neuronalen Netzes bei jedem Traningsschritt angepasst werden.                                                   </td></tr>
+            <tr><td>                          </td><td><ul> * Klein (z.B. 0.001): langsames, stabiles Lernen; geringes Risiko von Überschwingen, aber längere Trainingszeit. </ul>                          </td></tr>
+            <tr><td>                          </td><td><ul> * Mittel (z.B. 0.005): guter Kompromiss zwischen Geschwindigkeit und Stabilität; oft ein sinnvoller Standardwert </ul>                          </td></tr>
+            <tr><td>                          </td><td><ul> * Groß (z.B. 0.05): schnelles Lernen, aber Gefahr von Instabilität oder Divergenz, wenn die Schritte zu groß sind </ul>                         </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0.05 | 0.01 | 0.005 | 0.001 </b>, default: 0.005                                                                                           </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td> <b>aiConMomentum</b>     </td><td>Steuert, wie stark frühere Gewichtsanpassungen in die aktuelle Lernrichtung einfließen.                                                              </td></tr>
+            <tr><td>                          </td><td><ul> * Klein (z.B. 0.2): Netz reagiert direkt auf aktuelle Fehler, aber schwankt stärker </ul>                                                       </td></tr>
+            <tr><td>                          </td><td><ul> * Mittel (z.B. 0.5–0.8): glättet die Lernschritte, beschleunigt die Konvergenz und verhindert Zickzack-Bewegungen </ul>                         </td></tr>
+            <tr><td>                          </td><td><ul> * Groß (z.B. 0.9): sehr starke Glättung, kann Training stabilisieren, aber das Netz kann an lokalen Minima 'vorbeischießen' </ul>               </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0.2 - 0.9 </b>, default: 0.7                                                                                                               </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td> <b>aiConShuffleMode</b>  </td><td>Einstellung des Shuffle Mode. Er bestimmt, wie die Trainingsdaten gemischt und in Trainings- sowie Testpakete aufgeteilt werden.                     </td></tr>
+            <tr><td>                          </td><td><ul> * 0 = chronologisch, reproduzierbar, aber anfällig für Reihenfolge-Effekte </ul>                                                                </td></tr>
+            <tr><td>                          </td><td><ul> * 1 = chronologischer Split, danach internes Shuffle - gute Balance zwischen zeitlicher Validierung und robustem Training </ul>                 </td></tr>
+            <tr><td>                          </td><td><ul> * 2 = vollständiges Shuffle vor dem Split + internes Shuffle - maximale Durchmischung, aber zeitliche Strukturen gehen verloren</ul>            </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2 </b>, default: 1                                                                                                                 </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td><b>aiConShufflePeriod</b> </td><td>Die Shuffle‑Periode bestimmt, nach wie vielen Epochen die Trainingsdaten im Hintergrund neu gemischt werden.                                         </td></tr>
+            <tr><td>                          </td><td>Der Parameter beeinflusst, wie stark das Netz zufällige Reihenfolgen sieht und damit Generalisation vs. Stabilität.                                  </td></tr>
+            <tr><td>                          </td><td><ul> * Klein (5–10): Daten werden sehr häufig neu gemischt, bessere Generalisierung, weniger Gefahr von 'Auswendiglernen' </ul>                      </td></tr>
+            <tr><td>                          </td><td><ul> * Mittel (10–20): guter Kompromiss zwischen Stabilität und Durchmischung, glatte Lernkurven, trotzdem genug Variation </ul>                     </td></tr>
+            <tr><td>                          </td><td><ul> * Groß (>20): länger gleiche Datenreihenfolge, sehr stabiles Lernen weniger Stochastik, Netz kann Muster zu stark übernehmen</ul>               </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 10 | 15 | 20 | 25 | 30 </b>, default: 20                                                                                                   </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td> <b>aiConSteepness</b>    </td><td>Steepness steuert die Empfindlichkeit der Neuronen. Niedrigere Werte glätten, höhere Werte schärfen.                                                 </td></tr>
+            <tr><td>                          </td><td><ul> * 0.3 - 0.4: wenn das Modell zu stark auf Spitzen reagiert und geglättet werden soll </ul>                                                      </td></tr>
+            <tr><td>                          </td><td><ul> * 0.5: Standard, wenn keine besonderen Anforderungen bestehen </ul>                                                                             </td></tr>
+            <tr><td>                          </td><td><ul> * 0.7 - 1.0: Wenn feine Details oder starke Muster (z.B. Lastspitzen) deutlicher erfasst werden sollen </ul>                                    </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0.1 - 0.9 | 1.0 </b>, default: 0.5                                                                                                         </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td> <b>aiConTrainAlgo</b>    </td><td>Stellt den Trainingsalgorithmus des neuronalen Netzes ein.                                                                                           </td></tr>
+            <tr><td>                          </td><td>Der Trainingsalgorithmus bestimmt, wie die Gewichte im Netz angepasst werden.                                                                        </td></tr>
+            <tr><td>                          </td><td><ul> * RPROP arbeitet stabil und automatisch mit angepassten Schrittweiten, ideal für zuverlässiges Training ohne viele Parameter </ul>              </td></tr>
+            <tr><td>                          </td><td><ul> * INCREMENTAL lernt schneller und reagiert direkt auf jedes Beispiel, ist aber empfindlicher gegenüber Ausreißern </ul>                         </td></tr>
+            <tr><td>                          </td><td>Werte:<b> RPROP | INCREMENTAL </b>, default: INCREMENTAL                                                                                             </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
         </table>
-         </ul>
+        </ul>
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3
+         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 aiConHiddenLayers=50-25
        </ul>
 
        </li>
