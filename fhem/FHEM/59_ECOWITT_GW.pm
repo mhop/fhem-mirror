@@ -1,8 +1,8 @@
 ##############################################
 # $Id$
 #
-# Pprovides support for the ecowitt weatherstation LAN/WLAN Gateway
-# ECOWITT/WH2650/GW2000
+# Provides support for the Ecowitt weatherstation LAN/WLAN Gateway
+# Gw1000/WH2650/GW2000
 #
 # based on the original work by sepo83 and LukeSky007, https://forum.fhem.de/index.php?topic=124794.0
 # original filename 50_GW1000_TCP.pm
@@ -23,6 +23,7 @@ use Readonly;
 ################################################################################################################
 # API from https://osswww.ecowitt.net/uploads/20220407/WN1900%20ECOWITT,1100%20WH2680,2650%20telenet%20v1.6.4.pdf
 # GW1000,1100 WH2680,2650 telenet v1.6.4.pdf, page 7 - 9
+# online API doc: https://doc.ecowitt.net/web/#/apiv3en?page_id=1
 
 my %ECOWITT_cmdMap = (
     CMD_WRITE_SSID               => 0x11,        # ToDo # send SSID and Password to WIFI module
@@ -160,7 +161,7 @@ my %ECOWITT_Items = (
     0x5A => {name => "Leak_ch3",                        size => 1, isSigned => 0, factor => 1, unit => "-"},
     0x5B => {name => "Leak_ch4",                        size => 1, isSigned => 0, factor => 1, unit => "-"},
     0x60 => {name => "lightning_distance",              size => 1, isSigned => 0, factor => 1, unit => "km"},
-    0x61 => {name => "lightning_happened_time",         size => 4, isSigned => 0, factor => 1, unit => "UTC"},
+    0x61 => {name => "lightning_happened_time",         size => 4, isSigned => 0, factor => 1, unit => "time"},
     0x62 => {name => "lightning_counter_for_the_day",   size => 4, isSigned => 0, factor => 1, unit => "-"},
     
     0x63 => {name => "TF_USR_Temperature_1",            size => 4, isSigned => 0, factor => 1, unit => "°C"},
@@ -205,7 +206,7 @@ my %ECOWITT_SensorID = (
     0x01 => {name => "WH68",                size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
     0x02 => {name => "WH80",                size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.02 },
     0x03 => {name => "WH40",                size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x04 => {name => "WH26",                size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x04 => {name => "WH25",                size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
     0x05 => {name => "WH26",                size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
     0x06 => {name => "WH31_1",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
     0x07 => {name => "WH31_2",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
@@ -215,40 +216,40 @@ my %ECOWITT_SensorID = (
     0x0B => {name => "WH31_6",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
     0x0C => {name => "WH31_7",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
     0x0D => {name => "WH31_8",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x0E => {name => "Soil_moisture_1",     size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
-    0x0F => {name => "Soil_moisture_2",     size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
-    0x10 => {name => "Soil_moisture_3",     size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
-    0x11 => {name => "Soil_moisture_4",     size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
-    0x12 => {name => "Soil_moisture_5",     size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
-    0x13 => {name => "Soil_moisture_6",     size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
-    0x14 => {name => "Soil_moisture_7",     size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
-    0x15 => {name => "Soil_moisture_8",     size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
-    0x16 => {name => "unknown_16",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x17 => {name => "unknown_17",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x18 => {name => "unknown_18",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x19 => {name => "unknown_19",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x1A => {name => "unknown_1A",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x1B => {name => "unknown_1B",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x1C => {name => "unknown_1C",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x1D => {name => "unknown_1D",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x1E => {name => "unknown_1E",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x1F => {name => "unknown_1F",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x20 => {name => "unknown_20",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x21 => {name => "unknown_21",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x22 => {name => "unknown_22",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x23 => {name => "unknown_23",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x24 => {name => "unknown_24",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x25 => {name => "unknown_25",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x26 => {name => "unknown_26",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x27 => {name => "unknown_27",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x28 => {name => "unknown_28",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x29 => {name => "unknown_29",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x2A => {name => "unknown_2A",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x2B => {name => "unknown_2B",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x2C => {name => "unknown_2C",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x2D => {name => "unknown_2D",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x2E => {name => "unknown_2E",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
-    0x2F => {name => "unknown_2F",          size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x0E => {name => "WH51_1",              size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
+    0x0F => {name => "WH51_2",              size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
+    0x10 => {name => "WH51_3",              size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
+    0x11 => {name => "WH51_4",              size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
+    0x12 => {name => "WH51_5",              size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
+    0x13 => {name => "WH51_6",              size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
+    0x14 => {name => "WH51_7",              size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
+    0x15 => {name => "WH51_8",              size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.1 },
+    0x16 => {name => "WH41_1",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x17 => {name => "WH41_2",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x18 => {name => "WH41_3",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x19 => {name => "WH41_4",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x1A => {name => "WH57",                size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x1B => {name => "WH55_1",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x1C => {name => "WH55_2",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x1D => {name => "WH55_3",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x1E => {name => "WH55_4",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x1F => {name => "WH34_1",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x20 => {name => "WH34_2",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x21 => {name => "WH34_3",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x22 => {name => "WH34_4",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x23 => {name => "WH34_5",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x24 => {name => "WH34_6",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x25 => {name => "WH34_7",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x26 => {name => "WH34_8",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x27 => {name => "WH45",                size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x28 => {name => "WH35_1",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x29 => {name => "WH35_2",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x2A => {name => "WH35_3",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x2B => {name => "WH35_4",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x2C => {name => "WH35_5",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x2D => {name => "WH35_6",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x2E => {name => "WH35_7",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
+    0x2F => {name => "WH35_8",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
     0x30 => {name => "WS90",                size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.02 },
     0x31 => {name => "WS90a",               size => 4, isSigned => 1, batteryType => 1, Battery_Scaling => 0.02 },
     0x6c => {name => "WS906c",              size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 },
@@ -780,6 +781,34 @@ sub ECOWITT_GW_hexDump {
     return "[" . join(" ", @retval) . "]";
 }
 
+# example: $value = ECOWITT_GW_toInt(4, \@data);
+# this creates an integer return value from 4 bytes in the @data array
+# the @data array is shifted by 4 bytes
+sub ECOWITT_GW_toInt {
+    my $size = shift;
+    my $dataref = shift;
+    my $result = 0;
+    #my $msg= "$size byte(s): ";
+    for (my $i = 0; $i < $size; $i++) {
+        $result *= 256;
+        my $byte = shift(@$dataref);
+        #$msg .= "$byte ";
+        $result += $byte;
+    }   
+    #$msg .= " = $result";
+    #Log3("toInt", 5, "ECOWITT_GW: $msg"); 
+    return $result;
+}
+
+# The API doc says it is UTC time but actually it is local time.
+# We therefore use gmtime() instead of localtime() in order to NOT adjust to localtime
+sub ECOWITT_GW_FmtDateTime {
+  my @t = gmtime(shift);
+  return sprintf("%04d-%02d-%02d %02d:%02d:%02d",
+      $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+}
+
+
 # method to analyze the returned data and set the corresponding readings
 sub ECOWITT_GW_updateData {
     my ($hash, $cmd, @data) = @_;
@@ -807,31 +836,42 @@ sub ECOWITT_GW_updateData {
         readingsSingleUpdate($hash, 'Firmware_Version', sprintf("%s" , $x), 1 );
     }
     elsif ($cmd == $ECOWITT_cmdMap{CMD_READ_SSSS}) {
+
+        readingsBeginUpdate($hash);
+
         my $readingsName = 'SensorReceiveFrequency';
         my $valueItem = shift @data;
         my $itemvals = { 0 => 433, 1 => 868, 2 => 915, 3 => 920};
-        my $rfFrequency = $itemvals->{$valueItem} // 'unknown value';
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged($hash, $readingsName, $rfFrequency);
+        my $rfFrequency = $itemvals->{$valueItem} // "unknown value $valueItem";
+        readingsBulkUpdate($hash, $readingsName, $rfFrequency);
 
         $readingsName = 'SensorType';
         $valueItem = shift @data;
         $itemvals = { 0 => 'WH24', 1 => 'WH65'};
-        my $sensorType = $itemvals->{$valueItem} // 'unknown value';
-        readingsBulkUpdateIfChanged($hash, $readingsName, $sensorType);
-        # we skip 4Bytes UTC Time
-        $valueItem = shift @data; $valueItem = shift @data; $valueItem = shift @data; $valueItem = shift @data;
+        my $sensorType = $itemvals->{$valueItem} // "unknown value $valueItem";
+        readingsBulkUpdate($hash, $readingsName, $sensorType);
+        
+        # this is the time of execution of the read system parameter comand CMD_READ_SSSS
+        $readingsName = 'Time';
+        my $Time = ECOWITT_GW_toInt(4, \@data);
+        # we do not expose that value
+        #readingsBulkUpdate($hash, $readingsName, $Time);
 
-        # we skip 1Bytes Timezone Index
+        # this is probably the index in the gateway's internal list of timezones
         $valueItem = shift @data;
+        $readingsName = 'TimeZoneIndex';
+        # we do not expose that value
+        #readingsBulkUpdate($hash, $readingsName, $valueItem);
 
+        # My tests resulted in values that could not be interpreted:
+        # If auto timezone is off, the value is 3. If auto timezone is on, the value is 1 in winter.
         $readingsName = 'DST_status';
         $valueItem = shift @data;
-        $itemvals = { 0 => 'OFF', 1 => 'ON'};
+        $itemvals = { 0 => 'OFF', 1 => 'ON'}; # todo: seems to be reserved, okay winter, re-check in summer
+        my $dstStatus = $itemvals->{$valueItem} // "unknown value $valueItem";
+        # we do not expose that value
+        readingsBulkUpdate($hash, $readingsName, $dstStatus);
 
-        my $dstStatus = $itemvals->{$valueItem} // 'unknown value';
-        readingsBulkUpdateIfChanged($hash, $readingsName, $dstStatus);
         readingsEndUpdate($hash, 1);
     }
     elsif ($cmd == $ECOWITT_cmdMap{CMD_READ_SENSOR_ID_NEW}) {
@@ -843,56 +883,53 @@ sub ECOWITT_GW_updateData {
         my $dataLength = @data;
         my $item = shift(@data);
         # $msg = sprintf("updateData() cmd: (%s) item: %x  Length:%s",   $cmd, $item, $dataLength);
-                # Log3 $name, 5, $msg;
+        # Log3 $name, 5, $msg;
         while ($dataLength > 0)
         {
-            if (exists $ECOWITT_SensorID{$item} )
-            {
-            my $value = 0;
-            for (my $i = $ECOWITT_SensorID{$item}{size} - 1; $i >= 0; $i--)
-            {
-                $value += shift(@data) * 2**(8*$i);
-            }
-            if ( $ECOWITT_SensorID{$item}{isSigned})
-            {
+            if (!exists $ECOWITT_SensorID{$item} ) {
+                # the SensorID is not in the hash of known sensors
+                # we therefore add a dummy entry
+                my $hex = sprintf("%02x", $item);
+                $ECOWITT_SensorID{$item} = {name => "unknown_$hex", size => 4, isSigned => 1, batteryType => 0, Battery_Scaling => 0 };
+                Log3 $name, 5, "ECOWITT_GW: unknown SensorID 0x$hex encountered.";
+            };
+            my $value = ECOWITT_GW_toInt($ECOWITT_SensorID{$item}{size}, \@data);
+            if ( $ECOWITT_SensorID{$item}{isSigned}) {
                 if    ($ECOWITT_SensorID{$item}{size} == 1) {$value = unpack('c', pack('C', $value));}
                 elsif ($ECOWITT_SensorID{$item}{size} == 2) {$value = unpack('s', pack('S', $value));}
                 elsif ($ECOWITT_SensorID{$item}{size} == 4) {$value = unpack('q', pack('Q', $value));}
                 else
                 {
-                $msg = sprintf("ERROR: Received %s (0x%x) but don't know how to convert value of size %d to signed integer. Skipping...", $ECOWITT_SensorID{$item}{name}, $item, $ECOWITT_SensorID{$item}{size});
+                $msg = sprintf("ERROR: Received %s (0x%02x) but don't know how to convert value of size %d to signed integer. Skipping...", $ECOWITT_SensorID{$item}{name}, $item, $ECOWITT_SensorID{$item}{size});
                 Log3 $name, 1, "ECOWITT_GW: $msg";
                 }
             }
-                my $batteryValue = shift @data;
-                my $receiveValue = shift @data;
-                if ($value != 0xFFFFFFFF && $value != 0xFFFFFFFE) {
-                    if ($ECOWITT_SensorID{$item}{batteryType} == 1) {
-                        $msg = sprintf("battery: %x", $batteryValue);
-                        #$batteryValue = unpack('c', pack('C', $batteryValue));
-                        $msg = sprintf("%s unpacked: %s", $msg , $batteryValue);
-                        if (($ECOWITT_SensorID{$item}{Battery_Scaling} == 0.1) && ($batteryValue == 0x1F))                 {
-                            $batteryValue = '0.0';
-                        } else {
-                            $batteryValue *= $ECOWITT_SensorID{$item}{Battery_Scaling};
-                        }
-                        $msg = sprintf("%s scaled: %s", $msg , $batteryValue);
-                        Log3 $name, 5, "ECOWITT_GW: $msg";
+            my $batteryValue = shift @data;
+            my $receiveValue = shift @data;
+            if ($value != 0xFFFFFFFF && $value != 0xFFFFFFFE) {
+                if ($ECOWITT_SensorID{$item}{batteryType} == 1) {
+                    $msg = sprintf("battery: %x", $batteryValue);
+                    #$batteryValue = unpack('c', pack('C', $batteryValue));
+                    $msg = sprintf("%s unpacked: %s", $msg , $batteryValue);
+                    if (($ECOWITT_SensorID{$item}{Battery_Scaling} == 0.1) && ($batteryValue == 0x1F))                 {
+                        $batteryValue = '0.0';
+                    } else {
+                        $batteryValue *= $ECOWITT_SensorID{$item}{Battery_Scaling};
                     }
-                    $msg = sprintf("Received %s (0x%2.0x) = %08.0x bat:%2.1f  recv:0x%x",  $ECOWITT_SensorID{$item}{name}, $item, $value, $batteryValue, $receiveValue);
-                    Log3 $name, 4, "ECOWITT_GW: $msg";
-                    readingsBulkUpdateIfChanged($hash, $ECOWITT_SensorID{$item}{name} . "_ID", sprintf("%x", $value) );
-                    readingsBulkUpdateIfChanged($hash, $ECOWITT_SensorID{$item}{name} . "_Batterie", sprintf("%2.1f", $batteryValue) );
-                    readingsBulkUpdateIfChanged($hash, $ECOWITT_SensorID{$item}{name} . "_Signal", sprintf("%d", $receiveValue) );
-                } elsif ($value != 0xFFFFFFFF) {
-                    $msg = sprintf("Received %s (0x%2.0x) never seen.", $ECOWITT_SensorID{$item}{name}, $item);
-                    Log3 $name, 5, "ECOWITT_GW: $msg";
-                } elsif ($value != 0xFFFFFFFE) {
-                    $msg = sprintf("Received %s (0x%2.0x) disabled.",  $ECOWITT_SensorID{$item}{name}, $item);
+                    $msg = sprintf("%s scaled: %s", $msg , $batteryValue);
                     Log3 $name, 5, "ECOWITT_GW: $msg";
                 }
-            } else {
-                readingsBulkUpdateIfChanged($hash, 'unkown_SensorID', "0x$item");
+                $msg = sprintf("Received %s (0x%02x) = %08.0x bat:%2.1f  recv:0x%x",  $ECOWITT_SensorID{$item}{name}, $item, $value, $batteryValue, $receiveValue);
+                Log3 $name, 4, "ECOWITT_GW: $msg";
+                readingsBulkUpdateIfChanged($hash, $ECOWITT_SensorID{$item}{name} . "_ID", sprintf("%x", $value) );
+                readingsBulkUpdateIfChanged($hash, $ECOWITT_SensorID{$item}{name} . "_Battery", sprintf("%2.1f", $batteryValue) );
+                readingsBulkUpdateIfChanged($hash, $ECOWITT_SensorID{$item}{name} . "_Signal", sprintf("%d", $receiveValue) );
+            } elsif ($value != 0xFFFFFFFF) {
+                $msg = sprintf("Received %s (0x%02x) never seen.", $ECOWITT_SensorID{$item}{name}, $item);
+                Log3 $name, 5, "ECOWITT_GW: $msg";
+            } elsif ($value != 0xFFFFFFFE) {
+                $msg = sprintf("Received %s (0x%02x) disabled.",  $ECOWITT_SensorID{$item}{name}, $item);
+                Log3 $name, 5, "ECOWITT_GW: $msg";
             }
             $dataLength = @data;
             $item = shift @data;
@@ -901,14 +938,12 @@ sub ECOWITT_GW_updateData {
     }
     elsif ($cmd == $ECOWITT_cmdMap{CMD_ECOWITT_LIVEDATA}) {
         readingsBeginUpdate($hash);
+        my $lightning_happened_time_changed = 0;
         while (my $item = shift(@data))
         {
             if (exists $ECOWITT_Items{$item}) {
-                my $value = 0;
+                my $value = ECOWITT_GW_toInt($ECOWITT_Items{$item}{size}, \@data);
                 my $unit = "";
-                for (my $i = $ECOWITT_Items{$item}{size} - 1; $i >= 0; $i--) {
-                    $value += shift(@data) * 2**(8*$i);
-                }
                 if ( $ECOWITT_Items{$item}{isSigned}) {
                     if    ($ECOWITT_Items{$item}{size} == 1) {$value = unpack('c', pack('C', $value));}
                     elsif ($ECOWITT_Items{$item}{size} == 2) {$value = unpack('s', pack('S', $value));}
@@ -926,6 +961,20 @@ sub ECOWITT_GW_updateData {
                 }
                 if ($ECOWITT_Items{$item}{unit} ne "-") {
                     $unit = "[" . $ECOWITT_Items{$item}{unit} . "]";
+                    # convert Unix timestamp to human-readable time
+                    # for reading 0x61 = lightning_happened_time this is actually UTC and not local time (verified)
+                    if($ECOWITT_Items{$item}{unit} eq "time") {
+                        $value = FmtDateTime($value);
+                        $formatString = "%s";
+                    }
+                }
+
+                # special treatment for lightning strikes
+                # 0x61 = lightning_happened_time 
+                # check for change of lightning_happened_time
+                # We use the item index instead of the name because reading name might change someday.
+                if(($item == 0x61) && (ReadingsVal($name, $ECOWITT_Items{$item}{name}, $value) ne $value)) { 
+                    $lightning_happened_time_changed = 1;
                 }
 
                 $msg = sprintf("Received %s (0x%x) = " . $formatString . " %s", $ECOWITT_Items{$item}{name}, $item, $value, $unit);
@@ -936,6 +985,18 @@ sub ECOWITT_GW_updateData {
             }
 
         }
+        # We read back the lightning_distance reading 0x60 after all readings have been updated.
+        # This ensures that the current distance is written to the synthetic lightning_strike reading 
+        # if the lightning_distance is received after the lightning_happened_time.
+        # We use the item index instead of the name because reading name might change someday.
+        # 0x60 = lightning_distance
+        # The lightning_strike reading has the actual time of the lightning as timestamp (assuming that the
+        # sensors sends lightning data immediately after the lightning has stroken). This is for plotting
+        # lightning distances over time.
+        if($lightning_happened_time_changed) {
+            readingsBulkUpdate($hash, "lightning_strike", ReadingsVal($name, $ECOWITT_Items{0x60}{name}, 0.0));
+        }
+
         readingsEndUpdate($hash, 1);
 
     }
@@ -947,9 +1008,7 @@ sub ECOWITT_GW_updateData {
             if (exists $ECOWITT_Items{$item}) {
                 my $value = 0;
                 my $unit = "";
-                for (my $i = $ECOWITT_Items{$item}{size} - 1; $i >= 0; $i--) {
-                    $value += shift(@data) * 2**(8*$i);
-                }
+                $value = ECOWITT_GW_toInt($ECOWITT_Items{$item}{size}, \@data);
                 if ( $ECOWITT_Items{$item}{isSigned}) {
                     if    ($ECOWITT_Items{$item}{size} == 1) {$value = unpack('c', pack('C', $value));}
                     elsif ($ECOWITT_Items{$item}{size} == 2) {$value = unpack('s', pack('S', $value));}
@@ -996,7 +1055,7 @@ sub ECOWITT_GW_updateData {
         readingsEndUpdate($hash, 1);
     }
     else {
-        Log3 $name, 1, "ECOWITT_GW: Unkown data received. Skipping!";
+        Log3 $name, 1, "ECOWITT_GW: Unknown data received. Skipping!";
     }
     if ($hash->{DevState} == $ECOWITT_GW_STATE_STARTINIT) {
         ECOWITT_GW_StartInit($hash);
@@ -1045,7 +1104,7 @@ __END__
 <a id="ECOWITT_GW"></a>
 <h3>ECOWITT_GW</h3>
 <ul>
-  ECOWITT_GW provides support for the EcoWitt API on various (Wireless) LAN Gateways. Tested with  ECOWITT, WH2650 and GW2000.<br>
+  ECOWITT_GW provides support for the EcoWitt API on various (Wireless) LAN Gateways. Tested with  GW1000, WH2650 and GW2000.<br>
   <br>
 
   <a id="ECOWITT_GW-define"></a>
@@ -1093,7 +1152,7 @@ __END__
 <a id="ECOWITT_GW"></a>
 <h3>ECOWITT_GW</h3>
 <ul>
-  Das Modul ECOWITT_GW bietet Unterst&uuml;tzung zum Auslesen eines EcoWitt (W)LAN Gateway &uuml;ber die ecoWitt API. Erm&ouml;glicht das lokale Auslesen der angeschlossenen EcoWitt Senoren.<br>
+  Das Modul ECOWITT_GW bietet Unterst&uuml;tzung zum Auslesen eines EcoWitt (W)LAN Gateway &uuml;ber die EcoWitt API. Erm&ouml;glicht das lokale Auslesen der angeschlossenen EcoWitt-Sensoren.<br>
 
   <br>
 
@@ -1103,10 +1162,10 @@ __END__
     <li><code>define &lt;name&gt; ECOWITT_GW &lt;device&gt;</code><br><br>
         Der &lt;device&gt;-Parameter gibt die IP-Adresse oder den Hostnamen
         des Gateways an, optional gefolgt von : und der Portnummer des
-        API-port (Standardwert wenn nicht angegeben: 45000).
+        API-port (Standardwert, wenn nicht angegeben: 45000).
     </li>
     <br>
-    Beispiel ein ecoWitt (W)LAN Gateway auf IP Adresse <code>192.168.42.23:45000</code>:<br>
+    Beispiel: Ein EcoWitt (W)LAN Gateway auf IP Adresse <code>192.168.42.23:45000</code>:<br>
         <ul><code>define myGW ECOWITT_GW 192.168.42.23</code><br>&nbsp;
     </ul>
   </ul>
