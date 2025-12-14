@@ -1,4 +1,4 @@
-FW_version["fhemweb_animatedsvg.js"] = "$Id: fhemweb_animatedsvg.js 0.7.5 schwatter $";
+FW_version["fhemweb_animatedsvg.js"] = "$Id: fhemweb_animatedsvg.js 0.7.6 schwatter $";
 FW_widgets['animatedsvg'] = { createFn: animatedSvgCreate };
 
 function animatedSvgCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -26,7 +26,7 @@ function animatedSvgCreate(elName, devName, vArr, currVal, set, params, cmd) {
     };
 
     // ---------------------------
-    // Icongröße (size@XX ? em)
+    // Icongröße
     // ---------------------------
     let iconSizeEm = 1.3;
     vArr.forEach(v => {
@@ -59,7 +59,7 @@ function animatedSvgCreate(elName, devName, vArr, currVal, set, params, cmd) {
     observer.observe(document.body, { childList: true, subtree: true });
 
     // ---------------------------
-    // Animation CSS (einmalig)
+    // Animation CSS
     // ---------------------------
     const styleId = 'animatedIconAnimations';
     if (!document.getElementById(styleId)) {
@@ -87,12 +87,36 @@ function animatedSvgCreate(elName, devName, vArr, currVal, set, params, cmd) {
     let gEl   = null;
 
     // ---------------------------
-    // State Update (LIVE)
+    // State Update
     // ---------------------------
     function updateState(val) {
         if (!svgEl || !gEl) return;
 
-        const isOn  = (val === readingMap.stateOn);
+        let isOn = false;
+
+        // val sicher in String + Zahl wandeln
+        const valStr = String(val).trim();
+        const numMatch = valStr.match(/-?\d+(\.\d+)?/);
+        const numVal = numMatch ? parseFloat(numMatch[0]) : null;
+
+        if (readingMap.stateOn.startsWith(">=") && numVal !== null) {
+            const limit = parseFloat(readingMap.stateOn.slice(2));
+            if (!isNaN(limit)) {
+                isOn = numVal >= limit;
+            }
+        } else {
+            isOn = (valStr === readingMap.stateOn);
+        }
+
+        if (readingMap.stateOff.startsWith("<") && numVal !== null) {
+            const limit = parseFloat(readingMap.stateOff.slice(1));
+            if (!isNaN(limit) && numVal < limit) {
+                isOn = false;
+            }
+        } else if (valStr === readingMap.stateOff) {
+            isOn = false;
+        }
+
         const color = isOn ? readingMap.colorOn : readingMap.colorOff;
 
         svgEl.querySelectorAll('*').forEach(el => {
@@ -155,7 +179,7 @@ function animatedSvgCreate(elName, devName, vArr, currVal, set, params, cmd) {
     });
 
     // ---------------------------
-    // InformID-Proxy für Live-Updates
+    // InformID für Live-Updates
     // ---------------------------
     const informer = $('<div/>', {
         informid: dev + '-' + readingMap.reading,
