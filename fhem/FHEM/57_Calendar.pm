@@ -3079,11 +3079,19 @@ sub Calendar_UpdateCalendar($$) {
         # totally skip old calendar entries
         if($cutoffLowerBound) {
           if(!$v->isRecurring()) {
+            #main::Debug "DTSTART = " . $v->tm($v->value("DTSTART"));
+            #main::Debug "DURATION = " .  $v->d($v->value("DURATION"));
+            #main::Debug "End = " . ($v->tm($v->value("DTSTART")) + $v->d($v->value("DURATION")));
+            #main::Debug "cutoffLowerBound = $cutoffLowerBound";
             # non recurring event
             next if(
               $v->hasKey("DTEND") &&
               $v->before($v->value("DTEND"), $cutoffLowerBound)
               );
+            next if(
+              $v->hasKey("DURATION") &&
+              ($v->tm($v->value("DTSTART")) + $v->d($v->value("DURATION")) < $cutoffLowerBound)
+            );
           } else {
             # recurring event, inspect
             my $rrule= $v->value("RRULE");
