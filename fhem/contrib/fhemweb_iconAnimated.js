@@ -1,4 +1,4 @@
-FW_version["fhemweb_iconAnimated.js"] = "$Id: fhemweb_iconAnimated.js 0.8.0 schwatter $";
+FW_version["fhemweb_iconAnimated.js"] = "$Id: fhemweb_iconAnimated.js 0.8.1 schwatter $";
 FW_widgets['iconAnimated'] = { createFn: iconAnimatedCreate };
 
 function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -147,6 +147,7 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
                 blink:'animatedIconAlarmBlink',
                 flow:'animatedIconFlow',
                 heat:'animatedIconHeat',
+                heatDevice: 'animatedIconHeatDevice',
                 pulse:'animatedIconPulse',
                 ring:'animatedIconRing',
                 robot:'animatedIconRobot',
