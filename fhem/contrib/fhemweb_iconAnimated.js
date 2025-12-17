@@ -1,4 +1,4 @@
-FW_version["fhemweb_iconAnimated.js"] = "$Id: fhemweb_iconAnimated.js 0.8.1 schwatter $";
+FW_version["fhemweb_iconAnimated.js"] = "$Id: fhemweb_iconAnimated.js 0.8.2 schwatter $";
 FW_widgets['iconAnimated'] = { createFn: iconAnimatedCreate };
 
 function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -187,19 +187,18 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
         const translateY = h/2 - (y + h/2);
         gEl.setAttribute('transform', `translate(${translateX},${translateY})`);
 
-        // Klasse hinzufügen für den CSS-Hack
-        svgEl.classList.add('icon', 'animatedIconForcedSize');
+        // Eindeutige Klasse pro Device erzeugen
+        const iconClass = 'animatedIcon_' + dev.replace(/[^a-zA-Z0-9_-]/g,'_');
+        svgEl.classList.add('icon', iconClass);
 
-        // Einmalig dynamisches <style>-Tag erstellen, falls noch nicht vorhanden
-        if (!document.getElementById('forcedIconSize')) {
+        // Style NUR für dieses Icon erzeugen
+        const styleId = 'forcedIconSize_' + iconClass;
+        if (!document.getElementById(styleId)) {
             const style = document.createElement('style');
-            style.id = 'forcedIconSize';
+            style.id = styleId;
             style.textContent = `
-                /* Höchste Spezifität wie Skin-Hack */
-                #content svg.icon, 
-                #content img.icon, 
-                svg.icon.animatedIconForcedSize, 
-                img.icon.animatedIconForcedSize {
+                svg.${iconClass},
+                img.${iconClass} {
                     width: ${iconSizePx}px !important;
                     height: ${iconSizePx}px !important;
                     max-width: ${iconSizePx}px !important;
