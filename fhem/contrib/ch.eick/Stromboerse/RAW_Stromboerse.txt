@@ -23,7 +23,7 @@ defmod Stromboerse DOIF 1_$SELF_PriceInfo\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
     and\
     (   [00:01]                 \
-     or [14:00-16:00] and [+:20] and [$SELF_connect:fc1_0000_startsAt,"null"] ne ""  ## Ab 14:00 Uhr gibt es die Preise für den nächsten Tag\
+     or [13:00-16:00] and [+:20] and [$SELF_connect:fc1_0000_startsAt,"null"] ne ""  ## Ab 14:00 Uhr gibt es die Preise für den nächsten Tag\
     )\
     or [$SELF:ui_command_1] eq "2_Preis_Info"   ## Hier wird das uiTable select ausgewertet\
    ) {\
