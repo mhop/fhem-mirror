@@ -1,8 +1,19 @@
 defmod EVU_Tibber_connect HTTPMOD https://api.tibber.com/v1-beta/gql 0
 attr EVU_Tibber_connect userattr ws_homeId ws_minInterval ws_myId ws_token ws_websocketURL
 attr EVU_Tibber_connect DbLogExclude .*
-attr EVU_Tibber_connect DbLogInclude total_cost_.*,fc0_trigger.*
-attr EVU_Tibber_connect comment Version 2024.01.31 13:00 \
+attr EVU_Tibber_connect DbLogInclude total_cost_.*,fc._trigger.*
+attr EVU_Tibber_connect DbLogValueFn {\
+  if ($READING =~ /fc0_trigger/) {\
+    my ($sec, $min, $hour, $mday, $mon, $year) = localtime(time_str2num($TIMESTAMP));;\
+   $year += 1900;;\
+   $mon  += 1;;\
+   my $quarter = int($min / 15) * 15;;  # Minuten auf 0, 15, 30 oder 45 runden\
+\
+   $TIMESTAMP = sprintf("%04d-%02d-%02d %02d:%02d:00", $year, $mon, $mday, $hour, $quarter);;\
+\
+  }\
+}
+attr EVU_Tibber_connect comment Version 2025.10.30 11:00 \
 https://developer.tibber.com/explorer\
 \
 In der FHEM Kommandozeile könnt Ihr das token und die homeID im KeyStore ablegen.\
@@ -28,165 +39,219 @@ attr EVU_Tibber_connect get01-3Name current_date
 attr EVU_Tibber_connect get01-3OExpr $val =~ s/T/ /g ;; substr($val,0,19)
 attr EVU_Tibber_connect get01-4Name current_price
 attr EVU_Tibber_connect get01-4OExpr $val *100
-attr EVU_Tibber_connect get01Data { "query": "{viewer {home(id:\"%%homeID%%\") {currentSubscription {priceInfo {current {total startsAt currency level}}}}}}" }
+attr EVU_Tibber_connect get01Data { "query": "{viewer {home(id:\"%%homeID%%\") {currentSubscription {priceInfo (resolution: QUARTER_HOURLY){current {total startsAt currency level}}}}}}" }
 attr EVU_Tibber_connect get01Header01 Content-Type: application/json
 attr EVU_Tibber_connect get01Header02 Authorization: Bearer %%token%%
 attr EVU_Tibber_connect get01JSON data_viewer_home_currentSubscription_priceInfo_current
 attr EVU_Tibber_connect get01Name 01_priceInfo
 attr EVU_Tibber_connect get01URL https://api.tibber.com/v1-beta/gql
-attr EVU_Tibber_connect get02-10Name fc0_03_total
-attr EVU_Tibber_connect get02-11Name fc0_04_startsAt
-attr EVU_Tibber_connect get02-11OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-12Name fc0_04_total
-attr EVU_Tibber_connect get02-13Name fc0_05_startsAt
-attr EVU_Tibber_connect get02-13OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-14Name fc0_05_total
-attr EVU_Tibber_connect get02-15Name fc0_06_startsAt
-attr EVU_Tibber_connect get02-15OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-16Name fc0_06_total
-attr EVU_Tibber_connect get02-17Name fc0_07_startsAt
-attr EVU_Tibber_connect get02-17OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-18Name fc0_07_total
-attr EVU_Tibber_connect get02-19Name fc0_08_startsAt
-attr EVU_Tibber_connect get02-19OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-1Name current_date
-attr EVU_Tibber_connect get02-1OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-20Name fc0_08_total
-attr EVU_Tibber_connect get02-21Name fc0_09_startsAt
-attr EVU_Tibber_connect get02-21OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-22Name fc0_09_total
-attr EVU_Tibber_connect get02-23Name fc0_10_startsAt
-attr EVU_Tibber_connect get02-23OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-24Name fc0_10_total
-attr EVU_Tibber_connect get02-25Name fc0_11_startsAt
-attr EVU_Tibber_connect get02-25OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-26Name fc0_11_total
-attr EVU_Tibber_connect get02-27Name fc0_12_startsAt
-attr EVU_Tibber_connect get02-27OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-28Name fc0_12_total
-attr EVU_Tibber_connect get02-29Name fc0_13_startsAt
-attr EVU_Tibber_connect get02-29OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-2Name current_price
-attr EVU_Tibber_connect get02-2OExpr $val *100
-attr EVU_Tibber_connect get02-30Name fc0_13_total
-attr EVU_Tibber_connect get02-31Name fc0_14_startsAt
-attr EVU_Tibber_connect get02-31OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-32Name fc0_14_total
-attr EVU_Tibber_connect get02-33Name fc0_15_startsAt
-attr EVU_Tibber_connect get02-33OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-34Name fc0_15_total
-attr EVU_Tibber_connect get02-35Name fc0_16_startsAt
-attr EVU_Tibber_connect get02-35OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-36Name fc0_16_total
-attr EVU_Tibber_connect get02-37Name fc0_17_startsAt
-attr EVU_Tibber_connect get02-37OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-38Name fc0_17_total
-attr EVU_Tibber_connect get02-39Name fc0_18_startsAt
-attr EVU_Tibber_connect get02-39OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-3Name fc0_00_startsAt
-attr EVU_Tibber_connect get02-3OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-40Name fc0_18_total
-attr EVU_Tibber_connect get02-41Name fc0_19_startsAt
-attr EVU_Tibber_connect get02-41OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-42Name fc0_19_total
-attr EVU_Tibber_connect get02-43Name fc0_20_startsAt
-attr EVU_Tibber_connect get02-43OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-44Name fc0_20_total
-attr EVU_Tibber_connect get02-45Name fc0_21_startsAt
-attr EVU_Tibber_connect get02-45OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-46Name fc0_21_total
-attr EVU_Tibber_connect get02-47Name fc0_22_startsAt
-attr EVU_Tibber_connect get02-47OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-48Name fc0_22_total
-attr EVU_Tibber_connect get02-49Name fc0_23_startsAt
-attr EVU_Tibber_connect get02-49OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-4Name fc0_00_total
-attr EVU_Tibber_connect get02-50Name fc0_23_total
-attr EVU_Tibber_connect get02-51Name fc1_00_startsAt
-attr EVU_Tibber_connect get02-51OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-52Name fc1_00_total
-attr EVU_Tibber_connect get02-53Name fc1_01_startsAt
-attr EVU_Tibber_connect get02-53OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-54Name fc1_01_total
-attr EVU_Tibber_connect get02-55Name fc1_02_startsAt
-attr EVU_Tibber_connect get02-55OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-56Name fc1_02_total
-attr EVU_Tibber_connect get02-57Name fc1_03_startsAt
-attr EVU_Tibber_connect get02-57OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-58Name fc1_03_total
-attr EVU_Tibber_connect get02-59Name fc1_04_startsAt
-attr EVU_Tibber_connect get02-59OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-5Name fc0_01_startsAt
-attr EVU_Tibber_connect get02-5OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-60Name fc1_04_total
-attr EVU_Tibber_connect get02-61Name fc1_05_startsAt
-attr EVU_Tibber_connect get02-61OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-62Name fc1_05_total
-attr EVU_Tibber_connect get02-63Name fc1_06_startsAt
-attr EVU_Tibber_connect get02-63OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-64Name fc1_06_total
-attr EVU_Tibber_connect get02-65Name fc1_07_startsAt
-attr EVU_Tibber_connect get02-65OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-66Name fc1_07_total
-attr EVU_Tibber_connect get02-67Name fc1_08_startsAt
-attr EVU_Tibber_connect get02-67OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-68Name fc1_08_total
-attr EVU_Tibber_connect get02-69Name fc1_09_startsAt
-attr EVU_Tibber_connect get02-69OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-6Name fc0_01_total
-attr EVU_Tibber_connect get02-70Name fc1_09_total
-attr EVU_Tibber_connect get02-71Name fc1_10_startsAt
-attr EVU_Tibber_connect get02-71OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-72Name fc1_10_total
-attr EVU_Tibber_connect get02-73Name fc1_11_startsAt
-attr EVU_Tibber_connect get02-73OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-74Name fc1_11_total
-attr EVU_Tibber_connect get02-75Name fc1_12_startsAt
-attr EVU_Tibber_connect get02-75OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-76Name fc1_12_total
-attr EVU_Tibber_connect get02-77Name fc1_13_startsAt
-attr EVU_Tibber_connect get02-77OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-78Name fc1_13_total
-attr EVU_Tibber_connect get02-79Name fc1_14_startsAt
-attr EVU_Tibber_connect get02-79OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-7Name fc0_02_startsAt
-attr EVU_Tibber_connect get02-7OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-80Name fc1_14_total
-attr EVU_Tibber_connect get02-81Name fc1_15_startsAt
-attr EVU_Tibber_connect get02-81OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-82Name fc1_15_total
-attr EVU_Tibber_connect get02-83Name fc1_16_startsAt
-attr EVU_Tibber_connect get02-83OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-84Name fc1_16_total
-attr EVU_Tibber_connect get02-85Name fc1_17_startsAt
-attr EVU_Tibber_connect get02-85OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-86Name fc1_17_total
-attr EVU_Tibber_connect get02-87Name fc1_18_startsAt
-attr EVU_Tibber_connect get02-87OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-88Name fc1_18_total
-attr EVU_Tibber_connect get02-89Name fc1_19_startsAt
-attr EVU_Tibber_connect get02-89OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-8Name fc0_02_total
-attr EVU_Tibber_connect get02-90Name fc1_19_total
-attr EVU_Tibber_connect get02-91Name fc1_20_startsAt
-attr EVU_Tibber_connect get02-91OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-92Name fc1_20_total
-attr EVU_Tibber_connect get02-93Name fc1_21_startsAt
-attr EVU_Tibber_connect get02-93OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-94Name fc1_21_total
-attr EVU_Tibber_connect get02-95Name fc1_22_startsAt
-attr EVU_Tibber_connect get02-95OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-96Name fc1_22_total
-attr EVU_Tibber_connect get02-97Name fc1_23_startsAt
-attr EVU_Tibber_connect get02-97OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02-98Name fc1_23_total
-attr EVU_Tibber_connect get02-9Name fc0_03_startsAt
-attr EVU_Tibber_connect get02-9OExpr $val =~ s/T/ /g ;; substr($val,0,19)
-attr EVU_Tibber_connect get02Data { "query": "{viewer {home(id:\"%%homeID%%\") {currentSubscription {priceInfo {current {total startsAt} today {total startsAt} tomorrow {total startsAt}}}}}}" }
+attr EVU_Tibber_connect get02-101Name fc0_0545_total
+attr EVU_Tibber_connect get02-105Name fc0_0600_total
+attr EVU_Tibber_connect get02-109Name fc0_0615_total
+attr EVU_Tibber_connect get02-113Name fc0_0630_total
+attr EVU_Tibber_connect get02-117Name fc0_0645_total
+attr EVU_Tibber_connect get02-11Name fc0_0000_total
+attr EVU_Tibber_connect get02-121Name fc0_0700_total
+attr EVU_Tibber_connect get02-125Name fc0_0715_total
+attr EVU_Tibber_connect get02-129Name fc0_0730_total
+attr EVU_Tibber_connect get02-12Name fc0_0000_startsAt
+attr EVU_Tibber_connect get02-12OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr EVU_Tibber_connect get02-133Name fc0_0745_total
+attr EVU_Tibber_connect get02-137Name fc0_0800_total
+attr EVU_Tibber_connect get02-13Name fc0_0015_total
+attr EVU_Tibber_connect get02-141Name fc0_0815_total
+attr EVU_Tibber_connect get02-145Name fc0_0830_total
+attr EVU_Tibber_connect get02-149Name fc0_0845_total
+attr EVU_Tibber_connect get02-153Name fc0_0900_total
+attr EVU_Tibber_connect get02-157Name fc0_0915_total
+attr EVU_Tibber_connect get02-161Name fc0_0930_total
+attr EVU_Tibber_connect get02-165Name fc0_0945_total
+attr EVU_Tibber_connect get02-169Name fc0_1000_total
+attr EVU_Tibber_connect get02-173Name fc0_1015_total
+attr EVU_Tibber_connect get02-177Name fc0_1030_total
+attr EVU_Tibber_connect get02-17Name fc0_0030_total
+attr EVU_Tibber_connect get02-181Name fc0_1045_total
+attr EVU_Tibber_connect get02-185Name fc0_1100_total
+attr EVU_Tibber_connect get02-189Name fc0_1115_total
+attr EVU_Tibber_connect get02-193Name fc0_1130_total
+attr EVU_Tibber_connect get02-197Name fc0_1145_total
+attr EVU_Tibber_connect get02-1Name current_price
+attr EVU_Tibber_connect get02-1OExpr $val *100
+attr EVU_Tibber_connect get02-201Name fc0_1200_total
+attr EVU_Tibber_connect get02-205Name fc0_1215_total
+attr EVU_Tibber_connect get02-209Name fc0_1230_total
+attr EVU_Tibber_connect get02-213Name fc0_1245_total
+attr EVU_Tibber_connect get02-217Name fc0_1300_total
+attr EVU_Tibber_connect get02-21Name fc0_0045_total
+attr EVU_Tibber_connect get02-221Name fc0_1315_total
+attr EVU_Tibber_connect get02-225Name fc0_1330_total
+attr EVU_Tibber_connect get02-229Name fc0_1345_total
+attr EVU_Tibber_connect get02-233Name fc0_1400_total
+attr EVU_Tibber_connect get02-237Name fc0_1415_total
+attr EVU_Tibber_connect get02-241Name fc0_1430_total
+attr EVU_Tibber_connect get02-245Name fc0_1445_total
+attr EVU_Tibber_connect get02-249Name fc0_1500_total
+attr EVU_Tibber_connect get02-253Name fc0_1515_total
+attr EVU_Tibber_connect get02-257Name fc0_1530_total
+attr EVU_Tibber_connect get02-25Name fc0_0100_total
+attr EVU_Tibber_connect get02-261Name fc0_1545_total
+attr EVU_Tibber_connect get02-265Name fc0_1600_total
+attr EVU_Tibber_connect get02-269Name fc0_1615_total
+attr EVU_Tibber_connect get02-273Name fc0_1630_total
+attr EVU_Tibber_connect get02-277Name fc0_1645_total
+attr EVU_Tibber_connect get02-281Name fc0_1700_total
+attr EVU_Tibber_connect get02-285Name fc0_1715_total
+attr EVU_Tibber_connect get02-289Name fc0_1730_total
+attr EVU_Tibber_connect get02-293Name fc0_1745_total
+attr EVU_Tibber_connect get02-297Name fc0_1800_total
+attr EVU_Tibber_connect get02-29Name fc0_0115_total
+attr EVU_Tibber_connect get02-301Name fc0_1815_total
+attr EVU_Tibber_connect get02-305Name fc0_1830_total
+attr EVU_Tibber_connect get02-309Name fc0_1845_total
+attr EVU_Tibber_connect get02-313Name fc0_1900_total
+attr EVU_Tibber_connect get02-317Name fc0_1915_total
+attr EVU_Tibber_connect get02-321Name fc0_1930_total
+attr EVU_Tibber_connect get02-325Name fc0_1945_total
+attr EVU_Tibber_connect get02-329Name fc0_2000_total
+attr EVU_Tibber_connect get02-333Name fc0_2015_total
+attr EVU_Tibber_connect get02-337Name fc0_2030_total
+attr EVU_Tibber_connect get02-33Name fc0_0130_total
+attr EVU_Tibber_connect get02-341Name fc0_2045_total
+attr EVU_Tibber_connect get02-345Name fc0_2100_total
+attr EVU_Tibber_connect get02-349Name fc0_2115_total
+attr EVU_Tibber_connect get02-353Name fc0_2130_total
+attr EVU_Tibber_connect get02-357Name fc0_2145_total
+attr EVU_Tibber_connect get02-361Name fc0_2200_total
+attr EVU_Tibber_connect get02-365Name fc0_2215_total
+attr EVU_Tibber_connect get02-369Name fc0_2230_total
+attr EVU_Tibber_connect get02-373Name fc0_2245_total
+attr EVU_Tibber_connect get02-377Name fc0_2300_total
+attr EVU_Tibber_connect get02-37Name fc0_0145_total
+attr EVU_Tibber_connect get02-381Name fc0_2315_total
+attr EVU_Tibber_connect get02-385Name fc0_2330_total
+attr EVU_Tibber_connect get02-389Name fc0_2345_total
+attr EVU_Tibber_connect get02-395Name fc1_0000_total
+attr EVU_Tibber_connect get02-396Name fc1_0000_startsAt
+attr EVU_Tibber_connect get02-396OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr EVU_Tibber_connect get02-397Name fc1_0015_total
+attr EVU_Tibber_connect get02-401Name fc1_0030_total
+attr EVU_Tibber_connect get02-405Name fc1_0045_total
+attr EVU_Tibber_connect get02-409Name fc1_0100_total
+attr EVU_Tibber_connect get02-413Name fc1_0115_total
+attr EVU_Tibber_connect get02-417Name fc1_0130_total
+attr EVU_Tibber_connect get02-41Name fc0_0200_total
+attr EVU_Tibber_connect get02-421Name fc1_0145_total
+attr EVU_Tibber_connect get02-425Name fc1_0200_total
+attr EVU_Tibber_connect get02-429Name fc1_0215_total
+attr EVU_Tibber_connect get02-433Name fc1_0230_total
+attr EVU_Tibber_connect get02-437Name fc1_0245_total
+attr EVU_Tibber_connect get02-441Name fc1_0300_total
+attr EVU_Tibber_connect get02-445Name fc1_0315_total
+attr EVU_Tibber_connect get02-449Name fc1_0330_total
+attr EVU_Tibber_connect get02-453Name fc1_0345_total
+attr EVU_Tibber_connect get02-457Name fc1_0400_total
+attr EVU_Tibber_connect get02-45Name fc0_0215_total
+attr EVU_Tibber_connect get02-461Name fc1_0415_total
+attr EVU_Tibber_connect get02-465Name fc1_0430_total
+attr EVU_Tibber_connect get02-469Name fc1_0445_total
+attr EVU_Tibber_connect get02-473Name fc1_0500_total
+attr EVU_Tibber_connect get02-477Name fc1_0515_total
+attr EVU_Tibber_connect get02-481Name fc1_0530_total
+attr EVU_Tibber_connect get02-485Name fc1_0545_total
+attr EVU_Tibber_connect get02-489Name fc1_0600_total
+attr EVU_Tibber_connect get02-493Name fc1_0615_total
+attr EVU_Tibber_connect get02-497Name fc1_0630_total
+attr EVU_Tibber_connect get02-49Name fc0_0230_total
+attr EVU_Tibber_connect get02-501Name fc1_0645_total
+attr EVU_Tibber_connect get02-505Name fc1_0700_total
+attr EVU_Tibber_connect get02-509Name fc1_0715_total
+attr EVU_Tibber_connect get02-513Name fc1_0730_total
+attr EVU_Tibber_connect get02-517Name fc1_0745_total
+attr EVU_Tibber_connect get02-521Name fc1_0800_total
+attr EVU_Tibber_connect get02-525Name fc1_0815_total
+attr EVU_Tibber_connect get02-529Name fc1_0830_total
+attr EVU_Tibber_connect get02-533Name fc1_0845_total
+attr EVU_Tibber_connect get02-537Name fc1_0900_total
+attr EVU_Tibber_connect get02-53Name fc0_0245_total
+attr EVU_Tibber_connect get02-541Name fc1_0915_total
+attr EVU_Tibber_connect get02-545Name fc1_0930_total
+attr EVU_Tibber_connect get02-549Name fc1_0945_total
+attr EVU_Tibber_connect get02-553Name fc1_1000_total
+attr EVU_Tibber_connect get02-557Name fc1_1015_total
+attr EVU_Tibber_connect get02-561Name fc1_1030_total
+attr EVU_Tibber_connect get02-565Name fc1_1045_total
+attr EVU_Tibber_connect get02-569Name fc1_1100_total
+attr EVU_Tibber_connect get02-573Name fc1_1115_total
+attr EVU_Tibber_connect get02-577Name fc1_1130_total
+attr EVU_Tibber_connect get02-57Name fc0_0300_total
+attr EVU_Tibber_connect get02-581Name fc1_1145_total
+attr EVU_Tibber_connect get02-585Name fc1_1200_total
+attr EVU_Tibber_connect get02-589Name fc1_1215_total
+attr EVU_Tibber_connect get02-593Name fc1_1230_total
+attr EVU_Tibber_connect get02-597Name fc1_1245_total
+attr EVU_Tibber_connect get02-601Name fc1_1300_total
+attr EVU_Tibber_connect get02-605Name fc1_1315_total
+attr EVU_Tibber_connect get02-609Name fc1_1330_total
+attr EVU_Tibber_connect get02-613Name fc1_1345_total
+attr EVU_Tibber_connect get02-617Name fc1_1400_total
+attr EVU_Tibber_connect get02-61Name fc0_0315_total
+attr EVU_Tibber_connect get02-621Name fc1_1415_total
+attr EVU_Tibber_connect get02-625Name fc1_1430_total
+attr EVU_Tibber_connect get02-629Name fc1_1445_total
+attr EVU_Tibber_connect get02-633Name fc1_1500_total
+attr EVU_Tibber_connect get02-637Name fc1_1515_total
+attr EVU_Tibber_connect get02-641Name fc1_1530_total
+attr EVU_Tibber_connect get02-645Name fc1_1545_total
+attr EVU_Tibber_connect get02-649Name fc1_1600_total
+attr EVU_Tibber_connect get02-653Name fc1_1615_total
+attr EVU_Tibber_connect get02-657Name fc1_1630_total
+attr EVU_Tibber_connect get02-65Name fc0_0330_total
+attr EVU_Tibber_connect get02-661Name fc1_1645_total
+attr EVU_Tibber_connect get02-665Name fc1_1700_total
+attr EVU_Tibber_connect get02-669Name fc1_1715_total
+attr EVU_Tibber_connect get02-673Name fc1_1730_total
+attr EVU_Tibber_connect get02-677Name fc1_1745_total
+attr EVU_Tibber_connect get02-681Name fc1_1800_total
+attr EVU_Tibber_connect get02-685Name fc1_1815_total
+attr EVU_Tibber_connect get02-689Name fc1_1830_total
+attr EVU_Tibber_connect get02-693Name fc1_1845_total
+attr EVU_Tibber_connect get02-697Name fc1_1900_total
+attr EVU_Tibber_connect get02-69Name fc0_0345_total
+attr EVU_Tibber_connect get02-6Name current_date
+attr EVU_Tibber_connect get02-6OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr EVU_Tibber_connect get02-701Name fc1_1915_total
+attr EVU_Tibber_connect get02-705Name fc1_1930_total
+attr EVU_Tibber_connect get02-709Name fc1_1945_total
+attr EVU_Tibber_connect get02-713Name fc1_2000_total
+attr EVU_Tibber_connect get02-717Name fc1_2015_total
+attr EVU_Tibber_connect get02-721Name fc1_2030_total
+attr EVU_Tibber_connect get02-725Name fc1_2045_total
+attr EVU_Tibber_connect get02-729Name fc1_2100_total
+attr EVU_Tibber_connect get02-733Name fc1_2115_total
+attr EVU_Tibber_connect get02-737Name fc1_2130_total
+attr EVU_Tibber_connect get02-73Name fc0_0400_total
+attr EVU_Tibber_connect get02-741Name fc1_2145_total
+attr EVU_Tibber_connect get02-745Name fc1_2200_total
+attr EVU_Tibber_connect get02-749Name fc1_2215_total
+attr EVU_Tibber_connect get02-753Name fc1_2230_total
+attr EVU_Tibber_connect get02-757Name fc1_2245_total
+attr EVU_Tibber_connect get02-761Name fc1_2300_total
+attr EVU_Tibber_connect get02-765Name fc1_2315_total
+attr EVU_Tibber_connect get02-769Name fc1_2330_total
+attr EVU_Tibber_connect get02-773Name fc1_2345_total
+attr EVU_Tibber_connect get02-77Name fc0_0415_total
+attr EVU_Tibber_connect get02-81Name fc0_0430_total
+attr EVU_Tibber_connect get02-85Name fc0_0445_total
+attr EVU_Tibber_connect get02-89Name fc0_0500_total
+attr EVU_Tibber_connect get02-93Name fc0_0515_total
+attr EVU_Tibber_connect get02-97Name fc0_0530_total
+attr EVU_Tibber_connect get02Data { "query": "{viewer {home(id:\"%%homeID%%\") {currentSubscription {priceInfo (resolution: QUARTER_HOURLY)  {current {total startsAt} today {total startsAt} tomorrow {total startsAt}}}}}}" }
+attr EVU_Tibber_connect get02DeleteIfUnmatched 1
 attr EVU_Tibber_connect get02Header01 Content-Type: application/json
 attr EVU_Tibber_connect get02Header02 Authorization: Bearer %%token%%
-attr EVU_Tibber_connect get02JSON data_viewer_home_currentSubscription_priceInfo
 attr EVU_Tibber_connect get02Name 02_priceAll
+attr EVU_Tibber_connect get02RegOpt g
+attr EVU_Tibber_connect get02Regex "total":(-*\d+.\d+)|"startsAt":"(\d+-\d+-\d+T\d+:\d+:\d+).*(?="today")|\[\{"total":(-*\d+.\d+),"startsAt":"(\d+-\d+-\d+T\d+:\d+:\d+)
 attr EVU_Tibber_connect get02URL https://api.tibber.com/v1-beta/gql
 attr EVU_Tibber_connect get03-1Name nodes_00_00_from
 attr EVU_Tibber_connect get03-1OExpr $val =~ s/T/ /g ;; substr($val,0,19)
@@ -209,7 +274,7 @@ attr EVU_Tibber_connect get03Header01 Content-Type: application/json
 attr EVU_Tibber_connect get03Header02 Authorization: Bearer %%token%%
 attr EVU_Tibber_connect get03Name 03_consumption_hour
 attr EVU_Tibber_connect get03RegOpt g
-attr EVU_Tibber_connect get03Regex \{"from":"([\d+-]+T[\d+:]+\.000[+-][\d+:]+)","cost":(null|\d+\.\d+|0),"consumption":(null|\d+\.\d+|0)\}
+attr EVU_Tibber_connect get03Regex \{"from":"([\d+-]+T[\d+:]+\.000[+-][\d+:]+)","cost":(null|-*\d+\.\d+|0),"consumption":(null|\d+\.\d+|0)\}
 attr EVU_Tibber_connect get03URL https://api.tibber.com/v1-beta/gql
 attr EVU_Tibber_connect get04-10Name nodes_24_03_from
 attr EVU_Tibber_connect get04-10OExpr $val =~ s/T/ /g ;; substr($val,0,19)
@@ -336,7 +401,7 @@ attr EVU_Tibber_connect get04Header01 Content-Type: application/json
 attr EVU_Tibber_connect get04Header02 Authorization: Bearer %%token%%
 attr EVU_Tibber_connect get04Name 04_consumption_hour_24
 attr EVU_Tibber_connect get04RegOpt g
-attr EVU_Tibber_connect get04Regex \{"from":"([\d+-]+T[\d+:]+\.000[+-][\d+:]+)","cost":(null|\d+\.\d+|0),"consumption":(null|\d+\.\d+|0)\}
+attr EVU_Tibber_connect get04Regex \{"from":"([\d+-]+T[\d+:]+\.000[+-][\d+:]+)","cost":(null|-*\d+\.\d+|0),"consumption":(null|\d+\.\d+|0)\}
 attr EVU_Tibber_connect get04URL https://api.tibber.com/v1-beta/gql
 attr EVU_Tibber_connect get05AutoNumLen 4
 attr EVU_Tibber_connect get05Data { "query": "{viewer {home(id:\"%%homeID%%\") {consumption(resolution: HOURLY, last: 100) {nodes {from cost consumption}}}}}"}
@@ -489,7 +554,7 @@ attr EVU_Tibber_connect get07Header02 Authorization: Bearer %%token%%
 attr EVU_Tibber_connect get07JSON data_viewer_home
 attr EVU_Tibber_connect get07Name 07_realTimeConsumptionEnabled
 attr EVU_Tibber_connect get07RegOpt g
-attr EVU_Tibber_connect get07Regex \{"from":"([\d+-]+T[\d+:]+\.000[+-][\d+:]+)","cost":(null|\d+\.\d+|0),"consumption":(null|\d+\.\d+|0)\}
+attr EVU_Tibber_connect get07Regex \{"from":"([\d+-]+T[\d+:]+\.000[+-][\d+:]+)","cost":(null|-*\d+\.\d+|0),"consumption":(null|\d+\.\d+|0)\}
 attr EVU_Tibber_connect get07URL https://api.tibber.com/v1-beta/gql
 attr EVU_Tibber_connect group PV Steuerung EVU
 attr EVU_Tibber_connect icon stromzaehler_icon
@@ -503,7 +568,7 @@ attr EVU_Tibber_connect requestData { "query": "{viewer {home(id:\"%%homeID%%\")
 attr EVU_Tibber_connect requestHeader1 Content-Type: application/json
 attr EVU_Tibber_connect requestHeader2 Authorization: Bearer %%token%%
 attr EVU_Tibber_connect room Strom->Boerse
-attr EVU_Tibber_connect showBody 1
+attr EVU_Tibber_connect showBody 0
 attr EVU_Tibber_connect showError 1
 attr EVU_Tibber_connect sortby 313
 attr EVU_Tibber_connect timeout 30
@@ -873,25 +938,56 @@ nodes_consumption_year:nodes_TIMESTAMP.* {\
              AND YEAR(TIMESTAMP) = YEAR(curdate()) ;;") ;;\
 },\
 \
-fc_avg:current_price.* {\
-## Berechnung des durchschnitt Wertes\
-  my $fc_avg = 0;;\
-  my $fc = 0;;\
+current_level:fc._0000_total.* {\
+  ## Aktueller Preis\
+  my $hash = $defs{$name};;\
 \
-  if (ReadingsVal("$NAME","fc1_00_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
+   # --- Readings setzen ---\
+  readingsBeginUpdate($hash);;\
+  readingsBulkUpdate($hash,"current_price",ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",strftime("%H",localtime),int(strftime("%M",localtime)  / 15) * 15),0) );;\
+  readingsBulkUpdate($hash,"current_date",sprintf("%s:%02d:00",strftime("%Y-%m-%d %H",localtime),int(strftime("%M",localtime)  / 15) * 15) );;\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_2  : Daten für current Werte gesetzt";;\
+  }\
+  readingsBulkUpdate($hash,"fc0_0000_startsAt",strftime("%Y-%m-%d 00:00:00",localtime) );;\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_2  : Daten für fc0 Startzeit gesetzt";;\
+  }\
+  if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {       ## Der nächste Tag ist bereits da\
+    readingsBulkUpdate($hash,"fc1_0000_startsAt",strftime("%Y-%m-%d 00:00:00",localtime(time+86400)) );;\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_2  : Daten für fc1 Startzeit gesetzt";;\
+    }\
+  } else {\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_2  : Daten für fc1 sind noch nicht da";;\
+    }\
+    fhem("deletereading ".$NAME." fc1_0000_startsAt");;\
+  } # end if\
+  return "null";;\
+},\
+\
+fc_avg:current_price.* {\
+## Berechnung des durchschnitt Wertes über alle Werte von fc0 und fc1\
+  my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
+  my $fc_avg = 0;;\
+\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
     if (AttrVal("$NAME","verbose",0) >=3) {\
       Log 3, "$NAME cmd_1  : Tibber Daten für fc1 sind bereits da";;\
     }\
-    $fc = 1;;\
+    $fc  = 1;;\
   } # end if\
 \
-    for (my $j=0;;$j<=$fc;;$j++){\
+    for (my $j=0;;$j<=$fc ;;$j++){ # heute und eventuell morgen durchlaufen\
       for (my $k=0;;$k<=23;;$k++) {                                          ## Summe  berechnen\
-        $fc_avg += ReadingsVal("$NAME",sprintf("fc%d_%02d_total",$j,$k),0);;\
-        } # end $k\
+        for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+          $fc_avg += ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j, $k, $quarter*15),0);;\
+        } # end $quarter\
+      } # end $k\
     } # end $j\
 \
-    return round($fc_avg / (24 *(1+$fc)) *100 ,2);;                     ## Durchschnitt berechnen\
+    return round($fc_avg / (96 *(1+$fc)) *100 ,2);;                     ## Durchschnitt berechnen\
 },\
 \
 fc_med:current_price.* {\
@@ -910,21 +1006,22 @@ fc_med:current_price.* {\
 \
 fc_min:current_price.* {\
 ##  Ermittlung des minimal Wertes\
+  my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
   my $fc_min = 0;;\
   my $fc_tmp = 0;;\
-  my $fc = 0;;\
 \
-  if (ReadingsVal("$NAME","fc1_00_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
     $fc = 1;;\
   } # end if\
 \
     for (my $j=0;;$j<=$fc;;$j++){\
       for (my $k=0;;$k<=23;;$k++) {\
-        $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d_total",$j,$k),0);;\
-  \
-        if (($fc_tmp < $fc_min) or ($j == 0 and $k == 0)) {\
-          $fc_min = $fc_tmp;;\
-        }\
+        for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+          $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j,$k, $quarter*15),0);;\
+          if (($fc_tmp < $fc_min) or ($j == 0 and $k == 0 and $quarter == 0)) {\
+            $fc_min = $fc_tmp;;\
+          }\
+        } # end $quarter\
       } # end $k\
     } # end $j\
 \
@@ -933,21 +1030,22 @@ fc_min:current_price.* {\
 \
 fc_max:current_price.* {\
 ##  Ermittlung des minimal Wertes\
+  my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
   my $fc_max = 0;;\
   my $fc_tmp = 0;;\
-  my $fc = 0;;\
 \
-  if (ReadingsVal("$NAME","fc1_00_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
     $fc = 1;;\
   } # end if\
 \
     for (my $j=0;;$j<=$fc;;$j++){\
       for (my $k=0;;$k<=23;;$k++) {\
-        $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d_total",$j,$k),0);;\
-  \
-        if (($fc_tmp > $fc_max) or ($j == 0 and $k == 0)) {\
-          $fc_max = $fc_tmp;;\
-        }\
+        for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+          $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j,$k, $quarter*15),0);;\
+          if (($fc_tmp > $fc_max) or ($j == 0 and $k == 0 and $quarter == 0)) {\
+            $fc_max = $fc_tmp;;\
+          }\
+        } # end $quarter\
       } # end $k\
     } # end $j\
 \
@@ -969,21 +1067,24 @@ fc_trigger_price:fc_avg.* {\
       $price_level = $price_level_battery;;\
     }\
   }\
-$price_level;;\
+ return($price_level);;\
 },\
 \
 fc0_trigger_start:fc_trigger_price.* {\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
   my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0) /100;;\
 \
   # Ermitteln des nächsten Trigger Fensters\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
   my $fc_total = 0;;\
 \
     for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
-      $fc_total = ReadingsVal("$NAME","fc0_".sprintf("%02d",$loop_hour)."_total",0);;\
-      if ( $fc_total < $fc_trigger_price ) {\
-        return(sprintf("%02d:00",$loop_hour)) ;;\
-      }\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc0 Start %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
+        if ( $fc_total < $fc_trigger_price ) {\
+          return(sprintf("%02d:%02d",$loop_hour ,$quarter*15)) ;;\
+        }\
+      } # end $quarter\
     } # end  for loop_hour\
 \
   return("null");;\
@@ -998,24 +1099,33 @@ fc0_trigger_stop:fc0_trigger_start.* {\
   my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_start","null");;\
   my $fc_trigger_stop = $fc_trigger_start;;\
 \
+  my ($fc_trigger_start_hour, $fc_trigger_start_quarter);;\
+\
   if ( $fc_trigger_start ne "null" ) {\
-    $fc_trigger_start =~ /(\d\d):/;; $fc_trigger_start = $1 ;;\
+    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_start_hour = $1;;\
+    $fc_trigger_start_quarter = $2 / 15;;\
     my $fc_total = 0;;\
 \
-    for ($loop_hour = $fc_trigger_start;; $loop_hour <= 23;; $loop_hour++) {\
-      $fc_total = ReadingsVal("$NAME","fc".$fc."_".sprintf("%02d",$loop_hour)."_total",0);;\
-      if ( $fc_total < $fc_trigger_price ) {\
-        $fc_trigger_stop = sprintf("%02d:00",$loop_hour) ;;\
-      } else {\
-        return(sprintf("%02d:00",$loop_hour));;\
-      }\
+    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc0 Stop  %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
+        if ( $fc_total < $fc_trigger_price ) {\
+          $fc_trigger_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
+        } else {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
+        }\
 \
-     # wechsel zum nächsten Tag\
-     if ( $loop_hour == 23 and $fc == 0 ) {\
-       $fc = 1;;\
-       $loop_hour = -1;;\
-     }\
+       # wenn es 23:45 is wechsel zum nächsten Tag\
+       if ( $loop_hour == 23 and $fc == 0 and $quarter == 3) {\
+         $fc = 1;;\
+         $loop_hour = -1;; # beginne wieder bei 00:00\
+       }\
 \
+       if ( $quarter == 3 ) { $fc_trigger_start_quarter = 0 }\
+\
+      } # end $quarter\
     } # end for loop_hour\
   }\
  \
@@ -1023,8 +1133,7 @@ fc0_trigger_stop:fc0_trigger_start.* {\
 },\
 \
 fc0_trigger:fc0_trigger_stop.* {\
-\
-  # Setzen des Triggers für die aktuelle Stunde\
+  # Setzen des Triggers für die aktuelle viertel Stunde\
   if ( ReadingsVal("$NAME","current_price",100)  < ReadingsVal("$NAME","fc_trigger_price",0) ) {\
     return("on")\
   } else {\
@@ -1033,43 +1142,54 @@ fc0_trigger:fc0_trigger_stop.* {\
 },\
 \
 fc1_trigger_start:fc_trigger_price.* {\
-  if (ReadingsVal("$NAME","fc1_00_startsAt","null") ne "null") {\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {\
     my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0) /100;;\
 \
     # Ermitteln des nächsten Trigger Fensters\
-    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
     my $fc_total = 0;;\
 \
     for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
-      $fc_total = ReadingsVal("$NAME","fc1_".sprintf("%02d",$loop_hour)."_total",0);;\
-      if ( $fc_total < $fc_trigger_price ) {\
-        return(sprintf("%02d:00",$loop_hour)) ;;\
-      }\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc1 Start %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
+        if ( $fc_total < $fc_trigger_price ) {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
+        }\
+      } # end $quarter\
     } # end  for loop_hour\
   }\
   return("null");;\
 },\
 \
 fc1_trigger_stop:fc0_trigger_start.* {\
-  my $loop_hour = 0;;\
+  # Ermitteln des nächsten Trigger Fensters\
+  my $loop_hour;;\
   my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0) /100;;\
 \
-  # Ermitteln des nächsten Trigger Fensters\
   my $fc_trigger_start = ReadingsVal("$NAME","fc1_trigger_start","null");;\
   my $fc_trigger_stop = $fc_trigger_start;;\
 \
+  my ($fc_trigger_start_hour, $fc_trigger_start_quarter);;\
+\
   if ( $fc_trigger_start ne "null" ) {\
-    $fc_trigger_start =~ /(\d\d):/;; $fc_trigger_start = $1 ;;\
+    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_start_hour = $1;;\
+    $fc_trigger_start_quarter = $2 / 15;;\
     my $fc_total = 0;;\
 \
-    for ($loop_hour = $fc_trigger_start;; $loop_hour <= 23;; $loop_hour++) {\
-      $fc_total = ReadingsVal("$NAME","fc1_".sprintf("%02d",$loop_hour)."_total",0);;\
-      if ( $fc_total < $fc_trigger_price ) {\
-        $fc_trigger_stop = sprintf("%02d:00",$loop_hour) ;;\
-      } else {\
-        return(sprintf("%02d:00",$loop_hour));;\
-      }\
+    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total", $loop_hour, $quarter*15),0);;\
+# print sprintf("fc1 Stop  %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
+        if ( $fc_total < $fc_trigger_price ) {\
+          $fc_trigger_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
+        } else {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
+        }\
 \
+       if ( $quarter == 3 ) { $fc_trigger_start_quarter = 0 }\
+\
+      } # end $quarter\
     } # end for loop_hour\
   }\
  \
@@ -1087,42 +1207,53 @@ $price_level;;\
 },\
 \
 fc0_trigger_max_start:fc_trigger_max.* {\
-  my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0) /100;;\
-\
   # Ermitteln des nächsten Trigger_max Fensters\
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0) /100;;\
   my $fc_total = 0;;\
 \
     for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
-      $fc_total = ReadingsVal("$NAME","fc0_".sprintf("%02d",$loop_hour)."_total",0);;\
-      if ( $fc_total > $fc_trigger_max ) {\
-        return(sprintf("%02d:00",$loop_hour)) ;;\
-      }\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc0 Start max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
+        if ( $fc_total > $fc_trigger_max ) {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
+        }\
+      } # end $quarter\
     } # end  for loop_hour\
 \
   return("null");;\
 },\
 \
 fc0_trigger_max_stop:fc0_trigger_max_start.* {\
+  # Ermitteln des nächsten Trigger Fensters\
   my $fc = 0;;\
-  my $loop_hour = 0;;\
   my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0) /100;;\
 \
-  # Ermitteln des nächsten Trigger Fensters\
   my $fc_trigger_max_start = ReadingsVal("$NAME","fc0_trigger_max_start","null");;\
   my $fc_trigger_max_stop = $fc_trigger_max_start;;\
 \
+  my ($fc_trigger_max_start_hour, $fc_trigger_max_start_quarter);;\
+\
   if ( $fc_trigger_max_start ne "null" ) {\
-    $fc_trigger_max_start =~ /(\d\d):/;; $fc_trigger_max_start = $1 ;;\
+    $fc_trigger_max_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_max_start_hour = $1;;\
+    $fc_trigger_max_start_quarter = $2 / 15;;\
     my $fc_total = 0;;\
 \
-    for ($loop_hour = $fc_trigger_max_start;; $loop_hour <= 23;; $loop_hour++) {\
-      $fc_total = ReadingsVal("$NAME","fc".$fc."_".sprintf("%02d",$loop_hour)."_total",0);;\
-      if ( $fc_total > $fc_trigger_max ) {\
-        $fc_trigger_max_stop = sprintf("%02d:00",$loop_hour) ;;\
-      } else {\
-        return(sprintf("%02d:00",$loop_hour));;\
-      }\
+    for (my $loop_hour = $fc_trigger_max_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = $fc_trigger_max_start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total", $fc, $loop_hour, $quarter*15),0);;\
+# print sprintf("fc0 Stop  max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
+        if ( $fc_total > $fc_trigger_max ) {\
+          $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
+        } else {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
+        }\
+\
+       if ( $quarter == 3 ) { $fc_trigger_max_start_quarter = 0 }\
+\
+      } # end $quarter\
 \
      # wechsel zum nächsten Tag\
      if ( $loop_hour == 23 and $fc == 0 ) {\
@@ -1147,7 +1278,7 @@ fc0_trigger_max:fc0_trigger_max_stop.* {\
 },\
 \
 fc1_trigger_max_start:fc_trigger_max.* {\
-  if (ReadingsVal("$NAME","fc1_00_startsAt","null") ne "null") {\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {\
     my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0) /100;;\
 \
     # Ermitteln des nächsten Trigger Fensters\
@@ -1155,35 +1286,46 @@ fc1_trigger_max_start:fc_trigger_max.* {\
     my $fc_total = 0;;\
 \
     for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
-      $fc_total = ReadingsVal("$NAME","fc1_".sprintf("%02d",$loop_hour)."_total",0);;\
-      if ( $fc_total > $fc_trigger_max ) {\
-        return(sprintf("%02d:00",$loop_hour)) ;;\
-      }\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc1 Start max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
+        if ( $fc_total > $fc_trigger_max ) {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
+        }\
+      } # end $quarter\
     } # end  for loop_hour\
   }\
   return("null");;\
 },\
 \
-fc1_trigger_max_stop:fc0_trigger_max_start.* {\
-  my $loop_hour = 0;;\
+fc1_trigger_max_stop:fc1_trigger_max_start.* {\
+  # Ermitteln des nächsten Trigger Fensters\
   my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0) /100;;\
 \
-  # Ermitteln des nächsten Trigger Fensters\
   my $fc_trigger_max_start = ReadingsVal("$NAME","fc1_trigger_max_start","null");;\
   my $fc_trigger_max_stop = $fc_trigger_max_start;;\
 \
+  my ($fc_trigger_max_start_hour, $fc_trigger_max_start_quarter);;\
+\
   if ( $fc_trigger_max_start ne "null" ) {\
-    $fc_trigger_max_start =~ /(\d\d):/;; $fc_trigger_max_start = $1 ;;\
+    $fc_trigger_max_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_max_start_hour = $1;;\
+    $fc_trigger_max_start_quarter = $2 / 15;;\
     my $fc_total = 0;;\
 \
-    for ($loop_hour = $fc_trigger_max_start;; $loop_hour <= 23;; $loop_hour++) {\
-      $fc_total = ReadingsVal("$NAME","fc1_".sprintf("%02d",$loop_hour)."_total",0);;\
-      if ( $fc_total > $fc_trigger_max ) {\
-        $fc_trigger_max_stop = sprintf("%02d:00",$loop_hour) ;;\
-      } else {\
-        return(sprintf("%02d:00",$loop_hour));;\
-      }\
+    for (my $loop_hour = $fc_trigger_max_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = $fc_trigger_max_start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total", $loop_hour, $quarter*15),0);;\
+# print sprintf("fc1 Stop  max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
+        if ( $fc_total > $fc_trigger_max ) {\
+          $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
+        } else {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
+        }\
 \
+       if ( $quarter == 3 ) { $fc_trigger_max_start_quarter = 0 }\
+\
+      } # end $quarter\
     } # end for loop_hour\
   }\
  \
@@ -1221,33 +1363,74 @@ total_cost_year:nodes_TIMESTAMP.* {\
              AND YEAR(TIMESTAMP) = YEAR(curdate()) ;;") ;;\
 },\
 \
-fc_DbLog:fc0_00_total.* {\
+fc_DbLog:fc0_0000_total.* {\
+# Schreibt die redings fc*_hhmm_total als fc*_total mit passendem TIMESTAMP in die Datenbank\
 my ($timestamp,$date,$hour,$value,$loop_fc_next) = 5x0;;\
 \
 for (my $loop_fc = 0;; $loop_fc <= 1;; $loop_fc++) {\
   $loop_fc_next = $loop_fc +1;;\
-  $date = ReadingsVal("$NAME","fc".$loop_fc."_00_startsAt","null");;\
-  if ($date ne "null") {\
+  $date = ReadingsVal("$NAME","fc".$loop_fc."_0000_startsAt","null");;\
+  if ($date ne "null" and $date ne "") {\
     $date =~ /([\d+-]+)/;; $date = $1 ;;\
     for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
       $hour = sprintf("%02d",$loop_hour);;\
-      $timestamp = $date." ".$hour.":00:00";;\
-      $value = ReadingsVal("$NAME","fc".$loop_fc."_".$hour."_total","null");;\
-      ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-                        INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                          VALUES('".$timestamp."','$NAME','Tibber','fc".$loop_fc."_total','".$value."')\
-                        ON DUPLICATE KEY UPDATE\
-                          VALUE='".$value."';;") ;;\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $timestamp = $date." ".$hour.":".($quarter*15).":00";;\
+        $value = ReadingsVal("$NAME","fc".$loop_fc."_".$hour.sprintf("%02d",$quarter*15)."_total","null");;\
+        ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+                          INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                            VALUES('".$timestamp."','$NAME','Tibber','fc".$loop_fc."_total','".$value."')\
+                          ON DUPLICATE KEY UPDATE\
+                            VALUE='".$value."';;") ;;\
+      }\
     }\
-    if (ReadingsVal("$NAME","fc".$loop_fc."_00_startsAt","null") eq ReadingsVal("$NAME","fc".$loop_fc_next."_00_startsAt","null")) {\
-      fhem("deletereading $NAME fc".$loop_fc_next."_.*");;\
-    }\
-  } else {\
-      fhem("deletereading $NAME fc1_.*");;\
+##    if (ReadingsVal("$NAME","fc".$loop_fc."_0000_startsAt","null") eq ReadingsVal("$NAME","fc".$loop_fc_next."_0000_startsAt","null")) {\
+##      fhem("deletereading $NAME fc".$loop_fc_next."_.*");;\
+##    }\
   }\
+## else {\
+##      fhem("deletereading $NAME fc1_\\d.*");;\
+##  }\
 }\
-ReadingsTimestamp("$NAME","fc0_00_startsAt","null");;\
-}
+ReadingsTimestamp("$NAME","fc0_0000_startsAt","null");;\
+},\
+\
+next1_quarter:current_price.* {\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my $quarter = int($min / 15);; # aktuelle Viertelstunde 0–3\
+  my $next_quarter = ($quarter + 1) % 4;;  # nächste Viertelstunde\
+  my $hour_offset = $hour;; # passen sich an wenn es über Mitternacht geht\
+  my $fc = 0;; # fc0_ = # heute passen sich an wenn es über Mitternacht geht\
+\
+  if ($quarter == 3) {  # wenn wir in 23:45 sind nächste Viertelstunde gehört zur nächsten Stunde \
+        $hour_offset++;;\
+        if ($hour_offset >= 24) { \
+            $hour_offset -= 24;;\
+            $fc = 1;; # fc1_ = morgen\
+        }\
+    }\
+\
+  return round(ReadingsVal($NAME,sprintf("fc%d_%02d%02d_total",$fc, $hour_offset, $next_quarter*15),0)*100,1);;\
+ },\
+\
+next1_hour:current_price.* {\
+  my $j;;\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my $quarter = int($min / 15);; # aktuelle Viertelstunde 0–3\
+  my $next_quarter = ($quarter + 1) % 4;;  # nächste Viertelstunde\
+  my $hour_offset = $hour;; # passt sich an wenn es über Mitternacht geht\
+  my $fc = 0;; # fc0_ = # heute, passt sich an wenn es über Mitternacht geht\
+\
+  if ($hour_offset == 23) {  # wenn wir bei 23:00 sind gehört die nächste Stunde zum nächsten Tag\
+     $hour_offset = 0;;\
+     $fc = 1;; # fc1_ = morgen\
+    }\
+    for ($quarter = 0;; $quarter <= 3;; $quarter++) {\
+      $j += ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $hour_offset, $quarter*15),0);;\
+    }\
+\
+  return round($j/4*100,1);; # Für die nächste Stunde wird der Durchschnitt ausgegeben\
+ }
 attr EVU_Tibber_connect verbose 0
 attr EVU_Tibber_connect ws_minInterval 54
 attr EVU_Tibber_connect ws_websocketURL wss:websocket-api.tibber.com:443/v1-beta/gql/subscriptions

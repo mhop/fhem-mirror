@@ -1,0 +1,1373 @@
+defmod Stromboerse_connect HTTPMOD none
+attr Stromboerse_connect userattr conf_EVU_Tibber_Grundgebuehr_EUR_Jahr conf_EVU_Tibber_Korrektur conf_EVU_Tibber_Zuschlag_ct_kWh conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr conf_EVU_aWATTar_Zuschlag_ct_kWh conf_Netz_Jahresverbrauch_kWh conf_VAT conf_VNB conf_VNB_Arbeitspreis_ct_kWh conf_VNB_KWKG_ct_kWh conf_VNB_Konzession_ct_kWh conf_VNB_Leistungspreis_EUR_Jahr conf_VNB_MSB_iMSys_EUR_Jahr conf_VNB_MSB_mME_EUR_Jahr conf_VNB_Messstelle conf_VNB_Netzentgelt_ct_kWh conf_VNB_Paragraph_19_Umlage_ct_kWh conf_VNB_Stromsteuer_ct_kWh
+attr Stromboerse_connect DbLogValueFn {\
+  if ($READING =~ /fc0_trigger/) {\
+    my ($sec, $min, $hour, $mday, $mon, $year) = localtime(time_str2num($TIMESTAMP));;\
+   $year += 1900;;\
+   $mon  += 1;;\
+   my $quarter = int($min / 15) * 15;;  # Minuten auf 0, 15, 30 oder 45 runden\
+\
+   $TIMESTAMP = sprintf("%04d-%02d-%02d %02d:%02d:00", $year, $mon, $mday, $hour, $quarter);;\
+\
+  }\
+}
+attr Stromboerse_connect comment https://api.energy-charts.info\
+https://api.energy-charts.info/price?bzn=DE-LU&start=2025-06-25&end=2025-06-25\
+\
+https://api.energy-charts.info/price?bzn=DE-LU 3600\
+\
+\
+\
+Tibber Formel mit Kosten für 64560 bei e-Netz Südhessen\
+\
+Rechnung (alle Werte in ct/kWh)\
+  Spotpreis: S = 13.3 (Beispiel)\
+\
+  Tibber-Zuschlag: P = 2.15\
+  Grundgebühr: G = 5.99 Brutto\
+           G ct_pro_kWh    = 5.03 × 100 / 425 ≈ 1.1835 ct_pro_kWh\
+\
+  Netzentgelt (Arbeit): N = 8.00\
+  KWKG = 0.277\
+  Konzessionsabgabe: Konz = 1.59\
+  Arbeitspreis (Netznutzung): A = 2.14 ct/kWh\
+  moderne Messeinrichtungen (mME): 25.00 € / Jahr brutto  => 21.01 € / Jahr Netto\
+  \
+  \
+\
+\
+\
+\
+
+attr Stromboerse_connect conf_EVU_Tibber_Grundgebuehr_EUR_Jahr 57.84
+attr Stromboerse_connect conf_EVU_Tibber_Korrektur 0.755
+attr Stromboerse_connect conf_EVU_Tibber_Zuschlag_ct_kWh 2.15
+attr Stromboerse_connect conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr 46.20
+attr Stromboerse_connect conf_EVU_aWATTar_Zuschlag_ct_kWh 0
+attr Stromboerse_connect conf_Netz_Jahresverbrauch_kWh 5099
+attr Stromboerse_connect conf_VAT 1.19
+attr Stromboerse_connect conf_VNB Mainzer Netze GmbH (64560)
+attr Stromboerse_connect conf_VNB_Arbeitspreis_ct_kWh 7.54
+attr Stromboerse_connect conf_VNB_KWKG_ct_kWh 0.446
+attr Stromboerse_connect conf_VNB_Konzession_ct_kWh 1.32
+attr Stromboerse_connect conf_VNB_MSB_iMSys_EUR_Jahr 120
+attr Stromboerse_connect conf_VNB_MSB_mME_EUR_Jahr 16.81
+attr Stromboerse_connect conf_VNB_Messstelle mME
+attr Stromboerse_connect conf_VNB_Netzentgelt_ct_kWh 6.72
+attr Stromboerse_connect conf_VNB_Paragraph_19_Umlage_ct_kWh 1.559
+attr Stromboerse_connect conf_VNB_Stromsteuer_ct_kWh 2.05
+attr Stromboerse_connect disable 0
+attr Stromboerse_connect get01-100Name fc1_0045_total
+attr Stromboerse_connect get01-100OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-101Name fc1_0100_total
+attr Stromboerse_connect get01-101OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-102Name fc1_0115_total
+attr Stromboerse_connect get01-102OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-103Name fc1_0130_total
+attr Stromboerse_connect get01-103OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-104Name fc1_0145_total
+attr Stromboerse_connect get01-104OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-105Name fc1_0200_total
+attr Stromboerse_connect get01-105OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-106Name fc1_0215_total
+attr Stromboerse_connect get01-106OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-107Name fc1_0230_total
+attr Stromboerse_connect get01-107OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-108Name fc1_0245_total
+attr Stromboerse_connect get01-108OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-109Name fc1_0300_total
+attr Stromboerse_connect get01-109OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-10Name fc0_0215_total
+attr Stromboerse_connect get01-10OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-110Name fc1_0315_total
+attr Stromboerse_connect get01-110OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-111Name fc1_0330_total
+attr Stromboerse_connect get01-111OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-112Name fc1_0345_total
+attr Stromboerse_connect get01-112OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-113Name fc1_0400_total
+attr Stromboerse_connect get01-113OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-114Name fc1_0415_total
+attr Stromboerse_connect get01-114OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-115Name fc1_0430_total
+attr Stromboerse_connect get01-115OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-116Name fc1_0445_total
+attr Stromboerse_connect get01-116OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-117Name fc1_0500_total
+attr Stromboerse_connect get01-117OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-118Name fc1_0515_total
+attr Stromboerse_connect get01-118OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-119Name fc1_0530_total
+attr Stromboerse_connect get01-119OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-11Name fc0_0230_total
+attr Stromboerse_connect get01-11OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-120Name fc1_0545_total
+attr Stromboerse_connect get01-120OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-121Name fc1_0600_total
+attr Stromboerse_connect get01-121OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-122Name fc1_0615_total
+attr Stromboerse_connect get01-122OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-123Name fc1_0630_total
+attr Stromboerse_connect get01-123OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-124Name fc1_0645_total
+attr Stromboerse_connect get01-124OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-125Name fc1_0700_total
+attr Stromboerse_connect get01-125OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-126Name fc1_0715_total
+attr Stromboerse_connect get01-126OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-127Name fc1_0730_total
+attr Stromboerse_connect get01-127OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-128Name fc1_0745_total
+attr Stromboerse_connect get01-128OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-129Name fc1_0800_total
+attr Stromboerse_connect get01-129OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-12Name fc0_0245_total
+attr Stromboerse_connect get01-12OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-130Name fc1_0815_total
+attr Stromboerse_connect get01-130OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-131Name fc1_0830_total
+attr Stromboerse_connect get01-131OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-132Name fc1_0845_total
+attr Stromboerse_connect get01-132OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-133Name fc1_0900_total
+attr Stromboerse_connect get01-133OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-134Name fc1_0915_total
+attr Stromboerse_connect get01-134OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-135Name fc1_0930_total
+attr Stromboerse_connect get01-135OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-136Name fc1_0945_total
+attr Stromboerse_connect get01-136OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-137Name fc1_1000_total
+attr Stromboerse_connect get01-137OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-138Name fc1_1015_total
+attr Stromboerse_connect get01-138OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-139Name fc1_1030_total
+attr Stromboerse_connect get01-139OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-13Name fc0_0300_total
+attr Stromboerse_connect get01-13OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-140Name fc1_1045_total
+attr Stromboerse_connect get01-140OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-141Name fc1_1100_total
+attr Stromboerse_connect get01-141OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-142Name fc1_1115_total
+attr Stromboerse_connect get01-142OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-143Name fc1_1130_total
+attr Stromboerse_connect get01-143OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-144Name fc1_1145_total
+attr Stromboerse_connect get01-144OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-145Name fc1_1200_total
+attr Stromboerse_connect get01-145OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-146Name fc1_1215_total
+attr Stromboerse_connect get01-146OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-147Name fc1_1230_total
+attr Stromboerse_connect get01-147OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-148Name fc1_1245_total
+attr Stromboerse_connect get01-148OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-149Name fc1_1300_total
+attr Stromboerse_connect get01-149OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-14Name fc0_0315_total
+attr Stromboerse_connect get01-14OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-150Name fc1_1315_total
+attr Stromboerse_connect get01-150OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-151Name fc1_1330_total
+attr Stromboerse_connect get01-151OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-152Name fc1_1345_total
+attr Stromboerse_connect get01-152OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-153Name fc1_1400_total
+attr Stromboerse_connect get01-153OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-154Name fc1_1415_total
+attr Stromboerse_connect get01-154OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-155Name fc1_1430_total
+attr Stromboerse_connect get01-155OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-156Name fc1_1445_total
+attr Stromboerse_connect get01-156OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-157Name fc1_1500_total
+attr Stromboerse_connect get01-157OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-158Name fc1_1515_total
+attr Stromboerse_connect get01-158OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-159Name fc1_1530_total
+attr Stromboerse_connect get01-159OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-15Name fc0_0330_total
+attr Stromboerse_connect get01-15OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-160Name fc1_1545_total
+attr Stromboerse_connect get01-160OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-161Name fc1_1600_total
+attr Stromboerse_connect get01-161OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-162Name fc1_1615_total
+attr Stromboerse_connect get01-162OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-163Name fc1_1630_total
+attr Stromboerse_connect get01-163OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-164Name fc1_1645_total
+attr Stromboerse_connect get01-164OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-165Name fc1_1700_total
+attr Stromboerse_connect get01-165OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-166Name fc1_1715_total
+attr Stromboerse_connect get01-166OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-167Name fc1_1730_total
+attr Stromboerse_connect get01-167OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-168Name fc1_1745_total
+attr Stromboerse_connect get01-168OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-169Name fc1_1800_total
+attr Stromboerse_connect get01-169OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-16Name fc0_0345_total
+attr Stromboerse_connect get01-16OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-170Name fc1_1815_total
+attr Stromboerse_connect get01-170OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-171Name fc1_1830_total
+attr Stromboerse_connect get01-171OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-172Name fc1_1845_total
+attr Stromboerse_connect get01-172OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-173Name fc1_1900_total
+attr Stromboerse_connect get01-173OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-174Name fc1_1915_total
+attr Stromboerse_connect get01-174OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-175Name fc1_1930_total
+attr Stromboerse_connect get01-175OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-176Name fc1_1945_total
+attr Stromboerse_connect get01-176OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-177Name fc1_2000_total
+attr Stromboerse_connect get01-177OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-178Name fc1_2015_total
+attr Stromboerse_connect get01-178OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-179Name fc1_2030_total
+attr Stromboerse_connect get01-179OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-17Name fc0_0400_total
+attr Stromboerse_connect get01-17OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-180Name fc1_2045_total
+attr Stromboerse_connect get01-180OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-181Name fc1_2100_total
+attr Stromboerse_connect get01-181OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-182Name fc1_2115_total
+attr Stromboerse_connect get01-182OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-183Name fc1_2130_total
+attr Stromboerse_connect get01-183OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-184Name fc1_2145_total
+attr Stromboerse_connect get01-184OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-185Name fc1_2200_total
+attr Stromboerse_connect get01-185OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-186Name fc1_2215_total
+attr Stromboerse_connect get01-186OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-187Name fc1_2230_total
+attr Stromboerse_connect get01-187OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-188Name fc1_2245_total
+attr Stromboerse_connect get01-188OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-189Name fc1_2300_total
+attr Stromboerse_connect get01-189OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-18Name fc0_0415_total
+attr Stromboerse_connect get01-18OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-190Name fc1_2315_total
+attr Stromboerse_connect get01-190OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-191Name fc1_2330_total
+attr Stromboerse_connect get01-191OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-192Name fc1_2345_total
+attr Stromboerse_connect get01-192OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-19Name fc0_0430_total
+attr Stromboerse_connect get01-19OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-1Name fc0_0000_total
+attr Stromboerse_connect get01-1OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-20Name fc0_0445_total
+attr Stromboerse_connect get01-20OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-21Name fc0_0500_total
+attr Stromboerse_connect get01-21OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-22Name fc0_0515_total
+attr Stromboerse_connect get01-22OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-23Name fc0_0530_total
+attr Stromboerse_connect get01-23OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-24Name fc0_0545_total
+attr Stromboerse_connect get01-24OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-25Name fc0_0600_total
+attr Stromboerse_connect get01-25OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-26Name fc0_0615_total
+attr Stromboerse_connect get01-26OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-27Name fc0_0630_total
+attr Stromboerse_connect get01-27OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-28Name fc0_0645_total
+attr Stromboerse_connect get01-28OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-29Name fc0_0700_total
+attr Stromboerse_connect get01-29OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-2Name fc0_0015_total
+attr Stromboerse_connect get01-2OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-30Name fc0_0715_total
+attr Stromboerse_connect get01-30OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-31Name fc0_0730_total
+attr Stromboerse_connect get01-31OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-32Name fc0_0745_total
+attr Stromboerse_connect get01-32OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-33Name fc0_0800_total
+attr Stromboerse_connect get01-33OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-34Name fc0_0815_total
+attr Stromboerse_connect get01-34OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-35Name fc0_0830_total
+attr Stromboerse_connect get01-35OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-36Name fc0_0845_total
+attr Stromboerse_connect get01-36OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-37Name fc0_0900_total
+attr Stromboerse_connect get01-37OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-38Name fc0_0915_total
+attr Stromboerse_connect get01-38OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-39Name fc0_0930_total
+attr Stromboerse_connect get01-39OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-3Name fc0_0030_total
+attr Stromboerse_connect get01-3OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-40Name fc0_0945_total
+attr Stromboerse_connect get01-40OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-41Name fc0_1000_total
+attr Stromboerse_connect get01-41OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-42Name fc0_1015_total
+attr Stromboerse_connect get01-42OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-43Name fc0_1030_total
+attr Stromboerse_connect get01-43OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-44Name fc0_1045_total
+attr Stromboerse_connect get01-44OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-45Name fc0_1100_total
+attr Stromboerse_connect get01-45OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-46Name fc0_1115_total
+attr Stromboerse_connect get01-46OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-47Name fc0_1130_total
+attr Stromboerse_connect get01-47OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-48Name fc0_1145_total
+attr Stromboerse_connect get01-48OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-49Name fc0_1200_total
+attr Stromboerse_connect get01-49OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-4Name fc0_0045_total
+attr Stromboerse_connect get01-4OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-50Name fc0_1215_total
+attr Stromboerse_connect get01-50OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-51Name fc0_1230_total
+attr Stromboerse_connect get01-51OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-52Name fc0_1245_total
+attr Stromboerse_connect get01-52OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-53Name fc0_1300_total
+attr Stromboerse_connect get01-53OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-54Name fc0_1315_total
+attr Stromboerse_connect get01-54OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-55Name fc0_1330_total
+attr Stromboerse_connect get01-55OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-56Name fc0_1345_total
+attr Stromboerse_connect get01-56OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-57Name fc0_1400_total
+attr Stromboerse_connect get01-57OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-58Name fc0_1415_total
+attr Stromboerse_connect get01-58OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-59Name fc0_1430_total
+attr Stromboerse_connect get01-59OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-5Name fc0_0100_total
+attr Stromboerse_connect get01-5OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-60Name fc0_1445_total
+attr Stromboerse_connect get01-60OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-61Name fc0_1500_total
+attr Stromboerse_connect get01-61OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-62Name fc0_1515_total
+attr Stromboerse_connect get01-62OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-63Name fc0_1530_total
+attr Stromboerse_connect get01-63OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-64Name fc0_1545_total
+attr Stromboerse_connect get01-64OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-65Name fc0_1600_total
+attr Stromboerse_connect get01-65OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-66Name fc0_1615_total
+attr Stromboerse_connect get01-66OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-67Name fc0_1630_total
+attr Stromboerse_connect get01-67OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-68Name fc0_1645_total
+attr Stromboerse_connect get01-68OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-69Name fc0_1700_total
+attr Stromboerse_connect get01-69OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-6Name fc0_0115_total
+attr Stromboerse_connect get01-6OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-70Name fc0_1715_total
+attr Stromboerse_connect get01-70OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-71Name fc0_1730_total
+attr Stromboerse_connect get01-71OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-72Name fc0_1745_total
+attr Stromboerse_connect get01-72OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-73Name fc0_1800_total
+attr Stromboerse_connect get01-73OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-74Name fc0_1815_total
+attr Stromboerse_connect get01-74OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-75Name fc0_1830_total
+attr Stromboerse_connect get01-75OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-76Name fc0_1845_total
+attr Stromboerse_connect get01-76OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-77Name fc0_1900_total
+attr Stromboerse_connect get01-77OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-78Name fc0_1915_total
+attr Stromboerse_connect get01-78OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-79Name fc0_1930_total
+attr Stromboerse_connect get01-79OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-7Name fc0_0130_total
+attr Stromboerse_connect get01-7OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-80Name fc0_1945_total
+attr Stromboerse_connect get01-80OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-81Name fc0_2000_total
+attr Stromboerse_connect get01-81OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-82Name fc0_2015_total
+attr Stromboerse_connect get01-82OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-83Name fc0_2030_total
+attr Stromboerse_connect get01-83OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-84Name fc0_2045_total
+attr Stromboerse_connect get01-84OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-85Name fc0_2100_total
+attr Stromboerse_connect get01-85OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-86Name fc0_2115_total
+attr Stromboerse_connect get01-86OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-87Name fc0_2130_total
+attr Stromboerse_connect get01-87OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-88Name fc0_2145_total
+attr Stromboerse_connect get01-88OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-89Name fc0_2200_total
+attr Stromboerse_connect get01-89OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-8Name fc0_0145_total
+attr Stromboerse_connect get01-8OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-90Name fc0_2215_total
+attr Stromboerse_connect get01-90OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-91Name fc0_2230_total
+attr Stromboerse_connect get01-91OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-92Name fc0_2245_total
+attr Stromboerse_connect get01-92OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-93Name fc0_2300_total
+attr Stromboerse_connect get01-93OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-94Name fc0_2315_total
+attr Stromboerse_connect get01-94OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-95Name fc0_2330_total
+attr Stromboerse_connect get01-95OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-96Name fc0_2345_total
+attr Stromboerse_connect get01-96OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-97Name fc1_0000_total
+attr Stromboerse_connect get01-97OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-98Name fc1_0015_total
+attr Stromboerse_connect get01-98OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-99Name fc1_0030_total
+attr Stromboerse_connect get01-99OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01-9Name fc0_0200_total
+attr Stromboerse_connect get01-9OExpr round( (ReadingsVal($name,"conf_EVU","null") eq "EPEX_Spot" ? $val/10 : ReadingsVal($name,"conf_EVU","null") eq "Tibber" ? ($val/10 + ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0)) : $val/10+0.03*abs($val/10)+ ReadingsVal($name,"conf_EVU_Summe_ct_kWh",0) ) * AttrVal($name,"conf_VAT",0) ,4)
+attr Stromboerse_connect get01DeleteIfUnmatched 1
+attr Stromboerse_connect get01Name 01_Preis_Info_EPEX_Spot
+attr Stromboerse_connect get01RegOpt g
+attr Stromboerse_connect get01Regex [price":\[|,](-?\d+\.\d+)
+attr Stromboerse_connect get01URL https://api.energy-charts.info/price?bzn=DE-LU&start=%%start_today%%&end=%%start_tomorrow%%
+attr Stromboerse_connect get02-101Name fc0_0545_total
+attr Stromboerse_connect get02-101OExpr $val * 100
+attr Stromboerse_connect get02-105Name fc0_0600_total
+attr Stromboerse_connect get02-105OExpr $val * 100
+attr Stromboerse_connect get02-109Name fc0_0615_total
+attr Stromboerse_connect get02-109OExpr $val * 100
+attr Stromboerse_connect get02-113Name fc0_0630_total
+attr Stromboerse_connect get02-113OExpr $val * 100
+attr Stromboerse_connect get02-117Name fc0_0645_total
+attr Stromboerse_connect get02-117OExpr $val * 100
+attr Stromboerse_connect get02-11Name fc0_0000_total
+attr Stromboerse_connect get02-11OExpr $val * 100
+attr Stromboerse_connect get02-121Name fc0_0700_total
+attr Stromboerse_connect get02-121OExpr $val * 100
+attr Stromboerse_connect get02-125Name fc0_0715_total
+attr Stromboerse_connect get02-125OExpr $val * 100
+attr Stromboerse_connect get02-129Name fc0_0730_total
+attr Stromboerse_connect get02-129OExpr $val * 100
+attr Stromboerse_connect get02-12Name fc0_0000_startsAt
+attr Stromboerse_connect get02-12OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get02-133Name fc0_0745_total
+attr Stromboerse_connect get02-133OExpr $val * 100
+attr Stromboerse_connect get02-137Name fc0_0800_total
+attr Stromboerse_connect get02-137OExpr $val * 100
+attr Stromboerse_connect get02-13Name fc0_0015_total
+attr Stromboerse_connect get02-13OExpr $val * 100
+attr Stromboerse_connect get02-141Name fc0_0815_total
+attr Stromboerse_connect get02-141OExpr $val * 100
+attr Stromboerse_connect get02-145Name fc0_0830_total
+attr Stromboerse_connect get02-145OExpr $val * 100
+attr Stromboerse_connect get02-149Name fc0_0845_total
+attr Stromboerse_connect get02-149OExpr $val * 100
+attr Stromboerse_connect get02-153Name fc0_0900_total
+attr Stromboerse_connect get02-153OExpr $val * 100
+attr Stromboerse_connect get02-157Name fc0_0915_total
+attr Stromboerse_connect get02-157OExpr $val * 100
+attr Stromboerse_connect get02-161Name fc0_0930_total
+attr Stromboerse_connect get02-161OExpr $val * 100
+attr Stromboerse_connect get02-165Name fc0_0945_total
+attr Stromboerse_connect get02-165OExpr $val * 100
+attr Stromboerse_connect get02-169Name fc0_1000_total
+attr Stromboerse_connect get02-169OExpr $val * 100
+attr Stromboerse_connect get02-173Name fc0_1015_total
+attr Stromboerse_connect get02-173OExpr $val * 100
+attr Stromboerse_connect get02-177Name fc0_1030_total
+attr Stromboerse_connect get02-177OExpr $val * 100
+attr Stromboerse_connect get02-17Name fc0_0030_total
+attr Stromboerse_connect get02-17OExpr $val * 100
+attr Stromboerse_connect get02-181Name fc0_1045_total
+attr Stromboerse_connect get02-181OExpr $val * 100
+attr Stromboerse_connect get02-185Name fc0_1100_total
+attr Stromboerse_connect get02-185OExpr $val * 100
+attr Stromboerse_connect get02-189Name fc0_1115_total
+attr Stromboerse_connect get02-189OExpr $val * 100
+attr Stromboerse_connect get02-193Name fc0_1130_total
+attr Stromboerse_connect get02-193OExpr $val * 100
+attr Stromboerse_connect get02-197Name fc0_1145_total
+attr Stromboerse_connect get02-197OExpr $val * 100
+attr Stromboerse_connect get02-1Name current_price
+attr Stromboerse_connect get02-201Name fc0_1200_total
+attr Stromboerse_connect get02-201OExpr $val * 100
+attr Stromboerse_connect get02-205Name fc0_1215_total
+attr Stromboerse_connect get02-205OExpr $val * 100
+attr Stromboerse_connect get02-209Name fc0_1230_total
+attr Stromboerse_connect get02-209OExpr $val * 100
+attr Stromboerse_connect get02-213Name fc0_1245_total
+attr Stromboerse_connect get02-213OExpr $val * 100
+attr Stromboerse_connect get02-217Name fc0_1300_total
+attr Stromboerse_connect get02-217OExpr $val * 100
+attr Stromboerse_connect get02-21Name fc0_0045_total
+attr Stromboerse_connect get02-21OExpr $val * 100
+attr Stromboerse_connect get02-221Name fc0_1315_total
+attr Stromboerse_connect get02-221OExpr $val * 100
+attr Stromboerse_connect get02-225Name fc0_1330_total
+attr Stromboerse_connect get02-225OExpr $val * 100
+attr Stromboerse_connect get02-229Name fc0_1345_total
+attr Stromboerse_connect get02-229OExpr $val * 100
+attr Stromboerse_connect get02-233Name fc0_1400_total
+attr Stromboerse_connect get02-233OExpr $val * 100
+attr Stromboerse_connect get02-237Name fc0_1415_total
+attr Stromboerse_connect get02-237OExpr $val * 100
+attr Stromboerse_connect get02-241Name fc0_1430_total
+attr Stromboerse_connect get02-241OExpr $val * 100
+attr Stromboerse_connect get02-245Name fc0_1445_total
+attr Stromboerse_connect get02-245OExpr $val * 100
+attr Stromboerse_connect get02-249Name fc0_1500_total
+attr Stromboerse_connect get02-249OExpr $val * 100
+attr Stromboerse_connect get02-253Name fc0_1515_total
+attr Stromboerse_connect get02-253OExpr $val * 100
+attr Stromboerse_connect get02-257Name fc0_1530_total
+attr Stromboerse_connect get02-257OExpr $val * 100
+attr Stromboerse_connect get02-25Name fc0_0100_total
+attr Stromboerse_connect get02-25OExpr $val * 100
+attr Stromboerse_connect get02-261Name fc0_1545_total
+attr Stromboerse_connect get02-261OExpr $val * 100
+attr Stromboerse_connect get02-265Name fc0_1600_total
+attr Stromboerse_connect get02-265OExpr $val * 100
+attr Stromboerse_connect get02-269Name fc0_1615_total
+attr Stromboerse_connect get02-269OExpr $val * 100
+attr Stromboerse_connect get02-273Name fc0_1630_total
+attr Stromboerse_connect get02-273OExpr $val * 100
+attr Stromboerse_connect get02-277Name fc0_1645_total
+attr Stromboerse_connect get02-277OExpr $val * 100
+attr Stromboerse_connect get02-281Name fc0_1700_total
+attr Stromboerse_connect get02-281OExpr $val * 100
+attr Stromboerse_connect get02-285Name fc0_1715_total
+attr Stromboerse_connect get02-285OExpr $val * 100
+attr Stromboerse_connect get02-289Name fc0_1730_total
+attr Stromboerse_connect get02-289OExpr $val * 100
+attr Stromboerse_connect get02-293Name fc0_1745_total
+attr Stromboerse_connect get02-293OExpr $val * 100
+attr Stromboerse_connect get02-297Name fc0_1800_total
+attr Stromboerse_connect get02-297OExpr $val * 100
+attr Stromboerse_connect get02-29Name fc0_0115_total
+attr Stromboerse_connect get02-29OExpr $val * 100
+attr Stromboerse_connect get02-301Name fc0_1815_total
+attr Stromboerse_connect get02-301OExpr $val * 100
+attr Stromboerse_connect get02-305Name fc0_1830_total
+attr Stromboerse_connect get02-305OExpr $val * 100
+attr Stromboerse_connect get02-309Name fc0_1845_total
+attr Stromboerse_connect get02-309OExpr $val * 100
+attr Stromboerse_connect get02-313Name fc0_1900_total
+attr Stromboerse_connect get02-313OExpr $val * 100
+attr Stromboerse_connect get02-317Name fc0_1915_total
+attr Stromboerse_connect get02-317OExpr $val * 100
+attr Stromboerse_connect get02-321Name fc0_1930_total
+attr Stromboerse_connect get02-321OExpr $val * 100
+attr Stromboerse_connect get02-325Name fc0_1945_total
+attr Stromboerse_connect get02-325OExpr $val * 100
+attr Stromboerse_connect get02-329Name fc0_2000_total
+attr Stromboerse_connect get02-329OExpr $val * 100
+attr Stromboerse_connect get02-333Name fc0_2015_total
+attr Stromboerse_connect get02-337Name fc0_2030_total
+attr Stromboerse_connect get02-337OExpr $val * 100
+attr Stromboerse_connect get02-33Name fc0_0130_total
+attr Stromboerse_connect get02-33OExpr $val * 100
+attr Stromboerse_connect get02-341Name fc0_2045_total
+attr Stromboerse_connect get02-341OExpr $val * 100
+attr Stromboerse_connect get02-345Name fc0_2100_total
+attr Stromboerse_connect get02-345OExpr $val * 100
+attr Stromboerse_connect get02-349Name fc0_2115_total
+attr Stromboerse_connect get02-349OExpr $val * 100
+attr Stromboerse_connect get02-353Name fc0_2130_total
+attr Stromboerse_connect get02-353OExpr $val * 100
+attr Stromboerse_connect get02-357Name fc0_2145_total
+attr Stromboerse_connect get02-357OExpr $val * 100
+attr Stromboerse_connect get02-361Name fc0_2200_total
+attr Stromboerse_connect get02-361OExpr $val * 100
+attr Stromboerse_connect get02-365Name fc0_2215_total
+attr Stromboerse_connect get02-365OExpr $val * 100
+attr Stromboerse_connect get02-369Name fc0_2230_total
+attr Stromboerse_connect get02-369OExpr $val * 100
+attr Stromboerse_connect get02-373Name fc0_2245_total
+attr Stromboerse_connect get02-373OExpr $val * 100
+attr Stromboerse_connect get02-377Name fc0_2300_total
+attr Stromboerse_connect get02-377OExpr $val * 100
+attr Stromboerse_connect get02-37Name fc0_0145_total
+attr Stromboerse_connect get02-37OExpr $val * 100
+attr Stromboerse_connect get02-381Name fc0_2315_total
+attr Stromboerse_connect get02-381OExpr $val * 100
+attr Stromboerse_connect get02-385Name fc0_2330_total
+attr Stromboerse_connect get02-385OExpr $val * 100
+attr Stromboerse_connect get02-389Name fc0_2345_total
+attr Stromboerse_connect get02-389OExpr $val * 100
+attr Stromboerse_connect get02-395Name fc1_0000_total
+attr Stromboerse_connect get02-395OExpr $val * 100
+attr Stromboerse_connect get02-396Name fc1_0000_startsAt
+attr Stromboerse_connect get02-396OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get02-397Name fc1_0015_total
+attr Stromboerse_connect get02-397OExpr $val * 100
+attr Stromboerse_connect get02-401Name fc1_0030_total
+attr Stromboerse_connect get02-401OExpr $val * 100
+attr Stromboerse_connect get02-405Name fc1_0045_total
+attr Stromboerse_connect get02-405OExpr $val * 100
+attr Stromboerse_connect get02-409Name fc1_0100_total
+attr Stromboerse_connect get02-409OExpr $val * 100
+attr Stromboerse_connect get02-413Name fc1_0115_total
+attr Stromboerse_connect get02-413OExpr $val * 100
+attr Stromboerse_connect get02-417Name fc1_0130_total
+attr Stromboerse_connect get02-417OExpr $val * 100
+attr Stromboerse_connect get02-41Name fc0_0200_total
+attr Stromboerse_connect get02-41OExpr $val * 100
+attr Stromboerse_connect get02-421Name fc1_0145_total
+attr Stromboerse_connect get02-421OExpr $val * 100
+attr Stromboerse_connect get02-425Name fc1_0200_total
+attr Stromboerse_connect get02-425OExpr $val * 100
+attr Stromboerse_connect get02-429Name fc1_0215_total
+attr Stromboerse_connect get02-429OExpr $val * 100
+attr Stromboerse_connect get02-433Name fc1_0230_total
+attr Stromboerse_connect get02-433OExpr $val * 100
+attr Stromboerse_connect get02-437Name fc1_0245_total
+attr Stromboerse_connect get02-437OExpr $val * 100
+attr Stromboerse_connect get02-441Name fc1_0300_total
+attr Stromboerse_connect get02-441OExpr $val * 100
+attr Stromboerse_connect get02-445Name fc1_0315_total
+attr Stromboerse_connect get02-445OExpr $val * 100
+attr Stromboerse_connect get02-449Name fc1_0330_total
+attr Stromboerse_connect get02-449OExpr $val * 100
+attr Stromboerse_connect get02-453Name fc1_0345_total
+attr Stromboerse_connect get02-453OExpr $val * 100
+attr Stromboerse_connect get02-457Name fc1_0400_total
+attr Stromboerse_connect get02-457OExpr $val * 100
+attr Stromboerse_connect get02-45Name fc0_0215_total
+attr Stromboerse_connect get02-45OExpr $val * 100
+attr Stromboerse_connect get02-461Name fc1_0415_total
+attr Stromboerse_connect get02-461OExpr $val * 100
+attr Stromboerse_connect get02-465Name fc1_0430_total
+attr Stromboerse_connect get02-465OExpr $val * 100
+attr Stromboerse_connect get02-469Name fc1_0445_total
+attr Stromboerse_connect get02-469OExpr $val * 100
+attr Stromboerse_connect get02-473Name fc1_0500_total
+attr Stromboerse_connect get02-473OExpr $val * 100
+attr Stromboerse_connect get02-477Name fc1_0515_total
+attr Stromboerse_connect get02-477OExpr $val * 100
+attr Stromboerse_connect get02-481Name fc1_0530_total
+attr Stromboerse_connect get02-481OExpr $val * 100
+attr Stromboerse_connect get02-485Name fc1_0545_total
+attr Stromboerse_connect get02-485OExpr $val * 100
+attr Stromboerse_connect get02-489Name fc1_0600_total
+attr Stromboerse_connect get02-489OExpr $val * 100
+attr Stromboerse_connect get02-493Name fc1_0615_total
+attr Stromboerse_connect get02-493OExpr $val * 100
+attr Stromboerse_connect get02-497Name fc1_0630_total
+attr Stromboerse_connect get02-497OExpr $val * 100
+attr Stromboerse_connect get02-49Name fc0_0230_total
+attr Stromboerse_connect get02-49OExpr $val * 100
+attr Stromboerse_connect get02-501Name fc1_0645_total
+attr Stromboerse_connect get02-501OExpr $val * 100
+attr Stromboerse_connect get02-505Name fc1_0700_total
+attr Stromboerse_connect get02-505OExpr $val * 100
+attr Stromboerse_connect get02-509Name fc1_0715_total
+attr Stromboerse_connect get02-509OExpr $val * 100
+attr Stromboerse_connect get02-513Name fc1_0730_total
+attr Stromboerse_connect get02-513OExpr $val * 100
+attr Stromboerse_connect get02-517Name fc1_0745_total
+attr Stromboerse_connect get02-517OExpr $val * 100
+attr Stromboerse_connect get02-521Name fc1_0800_total
+attr Stromboerse_connect get02-521OExpr $val * 100
+attr Stromboerse_connect get02-525Name fc1_0815_total
+attr Stromboerse_connect get02-525OExpr $val * 100
+attr Stromboerse_connect get02-529Name fc1_0830_total
+attr Stromboerse_connect get02-529OExpr $val * 100
+attr Stromboerse_connect get02-533Name fc1_0845_total
+attr Stromboerse_connect get02-533OExpr $val * 100
+attr Stromboerse_connect get02-537Name fc1_0900_total
+attr Stromboerse_connect get02-537OExpr $val * 100
+attr Stromboerse_connect get02-53Name fc0_0245_total
+attr Stromboerse_connect get02-53OExpr $val * 100
+attr Stromboerse_connect get02-541Name fc1_0915_total
+attr Stromboerse_connect get02-541OExpr $val * 100
+attr Stromboerse_connect get02-545Name fc1_0930_total
+attr Stromboerse_connect get02-545OExpr $val * 100
+attr Stromboerse_connect get02-549Name fc1_0945_total
+attr Stromboerse_connect get02-549OExpr $val * 100
+attr Stromboerse_connect get02-553Name fc1_1000_total
+attr Stromboerse_connect get02-553OExpr $val * 100
+attr Stromboerse_connect get02-557Name fc1_1015_total
+attr Stromboerse_connect get02-557OExpr $val * 100
+attr Stromboerse_connect get02-561Name fc1_1030_total
+attr Stromboerse_connect get02-561OExpr $val * 100
+attr Stromboerse_connect get02-565Name fc1_1045_total
+attr Stromboerse_connect get02-565OExpr $val * 100
+attr Stromboerse_connect get02-569Name fc1_1100_total
+attr Stromboerse_connect get02-569OExpr $val * 100
+attr Stromboerse_connect get02-573Name fc1_1115_total
+attr Stromboerse_connect get02-573OExpr $val * 100
+attr Stromboerse_connect get02-577Name fc1_1130_total
+attr Stromboerse_connect get02-577OExpr $val * 100
+attr Stromboerse_connect get02-57Name fc0_0300_total
+attr Stromboerse_connect get02-57OExpr $val * 100
+attr Stromboerse_connect get02-581Name fc1_1145_total
+attr Stromboerse_connect get02-581OExpr $val * 100
+attr Stromboerse_connect get02-585Name fc1_1200_total
+attr Stromboerse_connect get02-585OExpr $val * 100
+attr Stromboerse_connect get02-589Name fc1_1215_total
+attr Stromboerse_connect get02-589OExpr $val * 100
+attr Stromboerse_connect get02-593Name fc1_1230_total
+attr Stromboerse_connect get02-593OExpr $val * 100
+attr Stromboerse_connect get02-597Name fc1_1245_total
+attr Stromboerse_connect get02-597OExpr $val * 100
+attr Stromboerse_connect get02-601Name fc1_1300_total
+attr Stromboerse_connect get02-601OExpr $val * 100
+attr Stromboerse_connect get02-605Name fc1_1315_total
+attr Stromboerse_connect get02-605OExpr $val * 100
+attr Stromboerse_connect get02-609Name fc1_1330_total
+attr Stromboerse_connect get02-609OExpr $val * 100
+attr Stromboerse_connect get02-613Name fc1_1345_total
+attr Stromboerse_connect get02-613OExpr $val * 100
+attr Stromboerse_connect get02-617Name fc1_1400_total
+attr Stromboerse_connect get02-617OExpr $val * 100
+attr Stromboerse_connect get02-61Name fc0_0315_total
+attr Stromboerse_connect get02-61OExpr $val * 100
+attr Stromboerse_connect get02-621Name fc1_1415_total
+attr Stromboerse_connect get02-621OExpr $val * 100
+attr Stromboerse_connect get02-625Name fc1_1430_total
+attr Stromboerse_connect get02-625OExpr $val * 100
+attr Stromboerse_connect get02-629Name fc1_1445_total
+attr Stromboerse_connect get02-629OExpr $val * 100
+attr Stromboerse_connect get02-633Name fc1_1500_total
+attr Stromboerse_connect get02-633OExpr $val * 100
+attr Stromboerse_connect get02-637Name fc1_1515_total
+attr Stromboerse_connect get02-637OExpr $val * 100
+attr Stromboerse_connect get02-641Name fc1_1530_total
+attr Stromboerse_connect get02-641OExpr $val * 100
+attr Stromboerse_connect get02-645Name fc1_1545_total
+attr Stromboerse_connect get02-645OExpr $val * 100
+attr Stromboerse_connect get02-649Name fc1_1600_total
+attr Stromboerse_connect get02-649OExpr $val * 100
+attr Stromboerse_connect get02-653Name fc1_1615_total
+attr Stromboerse_connect get02-653OExpr $val * 100
+attr Stromboerse_connect get02-657Name fc1_1630_total
+attr Stromboerse_connect get02-657OExpr $val * 100
+attr Stromboerse_connect get02-65Name fc0_0330_total
+attr Stromboerse_connect get02-65OExpr $val * 100
+attr Stromboerse_connect get02-661Name fc1_1645_total
+attr Stromboerse_connect get02-661OExpr $val * 100
+attr Stromboerse_connect get02-665Name fc1_1700_total
+attr Stromboerse_connect get02-665OExpr $val * 100
+attr Stromboerse_connect get02-669Name fc1_1715_total
+attr Stromboerse_connect get02-669OExpr $val * 100
+attr Stromboerse_connect get02-673Name fc1_1730_total
+attr Stromboerse_connect get02-673OExpr $val * 100
+attr Stromboerse_connect get02-677Name fc1_1745_total
+attr Stromboerse_connect get02-677OExpr $val * 100
+attr Stromboerse_connect get02-681Name fc1_1800_total
+attr Stromboerse_connect get02-681OExpr $val * 100
+attr Stromboerse_connect get02-685Name fc1_1815_total
+attr Stromboerse_connect get02-685OExpr $val * 100
+attr Stromboerse_connect get02-689Name fc1_1830_total
+attr Stromboerse_connect get02-689OExpr $val * 100
+attr Stromboerse_connect get02-693Name fc1_1845_total
+attr Stromboerse_connect get02-693OExpr $val * 100
+attr Stromboerse_connect get02-697Name fc1_1900_total
+attr Stromboerse_connect get02-697OExpr $val * 100
+attr Stromboerse_connect get02-69Name fc0_0345_total
+attr Stromboerse_connect get02-69OExpr $val * 100
+attr Stromboerse_connect get02-6Name current_date
+attr Stromboerse_connect get02-6OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get02-701Name fc1_1915_total
+attr Stromboerse_connect get02-701OExpr $val * 100
+attr Stromboerse_connect get02-705Name fc1_1930_total
+attr Stromboerse_connect get02-705OExpr $val * 100
+attr Stromboerse_connect get02-709Name fc1_1945_total
+attr Stromboerse_connect get02-709OExpr $val * 100
+attr Stromboerse_connect get02-713Name fc1_2000_total
+attr Stromboerse_connect get02-713OExpr $val * 100
+attr Stromboerse_connect get02-717Name fc1_2015_total
+attr Stromboerse_connect get02-717OExpr $val * 100
+attr Stromboerse_connect get02-721Name fc1_2030_total
+attr Stromboerse_connect get02-721OExpr $val * 100
+attr Stromboerse_connect get02-725Name fc1_2045_total
+attr Stromboerse_connect get02-725OExpr $val * 100
+attr Stromboerse_connect get02-729Name fc1_2100_total
+attr Stromboerse_connect get02-729OExpr $val * 100
+attr Stromboerse_connect get02-733Name fc1_2115_total
+attr Stromboerse_connect get02-733OExpr $val * 100
+attr Stromboerse_connect get02-737Name fc1_2130_total
+attr Stromboerse_connect get02-737OExpr $val * 100
+attr Stromboerse_connect get02-73Name fc0_0400_total
+attr Stromboerse_connect get02-73OExpr $val * 100
+attr Stromboerse_connect get02-741Name fc1_2145_total
+attr Stromboerse_connect get02-741OExpr $val * 100
+attr Stromboerse_connect get02-745Name fc1_2200_total
+attr Stromboerse_connect get02-745OExpr $val * 100
+attr Stromboerse_connect get02-749Name fc1_2215_total
+attr Stromboerse_connect get02-749OExpr $val * 100
+attr Stromboerse_connect get02-753Name fc1_2230_total
+attr Stromboerse_connect get02-753OExpr $val * 100
+attr Stromboerse_connect get02-757Name fc1_2245_total
+attr Stromboerse_connect get02-757OExpr $val * 100
+attr Stromboerse_connect get02-761Name fc1_2300_total
+attr Stromboerse_connect get02-761OExpr $val * 100
+attr Stromboerse_connect get02-765Name fc1_2315_total
+attr Stromboerse_connect get02-765OExpr $val * 100
+attr Stromboerse_connect get02-769Name fc1_2330_total
+attr Stromboerse_connect get02-769OExpr $val * 100
+attr Stromboerse_connect get02-773Name fc1_2345_total
+attr Stromboerse_connect get02-773OExpr $val * 100
+attr Stromboerse_connect get02-77Name fc0_0415_total
+attr Stromboerse_connect get02-77OExpr $val * 100
+attr Stromboerse_connect get02-81Name fc0_0430_total
+attr Stromboerse_connect get02-81OExpr $val * 100
+attr Stromboerse_connect get02-85Name fc0_0445_total
+attr Stromboerse_connect get02-85OExpr $val * 100
+attr Stromboerse_connect get02-89Name fc0_0500_total
+attr Stromboerse_connect get02-89OExpr $val * 100
+attr Stromboerse_connect get02-93Name fc0_0515_total
+attr Stromboerse_connect get02-93OExpr $val * 100
+attr Stromboerse_connect get02-97Name fc0_0530_total
+attr Stromboerse_connect get02-97OExpr $val * 100
+attr Stromboerse_connect get02Data { "query": "{viewer {home(id:\"%%homeID%%\") {currentSubscription {priceInfo (resolution: QUARTER_HOURLY)  {current {total startsAt} today {total startsAt} tomorrow {total startsAt}}}}}}" }
+attr Stromboerse_connect get02DeleteIfUnmatched 1
+attr Stromboerse_connect get02Header01 Content-Type: application/json
+attr Stromboerse_connect get02Header02 Authorization: Bearer %%token%%
+attr Stromboerse_connect get02Name 02_Preis_Info_Tibber_Live
+attr Stromboerse_connect get02RegOpt g
+attr Stromboerse_connect get02Regex "total":(-*\d+.\d+)|"startsAt":"(\d+-\d+-\d+T\d+:\d+:\d+).*(?="today")|\[\{"total":(-*\d+.\d+),"startsAt":"(\d+-\d+-\d+T\d+:\d+:\d+)
+attr Stromboerse_connect get02URL https://api.tibber.com/v1-beta/gql
+attr Stromboerse_connect group PV Steuerung EVU
+attr Stromboerse_connect icon stromzaehler_icon
+attr Stromboerse_connect replacement01Mode expression
+attr Stromboerse_connect replacement01Regex %%start_today%%
+attr Stromboerse_connect replacement01Value strftime("%Y-%m-%d",localtime(time))
+attr Stromboerse_connect replacement02Mode expression
+attr Stromboerse_connect replacement02Regex %%start_tomorrow%%
+attr Stromboerse_connect replacement02Value strftime("%Y-%m-%d",localtime(time()+86400))
+attr Stromboerse_connect replacement03Mode expression
+attr Stromboerse_connect replacement03Regex %%token%%
+attr Stromboerse_connect replacement03Value {KeyValue("read","EVU_Tibber_connect_token")}
+attr Stromboerse_connect replacement04Mode expression
+attr Stromboerse_connect replacement04Regex %%homeID%%
+attr Stromboerse_connect replacement04Value {KeyValue("read","EVU_Tibber_connect_homeID")}
+attr Stromboerse_connect room Strom->Boerse
+attr Stromboerse_connect showBody 0
+attr Stromboerse_connect sortby 413
+attr Stromboerse_connect timeout 10
+attr Stromboerse_connect userReadings conf_EVU_Summe_ct_kWh:conf_EVU.* {\
+## Berechnung des Zuschlages pro kWh, alle Kosten müssen als Nettopreis angegeben werden\
+\
+  my $conf_EVU = ReadingsVal("$NAME","conf_EVU","EPEX_Spot") ;;\
+  my $Summe_ct_kWh = 0;;\
+  if ( $conf_EVU eq "Tibber" ) {                                     ## Es wurde ein EVU ausgewählt\
+    $Summe_ct_kWh =\
+          AttrVal("$NAME","conf_EVU_".$conf_EVU."_Zuschlag_ct_kWh",0)\
+       + AttrVal("$NAME","conf_EVU_".$conf_EVU."_Grundgebuehr_EUR_Jahr",0) *100 / AttrVal("$NAME","conf_Netz_Jahresverbrauch_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Arbeitspreis_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_KWKG_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Konzession_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Netzentgelt_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_MSB_".AttrVal("$NAME","conf_VNB_Messstelle","mME")."_EUR_Jahr",0) *100 / AttrVal("$NAME","conf_Netz_Jahresverbrauch_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Paragraph_19_Umlage_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Stromsteuer_ct_kWh",0);;\
+\
+    $Summe_ct_kWh *= AttrVal("$NAME","conf_EVU_".$conf_EVU."_Korrektur",1);;\
+    $Summe_ct_kWh  = round($Summe_ct_kWh ,4);;              ## Netto Aufschlag pro kWh\
+\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_1  : Zuschlag von ".$Summe_ct_kWh." ct/kWh für ".$conf_EVU." berechnet";;\
+    }\
+  } ## end if\
+\
+  if ( $conf_EVU eq "aWATTar" ) {                                    ## Es wurde ein EVU ausgewählt\
+    $Summe_ct_kWh =\
+          AttrVal("$NAME","conf_EVU_".$conf_EVU."_Grundgebuehr_EUR_Jahr",0) *100 / AttrVal("$NAME","conf_Netz_Jahresverbrauch_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Arbeitspreis_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_KWKG_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Konzession_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Netzentgelt_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_MSB_".AttrVal("$NAME","conf_VNB_Messstelle","mME")."_EUR_Jahr",0) *100 / AttrVal("$NAME","conf_Netz_Jahresverbrauch_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Paragraph_19_Umlage_ct_kWh",0)\
+       + AttrVal("$NAME","conf_VNB_Stromsteuer_ct_kWh",0);;\
+\
+    $Summe_ct_kWh *= AttrVal("$NAME","conf_EVU_".$conf_EVU."_Korrektur",1);;\
+    $Summe_ct_kWh  = round($Summe_ct_kWh ,4);;              ## Netto Aufschlag pro kWh\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_1  : Zuschlag von ".$Summe_ct_kWh." für ".$conf_EVU." berechnet";;\
+      Log 3, "$NAME  ur_1  : Zusätzlich erfolgt bei ".$conf_EVU." ein dynamischer Zuschlag von val+0.03*abs(val) pro kWh";;\
+    }\
+  } ## end if\
+\
+  if ( $conf_EVU eq "EPEX_Spot" ) {\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_1  : Zuschlag von 0 für ".$conf_EVU."";;\
+    }\
+  } ## end if\
+\
+  if ( $conf_EVU ne "Tibber_Live" ) {\
+   fhem("get $NAME 01_Preis_Info_EPEX_Spot");;\
+  } else {\
+   fhem("get $NAME 02_Preis_Info_Tibber_Live");;\
+  }\
+\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_1  : Daten für ".$conf_EVU." aktualisiert";;\
+  }\
+ \
+  return $Summe_ct_kWh;;\
+},\
+\
+current_level:fc._0000_total.* {\
+  ## Aktueller Preis\
+  my $hash = $defs{$name};;\
+\
+   # --- Readings setzen ---\
+  readingsBeginUpdate($hash);;\
+  readingsBulkUpdate($hash,"current_price",ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",strftime("%H",localtime),int(strftime("%M",localtime)  / 15) * 15),0) );;\
+  readingsBulkUpdate($hash,"current_date",sprintf("%s:%02d:00",strftime("%Y-%m-%d %H",localtime),int(strftime("%M",localtime)  / 15) * 15) );;\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_2  : Daten für current Werte gesetzt";;\
+  }\
+  readingsBulkUpdate($hash,"fc0_0000_startsAt",strftime("%Y-%m-%d 00:00:00",localtime) );;\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_2  : Daten für fc0 Startzeit gesetzt";;\
+  }\
+  if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {       ## Der nächste Tag ist bereits da\
+    readingsBulkUpdate($hash,"fc1_0000_startsAt",strftime("%Y-%m-%d 00:00:00",localtime(time+86400)) );;\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_2  : Daten für fc1 Startzeit gesetzt";;\
+    }\
+  } else {\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_2  : Daten für fc1 sind noch nicht da";;\
+    }\
+    fhem("deletereading ".$NAME." fc1_0000_startsAt");;\
+  } # end if\
+  return "null";;\
+},\
+\
+fc_avg:current_price.* {\
+## Berechnung des durchschnitt Wertes über alle Werte von fc0 und fc1\
+  my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
+  my $fc_avg = 0;;\
+\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_3  : Daten für fc1 sind bereits da";;\
+    }\
+    $fc  = 1;;\
+  } # end if\
+\
+  for (my $j=0;;$j<=$fc ;;$j++){ # heute und eventuell morgen durchlaufen\
+    for (my $k=0;;$k<=23;;$k++) {                                          ## Summe  berechnen\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_avg += ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j, $k, $quarter*15),0);;\
+      } # end $quarter\
+    } # end $k\
+  } # end $j\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_3  : berechne Durchschnittspreis";;\
+  }\
+  return round($fc_avg / (96 *(1+$fc)) ,2);;                     ## Durchschnitt berechnen\
+},\
+\
+fc_med:current_price.* {\
+## Berechnung des median Wertes\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_4  : berechne Medianwert aus der Datenbank";;\
+  }\
+  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+           SELECT\
+             cast( (   (SUBSTRING_INDEX(SUBSTRING_INDEX(group_concat(VALUE order by VALUE), ',', floor(1+((count(VALUE)-1) / 2)))  , ',', -1))\
+                       + (SUBSTRING_INDEX(SUBSTRING_INDEX(group_concat(VALUE order by VALUE), ',', ceiling(1+((count(VALUE)-1) / 2))), ',', -1))\
+                     )/2 *100\
+             AS DECIMAL(4,2))\
+           FROM history\
+           WHERE DEVICE='".$NAME."'\
+             AND (   READING='fc0_total' AND TIMESTAMP >= DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00')\
+                     OR READING='fc1_total' AND TIMESTAMP >= DATE_FORMAT(NOW() + INTERVAL 1 DAY, '%Y-%m-%d 00:00:00') ) ;;") ;;\
+},\
+\
+fc_min:current_price.* {\
+##  Ermittlung des minimal Wertes\
+  my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
+  my $fc_min = 0;;\
+  my $fc_tmp = 0;;\
+\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
+    $fc = 1;;\
+  } # end if\
+\
+  for (my $j=0;;$j<=$fc;;$j++){\
+    for (my $k=0;;$k<=23;;$k++) {\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j,$k, $quarter*15),0);;\
+        if (($fc_tmp < $fc_min) or ($j == 0 and $k == 0 and $quarter == 0)) {\
+          $fc_min = $fc_tmp;;\
+        }\
+      } # end $quarter\
+    } # end $k\
+  } # end $j\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_5  : berechne Minimalpreis";;\
+  }\
+  return round($fc_min ,2);;                             ## Von Euro auf Cent umrechnen\
+},\
+\
+fc_max:current_price.* {\
+##  Ermittlung des minimal Wertes\
+  my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
+  my $fc_max = 0;;\
+  my $fc_tmp = 0;;\
+\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
+    $fc = 1;;\
+  } # end if\
+\
+  for (my $j=0;;$j<=$fc;;$j++){\
+    for (my $k=0;;$k<=23;;$k++) {\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j,$k, $quarter*15),0);;\
+        if (($fc_tmp > $fc_max) or ($j == 0 and $k == 0 and $quarter == 0)) {\
+          $fc_max = $fc_tmp;;\
+        }\
+      } # end $quarter\
+    } # end $k\
+  } # end $j\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_6  : berechne Maximalpreis";;\
+  }\
+  return round($fc_max ,2);;                             ## Von Euro auf Cent umrechnen\
+},\
+\
+fc_trigger_price:fc_avg.* {\
+## fc_trigger_price:[fc_avg|compensation_grid].* {\
+  my $fc_avg = ReadingsVal("$NAME","fc_avg",0);;\
+  my $fc_min = ReadingsVal("$NAME","fc_min",0);;\
+\
+  # Berechnung eines Default Schwellwertes als täglicher Niedrigpreis\
+  my $price_level = round( ($fc_avg - $fc_min)/2 + $fc_min , 1);;\
+  \
+  # Abschätzung von Wirtschaftlichkeit beim Speicher Laden, falls die Börse zu teuer wird\
+  if ( ReadingsVal("$NAME","compensation_grid",0) != 0 ) {\
+    my $price_level_battery = round( ($fc_avg - ReadingsVal("$NAME","compensation_grid",0)) *0.85 , 1) ;;\
+    if ( $price_level > $price_level_battery ) {\
+      $price_level = $price_level_battery;;\
+    }\
+  }\
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_7  : berechne Triggerpreis";;\
+  }\
+ return($price_level);;\
+},\
+\
+fc0_trigger_start:fc_trigger_price.* {\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0);;\
+\
+  # Ermitteln des nächsten Trigger Fensters\
+  my $fc_total = 0;;\
+\
+    for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc0 Start %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
+        if ( $fc_total < $fc_trigger_price ) {\
+          return(sprintf("%02d:%02d",$loop_hour ,$quarter*15)) ;;\
+        }\
+      } # end $quarter\
+    } # end  for loop_hour\
+\
+  return("null");;\
+},\
+\
+fc0_trigger_stop:fc0_trigger_start.* {\
+  my $fc = 0;;\
+  my $loop_hour = 0;;\
+  my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0);;\
+\
+  # Ermitteln des nächsten Trigger Fensters\
+  my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_start","null");;\
+  my $fc_trigger_stop = $fc_trigger_start;;\
+\
+  my ($fc_trigger_start_hour, $fc_trigger_start_quarter);;\
+\
+  if ( $fc_trigger_start ne "null" ) {\
+    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_start_hour = $1;;\
+    $fc_trigger_start_quarter = $2 / 15;;\
+    my $fc_total = 0;;\
+\
+    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc0 Stop  %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
+        if ( $fc_total < $fc_trigger_price ) {\
+          $fc_trigger_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
+        } else {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
+        }\
+\
+       # wenn es 23:45 is wechsel zum nächsten Tag\
+       if ( $loop_hour == 23 and $fc == 0 and $quarter == 3) {\
+         $fc = 1;;\
+         $loop_hour = -1;; # beginne wieder bei 00:00\
+       }\
+\
+       if ( $quarter == 3 ) { $fc_trigger_start_quarter = 0 }\
+\
+      } # end $quarter\
+    } # end for loop_hour\
+  }\
+ \
+  return($fc_trigger_stop);;\
+},\
+\
+fc0_trigger:fc0_trigger_stop.* {\
+  # Setzen des Triggers für die aktuelle viertel Stunde\
+  if ( ReadingsVal("$NAME","current_price",100)  < ReadingsVal("$NAME","fc_trigger_price",0) ) {\
+    return("on")\
+  } else {\
+    return("off")\
+  }\
+},\
+\
+fc1_trigger_start:fc_trigger_price.* {\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {\
+    my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0);;\
+\
+    # Ermitteln des nächsten Trigger Fensters\
+    my $fc_total = 0;;\
+\
+    for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc1 Start %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
+        if ( $fc_total < $fc_trigger_price ) {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
+        }\
+      } # end $quarter\
+    } # end  for loop_hour\
+  }\
+  return("null");;\
+},\
+\
+fc1_trigger_stop:fc0_trigger_start.* {\
+  # Ermitteln des nächsten Trigger Fensters\
+  my $loop_hour;;\
+  my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0);;\
+\
+  my $fc_trigger_start = ReadingsVal("$NAME","fc1_trigger_start","null");;\
+  my $fc_trigger_stop = $fc_trigger_start;;\
+\
+  my ($fc_trigger_start_hour, $fc_trigger_start_quarter);;\
+\
+  if ( $fc_trigger_start ne "null" ) {\
+    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_start_hour = $1;;\
+    $fc_trigger_start_quarter = $2 / 15;;\
+    my $fc_total = 0;;\
+\
+    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total", $loop_hour, $quarter*15),0);;\
+# print sprintf("fc1 Stop  %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
+        if ( $fc_total < $fc_trigger_price ) {\
+          $fc_trigger_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
+        } else {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
+        }\
+\
+       if ( $quarter == 3 ) { $fc_trigger_start_quarter = 0 }\
+\
+      } # end $quarter\
+    } # end for loop_hour\
+  }\
+ \
+  return($fc_trigger_stop);;\
+},\
+\
+fc_trigger_max:fc_avg.* {\
+  my $fc_avg = ReadingsVal("$NAME","fc_avg",0);;\
+  my $fc_max = ReadingsVal("$NAME","fc_max",0);;\
+\
+  # Berechnung eines Schwellwertes als täglichen Maximalpreises\
+  my $price_level = round( ($fc_max - $fc_avg)/2 + $fc_avg , 0);;\
+  \
+$price_level;;\
+},\
+\
+fc0_trigger_max_start:fc_trigger_max.* {\
+  # Ermitteln des nächsten Trigger_max Fensters\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0);;\
+  my $fc_total = 0;;\
+\
+    for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc0 Start max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
+        if ( $fc_total > $fc_trigger_max ) {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
+        }\
+      } # end $quarter\
+    } # end  for loop_hour\
+\
+  return("null");;\
+},\
+\
+fc0_trigger_max_stop:fc0_trigger_max_start.* {\
+  # Ermitteln des nächsten Trigger Fensters\
+  my $fc = 0;;\
+  my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0);;\
+\
+  my $fc_trigger_max_start = ReadingsVal("$NAME","fc0_trigger_max_start","null");;\
+  my $fc_trigger_max_stop = $fc_trigger_max_start;;\
+\
+  my ($fc_trigger_max_start_hour, $fc_trigger_max_start_quarter);;\
+\
+  if ( $fc_trigger_max_start ne "null" ) {\
+    $fc_trigger_max_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_max_start_hour = $1;;\
+    $fc_trigger_max_start_quarter = $2 / 15;;\
+    my $fc_total = 0;;\
+\
+    for (my $loop_hour = $fc_trigger_max_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = $fc_trigger_max_start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total", $fc, $loop_hour, $quarter*15),0);;\
+# print sprintf("fc0 Stop  max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
+        if ( $fc_total > $fc_trigger_max ) {\
+          $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
+        } else {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
+        }\
+\
+       if ( $quarter == 3 ) { $fc_trigger_max_start_quarter = 0 }\
+\
+      } # end $quarter\
+\
+     # wechsel zum nächsten Tag\
+     if ( $loop_hour == 23 and $fc == 0 ) {\
+       $fc = 1;;\
+       $loop_hour = -1;;\
+     }\
+\
+    } # end for loop_hour\
+  }\
+ \
+  return($fc_trigger_max_stop);;\
+},\
+\
+fc0_trigger_max:fc0_trigger_max_stop.* {\
+\
+  # Setzen des maximum Triggers für die aktuelle Stunde\
+  if ( ReadingsVal("$NAME","current_price",0)  > ReadingsVal("$NAME","fc_trigger_max",0) ) {\
+    return("on")\
+  } else {\
+    return("off")\
+  }\
+},\
+\
+fc1_trigger_max_start:fc_trigger_max.* {\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {\
+    my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0);;\
+\
+    # Ermitteln des nächsten Trigger Fensters\
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+    my $fc_total = 0;;\
+\
+    for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total",$loop_hour , $quarter*15),0);;\
+# print sprintf("fc1 Start max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
+        if ( $fc_total > $fc_trigger_max ) {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
+        }\
+      } # end $quarter\
+    } # end  for loop_hour\
+  }\
+  return("null");;\
+},\
+\
+fc1_trigger_max_stop:fc1_trigger_max_start.* {\
+  # Ermitteln des nächsten Trigger Fensters\
+  my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0);;\
+\
+  my $fc_trigger_max_start = ReadingsVal("$NAME","fc1_trigger_max_start","null");;\
+  my $fc_trigger_max_stop = $fc_trigger_max_start;;\
+\
+  my ($fc_trigger_max_start_hour, $fc_trigger_max_start_quarter);;\
+\
+  if ( $fc_trigger_max_start ne "null" ) {\
+    $fc_trigger_max_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_max_start_hour = $1;;\
+    $fc_trigger_max_start_quarter = $2 / 15;;\
+    my $fc_total = 0;;\
+\
+    for (my $loop_hour = $fc_trigger_max_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = $fc_trigger_max_start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total", $loop_hour, $quarter*15),0);;\
+# print sprintf("fc1 Stop  max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
+        if ( $fc_total > $fc_trigger_max ) {\
+          $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
+        } else {\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
+        }\
+\
+       if ( $quarter == 3 ) { $fc_trigger_max_start_quarter = 0 }\
+\
+      } # end $quarter\
+    } # end for loop_hour\
+  }\
+ \
+  return($fc_trigger_max_stop);;\
+},\
+\
+next1_quarter:current_price.* {\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my $quarter = int($min / 15);; # aktuelle Viertelstunde 0–3\
+  my $next_quarter = ($quarter + 1) % 4;;  # nächste Viertelstunde\
+  my $hour_offset = $hour;; # passen sich an wenn es über Mitternacht geht\
+  my $fc = 0;; # fc0_ = # heute passen sich an wenn es über Mitternacht geht\
+\
+  if ($quarter == 3) {  # wenn wir in 23:45 sind nächste Viertelstunde gehört zur nächsten Stunde \
+        $hour_offset++;;\
+        if ($hour_offset >= 24) { \
+            $hour_offset -= 24;;\
+            $fc = 1;; # fc1_ = morgen\
+        }\
+    }\
+\
+  return round(ReadingsVal($NAME,sprintf("fc%d_%02d%02d_total",$fc, $hour_offset, $next_quarter*15),0),2);;\
+ },\
+\
+next1_hour:current_price.* {\
+  my $j;;\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my $quarter = int($min / 15);; # aktuelle Viertelstunde 0–3\
+  my $next_quarter = ($quarter + 1) % 4;;  # nächste Viertelstunde\
+  my $hour_offset = $hour;; # passt sich an wenn es über Mitternacht geht\
+  my $fc = 0;; # fc0_ = # heute, passt sich an wenn es über Mitternacht geht\
+\
+  if ($hour_offset == 23) {  # wenn wir bei 23:00 sind gehört die nächste Stunde zum nächsten Tag\
+     $hour_offset = 0;;\
+     $fc = 1;; # fc1_ = morgen\
+    }\
+    for ($quarter = 0;; $quarter <= 3;; $quarter++) {\
+      $j += ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $hour_offset, $quarter*15),0);;\
+    }\
+\
+  return round($j/4,2);; # Für die nächste Stunde wird der Durchschnitt ausgegeben\
+ }\
+\
+\
+
+attr Stromboerse_connect verbose 3

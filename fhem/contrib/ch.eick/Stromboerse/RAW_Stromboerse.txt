@@ -1,35 +1,9 @@
-defmod EVU_Tibber DOIF ## Startup Befehle für den WebSocket vom EVU_Tibber_connect\
-init\
-{ \
-  Log(0, "$SELF 0   init       : ▶️  $SELF init");;\
-  fhem("setreading $SELF_connect ws_cmd connect");; \
-  if (AttrVal("$SELF","verbose",0) >=3) {\
-      Log 3, "$SELF 0   WebSocket  : ▶️  $SELF_connect start Websocket";;\
-  }\
-  Log(0, "$SELF 0   init       : 🏁 $SELF init done");;\
-}\
-\
-################################################################################################################\
-## EVU_Tibber_connect start/stop WebSocket\
-EVU_Tibber_connect_ws\
-{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
-#    or  [$SELF:ui_command_2]                                             ## Hier wird das uiTable select ausgewertet\
-    and [$SELF:ui_command_2] ne "---"\
-   ) {\
-\
-    fhem("setreading $SELF_connect ws_cmd ".[?$SELF:ui_command_2]);; \
-\
-    set_Reading("ui_command_2","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
-                                                                         ## kann das Kommando nicht sofort wiederholt werden\
-  }\
-}\
-\
-1_$SELF_PriceInfo\
+defmod Stromboerse DOIF 1_$SELF_PriceInfo\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
     and\
     (     [:00] or [:15] or [:30] or [:45]                               ## jede 15 Minuten\
     )\
-    or [$SELF:ui_command_1] eq "1_$SELF_PriceInfo"                       ## Hier wird das uiTable select ausgewertet\
+    or [$SELF:ui_command_1] eq "1_Aktueller_Preis"                       ## Hier wird das uiTable select ausgewertet\
    ) {\
 \
   fhem("setreading $SELF_connect fc0_0000_total ".[?$SELF_connect:fc0_0000_total]);;  ## Preis für die aktuelle Stunde triggern\
@@ -45,32 +19,45 @@ EVU_Tibber_connect_ws\
 \
 ################################################################################################################\
 ## 2 Scheduling für das Abholen der Börsenpreise\
-2_$SELF_PriceAll\
+2_$SELF_PriceInfo_Schedule\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
     and\
     (   [00:01]                 \
      or [14:00-16:00] and [+:20] and [$SELF_connect:fc1_0000_startsAt,"null"] ne ""  ## Ab 14:00 Uhr gibt es die Preise für den nächsten Tag\
     )\
-    or [$SELF:ui_command_1] eq "2_$SELF_PriceAll"                        ## Hier wird das uiTable select ausgewertet\
+    or [$SELF:ui_command_1] eq "2_Preis_Info"   ## Hier wird das uiTable select ausgewertet\
    ) {\
 \
-  ::CommandGet(undef, "$SELF_connect 02_priceAll");;\
   if (AttrVal("$SELF","verbose",0) >=3) {\
-      Log 3, "$SELF 2   priceAll   : Abfrage von $SELF für den nächsten Tag";;\
+    Log 3, "$SELF 2   PriceInfo  : Abfrage von ".[$SELF_connect:conf_EVU];;\
+  }\
+  if (ReadingsVal("$SELF_connect","fc1_0000_startsAt","null") eq "null") {  ## Der nächste Tag ist noch nicht da\
+    if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 2   PriceInfo  : Daten für fc1 sind noch nicht da";;\
     }\
-\
-    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+  }\
+  my $rc = "";;\
+  if ([$SELF_connect:conf_EVU] ne "Tibber_Live") {\
+    $rc = ::CommandGet(undef, "$SELF_connect 01_Preis_Info_EPEX_Spot");;  ## Preisbasis für Tibber und aWATTar\
+    if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 2   PriceInfo  : $rc";;\
+    }\
+  }\
+  set_Reading("ui_command_1","---");;                                     ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
                                                                          ## kann das Kommando nicht sofort wiederholt werden\
   }\
 }\
 \
 ################################################################################################################\
-## 2 Erstellen des Diagramms im uiTable\
+## 3 Erstellen des Diagramms im uiTable\
 3_$SELF_Diagramm\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
     and\
        [$SELF_connect:fc0_0000_total]\
-    or [$SELF:ui_command_1] eq "3_$SELF_Diagramm"                        ## Hier wird das uiTable select ausgewertet\
+##    (   [$SELF_connect:conf_EVU]\
+##     or [$SELF_connect:fc0_0000_total]\
+##    )\
+    or [$SELF:ui_command_1] eq "3_Diagramm"                              ## Hier wird das uiTable select ausgewertet\
    ) {\
 \
   my (@out) = ("") x 2;;\
@@ -80,10 +67,10 @@ EVU_Tibber_connect_ws\
 \
     if (ReadingsVal("$SELF_connect",sprintf("fc%d_0000_startsAt",$j),"null") eq "null") {     ## Der nächste Tag ist noch nicht da\
       if (AttrVal("$SELF","verbose",0) >=3) {\
-        Log 3, "$SELF 3   Diagramm   : $SELF Daten für fc".$j." sind noch nicht da";;\
+        Log 3, "$SELF 3   Diagramm   : Daten für fc".$j." sind noch nicht da";;\
       }\
 \
-      $timestamp = POSIX::strftime("%Y-%m-%d",localtime(time+86400));;   ## Setze das Datum auf morgen\
+      $timestamp = POSIX::strftime("%Y-%m-%d",localtime(time+86400));;    ## Setze das Datum auf morgen\
       for (my $k=0;;$k<=23;;$k++) {\
         for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
           $out[$j] .= sprintf("%s_%02d:%02d:00 0.0\n", $timestamp, $k, $quarter*15);;      ## Die Daten mit 0 ergänzen\
@@ -96,10 +83,10 @@ EVU_Tibber_connect_ws\
       for (my $i=0;;$i<=23;;$i++){\
         for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
           $timestamp = sprintf("%s_%02d:%02d:00", POSIX::strftime("%Y-%m-%d",localtime(time+86400*$j)), $i, $quarter*15);;\
-          $out[$j] .=$timestamp." ".::round(ReadingsVal("$SELF_connect",sprintf("fc%d_%02d%02d_total",$j, $i, $quarter*15),0)*100,1)."\n";;\
+          $out[$j] .=$timestamp." ".::round(ReadingsVal("$SELF_connect",sprintf("fc%d_%02d%02d_total",$j, $i, $quarter*15),0),1)."\n";;\
         } # end $quarter\
       } # End $i\
-      Log 3, "$SELF 3   Diagramm   : $SELF Daten für fc".$j." wurden emfangen.";;\
+      Log 3, "$SELF 3   Diagramm   : Daten für fc".$j." wurden im Diagramm gesetzt.";;\
     } # End if\
   } # End $j\
   \
@@ -115,22 +102,21 @@ EVU_Tibber_connect_ws\
   ::DOIF_modify_card_data("$SELF","$SELF_connect","current_level","bar1day",-86400,$out[1]);;\
 \
   ## Mit der Abfrage 03_consumption_hour werden die Trigger erneut ausgelöst\
-  ::CommandGet(undef, "$SELF_connect 01_priceInfo");;                     ## Kosten der letzen drei Stunden\
-\
+##  ::CommandGet(undef, "$SELF_connect 01_Preis_Info_EPEX_Spot");;           ## \
     set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
                                                                          ## kann das Kommando nicht sofort wiederholt werden\
   }\
 }\
 
-attr EVU_Tibber DbLogExclude .*
-attr EVU_Tibber comment Version 2023.12.06 13:00 \
-Dieses Device benötigt EVU_Tibber_connect als Verbindung zu Tibber.
-attr EVU_Tibber disable 0
-attr EVU_Tibber group PV Steuerung EVU
-attr EVU_Tibber icon stromzaehler_icon
-attr EVU_Tibber room Strom->Boerse
-attr EVU_Tibber sortby 315
-attr EVU_Tibber uiState {\
+attr Stromboerse DbLogExclude .*
+attr Stromboerse comment Version 2025.12.11 15:00 \
+Dieses Device benötigt EPEX_Spot_connect als Verbindung zu EPEX_Spot.
+attr Stromboerse disable 0
+attr Stromboerse group PV Steuerung EVU
+attr Stromboerse icon stromzaehler_icon
+attr Stromboerse room Strom->Boerse
+attr Stromboerse sortby 415
+attr Stromboerse uiState {\
 package ui_Table;;\
   $TABLE = "style='width:100%;;'";;\
 \
@@ -139,13 +125,13 @@ package ui_Table;;\
   $TD{0..6}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
 }\
 \
-"Kommando<dd>Auswahl</dd>" |widget([$SELF:ui_command_1],"uzsuDropDown,---,1_$SELF_PriceInfo,2_$SELF_PriceAll,3_$SELF_Diagramm") |"LiveMessurement <br>".widget([$SELF:ui_command_2],"uzsuDropDown,---,connect,disconnect")|""|[$SELF_connect:ws_cmd]\
+"Kommando<dd>Auswahl</dd>" |widget([$SELF:ui_command_1],"uzsuDropDown,---,1_Aktueller_Preis,2_Preis_Info,3_Diagramm") |"Börse <br>".widget([$SELF_connect:conf_EVU],"uzsuDropDown,EPEX_Spot,Tibber,Tibber_Live,aWATTar")|""|""\
 \
 "Strompreis<br>".card([$SELF_connect:current_price:bar1day],undef,undef,0,60,90,0,"fc0  ".::ReadingsVal("$SELF_connect","current_currency",""),undef,"1","130,,,,,,220").card([$SELF_connect:current_level:bar1day],undef,undef,0,60,90,0,"fc1  ".::ReadingsVal("$SELF_connect","current_currency",""),undef,"1","130,,,,,,220")|\
-"<span style=font-weight:bold>avg nächste 3h</span><br><br>".Price(1)."<br>".Price(2)."<br>".Price(3)|"<span style=font-weight:bold>Statistik fc0</span><br><br>".::ReadingsVal("$SELF_connect","fc_min",0)." min<br>".::ReadingsVal("$SELF_connect","fc_avg",0)." avg<br>".::ReadingsVal("$SELF_connect","fc_med",0)." med<br>".::ReadingsVal(Device(),"fc_max",0)." max"|\
-"<span style=font-weight:bold>Trigger fc0</span><br>Basis ".widget([$SELF_connect:compensation_grid],"selectnumbers,0,0.1,12,1,lin")."<br>".Format("trigger_0")|\
-"<span style=font-weight:bold>Trigger fc1</span><br><br>".Format("trigger_1")
-attr EVU_Tibber uiTable {\
+"<span style=font-weight:bold>avg nächste 3h</span><br><br>".$SELF_Price(1)."<br>".$SELF_Price(2)."<br>".$SELF_Price(3)|"<span style=font-weight:bold>Statistik fc0</span><br><br>".::ReadingsVal("$SELF_connect","fc_min",0)." min<br>".::ReadingsVal("$SELF_connect","fc_avg",0)." avg<br>".::ReadingsVal("$SELF_connect","fc_med",0)." med<br>".::ReadingsVal("$SELF_connect","fc_max",0)." max"|\
+"<span style=font-weight:bold>Trigger fc0</span><br>Basis ".widget([$SELF_connect:compensation_grid],"selectnumbers,0,0.1,12,1,lin")."<br>".$SELF_Format("trigger_0")|\
+"<span style=font-weight:bold>Trigger fc1</span><br><br>".$SELF_Format("trigger_1")
+attr Stromboerse uiTable {\
 package ui_Table;;\
   $TABLE = "style='width:100%;;'";;\
 \
@@ -153,27 +139,27 @@ package ui_Table;;\
   $TD{0..18}{1..5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
   $TD{0..18}{6} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
 \
-sub FUNC_Status {\
+sub $SELF_FUNC_Status {\
     my($value, $min, $colorMin,  $statusMin,  $colorMiddel, $statusMiddle, $max, $colorMax, $statusMax)=@_;;\
     my $ret = ($value < $min)? '<span style="color:'.$colorMin.'">'.$statusMin.'</span>' : ($value > $max)? '<span style="color:'.$colorMax.'">'.$statusMax.'</span>' : '<span style="color:'.$colorMiddel.'">'.$statusMiddle.'</span>';;\
     return $ret;;\
   }\
 \
-sub Cost {\
+sub $SELF_Cost {\
   my($i)=@_;;\
   my $currency = (::ReadingsVal("$SELF_connect","current_currency","") eq "EUR")? " €" : "";;\
 \
   return ::ReadingsVal("$SELF_connect","total_cost_".$i,0).$currency;;\
 }\
 \
-sub Price {\
+sub $SELF_Price {\
   my($i)=@_;;\
   my $j;;\
   my $value;;\
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
 \
   if ($i == 0) {\
-    $value = ::ReadingsVal("$SELF_connect","current_price",0);;\
+    $value = ::round(::ReadingsVal("$SELF_connect","current_price",0),2);;\
     $value = ( ::ReadingsVal("$SELF_connect","fc0_trigger","off") eq "on" ) ?\
          "<span style='color:green'>".$value."</span>" :\
          "<span style='color:red'>".$value."</span>" ;;\
@@ -190,7 +176,7 @@ sub Price {\
         $value += ::ReadingsVal("$SELF_connect","fc1_".sprintf("%02d%02d",$j, $quarter*15)."_total",0);;\
       }\
     }\
-    $value = ::round($value/4*100,1);;\
+    $value = ::round($value/4,1);;\
     $value = ( ::ReadingsVal("$SELF_connect","fc_trigger_price","0") > $value ) ?\
          "<span style='color:green'>".$value."</span>" :\
          "<span style='color:red'>".$value."</span>" ;;\
@@ -199,7 +185,7 @@ sub Price {\
   return  $value;;\
  }\
 \
-sub Format {\
+sub $SELF_Format {\
   my($i)=@_;;\
 \
   my $MonthBefore   = "LogDBRep_Statistic_previous_Month";;\
@@ -217,7 +203,7 @@ sub Format {\
       $evu_em .= ($MonthPrevious ne "null") ? sprintf(" / %04d", ::ReadingsVal("$MonthBefore","$SELF_connect_nodes_consumption_month",0) ) : "";;\
       return $evu_em;;\
     } elsif ($i eq "year") {\
-      my $evu_ey = sprintf("%04d",::ReadingsVal(Device(),"nodes_consumption_year",0));;\
+      my $evu_ey = sprintf("%04d",::ReadingsVal("$SELF_connect","nodes_consumption_year",0));;\
       $evu_ey .= ($YearPrevious ne "null") ? sprintf(" / %04d", ::ReadingsVal("$YearBefore","$SELF_connect_nodes_consumption_month",0) ) : "";;\
       return $evu_ey;;\
     } elsif ($i eq "trigger_0") {\
@@ -228,7 +214,7 @@ sub Format {\
                  ::ReadingsVal("$SELF_connect","fc0_trigger_start","00:00")." bis ".::ReadingsVal("$SELF_connect","fc0_trigger_stop","00:00")."<br>unter ".\
                  ::ReadingsVal("$SELF_connect","fc_trigger_price","null")." ct</span>" );;\
     } elsif ($i eq "trigger_1") {\
-      if (::ReadingsVal("$SELF_connect","fc1_0000_startsAt","null") ne "null") {\
+      if (::ReadingsVal(EPEX_Spot_Device(),"fc1_00_startsAt","null") ne "null") {\
         return ((::ReadingsVal("$SELF_connect","fc1_trigger_start","null") eq "null" ) ?\
               "<span style='color:red'>Morgen kein Trigger <br>mehr unter ".\
                    ::ReadingsVal("$SELF_connect","fc_trigger_price","null")." ct</span>" :\
@@ -244,20 +230,14 @@ sub Format {\
 \
 }\
 \
-"Statistiken ".::ReadingsVal("$SELF_connect","current_date",0)." in kWh"|"<span style=font-weight:bold>aktuell</span>"|"<span style=font-weight:bold>heute</span>"|"<span style=font-weight:bold>Monat</span>"|"<span style=font-weight:bold>Jahr</span>"\
+##"Statistiken ".::ReadingsVal("$SELF_connect","current_date",0)." in kWh"|"<span style=font-weight:bold>aktuell</span>"|"<span style=font-weight:bold>heute</span>"|"<span style=font-weight:bold>Monat</span>"|"<span style=font-weight:bold>Jahr</span>"\
+"Statistiken ".[$SELF_connect:current_date]." in kWh"|"<span style=font-weight:bold>aktuell</span>"|"<span style=font-weight:bold>heute</span>"|"<span style=font-weight:bold>Monat</span>"|"<span style=font-weight:bold>Jahr</span>"\
 \
-"Strom<dd>Preis / Kosten</dd>"|Price(0)|Cost("day")|Cost("month")|Cost("year")\
-\
-## Wenn man das liveMessurment von Tibber verwendet\
-"Bezug vom Netz"|\
-sprintf("%04d W",([$SELF_connect:payload_data_liveMeasurement_power]  >= 0 ? ::ReadingsVal("$SELF_connect","payload_data_liveMeasurement_power",0) : 0))|\
-Format("day")|Format("month")|Format("year")\
-\
-"Einspeisung ins Netz"|\
-sprintf("%04d W",([$SELF_connect:payload_data_liveMeasurement_powerProduction]  >= 0 ? ::ReadingsVal("$SELF_connect","payload_data_liveMeasurement_powerProduction",0) : 0))|\
-""|""|""\
+"Strom<dd>Preis / Kosten</dd>"|$SELF_Price(0)|$SELF_Cost("day")|$SELF_Cost("month")|$SELF_Cost("year")\
 \
 ## Wenn man einen eigenes SmartMeter verwendet\
 ## "Bezug vom Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] >= 0 ? ::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0) : 0) )|Format("day")|Format("month")|Format("year")\
 ## "Einspeisung ins Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] <= 0 ? abs(::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0)) :  0) )|""|""|""
-attr EVU_Tibber verbose 3
+attr Stromboerse verbose 3
+
+setstate Stromboerse 2025-12-19 11:15:00 ui_command_1 ---
