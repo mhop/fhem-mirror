@@ -571,7 +571,7 @@ SignalHandling();
 if($^O =~ m/Win/) {
   (my $dir = $0) =~ s+[/\\][^/\\]*$++; # Find the FHEM directory
   chdir($dir);
-  $winService = eval {require FHEM::WinService; FHEM::WinService->new(\@ARGV);};
+  $winService = eval { use lib "./lib"; require FHEM::WinService; FHEM::WinService->new(\@ARGV);};
   if((!$winService || $@) && ($ARGV[$#ARGV] eq "-i" || $ARGV[$#ARGV] eq "-u")) {
     print "Cannot initialize FHEM::WinService: $@, exiting.\n";
     exit 0;
