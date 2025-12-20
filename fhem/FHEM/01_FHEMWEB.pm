@@ -2619,8 +2619,7 @@ FW_style($$)
       $fileName = $FW_webArgs{saveName}
                     if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
       $FW_editFileToPath{$idx} =~ m,^(.*)/([^/]+)$,;
-      return if(!$1); # No experiments
-      $filePath = "$1/$fileName";
+      $filePath = $1 ? "$1/$fileName" : "./$fileName";
     }
     my $isImg = ($fileName =~ m,\.(svg|png)$,i);
     $forceType = "file" if($isImg);
