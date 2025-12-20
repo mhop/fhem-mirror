@@ -1350,7 +1350,7 @@ SVG_digestConf($$)
 
   for my $i (0..int(@lType)-1) {         # lAxis is optional
     $lAxis[$i] = "x1y2" if(!$lAxis[$i]);
-    $lStyle[$i] = "class=\"SVGplot ".
+    $lStyle[$i] = "class=\"SVGplot $lType[$i] ".
                         (defined($lStyle[$i]) ? $lStyle[$i] : "l$i")."\"";
     $lWidth[$i] = (defined($lWidth[$i]) ? "stroke-width:$lWidth[$i]" :"");
   }
@@ -1663,6 +1663,12 @@ SVG_render($$$$$$$$$$)
     }
   }
 
+  my $nx = time(); # now as x, used for steps, #143203
+  if($fromsec <= $nx && $nx <= $tosec) {
+    $nx = int(($nx-$fromsec)*$tmul);
+  } else {
+    $nx = int($tosec-$fromsec)*$tmul;
+  }
 
   ######################
   # Compute & draw vertical tics, grid and labels
@@ -1711,7 +1717,6 @@ SVG_render($$$$$$$$$$)
   # First the tics
   $off2 = $y+4;
   my ($off3, $off4) = ($y+$h-4, $y+$h);
-  my $initoffset = $tstep;
   if( $conf{xrange} ) { # user defined range
     if( !$xtics || $xtics ne "()" ) { # auto tics
       my ($step,$mi,$ma) = SVG_getSteps( $conf{xrange}, $xmin, $xmax );
@@ -1744,12 +1749,6 @@ SVG_render($$$$$$$$$$)
   my $t = SVG_fmtTime($first_tag, $fromsec, $conf{timefmt});
   SVG_pO "<text x=\"0\" y=\"$off2\" class=\"ylabel\">$t</text>"
         if(!$conf{xrange});
-  $initoffset = $step;
-
-  if(SVG_Attr($parent_name,$name,"endPlotNow",undef) && $ddur>1.1 && $ddur<6.9){
-    my $now = time();
-    $initoffset -= ($now+fhemTzOffset($now))%86400; # Forum #25768
-  }
 
   if( $conf{xrange} ) { # user defined range
     if( $xtics ) { #user tics and grid
@@ -2011,8 +2010,36 @@ SVG_render($$$$$$$$$$)
         SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
       }
 
-    } elsif($lType eq "steps" || $lType eq "fsteps" ) {
+    } elsif($lType eq "steps") {
+      $ret .=  sprintf(" %d,%d", $x+$dxp->[0],$y+$hfill) if($isFill && @{$dxp});
+      if(@{$dxp} == 1) {
+          my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
+          $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
+                $x,$y+$h, $x,$y1, $x+$nx,$y1, $x+$nx,$y+$h);
+      } else {
+        my $nEl = int(@{$dxp})-1;
+        foreach my $i (1..$nEl) {
+          my ($x1, $y1) = ($x+$dxp->[$i-1], $y+$h-($dyp->[$i-1]-$min)*$hmul);
+          my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
+          next if(int($x2) == $lx && int($y2) == $ly);
+          $lx = int($x2); $ly = int($y2);
+          $ret .= sprintf(" %d,%d %d,%d", $x1,$y1, $x2,$y1);
+        }
+        $ret .= sprintf(" %d,%d %d,%d", $lx,$ly, $x+$nx,$ly);
+      }
 
+      my $sAttributes = $attributes;
+      if($isFill && $lx > -1) { # extra contour, not closed
+        $sAttributes =~ s/style='/style='fill:none;/;
+        SVG_pO "<polyline $sAttributes $lStyle points=\"$ret\"/>";
+        $ret .=  sprintf(" %d,%d", $x+$nx, $y+$hfill);
+        $sAttributes = $attributes;
+        $sAttributes =~ s/style='/style='stroke:none;/;
+      }
+
+      SVG_pO "<polyline $sAttributes $lStyle points=\"$ret\"/>";
+
+    } elsif($lType eq "fsteps" ) {
       $ret .=  sprintf(" %d,%d", $x+$dxp->[0],$y+$hfill) if($isFill && @{$dxp});
       if(@{$dxp} == 1) {
           my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
@@ -2026,17 +2053,9 @@ SVG_render($$$$$$$$$$)
           next if(int($x2) == $lx && int($y2) == $ly);
           $lx = int($x2); $ly = int($y2);
           if($i == $nEl) {
-            if($lType eq "steps") {
-              $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x2,$y1, $x2,$y2);
-            } else {
-              $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x1,$y2, $x2,$y2);
-            }
+            $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x1,$y2, $x2,$y2);
           } else {
-            if($lType eq "steps") {
-              $ret .=  sprintf(" %d,%d %d,%d", $x1,$y1, $x2,$y1);
-            } else {
-              $ret .=  sprintf(" %d,%d %d,%d", $x1,$y1, $x1,$y2);
-            }
+            $ret .=  sprintf(" %d,%d %d,%d", $x1,$y1, $x1,$y2);
           }
         }
       }
