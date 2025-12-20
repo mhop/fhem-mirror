@@ -204,8 +204,12 @@
 #              modify DBLog_split unit logic
 #              modified dpt18 encode
 #              prepare for removal of $MODELERR
-# 
+# MH 202511yy  change autocreate (removal of $MODELERR)
+#              Attribute format is announced deprecated
+#              prepare removal of $dpttypes{$model}->{CODE};
+#
 # todo-4/2024  remove support for oldsyntax cmd's: raw,value,string,rgb
+# todo-5/2026  remove support for attr format
 
 
 package KNX; ## no critic 'package'
@@ -254,17 +258,15 @@ BEGIN {
 }
 
 #string constants
-my $MODELERR    = 'MODEL_NOT_DEFINED'; # for autocreate
+my $KNXID  = 'C'; #identifier for KNX - extended adressing
+my $SVNID  = '$Id$'; ## no critic (Policy::ValuesAndExpressions::RequireInterpolationOfMetachars)
 
-my $BLINK       = 'blink';
-my $TOGGLE      = 'toggle';
-my $RAW         = 'raw';    # announced deprecated
-my $RGB         = 'rgb';    # announced deprecated
-my $STRING      = 'string'; # announced deprecated
-my $VALUE       = 'value';  # announced deprecated
-
-my $KNXID       = 'C'; #identifier for KNX - extended adressing
-my $SVNID       = '$Id$'; ## no critic (Policy::ValuesAndExpressions::RequireInterpolationOfMetachars)
+my $BLINK  = 'blink';
+my $TOGGLE = 'toggle';
+my $RAW    = 'raw';    # announced deprecated
+my $RGB    = 'rgb';    # announced deprecated
+my $STRING = 'string'; # announced deprecated
+my $VALUE  = 'value';  # announced deprecated
 
 #regex patterns
 #pattern for group-adress
@@ -281,6 +283,7 @@ my $PAT_GAD_SUFFIX = 'nosuffix';
 my $PAT_GAD_NONAME = qr/^((?:on|off)(?:-for-timer|-until|-till)?|toggle|blink|raw|rgb|string|value|get|set|listenonly|nosuffix)$/xms; ## no critic (RegularExpressions::ProhibitComplexRegexes)
 #pattern for DPT
 my $PAT_DPT = qr/dpt(?:\d+(?:[.]\d{3,4})?|RAW)/mxs;
+#my $PAT_DPT = qr/(dpt\d{1,3}(?:[.]\d{3,4})?|dptRAW))(?:[:].*)?$/xms; # $1 contains dptxxx.yyy
 #pattern for dpt1 (standard)
 my $PAT_DPT1_PAT = 'on|off|[01]';
 #pattern for date
@@ -641,7 +644,7 @@ sub Initialize {
 	   'KNX_toggle:textField ' .      #toggle source <device>:<reading>
 	   "$readingFnAttributes ";       #standard attributes
 	$hash->{noAutocreatedFilelog} = 1; # autocreate devices create no FileLog
-	$hash->{AutoCreate} = {'KNX_.*'  => { ATTR => 'disable:1'} }; #autocreate devices are disabled by default
+#	$hash->{AutoCreate} = {'KNX_.*'  => { ATTR => 'disable:1'} }; #autocreate devices are disabled by default
 
 	return;
 }
@@ -650,30 +653,26 @@ sub Initialize {
 #############################
 sub KNX_Define {
 	my $hash = shift // return;
-	my $def = shift;
+	my $def  = shift;
 
-### prepare for removal of $MODELERR
-	# replace all instances of MODELERR with dptRAW
-#	if ($def =~ /[:]MODEL_NOT_DEFINED/xms) {
-#		$def =~ s/[:]MODEL_NOT_DEFINED/[:]dptRAW/gxms;
-#		KNX_Log ($hash, 2, q{replaced all instances of 'MODEL_NOT_DEFINED' with 'dptRAW', pls. save config!});
-#	}
-###
-	my @a = split(/[ \t\n]+/xms, $def); #enable newline within define with \
-	my $name = $a[0];
+	my $name = (split(/[\s\t\n]+/xms, $def))[0];
 	$hash->{NAME} = $name;
 	$hash->{'.SVN'} = $SVNID =~ s/.+[.]pm\s(\S+\s+\S+).+/$1/rxms;
 
-	#too less arguments or no valid 1st gad
-	if (scalar(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GADHEX)[:](?:$PAT_DPT|$MODELERR)/ixms) { # at least the first gad must be valid
-### prepare for removal of $MODELERR
-#	if (scalar(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GADHEX)[:]$PAT_DPT/ixms) { # at least the first gad must be valid
-		return (qq{KNX_define: wrong syntax or wrong group-format (0-31/0-7/0-255)\n} .
-		       qq{  "define $name KNX <group:model[:GAD-name]>[:set|get|listenonly][:nosuffix] } .
-		       q{[<group:model[:GAD-name]>[:set|get|listenonly][:nosuffix]]"});
+### removal of $MODELERR
+	if ($def =~ /[:]MODEL_NOT_DEFINED/xms) { # replace all instances of MODELERR with dptRAW
+		$hash->{DEF} =~ s/[:]MODEL_NOT_DEFINED/:dptRAW/gxms;
+		KNX_Log ($name, 2, q{replaced all instances of 'MODEL_NOT_DEFINED' with 'dptRAW', pls. save config!});
 	}
 
-	$hash->{'.DEFLINE'} = join(q{ },@a[2 .. $#a]); # temp store defs for define2...
+	my @a = split(/[\s\t\n]+/xms, $hash->{DEF}); #enable newline within define with \
+	if (scalar(@a) < 1 || $a[0] !~ m/^(?:$PAT_GAD|$PAT_GADHEX)[:]$PAT_DPT/ixms) { # at least the first gad must be valid
+###
+		return (q{KNX_define: wrong syntax or wrong group-format (0-31/0-7/0-255)} . qq{\n  "define $name } .
+		        q{KNX <group:model[:GAD-name]>[:set|get|listenonly][:nosuffix] } .
+		        q{[<group:model[:GAD-name]>[:set|get|listenonly][:nosuffix]]"});
+	}
+
 	return InternalTimer(Time::HiRes::time() + 3.0,\&KNX_Define2,$hash) if (! $init_done);
 	return KNX_Define2($hash);
 }
@@ -683,8 +682,7 @@ sub KNX_Define2 {
 	my $hash = shift // return;
 
 	my $name = $hash->{NAME};
-	my @a = split(/\s+/xms, $hash->{'.DEFLINE'});
-	delete $hash->{'.DEFLINE'};
+	my @a = split(/[\s\t\n]+/xms, $hash->{DEF});
 	RemoveInternalTimer($hash);
 
 	# Add pulldown for attr IODev
@@ -724,15 +722,8 @@ sub KNX_Define2 {
 		}
 
 		if (! defined($gadModel)) {
-			push(@logarr,qq{no model defined for group-number $gadNo});
+			push(@logarr,qq{no dpt-model defined for group-number $gadNo});
 			next;
-		}
-
-### prepare for removal of $MODELERR
-# remove if cond
-		if ($gadModel eq $MODELERR) { #within autocreate no model is supplied - throw warning
-			KNX_Log ($name, 3, q{autocreate device will be disabled, correct def with valid dpt and enable device});
-			if (AttrNum($name,'disable',0) != 1) {$attr{$name}->{disable} = 1;}
 		}
 		elsif (! defined($dpttypes{$gadModel})) { #check model-type
 			push(@logarr,qq{invalid dpt $gadModel for group-number $gadNo, consult commandref - avaliable DPT});
@@ -741,6 +732,7 @@ sub KNX_Define2 {
 		}
 		elsif ($gadNo == 1) { # gadModel ok - use first gad as mdl reference for fheminfo
 			$hash->{model} = $dpttypes{$gadModel}->{CODE};
+#			$hash->{model} = $gadModel =~ s/(dpt[^\.]+).*/$1/rxms; # prepare removal of $dpttypes{$model}->{CODE};
 		}
 
 		# optional param
@@ -901,7 +893,7 @@ sub KNX_Set {
 		return qq{unknown argument $targetGadName choose one of $setter};
 	}
 
-	return qq{set cmd ($name) not allowed during fhem-start} if (! $init_done);
+	return qq{set $name - not allowed during fhem-start} if (! $init_done);
 	return qq{$name is disabled} if (IsDisabled($name) == 1);
 
 	$targetGadName =~ s/^\s+|\s+$//gxms; # gad-name or cmd (in old syntax)
@@ -909,11 +901,11 @@ sub KNX_Set {
 
 	if (exists ($hash->{GADDETAILS}->{$targetGadName})) { #new syntax, if first arg is a valid gadName
 		$cmd = shift(@arg); #shift args as with newsyntax $arg[0] is cmd
-		return qq{$name no cmd found} if(!defined($cmd));
+		return qq{set $name $targetGadName - cmd missing} if(!defined($cmd));
 	}
 	else { # process old syntax targetGadName contains command!
 		(my $err, $targetGadName, $cmd, @arg) = KNX_Set_oldsyntax($hash,$targetGadName,@arg);
-		return qq{$name $err} if defined($err);
+		return qq{set $name - $err} if defined($err);
 	}
 
 	KNX_Log ($name, 4, qq{gadName: $targetGadName , command: $cmd , args: } . join (q{ }, @arg));
@@ -925,7 +917,8 @@ sub KNX_Set {
 	my $model     = $hash->{GADDETAILS}->{$targetGadName}->{MODEL};
 
 	if (defined ($option) && ($option =~ m/(?:get|listenonly)/xms)) {
-		return $name . q{ set cmd rejected - "get" or "listenonly" option is defined.};
+#		return $name . q{ set cmd rejected - "get" or "listenonly" option is defined.};
+		return qq{set $name $targetGadName $cmd} . q{ - rejected - "get" or "listenonly" option is defined};
 	}
 
 	my $value = $cmd; #process set command with $value as output
@@ -1071,8 +1064,8 @@ sub KNX_Set_dpt1 {
 		my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time()); # default now
 		$endTS = fhemTimeLocal($sec, $min, $hr, $mday, $mon, $year); # today end-time spec
 
-		if ($cmd =~ /-till$/xms) { # prevent overnight times
-			return qq{KNX_Set_dpt1 ($name): will not execute as end-Time is earlier than now} if (time() >= $endTS);
+		if (($cmd =~ /-till$/xms) && (time() >= $endTS)) { # prevent overnight times
+			return qq{KNX_Set_dpt1 ($name): will not execute as end-Time is earlier than now};
 		}
 	}
 	# process both timer variants
@@ -1099,7 +1092,7 @@ sub KNX_set_dpt1_sp {
 
 	my ($tDev, $togglereading) = split(qr/:/xms,AttrVal($name,'KNX_toggle',$name));
 	if (defined($togglereading)) { # prio1: use Attr. KNX_toggle: format: <device>:<reading>
-		if ($tDev eq '$self') {$tDev = $name;} ## no critic (Policy::ValuesAndExpressions::RequireInterpolationOfMetachars)
+		if ($tDev eq q{$self}) {$tDev = $name;} ## no critic (Policy::ValuesAndExpressions::RequireInterpolationOfMetachars)
 		$toggleOldVal = ReadingsVal($tDev, $togglereading, undef); # switch off in case of non existent reading
 	}
 	else {
@@ -1161,20 +1154,18 @@ sub KNX_Attr {
 		# check valid IODev
 		return KNX_chkIODev($hash,$aVal) if ($aName eq 'IODev');
 
-		if ($aName eq 'KNX_toggle') { # validate device/reading
+		if ($aName eq 'KNX_toggle') { ## no critic (ControlStructures::ProhibitCascadingIfElse)  # validate device/reading
 			my ($srcDev,$srcReading) = split(qr/:/xms,$aVal); # format: <device>:<reading>
-			if ($srcDev eq '$self') {$srcDev = $name;} ## no critic (Policy::ValuesAndExpressions::RequireInterpolationOfMetachars)
+			if ($srcDev eq q{$self}) {$srcDev = $name;} ## no critic (Policy::ValuesAndExpressions::RequireInterpolationOfMetachars)
 			return 'no valid device for attr: KNX_toggle' if (!IsDevice($srcDev));
 			if (defined($srcReading)) {$value = ReadingsVal($srcDev,$srcReading,undef);} #test for value  
 			return 'no valid device/reading value for attr: KNX_toggle' if (!defined($value) );
 		}
-
 		elsif ($aName =~ /(?:stateCmd|putCmd)/xms ) { # test for syntax errors
 			my %specials = ( '%hash' => $hash, '%name' => $name, '%gadName' => $name, '%state' => $name, );
 			my $err = perlSyntaxCheck($aVal, %specials); # fhem.pl
 			return qq{syntax check failed for $aName: \n $err} if($err);
 		}
-
 		elsif ($aName eq 'stateRegex') { # test for syntax errors
 			my @aValS = split(/\s+|\//xms,$aVal);
 			foreach (@aValS) {
@@ -1183,15 +1174,21 @@ sub KNX_Attr {
 				return qq{syntax check failed for $aName: \n $err} if (defined($err));
 			}
 		}
+		elsif ($aName eq 'format') { # deprecated 12/2025
+			KNX_Log($name, 3, q{Attribute format is deprecated, use stateRegex or stateCmd});
+#			return q{Attribute format is deprecated, use stateRegex or stateCmd};
+		}
 	} # /set
 
 	elsif ($cmd eq 'del') {
 		if ($aName eq 'disable') {
 			my @defentries = split(/[\s\t\n]+/xms,$hash->{DEF});
-			foreach my $def (@defentries) { # check all entries
-				next if ($def =~ /$PAT_DPT/xms);
-				return qq{Attribut "disable" cannot be deleted for device $name until you specify a valid dpt!};
-			}
+			my $err = grep {!/$PAT_DPT/xms} @defentries; # count defs that dont match
+			return qq{Attribut "disable" cannot be deleted for device $name until you specify a valid dpt!} if ($err != 0);
+#			foreach my $def (@defentries) { # check all entries
+#				next if ($def =~ /$PAT_DPT/xms);
+#				return qq{Attribut "disable" cannot be deleted for device $name until you specify a valid dpt!};
+#			}
 			delete $hash->{RAWMSG}; # debug internal
 		}
 	}
@@ -1290,7 +1287,7 @@ sub KNX_Parse {
 	my $ioName = $iohash->{NAME};
 	return q{} if ((IsDisabled($ioName) == 1) || IsDummy($ioName)); # IO - device is disabled or dummy
 
-	#frienldy reminder to migrate to KNXIO.....only once after def or fhem-start!
+	#friendly reminder to migrate to KNXIO.....only once after def or fhem-start!
 	if (!exists($iohash->{INFO}) && ($iohash->{TYPE} =~ /^(?:TUL|KNXTUL)/xms) ) {
 		$iohash->{INFO} = qq{consider migrating $ioName to KNXIO Module}; # set flag
 		KNX_Log ($ioName, 2, q{INFO: } . $iohash->{INFO});
@@ -1324,7 +1321,8 @@ sub KNX_Parse {
 
 =begin comment
 		# ignore input from "wrong" IO-dev 
-		if (AttrVal($deviceName,'IODev',$ioName) ne $ioName) {
+		if ($deviceHash->{IODev} ne $iohash) {
+#		if (AttrVal($deviceName,'IODev',$ioName) ne $ioName) {
 			KNX_Log ($deviceName, 2, qq{msg for gad-name: $gadName from wrong IO-device: $ioName - ignored});
 			next;
 		}
@@ -1439,9 +1437,7 @@ sub KNX_autoCreate {
 		my $igntypes = AttrVal($acdev,'ignoreTypes',q{});
 		return q{} if($newDevName =~ /$igntypes/xms);
 	}
-### prepare for removal of $MODELERR
-	return qq{UNDEFINED $newDevName KNX $gad} . q{:} . $MODELERR;
-#	return qq{UNDEFINED $newDevName KNX $gad} . q{:dptRAW};
+	return qq{UNDEFINED $newDevName KNX $gad} . q{:dptRAW};
 }
 
 ### KNX_SetReadings is called from KNX_Set and KNX_Parse
@@ -1458,9 +1454,10 @@ sub KNX_SetReadings {
 	#append post-string, if supplied: format attr overrides supplied unit!
 	my $model = $hash->{GADDETAILS}->{$gadName}->{MODEL};
 	my $unit = $dpttypes{$model}->{UNIT};
-	my $suffix = AttrVal($name, 'format', undef);
-	if (defined($suffix) && ($suffix ne q{})) {
+	my $suffix = AttrVal($name, 'format', q{});
+	if ($suffix ne q{}) {
 		$value .= q{ } . $suffix;
+		KNX_Log($name, 3, q{Attr format is deprecated and will be removed in the future, use stateCmd or stateRegex});
 	} elsif (defined ($unit) && ($unit ne q{})) {
 		$value .= q{ } . $unit;
 	}
@@ -1706,7 +1703,7 @@ sub KNX_limit {
 		if (defined ($min) && ($value < $min)) {$retVal = $min;}
 		if (defined ($max) && ($value > $max)) {$retVal = $max;}
 		if ($value != $retVal) {
-			KNX_Log ($name, 3, qq{cmd value modified by limits... Input= $value Output= $retVal Model= $model});
+			KNX_Log ($name, 3, qq{$direction - value modified by limits... Input= $value Output= $retVal Model= $model});
 		}
 		#correct value
 		$retVal /= $factor;
@@ -1721,8 +1718,6 @@ sub KNX_limit {
 		if (defined ($max) && ($retVal > $max)) {$retVal = $max;}
 	}
 
-	KNX_Log ($name, 5, qq{DIR= $direction INPUT= $value OUTPUT= $retVal});
-
 	return $retVal;
 }
 
@@ -1732,6 +1727,7 @@ sub KNX_eval {
 
 	my $name = $hash->{NAME};
 	my $retVal = undef;
+#	return $state if (!(defined($evalString)) || $evalString eq q{});
 
 	my $code = EvalSpecials($evalString,('%hash' => $hash, '%name' => $name, '%gadName' => $gadName, '%state' => $state));
 	$retVal =  AnalyzeCommandChain(undef, $code);
@@ -1750,11 +1746,10 @@ sub KNX_eval {
 sub KNX_encodeByDpt {
 	my ($hash, $gadName, $value, @arg) = @_;
 
-	my $name = $hash->{NAME};
+	my $name  = $hash->{NAME};
 	my $model = $hash->{GADDETAILS}->{$gadName}->{MODEL};
 	my $code = $dpttypes{$model}->{CODE};
-
-	return if ($model eq $MODELERR); #return unchecked, if this is a autocreate-device
+#	my $code  = $model =~ s/(dpt[^\.]+).*/$1/rxms; # prepare removal of $dpttypes{$model}->{CODE};
 
 	# special handling
 	if ($code eq 'dpt16') { # $arg contains additional words
@@ -1788,11 +1783,10 @@ sub KNX_encodeByDpt {
 	KNX_Log ($name, 5, qq{gadName= $gadName value= $value model= $model pattern= $pattern});
 
 	my $lvalue = KNX_limit($hash, $value, $model, 'ENCODE');
+	if ($dpt18flag == 1) {$lvalue += 0x80;};
 
 	if (ref($dpttypes{$code}->{ENC}) eq 'CODE') {
 		my $hexval = $dpttypes{$code}->{ENC}->($lvalue, $model);
-#		if ($code eq 'dpt18' && $arg1 =~ /^learn/xms) {$hexval = sprintf('00%.2x',hex($hexval) + 0x80);}
-		if ($dpt18flag == 1) {$hexval = sprintf('00%.2x',hex($hexval) + 0x80);}
 		KNX_Log ($name, 5, qq{gadName= $gadName model= $model } .
 		        qq{in-Value= $value out-Value= $lvalue out-ValueHex= $hexval});
 		return $hexval;
@@ -1813,8 +1807,7 @@ sub KNX_decodeByDpt {
 	my $name  = $hash->{NAME};
 	my $model = $hash->{GADDETAILS}->{$gadName}->{MODEL};
 	my $code  = $dpttypes{$model}->{CODE};
-
-	return if ($model eq $MODELERR); #return unchecked, if this is a autocreate-device
+#	my $code  = $model =~ s/(dpt[^\.]+).*/$1/rxms; # prepare removal of $dpttypes{$model}->{CODE};
 
 	if (ref($dpttypes{$code}->{DEC}) eq 'CODE') {
 		my $state = $dpttypes{$code}->{DEC}->($value, $model, $hash);
@@ -1964,15 +1957,11 @@ sub enc_dpt16 { #14-Octet String
 	my $dat = unpack('H*', $numval);
 	if ($value =~ /^$PAT_DPT16_CLR/ixms) {$dat = '00';} # send all zero string if "clear line string"
 	#format for 14-byte-length and replace trailing blanks with zeros
-	my $hexval = sprintf('00%-28s',$dat);
-	$hexval =~ s/\s/0/gxms;
-	return $hexval;
+	return sprintf('00%-28s',$dat);
 }
 
-sub enc_dpt18 { # scene 10/2024 allow activate & learn
-	my $value = shift;
-#	$value = ($value & 0x3f);
-	return sprintf('00%.2x',$value);
+sub enc_dpt18 { # also used by dpt17
+	return sprintf('00%.2x',shift);
 }
 
 sub enc_dpt19 { #DateTime
@@ -2019,7 +2008,6 @@ sub enc_dptRAW {
 	$n1 = sprintf('%.2x',($n1 & 0x3f)); # only 6 bits allowed in 1st byte
 	return $numval = $n1 . substr($numval,2);
 }
-
 
 ############################
 ### decode sub functions ###
@@ -2264,10 +2252,10 @@ sub dec_dpt251 { #RGBW-Code
 }
 
 sub dec_dptRAW {
-	my $numval = substr(shift, 0);
-	return sprintf('%s',$numval);
+#	my $numval = substr(shift, 0);
+#	return sprintf('%s',$numval);
+	return sprintf('%s',shift);
 }
-
 
 ### lookup gadname by gadnumber
 # called from: KNX_Get, KNX_setOldsyntax
@@ -2340,8 +2328,7 @@ sub main::KNX_scan {
 		my $k0 = $k; #save previous number of get's
 		foreach my $key (keys %{$devhash->{GADDETAILS}}) {
 			last if (! defined($key));
-			next if($devhash->{GADDETAILS}->{$key}->{MODEL} eq $MODELERR);
-#			next if($devhash->{GADDETAILS}->{$key}->{MODEL} eq q{dptRAW});
+			next if($devhash->{GADDETAILS}->{$key}->{MODEL} eq q{dptRAW});
 			my $option = $devhash->{GADDETAILS}->{$key}->{OPTION};
 			next if (defined($option) && $option =~ /(?:set|listenonly)/ixms);
 			$k++;
@@ -2499,9 +2486,13 @@ If you want to restrict the GAD, use the options "get", "set", or "listenonly". 
 <p><b>Specifying an IO-Device in define is deprecated!</b> Use attribute <a href="#KNX-attr-IODev">IODev</a> instead,
  but only if absolutely required!</p>
 <p>If enabled, the module <a href="#autocreate">autocreate</a> is creating a new definition for each not already defined group-address.
- However, <strong>the new device will be disabled until you added a DPT to the definition </strong>and delete the
- <a href="#KNX-attr-disable">disable</a> attribute. The device name will be KNX_&lt;llaaddd&gt; where ll is the line-,
- aa the area- and ddd the device-address.
+ <del>However, <strong>the new device will be disabled until you added a DPT to the definition </strong>and delete the
+ <a href="#KNX-attr-disable">disable</a> attribute.</del>
+ The device name will be <b>KNX_&lt;llaaddd&gt;</b> where &lt;ll&gt; is the line-, &lt;aa&gt; the area- and &lt;ddd&gt; the device-address.
+ As the correct dpt cannot be determined by autocreate, <b>dptRAW</b> is used as dpt. It is recommended to change the 
+ devicename to a name indicating the usage or function of the device (e.g. KitchenLight) and change dptRAW to the correct 
+ dpt used by the KNX hardware. Migration from &quot;old style&quot; autocreate handling (MODEL_NOT_DEFINED) to <b>dptRAW</b>
+ format will be done during FHEM-start or device definition.<br/>
  No FileLog or SVG definition is created for KNX-devices by autocreate. Use for example&colon; 
  <code>   define &lt;name&gt; FileLog &lt;filename&gt; KNX_.*   </code>
  to create a single FileLog-definition for all KNX-devices created by autocreate.  
@@ -2628,7 +2619,7 @@ Examples&colon;
   Can also be used to make the reading-name independent from the gadName / cmd, to simplify integration of external systems.
   This attr does <b>not change</b> the value of the reading.<br/>
   This attr is processed ahead of other attributes, you have to use the mapped reading-name in stateRegex,stateCmd,toggle attributes.
-<br/></li>
+</li>
 <li><a id="KNX-attr-stateRegex"></a><b>stateRegex</b><br/>
   This function modifies the value of reading state.
   It is executed directly after replacing the reading-names and processing "format" Attr, but before stateCmd.<br/>
@@ -2678,16 +2669,17 @@ Examples&colon;
    attr &lt;device&gt; putCmd {return (split(/[\s]/xms,TimeNow()))[1] if ($gadName eq 'time'); return;} #returns system timestamp (dpt10 format) ...
 </code></pre>
 </li>
-<li><a id="KNX-attr-format"></a><b>format</b><br/>
+<li><a id="KNX-attr-format"></a><b>format</b> This attr is deprecated (12/2025) and will be removed in the future. 
+  Pls. use attr stateCmd or stateRegex or stateFormat. <br/>
   The content of this attribute is appended to every sent/received value before readings are set, 
   it replaces the default unit-value! "format" will be appied to ALL readings, it is better to use the (more complex)
   "stateCmd" or "stateRegex" attributes if you have more than one GAD in your device.
-<br/></li>
+</li>
 <li><a id="KNX-attr-disable"></a><b>disable</b><br/>
-  Disable the device if set to <b>1</b>. No send/receive from bus and no set/get possible. Delete this attr to enable device again. 
+  Disable the device if set to <b>1</b>. <del>No send/receive from bus and no set/get possible.</del> Set- and get-commands will be refused. Delete this attr to enable device again. 
   Deleting this attribute is prevented in case the definition is incomplete or contains errors!
   <br/>As an aid for debugging, an additional INTERNAL&colon; "RAWMSG" will show any message received from bus while the device is disabled.
-<br/></li>
+</li>
 <li><a id="KNX-attr-KNX_toggle"></a><b>KNX_toggle</b><br/>
   As there is no direct support in KNX devices for toggle cmd, we have to
   lookup the current value before issuing <code>set &lt;device&gt; &lt;gadName&gt; toggle</code> cmd.<br/> 
@@ -2697,18 +2689,18 @@ Examples&colon;
   when defining &lt;device&gt;&colon;&lt;readingname&gt;.<br/>
   If this attribute is not defined, the current value will be taken from &lt;owndevice&gt;&colon;&lt;readingName-get&gt; or,
   if &lt;readingName-get&gt; is not defined, the value will be taken from &lt;readingName-set&gt;.
-<br/></li>
+</li>
 <li><a id="KNX-attr-IODev"></a><b>IODev</b><br/>
   Due to changes in IO-Device handling, (default IO-Device will be stored in <b>reading IODev</b>), setting this Attribute
   is no longer required, except in cases where multiple IO-devices (of type TUL/KNXTUL/KNXIO) exist in your config.
   Defining more than one IO-device is <b>NOT recommended</b> unless you take special care with yr. knxd or KNX-router definitions
   - to prevent multiple path from KNX-Bus to FHEM resulting in message loops.
-<br/></li>
+</li>
 <li><a id="KNX-attr-widgetOverride"></a><b>widgetOverride</b><br/>
   This is a standard FHEMWEB-attribute, the recommendation for use in KNX-module is to specify the following form&colon;
   <b>&lt;gadName&gt;@set&colon;&lt;widgetName,parameter&gt;</b> This avoids overwriting the GET pulldown in FHEMWEB detail page.
   For details, pls see <a href="#FHEMWEB-attr-widgetOverride">FHEMWEB-attribute</a>.
-<br/></li>
+</li>
 </ul>
 <br/></li>
 
@@ -2936,13 +2928,14 @@ Examples&colon;
 <li><b>dpt232    </b>  RRGGBB RGB-Value (hex)</li>
 <li><b>dpt251    </b>  RRGGBBWW RGBW-Value (hex)</li>
 <li><b>dpt251.600</b>  RRGGBBWW RGBW-Value (hex)</li>
-<li><b>dptRAW    </b>  testing/debugging - see Note 2</li>
+<li><b>dptRAW    </b>  used by autocreate/testing/debugging - see Note 2</li>
 </ol>
 <br/>
-<b>Note 1:&nbsp;</b>A toggle cmd is translated to on/off, as there is no direct support for toggle in KNX-devices. See also Attr KNX_toggle.
+<b>Note 1:&nbsp;</b>A toggle cmd is translated to on/off, as there is no direct support for toggle in KNX-devices. 
+See also <a href="#KNX-attr-KNX_toggle">attribute KNX_toggle.</a>
 <br/>
-<b>Note 2:&nbsp;</b>dptRAW is for testing/debugging only! You can send/receive hex strings of unlimited length (assuming the KNX-HW supports it).
-No conversion, limit-, plausibility-check is done, the hex values are sent unmodified to the KNX bus.
+<b>Note 2:&nbsp;</b>dptRAW is used for autocreate and testing/debugging. You can send/receive hex strings of unlimited length (assuming the KNX-HW supports it).
+No conversion, limit-, plausibility-check is done, the hex values are sent unmodified to the KNX bus. Msgs received from the bus update readings as usual.
 <pre>  syntax: set &lt;device&gt; &lt;gadName&gt; &lt;hex-string&gt;
 <code>    Examples of valid / invalid hex-strings&colon;
       00..3f # valid, single byte range x00-x3f
@@ -2955,7 +2948,7 @@ No conversion, limit-, plausibility-check is done, the hex values are sent unmod
 
 <li><a id="KNX-utilities"></a><strong>KNX Utility Functions</strong><br/>&nbsp;
 <ul>
-<li><b>KNX_scan</b> Function to be called from scripts or FHEM cmdline. 
+<li><b>KNX_scan</b> Function to be used from scripts or FHEM cmdline. 
 <br/>Selects all KNX-definitions (specified by the argument) that support a "get" from the device. 
 Issues a <code>get &lt;device&gt; &lt;gadName&gt;</code> cmd to each selected device/GAD. 
 The result of the "get" cmd  will be stored in the respective readings. 

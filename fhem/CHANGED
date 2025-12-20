@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - change: 10_KNX: modify autocreate handling
  - bugfix: 57_Calendar: consider DURATION with cutoffOlderThan
  - change: 59_ECOWITT_GW.pm: many enhacements (forum #124749)
  - bugfix: 98_vitoconnect: asSingleValue fixed – this time for real

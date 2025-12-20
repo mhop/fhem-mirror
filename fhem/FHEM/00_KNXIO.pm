@@ -91,6 +91,9 @@
 #            rework _readST, _dispatch, _processFIFo, _deldupes subs
 # 25/10/2025 modify error handling (dupl. msg received) mode H
 #            modify _processFIFO fn
+# xx/yy/2025 cleanup
+#            Log msg on connectionstaterequest
+#            modify DNS query
 
 
 package KNXIO; ## no critic 'package'
@@ -123,20 +126,12 @@ BEGIN {
     # Import from main context
     GP_Import(
         qw(readingsSingleUpdate readingsBeginUpdate readingsEndUpdate
-          readingsBulkUpdate readingsBulkUpdateIfChanged
-          Log3
           AttrVal AttrNum ReadingsVal ReadingsNum
           readingFnAttributes
-          AssignIoPort IOWrite
-          DoTrigger
-          Dispatch
           defs attr
           selectlist readyfnlist 
           InternalTimer RemoveInternalTimer
-          init_done
-          IsDisabled IsDummy IsDevice
-          devspec2array
-          TimeNow)
+          init_done)
     );
 }
 
@@ -230,7 +225,8 @@ sub KNXIO_Define {
 			$hash->{PORT} = $port; # save port...
 			$hash->{timeout} = 5; # TO for DNS req.
 			$hash->{DNSWAIT} = 1;
-			my $KNXIO_DnsQ = ::HttpUtils_gethostbyname($hash,$host,1,\&KNXIO_gethostbyname_Cb);
+			delete $hash->{DeviceName};
+			main::HttpUtils_gethostbyname($hash,$host,1,\&KNXIO_gethostbyname_Cb);
 		}
 
 		else {
@@ -302,7 +298,7 @@ sub KNXIO_Read {
 		return;
 	}
 
-	return if IsDisabled($name); # moved after read function 8/2023
+	return if main::IsDisabled($name); # moved after read function 8/2023
 
 	KNXIO_Log ($name, 5, 'buf=' . unpack('H*',$buf));
 
@@ -432,7 +428,7 @@ sub KNXIO_ReadH {
 	my $errcode = 0;
 
 	my %resIDs = (
-	   0x0201 => sub { # search request
+	   0x0201 => sub { # search request - should not occur: Client->Server msg
 		KNXIO_Log ($name, 4, 'SearchRequest received');
 		return;
 	   },
@@ -441,7 +437,7 @@ sub KNXIO_ReadH {
 		my (@contolpointIp, $controlpointPort) =  unpack('x6CCCn',$buf);
 		return;
 	   },
-	   0x0203 => sub { # Decription request
+	   0x0203 => sub { # Decription request - should not occur: Client->Server msg
 		KNXIO_Log ($name, 4, 'DescriptionRequest received');
 		return;
 	   },
@@ -449,13 +445,14 @@ sub KNXIO_ReadH {
 		KNXIO_Log ($name, 4, 'DescriptionResponse received');
 		return;
 	   },
-	   0x0205 => sub {  # Connect request
+	   0x0205 => sub {  # Connect request - should not occur: Client->Server msg
 		KNXIO_Log ($name, 4, 'ConnectionRequest received');
 		return;
 	   },
 	   0x0206 => sub { # Connect response
 		($hash->{KNXIOhelper}->{CCID},$errcode) = unpack('x6CC',$buf); # save Comm Channel ID,errcode
 		RemoveInternalTimer($hash,\&KNXIO_keepAlive);
+		RemoveInternalTimer($hash,\&KNXIO_openTO);
 		if ($errcode > 0) {
 			KNXIO_Log ($name, 3, q{ConnectResponse received } .
 				qq{CCID=$hash->{KNXIOhelper}->{CCID} Status=} . KNXIO_errCodes($errcode));
@@ -470,8 +467,10 @@ sub KNXIO_ReadH {
 		InternalTimer(Time::HiRes::time() + 60, \&KNXIO_keepAlive, $hash); # start keepalive
 		return;
 	   },
-	   0x0207 => sub { # ConnectionState request
-		KNXIO_Log ($name, 4, 'ConnectioStatenRequest received');
+	   0x0207 => sub { # ConnectionState request - should not occur: Client->Server msg
+#		KNXIO_Log ($name, 4, 'ConnectionStateRequest received');
+		my ($ip0,$ip1,$ip2,$ip3,$port) = unpack('x10CCCCn',$buf);
+		KNXIO_Log ($name, 3, 'ConnectionStateRequest received from IP ' . $ip0 . q{.}  . $ip1 . q{.} . $ip2 . q{.} . $ip3 . q{:} . $port . ' - ignored');
 		return;
 	   },
 	   0x0208 => sub { # ConnectionState response
@@ -497,6 +496,11 @@ sub KNXIO_ReadH {
 	   },
 	   0x020A => sub { # Disconnect response
 		KNXIO_Log ($name, 4, q{DisconnectResponse received - sending connrequest});
+		($ccid,$errcode) = unpack('x6CC',$buf);
+		if ($errcode > 0) {
+			KNXIO_Log ($name, 3, q{DisconnectResponse received } .
+			        qq{CCID=$ccid  Status=} . KNXIO_errCodes($errcode) . q{ - sending connrequest});
+		}
 		$msg = KNXIO_prepareConnRequ($hash);
 		return $msg;
 	   },
@@ -565,7 +569,7 @@ sub KNXIO_Ready {
 
 	my $name = $hash->{NAME};
 
-	return if (! $init_done || exists($hash->{DNSWAIT}) || IsDisabled($name) == 1);
+	return if (! $init_done || exists($hash->{DNSWAIT}) || main::IsDisabled($name) == 1);
 	return if (ReadingsVal($name, 'state', q{}) eq 'connected' );
 	if (exists($hash->{NEXT_OPEN}) ) { # avoid open loop
 		InternalTimer($hash->{NEXT_OPEN},\&KNXIO_openDev,$hash);
@@ -584,7 +588,6 @@ sub KNXIO_Write {
 	my $name = $hash->{NAME};
 	my $mode = $hash->{model};
 
-	KNXIO_Log ($name, 5, 'started');
 	return if(!defined($fn) && $fn ne $KNXID);
 	if (ReadingsVal($name, 'state', 'disconnected') ne 'connected') {
 		KNXIO_Log ($name, 3, qq{called while not connected! Msg: $msg lost});
@@ -670,7 +673,7 @@ sub KNXIO_Write2 {
 	my $dataoffset; # offset to data in msg - debug only
 	if ($mode eq 'H') {
 		# replace sequence counterW
-		substr($msg,8,1) = pack('C',$hash->{KNXIOhelper}->{SEQUENCECNTR_W}); ##no critic (BuiltinFunctions::ProhibitLvalueSubstr)
+		substr($msg,8,1) = pack('C',$hash->{KNXIOhelper}->{SEQUENCECNTR_W}); ## no critic (BuiltinFunctions::ProhibitLvalueSubstr)
 #		$msg = substr($msg,0,8) . pack('C',$hash->{KNXIOhelper}->{SEQUENCECNTR_W}) . substr($msg,9); # w.o. LvalueSubstr PBP !
 
 		$ret = ::DevIo_SimpleWrite($hash,$msg,0);
@@ -726,16 +729,16 @@ sub KNXIO_Rename {
 	my $newname = shift;
 	my $oldname = shift;
 
-	if (! IsDevice($newname,'KNXIO')) {
+	if (! main::IsDevice($newname,'KNXIO')) {
 		KNXIO_Log ($oldname, 1, qq{$newname is not a KNXIO device!});
 		return;
 	}
 	KNXIO_Log ($oldname, 3, qq{device $oldname renamed to $newname});
 
 	#check if any reading IODev has still the old KNXIO name...
-	my @KNXdevs = devspec2array('TYPE=KNX:FILTER=r:IODev=' . $oldname);
+	my @KNXdevs = main::devspec2array('TYPE=KNX:FILTER=r:IODev=' . $oldname);
 	foreach my $KNXdev (@KNXdevs) {
-		next if (! IsDevice($KNXdev)); # devspec error!
+		next if (! main::IsDevice($KNXdev)); # devspec error!
 		readingsSingleUpdate($defs{$KNXdev},'IODev',$newname,0);
 		my $logtxt = qq{reading IODev -> $newname};
 		if (AttrVal($KNXdev,'IODev',q{}) eq $oldname) {
@@ -828,7 +831,7 @@ sub KNXIO_gethostbyname_Cb {
 		delete $hash->{DeviceName};
 		delete $hash->{PORT};
 		KNXIO_Log ($name, 1, qq{hostname could not be resolved: $error});
-		return  qq{KNXIO-define: hostname could not be resolved: $error};
+		return qq{KNXIO-define: hostname could not be resolved: $error};
 	}
 	my $host = ::ip2str($dhost);
 	KNXIO_Log ($name, 3, qq{DNS query result= $host});
@@ -844,19 +847,11 @@ sub KNXIO_openDev {
 	my $name = $hash->{NAME};
 	my $mode = $hash->{model};
 
-	return if (IsDisabled($name) == 1);
+	return if (main::IsDisabled($name) == 1);
 	return KNXIO_openDevX($hash) if ($mode eq q{X});
 
-	if (exists $hash->{DNSWAIT}) {
-		$hash->{DNSWAIT} += 1;
-		if ($hash->{DNSWAIT} > 5) {
-			KNXIO_Log ($name, 2, q{DNS failed, check ip/hostname});
-			return;
-		}
-		InternalTimer(Time::HiRes::time() + 1,\&KNXIO_openDev,$hash);
-		KNXIO_Log ($name, 2, q{waiting for DNS});
-		return; # waiting for DNS
-	}
+	my $dnsret = KNXIO_DNScheck($hash); # resolve dns if required;
+	return $dnsret if (defined($dnsret));
 	return if (! exists($hash->{DeviceName})); # DNS failed !
 
 	my $reopen = (exists($hash->{NEXT_OPEN}))?1:0;
@@ -932,17 +927,36 @@ sub KNXIO_openDev {
 	return $ret;
 }
 
+### wait for DNS answer
+### return undef on ok / still waiting 
+sub KNXIO_DNScheck {
+	my $hash = shift;
+
+	return if (!exists $hash->{DNSWAIT});
+	return if (exists $hash->{DeviceName}); # DNS ok
+	my $name = $hash->{NAME};
+
+	if ($hash->{DNSWAIT} > 4) {
+		KNXIO_Log ($name, 2, q{DNS failed, check ip/hostname});
+		return q{DNS failed, check ip/hostname};
+	}
+	$hash->{DNSWAIT} += 1;
+	InternalTimer(Time::HiRes::time() + 1,\&KNXIO_openDev,$hash);
+	KNXIO_Log ($name, 2, q{waiting for DNS});
+	return; # waiting for DNS
+}
+
 ### called from define - after init_complete for mode X
 ### return undef on success
 sub KNXIO_openDevX {
 	my $hash = shift;
 	my $name = $hash->{NAME};
 
-	my @f2flist = devspec2array('TYPE=FHEM2FHEM'); # get F2F devices
+	my @f2flist = main::devspec2array('TYPE=FHEM2FHEM'); # get F2F devices
 	foreach my $f2fdev (@f2flist) {
-		next if (IsDevice($f2fdev) == 0); # no F2Fdevice found
+		next if (main::IsDevice($f2fdev) == 0); # no F2Fdevice found
 		my $rawdev = $defs{$f2fdev}->{rawDevice};
-		next if (IsDevice($rawdev,'KNXIO') == 0);
+		next if (main::IsDevice($rawdev,'KNXIO') == 0);
 		next if ($rawdev ne $name);
 		KNXIO_init($hash);
 		return;
@@ -968,7 +982,6 @@ sub KNXIO_init {
 	elsif ($mode eq 'H') {
 		my $connreq = KNXIO_prepareConnRequ($hash);
 		::DevIo_SimpleWrite($hash,$connreq,0);
-		InternalTimer(Time::HiRes::time() + 2, \&KNXIO_openTO, $hash);
 	}
 
 	# state 'connected' is set in decode_EMI (model ST) or in readH (model H)  
@@ -1015,7 +1028,7 @@ sub KNXIO_initcomplete {
 			main::KNX_scan('TYPE=KNX:FILTER=IODev=' . $name);
 		}
 		$hash->{KNXIOhelper}->{startdone} = 1;
-		DoTrigger($name,'INITIALIZED');
+		main::DoTrigger($name,'INITIALIZED');
 		readingsSingleUpdate($hash, 'state', 'connected', 1); # now do event
 	}
 	elsif (AttrNum($name,'disable', 0) != 1) {
@@ -1043,6 +1056,7 @@ sub KNXIO_prepareConnRequ {
 	$hash->{KNXIOhelper}->{SEQUENCECNTR_W} = 0; # write requests
 	RemoveInternalTimer($hash,\&KNXIO_keepAliveTO); # reset timeout timer
 	RemoveInternalTimer($hash,\&KNXIO_keepAlive);
+	InternalTimer(Time::HiRes::time() + 2, \&KNXIO_openTO, $hash);
 
 	return $connreq;
 }
@@ -1062,26 +1076,6 @@ sub KNXIO_dispatch {
 	return;
 }
 
-=begin comment
-### called from FIFO TIMER
-sub KNXIO_dispatch2 {
-##	my ($hash, $outbuf ) = ($_[0]->{h}, $_[0]->{m});
-	my $hash = shift;
-	my $buf  = shift;
-
-	my $name = $hash->{NAME};
-
-	$hash->{'MSGCNT'}++;
-	$hash->{'MSGTIME'} = TimeNow();
-
-	Dispatch($hash, $buf);
-
-	KNXIO_processFIFO($hash);
-	return;
-}
-=end comment
-=cut
-
 ### fetch msgs from FIFO and call dispatch
 sub KNXIO_processFIFO {
 	my $hash = shift;
@@ -1097,11 +1091,9 @@ sub KNXIO_processFIFO {
 	if ($queentries > 0) { # process timer is not running & fifo not empty
 		my $msg = shift(@{$hash->{KNXIOhelper}->{FIFO}});
 		KNXIO_Log ($name, 4, qq{dispatching buf=$msg Nr_msgs=$queentries});
-#		KNXIO_dispatch2($hash, $msg);
 		$hash->{'MSGCNT'}++; # update internals and dispatch
-		$hash->{'MSGTIME'} = TimeNow();
-		Dispatch($hash, $msg);
-
+		$hash->{'MSGTIME'} = main::TimeNow();
+		main::Dispatch($hash, $msg);
 		InternalTimer(Time::HiRes::time() + 0.05, \&KNXIO_processFIFO, $hash); # allow time for new/duplicate msgs to be read
 	}
 	return;
@@ -1402,7 +1394,7 @@ sub KNXIO_Log {
 	my $line = (caller(0))[2];
 	$sub =~ s/^.+[:]+//xms;
 
-	Log3 ($name, $loglvl, qq{$name [$sub $line]: $logtxt});
+	main::Log3 ($name, $loglvl, qq{$name [$sub $line]: $logtxt});
 	return;
 }
 
@@ -1418,7 +1410,7 @@ sub KNXIO_Debug {
 	my $name = ( ref($dev) eq 'HASH' ) ? $dev->{NAME} : $dev;
 	return if ($loglvl != AttrNum($name,'KNXIOdebug',99));
 
-	Log3 ($name, 0, qq{$name DEBUG$loglvl>> $logtxt});
+	main::Log3 ($name, 0, qq{$name DEBUG$loglvl>> $logtxt});
 	return;
 }
 
