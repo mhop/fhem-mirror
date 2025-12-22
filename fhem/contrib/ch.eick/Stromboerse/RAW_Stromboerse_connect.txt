@@ -1116,10 +1116,14 @@ fc0_trigger_stop:fc0_trigger_start.* {\
           return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
         }\
 \
-       # wenn es 23:45 is wechsel zum nächsten Tag\
-       if ( $loop_hour == 23 and $fc == 0 and $quarter == 3) {\
-         $fc = 1;;\
-         $loop_hour = -1;; # beginne wieder bei 00:00\
+      # wenn es 23:45 is wechsel zum nächsten Tag\
+       if ($loop_hour == 23 and $fc == 0 and $quarter == 3) {\
+         if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {   # Der nächste Tag ist bereits da\
+           $fc = 1;\
+           $loop_hour = -1;                                                                # beginne wieder bei 00:00\
+         } else {\
+           $fc_trigger_stop = "23:59";                                                 # fc0 stop ist um 00:00\
+         }\
        }\
 \
        if ( $quarter == 3 ) { $fc_trigger_start_quarter = 0 }\
