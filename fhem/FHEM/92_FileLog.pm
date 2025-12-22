@@ -1102,7 +1102,7 @@ RESCAN:
       $rescan=1;
       my $buf;
       my $end = $hash->{pos}{"$inf:$from"};
-      my $start = $end - 1024;
+      my $start = $end - 102400;
       $start = 0 if($start < 0);
 
       $ifh->seek($end, 0);

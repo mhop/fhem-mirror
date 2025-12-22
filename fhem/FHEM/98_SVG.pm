@@ -2011,13 +2011,10 @@ SVG_render($$$$$$$$$$)
       }
 
     } elsif($lType eq "steps") {
-      $ret .=  sprintf(" %d,%d", $x+$dxp->[0],$y+$hfill) if($isFill && @{$dxp});
-      if(@{$dxp} == 1) {
-          my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
-          $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
-                $x,$y+$h, $x,$y1, $x+$nx,$y1, $x+$nx,$y+$h);
-      } else {
-        my $nEl = int(@{$dxp})-1;
+      my $nEl = int(@{$dxp})-1;
+      if($nEl>=0) {
+        ($lx, $ly) = ($x+$dxp->[0], $y+$h-($dyp->[0]-$min)*$hmul);
+        $ret .=  sprintf(" %d,%d", $lx,$y+$hfill) if($isFill);
         foreach my $i (1..$nEl) {
           my ($x1, $y1) = ($x+$dxp->[$i-1], $y+$h-($dyp->[$i-1]-$min)*$hmul);
           my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
