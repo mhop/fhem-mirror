@@ -25,9 +25,14 @@ par:MAKECOPIES;MAKECOPIES: boolean, if set, device will be copied to other chann
 par:IODEVATTR;IODEVATTR: attribute value if set, will be copied to other channel devices , defaults to 0;{ AttrVal('DEVICE','IODev',0) }
 par:IODEVREADING;IODEVREADING: reading value if set and no attribute is set, will be copied to other channel devices , defaults to 0;{ AttrVal('DEVICE','IODev',0) ? 0 : ReadingsVal('DEVICE','IODev',0)}
 
-# 2 channels
-option:{return 1 if CHANNELS==2 && MAKECOPIES==1;;return 0}
+# second channel preparation - all TYPE devices
+option:{return 1 if MAKECOPIES==1;;return 0}
 copy DEVICE DEVICE_CH2
+# 2 channels for MQTT2_DEVICE channels - delete CID info in first channel
+option:{return 1 if InternalVal(DEVICE,'TYPE','unknown') eq 'MQTT2_DEVICE' && MAKECOPIES==1;;return 0}
+defmod DEVICE_CH2 MQTT2_\DEVICE
+
+# 2 channels
 option:{return 1 if CHANNELS==2;;return 0}
 setreading DEVICE associatedWith DEVICE_CH2
 setreading DEVICE_CH2 associatedWith DEVICE
@@ -36,8 +41,7 @@ attr DEVICE_CH2 comment Channel 2 for DEVICE
 
 # 3 channels
 option:{return 1 if CHANNELS==3 && MAKECOPIES==1;;return 0}
-copy DEVICE DEVICE_CH2
-copy DEVICE DEVICE_CH3
+copy DEVICE_CH2 DEVICE_CH3
 option:{return 1 if CHANNELS==3;;return 0}
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2 and DEVICE_CH3 
 attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE and DEVICE_CH3
@@ -48,9 +52,8 @@ setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2
 
 # 4 channels
 option:{return 1 if CHANNELS==4 && MAKECOPIES==1;;return 0}
-copy DEVICE DEVICE_CH2
-copy DEVICE DEVICE_CH3
-copy DEVICE DEVICE_CH4
+copy DEVICE_CH2 DEVICE_CH3
+copy DEVICE_CH2 DEVICE_CH4
 option:{return 1 if CHANNELS==4;;return 0}
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
@@ -63,10 +66,9 @@ setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
 
 # 5 channels
 option:{return 1 if CHANNELS==5 && MAKECOPIES==1;;return 0}
-copy DEVICE DEVICE_CH2
-copy DEVICE DEVICE_CH3
-copy DEVICE DEVICE_CH4
-copy DEVICE DEVICE_CH5
+copy DEVICE_CH2 DEVICE_CH3
+copy DEVICE_CH2 DEVICE_CH4
+copy DEVICE_CH2 DEVICE_CH5
 option:{return 1 if CHANNELS==5;;return 0}
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3, DEVICE_CH4 and DEVICE_CH5
 attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3, DEVICE_CH4 and DEVICE_CH5
@@ -81,11 +83,10 @@ setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEV
 
 # 6 channels
 option:{return 1 if CHANNELS==6 && MAKECOPIES==1;;return 0}
-copy DEVICE DEVICE_CH2
-copy DEVICE DEVICE_CH3
-copy DEVICE DEVICE_CH4
-copy DEVICE DEVICE_CH5
-copy DEVICE DEVICE_CH6
+copy DEVICE_CH2 DEVICE_CH3
+copy DEVICE_CH2 DEVICE_CH4
+copy DEVICE_CH2 DEVICE_CH5
+copy DEVICE_CH2 DEVICE_CH6
 option:{return 1 if CHANNELS==6;;return 0}
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5 and DEVICE_CH6
 attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5 and DEVICE_CH6
@@ -102,13 +103,12 @@ setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEV
 
 # 8 channels
 option:{return 1 if CHANNELS==8 && MAKECOPIES==1;return 0}
-copy DEVICE DEVICE_CH2
-copy DEVICE DEVICE_CH3
-copy DEVICE DEVICE_CH4
-copy DEVICE DEVICE_CH5
-copy DEVICE DEVICE_CH6
-copy DEVICE DEVICE_CH7
-copy DEVICE DEVICE_CH8
+copy DEVICE_CH2 DEVICE_CH3
+copy DEVICE_CH2 DEVICE_CH4
+copy DEVICE_CH2 DEVICE_CH5
+copy DEVICE_CH2 DEVICE_CH6
+copy DEVICE_CH2 DEVICE_CH7
+copy DEVICE_CH2 DEVICE_CH8
 option:{return 1 if CHANNELS==8;;return 0}
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5, DEVICE_CH6, DEVICE_CH7 and DEVICE_CH8
 attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5, DEVICE_CH6, DEVICE_CH7 and DEVICE_CH8
