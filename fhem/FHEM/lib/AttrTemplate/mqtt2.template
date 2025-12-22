@@ -647,7 +647,7 @@ attr DEVICE setStateList on off toggle
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE attrTemplate set_associatedWith \CHANNELS=5 \MAKECOPIES=1
 loop:#:2:3:4:5
-defmod DEVICE_CH# MQTT2_\DEVICE
+#defmod DEVICE_CH# MQTT2_\DEVICE
 attr DEVICE_CH# setList \
   on:noArg $\DEVICETOPIC/set {"state_l#":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state_l#":"OFF"}\
@@ -659,7 +659,7 @@ attr DEVICE_CH4 jsonMap state_l4:state state_l1:0 state_l2:0 state_l3:0 state_l5
 attr DEVICE_CH5 jsonMap state_l5:state state_l1:0 state_l2:0 state_l3:0 state_l4:0 state:0
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 model zigbee2mqtt_5channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 attrTemplateVersion 20221007
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 attrTemplateVersion 20251222
 
 
 # A blind drive motor TS0601_cover connected via zigbee2mqtt
@@ -1275,6 +1275,54 @@ attr DEVICE model zigbee2mqtt_thermostat_with_weekprofile_5_1_1
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
 setreading DEVICE attrTemplateVersion 20240402
+
+#contributed by offebaescher
+name:zigbee2mqtt_thermostat_AVATTO_TRV06_TS0601
+desc: Developed for AVATTO TRV06 TS0601 (Thermostatic radiator valve)
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_17c
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal('DEVICE','icon','temp_control') }
+farewell:template has been applied successfully.
+attr DEVICE comment For use with weekprofile, additional configuration and code would be needed, 6 Transitions required, format example: "HH:MM/C HH:MM/C HH:MM/C HH:MM/C HH:MM/C HH:MM/C"
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList\
+  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }\
+  child_lock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
+  schedule_monday:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set {"schedule_monday":"$payload"})}\
+  schedule_tuesday:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set {"schedule_tuesday":"$payload"})}\
+  schedule_wednesday:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set {"schedule_wednesday":"$payload"})}\
+  schedule_thursday:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set {"schedule_thursday":"$payload"})}\
+  schedule_friday:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set {"schedule_friday":"$payload"})}\
+  schedule_saturday:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set {"schedule_saturday":"$payload"})}\
+  schedule_sunday:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set {"schedule_sunday":"$payload"})}\
+  mode:heat,auto,off $\DEVICETOPIC/set {"system_mode": "$EVTPART1"}\
+  pi_heating_demand:slider,0,1,100,1 $\DEVICETOPIC/set {"pi_heating_demand": $EVTPART1 }\
+  frost_protection:ON,OFF $\DEVICETOPIC/set {"frost_protection": "$EVTPART1"}\
+  scale_protection:ON,OFF $\DEVICETOPIC/set {"scale_protection": "$EVTPART1"}\
+  local_temperature_calibration:slider,-9.0,1,9.0,1 $\DEVICETOPIC/set {"local_temperature_calibration": $EVTPART1 }\
+  x_send_set_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set $payload)}
+# es gibt laut https://www.zigbee2mqtt.io/devices/TRV06_1.html KEINE Werte, die per /get geholt werden können aktiv
+attr DEVICE getList desired-temp:noArg desired-temp $\DEVICETOPIC/get {"current_heating_setpoint": ""}\
+  temperature:noArg temperature $\DEVICETOPIC/get {"local_temperature": ""}\
+attr DEVICE periodicCmd temperature:55
+attr DEVICE stateFormat lock:child_lock\modus:mode\
+Measured: temperature&deg;C / Desired: desired-temp&deg;C<br>Battery: batteryState
+attr DEVICE devStateIcon lock.LOCK:secur_locked:child_lock+UNLOCK lock.UNLOCK:secur_open:child_lock+LOCK modus.auto:sani_heating_automatic modus.heat:sani_heating_manual modus.off:sani_heating_level_0
+attr DEVICE webCmd desired-temp
+attr DEVICE widgetOverride desired-temp@set:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:battery_low system_mode:mode
+attr DEVICE setStateList on off
+attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}
+attr DEVICE model zigbee2mqtt_thermostat_AVATTO_TRV06_TS0601
+set DEVICE attrTemplate speechcontrol_type_thermostat
+deletereading -q DEVICE (?!associatedWith|IODev).*
+setreading DEVICE battery_low false
+setreading DEVICE attrTemplateVersion 20251221
+
 
 
 ###########################################
