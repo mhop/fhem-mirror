@@ -5053,7 +5053,7 @@ sub widget {
    $pos_left = -3 if (!defined ($pos_left));
    $pos_top = -8 if (!defined ($pos_top));
    my $pad = (length($text) > 1) ? 2 : 5; 
-   return '<div style="display:inline-table;">'.::FW_makeImage($icon).'<div style="display:inline;border-radius:20px;color:'.$color.';background-color:'.
+   return '<div style="display:inline-flex; align-items:center;">'.::FW_makeImage($icon).'<div style="border-radius:20px;color:'.$color.';background-color:'.
           $color_bg.
           ';font-size:14px;font-weight:bold;text-align:center;position:relative;padding-top: 1px;padding-left: '.$pad.'px; padding-right: '.$pad.'px;padding-bottom: 1px;'.
           'left:'.$pos_left.'px;top:'.$pos_top.'px;">'.$text.'</div></div>'
