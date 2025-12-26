@@ -434,6 +434,10 @@ MQTT2_CLIENT_Attr(@)
     }
   }
 
+  if($attrName eq "username" && $type eq "del") { #143181
+    setKeyValue($devName,undef);
+  }
+
   return undef;
 }
 
