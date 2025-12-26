@@ -1,4 +1,4 @@
-FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.3.1 schwatter $";
+FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.3.2 schwatter $";
 FW_widgets['controlminidash'] = { createFn: controlMiniDashCreate };
 
 function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -147,6 +147,70 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
     });
     wrapper[0].appendChild(svg);
 
+    // --- Geometrie und Winkelkonstanten ---
+    let CENTER_X = 177;
+    let CENTER_Y = 90;
+    const RADIUS = 75;
+    const ANGLE_START = 140;
+    const ANGLE_MIN = 138;
+    const ANGLE_MAX = 42;
+
+    // --- Compact-Modus prüfen ---
+    const isCompact = Array.isArray(vArr) && vArr.some(v => typeof v === 'string' && v.toLowerCase() === "compact");
+
+    if (isCompact) {
+        // SVG skalieren
+        svg.setAttribute("viewBox", "0 0 180 160");
+        svg.setAttribute("width", 180);
+        svg.setAttribute("height", 160);
+        svg.style.width = "180px";
+        svg.style.height = "160px";
+        wrapper.css({ width: "180px", height: "160px" });
+
+        // Ring/Knob nach links verschieben
+        CENTER_X = 90;
+        CENTER_Y = 90;
+
+        // Data-Circle & Data-Segment anpassen
+        const dataCircle = svg.querySelector("#dataCircle");
+        if (dataCircle) {
+            dataCircle.setAttribute("cx", CENTER_X);
+            dataCircle.setAttribute("transform", `rotate(126,${CENTER_X},${CENTER_Y})`);
+        }
+
+        const dataSegment = svg.querySelector("#dataSegment");
+        if (dataSegment) {
+            dataSegment.setAttribute("cx", CENTER_X);
+            dataSegment.setAttribute("cy", CENTER_Y);
+        }
+
+        // Knob-Position direkt setzen
+        if (knob) {
+            knob.setAttribute("cx", CENTER_X);
+            knob.setAttribute("cy", CENTER_Y);
+        }
+
+        // Info-Texte zentrieren
+        ["info1Val","info2Val","info3Val","info4Val"].forEach(id => {
+            const t = svg.querySelector(`.informId_ringSVG\\:${id}`);
+            if (t) t.setAttribute("x", CENTER_X);
+        });
+
+        // Alle Buttons ausblenden
+        svg.querySelectorAll(".button-area").forEach(btn => {
+            btn.setAttribute("display", "none");
+            btn.setAttribute("pointer-events", "none");
+            btn.style.setProperty("display", "none", "important");
+            btn.style.setProperty("pointer-events", "none", "important");
+        });
+
+        // Optional: Icons ausblenden
+        svg.querySelectorAll("g[id$='Icon']").forEach(icon => {
+            icon.setAttribute("display","none");
+            icon.style.setProperty("display","none","important");
+        });
+    }
+
     // Knob erstellen, Position kommt später aus FHEM
     if (!knob) {
         var knob = document.createElementNS(svgNS, "circle");
@@ -158,15 +222,6 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
         knob.style.visibility = "hidden";
         svg.appendChild(knob);
     }
-
-
-    // --- Geometrie und Winkelkonstanten ---
-    const CENTER_X = 177;
-    const CENTER_Y = 90;
-    const RADIUS = 75;
-    const ANGLE_START = 140;
-    const ANGLE_MIN = 138;
-    const ANGLE_MAX = 42;
 
     const ANGLE_ARC = (360 - ANGLE_MIN) + ANGLE_MAX;
     const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
