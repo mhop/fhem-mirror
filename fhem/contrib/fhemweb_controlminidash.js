@@ -1,4 +1,4 @@
-FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.3.2 schwatter $";
+FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.3.4 schwatter $";
 FW_widgets['controlminidash'] = { createFn: controlMiniDashCreate };
 
 function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -947,7 +947,6 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
 
             // --- Animation direkt beim Klick ---
             const rect = btn.getBoundingClientRect();
-
             const wave = document.createElement('div');
             wave.style.position = 'fixed';
             wave.style.left = rect.left + 'px';
@@ -960,47 +959,48 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
             wave.style.transform = 'scale(0)';
             wave.style.transition = 'transform 0.4s ease-out, opacity 0.4s ease-out';
             wave.style.zIndex = 9999;
-
             document.body.appendChild(wave);
-
-            requestAnimationFrame(() => {
-                wave.style.transform = 'scale(3)';
-                wave.style.opacity = '0';
-            });
-
+            requestAnimationFrame(() => { wave.style.transform = 'scale(3)'; wave.style.opacity = '0'; });
             setTimeout(() => wave.remove(), 400);
 
-            // Prüfen ob vArr einen FHEM-Befehl enthält
+            // --- Prüfen ob vArr einen FHEM-Befehl enthält ---
             if (Array.isArray(vArr)) {
                 const val = vArr[6 + btnNum]; // Offset im vArr
+
                 if (val && val.includes('@')) {
-                    sendFHEMCmd(val, btn);
+                    const [iconName, statePartRaw] = val.split('@');
+
+                    if (statePartRaw === '#') {
+                        // Userattr-Befehl verwenden
+                        const cmdDiv = document.getElementById(`${dev}-btn${btnNum}Cmd`);
+                        const cmdText = cmdDiv?.textContent?.trim();
+
+                        if (cmdText) {
+                            // Roh weitergeben
+                            FW_cmd(FW_root + '?cmd=' + encodeURIComponent(cmdText) + '&XHR=1');
+                        }
+                    } else {
+                        // Punkte durch Leerzeichen ersetzen
+                        const statePart = statePartRaw.replace(/\./g, ' ');
+                        const parts = statePart.split(' ');
+                        const param = parts[0];
+                        const value = parts.slice(1).join(' ');
+                        const fullCmd = `{fhem("set ${dev} ${param} ${value}")}`;
+                        FW_cmd(FW_root + '?cmd=' + encodeURIComponent(fullCmd) + '&XHR=1');
+                    }
                     handled = true;
-                } else {
-                    console.log(`   ? No valid vArr entry for btn${btnNum}:`, val);
                 }
             }
 
-            // Falls kein val aus vArr, btnXCmd auslesen
+            // --- Falls kein val aus vArr, btnXCmd auslesen ---
             if (!handled) {
                 const cmdDiv = document.getElementById(`${dev}-btn${btnNum}Cmd`);
-                const cmdText = cmdDiv?.textContent?.trim() || '';
+                const cmdText = cmdDiv?.textContent?.trim();
 
                 if (cmdText) {
-
-                    let fullCmd = '';
-                    if (cmdText.startsWith('{') && cmdText.endsWith('}')) {
-                        fullCmd = cmdText;
-                    } else if (/^(set|get|attr|deleteattr)\b/i.test(cmdText)) {
-                        fullCmd = `{fhem("${cmdText}")}`;
-                    } else {
-                        fullCmd = `{fhem("set ${dev} ${cmdText}")}`;
-                    }
-
-                    FW_cmd(FW_root + '?cmd=' + encodeURIComponent(fullCmd) + '&XHR=1');
+                    // Roh weitergeben
+                    FW_cmd(FW_root + '?cmd=' + encodeURIComponent(cmdText) + '&XHR=1');
                     handled = true;
-                } else {
-                    console.log(`   ? No command in btn${btnNum}Cmd`);
                 }
             }
         });
