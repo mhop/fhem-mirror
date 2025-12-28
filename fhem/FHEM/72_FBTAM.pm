@@ -41,7 +41,7 @@ use HTML::Entities;
 use URI::Escape;
 use LWP::UserAgent;
 
-my $fbtam_version = "1.1";
+my $fbtam_version = "1.2";
 
 #########################################################################################
 #
@@ -1253,10 +1253,15 @@ EOFC
        </ul>         
     <a name="FBTAMattr"></a>
     <h4>Attributes</h4>
-    <ul>
+    <ul>  
+       <li><a name="fbtam_mp3fun"><code>attr &lt;name&gt; Wav2MP3Fun
+         &lt;string&gt;</code></a>
+            <br />Perl code (not FHEM code !!) to be executed to transcode a WAV file into an MP3 file.
+        	Replacements are made for the string METADATA=metadata of the message as well as for INPUT and OUTPUT for the files of the recorded message
+        	<br>Example: <code>system('ffmpeg -y -i INPUT -metadata title=\"METADATA\" OUTPUT')</code></li>
        <li><a name="fbtam_mailfun"><code>attr &lt;name&gt; MailFun 
                 &lt;string&gt;</code></a>
-            <br />FHEM code to be exceuted when a message is send by messenger. 
+            <br />Perl code (not FHEM code !!) to be executed when a message is send by messenger. 
             Replacements are made for the strings REC=receiver of the message, META=metadata of the message and FILE=filename of the recorded message</li>
        <li><a name="fbtam_mailreclist"><code>attr &lt;name&gt; MailRecList
                 &lt;string&gt;</code></a>
@@ -1266,7 +1271,7 @@ EOFC
             <br />Type of the messenger to appear in the send button, e.g. "Telegram";</li>
        <li><a name="fbtam_msgrfun"><code>attr &lt;name&gt; MsgrFun 
                 &lt;string&gt;</code></a>
-            <br />FHEM code to be exceuted when a message is send by messenger. 
+            <br />Perl code (not FHEM code !!) to be executed when a message is send by messenger. 
             Replacements are made for the strings REC=receiver of the message, META=metadata of the message and FILE=filename of the recorded message</li>
        <li><a name="fbtam_msgrreclist"><code>attr &lt;name&gt; MsgrRecList
                 &lt;string&gt;</code></a>
@@ -1276,7 +1281,6 @@ EOFC
             <br />target directory at the FHEM server for dowloaded messages</li> 
     </ul>
 </ul>
-
 =end html
 
 =begin html_DE
