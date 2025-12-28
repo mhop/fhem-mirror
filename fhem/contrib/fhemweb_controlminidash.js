@@ -1,4 +1,4 @@
-FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.3.4 schwatter $";
+FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.3.5 schwatter $";
 FW_widgets['controlminidash'] = { createFn: controlMiniDashCreate };
 
 function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -252,7 +252,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
     };
 
 
-    let gradientColors = ["purple","blue","green","yellow","orange"]; // Default
+    let gradientColors = ["#FF10F0","#00FFFF","#39FF14","#CFFF04","#FF3131"]; // Default
 
     FW_queryValue(`{AttrVal("${dev}","knobColor","")}`, {
         setValueFn: val => { if(val) gradientColors = val.split(",").map(s => s.trim()); }
