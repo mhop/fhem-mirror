@@ -84,7 +84,7 @@ my %ECOWITT_Items = (
     0x08 => {name => "Barometric_Absolutely",           size => 2, isSigned => 0, factor => 0.1, unit => "hpa"},
     0x09 => {name => "Barometric_Relative",             size => 2, isSigned => 0, factor => 0.1, unit => "hpa"},
     0x0A => {name => "Wind_Direction",                  size => 2, isSigned => 0, factor => 1, unit => "°"},
-    0x0B => {name => "Wind_Speed ",                     size => 2, isSigned => 0, factor => 0.1, unit => "m/s"},
+    0x0B => {name => "Wind_Speed",                      size => 2, isSigned => 0, factor => 0.1, unit => "m/s"},
     0x0C => {name => "Wind_Speed_Gust",                 size => 2, isSigned => 0, factor => 0.1, unit => "m/s"},
     0x0D => {name => "Rain_Event",                      size => 2, isSigned => 0, factor => 1, unit => "mm"},
     0x0E => {name => "Rain_Rate",                       size => 2, isSigned => 0, factor => 1, unit => "mm/h"},
@@ -289,6 +289,7 @@ sub ECOWITT_GW_Initialize {
     );
     $hash->{AttrList} =
         join(' ', values %attributeMap). " "   #add attributes from %attributeMap
+        . "maxAge "
         . $readingFnAttributes;
     return;
 }
@@ -808,11 +809,20 @@ sub ECOWITT_GW_FmtDateTime {
       $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
 }
 
+sub ECOWITT_readingsUpdate {
+  my ($device, $reading, $value) = @_;
+  my $name = $device->{NAME};
+  my $maxAgeInSeconds = AttrVal($name, "maxAge", 3600);
+  if((ReadingsAge($name, $reading, 0) > $maxAgeInSeconds) || ($value ne ReadingsVal($name, $reading, ""))) {
+    return readingsBulkUpdate($device, $reading, $value); } else {
+    return undef;   
+  }
+}
 
 # method to analyze the returned data and set the corresponding readings
 sub ECOWITT_GW_updateData {
     my ($hash, $cmd, @data) = @_;
-    my $name = $hash->{name} // return;
+    my $name = $hash->{NAME} // return;
 
     my $msg = sprintf("Received %s (0x%x). Unpacking data...",  $ECOWITT_cmdMap_reversed{$cmd}, $cmd);
     Log3($name, 5, "ECOWITT_GW: $msg"); 
@@ -921,9 +931,9 @@ sub ECOWITT_GW_updateData {
                 }
                 $msg = sprintf("Received %s (0x%02x) = %08.0x bat:%2.1f  recv:0x%x",  $ECOWITT_SensorID{$item}{name}, $item, $value, $batteryValue, $receiveValue);
                 Log3 $name, 4, "ECOWITT_GW: $msg";
-                readingsBulkUpdateIfChanged($hash, $ECOWITT_SensorID{$item}{name} . "_ID", sprintf("%x", $value) );
-                readingsBulkUpdateIfChanged($hash, $ECOWITT_SensorID{$item}{name} . "_Battery", sprintf("%2.1f", $batteryValue) );
-                readingsBulkUpdateIfChanged($hash, $ECOWITT_SensorID{$item}{name} . "_Signal", sprintf("%d", $receiveValue) );
+                ECOWITT_readingsUpdate($hash, $ECOWITT_SensorID{$item}{name} . "_ID", sprintf("%x", $value) );
+                ECOWITT_readingsUpdate($hash, $ECOWITT_SensorID{$item}{name} . "_Battery", sprintf("%2.1f", $batteryValue) );
+                ECOWITT_readingsUpdate($hash, $ECOWITT_SensorID{$item}{name} . "_Signal", sprintf("%d", $receiveValue) );
             } elsif ($value != 0xFFFFFFFF) {
                 $msg = sprintf("Received %s (0x%02x) never seen.", $ECOWITT_SensorID{$item}{name}, $item);
                 Log3 $name, 5, "ECOWITT_GW: $msg";
@@ -979,9 +989,9 @@ sub ECOWITT_GW_updateData {
 
                 $msg = sprintf("Received %s (0x%x) = " . $formatString . " %s", $ECOWITT_Items{$item}{name}, $item, $value, $unit);
                 Log3 $name, 4, "ECOWITT_GW: $msg";
-                readingsBulkUpdateIfChanged($hash, $ECOWITT_Items{$item}{name}, sprintf( $formatString, $value) );
+                ECOWITT_readingsUpdate($hash, $ECOWITT_Items{$item}{name}, sprintf( $formatString, $value) );
             } else {
-                readingsBulkUpdateIfChanged($hash, "Error_unknown ECOWITT_Item", "0x$item");
+                ECOWITT_readingsUpdate($hash, "Error_unknown ECOWITT_Item", "0x$item");
             }
 
         }
@@ -1026,7 +1036,7 @@ sub ECOWITT_GW_updateData {
                 if (!(($item == 0x87) || ($item == 0x88))){
                     $msg = sprintf("Received %s (0x%x) = %2.1f %s",  $ECOWITT_Items{$item}{name}, $item, $value, $unit);
                     Log3 $name, 4, "ECOWITT_GW: $msg";
-                    readingsBulkUpdateIfChanged($hash, $ECOWITT_Items{$item}{name}, sprintf("%2.1f", $value) );
+                    ECOWITT_readingsUpdate($hash, $ECOWITT_Items{$item}{name}, sprintf("%2.1f", $value) );
                 } elsif ($item == 0x88) {
                     $msg = sprintf("Received %s (0x%x) = 0x%08x",  $ECOWITT_Items{$item}{name}, $item, $value);
                     Log3 $name, 4, "ECOWITT_GW: $msg";
@@ -1043,9 +1053,9 @@ sub ECOWITT_GW_updateData {
                     my @resDay = ("Son", "Mon");
                     my @resMonth = ( "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez");
 
-                    readingsBulkUpdateIfChanged($hash, $ECOWITT_Items{$item}{name} . "_hour", sprintf("%02d", $resethour) );
-                    readingsBulkUpdateIfChanged($hash, $ECOWITT_Items{$item}{name} . "_day",  $resDay[$resetday] );
-                    readingsBulkUpdateIfChanged($hash, $ECOWITT_Items{$item}{name} . "_month", $resMonth[$resetmonth] );
+                    ECOWITT_readingsUpdate($hash, $ECOWITT_Items{$item}{name} . "_hour", sprintf("%02d", $resethour) );
+                    ECOWITT_readingsUpdate($hash, $ECOWITT_Items{$item}{name} . "_day",  $resDay[$resetday] );
+                    ECOWITT_readingsUpdate($hash, $ECOWITT_Items{$item}{name} . "_month", $resMonth[$resetmonth] );
                 }
             } else {
                 $msg = sprintf("ECOWITT_Items (0x%x) is unknown. Skipping complete package!", $item);
@@ -1134,14 +1144,18 @@ __END__
   <ul>
     <li><a id="ECOWITT_GW-attr-updateInterval"></a>
     <dt><code><b>updateInterval</b></code></dt>
-    Time in seconds when the next Update request is made.
+    Time in seconds when the next update request is made.
         Default: 60</li>
     <li><a id="ECOWITT_GW-attr-connectTimeout"></a>
     <dt><code><b>connectTimeout</b></code></dt>
     Timeout in seconds for a connection to the (W)LAN Gateway
-        if no response in connectTimeout seconds an repeated Connection request
+        if no response in connectTimeout seconds an repeated connection request
         is initiated (3 x times).<br>
         Default: 15</li>
+    <li>
+    <dt><code><b>maxAge</b></code></dt>
+    When a sensor value is received, the respective reading is updated if the sensor value has changed since 
+    it was received last or at least maxAge seconds have passed. Default: 3600 (one hour).</li>
   </ul>
 </ul>
 
@@ -1196,9 +1210,14 @@ __END__
     <li><a id="ECOWITT_GW-attr-connectTimeout"></a>
     <dt><code><b>connectTimeout</b></code></dt>
     setzt die Wartezeit in Sekunden für eine Verbindung zum (W)LAN Gateway -
-        wenn keine Antwort in <i>connectTimeout</i> Sekunden wird eine wiederholte Verbindungsanfrage
+        wenn keine Antwort in <i>connectTimeout</i> Sekunden empfangen wurde, wird eine wiederholte Verbindungsanfrage
         initiiert (3 x mal).<br>
         Standardwert: 15</li>
+    <li>
+    <dt><code><b>maxAge</b></code></dt>
+    Wenn ein Sensor-Wert empfangen wird, wird der entsprechende Anzeigewert aktualisiert, wenn sich der Sensor-Wert
+    seit dem letzten Empfang verändert hat, oder wenn wenigstens maxAge Sekunden vergangen sind. Vorgabe: 3600 (eine
+    Stunde).</li>
   </ul>
 </ul>
 
