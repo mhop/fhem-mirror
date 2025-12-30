@@ -174,6 +174,7 @@
 #           fix: do not format incoming values als float for set power ... etc.
 # 6.04.6    add: voltmeter for ShellyPlusUni
 # 6.04.7    add: shelly1LG3, shelly2LG3
+# 6.04.8    add: shelly power strip 4
 
 # to do     new: periods Month and Year for energymeter
 # to do     roller: get maxtime open/close from shelly gen1
@@ -198,7 +199,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.04.7 11.12.2025";
+my $version = "6.04.8 30.12.2025";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -356,6 +357,8 @@ my %shelly_vendor_ids = (
     ## Gen4 Devices
     "S4SW-001X16EU"   => ["shellyplus1",    "Shelly 1 Gen4",           0x1028],   # added 03/2025
     "S4SW-001P16EU"   => ["shellyplus1pm",  "Shelly 1PM Gen4",         0x1019],   # added 03/2025
+    "S4PL-00416EU"    => ["shellypstrip4", "Shelly Power Strip 4 Gen4",0x1851],   # added 12/2025   ADE7953
+    "S4PL-10416EU"    => ["shellypstrip4", "Shelly Power Strip 4 Gen4",0x1851],   # added 12/2025   BL0973
     ## Mini Gen4 Devices
     "S4SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen4",      0x1030],   # added 03/2025
     "S4SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1PM Mini Gen4",    0x1031],   # added 03/2025
@@ -412,7 +415,7 @@ my %shelly_category = (
      "DC" => "LED driver",
      "DM" => "dimmer",
      "EM" => "energy meter",
-     "PL" => "plug",
+     "PL" => "plug",     #  or power strip
      "PM" => "power meter",
      "SH" => "shutter",
      "SN" => "sensor",
@@ -467,6 +470,7 @@ my %shelly_models = (
     "shellyemG3"    => [1,0,0, 0,3,0,  2,0,0],    # similar to 'shellyproem50'
     "shelly3emG3"   => [0,0,0, 0,3,0,  3,0,2],    # similar to 'shellypro3em'
     #-- 4nd generation devices (Gen4)
+    "shellypstrip4" => [4,0,0, 4,4,0,  0,0,0],    # buttons?
     "shellyemmini"  => [0,0,0, 1,1,0,  0,0,0],    # similar to 'shellypmmini'    EM1 or PM1 ?
     #-- Android devices
     "walldisplay1"  => [1,0,0, 0,2,1,  0,0,0],     # similar to ShellyPlus1PM
