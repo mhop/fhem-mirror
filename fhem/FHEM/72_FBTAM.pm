@@ -41,7 +41,7 @@ use HTML::Entities;
 use URI::Escape;
 use LWP::UserAgent;
 
-my $fbtam_version = "1.2";
+my $fbtam_version = "1.3";
 
 #########################################################################################
 #
@@ -77,7 +77,7 @@ sub FBTAM_Initialize {
 sub FBTAM_Define {
   my ($hash, $def) = @_;
   my @args = split(/[ \t]+/, $def);
-  return "Usage: define <name> FBTAM <FritzBoxDevice> <TAM-Index 1-4>" unless(@args == 4);
+  return "Usage: define <name> FBTAM <FritzBoxDevice> <TAM-Nr 1-4>" unless(@args == 4);
 
   my ($name, $type, $fbDev, $tamNr) = @args;
 
@@ -268,15 +268,16 @@ sub FBTAM_Update {
 
   my $password = FBTAM_readpassword($hash);
   my $username = $hash->{USERNAME};
-  my $tam = $hash->{TAM};
+  #-- careful, tamIndex=tamNr-1
+  my $tamIndex = $hash->{TAM}-1;
 
   return unless $fbip && $username && $password;
 
   #-- read data from FB device
-  my $nameReading    = ReadingsVal($fbDev, "tam$tam", '?');
-  my $newMsgReading  = ReadingsVal($fbDev, "tam${tam}_newMsg", '0');
-  my $oldMsgReading  = ReadingsVal($fbDev, "tam${tam}_oldMsg", '0');
-  my $stateReading   = ReadingsVal($fbDev, "tam${tam}_state", '0');
+  my $nameReading    = ReadingsVal($fbDev, "tam${tamIndex}", '?');
+  my $newMsgReading  = ReadingsVal($fbDev, "tam${tamIndex}_newMsg", '0');
+  my $oldMsgReading  = ReadingsVal($fbDev, "tam${tamIndex}_oldMsg", '0');
+  my $stateReading   = ReadingsVal($fbDev, "tam${tamIndex}_state", '0');
 
   my $prevNew  = ReadingsVal($name, "tam_newMsg", "");
   my $prevOld  = ReadingsVal($name, "tam_oldMsg", "");
@@ -294,7 +295,6 @@ sub FBTAM_Update {
   }else{
     readingsSingleUpdate($hash, 'msg', 'Nachrichtenliste unverändert', 1);
   }
-  #-- obsolete $hash->{STATE}=FBTAM_renderMsgTable($hash);
 }
 
 #########################################################################################
@@ -415,6 +415,7 @@ sub FBTAM_getMsgListUrl {
   my $name  = $hash->{NAME};
   my $fbDev = $hash->{FBDev};
   my $fbip  = InternalVal($fbDev, 'HOST', undef);
+  #-- careful, tamIndex=tamNr-1
   my $tamIndex = $hash->{TAM}-1;
   
   my $password = FBTAM_readpassword($hash);
@@ -478,6 +479,7 @@ sub FBTAM_getMsgList {
   my $name  = $hash->{NAME};
   my $fbDev = $hash->{FBDev};
   my $fbip  = InternalVal($fbDev, 'HOST', undef);
+  #-- careful, tamIndex=tamNr-1
   my $tamIndex = $hash->{TAM}-1;
   
   my $listUrl = FBTAM_getMsgListUrl($hash);
@@ -796,6 +798,7 @@ sub FBTAM_downloadMsg {
   my $name  = $hash->{NAME};
   my $fbDev = $hash->{FBDev};
   my $fbip  = InternalVal($fbDev, 'HOST', undef);
+  #-- careful, tamIndex=tamNr-1
   my $tamNr = $hash->{TAM};
   my $sid   = $hash->{SID};
   
@@ -1188,7 +1191,7 @@ EOFC
   $req->header('Content-Type' => 'text/xml; charset="utf-8"');
   $req->header('SOAPAction' => "\"$soap_action\"");
   $req->content($soap_content);
-      
+ 
   my $res = $ua->request($req);
   if (!$res->is_success) {
     Log 1, "[FBTAM] $name: Error, GetInfo failed: " . $res->status_line;
@@ -1202,7 +1205,7 @@ EOFC
   #  #readingsSingleUpdate($hash, "msg", "Fehler beim Löschen (Index $dlIndex)", 1);
   #  return undef;
   #}
-  Log 1,"==============> $content";
+  Log 1,"[FBTAM_getinfo] $content";
 }
 
 1;
@@ -1223,9 +1226,10 @@ EOFC
     <a name="FBTAMdefine"></a>
     <h4>Define</h4>
     <p>
-        <code>define &lt;name&gt; FBTAM &lt;device name of FritzBox&gt; &lt;Internal number
+        <code>define &lt;name&gt; FBTAM &lt;device name of FritzBox&gt; &lt;number
             of TAM, 1..4&gt;</code>
         <br />Defines the FBTAM system. </p> Notes: <ul>
+        <li>The number of the TAM 1..4 must not be confused with the internal indexing 0..3, e.g. TAM 1 = tam0 etc.</li>
         <li>The module requires that the accompanying JavaScript file fbtam.js is stored in
             /opt/fhem/www/pgm2</li>
     </ul>
@@ -1257,8 +1261,8 @@ EOFC
        <li><a name="fbtam_mp3fun"><code>attr &lt;name&gt; Wav2MP3Fun
          &lt;string&gt;</code></a>
             <br />Perl code (not FHEM code !!) to be executed to transcode a WAV file into an MP3 file.
-        	Replacements are made for the string METADATA=metadata of the message as well as for INPUT and OUTPUT for the files of the recorded message
-        	<br>Example: <code>system('ffmpeg -y -i INPUT -metadata title=\"METADATA\" OUTPUT')</code></li>
+        	Replacements are made for the string META=metadata of the message as well as for INPUT and OUTPUT for the files of the recorded message
+        	<br>Example: <code>system('ffmpeg -y -i INPUT -metadata title="META" OUTPUT')</code></li>
        <li><a name="fbtam_mailfun"><code>attr &lt;name&gt; MailFun 
                 &lt;string&gt;</code></a>
             <br />Perl code (not FHEM code !!) to be executed when a message is send by messenger. 
