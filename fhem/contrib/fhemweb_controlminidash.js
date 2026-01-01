@@ -1,4 +1,4 @@
-FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.3.5 schwatter $";
+FW_version["fhemweb_controlminidash.js"] = "$Id: controlminidash.js 0.3.6 schwatter $";
 FW_widgets['controlminidash'] = { createFn: controlMiniDashCreate };
 
 function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -6,6 +6,12 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
 
     // --- Schutz: nur ein Widget pro Device ---
     if ($(`div.controlminidash_widget[informid="${dev}-state"]`).length) {
+        return null;
+    }
+
+    // --- Schutz gegen Dialog-Container ---
+    const parentDialog = $('#FW_okDialog').closest('.ui-dialog-content');
+    if (parentDialog.length) {
         return null;
     }
 
