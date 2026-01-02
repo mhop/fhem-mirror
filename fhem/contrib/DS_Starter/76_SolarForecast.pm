@@ -3094,7 +3094,9 @@ sub __resetAiData {
       
       my %ops = (
           '==' => sub { $_[0] == $_[1] },
+          '>'  => sub { $_[0] >  $_[1] },
           '>=' => sub { $_[0] >= $_[1] },
+          '<'  => sub { $_[0] <  $_[1] },
           '<=' => sub { $_[0] <= $_[1] },
      );
       
@@ -6443,13 +6445,14 @@ sub __getaiFannConState {            ## no critic "not used"
   $conr2  = sprintf "%0.2f", $conr2  if($conr2  ne '-');
   $bias   = sprintf "%0.0f", $bias   if($bias   ne '-');
   $slope  = sprintf "%0.1f", $slope  if($slope  ne '-');
+  $tgtmax = sprintf "%0.0f", $tgtmax if($tgtmax ne '-');
   
   my $pvpeak = sprintf "%0.0f", ($aspeak * AIASPEAKSFAC);
 
   my $head  = '<h4><b><u>Informationen zum neuronalen Netz der Verbrauchsvorhersage</b></u></h4>';
   
   my $model = '<b>=== Modellparameter ===</b>'."\n\n";
-  $model   .= "<b>Normierungsgrenzen:</b> PV=$pvpeak W, Hausverbrauch: Min=$tgtmin W / Max=$tgtmax W"."\n";
+  $model   .= "<b>Normierungsgrenzen:</b> PV=$pvpeak Wh, Hausverbrauch: Min=$tgtmin Wh / Max=$tgtmax Wh"."\n";
   $model   .= (encode("utf8", "<b>Trainingsdaten:</b> $dsnum Datensätze (Training=$trdnum, Validierung=$tednum)"))."\n";
   $model   .= "<b>Architektur:</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum"."\n";
   $model   .= "<b>Hyperparameter:</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=0.35"."\n";
@@ -21836,17 +21839,11 @@ sub aiFannCreateConTrainData {
   
   # Min-Max Normierung für Zielwert(e)
   ######################################
-  my @flat_targets  = map { $_->[0] } @targets;                                             # flaches Array mit allen Zielwerten in zeitlicher Reihenfolge
-  
-  # den Max-Wert im Zielarray ermitteln
-  my $targminval = 0;                                                                       # (De)Normalisierung -> Targetgrenze min 
-  my $data_max   = max (@flat_targets); 
-  my $safety     = 1.3;                                                                     # 30% Sicherheitsaufschlag
-  my $targmaxval = $data_max * $safety;
-
-  my $norm_ref   = _aiFannNormAsymFixRange (\@flat_targets, $targminval, $targmaxval);
-  #my ($norm_ref, $targminval, $targmaxval) = _aiFannNormalizeMinMax (\@flat_targets);
-  my @targets_norm = map { [$_] } @$norm_ref;                                               # norm_ref ist ein Arrayref von Zahlenwerten
+  my @flat_targets  = map { $_->[0] } @targets;                                                             # flaches Array mit allen Zielwerten in zeitlicher Reihenfolge
+   
+  my ($targminval, $targmaxval) = _aiFannPercentileBasedLimits ($name, \@flat_targets, $debug);             # Min/Max-Grenzen berechnen
+  my $norm_ref                  = _aiFannNormAsymFixRange (\@flat_targets, $targminval, $targmaxval);
+  my @targets_norm              = map { [$_] } @$norm_ref;                                                  # norm_ref ist ein Arrayref von Zahlenwerten
    
   # Lag Normierungen erstellen
   ##############################
@@ -22017,6 +22014,46 @@ sub aiFannCreateConTrainData {
   $serial = aiFannTrainstartAndRetry ($paref);
 
 return $serial;
+}
+
+################################################################
+#    Percentile-basierte Target-Normierungsgrenzen erstellen          
+################################################################
+sub _aiFannPercentileBasedLimits {            
+  my ($name, $tgref, $debug) = @_;  
+  
+  my @sorted = sort { $a <=> $b } @$tgref;
+
+  my $p    = 0.99;                                                                   # p99 bestimmen
+  my $idx  = int ($p * $#sorted);
+  my $pmax = $sorted[$idx];
+
+  my $safety     = 1.3;                                                              # 30% Sicherheitsaufschlag
+  my $targminval = 0;                                                                # (De)Normalisierung -> Targetgrenze min 
+  my $targmaxval = $pmax * $safety;
+
+  my @outliers = grep { $_ > $pmax } @$tgref;                                        # Ausreißer ermitteln (alles > Percentile)
+
+  if ($debug =~ /aiProcess/xs) {
+      Log3 ($name, 1, sprintf ("%s DEBUG> AI FANN - Target-Norm: raw_max=%0.0f, p99=%0.0f, targmaxval=%0.0f (safety=%0.1f)",
+                               $name, max (@$tgref), $pmax, $targmaxval, $safety
+                              ));
+
+      if (@outliers) {
+          my $olist = join (', ', @outliers);
+          
+          Log3 ($name, 1, sprintf ("%s DEBUG> AI FANN - Outliers above p99 (%0.0f): %s",
+                                   $name, $pmax, $olist
+                                  ));
+      }
+      else {
+          Log3 ($name, 1, sprintf ("%s DEBUG> AI FANN - No outliers above p99 (%0.0f)",
+                                   $name, $pmax
+                                  ));
+      }
+  }
+  
+return ($targminval, $targmaxval);
 }
 
 ################################################################
@@ -22555,9 +22592,8 @@ sub aiFannTrain {
   #############################################################
   my @val_history;
   
-  # Guard
-  my $since_improve  = 0;
-  my $snapshot_saved = 0;
+  # Snapshot-Guard
+  my $since_improve = 0;
 
   # Guard: Snapshot-Statistik
   my $snap_metric_count   = 0;
@@ -22567,6 +22603,8 @@ sub aiFannTrain {
   my $snap_metric_last    = 0;
   my $snap_bit_last       = 0;
   my $snap_tradeoff_last  = 0;
+  
+  my $snapshot_saved_overall = 0;
   
   my $train_data = AI::FANN::TrainData->new (@train_pairs);                                                 # Trainingsdatenobjekt bauen
   $train_data->shuffle() if($shuffle_mode == 1);
@@ -22613,79 +22651,79 @@ sub aiFannTrain {
           && $num_epoch_between_statmsg 
           && $epoch % $num_epoch_between_statmsg == 0) {                                                    # Logging alle X Epochen
           Log3 ($name, 1, sprintf "%s DEBUG> Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d", 
-                          $name, $epoch, $best_train_mse, $mse_val, $mae_val, $medae_val, $bit_fail_val);
+                          $name, $epoch, $mse_train, $mse_val, $mae_val, $medae_val, $bit_fail_val);
       }
       
-      # Snapshot-Guard: speichern bei Verbesserung in MSE, MAE oder MedAE 
-      #####################################################################
-      my $mae_tolerance   = $best_val_mae   * 0.05;                                              # 5% Verschlechterung erlaubt
-      my $medae_tolerance = $best_val_medae * 0.05;   
-      my $bitfail_gain    = 1;                                                                   # mindestens 2 BitFails besser
-      
-      if (  # Zweig 1: echte metrische Verbesserung (alle Fehlermaße besser)
-            ($mse_val     < $best_val_mse - 1e-6   && 
-            $mae_val      < $best_val_mae - 1e-6   && 
-            $medae_val    < $best_val_medae - 1e-6 &&
-            $bit_fail_val <= $best_bit_fail        &&       
-            $mse_val      < $model_save_threshold
-            ) 
-            ||
-            # Zweig 2: BitFail-Verbesserung (Fehlermaße gleich gut, BitFail besser)
-            ($mse_val     <= $best_val_mse   &&
-             $mae_val     <= $best_val_mae   &&
-             $medae_val   <= $best_val_medae &&
-             $bit_fail_val < $best_bit_fail  &&
-             $mse_val      < $model_save_threshold
-            )
-            ||
-            # Zweig 3: Trade-off – BitFail deutlich besser, MAE/MedAE dürfen leicht schlechter sein
-            ($bit_fail_val <= $best_bit_fail - $bitfail_gain     &&
-             $mse_val      <= $best_val_mse + 1e-6               &&
-             $mae_val      <= $best_val_mae + $mae_tolerance     &&
-             $medae_val    <= $best_val_medae + $medae_tolerance &&
-             $mse_val      < $model_save_threshold
-            )
-         )       
-         {                                                        # durch Toleranz 1e-6 -> nur echte Verbesserungen werden gespeichert
-          my $reason;
+      # Snapshot-Guard: Verbesserung in MSE, MAE oder MedAE
+      #####################################################
+      my $mae_tolerance   = $best_val_mae   * 0.05;
+      my $medae_tolerance = $best_val_medae * 0.05;
+      my $bitfail_gain    = 1;
 
-          if ($bit_fail_val < $best_bit_fail) {
-              $reason = 'bit improved';
-              $snap_bit_count++;
-              $snap_bit_last = $epoch;
-          }
-          elsif ($bit_fail_val <= $best_bit_fail - $bitfail_gain) {
-              $reason = 'bit tradeoff';
-              $snap_tradeoff_count++;
-              $snap_tradeoff_last = $epoch;
-          }
-          else {
-              $reason = 'metric improved';
-              $snap_metric_count++;
-              $snap_metric_last = $epoch;
-          }                      
-          
-          $best_val_mse     = $mse_val;                                                      # normalisiert FANN-interner Validierungsfehler
-          $best_val_mae     = $mae_val; 
-          $best_val_medae   = $medae_val; 
-          $best_train_mse   = $mse_train;                                                    # normalisiert FANN-interner Trainingsfehler
-          $best_train_epoch = $epoch;
-          $best_bit_fail    = $bit_fail_val;      
-          $since_improve    = 0;
-          
-          $ann->save ($snapshot);                                                            # Snapshot speichern, wenn besser
+      my $reason         = '';
+      my $improved       = 0;
+      my $good_enough    = 0;                                                   # unterhalb model_save_threshold 
+      my $snapshot_saved = 0;                                                   # pro Epoche zurücksetzen
+
+      # Zweig 1: echte metrische Verbesserung
+      if ($mse_val         <  $best_val_mse - 1e-6
+          && $mae_val      <  $best_val_mae - 1e-6
+          && $medae_val    <  $best_val_medae - 1e-6
+          && $bit_fail_val <= $best_bit_fail) {
+
+          $reason           = 'metric improved';
+          $snap_metric_last = $epoch;
+          $improved         = 1;
+          $snap_metric_count++;
+      }
+      # Zweig 2: BitFail-Verbesserung
+      elsif ($mse_val         <= $best_val_mse
+             && $mae_val      <= $best_val_mae
+             && $medae_val    <= $best_val_medae
+             && $bit_fail_val <  $best_bit_fail) {
+
+          $reason        = 'bit improved';
+          $snap_bit_last = $epoch;
+          $improved      = 1;
+          $snap_bit_count++;
+      }
+      # Zweig 3: Trade-off
+      elsif ($bit_fail_val <= $best_bit_fail - $bitfail_gain
+             && $mse_val   <= $best_val_mse + 1e-6
+             && $mae_val   <= $best_val_mae   + $mae_tolerance
+             && $medae_val <= $best_val_medae + $medae_tolerance) {
+
+          $reason             = 'bit tradeoff';
+          $snap_tradeoff_last = $epoch;
+          $improved           = 1;
+          $snap_tradeoff_count++;
+      }
+
+      if ($improved) {
+          $best_val_mse           = $mse_val;
+          $best_val_mae           = $mae_val;
+          $best_val_medae         = $medae_val;
+          $best_train_mse         = $mse_train;
+          $best_train_epoch       = $epoch;
+          $best_bit_fail          = $bit_fail_val;
+          $snapshot_saved_overall = 1;
+          $since_improve          = 0;
+
+          $ann->save ($snapshot);                                          # bestes Modell IMMER speichern
           $snapshot_saved = 1;
           
-          if ($debug =~ /aiProcess/xs) {              
-              Log3 ($name, 1,
-                    sprintf "%s DEBUG> Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d -> Snap saved (%s)",
-                    $name, $best_train_epoch, $best_train_mse, $best_val_mse, $best_val_mae, $best_val_medae, $best_bit_fail, $reason
+          $good_enough = ($mse_val < $model_save_threshold) ? 1 : 0;       # Bewertung: ist es "gut genug"?
+
+          if ($debug =~ /aiProcess/xs) {
+              Log3 ($name, 1, sprintf "%s DEBUG> Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d -> Snap %s %s",
+                                      $name, $best_train_epoch, $best_train_mse, $best_val_mse, $best_val_mae, $best_val_medae, $best_bit_fail,
+                                      $reason, ($good_enough ? '-> good' : '')
                    );
           }
-      } 
+      }
       else {
           $since_improve++;
-      }   
+      }  
       
       # Early Stopping
       ##################
@@ -22716,8 +22754,8 @@ sub aiFannTrain {
   
   # Fallback nach Trainingsloop
   ###############################
-  unless ($snapshot_saved) {
-      Log3 ($name, 1, "$name - WARNING - AI FANN Training has no snapshot with Val-MSE < 0.01 generated – saved last model as fallback");
+  unless ($snapshot_saved_overall) {
+      Log3 ($name, 1, "$name - WARNING - AI FANN Training has no snapshot generated – saved last model as fallback");
       
       $ann->save ($snapshot);
   }
@@ -22799,11 +22837,12 @@ sub aiFannTrain {
   
   my $r2 = 1 - ($ss_res / ($ss_tot || 1));                                                  # R² auf Originalskala
   
-  # Zielgrößen relative RMSE + Textbewertung
-  #############################################
+  # Zielgrößen relative RMSE / weighted RMSE / + Textbewertung
+  ##############################################################
+  # relative RMSE 
   my @targets_wh    = map { _aiFannDenormMinMaxValue ($_->[0], $minval, $maxval) } @test_targets;
   my $target_median = medianArray (\@targets_wh); 
-  my $rmse_rel      = sprintf "%0.0f", (($rmse / $target_median) * 100);                              # relative RMSE in %
+  my $rmse_rel      = sprintf "%0.0f", (($rmse / $target_median) * 100);                    # relative RMSE in %
   
   my $rmse_rating;
   if    ($rmse_rel < 5)  { $rmse_rating = "excellent"; }
@@ -22811,6 +22850,34 @@ sub aiFannTrain {
   elsif ($rmse_rel < 20) { $rmse_rating = "acceptable"; }
   elsif ($rmse_rel < 35) { $rmse_rating = "weak"; }
   else                   { $rmse_rating = "very bad"; }
+  
+  # weighted RMSE
+  my @weighted_sq;
+  my @weights;
+  my $clip = 2 * $mae;                                                                      # Clipping-Schwelle basierend auf MAE, Huber-artig, robust
+
+  for my $i (0 .. $#abs_errors) {
+      my $abs = $abs_errors[$i];
+
+      my $err_clipped = $abs > $clip ? $clip : $abs;                                        # Clipping
+
+      my $target_norm = $test_targets[$i]->[0];
+      my $target      = _aiFannDenormMinMaxValue ($target_norm, $minval, $maxval);          # Zielwert denormalisieren
+
+      my $w = ($target > 0) ? ($target / $maxval) : 0.1;                                    # Gewichtung nach Zielwertgröße
+
+      push @weights,     $w;
+      push @weighted_sq, $w * ($err_clipped ** 2);
+  }
+
+  my $weighted_rmse     = sqrt( (sum(@weighted_sq)) / (sum(@weights) || 1) );
+  my $weighted_rmse_rel = sprintf "%.0f", (($weighted_rmse / $target_median) * 100);
+
+  my $weighted_rmse_rating =  $weighted_rmse_rel < 5  ? "excellent"
+                            : $weighted_rmse_rel < 10 ? "good"
+                            : $weighted_rmse_rel < 20 ? "acceptable"
+                            : $weighted_rmse_rel < 35 ? "weak"
+                            :                           "very bad";
 
   # Bester Snapshot ->  Modell-Slope und Modell-Bias auf denormalisierten Werten
   #################################################################################
@@ -22887,16 +22954,16 @@ sub aiFannTrain {
                                                    mse_val        => $mse_val, 
                                                    bitfail        => $bitfail, 
                                                    valstd         => $val_std, 
-                                                   valmean        => $val_mean,
-                                                   rmse           => $rmse, 
+                                                   valmean        => $val_mean, 
                                                    mae            => $mae,
                                                    abserref       => \@abs_errors, 
                                                    mean_error     => $mean_error,
                                                    test_input_num => scalar (@test_inputs),
                                                    slope          => $model_slope,
                                                    bias           => $model_bias,
-                                                   r2             => $r2,   
-                                                   rmse_rel       => $rmse_rel,                                                   
+                                                   r2             => $r2,
+                                                   rmse           => $weighted_rmse,                                                   
+                                                   rmse_rel       => $weighted_rmse_rel,                                                   
                                                    debug          => $debug 
                                                  } 
                                                );
@@ -22950,9 +23017,9 @@ sub aiFannTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{TrainEpoches}   = $best_train_epoch;
   $data{$name}{$fanntyp.'temp'}{$attempt}{Mae}            = $mae; 
   $data{$name}{$fanntyp.'temp'}{$attempt}{Medae}          = $medae;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{Rmse}           = $rmse;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{RmseRel}        = $rmse_rel; 
-  $data{$name}{$fanntyp.'temp'}{$attempt}{RmseRating}     = $rmse_rating;  
+  $data{$name}{$fanntyp.'temp'}{$attempt}{Rmse}           = $weighted_rmse;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{RmseRel}        = $weighted_rmse_rel; 
+  $data{$name}{$fanntyp.'temp'}{$attempt}{RmseRating}     = $weighted_rmse_rating;  
   $data{$name}{$fanntyp.'temp'}{$attempt}{Mape}           = $mape; 
   $data{$name}{$fanntyp.'temp'}{$attempt}{Mdape}          = $mdape; 
   $data{$name}{$fanntyp.'temp'}{$attempt}{R2}             = $r2;
@@ -22980,9 +23047,9 @@ sub aiFannTrain {
               $fanntyp.'NNR2'                => $r2,
               $fanntyp.'NNModelSlope'        => $model_slope,
               $fanntyp.'NNModelBias'         => $model_bias,
-              $fanntyp.'NNRmse'              => $rmse,
-              $fanntyp.'NNRmseRel'           => $rmse_rel,
-              $fanntyp.'NNRmseRating'        => $rmse_rating,
+              $fanntyp.'NNRmse'              => $weighted_rmse,
+              $fanntyp.'NNRmseRel'           => $weighted_rmse_rel,
+              $fanntyp.'NNRmseRating'        => $weighted_rmse_rating,
               $fanntyp.'NNSeed'              => $seed,
               $fanntyp.'NNBestValMse'        => $mse_val,
               $fanntyp.'NNBestValMae'        => $mae,     
