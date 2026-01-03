@@ -1,6 +1,6 @@
 //########################################################################################
 // fbtam.js
-// Version 0.2
+// Version 1.0
 // See 72_FBTAM for licensing
 //########################################################################################
 //# Prof. Dr. Peter A. Henning
@@ -22,7 +22,7 @@ if (csrfToken == null) {
 //------------------------------------------------------------------------------------------------------
 
 function callTAMAction(action, device, index) {
-    let url = "/fhem?XHR=1&cmd=set%20" + device + "%20" + action + "%20" + index;
+    let url = "/fhem?XHR=1&cmd=set%20" + device + "%20" + action + "%20" + index + "&fwcsrf=" + csrfToken;
     fetch(url).then(response => response.text()).then(result => {
         console.log('FBTAM action:', result);
     }). catch (error => {

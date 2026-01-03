@@ -41,7 +41,7 @@ use HTML::Entities;
 use URI::Escape;
 use LWP::UserAgent;
 
-my $fbtam_version = "1.3";
+my $fbtam_version = "1.4";
 
 #########################################################################################
 #
@@ -58,7 +58,7 @@ sub FBTAM_Initialize {
   $hash->{UndefFn}  = \&FBTAM_Undef;
   $hash->{SetFn}    = \&FBTAM_Set;
   $hash->{AttrFn}   = \&FBTAM_Attr;
-  $hash->{AttrList} = "interval targetdir username TTSFun TTSDev MsgrType MsgrFun MsgrRecList MailFun MailRecList Wav2MP3Fun";
+  $hash->{AttrList} = "interval targetdir username TTSFun TTSDev MsgrType MsgrFun MsgrRecList MailFun MailRecList Wav2MP3Fun $readingFnAttributes";
   
    $hash->{FW_summaryFn}       = \&FBTAM_FW_Detail;
    $hash->{FW_detailFn}        = \&FBTAM_FW_Detail;
@@ -87,19 +87,11 @@ sub FBTAM_Define {
   $hash->{FBDev}     = $fbDev;
   #-- careful, tamIndex=tamNr-1
   $hash->{TAM}       = $tamNr;
-  $hash->{INTERVAL}  = AttrVal($name, 'interval', 60);
   
   #-- credentials
   my $savedUser = AttrVal($name, "username", undef);
   $hash->{USERNAME} = $savedUser if defined $savedUser;
-  #my $pwKey = AttrVal($name, "passwordKey", undef);
-  #if ($pwKey) {
-  #  $hash->{PASSWORD_KEY} = $pwKey;
-  #  my $pw = getKeyValue($pwKey);
-  #  $hash->{PASSWORD} = $pw if defined $pw;
-  #}
   $hash->{STATE}     = 'Initialized';
-
   $modules{FBTAM}{defptr}{$name} = $hash;
 
   InternalTimer(gettimeofday()+5, "FBTAM_Update", $hash, 0);
@@ -257,7 +249,7 @@ sub FBTAM_Update {
   my $name = $hash->{NAME};
 
   RemoveInternalTimer($hash);
-  my $next = gettimeofday() + ($hash->{INTERVAL} || 60);
+  my $next = gettimeofday() + AttrVal($name, 'interval', 60);
   InternalTimer($next, "FBTAM_Update", $hash, 0);
 
   my $fbDev = $hash->{FBDev};
@@ -274,13 +266,14 @@ sub FBTAM_Update {
   return unless $fbip && $username && $password;
 
   #-- read data from FB device
+  #   careful: 
   my $nameReading    = ReadingsVal($fbDev, "tam${tamIndex}", '?');
   my $newMsgReading  = ReadingsVal($fbDev, "tam${tamIndex}_newMsg", '0');
   my $oldMsgReading  = ReadingsVal($fbDev, "tam${tamIndex}_oldMsg", '0');
   my $stateReading   = ReadingsVal($fbDev, "tam${tamIndex}_state", '0');
 
-  my $prevNew  = ReadingsVal($name, "tam_newMsg", "");
-  my $prevOld  = ReadingsVal($name, "tam_oldMsg", "");
+  my $prevNew   = ReadingsVal($name, "tam_newMsg", "");
+  my $prevOld   = ReadingsVal($name, "tam_oldMsg", "");
   my $prevState = ReadingsVal($name, "tam_state", "");
 
   readingsBeginUpdate($hash);
@@ -916,6 +909,7 @@ sub FBTAM_downloadMsg {
     #-- mark as read
     FBTAM_markMsg($hash,$dlIndex,1);
     
+    #-- TODO !!
     #-- change into MP3 if function is defined, otherwise delete existing file
     my $cmd = AttrVal($name,"Wav2MP3Fun",undef);
     my $target2    = "$targetdir/fbtam${tamNr}_msg${dlIndex}.mp3"; 
