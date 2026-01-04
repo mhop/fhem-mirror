@@ -1,4 +1,4 @@
-FW_version["fhemweb_iconAnimated.js"] = "$Id: fhemweb_iconAnimated.js 0.8.2 schwatter $";
+FW_version["fhemweb_iconAnimated.js"] = "$Id: fhemweb_iconAnimated.js 0.8.3 schwatter $";
 FW_widgets['iconAnimated'] = { createFn: iconAnimatedCreate };
 
 function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -6,6 +6,12 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
     const dev = devName || 'unknown';
     const tr  = $(`tr.devname_${dev}`);
     if (!tr.length) return null;
+
+    // --- Schutz gegen Dialog-Container ---
+    const parentDialog = $('#FW_okDialog').closest('.ui-dialog-content');
+    if (parentDialog.length) {
+        return null;
+    }
 
     const col1 = tr.find('td:first-child .col1 a');
     if (!col1.length) return null;
