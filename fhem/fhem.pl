@@ -1393,6 +1393,13 @@ CommandInclude($$)
   my @ret;
   my $oldcfgfile;
 
+  if($arg =~ m/[*?]/) { # 143339
+    my @fileList = glob($arg);
+    return "$arg: no match" if(!@fileList);
+    map { my $r = CommandInclude($cl, $_); push(@ret, $r) if($r) } @fileList;
+    return @ret ? join("\n", @ret) : undef;
+  }
+
   my $type = ($unicodeEncoding ? "< :encoding(UTF-8)" : "<");
   if(!open($fh, $type, $arg)) {
     return "Can't open $arg: $!";
