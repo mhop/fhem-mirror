@@ -174,7 +174,7 @@ sub CommandDeleteReading($$);
 sub CommandDisplayAttr($$);
 sub CommandGet($$);
 sub CommandIOWrite($$);
-sub CommandInclude($$);
+sub CommandInclude($$;$);
 sub CommandList($$);
 sub CommandModify($$);
 sub CommandQuit($$);
@@ -1386,17 +1386,24 @@ devspec2array($;$$)
 
 #####################################
 sub
-CommandInclude($$)
+CommandInclude($$;$)
 {
-  my ($cl, $arg) = @_;
+  my ($cl, $arg, $skipComment) = @_;
   my $fh;
   my @ret;
   my $oldcfgfile;
 
+  my @t = localtime(gettimeofday());
+  my $gcfg = ResolveDateWildcards(AttrVal("global", "configfile", ""), @t);
+  my $stf  = ResolveDateWildcards(AttrVal("global", "statefile",  ""), @t);
+
   if($arg =~ m/[*?]/) { # 143339
     my @fileList = glob($arg);
     return "$arg: no match" if(!@fileList);
-    map { my $r = CommandInclude($cl, $_); push(@ret, $r) if($r) } @fileList;
+    my $nr = $devcount++;
+    $comments{$nr}{TEXT} = "include $arg";
+    $comments{$nr}{CFGFN} = $currcfgfile if($currcfgfile ne $gcfg);
+    map { my $r = CommandInclude($cl, $_, 1); push(@ret, $r) if($r) } @fileList;
     return @ret ? join("\n", @ret) : undef;
   }
 
@@ -1406,10 +1413,7 @@ CommandInclude($$)
   }
   
   Log 1, "Including $arg";
-  my @t = localtime(gettimeofday());
-  my $gcfg = ResolveDateWildcards(AttrVal("global", "configfile", ""), @t);
-  my $stf  = ResolveDateWildcards(AttrVal("global", "statefile",  ""), @t);
-  if(!$init_done && $arg ne $stf && $arg ne $gcfg) {
+  if(!$init_done && $arg ne $stf && $arg ne $gcfg && !$skipComment) {
     my $nr =  $devcount++;
     $comments{$nr}{TEXT} = "include $arg";
     $comments{$nr}{CFGFN} = $currcfgfile if($currcfgfile ne $gcfg);
