@@ -1400,9 +1400,11 @@ CommandInclude($$;$)
   if($arg =~ m/[*?]/) { # 143339
     my @fileList = glob($arg);
     return "$arg: no match" if(!@fileList);
-    my $nr = $devcount++;
-    $comments{$nr}{TEXT} = "include $arg";
-    $comments{$nr}{CFGFN} = $currcfgfile if($currcfgfile ne $gcfg);
+    if(!$init_done) {
+      my $nr = $devcount++;
+      $comments{$nr}{TEXT} = "include $arg";
+      $comments{$nr}{CFGFN} = $currcfgfile if($currcfgfile ne $gcfg);
+    }
     map { my $r = CommandInclude($cl, $_, 1); push(@ret, $r) if($r) } @fileList;
     return @ret ? join("\n", @ret) : undef;
   }
