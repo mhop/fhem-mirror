@@ -23624,9 +23624,9 @@ sub _aiFannRetrainIndicator {
               - 0.15 *  (abs ($model_bias) / ($mae || 1) * 100)
               - 0.2  *  (abs ($model_slope - 1) * 100)
               - 10   *  $bitfail_rate
-              - 5    *  (1 - $r2);
+              - 5    *  (1 - $r2)
               - 0.1  *  ($p95_error / ($mae || 1) * 100)
-              - 0.05 * ($p99_error / ($mae || 1) * 100);
+              - 0.05 *  ($p99_error / ($mae || 1) * 100);
                 
   $score = 0   if $score < 0;
   $score = 100 if $score > 100;
