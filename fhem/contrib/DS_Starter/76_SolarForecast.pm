@@ -1025,6 +1025,10 @@ my %hqtxt = (                                                                # H
               DE => qq{letztes Training des neuronalen Netzes Verbrauchsprognose:}                                          },
   ailgrt => { EN => qq{last AI result generation time:},
               DE => qq{letzte KI-Ergebnis Generierungsdauer:}                                                               },
+  vbnrhp => { EN => qq{Consumer number Heat pump},
+              DE => qq{Verbrauchernummer W&auml;rmepumpe}                                                                   },
+  feregv => { EN => qq{activated registry version},
+              DE => qq{aktivierte Registry Version}                                                                         }, 
   nnlgrt => { EN => qq{last generation time for a consumption forecast:},
               DE => qq{letzte Generierungsdauer einer Verbrauchsprognose:}                                                  },
   aitris => { EN => qq{Runtime in seconds:},
@@ -6642,8 +6646,8 @@ sub __getaiFannConState {            ## no critic "not used"
   $ars     = '<b>'.$hqtxt{airest}{$lang}.'</b> '.$ars;
   $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
   $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
-  $hpinst  = '<b>'.(encode('utf8', 'Verbrauchernummer Wärmepumpe')).': </b> '.$hpinst;
-  $frv     = '<b>'.'verwendete Registry Version'.': </b> '.$frv; 
+  $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;       
+  $frv     = '<b>'.$hqtxt{feregv}{$lang}.': </b> '.$frv;               
   
   
   my $note  = (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";;
@@ -23618,16 +23622,16 @@ sub _aiFannRetrainIndicator {
   my $lim_bitfail        = 5;                   # Sehr gut. BitFail ist ein harter Indikator für grobe Fehler.
   my $lim_bitfail_rate   = 0.10;
   
-  # --- Forecast Quality Score (0–100) + Ampel ---
+  # --- Forecast Quality Score (0–100) + Ampel ---              
   my $score = 100
-              - 0.5  *  $rmse_rel
-              - 0.15 *  (abs ($model_bias) / ($mae || 1) * 100)
-              - 0.2  *  (abs ($model_slope - 1) * 100)
-              - 10   *  $bitfail_rate
-              - 5    *  (1 - $r2)
-              - 0.1  *  ($p95_error / ($mae || 1) * 100)
-              - 0.05 *  ($p99_error / ($mae || 1) * 100);
-                
+              - 0.5  * $rmse_rel
+              - 5    * abs($model_bias) / ($mae || 1)    
+              - 10   * abs($model_slope - 1)            
+              - 10   * $bitfail_rate
+              - 5    * (1 - $r2)
+              - 2    * ($p95_error / ($mae || 1))       
+              - 1    * ($p99_error / ($mae || 1));   
+        
   $score = 0   if $score < 0;
   $score = 100 if $score > 100;
   $score = sprintf "%.0f", $score;
@@ -31637,6 +31641,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>dryer</b>          - Consumer is a tumble dryer                                                                                                </td></tr>
             <tr><td>                       </td><td><b>washingmachine</b> - Consumer is a washing machine                                                                                             </td></tr>
             <tr><td>                       </td><td><b>heater</b>         - Consumer is a heating rod                                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>heatpump</b>       - Consumer is a heat pump. (*)                                                                                              </td></tr>
             <tr><td>                       </td><td><b>charger</b>        - Consumer is a charging device (battery, car, bicycle, etc.)                                                               </td></tr>
             <tr><td>                       </td><td><b>other</b>          - Consumer is none of the above types                                                                                       </td></tr>
             <tr><td>                       </td><td><b>noSchedule</b>     - there is no scheduling or automatic switching for the consumer.                                                           </td></tr>
@@ -31784,6 +31789,27 @@ to ensure that the system configuration is correct.
          </table>
          </ul>
        <br>
+
+       (*) Special features must be taken into account for consumer type <b>heatpump</b>: 
+       <br>
+       <br>
+       
+         <ul>
+         <table>
+         <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+            <tr><td> <b>power</b>          </td><td>Maximum power consumption of the heat pump in W. The value must not be 0.                                                                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Reading: Unit (W/kW) indicating current energy consumption. This information is mandatory.                                                         </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>Reading: Unit (Wh/kWh) of the consumer device that provides the total amount of energy consumed. This information is mandatory.                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Reading: Unit (W/kW) that provides the current energy consumption. This information is mandatory.                                                  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>comforttemp</b>    </td><td>Target temperature (comfort temperature) in living spaces in °C. This information is mandatory.                                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+         </table>
+         </ul>
+       <br>      
 
        <ul>
          <b>Examples: </b> <br>
@@ -34526,6 +34552,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>dryer</b>          - Verbraucher ist ein Wäschetrockner                                                                                         </td></tr>
             <tr><td>                       </td><td><b>washingmachine</b> - Verbraucher ist eine Waschmaschine                                                                                         </td></tr>
             <tr><td>                       </td><td><b>heater</b>         - Verbraucher ist ein Heizstab                                                                                               </td></tr>
+            <tr><td>                       </td><td><b>heatpump</b>       - Verbraucher ist eine Wärmepumpe (*)                                                                                        </td></tr>
             <tr><td>                       </td><td><b>charger</b>        - Verbraucher ist eine Ladeeinrichtung (Akku, Auto, Fahrrad, etc.)                                                           </td></tr>
             <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                              </td></tr>
             <tr><td>                       </td><td><b>noSchedule</b>     - für den Verbraucher erfolgt keine Einplanung oder automatische Schaltung.                                                  </td></tr>
@@ -34673,6 +34700,27 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          </table>
          </ul>
        <br>
+       
+       (*) Für Verbrauchertyp <b>heatpump</b> sind Besonderheiten zu beachten: 
+       <br>
+       <br>
+       
+         <ul>
+         <table>
+         <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+            <tr><td> <b>power</b>          </td><td>maximale Leistungsaufnahme der Wärmepumpe in W. Der Wert darf nicht! 0 sein.                                                                       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch. Die Angabe ist verpflichtend.                                                       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert. Die Angabe ist verpflichtend.                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert. Die Angabe ist verpflichtend.                                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>comforttemp</b>    </td><td>Solltemperatur (Komforttemperatur) in den Wohnräumen in °C. Die Angabe ist verpflichtend.                                                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+         </table>
+         </ul>
+       <br>      
 
        <ul>
          <b>Beispiele: </b> <br>
