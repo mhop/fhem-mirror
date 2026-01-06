@@ -22463,8 +22463,6 @@ sub _aiCreateAdditionalSignals {
   # Heizlast + Kühllast (dynamische Komforttemp)
   # ---------------------------------------------------------
   my $t_comfort_norm      = $p->{temp_comfort_norm};               # normierte Komforttemp
-  my $temp_norm           = $p->{temp_norm};
-
   my $temp_norm_min       = ($range eq '-11') ? -1.0 : 0.0;        # Normraum-Minimum bestimmen
 
   my $heating_raw         = $t_comfort_norm - $temp_norm;          # Roh-Heizlast
