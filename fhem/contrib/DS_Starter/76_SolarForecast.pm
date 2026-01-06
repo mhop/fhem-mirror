@@ -165,6 +165,7 @@ my %vNotesIntern = (
   "2.0.0"  => "05.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
+                           "new consumer type 'heatpump' ".
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
@@ -412,7 +413,7 @@ my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";         
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
-                        noSchedule);                                                # erlaubte Consumer Typen
+                        heatpump noSchedule);                                       # erlaubte Consumer Typen
 
 
 ## Konstanten
@@ -464,6 +465,8 @@ use constant {
   AIACCUPLIM     => 150,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
+
+  HPCOMFTEMP     => 20,                                                             # Wärmepumpe Solltemperatur / Komforttemperatur
 
   MAXNEXTHOURS   => 71,                                                             # max. Anzahl Stunden der Wertebasis (Start mit 0 -> 72h) z.B. in Nexthours
   MAXNEXTDAYS    => 2,                                                              # max. Anzahl volle Tage in NextHours (Start mit 0 -> 3d)
@@ -1006,7 +1009,7 @@ my %hqtxt = (                                                                # H
               DE => qq{das neuronale Netzwerk f&uuml;r die Verbrauchsprognose wurde noch nicht trainiert.}                  },
   nncoit => { EN => qq{the neural network for consumption forecasting is just being trained, forecasting is done without AI},
               DE => qq{das neuronale Netz zur Verbrauchsprognose wird gerade trainiert, die Prognose erfolgt ohne KI}       },
-  nncoot => { EN => qq{the neural network for consumption forecasting is in ‘training only’ mode, forecasting is performed without AI.},
+  nncoot => { EN => qq{the neural network for consumption forecasting is in 'training only' mode, forecasting is performed without AI.},
               DE => qq{das neuronale Netz zur Verbrauchsprognose ist im 'Training only' Modus, die Prognose erfolgt ohne KI}},
   aiwhit => { EN => qq{the PV forecast value for the current hour is provided by the AI support},
               DE => qq{der PV Vorhersagewert f&uuml;r die aktuelle Stunde wird von der KI Unterst&uuml;tzung geliefert}     },
@@ -1455,6 +1458,7 @@ my %hef = (                                                                     
   "dryer"          => { f => 0.40, m => 0.40, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
   "washingmachine" => { f => 0.50, m => 0.30, l => 0.40, mt => 120         },
   "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
+  "heatpump"       => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
 );
 
 my %hcsr = (                                                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
@@ -1790,12 +1794,38 @@ my %FEATURE_BLOCKS = (
   semantics_rueckfall => sub {
       my ($f) = @_;
       return [
-          $f->{trend_break} * $f->{delta1_norm_neg},                   # Trend-Break × negativer Delta → Rückfall nach Peak
-          $f->{pv_drop}     * $f->{delta1_norm_neg},                   # PV-Drop × negativer Delta → Rückfall durch Lastabschaltung
-          $f->{trend_break} * $f->{hour_class_lateevening},            # Trend-Break × späte Stunde → Rückfall am Tagesende
+          $f->{trend_break} * $f->{delta1_norm_neg},                   # Trend-Break × negativer Delta -> Rückfall nach Peak
+          $f->{pv_drop}     * $f->{delta1_norm_neg},                   # PV-Drop × negativer Delta -> Rückfall durch Lastabschaltung
+          $f->{trend_break} * $f->{hour_class_lateevening},            # Trend-Break × späte Stunde -> Rückfall am Tagesende
       ];
   },
 
+  # --------------------------------------------------------
+  # Semantik für Wärmepumpen
+  # --------------------------------------------------------  
+  semantics_heatpump_advanced => sub {
+      my ($f) = @_;
+      return [
+          $f->{heating_degree_norm},                                   # Heizlast & Kühllast
+          $f->{cooling_degree_norm},
+
+          $f->{hp_heating_mode},                                       # WP-Modi
+          $f->{hp_cooling_mode},
+
+          $f->{ww_morning},                                            # Warmwasser-Semantik
+          $f->{ww_evening},
+          $f->{ww_cold_boost},
+          $f->{ww_pv_boost},
+
+          $f->{cop_proxy},                                             # COP-Semantik
+          $f->{cop_inverse},
+          $f->{hp_power_factor},
+
+          $f->{frost_protect},                                         # Frostschutz
+          $f->{frost_load},
+      ];
+  },
+  
   # --------------------------------------------------------
   # Sandbox für neue Features
   # --------------------------------------------------------
@@ -1820,7 +1850,7 @@ my %FEATURE_REGISTRY;
   # --------------------------------------------------------
   # v0: Basis-Features
   # --------------------------------------------------------
-  v0 => sub {
+  v0_base => sub {
       my ($f) = @_;
       return [
           @{ $FEATURE_BLOCKS{time_base}->($f) },
@@ -1831,12 +1861,12 @@ my %FEATURE_REGISTRY;
   },
 
   # --------------------------------------------------------
-  # v1: Basis + Trends + Semantik + PV
+  # v1_common – Standardhaushalt (inkl. PV-Semantik)
   # --------------------------------------------------------
-  v1 => sub {
+  v1_common => sub {
       my ($f) = @_;
       return [
-          @{ $FEATURE_REGISTRY{v0}->($f) },
+          @{ $FEATURE_REGISTRY{v0_base}->($f) },
           @{ $FEATURE_BLOCKS{trends}->($f) },
           @{ $FEATURE_BLOCKS{semantics_core}->($f) },
           @{ $FEATURE_BLOCKS{semantics_evening}->($f) },
@@ -1844,21 +1874,32 @@ my %FEATURE_REGISTRY;
           @{ $FEATURE_BLOCKS{semantics_rueckfall}->($f) },
       ];
   },
+  
+  # --------------------------------------------------------
+  # v2_hp_advanced – Haushalte mit Wärmepumpe
+  # --------------------------------------------------------  
+  v2_hp_advanced => sub {
+      my ($f) = @_;
+      return [
+          @{ $FEATURE_REGISTRY{v1_common}->($f) },
+          @{ $FEATURE_BLOCKS{semantics_heatpump_advanced}->($f) },
+      ];
+  },
 
   # --------------------------------------------------------
   # v2 (Sandbox): v1 + experimentelle Features
   # --------------------------------------------------------
-  v2 => sub {
+  v3 => sub {
       my ($f) = @_;
       return [
-          @{ $FEATURE_REGISTRY{v1}->($f) },
+          @{ $FEATURE_REGISTRY{v1_common}->($f) },
           @{ $FEATURE_BLOCKS{sandbox}->($f) },
       ];
   },
 
   # --------------------------------------------------------
   # bck: Feature Sammlung zum Copy/Paste in vx
-  # --------------------------------------------------------	
+  # --------------------------------------------------------    
   bck => sub {
       my ($f) = @_;
       return [
@@ -2392,8 +2433,10 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
 
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));
+  
+  my $ctype = ConsumerVal ($hash, $c, 'type', DEFCTYPE);
 
-  if (ConsumerVal ($hash, $c, 'type', DEFCTYPE) eq 'noSchedule') {
+  if ($ctype eq 'noSchedule' || $ctype eq 'heatpump') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps}       = 'noSchedule';
@@ -6485,6 +6528,7 @@ sub __getaiFannConState {            ## no critic "not used"
   my $spc6  = '&nbsp;' x 6;
   
   my $aspeak   = CurrentVal  ($name, 'allstringspeak',        '-');
+  my $hpinst   = CurrentVal  ($name, 'heatpumpInstalled',     '-');               # WP installiert?
   my $tgtmin   = AiNeuralVal ($name, 'con', 'MinVal',         '-');              
   my $tgtmax   = AiNeuralVal ($name, 'con', 'MaxVal',         '-');               
   my $dsnum    = AiNeuralVal ($name, 'con', 'NumDatasets',    '-'); 
@@ -6525,6 +6569,8 @@ sub __getaiFannConState {            ## no critic "not used"
   my $drift_bias    = AiNeuralVal ($name, 'con', 'DriftBias',        '-'); 
   my $drift_slope   = AiNeuralVal ($name, 'con', 'DriftSlope',       '-'); 
   my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',        '-');
+  
+  my $frv = _aiSelectRegistryVersion ($name);                                       # verwendete Feature-Registry Version
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
            $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
@@ -6596,6 +6642,9 @@ sub __getaiFannConState {            ## no critic "not used"
   $ars     = '<b>'.$hqtxt{airest}{$lang}.'</b> '.$ars;
   $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
   $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
+  $hpinst  = '<b>'.(encode('utf8', 'Verbrauchernummer Wärmepumpe')).': </b> '.$hpinst;
+  $frv     = '<b>'.'verwendete Registry Version'.': </b> '.$frv; 
+  
   
   my $note  = (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";;
   $note    .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
@@ -6653,8 +6702,8 @@ sub __getaiFannConState {            ## no critic "not used"
   $note    .= (encode('utf8', '<b>R²</b> (Bestimmtheitsmaß) → Maß für die Erklärungskraft des Modells. Je näher R² an 1 liegt, desto besser.'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² = 1.0 → perfekte Vorhersage, alle Punkte liegen exakt auf der Regressionslinie'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² > 0.8 → sehr gut - Modell erfasst den Großteil der Streuung → sehr zuverlässige Prognosen'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² = 0.6 – 0.8 → gut - Modell erklärt einen soliden Teil der Varianz → brauchbar für viele Anwendungen'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² = 0.5–0.6 → mäßig / grenzwertig - Modell liegt knapp über „zufällig“ → Muster erkannt, Prognosen nur eingeschränkt nützlich'))."\n";
+  $note    .= $spc3.(encode('utf8', 'R² = 0.6 - 0.8 → gut - Modell erklärt einen soliden Teil der Varianz → brauchbar für viele Anwendungen'))."\n";
+  $note    .= $spc3.(encode('utf8', 'R² = 0.5-0.6 → mäßig / grenzwertig - Modell liegt knapp über "zufällig" → Muster erkannt, Prognosen nur eingeschränkt nützlich'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² < 0.5 → schwach - Modell erklärt weniger als die Hälfte der Varianz → deutlicher Verbesserungsbedarf'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² = 0.0 → Modell erklärt gar nichts, es ist nicht besser als der Mittelwert der Daten'))."\n";
   $note    .= $spc3.(encode('utf8', 'R² < 0.0 → Modell ist schlechter als einfach immer den Mittelwert vorherzusagen'))."\n";
@@ -6663,7 +6712,9 @@ sub __getaiFannConState {            ## no critic "not used"
   $rs .= $head;
   $rs .= $atf.' / '.$art."\n";
   $rs .= $ars."\n";
-  $rs .= $agt;
+  $rs .= $agt."\n";
+  $rs .= $hpinst."\n";
+  $rs .= $frv;
   $rs .= "\n\n";
   $rs .= $model."\n";
   $rs .= $keyfig."\n";
@@ -7010,6 +7061,7 @@ sub _attrconsumer {                      ## no critic "not used"
       noshow        => '',
       exconfc       => '',
       pvshare       => '',
+      comforttemp   => '',
   };
 
   if ($cmd eq "set") {
@@ -7099,7 +7151,7 @@ sub _attrconsumer {                      ## no critic "not used"
               return qq{The surpmeth "$h->{surpmeth}" is wrong. It must contain a '<device>:<reading>', 'median[_2..20]', 'average[_2..20]' or 'default'.};
           }
       }
-
+      
       my $valid;
 
       if (exists $h->{notbefore}) {
@@ -7239,6 +7291,22 @@ sub _attrconsumer {                      ## no critic "not used"
           elsif (!isNumeric ($mintime) && $mintime !~ /^SunPath/xsi) {
               return qq(The key "mintime" must be an integer or a string starting with "SunPath.");
           }
+      }
+      
+      # Wärmepumpe
+      ##############
+      if ($h->{type} eq 'heatpump') {
+          if ($h->{power} == 0) {
+              return qq{For the consumer type 'heatpump' the rated power value must be specified as not equal to 0.};
+          }
+          
+          if (!defined $h->{etotal} || !defined $h->{pcurr}) {
+              return qq{The consumer type 'heatpump' needs both keys 'etotal' and 'pcurr' to be defined.};
+          }
+
+           if (!defined $h->{comforttemp}) {
+              return qq{The consumer type 'heatpump' needs the key 'comforttemp' to be defined.};
+          }                   
       }
   }
   else {
@@ -9143,6 +9211,7 @@ sub delConsumerFromMem {
 
   my $hash   = $defs{$name};
   my $calias = ConsumerVal ($hash, $c, 'alias', '');
+  my $dosave = 0;
 
   for my $d (1..31) {                                                            # Consumer aus phHistory entfernen
       $d = sprintf("%02d", $d);
@@ -9160,9 +9229,15 @@ sub delConsumerFromMem {
   }
   
   for my $ridx (sort keys %{ $data{$name}{aidectree}{airaw} // {} }) {          # Consumer aus AI Raw Data löschen 
-      next unless defined $ridx && length $ridx;
-
+      next unless (defined $ridx 
+                   && length $ridx 
+                   && defined $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c});
       delete $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c};
+      $dosave = 1;
+  }
+  
+  if ($dosave) {
+      my $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
   }
   
   delete $data{$name}{consumers}{$c};                                           # Consumerhash löschen
@@ -10278,7 +10353,7 @@ sub _collectAllRegConsumers {
       my $clt;
       if (exists $hc->{locktime}) {
           $clt = $hc->{locktime};
-      }
+      }  
 
       delete $data{$name}{consumers}{$c}{sunriseshift};
       delete $data{$name}{consumers}{$c}{sunsetshift};
@@ -10286,50 +10361,57 @@ sub _collectAllRegConsumers {
 
       my $rauto = $hc->{auto} // q{};
       my $ctype = $hc->{type} // DEFCTYPE;
+      
+      if ($ctype eq 'heatpump') {
+          $hc->{mode} = 'must';
+          $data{$name}{current}{heatpumpInstalled} = $c;
+      }
 
-      $data{$name}{consumers}{$c}{name}              = $consumer;                                # Name des Verbrauchers (Device)
-      $data{$name}{consumers}{$c}{alias}             = $alias;                                   # Alias des Verbrauchers (Device)
-      $data{$name}{consumers}{$c}{aliasshort}        = $hc->{aliasshort}   // q{};               # Kurzalias des Verbrauchers
-      $data{$name}{consumers}{$c}{type}              = $hc->{type}         // DEFCTYPE;          # Typ des Verbrauchers
-      $data{$name}{consumers}{$c}{power}             = $hc->{power};                             # Leistungsaufnahme des Verbrauchers in W
-      $data{$name}{consumers}{$c}{pvshare}           = $hc->{pvshare}      // 100;               # Anteil PV am Strommix des Verbrauchers
-      $data{$name}{consumers}{$c}{avgenergy}         = q{};                                      # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
-      $data{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};  # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
-      $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // DEFCMODE;          # Planungsmode des Verbrauchers
-      $data{$name}{consumers}{$c}{oncom}             = $hc->{on}           // q{};               # Setter Einschaltkommando
-      $data{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};               # Setter Ausschaltkommando
-      $data{$name}{consumers}{$c}{dswitch}           = $dswitch;                                 # Switchdevice zur Kommandoausführung
-      $data{$name}{consumers}{$c}{autoreading}       = $rauto;                                   # Readingname zur Automatiksteuerung
-      $data{$name}{consumers}{$c}{retotal}           = $rtot               // q{};               # Reading der Leistungsmessung
-      $data{$name}{consumers}{$c}{uetotal}           = $utot               // q{};               # Unit der Leistungsmessung
-      $data{$name}{consumers}{$c}{rpcurr}            = $rpcurr             // q{};               # Reading der aktuellen Leistungsaufnahme
-      $data{$name}{consumers}{$c}{upcurr}            = $upcurr             // q{};               # Unit der aktuellen Leistungsaufnahme
-      $data{$name}{consumers}{$c}{energythreshold}   = $ethreshold;                              # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
-      $data{$name}{consumers}{$c}{powerthreshold}    = $pthreshold;                              # Schwellenwert d. aktuellen Leistung(W) ab der ein Verbraucher als aktiv gewertet wird
-      $data{$name}{consumers}{$c}{notbefore}         = $hc->{notbefore}    // q{};               # nicht einschalten vor Stunde in 24h Format (00-23)
-      $data{$name}{consumers}{$c}{notafter}          = $hc->{notafter}     // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
-      $data{$name}{consumers}{$c}{rswstate}          = $rswstate           // 'state';           # Schaltstatus Reading
-      $data{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                 # Arbeitsweise FHEM Consumer Device
-      $data{$name}{consumers}{$c}{noshow}            = $noshow             // 0;                 # ausblenden in Grafik
-      $data{$name}{consumers}{$c}{exconfc}           = $exconfc            // 0;                 # Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
-      $data{$name}{consumers}{$c}{surpmeth}          = $hc->{surpmeth}     // 'default';         # Ermittlungsmethode des PV-Überschusses, default -> direkte Messung
-      $data{$name}{consumers}{$c}{locktime}          = $clt                // '0:0';             # Sperrzeit im Automatikmodus ('offlt:onlt')
-      $data{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';              # Regex für 'ein'
-      $data{$name}{consumers}{$c}{offreg}            = $offreg             // 'off';             # Regex für 'aus'
-      $data{$name}{consumers}{$c}{dswoncond}         = $dswoncond          // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
-      $data{$name}{consumers}{$c}{rswoncond}         = $rswoncond          // q{};               # Reading zur Lieferung einer zusätzliche Einschaltbedingung
-      $data{$name}{consumers}{$c}{swoncondition}     = $swoncondition      // q{};               # Regex einer zusätzliche Einschaltbedingung
-      $data{$name}{consumers}{$c}{dswoffcond}        = $dswoffcond         // q{};               # Device zur Lieferung einer vorrangigen Ausschaltbedingung
-      $data{$name}{consumers}{$c}{rswoffcond}        = $rswoffcond         // q{};               # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
-      $data{$name}{consumers}{$c}{swoffcondition}    = $swoffcondition     // q{};               # Regex einer vorrangigen Ausschaltbedingung
-      $data{$name}{consumers}{$c}{dspignorecond}     = $dspignorecond      // q{};               # Device liefert Ignore Bedingung
-      $data{$name}{consumers}{$c}{rigncond}          = $rigncond           // q{};               # Reading liefert Ignore Bedingung
-      $data{$name}{consumers}{$c}{spignorecondition} = $spignorecondition  // q{};               # Code/Regex der Ignore Bedingung
-      $data{$name}{consumers}{$c}{interruptable}     = $interruptable;                           # Ein-Zustand des Verbrauchers ist unterbrechbar
-      $data{$name}{consumers}{$c}{hysteresis}        = $hyst;                                    # Hysterese
-      $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift     if(defined $riseshift);    # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
-      $data{$name}{consumers}{$c}{sunsetshift}       = $setshift      if(defined $setshift);     # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
-      $data{$name}{consumers}{$c}{icon}              = $hc->{icon}    if(defined $hc->{icon});   # Icon für den Verbraucher
+      $data{$name}{consumers}{$c}{name}              = $consumer;                                           # Name des Verbrauchers (Device)
+      $data{$name}{consumers}{$c}{alias}             = $alias;                                              # Alias des Verbrauchers (Device)
+      $data{$name}{consumers}{$c}{aliasshort}        = $hc->{aliasshort}   // q{};                          # Kurzalias des Verbrauchers
+      $data{$name}{consumers}{$c}{type}              = $hc->{type}         // DEFCTYPE;                     # Typ des Verbrauchers
+      $data{$name}{consumers}{$c}{power}             = $hc->{power};                                        # Leistungsaufnahme des Verbrauchers in W
+      $data{$name}{consumers}{$c}{pvshare}           = $hc->{pvshare}      // 100;                          # Anteil PV am Strommix des Verbrauchers
+      $data{$name}{consumers}{$c}{avgenergy}         = q{};                                                 # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
+      $data{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};             # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
+      $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // DEFCMODE;                     # Planungsmode des Verbrauchers
+      $data{$name}{consumers}{$c}{oncom}             = $hc->{on}           // q{};                          # Setter Einschaltkommando
+      $data{$name}{consumers}{$c}{offcom}            = $hc->{off}          // q{};                          # Setter Ausschaltkommando
+      $data{$name}{consumers}{$c}{dswitch}           = $dswitch;                                            # Switchdevice zur Kommandoausführung
+      $data{$name}{consumers}{$c}{autoreading}       = $rauto;                                              # Readingname zur Automatiksteuerung
+      $data{$name}{consumers}{$c}{retotal}           = $rtot               // q{};                          # Reading der Leistungsmessung
+      $data{$name}{consumers}{$c}{uetotal}           = $utot               // q{};                          # Unit der Leistungsmessung
+      $data{$name}{consumers}{$c}{rpcurr}            = $rpcurr             // q{};                          # Reading der aktuellen Leistungsaufnahme
+      $data{$name}{consumers}{$c}{upcurr}            = $upcurr             // q{};                          # Unit der aktuellen Leistungsaufnahme
+      $data{$name}{consumers}{$c}{energythreshold}   = $ethreshold;                                         # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
+      $data{$name}{consumers}{$c}{powerthreshold}    = $pthreshold;                                         # Schwellenwert d. aktuellen Leistung(W) ab der ein Verbraucher als aktiv gewertet wird
+      $data{$name}{consumers}{$c}{notbefore}         = $hc->{notbefore}    // q{};                          # nicht einschalten vor Stunde in 24h Format (00-23)
+      $data{$name}{consumers}{$c}{notafter}          = $hc->{notafter}     // q{};                          # nicht einschalten nach Stunde in 24h Format (00-23)
+      $data{$name}{consumers}{$c}{rswstate}          = $rswstate           // 'state';                      # Schaltstatus Reading
+      $data{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                            # Arbeitsweise FHEM Consumer Device
+      $data{$name}{consumers}{$c}{noshow}            = $noshow             // 0;                            # ausblenden in Grafik
+      $data{$name}{consumers}{$c}{exconfc}           = $exconfc            // 0;                            # Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+      $data{$name}{consumers}{$c}{surpmeth}          = $hc->{surpmeth}     // 'default';                    # Ermittlungsmethode des PV-Überschusses, default -> direkte Messung
+      $data{$name}{consumers}{$c}{locktime}          = $clt                // '0:0';                        # Sperrzeit im Automatikmodus ('offlt:onlt')
+      $data{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';                         # Regex für 'ein'
+      $data{$name}{consumers}{$c}{offreg}            = $offreg             // 'off';                        # Regex für 'aus'
+      $data{$name}{consumers}{$c}{dswoncond}         = $dswoncond          // q{};                          # Device zur Lieferung einer zusätzliche Einschaltbedingung
+      $data{$name}{consumers}{$c}{rswoncond}         = $rswoncond          // q{};                          # Reading zur Lieferung einer zusätzliche Einschaltbedingung
+      $data{$name}{consumers}{$c}{swoncondition}     = $swoncondition      // q{};                          # Regex einer zusätzliche Einschaltbedingung
+      $data{$name}{consumers}{$c}{dswoffcond}        = $dswoffcond         // q{};                          # Device zur Lieferung einer vorrangigen Ausschaltbedingung
+      $data{$name}{consumers}{$c}{rswoffcond}        = $rswoffcond         // q{};                          # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
+      $data{$name}{consumers}{$c}{swoffcondition}    = $swoffcondition     // q{};                          # Regex einer vorrangigen Ausschaltbedingung
+      $data{$name}{consumers}{$c}{dspignorecond}     = $dspignorecond      // q{};                          # Device liefert Ignore Bedingung
+      $data{$name}{consumers}{$c}{rigncond}          = $rigncond           // q{};                          # Reading liefert Ignore Bedingung
+      $data{$name}{consumers}{$c}{spignorecondition} = $spignorecondition  // q{};                          # Code/Regex der Ignore Bedingung
+      $data{$name}{consumers}{$c}{interruptable}     = $interruptable;                                      # Ein-Zustand des Verbrauchers ist unterbrechbar
+      $data{$name}{consumers}{$c}{hysteresis}        = $hyst;                                               # Hysterese
+      $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift         if(defined $riseshift);           # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
+      $data{$name}{consumers}{$c}{sunsetshift}       = $setshift          if(defined $setshift);            # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+      $data{$name}{consumers}{$c}{icon}              = $hc->{icon}        if(defined $hc->{icon});          # Icon für den Verbraucher
+      $data{$name}{consumers}{$c}{comforttemp}       = $hc->{comforttemp} if(defined $hc->{comforttemp});   # Solltemperatur für Wärmepumpen-Consumer
+      
   }
 
   $data{$name}{current}{consumerCollected} = 1;
@@ -14435,7 +14517,9 @@ sub __planInitialSwitchTime {
                       qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
   }
 
-  if (ConsumerVal ($hash, $c, 'type', DEFCTYPE) eq 'noSchedule') {
+  my $ctype = ConsumerVal ($hash, $c, 'type', DEFCTYPE);
+  
+  if ($ctype eq 'noSchedule' || $ctype eq 'heatpump') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps} = 'noSchedule';
@@ -17860,7 +17944,7 @@ sub _graphicHeader {
       my ($manner, $perspective) = split ':', $genpvdva;
       $perspective //= 'default';
 
-      my $dvtntxt  = $hqtxt{dvtn}{$lang}.'&nbsp;';
+      my $dvtntxt  = 'PV '.$hqtxt{dvtn}{$lang}.'&nbsp;';
       my $tdaytxt  = ($manner eq 'daily' ? $hqtxt{tday}{$lang} : $hqtxt{ctnsly}{$lang}).':&nbsp;'."<b>".$tdayDvtn."</b>";
       my $ydaytxt  = $hqtxt{yday}{$lang}.':&nbsp;'."<b>".$ydayDvtn."</b>";
 
@@ -20398,7 +20482,7 @@ END3
          $chain_color = 'style="stroke: #'.val2pahColor ($cons_dmy, $strokeredlim).';"';
      }
 
-     $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};  # M790,690 → Move To (Startpunkt bei x=790, y=690), L1200,690 → Line To (Zeichnet eine Linie von 790,690 nach 1200,690)
+     $ret .= qq{<path id="home2dummy_$stna" class="$consumer_style" $chain_color d="M790,690 L1200,690" />};  # M790,690 -> Move To (Startpunkt bei x=790, y=690), L1200,690 -> Line To (Zeichnet eine Linie von 790,690 nach 1200,690)
   }
 
   ## Laufketten Generator (Solarzellen/Input) zu Producer/Inverter
@@ -21795,7 +21879,7 @@ sub aiFannCreateConTrainData {
 
   my $cst = [gettimeofday];                                                               # Training Startzeit
   
-  my (@training_data, @targets, @rr1cs, @skipped);                                                   
+  my (@training_data, @targets, @rr1cs, @skipped, @temp_comfort_norm_values);                                                   
   my (@delta_pos_values, @delta_neg_values, @delta_values, @sunalt_norm_values, @weekday_values);                    
   my (@hour_norm_values, @hod_sin_values, @hod_cos_values, @wday_sin_values, @wday_cos_values);
   my (@month_sin_values, @temp_norm_values, @pv_norm_values, @pv_norm_prev_values);
@@ -21806,7 +21890,7 @@ sub aiFannCreateConTrainData {
   ##########################
   my $hidden_layers     = CurrentVal ($name, 'aiConHiddenLayers', '80-40-20');            # Hidden Layers in String Notation (64-32), (50-25), (64-32-16)
   my $hidden_steepness  = CurrentVal ($name, 'aiConSteepness',           0.9);            # Empfindlichkeit der Neuronen. Niedrigere Werte glätten, höhere Werte schärfen
-  my $learning_rate     = CurrentVal ($name, 'aiConLearnRate',         0.005);            # Lernrate: zu klein → Netz kommt nicht aus dem Bias‑Plateau, zu groß -> Overshooting (0.01, 0.005)
+  my $learning_rate     = CurrentVal ($name, 'aiConLearnRate',         0.005);            # Lernrate: zu klein -> Netz kommt nicht aus dem Bias-Plateau, zu groß -> Overshooting (0.01, 0.005)
   my $learning_momentum = CurrentVal ($name, 'aiConMomentum',            0.5);            # Momentum 
   my $shuffle_mode      = CurrentVal ($name, 'aiConShuffleMode',           2);            # 0 = chronologisch, 1 = chronologischer Split und AI::FANN internes shuffle, 2 = shuffle vor dem Split und AI::FANN internes shuffle
   my $talgo             = CurrentVal ($name, 'aiConTrainAlgo', 'INCREMENTAL');            # Trainingsalgorithmus (RPROP INCREMENTAL)
@@ -21818,7 +21902,9 @@ sub aiFannCreateConTrainData {
   my $range             = _aiFannAfNormRange ($haf);
   my $fanntyp           = 'con';                                                          # FANN Verwendungsart 'consumption' Prognose
   
-  my $pvrl_prev         = 0;                                                              # virtueller Startwert PV real vor ersten Wert
+  my $pvrl_prev         = 0;                                                              # virtueller Startwert PV real vor ersten Wert                                                 
+  my ($hp, $comftemp)   = isHeatPumpUsed ($name);                                         # Consumer Nummer , Solltemp falls WP verwendet
+  $comftemp           //= HPCOMFTEMP;                                                     # Solltemperatur WP-Heizung
   
   # Rohdaten in Reihenfolge extrahieren und vorbereiten
   #######################################################  
@@ -21865,6 +21951,7 @@ sub aiFannCreateConTrainData {
       my $sunalt_norm            = _aiFannNormSunalt ($sunalt,    $range);              # Sonnenaltitude symmetrisch oder asymmetriech normalisieren
       my $wcc_norm               = _aiFannNormWcc    ($wcc,       $range);              # Bewölkung symmetrisch oder asymmetriech normalisieren
       my $temp_norm              = _aiFannNormTemp   ($temp,      $range);              # Temperatur symmetrisch oder asymmetriech normalisieren
+      my $temp_comfort_norm      = _aiFannNormTemp   ($comftemp,  $range);              # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
       my $pv_norm                = _aiFannNormPv     ($pvrl,      $pvpeak, $range);     # PV symmetrisch oder asymmetriech normalisieren
       my $pv_norm_prev           = _aiFannNormPv     ($pvrl_prev, $pvpeak, $range);
       my $day_hour_norm          = $isday  ? $hour_norm : 0;                            # Tagstunden normiert, sonst 0
@@ -21872,19 +21959,19 @@ sub aiFannCreateConTrainData {
       
       $pvrl_prev = $pvrl;                                                               # pvrl ist Vorgänger für nächsten loop
       
-      # Monat 1..12 → 0..11
+      # Monat 1..12 -> 0..11
       my $month0 = $month - 1;    
       my ($month_sin, $month_cos) = _aiFannEncodeCyclic ($month0,  12, $range);         # Monat, zyklische Struktur (0 .. 11)
       
-      # Stunde 1..24 → 0..23
+      # Stunde 1..24 -> 0..23
       my $hod0 = $inthod - 1;
       my ($hod_sin, $hod_cos)     = _aiFannEncodeCyclic ($hod0, 24, $range);            # Stunde des Tages zyklisch (0 .. 23)
       
-      # Wochentag 1..7 → 0..6
+      # Wochentag 1..7 -> 0..6
       my $wday0 = $weekday - 1;   
       my ($wday_sin, $wday_cos)   = _aiFannEncodeCyclic ($wday0, 7, $range);            # Wochentag in zyklischer Struktur (0..6)
 
-      # Sonnenazimut 0..360 → 0..359
+      # Sonnenazimut 0..360 -> 0..359
       my $sunaz0 = $sunaz % 360; 
       my ($sunaz_sin, $sunaz_cos) = _aiFannEncodeCyclic ($sunaz0, 360, $range);         # Sonnenazimut zyklisch (0 .. 359)
           
@@ -21900,25 +21987,26 @@ sub aiFannCreateConTrainData {
       
       # Daten für FeatureBuilder vorbereiten
       ######################################## 
-      push @weekday_values,         $weekday;      
-      push @sunalt_norm_values,     $sunalt_norm;
-      push @hour_norm_values,       $hour_norm;
-      push @hod_sin_values,         $hod_sin;
-      push @hod_cos_values,         $hod_cos;
-      push @wday_sin_values,        $wday_sin;  
-      push @wday_cos_values,        $wday_cos;
-      push @month_sin_values,       $month_sin; 
-      push @month_cos_values,       $month_cos;
-      push @sunaz_sin_values,       $sunaz_sin;
-      push @sunaz_cos_values,       $sunaz_cos;
-      push @wcc_norm_values,        $wcc_norm;
-      push @temp_norm_values,       $temp_norm;
-      push @pv_norm_values,         $pv_norm;
-      push @pv_norm_prev_values,    $pv_norm_prev;
-      push @isday_values,           $isday;
-      push @day_hour_norm_values,   $day_hour_norm;
-      push @night_hour_norm_values, $night_hour_norm;
-      push @inthod_values,          $inthod - 1;
+      push @weekday_values,           $weekday;      
+      push @sunalt_norm_values,       $sunalt_norm;
+      push @hour_norm_values,         $hour_norm;
+      push @hod_sin_values,           $hod_sin;
+      push @hod_cos_values,           $hod_cos;
+      push @wday_sin_values,          $wday_sin;  
+      push @wday_cos_values,          $wday_cos;
+      push @month_sin_values,         $month_sin; 
+      push @month_cos_values,         $month_cos;
+      push @sunaz_sin_values,         $sunaz_sin;
+      push @sunaz_cos_values,         $sunaz_cos;
+      push @wcc_norm_values,          $wcc_norm;
+      push @temp_norm_values,         $temp_norm;
+      push @temp_comfort_norm_values, $temp_comfort_norm;
+      push @pv_norm_values,           $pv_norm;
+      push @pv_norm_prev_values,      $pv_norm_prev;
+      push @isday_values,             $isday;
+      push @day_hour_norm_values,     $day_hour_norm;
+      push @night_hour_norm_values,   $night_hour_norm;
+      push @inthod_values,            $inthod - 1;
                                 
       # Zielwert
       ############
@@ -21973,12 +22061,14 @@ sub aiFannCreateConTrainData {
   for my $i (6 .. $#flat_targets) {                                                                
       my $lags = _aiFannBuildLagFeatures (\@flat_targets, $i, $lagnorm_ref);                   # Lags erstellen
       
-      my $sigs = _aiCreateAdditionalSignals ( { lags         => $lags,                            # diskrete, semantische Zusatzsignale
-                                                pv_norm      => $pv_norm_values[$i],
-                                                pv_norm_prev => $pv_norm_prev_values[$i],
-                                                temp_norm    => $temp_norm_values[$i],
-                                                inthod       => $inthod_values[$i],
-                                                weekday      => $weekday_values[$i],
+      my $sigs = _aiCreateAdditionalSignals ( { lags              => $lags,                    # diskrete, semantische Zusatzsignale
+                                                pv_norm           => $pv_norm_values[$i],
+                                                pv_norm_prev      => $pv_norm_prev_values[$i],
+                                                temp_norm         => $temp_norm_values[$i],
+                                                inthod            => $inthod_values[$i],
+                                                weekday           => $weekday_values[$i],
+                                                temp_comfort_norm => $temp_comfort_norm_values[$i],
+                                                range             => $range,
                                               }
                                             );
       
@@ -21987,11 +22077,11 @@ sub aiFannCreateConTrainData {
       if ($debug =~ /aiProcess/xs) {
           if ($i > $#flat_targets - 20) {                                                       # nur die letzten 20 Punkte loggen
               Log3 ($name, 1, sprintf (
-                    "%s - DBG F[%d]: lag1=%0.3f pvdrop=%0.3f lag24=%0.3f d1p=%0.3f d1n=%0.3f rollstd=%0.3f up=%d down=%d upS=%0.3f downS=%0.3f vol=%d pvX=%d break=%d",
+                    "%s - DBG F[%d]: lag1=%0.3f hppf=%0.3f lag24=%0.3f d1p=%0.3f d1n=%0.3f rollstd=%0.3f up=%d down=%d upS=%0.3f downS=%0.3f vol=%d pvX=%d break=%d",
                     $name,
                     $i,
                     $lags->{lag1_norm},
-                    $sigs->{pv_drop},
+                    $sigs->{hp_power_factor},
                     $lags->{lag24_norm},
                     $lags->{delta1_norm_pos},
                     $lags->{delta1_norm_neg},
@@ -22010,7 +22100,7 @@ sub aiFannCreateConTrainData {
       
       # Kombinatorik durch FEATURE_REGISTRY 
       #######################################
-      my $bv       = 'v1';                                                                    # Version Build
+      my $bv       = _aiSelectRegistryVersion ($name);                                        # verwendete Feature-Registry Version
       my $semantic = _aiFannFeatureBuilder ( $bv,                                          
                        { pv_norm                => $pv_norm_values[$i],
                          rr1c_norm              => $rr1c_norm->[$i],                          # Niederschlag, numerisch min-max normalisiert
@@ -22058,7 +22148,20 @@ sub aiFannCreateConTrainData {
                          hour_class_noon        => $sigs->{hour_class_noon},                         # Mittag Flag
                          day_class_weekend      => $sigs->{day_class_weekend},                       # Wochenende Flag
                          day_class_workday      => $sigs->{day_class_workday},                       # Arbeitstag Flag
-                         trend_break            => $sigs->{trend_break},                             # Trendwechsel       
+                         trend_break            => $sigs->{trend_break},                             # Trendwechsel 
+                         heating_degree_norm    => $sigs->{heating_degree_norm},                     # Heizlast  
+                         cooling_degree_norm    => $sigs->{cooling_degree_norm},                     # Kühllast
+                         hp_heating_mode        => $sigs->{hp_heating_mode},                         # WP Heizmodus
+                         hp_cooling_mode        => $sigs->{hp_cooling_mode},                         # WP Kühlmodus
+                         ww_morning             => $sigs->{ww_morning},                              # Warmwasser Morgens
+                         ww_evening             => $sigs->{ww_evening},                              # Warmwasser Abends
+                         ww_cold_boost          => $sigs->{ww_cold_boost},                           # Heizlast verstärkte WW-Semantik
+                         ww_pv_boost            => $sigs->{ww_pv_boost},                             # PV-optimiertes Warmwasser                          
+                         cop_proxy              => $sigs->{cop_proxy},                               # für Luft-Wasser-WP ist COP ungefähr linear mit Außentemperatur            
+                         cop_inverse            => $sigs->{cop_inverse},                             # invertierter COP (Strombedarf)
+                         hp_power_factor        => $sigs->{hp_power_factor},                         # kombinierte Semantik (sehr stark)         
+                         frost_protect          => $sigs->{frost_protect},                           # Frostschutz-Trigger binär
+                         frost_load             => $sigs->{frost_load},                              # kontinuierliches Lastsignal wenn Frostschutz aktiv 
                        }
                      );
                                                
@@ -22138,7 +22241,7 @@ return $serial;
 }
 
 ################################################################
-#               Double‑Percentile‑Filter
+#               Double-Percentile-Filter
 #    Percentile-basierte Target-Normierungsgrenzen erstellen          
 ################################################################
 sub _aiFannPercentileBasedLimits {            
@@ -22311,16 +22414,20 @@ sub _aiFannBuildLagFeatures {
 sub _aiCreateAdditionalSignals {      
   my ($p) = @_;
 
-  my $lags         = $p->{lags};
-  my $pv_norm      = $p->{pv_norm};
-  my $pv_norm_prev = $p->{pv_norm_prev};
-  my $temp_norm    = $p->{temp_norm};
-  my $hour         = $p->{inthod};
-  my $weekday      = $p->{weekday};
+  my $lags              = $p->{lags};
+  my $pv_norm           = $p->{pv_norm};
+  my $pv_norm_prev      = $p->{pv_norm_prev};
+  my $temp_norm         = $p->{temp_norm};
+  my $hour              = $p->{inthod};
+  my $weekday           = $p->{weekday};
+  my $temp_comfort_norm = $p->{temp_comfort_norm};
+  my $range             = $p->{range};               # 01 - asymmetrisch, -11 - symmetrisch
 
   my $sigs;
 
+  # ---------------------------------------------------------
   # Trend-Features
+  # ---------------------------------------------------------
   $sigs->{trend_up_norm}       = $lags->{delta1_norm_pos} > 0.005 ? 1 : 0;
   $sigs->{trend_down_norm}     = $lags->{delta1_norm_neg} > 0.005 ? 1 : 0;
   $sigs->{trend_up_strength}   = $lags->{delta1_norm_pos};
@@ -22338,17 +22445,75 @@ sub _aiCreateAdditionalSignals {
                          || ($lags->{delta1_norm_pos} > 0.02 && $lags->{delta1_norm_neg}      > 0.02)
                          ) ? 1 : 0; 
 
-  # Temperatur
+  # ---------------------------------------------------------
+  # Temperatur-Trigger
+  # ---------------------------------------------------------
   $sigs->{cold_trigger} = $temp_norm < 0.2 ? 1 : 0;
   $sigs->{heat_trigger} = $temp_norm > 0.8 ? 1 : 0;
 
+  # ---------------------------------------------------------
   # PV/Consumption Cross
+  # ---------------------------------------------------------
   $sigs->{pv_consumption_cross} = ($pv_norm > 0.4 && $lags->{delta1_norm_neg} > 0.02) ? 1 : 0;
   
   # PV-Drop
   $sigs->{pv_drop} = ($pv_norm_prev > 0.4 && $pv_norm < 0.2) ? 1 : 0;
+  
+  # ---------------------------------------------------------
+  # Heizlast + Kühllast (dynamische Komforttemp)
+  # ---------------------------------------------------------
+  my $t_comfort_norm      = $p->{temp_comfort_norm};               # normierte Komforttemp
+  my $temp_norm           = $p->{temp_norm};
 
+  my $temp_norm_min       = ($range eq '-11') ? -1.0 : 0.0;        # Normraum-Minimum bestimmen
+
+  my $heating_raw         = $t_comfort_norm - $temp_norm;          # Roh-Heizlast
+  $heating_raw            = 0 if($heating_raw < 0);
+
+  my $heating_span        = $t_comfort_norm - $temp_norm_min;                             # Spannweite für Normierung
+  $heating_span           = 1 if($heating_span <= 0);
+
+  my $heating_degree_norm = $heating_raw / $heating_span;                                 # Normierte Heizlast
+  $heating_degree_norm    = 0 if($heating_degree_norm < 0);
+  $heating_degree_norm    = 1 if($heating_degree_norm > 1);
+  
+  my $cooling_raw         = $temp_norm - $t_comfort_norm;
+  $cooling_raw            = 0 if($cooling_raw < 0);
+
+  my $cooling_degree_norm = $cooling_raw / (1 - $t_comfort_norm);
+  $cooling_degree_norm    = 0 if($cooling_degree_norm < 0);
+  $cooling_degree_norm    = 1 if($cooling_degree_norm > 1);
+
+  $sigs->{heating_degree_norm} = $heating_degree_norm;
+  $sigs->{cooling_degree_norm} = $cooling_degree_norm;
+  $sigs->{hp_heating_mode}     = ($heating_degree_norm > 0.1) ? 1 : 0;
+  $sigs->{hp_cooling_mode}     = ($cooling_degree_norm > 0.1) ? 1 : 0;
+  
+  # ---------------------------------------------------------
+  # Warmwasser-Semantik
+  # ---------------------------------------------------------  
+  $sigs->{ww_morning}      = ($hour >= 6  && $hour < 9 )  ? 1 : 0;
+  $sigs->{ww_evening}      = ($hour >= 17 && $hour < 21)  ? 1 : 0;
+  $sigs->{ww_cold_boost}   = $heating_degree_norm * $sigs->{ww_morning};                  # verstärkte Semantik (mit Heizlast kombiniert)
+  $sigs->{ww_pv_boost}     = ($pv_norm > 0.6 && $hour >= 11 && $hour < 15) ? 1 : 0;       # PV-optimiertes Warmwasser (Eigenverbrauchslogik)
+
+  # ---------------------------------------------------------
+  # COP-Semantik (Coefficient of Performance)
+  # ---------------------------------------------------------
+  $sigs->{cop_proxy}       = $temp_norm;                                                  # warm = effizient, kalt = ineffizient
+  $sigs->{cop_inverse}     = 1 - $temp_norm;                                              # invertierter COP (Strombedarf)
+  $sigs->{hp_power_factor} = $heating_degree_norm * $sigs->{cop_inverse};                 # kombinierte Semantik (sehr stark) -> sehr realistische WP-Last
+
+  # ---------------------------------------------------------
+  # Frostschutz-Semantik
+  # ---------------------------------------------------------
+  if ($range eq '01') { $sigs->{frost_protect} = ($temp_norm < 0.25) ? 1 : 0; }           # Frostschutz-Trigger 
+  else                { $sigs->{frost_protect} = ($temp_norm < -0.4) ? 1 : 0; }
+  $sigs->{frost_load} = $sigs->{frost_protect} * 0.3;                                     # kontinuierliches Lastsignal wenn Frostschutz aktiv 
+
+  # ---------------------------------------------------------
   # Stundenklassen
+  # ---------------------------------------------------------
   $sigs->{hour_class_morning}     = ($hour >= 6  && $hour < 9 )  ? 1 : 0;
   $sigs->{hour_class_evening}     = ($hour >= 17 && $hour < 21)  ? 1 : 0;
   $sigs->{hour_class_lateevening} = ($hour >= 21 && $hour < 23)  ? 1 : 0;
@@ -22356,11 +22521,28 @@ sub _aiCreateAdditionalSignals {
   $sigs->{hour_class_night}       = ($hour >= 1  && $hour < 6 )  ? 1 : 0;
   $sigs->{hour_class_noon}        = ($hour >= 11 && $hour < 14)  ? 1 : 0;
 
+  # ---------------------------------------------------------
   # Wochentag-Klassen
+  # ---------------------------------------------------------
   $sigs->{day_class_weekend} = ($weekday == 6 || $weekday == 7) ? 1 : 0;
   $sigs->{day_class_workday} = ($weekday >= 1 && $weekday <= 5) ? 1 : 0;
 
 return $sigs;
+}
+
+################################################################
+#   selektiert die relevante FEATURE-REGISTRY Version
+################################################################
+sub _aiSelectRegistryVersion {                                        
+  my ($name) = @_;
+
+  my ($c, $ct) = isHeatPumpUsed ($name);
+   
+  my $frv = $c 
+            ? 'v2_hp_advanced'          # Haushalt mit Wärmepumpe
+            : 'v1_common';              # Standardhaushalt
+      
+return $frv;
 }
 
 ################################################################
@@ -22372,7 +22554,7 @@ return $sigs;
 # 1. Architektur: 50-25    
 #    Lernrate/Momentum: 0.01 / 0.9
 #    Shuffling: Chronologischer Split, Shuffle jede Epoche
-#    Erwartung: Baseline; stabile Konvergenz, ggf. Bias‑Plateaus (das Training „steht“ auf einem Plateau)
+#    Erwartung: Baseline; stabile Konvergenz, ggf. Bias-Plateaus (das Training „steht“ auf einem Plateau)
 #
 # 2. Architektur: 64-32   
 #    Lernrate/Momentum: 0.01 / 0.8
@@ -22508,9 +22690,9 @@ sub aiFannTrainstartAndRetry {
               
               # Adaptive Retrain Logik
               ###########################
-              if    ($best_modelslope < 0.3 || $best_modelslope > 1.7) { $max_retries = 6; }        # extrem schlechte Skalierung → viele Retries
+              if    ($best_modelslope < 0.3 || $best_modelslope > 1.7) { $max_retries = 6; }        # extrem schlechte Skalierung -> viele Retries
               elsif ($best_modelslope < 0.6 || $best_modelslope > 1.4) { $max_retries = 4; }        # mäßig schlechte Skalierung
-              elsif ($best_rmse_rel   > 25)                            { $max_retries = 4; }        # hohe relative Fehler → mehr Retries
+              elsif ($best_rmse_rel   > 25)                            { $max_retries = 4; }        # hohe relative Fehler -> mehr Retries
               else  { $max_retries = $maxRtyRetrain; }                                              # Standard
           }
 
@@ -22830,7 +23012,7 @@ sub aiFannTrain {
           
           ### NEW: Weighted-RMSE-Proxy sammeln ###
           push @err_norm_sq, $err2;
-          my $w = $target->[0];                                                                             # Gewichtung nach Zielwertgröße (normiert), 0..1 → perfekt geeignet
+          my $w = $target->[0];                                                                             # Gewichtung nach Zielwertgröße (normiert), 0..1 -> perfekt geeignet
 
           $w_sum    += $w;                                                                                  # Clipping erst NACH der Schleife (braucht Median), hier nur Rohwerte sammeln
           $werr_sum += $w * $err2;
@@ -23134,7 +23316,7 @@ sub aiFannTrain {
   
   # Validation Mittelwert und Standardabweichung berechnen
   ########################################################################
-  # Windows prüft nur die Phase, die wirklich relevant ist → ob das 
+  # Windows prüft nur die Phase, die wirklich relevant ist -> ob das 
   # Modell am Ende stabil war.
   # - Fenstergröße anpassen: Bei kurzen Trainingsläufen reichen 20–30 
   #                          Epochen, bei langen eher 50–100.
@@ -23355,33 +23537,33 @@ return;
 # Erläuterungen
 # --------------
 # - RMSE/MAE-Verhältnis:  Zeigt, ob Ausreißer die Fehler stark verzerren.
-#   Typische Schwellen:  >1.5 → Retrain, 1.3–1.5 → Borderline
+#   Typische Schwellen:  >1.5 -> Retrain, 1.3–1.5 -> Borderline
 # 
 # - Maximaler absoluter Fehler: Schutz gegen extreme Einzelwerte (z.B. Verbrauchsspitzen)
-#   Typische Schwellen: >3×MAE oder über Domain‑Grenze → Retrain
+#   Typische Schwellen: >3×MAE oder über Domain-Grenze -> Retrain
 #
 # - Perzentile-Fehler (P95/P99): Prüft, ob viele Werte im oberen Bereich stark abweichen.
-#   Typische Schwellen: P95 >2×MAE oder P99 >3×MAE → Retrain
+#   Typische Schwellen: P95 >2×MAE oder P99 >3×MAE -> Retrain
 #
 # - Bias (mittlerer Vorzeichenfehler): Zeigt systematische Über- oder Unterschätzung.
-#   Typische Schwellen: mean_error > 0.4×MAE → Retrain
+#   Typische Schwellen: mean_error > 0.4×MAE -> Retrain
 #
 # - BitFail-Rate: Anteil der Testwerte außerhalb der Toleranz. 
-#   Typische Schwellen: >10% → Retrain, 5–10% → Borderline
+#   Typische Schwellen: >10% -> Retrain, 5–10% -> Borderline
 #
-# - Trend der Validierung (Slope): Wenn Val‑MSE im Verlauf steigt → Übertraining oder Divergenz.
-#   Typische Schwellen: Steigung >0.0005 über letzte 50 Epochen → Retrain
+# - Trend der Validierung (Slope): Wenn Val-MSE im Verlauf steigt -> Übertraining oder Divergenz.
+#   Typische Schwellen: Steigung >0.0005 über letzte 50 Epochen -> Retrain
 #
 # - Spannweite der letzten Val-MSEs: Prüft Stabilität der letzten Epochen.
-#   Typische Schwellen: (max_tail − min_tail) >0.5×val_mean → Retrain
+#   Typische Schwellen: (max_tail − min_tail) >0.5×val_mean -> Retrain
 #
 # RMSE relativ zum Verbrauch 
 ##############################
-# < 5% → sehr gut, das Modell trifft fast perfekt
-# 5–10% → gut, das Modell ist zuverlässig
-# 10–20% → akzeptabel, das Modell ist brauchbar
-# > 20% → schwach, das Modell hat starke Ausreißer
-# > 35% → katastrophal, das Modell ist unbrauchbar
+# < 5% -> sehr gut, das Modell trifft fast perfekt
+# 5–10% -> gut, das Modell ist zuverlässig
+# 10–20% -> akzeptabel, das Modell ist brauchbar
+# > 20% -> schwach, das Modell hat starke Ausreißer
+# > 35% -> katastrophal, das Modell ist unbrauchbar
 ################################################################################################
 sub _aiFannRetrainIndicator {
   my $paref = shift;
@@ -23427,8 +23609,8 @@ sub _aiFannRetrainIndicator {
   my $lim_bias           = 1.5 * $mae;          # Sehr gut. Bias > 50% des MAE bedeutet systematische Verzerrung
   
   # RMSE/MAE
-  my $lim_rmse_mae_ratio = 1.5;                 # Sehr gut. RMSE sollte nicht viel größer sein als MAE → sonst Ausreißerproblem
-  my $lim_rmse_rel       = 20;                  # RMSE relativ zum Medianverbrauch >20% → Retrain
+  my $lim_rmse_mae_ratio = 1.5;                 # Sehr gut. RMSE sollte nicht viel größer sein als MAE -> sonst Ausreißerproblem
+  my $lim_rmse_rel       = 20;                  # RMSE relativ zum Medianverbrauch >20% -> Retrain
   
   # P95 / P99
   my $lim_p95_error      = 4 * $mae;
@@ -23564,11 +23746,13 @@ sub aiFannGetConResult {
       return $msg;
   }
   
-  my $cst    = [gettimeofday];                                                            # Startzeit
-  my $haf    = AiNeuralVal ($name, 'con', 'HiddActFunc', 'SIGMOID');                      # Hidden Activation Function
-  my $oaf    = 'LINEAR';                                                                  # Output Activation Function
-  my $range  = _aiFannAfNormRange ($haf);
-  my $pvpeak = $aspeak * AIASPEAKSFAC;                                                    # Peak Sicherheitsaufschlag
+  my $cst               = [gettimeofday];                                                 # Startzeit
+  my $haf               = AiNeuralVal ($name, 'con', 'HiddActFunc', 'SIGMOID');           # Hidden Activation Function
+  my $oaf               = 'LINEAR';                                                       # Output Activation Function
+  my $range             = _aiFannAfNormRange ($haf);
+  my $pvpeak            = $aspeak * AIASPEAKSFAC;                                         # Peak Sicherheitsaufschlag
+  my ($hp, $comftemp)   = isHeatPumpUsed ($name);                                         # Consumer Nummer , Solltemp falls WP verwendet
+  $comftemp           //= HPCOMFTEMP;                                                     # Solltemperatur WP-Heizung
   
   ## letzte reale Zielwerte für Regression lesen
   ################################################
@@ -23647,27 +23831,28 @@ sub aiFannGetConResult {
       $temp                = clampValue (int $temp, -40, 40);
       $pv                  = clampValue ($pv, 0, $pvpeak);
       
-      my $sunalt_norm      = _aiFannNormSunalt ($sunalt, $range);                      # Sonnenaltitude normalisieren im Bereich 0..+1      
-      my $wcc_norm         = _aiFannNormWcc    ($wcc,    $range);                      # Bewölkung symmetrisch oder asymmetriech normalisieren
-      my $temp_norm        = _aiFannNormTemp   ($temp,   $range);                      # Temperatur symmetrisch oder asymmetriech normalisieren
-      my $pv_norm          = _aiFannNormPv     ($pv, $pvpeak, $range);                 # PV symmetrisch oder asymmetriech normalisieren
-      my $pv_norm_prev     = _aiFannNormPv     ($pv_prev, $pvpeak, $range); 
-      my $day_hour_norm    = $isday  ? $hour_norm : 0;                                 # Tagstunden normiert, sonst 0
-      my $night_hour_norm  = !$isday ? $hour_norm : 0;                                 # Nachtstunden normiert, sonst 0 
+      my $sunalt_norm        = _aiFannNormSunalt ($sunalt,     $range);                  # Sonnenaltitude normalisieren im Bereich 0..+1      
+      my $wcc_norm           = _aiFannNormWcc    ($wcc,         $range);                 # Bewölkung symmetrisch oder asymmetriech normalisieren
+      my $temp_norm          = _aiFannNormTemp   ($temp,        $range);                 # Temperatur symmetrisch oder asymmetriech normalisieren
+      my $temp_comfort_norm  = _aiFannNormTemp   ($comftemp,    $range);                 # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
+      my $pv_norm            = _aiFannNormPv     ($pv, $pvpeak, $range);                 # PV symmetrisch oder asymmetriech normalisieren
+      my $pv_norm_prev       = _aiFannNormPv     ($pv_prev, $pvpeak, $range); 
+      my $day_hour_norm      = $isday  ? $hour_norm : 0;                                 # Tagstunden normiert, sonst 0
+      my $night_hour_norm    = !$isday ? $hour_norm : 0;                                 # Nachtstunden normiert, sonst 0 
       
-      # Monat 1..12 → 0..11
+      # Monat 1..12 -> 0..11
       my $month0 = $month - 1;    
       my ($month_sin, $month_cos) = _aiFannEncodeCyclic ($month0,  12, $range);        # Monat, zyklische Struktur (0 .. 11)
       
-      # Stunde 1..24 → 0..23
+      # Stunde 1..24 -> 0..23
       my $hod0 = $inthod - 1;
       my ($hod_sin, $hod_cos)     = _aiFannEncodeCyclic ($hod0, 24, $range);           # Stunde des Tages zyklisch (0 .. 23)
       
-      # Wochentag 1..7 → 0..6
+      # Wochentag 1..7 -> 0..6
       my $wday0 = $weekday - 1;   
       my ($wday_sin, $wday_cos)   = _aiFannEncodeCyclic ($wday0, 7, $range);           # Wochentag in zyklischer Struktur (0..6)
 
-      # Sonnenazimut 0..360 → 0..359
+      # Sonnenazimut 0..360 -> 0..359
       my $sunaz0 = $sunaz % 360; 
       my ($sunaz_sin, $sunaz_cos) = _aiFannEncodeCyclic ($sunaz0, 360, $range);        # Sonnenazimut zyklisch (0 .. 359)      
       
@@ -23689,12 +23874,14 @@ sub aiFannGetConResult {
       
       # diskrete, semantische Zusatzsignale
       #######################################
-      my $sigs = _aiCreateAdditionalSignals ( { lags         => $lags,                          
-                                                pv_norm      => $pv_norm,
-                                                pv_norm_prev => $pv_norm_prev,
-                                                temp_norm    => $temp_norm,
-                                                inthod       => $inthod - 1,
-                                                weekday      => $weekday,
+      my $sigs = _aiCreateAdditionalSignals ( { lags              => $lags,                          
+                                                pv_norm           => $pv_norm,
+                                                pv_norm_prev      => $pv_norm_prev,
+                                                temp_norm         => $temp_norm,
+                                                inthod            => $inthod - 1,
+                                                weekday           => $weekday,
+                                                temp_comfort_norm => $temp_comfort_norm,
+                                                range             => $range,
                                               }
                                             );      
       
@@ -23704,7 +23891,7 @@ sub aiFannGetConResult {
       
       # Kombinatorik durch FEATURE_REGISTRY 
       #######################################
-      my $bv       = 'v1';                                                            # Version Build
+      my $bv       = _aiSelectRegistryVersion ($name);                                # verwendete Feature-Registry Version
       my $semantic = _aiFannFeatureBuilder ($bv,                                     
                        { pv_norm                => $pv_norm,                          # Erstatzwert für PV Ertrag min-max normalisiert
                          rr1c_norm              => $rr1c_norm,                        # Niederschlag, numerisch min-max normalisiert
@@ -23753,6 +23940,19 @@ sub aiFannGetConResult {
                          day_class_weekend      => $sigs->{day_class_weekend},                # Wochenende Flag
                          day_class_workday      => $sigs->{day_class_workday},                # Arbeitstag Flag
                          trend_break            => $sigs->{trend_break},                      # Trendwechsel
+                         heating_degree_norm    => $sigs->{heating_degree_norm},              # Heizlast
+                         cooling_degree_norm    => $sigs->{cooling_degree_norm},              # Kühllast
+                         hp_heating_mode        => $sigs->{hp_heating_mode},                  # WP Heizmodus
+                         hp_cooling_mode        => $sigs->{hp_cooling_mode},                  # WP Kühlmodus
+                         ww_morning             => $sigs->{ww_morning},                       # Warmwasser Morgens
+                         ww_evening             => $sigs->{ww_evening},                       # Warmwasser Abends
+                         ww_cold_boost          => $sigs->{ww_cold_boost},                    # Heizlast verstärkte WW-Semantik
+                         ww_pv_boost            => $sigs->{ww_pv_boost},                      # PV-optimiertes Warmwasser 
+                         cop_proxy              => $sigs->{cop_proxy},                        # für Luft-Wasser-WP ist COP ungefähr linear mit Außentemperatur            
+                         cop_inverse            => $sigs->{cop_inverse},                      # invertierter COP (Strombedarf)
+                         hp_power_factor        => $sigs->{hp_power_factor},                  # kombinierte Semantik (sehr stark)         
+                         frost_protect          => $sigs->{frost_protect},                    # Frostschutz-Trigger binär
+                         frost_load             => $sigs->{frost_load},                       # kontinuierliches Lastsignal wenn Frostschutz aktiv 
                        }       
                     );
       
@@ -23888,14 +24088,14 @@ return ($res, $bc, $zone);                                                      
 
 ###########################################################################
 #        Drift-Analyse-Routine
-#  $windows - die Anzahl der auszuwertenden (letzten) Daten 
+#  $windows - die Anzahl der auszuwertenden (letzten) Daten
 #             default: 150 
 #
 # Sie leistet:
-# - Drift basierend auf MAE_live / MAE_model → die wichtigste Drift‑Metrik
-# - RMSE_rel_live (% vom Medianverbrauch) → erkennt Ausreißer‑Drift
-# - Slope/Bias-Drift → erkennt Skalierungsfehler im Live‑Betrieb
-# - Ampel-System: none, mild, moderate, severe
+# - Drift basierend auf MAE_live / MAE_model -> die wichtigste Drift-Metrik
+# - RMSE_rel_live (% vom Medianverbrauch) -> erkennt Ausreißer-Drift
+# - Slope/Bias-Drift -> erkennt Skalierungsfehler im Live-Betrieb
+# - Ampel-System: none, mild, moderate, severe 
 ###########################################################################      
 sub aiFannDetectDrift {
   my $name    = shift;
@@ -24068,8 +24268,8 @@ sub _aiFannMedianAbsoluteRrror {
   my $n = scalar (@abs_errors);
   
   my $med = $n % 2
-            ? $abs_errors[int($n/2)]                                            # ungerade Anzahl → mittleres Element
-            : ($abs_errors[$n/2 - 1] + $abs_errors[$n/2]) / 2;                  # gerade Anzahl → Mittelwert der beiden mittleren
+            ? $abs_errors[int($n/2)]                                            # ungerade Anzahl -> mittleres Element
+            : ($abs_errors[$n/2 - 1] + $abs_errors[$n/2]) / 2;                  # gerade Anzahl -> Mittelwert der beiden mittleren
   
 return $med; 
 }
@@ -24157,8 +24357,8 @@ sub _aiFannNormSunalt {
   my $sunalt = shift;
   my $range  = shift // '01';
   
-  if ($range eq '-11') { return $sunalt / 90; }                         # [-90 .. 90] → [-1 ..1] für SIGMOID_SYMMETRIC
-  else                 { return ($sunalt + 90) / 180; }                 # [-90 .. 90] → [0 .. 1] für SIGMOID
+  if ($range eq '-11') { return $sunalt / 90; }                         # [-90 .. 90] -> [-1 ..1] für SIGMOID_SYMMETRIC
+  else                 { return ($sunalt + 90) / 180; }                 # [-90 .. 90] -> [0 .. 1] für SIGMOID
 }
 
 ###############################################################
@@ -24786,25 +24986,27 @@ sub aiAddRawData {
       for my $hod (sort keys %{$data{$name}{pvhist}{$pvd}}) {
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
 
-          my $ridx    = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
+          my $ridx      = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
 
-          my $temp    = HistoryVal ($name, $pvd, $hod, 'temp',      undef);
-          my $sunalt  = HistoryVal ($name, $pvd, $hod, 'sunalt',        0);
-          my $sunaz   = HistoryVal ($name, $pvd, $hod, 'sunaz',         0);
-          my $con     = HistoryVal ($name, $pvd, $hod, 'con',       undef);
-          my $conaifc = HistoryVal ($name, $pvd, $hod, 'conaifc',   undef);
-          my $gcons   = HistoryVal ($name, $pvd, $hod, 'gcons',     undef);
-          my $wcc     = HistoryVal ($name, $pvd, $hod, 'wcc',       undef);
-          my $wid     = HistoryVal ($name, $pvd, $hod, 'weatherid', undef);            # Wetter ID
-          my $rr1c    = HistoryVal ($name, $pvd, $hod, 'rr1c',      undef);
-          my $rad1h   = HistoryVal ($name, $pvd, $hod, 'rad1h',     undef);
-          my $pvrlvd  = HistoryVal ($name, $pvd, $hod, 'pvrlvd',        1);            # PV Generation valide?
-          my $pvrl    = HistoryVal ($name, $pvd, $hod, 'pvrl',      undef);
+          my $temp      = HistoryVal ($name, $pvd, $hod, 'temp',      undef);
+          my $sunalt    = HistoryVal ($name, $pvd, $hod, 'sunalt',        0);
+          my $sunaz     = HistoryVal ($name, $pvd, $hod, 'sunaz',         0);
+          my $con       = HistoryVal ($name, $pvd, $hod, 'con',       undef);
+          my $conaifc   = HistoryVal ($name, $pvd, $hod, 'conaifc',   undef);
+          my $gcons     = HistoryVal ($name, $pvd, $hod, 'gcons',     undef);
+          my $wcc       = HistoryVal ($name, $pvd, $hod, 'wcc',       undef);
+          my $wid       = HistoryVal ($name, $pvd, $hod, 'weatherid', undef);            # Wetter ID
+          my $rr1c      = HistoryVal ($name, $pvd, $hod, 'rr1c',      undef);
+          my $rad1h     = HistoryVal ($name, $pvd, $hod, 'rad1h',     undef);
+          my $pvrlvd    = HistoryVal ($name, $pvd, $hod, 'pvrlvd',        1);            # PV Generation valide?
+          my $pvrl      = HistoryVal ($name, $pvd, $hod, 'pvrl',      undef);
+          my $socwhsum  = HistoryVal ($name, $pvd, $hod, 'socwhsum',  undef);            # erreichter SoC total (Wh)    
 
           $data{$name}{aidectree}{airaw}{$ridx}{sunalt}    = $sunalt;
           $data{$name}{aidectree}{airaw}{$ridx}{sunaz}     = $sunaz;
           $data{$name}{aidectree}{airaw}{$ridx}{dayname}   = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}       = $hod;
+          $data{$name}{aidectree}{airaw}{$ridx}{socwhsum}  = $socwhsum                        if(defined $socwhsum);
           $data{$name}{aidectree}{airaw}{$ridx}{temp}      = sprintf "%.0f", $temp            if(defined $temp);
           $data{$name}{aidectree}{airaw}{$ridx}{con}       = $con                             if(defined $con     && $con     >= 0);
           $data{$name}{aidectree}{airaw}{$ridx}{conaifc}   = $conaifc                         if(defined $conaifc && $conaifc >= 0);
@@ -25998,20 +26200,21 @@ sub _listDataPoolAiRawData {
   my $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
 
   for my $idx (sort keys %{$h}) {
-      my $hod     = AiRawdataVal ($name, $idx, 'hod',       '-');
-      my $sunalt  = AiRawdataVal ($name, $idx, 'sunalt',    '-');
-      my $sunaz   = AiRawdataVal ($name, $idx, 'sunaz',     '-');
-      my $rad1h   = AiRawdataVal ($name, $idx, 'rad1h',     '-');
-      my $wcc     = AiRawdataVal ($name, $idx, 'wcc',       '-');
-      my $wid     = AiRawdataVal ($name, $idx, 'weatherid', '-');
-      my $rr1c    = AiRawdataVal ($name, $idx, 'rr1c',      '-');
-      my $pvrl    = AiRawdataVal ($name, $idx, 'pvrl',      '-');
-      my $pvrlvd  = AiRawdataVal ($name, $idx, 'pvrlvd',    '-');
-      my $temp    = AiRawdataVal ($name, $idx, 'temp',      '-');
-      my $nod     = AiRawdataVal ($name, $idx, 'dayname',   '-');
-      my $con     = AiRawdataVal ($name, $idx, 'con',       '-');
-      my $conaifc = AiRawdataVal ($name, $idx, 'conaifc',   '-');
-      my $gcons   = AiRawdataVal ($name, $idx, 'gcons',     '-');
+      my $hod      = AiRawdataVal ($name, $idx, 'hod',       '-');
+      my $sunalt   = AiRawdataVal ($name, $idx, 'sunalt',    '-');
+      my $sunaz    = AiRawdataVal ($name, $idx, 'sunaz',     '-');
+      my $rad1h    = AiRawdataVal ($name, $idx, 'rad1h',     '-');
+      my $wcc      = AiRawdataVal ($name, $idx, 'wcc',       '-');
+      my $wid      = AiRawdataVal ($name, $idx, 'weatherid', '-');
+      my $rr1c     = AiRawdataVal ($name, $idx, 'rr1c',      '-');
+      my $pvrl     = AiRawdataVal ($name, $idx, 'pvrl',      '-');
+      my $pvrlvd   = AiRawdataVal ($name, $idx, 'pvrlvd',    '-');
+      my $temp     = AiRawdataVal ($name, $idx, 'temp',      '-');
+      my $nod      = AiRawdataVal ($name, $idx, 'dayname',   '-');
+      my $con      = AiRawdataVal ($name, $idx, 'con',       '-');
+      my $conaifc  = AiRawdataVal ($name, $idx, 'conaifc',   '-');
+      my $gcons    = AiRawdataVal ($name, $idx, 'gcons',     '-');
+      my $socwhsum = AiRawdataVal ($name, $idx, 'socwhsum',  '-');
       
       my $csm;
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
@@ -26025,9 +26228,11 @@ sub _listDataPoolAiRawData {
       }
 
       $sq .= "\n";
-      $sq .= "$idx => hod: $hod, dayname: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, ";
-      $sq .= "wcc: $wcc, weatherid: $wid, rr1c: $rr1c, pvrl: $pvrl, pvrlvd: $pvrlvd, conaifc: $conaifc, con: $con, gcons: $gcons, temp: $temp";
-      
+      $sq .= "$idx => hod: $hod, dayname: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, weatherid: $wid, ";
+      $sq .= "rr1c: $rr1c, temp: $temp, socwhsum: $socwhsum, ";
+      $sq .= "\n              ";
+      $sq .= "pvrl: $pvrl, pvrlvd: $pvrlvd, conaifc: $conaifc, con: $con, gcons: $gcons, ";
+       
       if (defined $csm) { $sq .= "\n              "; $sq .= $csm; }
   }
 
@@ -27397,16 +27602,16 @@ sub val2dynColor {
 
   my ($r, $g, $b, $t);
 
-  if ($val <= 50) {                                             # Übergang: Rot (#FF0000) → Orange (#FF8C00)
+  if ($val <= 50) {                                             # Übergang: Rot (#FF0000) -> Orange (#FF8C00)
       $t = $val / 50;
       $r = 255;
-      $g = int (140 * $t);                                      # 0 → 140
+      $g = int (140 * $t);                                      # 0 -> 140
       $b = 0;
   }
-  else {                                                        # Übergang: Orange (#FF8C00) → Dunkelgrün (#00C000)
+  else {                                                        # Übergang: Orange (#FF8C00) -> Dunkelgrün (#00C000)
       $t = ($val - 50) / 50;
-      $r = int (255 * (1 - $t));                                # 255 → 0
-      $g = int (140 + (192 - 140) * $t);                        # 140 → 192 (z.B. C0)
+      $r = int (255 * (1 - $t));                                # 255 -> 0
+      $g = int (140 + (192 - 140) * $t);                        # 140 -> 192 (z.B. C0)
       $b = 0;
     }
 
@@ -27425,9 +27630,9 @@ sub _reduceSaturation {
   return ($r, $g, $b) unless $satiety;
 
   ($r, $g, $b)    = map { $_ / 255 } ($r, $g, $b);           # RGB normalisieren auf [0,1]
-  my ($h, $s, $v) = Color::rgb2hsv ($r, $g, $b);             # Umwandlung RGB → HSV
-  $s             *= $satiety;                                # Sättigung verringern → Farbe wird grauer: 0.1 -> fast ganz grau, 0.6 -> nur leicht verblasst
-  ($r, $g, $b)    = Color::hsv2rgb ($h, $s, $v);             # HSV → zurück zu RGB
+  my ($h, $s, $v) = Color::rgb2hsv ($r, $g, $b);             # Umwandlung RGB -> HSV
+  $s             *= $satiety;                                # Sättigung verringern -> Farbe wird grauer: 0.1 -> fast ganz grau, 0.6 -> nur leicht verblasst
+  ($r, $g, $b)    = Color::hsv2rgb ($h, $s, $v);             # HSV -> zurück zu RGB
 
 return map { int($_ * 255 + 0.5) } ($r, $g, $b);             # Zurück in 0–255 Bereich
 }
@@ -27940,12 +28145,12 @@ sub isAddSwitchOnCond {
       }
 
       if ($true) {
-          $info  = qq{The return value “$true” resulted in 'true' after exec "$swoncode" \n};
+          $info  = qq{The return value "$true" resulted in 'true' after exec "$swoncode" \n};
           $info .= "-> Check successful ";
           $swon  = 1;
       }
       else {
-          $info = qq{The return value “$true” resulted in 'false' after exec "$swoncode" \n};
+          $info = qq{The return value "$true" resulted in 'false' after exec "$swoncode" \n};
           $swon = 0;
       }
   }
@@ -28014,12 +28219,12 @@ sub isAddSwitchOffCond {
           }
 
           if ($true) {
-              $info   = qq{The return value “$true” resulted in 'true' after exec "$swoffcode" \n};
+              $info   = qq{The return value "$true" resulted in 'true' after exec "$swoffcode" \n};
               $info  .= "-> Check successful ";
               $swoff  = 1;
           }
           else {
-              $info  = qq{The return value “$true” resulted in 'false' after exec "$swoffcode" \n};
+              $info  = qq{The return value "$true" resulted in 'false' after exec "$swoffcode" \n};
               $swoff = 0;
           }
       }
@@ -28096,11 +28301,11 @@ sub isReductionState {
       }
 
       if ($true) {
-          $info  = qq{The value “$rdcval” resulted in 'true' after exec "$rdcrgx"};
+          $info  = qq{The value "$rdcval" resulted in 'true' after exec "$rdcrgx"};
           $rdcstate  = 1;
       }
       else {
-          $info = qq{The value “$rdcval” resulted in 'false' after exec "$rdcrgx" \n};
+          $info = qq{The value "$rdcval" resulted in 'false' after exec "$rdcrgx" \n};
           $rdcstate = 0;
       }
   }
@@ -28162,12 +28367,12 @@ sub isSurplusIgnoCond {
           }
 
           if ($true) {
-              $info   = qq{Value “$condval” resulted in 'true' after exec "$ignorecode" \n};
+              $info   = qq{Value "$condval" resulted in 'true' after exec "$ignorecode" \n};
               $info  .= "-> Check successful ";
               $igno  = 1;
           }
           else {
-              $info  = qq{Value “$condval” resulted in 'false' after exec "$ignorecode" \n};
+              $info  = qq{Value "$condval" resulted in 'false' after exec "$ignorecode" \n};
               $igno = 0;
           }
       }
@@ -28311,6 +28516,20 @@ sub isNumeric {
   if ($val =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/xs) { $ret = 1; }
 
 return $ret;
+}
+
+################################################################
+#  liefert die Consumernummer der Wärmepumpe falls vorhanden
+################################################################
+sub isHeatPumpUsed {
+  my $name = shift;
+
+  my $ct;
+  
+  my $c = CurrentVal  ($name, 'heatpumpInstalled', undef);
+  $ct   = ConsumerVal ($name, $c, 'comforttemp',   undef) if($c);
+  
+return ($c, $ct);
 }
 
 ################################################################
@@ -31647,12 +31866,12 @@ to ensure that the system configuration is correct.
             <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
             <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
             <tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr>
-            <tr><td>                     </td><td><b>Note:</b> The relationship ‘careCycle * stepSoC = 100’ should be observed!                   </td></tr>
+            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100' should be observed!                   </td></tr>
             <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>careCycle</b>    </td><td>Maximum interval in days between two charge states of at least 'maxSoC' that should not be      </td></tr>
             <tr><td>                     </td><td>exceeded if possible. The specification is optional (default: 20)                               </td></tr>
-            <tr><td>                     </td><td><b>Note:</b> The relationship ‘careCycle * stepSoC = 100’ should be observed!                   </td></tr>
+            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100' should be observed!                   </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>lcSlot</b>       </td><td>A daily time window is defined in which the charging control of the module should be active     </td></tr>
             <tr><td>                     </td><td>for this battery. Outside the time window, the battery charge is released                       </td></tr>
@@ -34180,7 +34399,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * 2 = vollständiges Shuffle vor dem Split + internes Shuffle - maximale Durchmischung, aber zeitliche Strukturen gehen verloren</ul>            </td></tr>
             <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2 </b>, default: 2                                                                                                                 </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td><b>aiConShufflePeriod</b> </td><td>Die Shuffle‑Periode bestimmt, nach wie vielen Epochen die Trainingsdaten im Hintergrund neu gemischt werden.                                         </td></tr>
+            <tr><td><b>aiConShufflePeriod</b> </td><td>Die Shuffle-Periode bestimmt, nach wie vielen Epochen die Trainingsdaten im Hintergrund neu gemischt werden.                                         </td></tr>
             <tr><td>                          </td><td>Der Parameter beeinflusst, wie stark das Netz zufällige Reihenfolgen sieht und damit Generalisation vs. Stabilität.                                  </td></tr>
             <tr><td>                          </td><td><ul> * Klein (5–10): Daten werden sehr häufig neu gemischt, bessere Generalisierung, weniger Gefahr von 'Auswendiglernen' </ul>                      </td></tr>
             <tr><td>                          </td><td><ul> * Mittel (10–20): guter Kompromiss zwischen Stabilität und Durchmischung, glatte Lernkurven, trotzdem genug Variation </ul>                     </td></tr>
