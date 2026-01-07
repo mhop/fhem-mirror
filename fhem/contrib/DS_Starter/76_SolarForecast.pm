@@ -31876,8 +31876,6 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
             <tr><td> <b>power</b>          </td><td>Maximum power consumption of the heat pump in W. The value must not be 0.                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Reading: Unit (W/kW) indicating current energy consumption. This information is mandatory.                                                         </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Reading: Unit (Wh/kWh) of the consumer device that provides the total amount of energy consumed. This information is mandatory.                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>Reading: Unit (W/kW) that provides the current energy consumption. This information is mandatory.                                                  </td></tr>
@@ -32676,6 +32674,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>genPVdeviation</b>            </td><td>Defines the method for calculating the deviation between forecast and actual PV generation.                                                                     </td></tr>
             <tr><td>                                  </td><td>The reading <b>Today_PVdeviation</b> is created depending on this setting.                                                                                      </td></tr>
             <tr><td>                                  </td><td>The optional addition ':reverse' specifies that PV generation > forecast is evaluated as a positive value instead of a negative value (change of perspective).  </td></tr>
+            <tr><td>                                  </td><td>This setting also applies to the Consumption Variance Perspective display.                                                                                      </td></tr>
             <tr><td>                                  </td><td><b>daily[:reverse]</b>        - Calculation and creation of Today_PVdeviation takes place after sunset (default)                                                </td></tr>
             <tr><td>                                  </td><td><b>continuously[:reverse]</b> - Calculation and creation of Today_PVdeviation is continuous                                                                     </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
@@ -34789,8 +34788,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
             <tr><td> <b>power</b>          </td><td>maximale Leistungsaufnahme der Wärmepumpe in W. Der Wert darf nicht! 0 sein.                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch. Die Angabe ist verpflichtend.                                                       </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert. Die Angabe ist verpflichtend.                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert. Die Angabe ist verpflichtend.                                               </td></tr>
@@ -35588,6 +35585,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>genPVdeviation</b>            </td><td>Legt die Methode zur Berechnung der Abweichung von prognostizierter und realer PV Erzeugung fest.                                                 </td></tr>
             <tr><td>                                  </td><td>Das Reading <b>Today_PVdeviation</b> wird in Abhängigkeit dieser Einstellung erstellt.                                                            </td></tr>
             <tr><td>                                  </td><td>Der optionale Zusatz ':reverse' legt fest, dass PV-Erzeugung > Prognose als positiver statt negativer Wert gewertet wird (Perspektivwechsel).     </td></tr>
+            <tr><td>                                  </td><td>Diese Einstellung gilt ebenfalls für die Anzeige Perspektive der Verbrauchsabweichung.                                                            </td></tr>
             <tr><td>                                  </td><td><b>daily[:reverse]</b>        - Berechnung und Erstellung von Today_PVdeviation erfolgt nach Sonnenuntergang (default)                            </td></tr>
             <tr><td>                                  </td><td><b>continuously[:reverse]</b> - Berechnung und Erstellung von Today_PVdeviation erfolgt fortlaufend                                               </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
