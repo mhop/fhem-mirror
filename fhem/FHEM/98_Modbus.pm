@@ -1071,7 +1071,7 @@ sub UpdateGetSetList {
         foreach my $at (keys %{$attr{$name}}) {
             #Log3 $name, 5, "$name: UpdateGetSetList looks at $at";
             if ($at =~ /^obj-(.*)-reading$/ || $at =~ /^obj-([^-]*)$/) {
-                #Log3 $name, 5, "$name: UpdateGetSetList adds $1";
+                #Log3 $name, 5, "$name: UpdateGetSetList adds $1 to ObjList";
                 push @ObjList, $1 if (!$parseInfo->{$1});
             }
         }
@@ -1080,7 +1080,7 @@ sub UpdateGetSetList {
         foreach my $objCombi (sort @ObjList) {
             my $oi = GetOICache($hash, $objCombi);  # cached for this objCombi until attrs change
             my $setopt;
-            $hash->{'.getList'} .= "$oi->{'reading'}:noArg " if ($oi->{'showget'}); # sichtbares get
+            $hash->{'.getList'} .= "$oi->{'reading'}:noArg " if ($oi->{'showGet'}); # sichtbares get
     
             #Log3 $name, 5, "$name: UpdateGetSetList check set for $objCombi ($oi->{set})";
             if ($oi->{set}) {                 # gibt es für das Reading ein SET?
@@ -1147,7 +1147,7 @@ sub GetLDFn {
 
     if (!$objCombi) {
         UpdateGetSetList($hash) if ($hash->{'.updateSetGet'});
-        #Log3 $name, 5, "$name: get $getName not found, return list $hash->{'.getList'}" if ($getName ne '?');
+        Log3 $name, 5, "$name: get $getName not found, return list $hash->{'.getList'}" if ($getName ne '?');
         return "Unknown argument $getName, choose one of $hash->{'.getList'}";
     }
     my $msg = GetSetChecks($hash, $async);
