@@ -1827,6 +1827,7 @@ my %FEATURE_BLOCKS = (
           $f->{ww_evening},
           $f->{ww_cold_boost},
           $f->{ww_pv_boost},
+          $f->{ww_cycle_flag},                                         # WW-Zyklus (NEU)
 
           $f->{cop_proxy},                                             # COP-Semantik
           $f->{cop_inverse},
@@ -1834,6 +1835,13 @@ my %FEATURE_BLOCKS = (
 
           $f->{frost_protect},                                         # Frostschutz
           $f->{frost_load},
+          
+          $f->{temp_norm_lag1h},                                       # Temperatur-Dynamik (NEU)
+          $f->{temp_norm_lag3h},
+          $f->{temp_norm_lag24h},
+          $f->{temp_delta_1h},
+          $f->{temp_delta_3h},
+          $f->{temp_trend},
       ];
   },
   
@@ -22137,9 +22145,9 @@ sub aiFannCreateConTrainData {
   # Zusammenführen für Training
   ################################
   for my $i (6 .. $#flat_targets) {                                                                
-      my $lags = _aiFannBuildLagFeatures (\@flat_targets, $i, $lagnorm_ref);                   # Lags erstellen
+      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, $i, $lagnorm_ref);            # Lags erstellen
       
-      my $sigs = _aiCreateAdditionalSignals ( { lags              => $lags,                    # diskrete, semantische Zusatzsignale
+      my $sigs = _aiCreateAdditionalSignals ( { lags              => $lags,                                 # diskrete, semantische Zusatzsignale
                                                 pv_norm           => $pv_norm_values[$i],
                                                 pv_norm_prev      => $pv_norm_prev_values[$i],
                                                 temp_norm         => $temp_norm_values[$i],
@@ -22171,8 +22179,20 @@ sub aiFannCreateConTrainData {
                     $sigs->{volatility_flag},
                     $sigs->{pv_consumption_cross},
                     $sigs->{trend_break},
-                   )
-                  ); 
+              ));
+
+              # Temperatur-Features separat
+              Log3 ($name, 1, sprintf(
+                    "%s - DBG F[%d]: tmplag1=%0.3f tmplag3=%0.3f tmplag24=%0.3f tmpd1=%0.3f tmpd3=%0.3f tmpTrend=%0.3f",
+                    $name, 
+                    $i,
+                    $lags->{temp_norm_lag1h},
+                    $lags->{temp_norm_lag3h},
+                    $lags->{temp_norm_lag24h},
+                    $lags->{temp_delta_1h},
+                    $lags->{temp_delta_3h},
+                    $lags->{temp_trend},
+              ));              
           }
       }  
       
@@ -22207,7 +22227,13 @@ sub aiFannCreateConTrainData {
                          delta24_norm_pos       => $lags->{delta24_norm_pos},
                          delta24_norm_neg       => $lags->{delta24_norm_neg},
                          roll_mean_3_norm       => $lags->{roll_mean_3_norm},
-                         roll_std_6_norm        => $lags->{roll_std_6_norm},  
+                         roll_std_6_norm        => $lags->{roll_std_6_norm}, 
+                         temp_norm_lag1h        => $lags->{temp_norm_lag1h},
+                         temp_norm_lag3h        => $lags->{temp_norm_lag3h},
+                         temp_norm_lag24h       => $lags->{temp_norm_lag24h},
+                         temp_delta_1h          => $lags->{temp_delta_1h},
+                         temp_delta_3h          => $lags->{temp_delta_3h},
+                         temp_trend             => $lags->{temp_trend},                         
                          trend_up_norm          => $sigs->{trend_up_norm},
                          trend_down_norm        => $sigs->{trend_down_norm},
                          trend_up_strength      => $sigs->{trend_up_strength},
@@ -22235,6 +22261,7 @@ sub aiFannCreateConTrainData {
                          ww_evening             => $sigs->{ww_evening},                              # Warmwasser Abends
                          ww_cold_boost          => $sigs->{ww_cold_boost},                           # Heizlast verstärkte WW-Semantik
                          ww_pv_boost            => $sigs->{ww_pv_boost},                             # PV-optimiertes Warmwasser                          
+                         ww_cycle_flag          => $sigs->{ww_cycle_flag},                           # WW-Zyklus
                          cop_proxy              => $sigs->{cop_proxy},                               # für Luft-Wasser-WP ist COP ungefähr linear mit Außentemperatur            
                          cop_inverse            => $sigs->{cop_inverse},                             # invertierter COP (Strombedarf)
                          hp_power_factor        => $sigs->{hp_power_factor},                         # kombinierte Semantik (sehr stark)         
@@ -22370,7 +22397,7 @@ return ($targminval, $targmaxval);
 }
 
 ################################################################
-#    Normierungen für Lag-Features erstellen
+#    Normierungen für Target Lag-Features erstellen
 ################################################################
 sub _aiFannCreateLagNorms {            
   my ($targref, $targminval, $targmaxval) = @_;              
@@ -22418,9 +22445,10 @@ return \%lag_norms;
 # Rolling-Statistik-Features für den Zeitreihen-Workflow
 #
 # $con_series - Arrayref der Verbräuche in Originalskalierung
+# $temp_norm_series - Arrayref normierter Temperaturen
 ################################################################
 sub _aiFannBuildLagFeatures {
-  my ($con_series, $i, $norms) = @_;                        
+  my ($con_series, $temp_norm_series, $i, $norms) = @_;                        
 
   # Sicherheitsprüfung: genug Historie vorhanden?
   return undef if $i < 6;
@@ -22470,6 +22498,34 @@ sub _aiFannBuildLagFeatures {
   my $delta1_norm_neg_prev = _aiFannNormMinMaxValue ($delta1_prev_neg, $norms->{delta_neg_min}, $norms->{delta_neg_max});
   my $delta24_norm_pos     = _aiFannNormMinMaxValue ($delta24_pos,     $norms->{delta_pos_min}, $norms->{delta_pos_max});
   my $delta24_norm_neg     = _aiFannNormMinMaxValue ($delta24_neg,     $norms->{delta_neg_min}, $norms->{delta_neg_max});
+  
+  # ---------------------------------------------------------
+  # Temperatur-Lags
+  # ---------------------------------------------------------
+  my $t_t     = $temp_norm_series->[$i];
+  my $t_t_1   = $temp_norm_series->[$i - 1];
+  my $t_t_3   = $i >= 3  ? $temp_norm_series->[$i - 3]  : $t_t_1;
+  my $t_t_24  = $i >= 24 ? $temp_norm_series->[$i - 24] : $t_t_1;
+
+  # Temperatur-Deltas
+  my $temp_delta_1h = $t_t - $t_t_1;
+  my $temp_delta_3h = $t_t - $t_t_3;
+
+  # Temperatur-Trend (gemittelt)
+  my $temp_trend = ($temp_delta_1h + $temp_delta_3h) / 2;
+
+  # Normierung (Temperatur ist bereits normiert, clamp reicht)
+  $temp_delta_1h = clampValue ($temp_delta_1h, -1, 1);
+  $temp_delta_3h = clampValue ($temp_delta_3h, -1, 1);
+  $temp_trend    = clampValue ($temp_trend,    -1, 1);
+  
+  # ---------------------------------------------------------
+  # WW-Zyklus Erkennung Prefilter
+  # ---------------------------------------------------------
+  my $spike        = ($y_t - $y_t_1) > 1000 ? 1 : 0;                                          # Verbrauchssprung (Spike-Schwelle 1000W)
+  my $plateau      = ($y_t > $y_t_1 * 0.8 && $y_t_1 > $y_t_2 * 0.8) ? 1 : 0;                  # Plateau über 2 Stunden  
+  my $stable       = $std6_norm < 0.15 ? 1 : 0;                                               # Stabilität (WW glatt, Kochen unruhig)
+  my $ww_prefilter = ($spike && $plateau && $stable) ? 1 : 0;                                 # Warmwasser-Zyklus erkannt
 
   return {
       lag1_norm            => $lag1_norm,
@@ -22485,6 +22541,15 @@ sub _aiFannBuildLagFeatures {
       delta24_norm_neg     => $delta24_norm_neg,
       roll_mean_3_norm     => $mean3_norm,
       roll_std_6_norm      => $std6_norm,
+      
+      temp_norm_lag1h      => $t_t_1,
+      temp_norm_lag3h      => $t_t_3,
+      temp_norm_lag24h     => $t_t_24,
+      temp_delta_1h        => $temp_delta_1h,
+      temp_delta_3h        => $temp_delta_3h,
+      temp_trend           => $temp_trend,
+      
+      ww_prefilter         => $ww_prefilter,
   };
 }
 
@@ -22575,6 +22640,16 @@ sub _aiCreateAdditionalSignals {
   $sigs->{ww_cold_boost}   = $heating_degree_norm * $sigs->{ww_morning};                  # verstärkte Semantik (mit Heizlast kombiniert)
   $sigs->{ww_pv_boost}     = ($pv_norm > 0.6 && $hour >= 11 && $hour < 15) ? 1 : 0;       # PV-optimiertes Warmwasser (Eigenverbrauchslogik)
 
+  # ---------------------------------------------------------
+  # Finalisierung Warmwasser-Zyklus (WW)
+  # ---------------------------------------------------------
+  my $ww_prefilter  = $lags->{ww_prefilter} // 0;                                         # Vorfilter aus Lag-Funktion
+  my $ww_time       = ($sigs->{ww_morning} || $sigs->{ww_evening}) ? 1 : 0;               # Semantische Verstärker
+  my $pv_boost      = ($sigs->{ww_pv_boost} // 0) > 0.3 ? 1 : 0;
+  my $ww_cycle_flag = ($ww_prefilter && ($ww_time || $pv_boost)) ? 1 : 0;                 # Finaler WW-Trigger: - Vorfilter muss passen UND (typische Tageszeit ODER PV-Boost)
+
+  $sigs->{ww_cycle_flag} = $ww_cycle_flag;
+  
   # ---------------------------------------------------------
   # COP-Semantik (Coefficient of Performance)
   # ---------------------------------------------------------
@@ -23829,9 +23904,12 @@ sub aiFannGetConResult {
   my ($hp, $comftemp)   = isHeatPumpUsed ($name);                                         # Consumer Nummer , Solltemp falls WP verwendet
   $comftemp           //= HPCOMFTEMP;                                                     # Solltemperatur WP-Heizung
   
-  ## letzte reale Zielwerte für Regression lesen
-  ################################################
-  my @flat_targets = getPvHistTargetArray ($name, $fanntyp, 200); 
+  ## letzte reale Zielwerte / Temperaturen für Regression lesen
+  ###############################################################
+  my @flat_targets     = getPvHistTargetArray ($name, $fanntyp, 200); 
+  my @temps            = getPvHistTargetArray ($name, 'temp',   200);                     # Temperaturen aus History lesen
+  my @temp_norm_values = map { _aiFannNormTemp ($_, $range) } @temps;                     # Temperaturen symmetrisch oder asymmetriech normalisieren
+
     
   # Lag-Norms auslesen
   ######################
@@ -23945,7 +24023,7 @@ sub aiFannGetConResult {
       ## Lag-Features erzeugen
       ##########################
       my $i    = @flat_targets - 1;
-      my $lags = _aiFannBuildLagFeatures (\@flat_targets, $i, $lag_normref); 
+      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, $i, $lag_normref); 
       
       # diskrete, semantische Zusatzsignale
       #######################################
@@ -23996,6 +24074,12 @@ sub aiFannGetConResult {
                          delta24_norm_neg       => $lags->{delta24_norm_neg},
                          roll_mean_3_norm       => $lags->{roll_mean_3_norm},
                          roll_std_6_norm        => $lags->{roll_std_6_norm},
+                         temp_norm_lag1h        => $lags->{temp_norm_lag1h},
+                         temp_norm_lag3h        => $lags->{temp_norm_lag3h},
+                         temp_norm_lag24h       => $lags->{temp_norm_lag24h},
+                         temp_delta_1h          => $lags->{temp_delta_1h},
+                         temp_delta_3h          => $lags->{temp_delta_3h},
+                         temp_trend             => $lags->{temp_trend},
                          trend_up_norm          => $sigs->{trend_up_norm},
                          trend_down_norm        => $sigs->{trend_down_norm},
                          trend_up_strength      => $sigs->{trend_up_strength},
@@ -24023,6 +24107,7 @@ sub aiFannGetConResult {
                          ww_evening             => $sigs->{ww_evening},                       # Warmwasser Abends
                          ww_cold_boost          => $sigs->{ww_cold_boost},                    # Heizlast verstärkte WW-Semantik
                          ww_pv_boost            => $sigs->{ww_pv_boost},                      # PV-optimiertes Warmwasser 
+                         ww_cycle_flag          => $sigs->{ww_cycle_flag},                    # WW-Zyklus
                          cop_proxy              => $sigs->{cop_proxy},                        # für Luft-Wasser-WP ist COP ungefähr linear mit Außentemperatur            
                          cop_inverse            => $sigs->{cop_inverse},                      # invertierter COP (Strombedarf)
                          hp_power_factor        => $sigs->{hp_power_factor},                  # kombinierte Semantik (sehr stark)         
