@@ -162,10 +162,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.0.0"  => "05.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
+  "2.0.0"  => "07.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
-                           "new consumer type 'heatpump' ".
+                           "new consumer type 'heatpump', new readings Today_CONdeviation, Today_CONforecast, Today_CONreal ".
+                           "show Con deviation in UI ".
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
@@ -1057,6 +1058,12 @@ my %hqtxt = (                                                                # H
               DE => qq{produziert wie vorhergesagt &#128522;}                                                               },
   pltp   => { EN => qq{produced less than predicted &#128531;},
               DE => qq{weniger produziert als vorhergesagt &#128531;}                                                       },
+  conmtp => { EN => qq{consumed more than predicted &#128531;},           
+              DE => qq{mehr verbraucht als vorhergesagt &#128531;}                                                          },
+  conetp => { EN => qq{consumed same as predicted &#128522;},
+              DE => qq{verbraucht wie vorhergesagt &#128522;}                                                               },
+  conltp => { EN => qq{consumed less than predicted &#128515;},
+              DE => qq{weniger verbraucht als vorhergesagt &#128515;}                                                       },
   wusond => { EN => qq{waiting for data ...},
               DE => qq{warte auf Daten ...}                                                                                 },
   snbefb => { EN => qq{the data will be available tomorrow},
@@ -9963,8 +9970,8 @@ sub centralTask {
   #    delete $data{$name}{circular}{$hodc};
   #}
 
-  delete $data{$name}{circular}{'99'}{neuralNetConRuntimeTrain};         # 23.12.
-  delete $data{$name}{circular}{'99'}{neuralNetConTrainLastFinishTs};    # 23.12.
+  #delete $data{$name}{circular}{'99'}{neuralNetConRuntimeTrain};         # 23.12.
+  #delete $data{$name}{circular}{'99'}{neuralNetConTrainLastFinishTs};    # 23.12.
 
   #my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
   #my $gco = AttrVal ($name, 'graphicControl', '');
@@ -10058,15 +10065,16 @@ sub centralTask {
   
   _evaluateTrigger            ($centpars);                                            # Schwellenwerte der Trigger bewerten und signalisieren
   _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
-  _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
+  _calcTodayDeviation         ($centpars);                                            # Vorhersageabweichung erstellen 
   _calcDataEveryFullHour      ($centpars);                                            # Daten berechnen/speichern die nur einmal nach jeder vollen Stunde ermittelt werden 
   _saveEnergyConsumption      ($centpars);                                            # Energie Hausverbrauch speichern
   _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
   _genSpecialReadings         ($centpars);                                            # optionale Spezialreadings erstellen
   
-  createReadingsFromArray     ($hash, $evt);                                          # Readings erzeugen
-
   userExit                    ($centpars);                                            # User spezifische Funktionen ausführen
+  
+  createReadingsFromArray     ($hash, $evt);                                          # Readings erzeugen
+  
   setTimeTracking             ($name, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
   _readSystemMessages         ($centpars);                                            # Notification System - System Messages zusammenstellen
 
@@ -10553,8 +10561,10 @@ sub _specialActivities {
               delete $data{$name}{circular}{99}{'initdaybatouttot'.$bn};
           }
 
-          $data{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
+          $data{$name}{circular}{99}{ydayDvtn}    = CircularVal ($hash, 99, 'tdayDvtn',    undef);
+          $data{$name}{circular}{99}{ydayConDvtn} = CircularVal ($hash, 99, 'tdayConDvtn', undef);
           delete $data{$name}{circular}{99}{tdayDvtn};
+          delete $data{$name}{circular}{99}{tdayConDvtn};
 
           delete $data{$name}{pvhist}{$day};                                                     # den (alten) aktuellen Tag aus History löschen
 
@@ -13888,8 +13898,11 @@ sub _createSummaries {
   }
 
   for my $th (1..24) {
-      $todaySumFc->{PV} += HistoryVal ($name, $day, sprintf("%02d", $th), 'pvfc', 0);
-      $todaySumRe->{PV} += HistoryVal ($name, $day, sprintf("%02d", $th), 'pvrl', 0);
+      $th = sprintf "%02d", $th;
+      $todaySumFc->{PV}          += HistoryVal ($name, $day, $th, 'pvfc',  0);
+      $todaySumRe->{PV}          += HistoryVal ($name, $day, $th, 'pvrl',  0);
+      $todaySumFc->{Consumption} += HistoryVal ($name, $day, $th, 'confc', 0);
+      $todaySumRe->{Consumption} += HistoryVal ($name, $day, $th, 'con',   0);
   }
 
   my $pvre = sprintf "%.0f", $todaySumRe->{PV};
@@ -14004,6 +14017,8 @@ sub _createSummaries {
   storeReading ('RestOfDayPVforecast',                 (sprintf "%.0f", $restOfDaySum->{PV}).          ' Wh');
   storeReading ('Tomorrow_PVforecast',                 (sprintf "%.0f", $tomorrowSum->{PV}).           ' Wh');
   storeReading ('Today_PVforecast',                    (sprintf "%.0f", $todaySumFc->{PV}).            ' Wh');
+  storeReading ('Today_CONforecast',                   (sprintf "%.0f", $todaySumFc->{Consumption}).   ' Wh');
+  storeReading ('Today_CONreal',                       (sprintf "%.0f", $todaySumRe->{Consumption}).   ' Wh');
   storeReading ('NextHours_Sum04_ConsumptionForecast', (sprintf "%.0f", $next4HoursSum->{Consumption}).' Wh');
   storeReading ('RestOfDayConsumptionForecast',        (sprintf "%.0f", $restOfDaySum->{Consumption}). ' Wh');
 
@@ -16126,45 +16141,60 @@ return;
 }
 
 ################################################################
-#  Korrektur von Today_PVreal +
-#  berechnet die prozentuale Abweichung von Today_PVforecast
-#  und Today_PVreal
+#  berechnet die prozentuale Abweichung von Tageswerten
 ################################################################
-sub _calcTodayPVdeviation {
+sub _calcTodayDeviation {
   my $paref = shift;
   my $name  = $paref->{name};
   my $t     = $paref->{t};
   my $date  = $paref->{date};
-  my $day   = $paref->{day};
+  my $day   = $paref->{day};                                            
 
-  my $hash = $defs{$name};
-  my $pvfc = ReadingsNum ($name, 'Today_PVforecast', 0);
-  my $pvre = ReadingsNum ($name, 'Today_PVreal',     0);
-
-  return if(!$pvre || !$pvfc);                                                # Illegal division by zero verhindern
-
-  my $dp;
+  my ($dpv, $dcon);
   my ($manner, $perspective) = split ':', CurrentVal ($name, 'genPVdeviation', 'daily');
   $perspective //= 'default';
+  my $dosave_dpv = 0;
+  
+  # PV Prognose/Ist Abweichung
+  ##############################
+  my $pvfc = ReadingsNum ($name, 'Today_PVforecast', 0);
+  my $pvre = ReadingsNum ($name, 'Today_PVreal',     0);
+  
+  if ($pvre && $pvfc) {                                                                     # Schutz Illegal division by zero
+      if ($manner eq 'daily') {
+          my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
 
-  if ($manner eq 'daily') {
-      my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
-      return if($t < $sstime);
+          if ($t >= $sstime) {
+              $dpv        = sprintf "%.2f", (100 - (100 * $pvre / $pvfc));                 
+              $dosave_dpv = 1;
+          }
+      }
+      else {
+          my $pvfcd   = ReadingsNum ($name, 'RestOfDayPVforecast', 0) - $pvfc;              # PV Prognose bis jetzt
+          $dpv        = sprintf "%.2f", (100 - (100 * $pvre / (abs $pvfcd || 1) ) );        # V 2.0.0
+          $dosave_dpv = 1;
+      }
 
-      $dp = sprintf "%.2f", (100 - (100 * $pvre / $pvfc));                    # V 1.23.0
+      if ($dosave_dpv) {
+          $dpv *= -1 if($perspective eq 'reverse');                                         # Perspektivänderung: Abweichung = Real - Vorhersage statt Abweichung = Vorhersage - Real
+          $data{$name}{circular}{99}{tdayDvtn} = $dpv;
+
+          storeReading ('Today_PVdeviation', $dpv.' %');
+      }
   }
-  else {
-      my $pvfcd = ReadingsNum ($name, 'RestOfDayPVforecast', 0) - $pvfc;      # PV Prognose bis jetzt
-      return if(!$pvfcd);                                                     # Illegal division by zero verhindern
-
-      $dp = sprintf "%.2f", (100 - (100 * $pvre / abs $pvfcd));               # V 1.25.0
-  }
-
-  $dp *= -1 if ($perspective eq 'reverse');                                   # Perspektivänderung: Abweichung = Real - Vorhersage statt Abweichung = Vorhersage - Real
-
-  $data{$name}{circular}{99}{tdayDvtn} = $dp;
-
-  storeReading ('Today_PVdeviation', $dp.' %');
+  
+  # Consumption Prognose/Ist Abweichung
+  #######################################
+  my $confc  = ReadingsNum ($name, 'Today_CONforecast', 0);
+  my $conre  = ReadingsNum ($name, 'Today_CONreal',     0);
+  my $confcd = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0) - $confc;             # Con Prognose bis jetzt
+  $dcon      = sprintf "%.2f", (100 - (100 * $conre / (abs $confcd || 1) ) );               # V 2.0.0
+  
+  $dcon *= -1 if($perspective eq 'reverse');                                                # Perspektivänderung
+  
+  $data{$name}{circular}{99}{tdayConDvtn} = $dcon;
+  
+  storeReading ('Today_CONdeviation', $dcon.' %');
 
 return;
 }
@@ -17964,6 +17994,34 @@ sub _graphicHeader {
 
       $text_tdayDvtn = encode ('utf8', $text_tdayDvtn);
       $text_ydayDvtn = encode ('utf8', $text_ydayDvtn);
+      
+      ## Abweichung CON Prognose/Erzeugung
+      ######################################
+      my $tdayConDvtn = CircularVal ($hash, 99, 'tdayConDvtn', '-');
+      my $ydayConDvtn = CircularVal ($hash, 99, 'ydayConDvtn', '-');
+      $tdayConDvtn    = sprintf "%.1f %%", $tdayConDvtn if(isNumeric($tdayConDvtn));
+      $ydayConDvtn    = sprintf "%.1f %%", $ydayConDvtn if(isNumeric($ydayConDvtn));
+      $tdayConDvtn    =~ s/\./,/;
+      $tdayConDvtn    =~ s/\,0//;
+      $ydayConDvtn    =~ s/\./,/;
+      $ydayConDvtn    =~ s/,0//;
+
+      my $dcontxt     = 'CO '.$hqtxt{dvtn}{$lang}.'&nbsp;';
+      my $tdaycontxt  = $hqtxt{ctnsly}{$lang}.':&nbsp;'."<b>".$tdayConDvtn."</b>";
+      my $ydaycontxt  = $hqtxt{yday}{$lang}.':&nbsp;'."<b>".$ydayConDvtn."</b>";
+
+      my $text_tdayConDvtn = $tdayConDvtn =~ /^-[1-9]/? ($perspective eq 'default' ? $hqtxt{conmtp}{$lang} : $hqtxt{conltp}{$lang}) :
+                             $tdayConDvtn =~ /^-?0,/  ? $hqtxt{conetp}{$lang} :
+                             $tdayConDvtn =~ /^[1-9]/ ? ($perspective eq 'default' ? $hqtxt{conltp}{$lang} : $hqtxt{conmtp}{$lang}) :
+                             $hqtxt{wusond}{$lang};
+
+      my $text_ydayConDvtn = $ydayConDvtn =~ /^-[1-9]/? ($perspective eq 'default' ? $hqtxt{conmtp}{$lang} : $hqtxt{conltp}{$lang}) :
+                             $ydayConDvtn =~ /^-?0,/  ? $hqtxt{conetp}{$lang} :
+                             $ydayConDvtn =~ /^[1-9]/ ? ($perspective eq 'default' ? $hqtxt{conltp}{$lang} : $hqtxt{conmtp}{$lang}) :
+                             $hqtxt{snbefb}{$lang};
+
+      $text_tdayConDvtn = encode ('utf8', $text_tdayConDvtn);
+      $text_ydayConDvtn = encode ('utf8', $text_ydayConDvtn);
 
       ## erste Header-Zeilen
       #######################
@@ -18000,6 +18058,7 @@ sub _graphicHeader {
       $header  .= qq{<td colspan="3" align="left"   $dstyle> $lupt $lup &nbsp; $upicon  </td>};
       $header  .= qq{<td colspan="3" align="right"  $dstyle> $api                       </td>};
       $header  .= qq{</tr>};
+      
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont1 </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont2 </td>};
@@ -18013,6 +18072,21 @@ sub _graphicHeader {
       $header  .= qq{</span>};
       $header  .= qq{</td>};
       $header  .= qq{</tr>};
+      
+      $header  .= qq{<tr>};
+      $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
+      $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
+      $header  .= qq{<td colspan="3" align="right" $dstyle> $dcontxt};
+      $header  .= qq{<span title="$text_tdayConDvtn">};
+      $header  .= qq{$tdaycontxt};
+      $header  .= qq{</span>};
+      $header  .= qq{,&nbsp;};
+      $header  .= qq{<span title="$text_ydayConDvtn">};
+      $header  .= qq{$ydaycontxt};
+      $header  .= qq{</span>};
+      $header  .= qq{</td>};
+      $header  .= qq{</tr>};
+      
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="9" align="left" $dstyle><hr></td>};
       $header  .= qq{</tr>};
@@ -22342,18 +22416,20 @@ return \%lag_norms;
 ################################################################
 # Berechnung und Normalisierung von Lag-, Delta- und 
 # Rolling-Statistik-Features für den Zeitreihen-Workflow
+#
+# $con_series - Arrayref der Verbräuche in Originalskalierung
 ################################################################
 sub _aiFannBuildLagFeatures {
-  my ($series, $i, $norms) = @_;
+  my ($con_series, $i, $norms) = @_;                        
 
   # Sicherheitsprüfung: genug Historie vorhanden?
   return undef if $i < 6;
 
   # Lags - verzögerte Werte einer Zeitreihe
-  my $y_t     = $series->[$i];
-  my $y_t_1   = $series->[$i - 1];
-  my $y_t_2   = $series->[$i - 2];
-  my $y_t_24  = $i >= 24 ? $series->[$i - 24] : undef;
+  my $y_t     = $con_series->[$i];
+  my $y_t_1   = $con_series->[$i - 1];
+  my $y_t_2   = $con_series->[$i - 2];
+  my $y_t_24  = $i >= 24 ? $con_series->[$i - 24] : undef;
 
   # Deltas
   my $delta1      = $y_t   - $y_t_1;
@@ -22369,8 +22445,8 @@ sub _aiFannBuildLagFeatures {
   my $delta24_neg     = (defined $delta24 && $delta24 < 0) ? -$delta24 : 0;
 
   # Rolling Mean & Std
-  my @window3 = @{$series}[$i - 3 .. $i - 1];
-  my @window6 = @{$series}[$i - 6 .. $i - 1];
+  my @window3 = @{$con_series}[$i - 3 .. $i - 1];
+  my @window6 = @{$con_series}[$i - 6 .. $i - 1];
   my $mean3   = avgArray (\@window3, scalar (@window3)) // 0;
   my $std6    = _aiFannStandardDeviation (\@window6);
 
@@ -22466,10 +22542,10 @@ sub _aiCreateAdditionalSignals {
   # ---------------------------------------------------------
   # Heizlast + Kühllast (dynamische Komforttemp)
   # ---------------------------------------------------------
-  my $t_comfort_norm      = $p->{temp_comfort_norm};               # normierte Komforttemp
-  my $temp_norm_min       = ($range eq '-11') ? -1.0 : 0.0;        # Normraum-Minimum bestimmen
+  my $t_comfort_norm      = $p->{temp_comfort_norm};                                      # normierte Komforttemp
+  my $temp_norm_min       = ($range eq '-11') ? -1.0 : 0.0;                               # Normraum-Minimum bestimmen
 
-  my $heating_raw         = $t_comfort_norm - $temp_norm;          # Roh-Heizlast
+  my $heating_raw         = $t_comfort_norm - $temp_norm;                                 # Roh-Heizlast
   $heating_raw            = 0 if($heating_raw < 0);
 
   my $heating_span        = $t_comfort_norm - $temp_norm_min;                             # Spannweite für Normierung
@@ -23044,10 +23120,10 @@ sub aiFannTrain {
 
       my $werr_sum_clipped = 0;
     
-      for my $i (0 .. $#err_norm_sq) {                                                                       # jetzt Clipping anwenden
+      for my $i (0 .. $#err_norm_sq) {                                                                      # jetzt Clipping anwenden
           my $e2             = $err_norm_sq[$i];
           $e2                = $clip_norm if($e2 > $clip_norm);
-          my $cw             = $targetvals[$i];                                                              # normierter Zielwert
+          my $cw             = $targetvals[$i];                                                             # normierter Zielwert
           $werr_sum_clipped += $cw * $e2;
       }
 
@@ -23061,8 +23137,7 @@ sub aiFannTrain {
 
       my $reason         = '';
       my $improved       = 0;
-      #my $good_enough    = 0;                                                   # unterhalb model_save_threshold 
-      my $snapshot_saved = 0;                                                   # pro Epoche zurücksetzen
+      my $snapshot_saved = 0;                                                                              # pro Epoche zurücksetzen
 
       # Zweig 1: echte metrische Verbesserung
       if ($mse_val         <  $best_val_mse - 1e-6
@@ -23116,10 +23191,8 @@ sub aiFannTrain {
           $snapshot_saved_overall   = 1;
           $since_improve            = 0;
 
-          $ann->save ($snapshot);                                          # bestes Modell IMMER speichern
+          $ann->save ($snapshot);                                           # bestes Modell IMMER speichern
           $snapshot_saved = 1;
-          
-          #$good_enough = ($mse_val < $model_save_threshold) ? 1 : 0;       # Bewertung: ist es "gut genug"?
 
           if ($debug =~ /aiProcess/xs) {
               Log3 ($name, 1, sprintf "%s DEBUG> Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d -> Snap %s",
@@ -25882,19 +25955,21 @@ sub _listDataPoolCircular {
       else {
           my ($batvl1, $batvl2, $batvl3, $batvl4, $batvl5, $batvl6, $batvl7,  $batvl8);
 
-          my $con      = CircularVal ($name, $idx, 'todayConsumption',         '-');
-          my $gcontot  = CircularVal ($name, $idx, 'gridcontotal',             '-');
-          my $idgcon   = CircularVal ($name, $idx, 'initdaygcon',              '-');
-          my $idfi     = CircularVal ($name, $idx, 'initdayfeedin',            '-');
-          my $fitot    = CircularVal ($name, $idx, 'feedintotal',              '-');
-          my $tdayDvtn = CircularVal ($name, $idx, 'tdayDvtn',                 '-');
-          my $ydayDvtn = CircularVal ($name, $idx, 'ydayDvtn',                 '-');
-          my $rtaitr   = CircularVal ($name, $idx, 'runTimeTrainAI',           '-');
-          my $fsaitr   = CircularVal ($name, $idx, 'aitrainLastFinishTs',      '-');
-          my $airn     = CircularVal ($name, $idx, 'aiRulesNumber',            '-');
-          my $nnrtt    = CircularVal ($name, $idx, 'conNNRuntimeTrain',        '-');
-          my $nntlfts  = CircularVal ($name, $idx, 'conNNTrainLastFinishTs',   '-');     
-          my $aicts    = CircularVal ($name, $idx, 'attrInvChangedTs',         '-');
+          my $con         = CircularVal ($name, $idx, 'todayConsumption',         '-');
+          my $gcontot     = CircularVal ($name, $idx, 'gridcontotal',             '-');
+          my $idgcon      = CircularVal ($name, $idx, 'initdaygcon',              '-');
+          my $idfi        = CircularVal ($name, $idx, 'initdayfeedin',            '-');
+          my $fitot       = CircularVal ($name, $idx, 'feedintotal',              '-');
+          my $tdayDvtn    = CircularVal ($name, $idx, 'tdayDvtn',                 '-');
+          my $ydayDvtn    = CircularVal ($name, $idx, 'ydayDvtn',                 '-');
+          my $tdayConDvtn = CircularVal ($name, $idx, 'tdayConDvtn',              '-');
+          my $ydayConDvtn = CircularVal ($name, $idx, 'ydayConDvtn',              '-');
+          my $rtaitr      = CircularVal ($name, $idx, 'runTimeTrainAI',           '-');
+          my $fsaitr      = CircularVal ($name, $idx, 'aitrainLastFinishTs',      '-');
+          my $airn        = CircularVal ($name, $idx, 'aiRulesNumber',            '-');
+          my $nnrtt       = CircularVal ($name, $idx, 'conNNRuntimeTrain',        '-');
+          my $nntlfts     = CircularVal ($name, $idx, 'conNNTrainLastFinishTs',   '-');     
+          my $aicts       = CircularVal ($name, $idx, 'attrInvChangedTs',         '-');
 
           for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
               $bn          = sprintf "%02d", $bn;
@@ -25924,7 +25999,7 @@ sub _listDataPoolCircular {
               $batvl8     .= "careCycleViolation${bn}: $ccycviol";
           }
 
-          $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn \n";
+          $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn, tdayConDvtn: $tdayConDvtn, ydayConDvtn: $ydayConDvtn \n";
           $sq .= "      todayConsumption: $con, feedintotal: $fitot, initdayfeedin: $idfi \n";
           $sq .= "      gridcontotal: $gcontot, initdaygcon: $idgcon \n";
           $sq .= "      $batvl1\n";
@@ -31285,12 +31360,14 @@ to ensure that the system configuration is correct.
             <tr><td> <b>aiRulesNumber</b>       </td><td>Number of rules in the trained AI instance                                                                            </td></tr>
             <tr><td> <b>todayConsumption</b>    </td><td>real energy consumption (Wh) of the house on the current day                                                          </td></tr>
             <tr><td> <b>tdayDvtn</b>            </td><td>Today's deviation PV forecast/generation in %                                                                         </td></tr>
+            <tr><td> <b>tdayConDvtn</b>         </td><td>Today's deviation between consumption forecast and generation in %                                                    </td></tr>
             <tr><td> <b>temp</b>                </td><td>Outdoor temperature                                                                                                   </td></tr>
             <tr><td> <b>wcc</b>                 </td><td>Degree of cloud cover                                                                                                 </td></tr>
             <tr><td> <b>rr1c</b>                </td><td>Total precipitation during the last hour kg/m2                                                                        </td></tr>
             <tr><td> <b>wid</b>                 </td><td>ID of the predicted weather                                                                                           </td></tr>
             <tr><td> <b>wtxt</b>                </td><td>Description of the predicted weather                                                                                  </td></tr>
             <tr><td> <b>ydayDvtn</b>            </td><td>Deviation PV forecast/generation in % on the previous day                                                             </td></tr>
+            <tr><td> <b>ydayConDvtn</b>         </td><td>Deviation between consumption forecast and generation in % on the previous day                                        </td></tr>
          </table>
       </ul>
 
@@ -34111,12 +34188,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>aiRulesNumber</b>       </td><td>Anzahl der Regeln in der trainierten KI Instanz                                                                           </td></tr>
             <tr><td> <b>todayConsumption</b>    </td><td>realer Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                                  </td></tr>
             <tr><td> <b>tdayDvtn</b>            </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                             </td></tr>
+            <tr><td> <b>tdayConDvtn</b>         </td><td>heutige Abweichung Verbrauch Prognose/Erzeugung in %                                                                      </td></tr>
             <tr><td> <b>temp</b>                </td><td>Außentemperatur                                                                                                           </td></tr>
             <tr><td> <b>wcc</b>                 </td><td>Grad der Wolkenüberdeckung                                                                                                </td></tr>
             <tr><td> <b>rr1c</b>                </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                                            </td></tr>
             <tr><td> <b>wid</b>                 </td><td>ID des vorhergesagten Wetters                                                                                             </td></tr>
             <tr><td> <b>wtxt</b>                </td><td>Beschreibung des vorhergesagten Wetters                                                                                   </td></tr>
             <tr><td> <b>ydayDvtn</b>            </td><td>Abweichung PV Prognose/Erzeugung in % am Vortag                                                                           </td></tr>
+            <tr><td> <b>ydayConDvtn</b>         </td><td>Abweichung Verbrauch Prognose/Erzeugung in % am Vortag                                                                    </td></tr>
          </table>
       </ul>
 
