@@ -22448,7 +22448,13 @@ return \%lag_norms;
 # $temp_norm_series - Arrayref normierter Temperaturen
 ################################################################
 sub _aiFannBuildLagFeatures {
-  my ($con_series, $temp_norm_series, $i, $norms) = @_;                        
+  my ($con_series, $temp_norm_series, $i, $norms) = @_;
+
+  # Synchronisation der Zeitreihen
+  my $len_con  = scalar @$con_series;
+  my $len_temp = scalar @$temp_norm_series;
+  my $len_sync = $len_con < $len_temp ? $len_con : $len_temp;                      # Gemeinsame Länge bestimmen
+  $i           = $len_sync - 1 if $i >= $len_sync;                                 # Index korrigieren, falls er zu groß ist 
 
   # Sicherheitsprüfung: genug Historie vorhanden?
   return undef if $i < 6;
@@ -23909,7 +23915,6 @@ sub aiFannGetConResult {
   my @flat_targets     = getPvHistTargetArray ($name, $fanntyp, 200); 
   my @temps            = getPvHistTargetArray ($name, 'temp',   200);                     # Temperaturen aus History lesen
   my @temp_norm_values = map { _aiFannNormTemp ($_, $range) } @temps;                     # Temperaturen symmetrisch oder asymmetriech normalisieren
-
     
   # Lag-Norms auslesen
   ######################
