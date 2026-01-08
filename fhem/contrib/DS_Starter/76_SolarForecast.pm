@@ -1836,12 +1836,15 @@ my %FEATURE_BLOCKS = (
           $f->{frost_protect},                                         # Frostschutz
           $f->{frost_load},
           
-          $f->{temp_norm_lag1h},                                       # Temperatur-Dynamik (NEU)
+          $f->{temp_norm_lag1h},                                       # Temperatur-Dynamik (NEU)  Pos 59
           $f->{temp_norm_lag3h},
           $f->{temp_norm_lag24h},
-          $f->{temp_delta_1h},
-          $f->{temp_delta_3h},
-          $f->{temp_trend},
+          $f->{temp_delta_1h_pos},
+          $f->{temp_delta_1h_neg},
+          $f->{temp_delta_3h_pos},
+          $f->{temp_delta_3h_neg},
+          $f->{temp_trend_pos},
+          $f->{temp_trend_neg},
       ];
   },
   
@@ -6582,14 +6585,14 @@ sub __getaiFannConState {            ## no critic "not used"
   my $bias     = AiNeuralVal ($name, 'con', 'ModelBias',      '-');                              
   my $slope    = AiNeuralVal ($name, 'con', 'ModelSlope',     '-');
   my $ampel    = AiNeuralVal ($name, 'con', 'ModelAmpel',     '-');
+  my $regv     = AiNeuralVal ($name, 'con', 'RegVersion',     '-');                       # verwendete Feature-Registry Version
+  my $talgo    = AiNeuralVal ($name, 'con', 'TrainAlgo',      '-');
   
   my $drift_score   = AiNeuralVal ($name, 'con', 'DriftScore',       '-'); 
   my $drift_rmserel = AiNeuralVal ($name, 'con', 'DriftRmseRelLive', '-'); 
   my $drift_bias    = AiNeuralVal ($name, 'con', 'DriftBias',        '-'); 
   my $drift_slope   = AiNeuralVal ($name, 'con', 'DriftSlope',       '-'); 
-  my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',        '-');
-  
-  my $frv = _aiSelectRegistryVersion ($name);                                       # verwendete Feature-Registry Version
+  my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',        '-');                                      
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
            $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
@@ -6620,6 +6623,7 @@ sub __getaiFannConState {            ## no critic "not used"
   $model   .= "<b>Architektur:</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum"."\n";
   $model   .= "<b>Hyperparameter:</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=0.35"."\n";
   $model   .= "<b>Aktivierungen:</b> Hidden=$conhaf, Steilheit=$hidste, Output=$conoaf"."\n";
+  $model   .= "<b>Trainingsalgorithmus:</b> $talgo, Registry Version=$regv"."\n";
   $model   .= "<b>Zufallsgenerator:</b> Mode=$shmode, Periode=$shperi"."\n";
   
   my $keyfig = '<b>=== Trainingsmetriken ===</b>'."\n\n";
@@ -6661,9 +6665,7 @@ sub __getaiFannConState {            ## no critic "not used"
   $ars     = '<b>'.$hqtxt{airest}{$lang}.'</b> '.$ars;
   $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
   $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
-  $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;       
-  $frv     = '<b>'.$hqtxt{feregv}{$lang}.': </b> '.$frv;               
-  
+  $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;                    
   
   my $note  = (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";;
   $note    .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
@@ -6732,8 +6734,7 @@ sub __getaiFannConState {            ## no critic "not used"
   $rs .= $atf.' / '.$art."\n";
   $rs .= $ars."\n";
   $rs .= $agt."\n";
-  $rs .= $hpinst."\n";
-  $rs .= $frv;
+  $rs .= $hpinst;
   $rs .= "\n\n";
   $rs .= $model."\n";
   $rs .= $keyfig."\n";
@@ -21949,7 +21950,7 @@ sub aiFannCreateConTrainData {
   my $name  = $paref->{name}; 
   my $debug = $paref->{debug}; 
 
-  my ($msg, $serial);
+  my ($msg, $serial, $regv);
   my $aspeak = CurrentVal ($name, 'allstringspeak', 0);                                   # PV Anlage Peakleistung (W)
   
   if (!$aspeak ) {
@@ -22146,7 +22147,7 @@ sub aiFannCreateConTrainData {
   ################################
   for my $i (6 .. $#flat_targets) {                                                                
       my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, $i, $lagnorm_ref);            # Lags erstellen
-      
+   
       my $sigs = _aiCreateAdditionalSignals ( { lags              => $lags,                                 # diskrete, semantische Zusatzsignale
                                                 pv_norm           => $pv_norm_values[$i],
                                                 pv_norm_prev      => $pv_norm_prev_values[$i],
@@ -22183,23 +22184,26 @@ sub aiFannCreateConTrainData {
 
               # Temperatur-Features separat
               Log3 ($name, 1, sprintf(
-                    "%s - DBG F[%d]: tmplag1=%0.3f tmplag3=%0.3f tmplag24=%0.3f tmpd1=%0.3f tmpd3=%0.3f tmpTrend=%0.3f",
+                    "%s - DBG F[%d]: tmplag1=%0.3f tmplag3=%0.3f tmplag24=%0.3f tmpd1p=%0.3f tmpd1n=%0.3f tmpd3p=%0.3f tmpd3n=%0.3f tmpTrendp=%0.3f tmpTrendn=%0.3f",
                     $name, 
                     $i,
                     $lags->{temp_norm_lag1h},
                     $lags->{temp_norm_lag3h},
                     $lags->{temp_norm_lag24h},
-                    $lags->{temp_delta_1h},
-                    $lags->{temp_delta_3h},
-                    $lags->{temp_trend},
+                    $lags->{temp_delta_1h_pos},
+                    $lags->{temp_delta_1h_neg},
+                    $lags->{temp_delta_3h_pos},
+                    $lags->{temp_delta_3h_neg},
+                    $lags->{temp_trend_pos},
+                    $lags->{temp_trend_neg},
               ));              
           }
       }  
       
       # Kombinatorik durch FEATURE_REGISTRY 
       #######################################
-      my $bv       = _aiSelectRegistryVersion ($name);                                        # verwendete Feature-Registry Version
-      my $semantic = _aiFannFeatureBuilder ( $bv,                                          
+      $regv        = _aiSelectRegistryVersion ($name);                                      # verwendete Feature-Registry Version
+      my $semantic = _aiFannFeatureBuilder ($regv,                                          
                        { pv_norm                => $pv_norm_values[$i],
                          rr1c_norm              => $rr1c_norm->[$i],                          # Niederschlag, numerisch min-max normalisiert
                          temp_norm              => $temp_norm_values[$i],
@@ -22231,9 +22235,12 @@ sub aiFannCreateConTrainData {
                          temp_norm_lag1h        => $lags->{temp_norm_lag1h},
                          temp_norm_lag3h        => $lags->{temp_norm_lag3h},
                          temp_norm_lag24h       => $lags->{temp_norm_lag24h},
-                         temp_delta_1h          => $lags->{temp_delta_1h},
-                         temp_delta_3h          => $lags->{temp_delta_3h},
-                         temp_trend             => $lags->{temp_trend},                         
+                         temp_delta_1h_pos      => $lags->{temp_delta_1h_pos},
+                         temp_delta_1h_neg      => $lags->{temp_delta_1h_neg},
+                         temp_delta_3h_pos      => $lags->{temp_delta_3h_pos},
+                         temp_delta_3h_neg      => $lags->{temp_delta_3h_neg},
+                         temp_trend_pos         => $lags->{temp_trend_pos},
+                         temp_trend_neg         => $lags->{temp_trend_neg},                         
                          trend_up_norm          => $sigs->{trend_up_norm},
                          trend_down_norm        => $sigs->{trend_down_norm},
                          trend_up_strength      => $sigs->{trend_up_strength},
@@ -22304,13 +22311,14 @@ sub aiFannCreateConTrainData {
   #debugLog ($paref, 'aiProcess', "AI FANN - First AI training dataset normalized: \n". $trainpo);
   #my $trainpo = join ", \n", @$norm_ref;
   #debugLog ($paref, 'aiProcess', "AI FANN - Targets normalized 0..1: \n". $trainpo);
-  # Prüfung auf negative Daten im Trainingsset
+  
+  # Prüfung auf verbotene negative Daten im Trainingsset
   for my $i (0 .. $#training_data) {
       my $row = $training_data[$i];
       for my $j (0 .. $#$row) {
           my $v = $row->[$j];
           if ($v < 0) {
-              Log3 $name, 1, "NEGATIV: training_data[$i][$j] = $v";
+              Log3 ($name, 1, "$name - AI Train data NEGATIV: training_data[$i][$j] = $v");
           }
       }
   }
@@ -22332,6 +22340,7 @@ sub aiFannCreateConTrainData {
   $paref->{shuffle_mode}      = $shuffle_mode;
   $paref->{shuffle_period}    = $shuffle_period;
   $paref->{talgo}             = $talgo;
+  $paref->{regv}              = $regv;                                    # ausgewählte Registry Version
   $paref->{haf}               = $haf;
   $paref->{oaf}               = $oaf;
   
@@ -22513,17 +22522,26 @@ sub _aiFannBuildLagFeatures {
   my $t_t_3   = $i >= 3  ? $temp_norm_series->[$i - 3]  : $t_t_1;
   my $t_t_24  = $i >= 24 ? $temp_norm_series->[$i - 24] : $t_t_1;
 
-  # Temperatur-Deltas
-  my $temp_delta_1h = $t_t - $t_t_1;
+  my $temp_delta_1h = $t_t - $t_t_1;                                                # Temperatur-Deltas (noch im -1..1 Raum)
   my $temp_delta_3h = $t_t - $t_t_3;
+  my $temp_trend    = ($temp_delta_1h + $temp_delta_3h) / 2;
 
-  # Temperatur-Trend (gemittelt)
-  my $temp_trend = ($temp_delta_1h + $temp_delta_3h) / 2;
+  my $temp_delta_1h_pos = $temp_delta_1h > 0 ? $temp_delta_1h :  0;                 # Positive/Negative Temperatur-Deltas (0..1)
+  my $temp_delta_1h_neg = $temp_delta_1h < 0 ? -$temp_delta_1h : 0;
 
-  # Normierung (Temperatur ist bereits normiert, clamp reicht)
-  $temp_delta_1h = clampValue ($temp_delta_1h, -1, 1);
-  $temp_delta_3h = clampValue ($temp_delta_3h, -1, 1);
-  $temp_trend    = clampValue ($temp_trend,    -1, 1);
+  my $temp_delta_3h_pos = $temp_delta_3h > 0 ? $temp_delta_3h :  0;
+  my $temp_delta_3h_neg = $temp_delta_3h < 0 ? -$temp_delta_3h : 0;
+
+  my $temp_trend_pos = $temp_trend > 0 ? $temp_trend : 0;
+  my $temp_trend_neg = $temp_trend < 0 ? -$temp_trend : 0;
+
+  # Clamping (Temperatur ist bereits normiert)
+  $temp_delta_1h_pos = clampValue ($temp_delta_1h_pos, 0, 1);
+  $temp_delta_1h_neg = clampValue ($temp_delta_1h_neg, 0, 1);
+  $temp_delta_3h_pos = clampValue ($temp_delta_3h_pos, 0, 1);
+  $temp_delta_3h_neg = clampValue ($temp_delta_3h_neg, 0, 1);
+  $temp_trend_pos    = clampValue ($temp_trend_pos,    0, 1);
+  $temp_trend_neg    = clampValue ($temp_trend_neg,    0, 1);
   
   # ---------------------------------------------------------
   # WW-Zyklus Erkennung Prefilter
@@ -22551,9 +22569,12 @@ sub _aiFannBuildLagFeatures {
       temp_norm_lag1h      => $t_t_1,
       temp_norm_lag3h      => $t_t_3,
       temp_norm_lag24h     => $t_t_24,
-      temp_delta_1h        => $temp_delta_1h,
-      temp_delta_3h        => $temp_delta_3h,
-      temp_trend           => $temp_trend,
+      temp_delta_1h_pos    => $temp_delta_1h_pos,
+      temp_delta_1h_neg    => $temp_delta_1h_neg,
+      temp_delta_3h_pos    => $temp_delta_3h_pos,
+      temp_delta_3h_neg    => $temp_delta_3h_neg,
+      temp_trend_pos       => $temp_trend_pos,
+      temp_trend_neg       => $temp_trend_neg,
       
       ww_prefilter         => $ww_prefilter,
   };
@@ -23573,6 +23594,8 @@ sub aiFannTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{NumInputs}      = $num_inputs;
   $data{$name}{$fanntyp.'temp'}{$attempt}{HiddenLayers}   = $hidden_layers;
   $data{$name}{$fanntyp.'temp'}{$attempt}{HiddSteepness}  = $hidden_steepness;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{TrainAlgo}      = $talgo;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{RegVersion}     = $paref->{regv};                                 # benutzte Registry Version
   $data{$name}{$fanntyp.'temp'}{$attempt}{NumOutputs}     = $num_outputs;
   $data{$name}{$fanntyp.'temp'}{$attempt}{TrainMse}       = $best_train_mse;
   $data{$name}{$fanntyp.'temp'}{$attempt}{ValidationMse}  = $mse_val;
@@ -23912,8 +23935,8 @@ sub aiFannGetConResult {
   
   ## letzte reale Zielwerte / Temperaturen für Regression lesen
   ###############################################################
-  my @flat_targets     = getPvHistTargetArray ($name, $fanntyp, 200); 
-  my @temps            = getPvHistTargetArray ($name, 'temp',   200);                     # Temperaturen aus History lesen
+  my (@flat_targets, @temps) = getPvHistTargetArray ($name, $fanntyp, 'temp', 200);       # $fanntyp + Temperaturen aus History lesen
+  #my @temps            = getPvHistTargetArray ($name, 'temp',   200);                     
   my @temp_norm_values = map { _aiFannNormTemp ($_, $range) } @temps;                     # Temperaturen symmetrisch oder asymmetriech normalisieren
     
   # Lag-Norms auslesen
@@ -23989,7 +24012,7 @@ sub aiFannGetConResult {
       $temp                = clampValue (int $temp, -40, 40);
       $pv                  = clampValue ($pv, 0, $pvpeak);
       
-      my $sunalt_norm        = _aiFannNormSunalt ($sunalt,     $range);                  # Sonnenaltitude normalisieren im Bereich 0..+1      
+      my $sunalt_norm        = _aiFannNormSunalt ($sunalt,      $range);                 # Sonnenaltitude normalisieren im Bereich 0..+1      
       my $wcc_norm           = _aiFannNormWcc    ($wcc,         $range);                 # Bewölkung symmetrisch oder asymmetriech normalisieren
       my $temp_norm          = _aiFannNormTemp   ($temp,        $range);                 # Temperatur symmetrisch oder asymmetriech normalisieren
       my $temp_comfort_norm  = _aiFannNormTemp   ($comftemp,    $range);                 # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
@@ -24049,8 +24072,8 @@ sub aiFannGetConResult {
       
       # Kombinatorik durch FEATURE_REGISTRY 
       #######################################
-      my $bv       = _aiSelectRegistryVersion ($name);                                # verwendete Feature-Registry Version
-      my $semantic = _aiFannFeatureBuilder ($bv,                                     
+      my $regv     = _aiSelectRegistryVersion ($name);                                # verwendete Feature-Registry Version
+      my $semantic = _aiFannFeatureBuilder ($regv,                                     
                        { pv_norm                => $pv_norm,                          # Erstatzwert für PV Ertrag min-max normalisiert
                          rr1c_norm              => $rr1c_norm,                        # Niederschlag, numerisch min-max normalisiert
                          temp_norm              => $temp_norm,                        # Temperatur, numerisch min-max normalisiert
@@ -24082,9 +24105,12 @@ sub aiFannGetConResult {
                          temp_norm_lag1h        => $lags->{temp_norm_lag1h},
                          temp_norm_lag3h        => $lags->{temp_norm_lag3h},
                          temp_norm_lag24h       => $lags->{temp_norm_lag24h},
-                         temp_delta_1h          => $lags->{temp_delta_1h},
-                         temp_delta_3h          => $lags->{temp_delta_3h},
-                         temp_trend             => $lags->{temp_trend},
+                         temp_delta_1h_pos      => $lags->{temp_delta_1h_pos},
+                         temp_delta_1h_neg      => $lags->{temp_delta_1h_neg},
+                         temp_delta_3h_pos      => $lags->{temp_delta_3h_pos},
+                         temp_delta_3h_neg      => $lags->{temp_delta_3h_neg},
+                         temp_trend_pos         => $lags->{temp_trend_pos},
+                         temp_trend_neg         => $lags->{temp_trend_neg},
                          trend_up_norm          => $sigs->{trend_up_norm},
                          trend_down_norm        => $sigs->{trend_down_norm},
                          trend_up_strength      => $sigs->{trend_up_strength},
@@ -29307,17 +29333,18 @@ return ($rapi, $wapi);
 }
 
 ###############################################################
-#  liefert ein Array der letzten $limit Werte von $key 
-#  aus pvHistory chronologisch zurück  
+#  liefert 2 Arrays der letzten $limit Werte von $key 
+#  und $depkey aus pvHistory synchron/chronologisch zurück. 
 ###############################################################
 sub getPvHistTargetArray {
-  my $name  = shift;
-  my $key   = shift;
-  my $limit = shift // 200;                                                               # Standard: 200 Werte                                                                         
+  my $name   = shift;
+  my $key    = shift;
+  my $depkey = shift;
+  my $limit  = shift // 200;                                                              # Standard: 200 Werte                                                                         
 
-  my @flat;
+  my (@akey, @adepkey);
 
-  return @flat unless exists $data{$name}{pvhist};                                        # Sicherheit: Struktur vorhanden?
+  return (@akey, @adepkey) unless exists $data{$name}{pvhist};                            # Sicherheit: Struktur vorhanden?
 
   my ($sec,$min,$hour,$mday) = localtime();                                               # aktueller Tag und Stunde
   $hour = int ($hour);                                                                    # 0..23
@@ -29344,18 +29371,20 @@ sub getPvHistTargetArray {
           }
 
           my $rec = $ph->{$day}{$hod};
-          next unless defined $rec->{$key};
+          next unless (defined $rec->{$key} && defined $rec->{$depkey});
           next unless $rec->{$key} >= 0;
 
-          push @flat, $rec->{$key};
+          push @akey,    $rec->{$key};
+          push @adepkey, $rec->{$depkey};
       }
   }
 
-  if (@flat > $limit) {                                                                   # nur die letzten $limit Werte behalten
-      @flat = @flat[-$limit .. -1];
+  if (@akey > $limit) {                                                                   # nur die letzten $limit Werte behalten
+      @akey    = @akey[-$limit .. -1];
+      @adepkey = @adepkey[-$limit .. -1];
   }
 
-return @flat;
+return (@akey, @adepkey);
 }
 
 ################################################################
