@@ -22001,15 +22001,15 @@ sub aiFannCreateConTrainData {
       my $rec = $data{$name}{aidectree}{airaw}{$idx};                                     # Datensatz
 
       # Vollständigkeitsprüfung
-      unless (defined $rec->{con}
-           && $rec->{con} >= 0
-           && defined $rec->{dayname}
-           && defined $rec->{hod}
-           && defined $rec->{sunaz}
-           && defined $rec->{sunalt}
-           && defined $rec->{rr1c}
-           && defined $rec->{wcc}
-           && defined $rec->{temp}) {
+      unless (defined $rec->{$fanntyp}
+              && $rec->{$fanntyp} >= 0
+              && defined $rec->{dayname}
+              && defined $rec->{hod}
+              && defined $rec->{sunaz}
+              && defined $rec->{sunalt}
+              && defined $rec->{rr1c}
+              && defined $rec->{wcc}
+              && defined $rec->{temp}) {
 
              push @skipped, $idx;            
              next; 
@@ -22459,14 +22459,11 @@ return \%lag_norms;
 sub _aiFannBuildLagFeatures {
   my ($con_series, $temp_norm_series, $i, $norms) = @_;
 
-  # Synchronisation der Zeitreihen
+  # Sicherheitsprüfung: genug Historie vorhanden?
   my $len_con  = scalar @$con_series;
   my $len_temp = scalar @$temp_norm_series;
-  my $len_sync = $len_con < $len_temp ? $len_con : $len_temp;                      # Gemeinsame Länge bestimmen
-  $i           = $len_sync - 1 if $i >= $len_sync;                                 # Index korrigieren, falls er zu groß ist 
-
-  # Sicherheitsprüfung: genug Historie vorhanden?
-  return undef if $i < 6;
+  #return undef if($i < 6 || $len_con < $i || $len_temp < $i);
+  return undef if($i < 6 || $i >= $len_con || $i >= $len_temp);
 
   # Lags - verzögerte Werte einer Zeitreihe
   my $y_t     = $con_series->[$i];
@@ -23935,10 +23932,11 @@ sub aiFannGetConResult {
   
   ## letzte reale Zielwerte / Temperaturen für Regression lesen
   ###############################################################
-  my (@flat_targets, @temps) = getPvHistTargetArray ($name, $fanntyp, 'temp', 200);       # $fanntyp + Temperaturen aus History lesen
-  #my @temps            = getPvHistTargetArray ($name, 'temp',   200);                     
-  my @temp_norm_values = map { _aiFannNormTemp ($_, $range) } @temps;                     # Temperaturen symmetrisch oder asymmetriech normalisieren
-    
+  my ($targetref, $tempsref) = getPvHistTargetArray ($name, $fanntyp, 'temp', 200);       # $fanntyp + Temperaturen aus History lesen                     
+  my @flat_targets           = @$targetref;
+  my @temps                  = @$tempsref;
+  my @temp_norm_values       = map { _aiFannNormTemp ($_, $range) } @temps;               # Temperaturen symmetrisch oder asymmetriech normalisieren
+
   # Lag-Norms auslesen
   ######################
   if (!defined $data{$name}{neuralnet}{con} || !defined $data{$name}{neuralnet}{con}{lagNorms}) {
@@ -24157,7 +24155,7 @@ sub aiFannGetConResult {
           push @new_input, @{$semantic};
       }
 
-      #debugLog ($paref, 'aiData', "AI FANN - Lags: ".Dumper $semantic);
+      #debugLog ($paref, 'aiData', "AI FANN - new_input: ".Dumper @new_input);
       #debugLog ($paref, 'aiData', "AI FANN - Series data: ".Dumper @flat_targets);   
       #debugLog ($paref, 'aiData', "AI FANN - Lags: ".Dumper $lags);        
 
@@ -29333,7 +29331,7 @@ return ($rapi, $wapi);
 }
 
 ###############################################################
-#  liefert 2 Arrays der letzten $limit Werte von $key 
+#  liefert 2 Array-Ref der letzten $limit Werte von $key 
 #  und $depkey aus pvHistory synchron/chronologisch zurück. 
 ###############################################################
 sub getPvHistTargetArray {
@@ -29344,21 +29342,17 @@ sub getPvHistTargetArray {
 
   my (@akey, @adepkey);
 
-  return (@akey, @adepkey) unless exists $data{$name}{pvhist};                            # Sicherheit: Struktur vorhanden?
+  return (\@akey, \@adepkey) unless exists $data{$name}{pvhist};                          # Sicherheit: Struktur vorhanden?
 
   my ($sec,$min,$hour,$mday) = localtime();                                               # aktueller Tag und Stunde
   $hour = int ($hour);                                                                    # 0..23
   $mday = int ($mday);                                                                    # 1..31
 
   my $ph = $data{$name}{pvhist};
-  
-  my @days_after = sort { $a <=> $b }                                                     # erst alle Tage > heute (Vormonatsrest)
-                   grep { $_ > $mday } keys %$ph;
-
-  my @days_upto  = sort { $a <=> $b }                                                     # dann alle Tage <= heute (aktueller Monatsteil)
-                   grep { $_ <= $mday } keys %$ph;
-  
-  my @days = (@days_after, @days_upto);
+ 
+  my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;                     # Tage sortieren: Vormonatsrest + aktueller Monat
+  my @days_upto  = sort { $a <=> $b } grep { $_ <= $mday } keys %$ph;
+  my @days       = (@days_after, @days_upto);
   
   for my $day (@days) {
       my @hods = sort { $a <=> $b } keys %{ $ph->{$day} };                                # Stunden sortieren
@@ -29371,20 +29365,26 @@ sub getPvHistTargetArray {
           }
 
           my $rec = $ph->{$day}{$hod};
-          next unless (defined $rec->{$key} && defined $rec->{$depkey});
+          next unless defined $rec->{$key};                                               # vollständige Datensätze erzwingen
+          next unless defined $rec->{$depkey};
           next unless $rec->{$key} >= 0;
 
           push @akey,    $rec->{$key};
           push @adepkey, $rec->{$depkey};
       }
   }
+  
+  my $len = @akey < @adepkey ? scalar @akey : scalar @adepkey;
+
+  splice @akey,    $len if(@akey    > $len);                                              # Arrays synchron kürzen
+  splice @adepkey, $len if(@adepkey > $len);
 
   if (@akey > $limit) {                                                                   # nur die letzten $limit Werte behalten
       @akey    = @akey[-$limit .. -1];
       @adepkey = @adepkey[-$limit .. -1];
   }
 
-return (@akey, @adepkey);
+return (\@akey, \@adepkey);
 }
 
 ################################################################
