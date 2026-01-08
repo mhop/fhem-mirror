@@ -1849,6 +1849,20 @@ my %FEATURE_BLOCKS = (
   },
   
   # --------------------------------------------------------
+  # Kälte mit PV
+  # --------------------------------------------------------
+  semantics_cold_pv => sub {
+      my ($f) = @_;
+      return [
+        $f->{temp_norm_neg} * $f->{pv_norm},                                       # Kälte × PV
+        $f->{temp_norm_neg} * $f->{pv_norm} * $f->{trend_up_strength},             # Kälte × PV × Trend
+        $f->{temp_norm_neg} * $f->{pv_drop},                                       # Kälte × PV-Drop
+        $f->{temp_norm_neg} * $f->{hour_class_evening},                            # Kälte × Abend
+        $f->{temp_norm_neg} * $f->{trend_break},                                   # Kälte × Trend-Break
+      ];
+  },
+  
+  # --------------------------------------------------------
   # Sandbox für neue Features
   # --------------------------------------------------------
   sandbox => sub {
@@ -1894,6 +1908,7 @@ my %FEATURE_REGISTRY;
           @{ $FEATURE_BLOCKS{semantics_evening}->($f) },
           @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
           @{ $FEATURE_BLOCKS{semantics_rueckfall}->($f) },
+          @{ $FEATURE_BLOCKS{semantics_cold_pv}->($f) },
       ];
   },
   
@@ -1909,9 +1924,9 @@ my %FEATURE_REGISTRY;
   },
 
   # --------------------------------------------------------
-  # v2 (Sandbox): v1 + experimentelle Features
+  # v3_sandbox: v1 + experimentelle Features
   # --------------------------------------------------------
-  v3 => sub {
+  v3_sandbox => sub {
       my ($f) = @_;
       return [
           @{ $FEATURE_REGISTRY{v1_common}->($f) },
@@ -22203,6 +22218,7 @@ sub aiFannCreateConTrainData {
       # Kombinatorik durch FEATURE_REGISTRY 
       #######################################
       $regv        = _aiSelectRegistryVersion ($name);                                      # verwendete Feature-Registry Version
+      $regv        = 'v3_sandbox';
       my $semantic = _aiFannFeatureBuilder ($regv,                                          
                        { pv_norm                => $pv_norm_values[$i],
                          rr1c_norm              => $rr1c_norm->[$i],                          # Niederschlag, numerisch min-max normalisiert
@@ -22462,11 +22478,10 @@ sub _aiFannBuildLagFeatures {
   # Sicherheitsprüfung: genug Historie vorhanden?
   my $len_con  = scalar @$con_series;
   my $len_temp = scalar @$temp_norm_series;
-  #return undef if($i < 6 || $len_con < $i || $len_temp < $i);
   return undef if($i < 6 || $i >= $len_con || $i >= $len_temp);
 
   # Lags - verzögerte Werte einer Zeitreihe
-  my $y_t     = $con_series->[$i];
+  my $y_t     = $con_series->[$i];    
   my $y_t_1   = $con_series->[$i - 1];
   my $y_t_2   = $con_series->[$i - 2];
   my $y_t_24  = $i >= 24 ? $con_series->[$i - 24] : undef;
@@ -22982,6 +22997,7 @@ sub aiFannTrain {
   my $haf               = $paref->{haf};
   my $oaf               = $paref->{oaf};
   my $talgo             = $paref->{talgo};
+  my $regv              = $paref->{regv};                                        # ausgewählte Registry Version
   my $attempt           = $paref->{attempt} // 0;                                # Nummer des Durchlaufs
   
   my $minval            = $paref->{minval};                                      # Target Denormalisierungsparameter
@@ -23111,7 +23127,8 @@ sub aiFannTrain {
                  : 'chronological split';
       
       Log3 ($name, 1, "$name DEBUG> AI FANN Training started with Params:\n".
-                      "num input datasets=$num_train_datasets, \n".
+                      "input datasets=$num_train_datasets, \n".
+                      "Registry version=$regv, \n".
                       "training algo=$ta, \n".
                       "output AF=$oaf, \n".
                       "hidden AF=$haf, \n".
@@ -23932,10 +23949,10 @@ sub aiFannGetConResult {
   
   ## letzte reale Zielwerte / Temperaturen für Regression lesen
   ###############################################################
-  my ($targetref, $tempsref) = getPvHistTargetArray ($name, $fanntyp, 'temp', 200);       # $fanntyp + Temperaturen aus History lesen                     
+  my ($targetref, $tempsref) = getPvHistTargetArray ($name, $debug, $fanntyp, 'temp', 50);    # $fanntyp + Temperaturen aus History lesen                     
   my @flat_targets           = @$targetref;
   my @temps                  = @$tempsref;
-  my @temp_norm_values       = map { _aiFannNormTemp ($_, $range) } @temps;               # Temperaturen symmetrisch oder asymmetriech normalisieren
+  my @temp_norm_values       = map { _aiFannNormTemp ($_, $range) } @temps;                   # Temperaturen symmetrisch oder asymmetriech normalisieren
 
   # Lag-Norms auslesen
   ######################
@@ -24049,7 +24066,8 @@ sub aiFannGetConResult {
       ## Lag-Features erzeugen
       ##########################
       my $i    = @flat_targets - 1;
-      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, $i, $lag_normref); 
+      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, $i, $lag_normref);
+      next if(!$lags);      
       
       # diskrete, semantische Zusatzsignale
       #######################################
@@ -24071,6 +24089,7 @@ sub aiFannGetConResult {
       # Kombinatorik durch FEATURE_REGISTRY 
       #######################################
       my $regv     = _aiSelectRegistryVersion ($name);                                # verwendete Feature-Registry Version
+      $regv        = 'v3_sandbox';
       my $semantic = _aiFannFeatureBuilder ($regv,                                     
                        { pv_norm                => $pv_norm,                          # Erstatzwert für PV Ertrag min-max normalisiert
                          rr1c_norm              => $rr1c_norm,                        # Niederschlag, numerisch min-max normalisiert
@@ -24180,7 +24199,10 @@ sub aiFannGetConResult {
       $prediction = sprintf '%.0f', $prediction;
       $bc         = sprintf '%.0f', $bc;
       
-      push @flat_targets, $prediction;
+      # Fortschreibung der Arrays!
+      ##############################
+      push @flat_targets,     $prediction;
+      push @temp_norm_values, $temp_norm;                                                    # wichtig: Temperaturreihe auch erweitern
       
       # Hybridmodell mit Legacy
       ##########################
@@ -29331,56 +29353,83 @@ return ($rapi, $wapi);
 }
 
 ###############################################################
-#  liefert 2 Array-Ref der letzten $limit Werte von $key 
-#  und $depkey aus pvHistory synchron/chronologisch zurück. 
+#  Liefert 2 Array-Refs der letzten $limit Werte von $key 
+#  und $depkey aus pvHistory synchron/chronologisch zurück.
+#  Enthält automatische Interpolation für fehlende Temperaturwerte.
 ###############################################################
 sub getPvHistTargetArray {
-  my $name   = shift;
-  my $key    = shift;
-  my $depkey = shift;
-  my $limit  = shift // 200;                                                              # Standard: 200 Werte                                                                         
+  my ($name, $debug, $key, $depkey, $limit) = @_;
+  $limit //= 200;
 
   my (@akey, @adepkey);
+  return (\@akey, \@adepkey) unless exists $data{$name}{pvhist};
 
-  return (\@akey, \@adepkey) unless exists $data{$name}{pvhist};                          # Sicherheit: Struktur vorhanden?
-
-  my ($sec,$min,$hour,$mday) = localtime();                                               # aktueller Tag und Stunde
-  $hour = int ($hour);                                                                    # 0..23
-  $mday = int ($mday);                                                                    # 1..31
+  my ($sec,$min,$hour,$mday) = localtime();
+  $hour = int($hour);
+  $mday = int($mday);
 
   my $ph = $data{$name}{pvhist};
- 
-  my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;                     # Tage sortieren: Vormonatsrest + aktueller Monat
+
+  my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;             # Tage sortieren (Vormonat + aktueller Monat)
   my @days_upto  = sort { $a <=> $b } grep { $_ <= $mday } keys %$ph;
   my @days       = (@days_after, @days_upto);
-  
-  for my $day (@days) {
-      my @hods = sort { $a <=> $b } keys %{ $ph->{$day} };                                # Stunden sortieren
-        
+
+  for my $day (@days) {                                                           # --- Werte sammeln ---
+      my @hods = sort { $a <=> $b } keys %{ $ph->{$day} };
+
       for my $hod (@hods) {
           next if $hod < 1 || $hod > 24;
-
-          if ($day == $mday && $hod == $hour + 1) {                                       # aktuelle Stunde überspringen (noch nicht abgeschlossen)
-              last;
-          }
+          last if ($day == $mday && $hod == $hour + 1);                           # aktuelle Stunde überspringen
 
           my $rec = $ph->{$day}{$hod};
-          next unless defined $rec->{$key};                                               # vollständige Datensätze erzwingen
-          next unless defined $rec->{$depkey};
-          next unless $rec->{$key} >= 0;
+
+          next unless (defined $rec->{$key});                                     # Wert muss vorhanden sein
+          next unless ($rec->{$key} >= 0);
 
           push @akey,    $rec->{$key};
-          push @adepkey, $rec->{$depkey};
+          push @adepkey, $rec->{$depkey};                                         # kann undef sein, wird später gefixt
       }
   }
-  
-  my $len = @akey < @adepkey ? scalar @akey : scalar @adepkey;
 
-  splice @akey,    $len if(@akey    > $len);                                              # Arrays synchron kürzen
+  my $len = @akey < @adepkey ? scalar @akey : scalar @adepkey;                    # --- Arrays synchronisieren ---
+  splice @akey,    $len if(@akey    > $len);
   splice @adepkey, $len if(@adepkey > $len);
 
-  if (@akey > $limit) {                                                                   # nur die letzten $limit Werte behalten
-      @akey    = @akey[-$limit .. -1];
+  # --- Interpolation fehlender Werte in Array @adepkey ---
+  for (my $i = 0; $i < $len; $i++) {
+      next if defined $adepkey[$i];
+        
+      if ($debug =~ /aiData/xs) {
+          Log3 ($name, 1, "$name DEBUG> AI FANN - UNDEFINED value found in Array at position $i ... interpolate it");
+      }
+
+      my $li = $i - 1;                                                            # Linken definierten Wert suchen
+      $li-- while $li >= 0 && !defined $adepkey[$li];
+
+      my $ri = $i + 1;                                                            # Rechten definierten Wert suchen
+      $ri++ while $ri < $len && !defined $adepkey[$ri];
+
+      if ($li < 0 && $ri >= $len) {                                               # Fall 1: beide Seiten undef -> 0
+          $adepkey[$i] = 0;
+          next;
+      }
+
+      if ($ri >= $len) {                                                          # Fall 2: nur links vorhanden
+          $adepkey[$i] = $adepkey[$li];
+          next;
+      }
+
+      if ($li < 0) {                                                              # Fall 3: nur rechts vorhanden
+          $adepkey[$i] = $adepkey[$ri];
+          next;
+      }
+
+      my $ratio = ($i - $li) / ($ri - $li);                                       # Fall 4: beide vorhanden -> lineare Interpolation
+      $adepkey[$i] = $adepkey[$li] + ($adepkey[$ri] - $adepkey[$li]) * $ratio;
+  }
+
+  if ($len > $limit) {
+      @akey    = @akey[-$limit .. -1];                                            # --- Limit anwenden ---
       @adepkey = @adepkey[-$limit .. -1];
   }
 
