@@ -162,11 +162,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.0.0"  => "07.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
+  "2.0.0"  => "09.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
                            "new consumer type 'heatpump', new readings Today_CONdeviation, Today_CONforecast, Today_CONreal ".
-                           "show Con deviation in UI ".
+                           "show Con deviation in UI, new key aiControl->aiConRegVersion ".
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
@@ -457,9 +457,11 @@ use constant {
 
   AINUMTREES     => 10,                                                             # Anzahl der Entscheidungsbäume im Ensemble
   AITRBLTO       => 7200,                                                           # KI DecTree Training BlockingCall Timeout
-  AIASPEAKSFAC   => 1.1,                                                            # Sicherheitsaufschlag auf installiertes PV Peak 
-  NNTRBLTO       => 86400,                                                          # Training neuronales Netz BlockingCall Timeout
-  NNMINNUMINPUTS => 2000,                                                           # Mindestanzahl valider Datensätze für Training AI::FANN
+  AIASPEAKSFAC   => 1.1,                                                            # Sicherheitsaufschlag auf installiertes PV Peak
+  AINUMEPOCHS    => 15000,                                                          # AI::FANN max. Anzahl Trainigs-Epochen
+  AIIMPPATIENCE  => 1000,                                                           # AI::FANN Training - Schwelle Anzahl Epochen ohne Verbesserung für Early Stopping                                                                           
+  AINNTRBLTO     => 86400,                                                          # Training neuronales Netz BlockingCall Timeout
+  AINUMMININPUTS => 2000,                                                           # Mindestanzahl valider Datensätze für Training AI::FANN
   AIBCTHHLD      => 0.2,                                                            # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
   AITRSTARTDEF   => 2,                                                              # default Stunde f. Start AI-Training
   AISTDUDEF      => 1825,                                                           # default Haltezeit KI Raw Daten (Tage)
@@ -1688,189 +1690,243 @@ my %hfspvh = (
 ###################################################################################
 my %FEATURE_BLOCKS = (
 
-  # --------------------------------------------------------
-  # Zeitstruktur
-  # --------------------------------------------------------
-  time_base => sub {
-      my ($f) = @_;
-      return [
-          $f->{isday},
-          $f->{hour_norm},
-          $f->{hour_class_morning},
-          $f->{hour_class_noon},
-          $f->{hour_class_evening},
-          $f->{hour_class_lateevening},
-          $f->{hour_class_midnight},
-          $f->{day_class_weekend},
-          $f->{day_class_workday},
-          $f->{day_hour_norm},
-          $f->{night_hour_norm},
-      ];
-  },
+# --------------------------------------------------------
+# Zeitstruktur
+# --------------------------------------------------------
+time_base => sub {
+    my ($f) = @_;
+    return [
+        $f->{isday},                                                        # Tag/Nacht – Grundrhythmus des Verbrauchs
+        $f->{hour_norm},                                                    # Normierte Stunde – kontinuierlicher Tagesverlauf
+        $f->{hour_class_morning},                                           # Grundaktivität morgens
+        $f->{hour_class_noon},                                              # Grundaktivität mittags
+        $f->{hour_class_evening},                                           # Grundaktivität abends
+        $f->{hour_class_lateevening},                                       # Aktivität sinkt
+        $f->{hour_class_midnight},                                          # Grundlast
+        $f->{day_class_workday},                                            # Werktag – Arbeitsrhythmus
+        $f->{day_class_weekend},                                            # Wochenende allgemein
+        $f->{day_hour_norm},                                                # Normierte Stunde nur tagsüber – PV-relevant
+        $f->{night_hour_norm},                                              # Normierte Stunde nur nachts – Grundlast/Heizung
+    ];
+},
 
-  # --------------------------------------------------------
-  # Saisonale Struktur
-  # --------------------------------------------------------
-  seasonality => sub {
-      my ($f) = @_;
-      return [
-          $f->{month_sin},
-          $f->{month_cos},
-          $f->{hod_sin},
-          $f->{hod_cos},
-          $f->{wday_sin},
-          $f->{wday_cos},
-          $f->{sunaz_sin},
-          $f->{sunaz_cos},
-          $f->{sunalt_norm},
-      ];
-  },
+# --------------------------------------------------------
+# Saisonale Struktur
+# --------------------------------------------------------
+seasonality => sub {
+    my ($f) = @_;
+    return [
+        $f->{month_sin},                                                    # Jahreszeit (sin) – glatte saisonale Kurve
+        $f->{month_cos},                                                    # Jahreszeit (cos) – ergänzt sin für eindeutige Kodierung
+        $f->{hod_sin},                                                      # Tageszyklus (sin) – glatte 24h-Periodik
+        $f->{hod_cos},                                                      # Tageszyklus (cos) – eindeutige Kodierung
+        $f->{wday_sin},                                                     # Wochenzyklus (sin) – glatte 7-Tage-Periodik
+        $f->{wday_cos},                                                     # Wochenzyklus (cos) – eindeutige Kodierung
+        $f->{sunaz_sin},                                                    # Sonnenstand (Azimut) – PV-Erwartung
+        $f->{sunaz_cos},                                                    # Sonnenstand (Azimut) – eindeutige Kodierung
+        $f->{sunalt_norm},                                                  # Sonnenhöhe – PV-Erzeugungspotenzial
+    ];
+},
 
-  # --------------------------------------------------------
-  # Wetter & PV
-  # --------------------------------------------------------
-  weather_pv => sub {
-      my ($f) = @_;
-      return [
-          $f->{temp_norm},
-          $f->{wcc_norm},
-          $f->{rr1c_norm},
-          $f->{pv_norm},
-      ];
-  },
 
-  # --------------------------------------------------------
-  # Lag-Features
-  # --------------------------------------------------------
-  lags => sub {
-      my ($f) = @_;
-      return [
-          $f->{delta1_norm_pos},
-          $f->{delta1_norm_neg},
-          $f->{delta24_norm_pos},
-          $f->{delta24_norm_neg},
-      ];
-  },
+# --------------------------------------------------------
+# Lag-Features
+# --------------------------------------------------------
+lags => sub {
+    my ($f) = @_;
+    return [
+        $f->{delta1_norm_pos},         # Verbrauchsanstieg zur Vorstunde
+        $f->{delta1_norm_neg},         # Verbrauchsabsenkung zur Vorstunde
+        $f->{delta24_norm_pos},        # Verbrauchsanstieg zum Vortag (gleiche Stunde)
+        $f->{delta24_norm_neg},        # Verbrauchsabsenkung zum Vortag
+    ];
+},
 
-  # --------------------------------------------------------
-  # Trend-Features
-  # --------------------------------------------------------
-  trends => sub {
-      my ($f) = @_;
-      return [
-          $f->{trend_up_strength},
-          $f->{trend_down_strength},
-          $f->{volatility_flag},
-          $f->{trend_break},                       
-      ];
-  },
+# --------------------------------------------------------
+# Trend-Features
+# --------------------------------------------------------
+trends => sub {
+    my ($f) = @_;
+    return [
+        $f->{trend_up_strength},       # Stärke eines steigenden Verbrauchstrends
+        $f->{trend_down_strength},     # Stärke eines fallenden Verbrauchstrends
+        $f->{volatility_flag},         # Unruhe/Schwankung – Kochen, Gerätewechsel
+        $f->{trend_break},             # Trendbruch – Peak oder Lastabwurf
+    ];
+},
 
-  # --------------------------------------------------------
-  # Semantik: Morgen & Mittag
-  # --------------------------------------------------------
-  semantics_core => sub {
-      my ($f) = @_;
-      return [
-          $f->{delta1_norm_pos}   * $f->{hour_class_noon},
-          $f->{delta1_norm_pos}   * $f->{hour_class_morning},
-          $f->{trend_up_strength} * $f->{delta1_norm_pos} * $f->{hour_class_noon},
-      ];
-  },
+# --------------------------------------------------------
+# Wetter
+# --------------------------------------------------------
+weather => sub {
+    my ($f) = @_;
+    return [
+        $f->{temp_norm},               # Temperatur – Heizung/Kühlung/Grundlast
+        $f->{wcc_norm},                # Bewölkung – PV-Erzeugung & Lichtbedarf
+        $f->{rr1c_norm},               # Niederschlag – Aktivität, Licht, Heizung
+    ];
+},
 
-  # --------------------------------------------------------
-  # Semantik: Abend
-  # --------------------------------------------------------
-  semantics_evening => sub {
-      my ($f) = @_;
-      return [
-          $f->{delta1_norm_pos} * $f->{hour_class_evening},
-          $f->{delta1_norm_neg} * $f->{hour_class_lateevening},
-      ];
-  },
+# --------------------------------------------------------
+# Semantik: Menschlicher Tagesrhythmus (PV-unabhängig)
+# --------------------------------------------------------
+semantics_human_rhythm => sub {
+    my ($f) = @_;
+    return [
+        # --- MORGEN ---
+        $f->{delta1_norm_pos}   * $f->{hour_class_morning},                             # Geräte an / Aufstehen
 
-  # --------------------------------------------------------
-  # PV-Semantik
-  # --------------------------------------------------------
-  semantics_pv => sub {
-      my ($f) = @_;
-      return [
-          $f->{pv_jump},
-          $f->{pv_drop},
-      ];
-  },
+        # --- MITTAG ---
+        $f->{delta1_norm_pos}   * $f->{hour_class_noon},                                # Kochen / Geräte
+
+        # --- ABEND ---
+        $f->{delta1_norm_pos}   * $f->{hour_class_evening},                             # Kochen / Geräte
+
+        # --- SPÄTER ABEND ---
+        $f->{delta1_norm_neg}     * $f->{hour_class_lateevening},                       # Geräte gehen aus
+    ];
+},
+
+# --------------------------------------------------------
+# Semantik: erweiterter Menschlicher Tagesrhythmus
+# --------------------------------------------------------
+semantics_human_rhythm_advanced => sub {
+    my ($f) = @_;
+    return [
+        # --- MORGEN ---
+        $f->{trend_up_strength} * $f->{hour_class_morning},                             # Starker Aktivitätsanstieg
+        $f->{delta24_norm_pos}  * $f->{hour_class_morning},                             # Muster vom Vortag (Aufstehen ähnlich)
+        $f->{roll_mean_3_norm}  * $f->{hour_class_morning},                             # Trägheit: Frühstück/Bad dauert an
+        $f->{temp_delta_1h_neg} * $f->{hour_class_morning},                             # Morgens: Bad/Heizung
+
+        # --- MITTAG ---
+        $f->{trend_up_strength} * $f->{hour_class_noon},                                # Starker Mittagsanstieg
+        $f->{trend_up_strength} * $f->{hour_class_noon} * $f->{delta1_norm_pos},        # sehr starker Mittagsanstieg
+        $f->{delta24_norm_pos}  * $f->{hour_class_noon},                                # Vortagsmuster
+        $f->{roll_mean_3_norm}  * $f->{hour_class_noon},                                # Mittag dauert oft 1–2h
+        $f->{temp_delta_1h_neg} * $f->{hour_class_noon},                                # Kalte Tage → mehr Heizung/Warmwasser
+
+        # --- ABEND ---
+        $f->{trend_up_strength} * $f->{hour_class_evening},                             # Abendanstieg
+        $f->{delta24_norm_pos}  * $f->{hour_class_evening},                             # Vortagsmuster
+        $f->{roll_mean_3_norm}  * $f->{hour_class_evening},                             # Abendessen/TV/Haushalt → Plateau
+        $f->{temp_delta_1h_neg} * $f->{hour_class_evening},                             # Kalter Abend → Heizerlast
+
+        # --- SPÄTER ABEND ---
+        $f->{trend_down_strength} * $f->{hour_class_lateevening},                       # Trendbruch -> Ruhephase
+        $f->{temp_delta_1h_neg}   * $f->{hour_class_lateevening},                       # Später Abend: Heizung fährt hoch
+
+        # --- NACHT ---
+        $f->{trend_down_strength} * $f->{hour_class_midnight},                          # Stabilität
+        $f->{roll_mean_3_norm}    * $f->{hour_class_midnight},                          # Nacht-Plateau
+
+        # --- WOCHENENDE ---
+        $f->{hour_class_morning} * $f->{day_class_weekend},                             # Späteres Aufstehen
+        $f->{hour_class_noon}    * $f->{day_class_weekend},                             # Mehr Kochen / Haushalt
+        $f->{hour_class_evening} * $f->{day_class_weekend},                             # Längere Aktivität abends
+        $f->{roll_mean_3_norm}   * $f->{day_class_weekend},                             # Generell längere Aktivitätsphasen
+
+        # --- TAGESMUSTER VOM VORTAG ---
+        $f->{delta24_norm_pos} * $f->{hour_norm},                                       # Verstärkung
+        $f->{delta24_norm_neg} * $f->{hour_norm},                                       # Abschwächung
+    ];
+},
+
+# --------------------------------------------------------
+# PV-Semantik
+# --------------------------------------------------------
+semantics_pv => sub {
+    my ($f) = @_;
+    return [
+        $f->{pv_jump},                                                          # Plötzlicher PV-Anstieg (Wolkenloch)
+        $f->{pv_drop},                                                          # Plötzlicher PV-Abfall (Wolke)
+        $f->{pv_norm},                                                          # PV-Erzeugung – Batterieladung, Lastverschiebung
+        $f->{pv_norm} * $f->{hour_class_noon},                                  # PV-Lastverschiebung
+        $f->{pv_norm} * $f->{trend_up_strength},                                # PV + steigender Trend
+        $f->{pv_norm} * $f->{delta1_norm_pos},                                  # PV + Verbrauchsanstieg
+        $f->{pv_drop} * $f->{delta1_norm_neg},                                  # Lastabfall durch PV-Wegfall
+        $f->{pv_norm} * $f->{temp_delta_1h_neg},                                # Kälte + PV -> Heizer + Batterie
+        $f->{pv_drop} * $f->{temp_delta_1h_neg},                                # Kälte + PV-Drop -> Lastabfall
+        $f->{pv_norm} * $f->{temp_delta_1h_neg} * $f->{trend_up_strength},      # Kälte + PV + steigender Trend -> Peak
+    ];
+},
+
+# --------------------------------------------------------
+# Rückfall Semantik
+# --------------------------------------------------------
+semantics_rueckfall => sub {
+    my ($f) = @_;
+    return [
+        $f->{trend_break} * $f->{delta1_norm_neg},           # Verbrauch fällt nach Peak abrupt
+        $f->{trend_break} * $f->{hour_class_lateevening},    # Tagesende-Rückfall
+    ];
+},
+
+# --------------------------------------------------------
+# Semantik für Wärmepumpen
+# --------------------------------------------------------
+semantics_heatpump => sub {
+    my ($f) = @_;
+    return [
+        $f->{heating_degree_norm},                           # Heizbedarf (Außentemp < Soll)
+        $f->{cooling_degree_norm},                           # Kühlbedarf (Außentemp > Soll)
+
+        $f->{hp_heating_mode},                               # WP im Heizmodus
+        $f->{hp_cooling_mode},                               # WP im Kühlmodus
+
+        $f->{ww_morning},                                    # Warmwasser morgens
+        $f->{ww_evening},                                    # Warmwasser abends
+        $f->{ww_cold_boost},                                 # Kaltstart-Boost
+        $f->{ww_pv_boost},                                   # PV-Überschuss-WW
+        $f->{ww_cycle_flag},                                 # WW-Zyklus erkannt
+
+        $f->{cop_proxy},                                     # Effizienzindikator
+        $f->{cop_inverse},                                   # Ineffizienzindikator
+        $f->{hp_power_factor},                               # Leistungsfaktor der WP
+
+        $f->{frost_protect},                                 # Frostschutz aktiv
+        $f->{frost_load},                                    # Frostlast (Heizbedarf bei Kälte)
+
+        $f->{temp_norm_lag1h},                               # Temperatur 1h zurück
+        $f->{temp_norm_lag3h},                               # Temperatur 3h zurück
+        $f->{temp_norm_lag24h},                              # Temperatur 24h zurück
+        $f->{temp_delta_1h_pos},                             # Temp-Anstieg 1h
+        $f->{temp_delta_1h_neg},                             # Temp-Abfall 1h
+        $f->{temp_delta_3h_pos},                             # Temp-Anstieg 3h
+        $f->{temp_delta_3h_neg},                             # Temp-Abfall 3h
+        $f->{temp_trend_pos},                                # Wärmetrend
+        $f->{temp_trend_neg},                                # Kältetrend
+    ];
+},
+
+# --------------------------------------------------------
+# Kälte
+# --------------------------------------------------------
+semantics_cold => sub {
+    my ($f) = @_;
+    return [                        
+        $f->{temp_delta_1h_neg} * $f->{trend_break},                             # Kälte + Trendbruch -> abruptes Ende
+    ];
+},
   
-  # --------------------------------------------------------
-  # Rückfall Semantik
-  # --------------------------------------------------------    
-  semantics_rueckfall => sub {
-      my ($f) = @_;
-      return [
-          $f->{trend_break} * $f->{delta1_norm_neg},                   # Trend-Break × negativer Delta -> Rückfall nach Peak
-          $f->{pv_drop}     * $f->{delta1_norm_neg},                   # PV-Drop × negativer Delta -> Rückfall durch Lastabschaltung
-          $f->{trend_break} * $f->{hour_class_lateevening},            # Trend-Break × späte Stunde -> Rückfall am Tagesende
-      ];
-  },
-
-  # --------------------------------------------------------
-  # Semantik für Wärmepumpen
-  # --------------------------------------------------------  
-  semantics_heatpump_advanced => sub {
-      my ($f) = @_;
-      return [
-          $f->{heating_degree_norm},                                   # Heizlast & Kühllast
-          $f->{cooling_degree_norm},
-
-          $f->{hp_heating_mode},                                       # WP-Modi
-          $f->{hp_cooling_mode},
-
-          $f->{ww_morning},                                            # Warmwasser-Semantik
-          $f->{ww_evening},
-          $f->{ww_cold_boost},
-          $f->{ww_pv_boost},
-          $f->{ww_cycle_flag},                                         # WW-Zyklus (NEU)
-
-          $f->{cop_proxy},                                             # COP-Semantik
-          $f->{cop_inverse},
-          $f->{hp_power_factor},
-
-          $f->{frost_protect},                                         # Frostschutz
-          $f->{frost_load},
-          
-          $f->{temp_norm_lag1h},                                       # Temperatur-Dynamik (NEU)  Pos 59
-          $f->{temp_norm_lag3h},
-          $f->{temp_norm_lag24h},
-          $f->{temp_delta_1h_pos},
-          $f->{temp_delta_1h_neg},
-          $f->{temp_delta_3h_pos},
-          $f->{temp_delta_3h_neg},
-          $f->{temp_trend_pos},
-          $f->{temp_trend_neg},
-      ];
-  },
-  
-  # --------------------------------------------------------
-  # Kälte mit PV
-  # --------------------------------------------------------
-  semantics_cold_pv => sub {
-      my ($f) = @_;
-      return [
-        $f->{temp_norm_neg} * $f->{pv_norm},                                       # Kälte × PV
-        $f->{temp_norm_neg} * $f->{pv_norm} * $f->{trend_up_strength},             # Kälte × PV × Trend
-        $f->{temp_norm_neg} * $f->{pv_drop},                                       # Kälte × PV-Drop
-        $f->{temp_norm_neg} * $f->{hour_class_evening},                            # Kälte × Abend
-        $f->{temp_norm_neg} * $f->{trend_break},                                   # Kälte × Trend-Break
-      ];
-  },
-  
-  # --------------------------------------------------------
-  # Sandbox für neue Features
-  # --------------------------------------------------------
-  sandbox => sub {
-      my ($f) = @_;
-      return [
-
-      ];
-  },
+# --------------------------------------------------------
+# Sandbox für neue Features
+# --------------------------------------------------------
+sandbox => sub {
+    my ($f) = @_;
+    return [
+        #$f->{roll_mean_3_norm},                                         # 3h-Gleitmittel – Glättung, Grundlast, sehr sinnvoll in v1_heatpump
+        #$f->{roll_std_6_norm},                                          # 6h-Volatilität – Unruhe, Kochen, Gerätewechsel
+        
+        #$f->{lag24_norm} * $f->{hour_class_noon},        # Vortag × Mittag
+        $f->{lag24_norm} * $f->{hour_norm},              # Vortag × Tagesverlauf
+        #$f->{lag24_norm} * $f->{day_class_weekend},      # Vortag × Wochenende
+        
+        $f->{delta1_norm},               # Änderung zur Vorstunde – Trendindikator
+        $f->{delta24_norm},              # Änderung zum Vortag – saisonale Tagesmuster
+        $f->{trend_break}       * $f->{hour_class_noon},                # Trendbruch mittags
+    ];
+},
 );
 
 ###################################################################################
@@ -1883,246 +1939,231 @@ my %FEATURE_REGISTRY;
 
 %FEATURE_REGISTRY = (
 
-  # --------------------------------------------------------
-  # v0: Basis-Features
-  # --------------------------------------------------------
-  v0_base => sub {
-      my ($f) = @_;
-      return [
-          @{ $FEATURE_BLOCKS{time_base}->($f) },
-          @{ $FEATURE_BLOCKS{seasonality}->($f) },
-          @{ $FEATURE_BLOCKS{weather_pv}->($f) },
-          @{ $FEATURE_BLOCKS{lags}->($f) },
-      ];
-  },
+# --------------------------------------------------------
+# v0: Basis-Features
+# --------------------------------------------------------
+v0_base => sub {
+    my ($f) = @_;
+    return [
+        @{ $FEATURE_BLOCKS{time_base}->($f) },
+        @{ $FEATURE_BLOCKS{seasonality}->($f) },
+        @{ $FEATURE_BLOCKS{weather}->($f) },
+        @{ $FEATURE_BLOCKS{lags}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_human_rhythm}->($f) },
+    ];
+},
 
-  # --------------------------------------------------------
-  # v1_common – Standardhaushalt (inkl. PV-Semantik)
-  # --------------------------------------------------------
-  v1_common => sub {
-      my ($f) = @_;
-      return [
-          @{ $FEATURE_REGISTRY{v0_base}->($f) },
-          @{ $FEATURE_BLOCKS{trends}->($f) },
-          @{ $FEATURE_BLOCKS{semantics_core}->($f) },
-          @{ $FEATURE_BLOCKS{semantics_evening}->($f) },
-          @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
-          @{ $FEATURE_BLOCKS{semantics_rueckfall}->($f) },
-          @{ $FEATURE_BLOCKS{semantics_cold_pv}->($f) },
-      ];
-  },
+# --------------------------------------------------------
+# v1_common – Standardhaushalt (ohne PV Semantik)
+# --------------------------------------------------------
+v1_common => sub {
+    my ($f) = @_;
+    return [
+        @{ $FEATURE_REGISTRY{v0_base}->($f) },
+        @{ $FEATURE_BLOCKS{trends}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_rueckfall}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_cold}->($f) },
+    ];
+},
+
+# --------------------------------------------------------
+# v1_common_active – Standardhaushalt (ohne PV) +
+#                    erweiterter Tagestythmus
+# --------------------------------------------------------
+v1_common_active => sub {
+    my ($f) = @_;
+    return [
+        @{ $FEATURE_REGISTRY{v1_common}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
+    ];
+},
+
+# --------------------------------------------------------
+# v1_common_pv – Standardhaushalt (inkl. PV-Semantik)
+# --------------------------------------------------------
+v1_common_pv => sub {
+    my ($f) = @_;
+    return [
+        @{ $FEATURE_REGISTRY{v1_common}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
+    ];
+},
   
-  # --------------------------------------------------------
-  # v2_hp_advanced – Haushalte mit Wärmepumpe
-  # --------------------------------------------------------  
-  v2_hp_advanced => sub {
-      my ($f) = @_;
-      return [
-          @{ $FEATURE_REGISTRY{v1_common}->($f) },
-          @{ $FEATURE_BLOCKS{semantics_heatpump_advanced}->($f) },
-      ];
-  },
+# --------------------------------------------------------
+# v1_common_pv_active – Standardhaushalt (inkl. PV) +
+#                       erweiterter Tagestythmus
+# --------------------------------------------------------
+v1_common_active_pv => sub {
+    my ($f) = @_;
+    return [
+        @{ $FEATURE_REGISTRY{v1_common}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
+    ];
+},
+  
+# --------------------------------------------------------
+# v1_heatpump – WP-Semantik
+# --------------------------------------------------------  
+v1_heatpump => sub {
+    my ($f) = @_;
+    return [
+        @{ $FEATURE_REGISTRY{v1_common}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) },
+    ];
+},
 
-  # --------------------------------------------------------
-  # v3_sandbox: v1 + experimentelle Features
-  # --------------------------------------------------------
-  v3_sandbox => sub {
-      my ($f) = @_;
-      return [
-          @{ $FEATURE_REGISTRY{v1_common}->($f) },
-          @{ $FEATURE_BLOCKS{sandbox}->($f) },
-      ];
-  },
+# --------------------------------------------------------
+# v1_heatpump_pv – WP + PV Semantik
+# --------------------------------------------------------  
+v1_heatpump_pv => sub {
+    my ($f) = @_;
+    return [
+        @{ $FEATURE_REGISTRY{v1_common_pv}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) },
+    ];
+},
 
-  # --------------------------------------------------------
-  # bck: Feature Sammlung zum Copy/Paste in vx
-  # --------------------------------------------------------    
-  bck => sub {
-      my ($f) = @_;
-      return [
-      
-          #### Backup Sammlung ####
+# --------------------------------------------------------
+# v1_sandbox: v1 + experimentelle Features
+# --------------------------------------------------------
+v1_sandbox => sub {
+    my ($f) = @_;
+    return [
+        @{ $FEATURE_REGISTRY{v1_common_pv}->($f) },
+        @{ $FEATURE_BLOCKS{sandbox}->($f) },
+    ];
+},
 
-          # --- Lag-Features ---
-          $f->{lag1_norm},
-          $f->{lag2_norm},
-          $f->{lag24_norm},
-          $f->{delta1_norm},
-          $f->{delta24_norm},
-          $f->{roll_mean_3_norm},
-          $f->{roll_std_6_norm},
-          
-          # --- Semantic Features ---
-          $f->{hour_norm}        * $f->{wday_sin},
-          $f->{hour_norm}        * $f->{wday_cos},
-          $f->{pv_norm}          * $f->{sunalt_norm},
-          $f->{hod_sin}          * $f->{wday_sin},
-          
-          # bestehende semantische Features …
-          $f->{hour_norm}        * $f->{wday_sin},
-          $f->{hour_norm}        * $f->{wday_cos},
-          $f->{pv_norm}          * $f->{sunalt_norm},
-          $f->{hod_sin}          * $f->{wday_sin},
-          $f->{lag24_norm}       * $f->{hour_norm},
-          $f->{lag24_norm}       * $f->{sunalt_norm},
+# --------------------------------------------------------
+# bck: Feature Sammlung zum Copy/Paste in vx
+# --------------------------------------------------------    
+bck => sub {
+    my ($f) = @_;
+    return [
 
-          # Trigger & Trend
-          $f->{trend_up_norm},
-          $f->{trend_down_norm},
-          $f->{trend_up_strength},
-          $f->{trend_down_strength},
-          $f->{pv_jump},
-          $f->{cold_trigger},
-          $f->{heat_trigger},
-          $f->{volatility_flag},
-          $f->{pv_consumption_cross},
-          $f->{trend_break},
+        #### Backup Sammlung ####
 
-          # Interaktionen (alle 0..1)
-          $f->{lag1_norm}          * $f->{pv_jump},
-          $f->{lag1_norm}          * $f->{cold_trigger},
-          $f->{trend_up_strength}  * $f->{pv_norm},
-          $f->{trend_down_strength}* $f->{pv_norm},
-          $f->{roll_std_6_norm}    * $f->{isday},
-          # --- Neue Trend- und Trigger-Features ---
-          $f->{trend_up_norm},          # 0/1 – Trend steigt
-          $f->{trend_down_norm},        # 0/1 – Trend fällt
-          $f->{trend_up_strength},      # 0..1 – Stärke des Aufwärtstrends
-          $f->{trend_down_strength},    # 0..1 – Stärke des Abwärtstrends
-          $f->{volatility_flag},        # 0/1 – hohe Std-Abweichung
-          $f->{pv_consumption_cross},   # 0/1 – PV steigt, Verbrauch fällt
-          $f->{trend_break},            # 0/1 – Trendbruch erkannt
+        # --- Lag-Features ---
+        $f->{lag1_norm},                 # Verbrauch der Vorstunde (normiert)
+        $f->{lag2_norm},                 # Verbrauch vor 2 Stunden – Glättung, Muster
+        $f->{lag24_norm},                # Verbrauch gleiche Stunde Vortag – Tagesmuster
+        $f->{delta1_norm},               # Änderung zur Vorstunde – Trendindikator
+        $f->{delta24_norm},              # Änderung zum Vortag – saisonale Tagesmuster
 
-          # --- Interaktionen zur Verstärkung der Dynamik ---
-          $f->{lag1_norm}           * $f->{volatility_flag},
-          $f->{lag1_norm}           * $f->{trend_break},
-          $f->{lag1_norm}           * $f->{hour_class_evening},
-          $f->{lag1_norm}           * $f->{hour_class_lateevening},
+        # --- Semantic Features ---
+        $f->{hour_norm} * $f->{wday_sin},    # Tageszeit × Wochenrhythmus – Aktivitätsmuster
+        $f->{hour_norm} * $f->{wday_cos},    # Ergänzende Wochenzyklus-Kodierung
+        $f->{pv_norm}   * $f->{sunalt_norm}, # PV × Sonnenhöhe – realistische PV-Semantik
+        $f->{hod_sin}   * $f->{wday_sin},    # Tageszyklus × Wochenzyklus – Wochenend-/Werktagprofile
 
-          $f->{trend_up_strength}   * $f->{pv_norm},
-          $f->{trend_down_strength} * $f->{pv_norm},
+        # bestehende semantische Features …
+        $f->{lag24_norm} * $f->{hour_norm},        # Vortagsmuster × Tageszeit – typische Peaks
+        $f->{lag24_norm} * $f->{sunalt_norm},      # Vortagsmuster × Sonnenstand – PV-Tagesprofile
 
-          $f->{roll_std_6_norm}     * $f->{hour_class_evening},
-          $f->{roll_std_6_norm}     * $f->{hour_class_lateevening},
-          $f->{roll_std_6_norm}     * $f->{hour_class_midnight},
+        # Trigger & Trend
+        $f->{trend_up_norm},             # 0/1 – Trend steigt
+        $f->{trend_down_norm},           # 0/1 – Trend fällt
+        $f->{trend_up_strength},         # Stärke des Aufwärtstrends
+        $f->{trend_down_strength},       # Stärke des Abwärtstrends
+        $f->{pv_jump},                   # PV-Sprung (Wolkenloch)
+        $f->{cold_trigger},              # Kälte-Trigger (Heizlast)
+        $f->{heat_trigger},              # Hitze-Trigger (Kühlung)
+        $f->{volatility_flag},           # Hohe Verbrauchsvolatilität
+        $f->{pv_consumption_cross},      # PV steigt, Verbrauch fällt (oder umgekehrt)
+        $f->{trend_break},               # Trendbruch – Peak oder Lastabwurf
 
-          # Optional: leichte Verstärkung der Tageszeit
-          $f->{hour_norm}           * $f->{roll_std_6_norm},
-          $f->{hour_norm}           * $f->{trend_up_norm},
-          # ---------------------------------------------------------
-          # 1. Zeit × Verhalten
-          # ---------------------------------------------------------
-          $f->{hour_norm}   * $f->{wday_sin},
-          $f->{hour_norm}   * $f->{wday_cos},
-          $f->{hour_class_morning}     * $f->{day_class_weekend},
-          $f->{hour_class_evening}     * $f->{day_class_weekend},
-          $f->{hour_class_noon}        * $f->{day_class_weekend},
+        # Interaktionen (alle 0..1)
+        $f->{lag1_norm} * $f->{pv_jump},             # Verbrauchsanstieg × PV-Sprung
+        $f->{lag1_norm} * $f->{cold_trigger},        # Verbrauch × Kälte – Heizerlast
+        $f->{trend_up_strength} * $f->{pv_norm},     # Trend steigt + PV – Lastverschiebung
+        $f->{trend_down_strength} * $f->{pv_norm},   # Trend fällt + PV – Rückgang
+        $f->{roll_std_6_norm} * $f->{isday},         # Volatilität × Tag – Kochen, Geräte
 
-          # ---------------------------------------------------------
-          # 2. Lag × Zeit (Tagesmuster)
-          # ---------------------------------------------------------
-          $f->{lag1_norm}   * $f->{hour_class_morning},
-          $f->{lag1_norm}   * $f->{hour_class_evening},
-          $f->{lag24_norm}  * $f->{hour_class_noon},        # Mittagshoch
-          $f->{lag24_norm}  * $f->{hour_norm},   # Tagesverlauf
-          $f->{lag24_norm}  * $f->{day_class_weekend},
+        # --- Neue Trend- und Trigger-Features ---
+        $f->{trend_up_norm},              # (Duplikat) Trend steigt
+        $f->{trend_down_norm},            # (Duplikat) Trend fällt
+        $f->{trend_up_strength},          # (Duplikat)
+        $f->{trend_down_strength},        # (Duplikat)
+        $f->{volatility_flag},            # (Duplikat)
+        $f->{pv_consumption_cross},       # (Duplikat)
+        $f->{trend_break},                # (Duplikat)
 
-          # ---------------------------------------------------------
-          # 3. Delta × Zeit (Trend)
-          # ---------------------------------------------------------
-          $f->{delta1_norm_pos}  * $f->{hour_class_morning},   # steigender Trend morgens
-          $f->{delta1_norm_neg}  * $f->{hour_class_evening},   # fallender Trend abends
-          $f->{delta24_norm_pos} * $f->{hour_class_noon},      # steigender Tagestrend
-          $f->{delta24_norm_neg} * $f->{day_class_weekend},   # fallender Tagestrend am WE
-          $f->{delta1_norm_neg}  * $f->{hour_class_noon},
-          $f->{delta1_norm_neg}  * $f->{hour_class_morning},                        # fallender Trend morgens
+        # --- Interaktionen zur Verstärkung der Dynamik ---
+        $f->{lag1_norm} * $f->{volatility_flag},          # Verbrauch × Unruhe
+        $f->{lag1_norm} * $f->{trend_break},              # Verbrauch × Trendbruch
+        $f->{lag1_norm} * $f->{hour_class_evening},       # Abendpeak × Verbrauch
+        $f->{lag1_norm} * $f->{hour_class_lateevening},   # Später Abend × Verbrauch
 
-          # ---------------------------------------------------------
-          # 4. Sonne/Temperatur × Lag/Delta
-          # ---------------------------------------------------------
-          $f->{sunalt_norm}  * $f->{lag1_norm},
-          $f->{sunalt_norm}  * $f->{lag24_norm},
-          $f->{sunalt_norm}  * $f->{delta1_norm_pos},
-          $f->{temp_norm}    * $f->{lag1_norm},
-          $f->{temp_norm}    * $f->{delta1_norm_pos},
+        $f->{trend_up_strength}   * $f->{pv_norm},        # Trend steigt × PV
+        $f->{trend_down_strength} * $f->{pv_norm},        # Trend fällt × PV
 
-          # ---------------------------------------------------------
-          # 5. Workday × Lag/Delta (stärkster Block)
-          # ---------------------------------------------------------
-          $f->{day_class_workday}      * $f->{lag1_norm},
-          $f->{day_class_workday}      * $f->{lag24_norm},
-          $f->{day_class_workday}      * $f->{delta1_norm_pos},
-          $f->{day_class_workday}      * $f->{delta1_norm_neg},
-          $f->{day_class_workday}      * $f->{delta24_norm_pos},
-          $f->{day_class_workday}      * $f->{delta24_norm_neg},
-          $f->{day_class_workday}      * $f->{sunalt_norm},
-          $f->{day_class_workday}      * $f->{temp_norm},
-          $f->{day_class_workday}      * $f->{pv_norm},
-          # --- Semantic Features ---
-          # ---------------------------------------------------------
-          # 1. Zeit × Verhalten
-          # ---------------------------------------------------------
-          $f->{hour_norm}   * $f->{wday_sin},
-          $f->{hour_norm}   * $f->{wday_cos},
-          $f->{hour_class_morning}     * $f->{day_class_weekend},
-          $f->{hour_class_evening}     * $f->{day_class_weekend},
-          $f->{hour_class_noon}        * $f->{day_class_weekend},
-          $f->{hour_class_midnight}    * $f->{day_class_weekend},
+        $f->{roll_std_6_norm} * $f->{hour_class_evening},     # Volatilität abends
+        $f->{roll_std_6_norm} * $f->{hour_class_lateevening}, # Volatilität spät abends
+        $f->{roll_std_6_norm} * $f->{hour_class_midnight},    # Volatilität nachts
 
-          # ---------------------------------------------------------
-          # 2. Lag × Zeit (Tagesmuster)
-          # ---------------------------------------------------------
-          $f->{lag1_norm}   * $f->{hour_class_morning},
-          $f->{lag1_norm}   * $f->{hour_class_evening},
-          $f->{lag24_norm}  * $f->{hour_class_noon},
-          $f->{lag24_norm}  * $f->{hour_norm},
-          $f->{lag24_norm}  * $f->{day_class_weekend},
-          $f->{lag1_norm}   * $f->{hour_class_midnight},
+        # Optional: leichte Verstärkung der Tageszeit
+        $f->{hour_norm} * $f->{roll_std_6_norm},         # Tageszeit × Unruhe
+        $f->{hour_norm} * $f->{trend_up_norm},           # Tageszeit × Trend
 
-          # ---------------------------------------------------------
-          # 3. Delta × Zeit (Trend)
-          # ---------------------------------------------------------
-          $f->{delta1_norm_pos}  * $f->{hour_class_morning},   # steigender Trend morgens
-          $f->{delta1_norm_neg}  * $f->{hour_class_morning},   # fallender Trend morgens
-          $f->{delta1_norm_pos}  * $f->{hour_class_evening},   # steigender Trend abends
-          $f->{delta1_norm_neg}  * $f->{hour_class_evening},   # fallender Trend abends
-          $f->{delta1_norm_pos}  * $f->{hour_class_noon},   
-          $f->{delta1_norm_neg}  * $f->{hour_class_noon},
-          $f->{delta24_norm_neg} * $f->{day_class_weekend},
-          $f->{delta1_norm_neg}  * $f->{hour_class_midnight},
+        # ---------------------------------------------------------
+        # 1. Zeit × Verhalten
+        # ---------------------------------------------------------
+        $f->{hour_norm} * $f->{wday_sin},                # Tageszeit × Wochenrhythmus
+        $f->{hour_norm} * $f->{wday_cos},                # Ergänzung
+        $f->{hour_class_morning} * $f->{day_class_weekend}, # Morgen am Wochenende
+        $f->{hour_class_evening} * $f->{day_class_weekend}, # Abend am Wochenende
+        $f->{hour_class_noon}    * $f->{day_class_weekend}, # Mittag am Wochenende
 
-          # ---------------------------------------------------------
-          # 4. Sonne/Temperatur × Lag/Delta
-          # ---------------------------------------------------------
-          $f->{sunalt_norm}  * $f->{lag1_norm},
-          $f->{sunalt_norm}  * $f->{lag24_norm},
-          $f->{sunalt_norm}  * $f->{delta1_norm_pos},
-          $f->{sunalt_norm}  * $f->{delta24_norm_pos},
-          $f->{sunalt_norm}  * $f->{hour_norm},
-          $f->{temp_norm}    * $f->{lag1_norm},
-          $f->{temp_norm}    * $f->{delta1_norm_pos},
+        # ---------------------------------------------------------
+        # 2. Lag × Zeit (Tagesmuster)
+        # ---------------------------------------------------------
+        $f->{lag1_norm}  * $f->{hour_class_morning},     # Verbrauch × Morgen
+        $f->{lag1_norm}  * $f->{hour_class_evening},     # Verbrauch × Abend
+        $f->{lag24_norm} * $f->{hour_class_noon},        # Vortag × Mittag
+        $f->{lag24_norm} * $f->{hour_norm},              # Vortag × Tagesverlauf
+        $f->{lag24_norm} * $f->{day_class_weekend},      # Vortag × Wochenende
 
-          # ---------------------------------------------------------
-          # 5. Workday × Lag/Delta
-          # ---------------------------------------------------------
-          $f->{day_class_workday}      * $f->{lag1_norm},
-          $f->{day_class_workday}      * $f->{lag24_norm},
-          $f->{day_class_workday}      * $f->{delta1_norm_pos},
-          $f->{day_class_workday}      * $f->{delta1_norm_neg},
-          $f->{day_class_workday}      * $f->{delta24_norm_pos},
-          $f->{day_class_workday}      * $f->{delta24_norm_neg},
-          $f->{day_class_workday}      * $f->{sunalt_norm},
-          $f->{day_class_workday}      * $f->{temp_norm},
-          $f->{day_class_workday}      * $f->{pv_norm},
+        # ---------------------------------------------------------
+        # 3. Delta × Zeit (Trend)
+        # ---------------------------------------------------------
+        $f->{delta1_norm_pos} * $f->{hour_class_morning}, # steigender Trend morgens
+        $f->{delta1_norm_neg} * $f->{hour_class_evening}, # fallender Trend abends
+        $f->{delta24_norm_pos} * $f->{hour_class_noon},   # steigender Tagestrend
+        $f->{delta24_norm_neg} * $f->{day_class_weekend}, # fallender Trend am WE
+        $f->{delta1_norm_neg}  * $f->{hour_class_noon},   # fallender Trend mittags
+        $f->{delta1_norm_neg}  * $f->{hour_class_morning},# fallender Trend morgens
 
-          # ---------------------------------------------------------
-          # 6. Rolling-Std gezielt eingesetzt
-          # ---------------------------------------------------------
-          $f->{roll_std_6_norm} * $f->{hour_class_midnight},
-          $f->{roll_std_6_norm} * $f->{day_class_weekend},
-          $f->{roll_std_6_norm} * $f->{day_class_workday},
-      ];
-  }
+        # ---------------------------------------------------------
+        # 4. Sonne/Temperatur × Lag/Delta
+        # ---------------------------------------------------------
+        $f->{sunalt_norm} * $f->{lag1_norm},             # Sonnenhöhe × Verbrauch
+        $f->{sunalt_norm} * $f->{lag24_norm},            # Sonnenhöhe × Vortag
+        $f->{sunalt_norm} * $f->{delta1_norm_pos},       # Sonnenhöhe × steigender Trend
+        $f->{temp_norm}   * $f->{lag1_norm},             # Temperatur × Verbrauch
+        $f->{temp_norm}   * $f->{delta1_norm_pos},       # Temperatur × steigender Trend
+
+        # ---------------------------------------------------------
+        # 5. Workday × Lag/Delta (stärkster Block)
+        # ---------------------------------------------------------
+        $f->{day_class_workday} * $f->{lag1_norm},       # Werktag × Verbrauch
+        $f->{day_class_workday} * $f->{lag24_norm},      # Werktag × Vortag
+        $f->{day_class_workday} * $f->{delta1_norm_pos}, # Werktag × steigender Trend
+        $f->{day_class_workday} * $f->{delta1_norm_neg}, # Werktag × fallender Trend
+        $f->{day_class_workday} * $f->{delta24_norm_pos},# Werktag × Tagestrend
+        $f->{day_class_workday} * $f->{delta24_norm_neg},# Werktag × Tagesrückgang
+        $f->{day_class_workday} * $f->{sunalt_norm},     # Werktag × Sonnenstand
+        $f->{day_class_workday} * $f->{temp_norm},       # Werktag × Temperatur
+        $f->{day_class_workday} * $f->{pv_norm},         # Werktag × PV
+
+        # ---------------------------------------------------------
+        # 6. Rolling-Std gezielt eingesetzt
+        # ---------------------------------------------------------
+        $f->{roll_std_6_norm} * $f->{hour_class_midnight}, # Nachtvolatilität
+        $f->{roll_std_6_norm} * $f->{day_class_weekend},   # WE-Volatilität
+        $f->{roll_std_6_norm} * $f->{day_class_workday},   # Werktagsvolatilität
+    ];
+}
 );
 
 
@@ -7704,7 +7745,17 @@ sub _attraiControl {                     ## no critic "not used"
                 THRESHOLD_SYMMETRIC
               );
               
+  my @rv = qw ( v1_common
+                v1_common_active
+                v1_common_pv
+                v1_common_active_pv
+                v1_heatpump
+                v1_heatpump_pv
+                v1_sandbox
+              );
+              
   my $afreg = join ('|', @af); 
+  my $rvreg = join ('|', @rv); 
 
   my $valid = {
       aiStorageDuration  => { comp => '\d+',                                                       act => 0 },
@@ -7721,6 +7772,7 @@ sub _attraiControl {                     ## no critic "not used"
       aiConActFunc       => { comp => "($afreg)",                                                  act => 0 },
       aiConSteepness     => { comp => '(0\.[1-9]|1\.[0-5])',                                       act => 0 },
       aiConAlpha         => { comp => '(0(?:\.\d+)?|1)',                                           act => 0 },
+      aiConRegVersion    => { comp => "($rvreg)",                                                  act => 1 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -8765,6 +8817,13 @@ sub __attrKeyAction {
               if (!grep /^$val$/, qw (all co pv own status)) {
                   return qq{The value '$val' is not valid for key '$akey'};
               }
+          }
+      }
+      
+      if ($init_done && $akey eq 'aiConRegVersion') {
+          if ($keyval =~ /heatpump/xs) {
+              my ($hp, $comftemp) = isHeatPumpUsed ($name);                                  # Consumer Nummer , Solltemp falls WP verwendet
+              if (!$hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
           }
       }
 
@@ -21942,7 +22001,7 @@ sub aiFannEnterTraining {
   $hash->{HELPER}{AINNTRAINBLOCKRUN} = BlockingCall ( "FHEM::SolarForecast::aiFannCreateConTrainData",
                                                       $paref,
                                                       "FHEM::SolarForecast::aiFannFinishTrain",
-                                                      NNTRBLTO,
+                                                      AINNTRBLTO,
                                                       "FHEM::SolarForecast::aiFannAbortConTrain",
                                                       $hash
                                                     );
@@ -21950,7 +22009,7 @@ sub aiFannEnterTraining {
   if (defined $hash->{HELPER}{AINNTRAINBLOCKRUN}) {
       $data{$name}{current}{conNNTrainstate} = 'is just retrained';
       $hash->{HELPER}{AINNTRAINBLOCKRUN}{loglevel}  = 3;                     # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
-      debugLog ($paref, 'aiProcess', qq{AI FANN Training for Consumption Forecast BlockingCall PID "$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}" with Timeout }.NNTRBLTO." s started");
+      debugLog ($paref, 'aiProcess', qq{AI FANN Training for Consumption Forecast BlockingCall PID "$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}" with Timeout }.AINNTRBLTO." s started");
   }
 
 return;
@@ -22125,7 +22184,7 @@ sub aiFannCreateConTrainData {
   
   # Mindestanzahl an gültigen Datensätzen prüfen
   ################################################
-  my $min_required = NNMINNUMINPUTS;
+  my $min_required = AINUMMININPUTS;
   my $num_inputs   = scalar @training_data;
 
   if ($num_inputs < $min_required) {
@@ -22199,7 +22258,7 @@ sub aiFannCreateConTrainData {
 
               # Temperatur-Features separat
               Log3 ($name, 1, sprintf(
-                    "%s - DBG F[%d]: tmplag1=%0.3f tmplag3=%0.3f tmplag24=%0.3f tmpd1p=%0.3f tmpd1n=%0.3f tmpd3p=%0.3f tmpd3n=%0.3f tmpTrendp=%0.3f tmpTrendn=%0.3f",
+                    "%s - DBG F[%d]: tmplag1=%0.3f tmplag3=%0.3f tmplag24=%0.3f tmpd1p=%0.3f tmpd1n=%0.3f tmpd3p=%0.3f tmpd3n=%0.3f tmpTrdp=%0.3f tmpTrdn=%0.3f",
                     $name, 
                     $i,
                     $lags->{temp_norm_lag1h},
@@ -22217,8 +22276,7 @@ sub aiFannCreateConTrainData {
       
       # Kombinatorik durch FEATURE_REGISTRY 
       #######################################
-      $regv        = _aiSelectRegistryVersion ($name);                                      # verwendete Feature-Registry Version
-      $regv        = 'v3_sandbox';
+      $regv        = _aiSelectRegistryVersion ($name);                                        # verwendete Feature-Registry Version
       my $semantic = _aiFannFeatureBuilder ($regv,                                          
                        { pv_norm                => $pv_norm_values[$i],
                          rr1c_norm              => $rr1c_norm->[$i],                          # Niederschlag, numerisch min-max normalisiert
@@ -22729,10 +22787,14 @@ sub _aiSelectRegistryVersion {
   my ($name) = @_;
 
   my ($c, $ct) = isHeatPumpUsed ($name);
-   
-  my $frv = $c 
-            ? 'v2_hp_advanced'          # Haushalt mit Wärmepumpe
-            : 'v1_common';              # Standardhaushalt
+ 
+ # defaults
+  my $frvdef = $c 
+               ? 'v1_heatpump_pv'                                           # Haushalt mit Wärmepumpe + PV
+               : 'v1_common_pv';                                            # Standardhaushalt + PV
+            
+  my $frv = CurrentVal ($name, 'aiConRegVersion', $frvdef);                 # überschreiben durch aiConRegVersion
+  $frv    = $frvdef if($frv =~ /heatpump/xs && !defined $c);                # Rückfall wenn explizit '*heatpump*' gewählt, aber keine WP als Consumer definiert
       
 return $frv;
 }
@@ -22773,10 +22835,11 @@ sub aiFannTrainstartAndRetry {
   my $paref         = shift;
   my $name          = $paref->{name}; 
   my $debug         = $paref->{debug};
-  my $fanntyp       = $paref->{fanntyp};                      # Verwendungstyp (z.B. 'con')
+  my $fanntyp       = $paref->{fanntyp};                            # Verwendungstyp (z.B. 'con')
   
-  my $maxRtyRetrain     = 3;                                  # max. Trainingsretries bei Status "Retrain"
-  my $maxRtyBorderline  = 2;                                  # max. Trainingsretries bei Status "Borderline"
+  my $maxRtyRetrain     = 3;                                        # max. Trainingsretries bei Status "Retrain"
+  my $maxRtyBorderline  = 2;                                        # max. Trainingsretries bei Status "Borderline"
+  my $aiconact          = CurrentVal ($name, 'aiConActivate', 0);   # evtl. Train-Only eingeschaltet?
   
   # Training starten
   #################### 
@@ -22827,7 +22890,11 @@ sub aiFannTrainstartAndRetry {
       my $best_attempt           = $attempt;
 
       if ($retrainQuality eq 'Retrain' || $retrainQuality eq 'Borderline') {
-          my $max_retries = $retrainQuality eq 'Retrain' ? $maxRtyRetrain : $maxRtyBorderline;
+          my $max_retries = $aiconact == 2                                                      
+                            ? 1                                                 # im "Train Only" Modus nur eine Wiederholung zur Schnelleinschätzung
+                            : $retrainQuality eq 'Retrain' 
+                            ? $maxRtyRetrain 
+                            : $maxRtyBorderline;
           
           for my $rt (1 .. $max_retries) {
               my $new_seed = ($seed * 37 + $rt * 101 + int (rand (1000000))) % 100000000;
@@ -23010,9 +23077,7 @@ sub aiFannTrain {
   
   # feste Parameter
   ###################
-  my $num_epoch                 = 15000;                                         # max. Anzahl Epochen
-  my $patience                  = 2000;                                          # Schwelle Anzahl Epochen ohne Verbesserung für Early Stopping
-  #my $model_save_threshold      = 0.01;                                          # nur ein Indikator für "gutes Modell" -> keine weitere Funktion  
+  my $num_epoch                 = AINUMEPOCHS;                                   # max. Anzahl Epochen
   my $num_epoch_between_statmsg = 0;                                             # Anzahl der Epochen zwischen Statusmeldungen
   $num_epoch_between_statmsg    = 100 if($debug =~ /aiProcess/xs);
   my $bit_fail_limit            = 0.35;                                          # Bit-Fail Limit, default=0.35
@@ -23322,11 +23387,11 @@ sub aiFannTrain {
       
       # Early Stopping
       ##################
-      if ($since_improve >= $patience) {
+      if ($since_improve >= AIIMPPATIENCE) {
           if ($debug =~ /aiProcess/xs) {
               Log3 ($name, 1,
                     sprintf "%s DEBUG> Early stopping bei Epoche %d (no improvement since %d epochs)",
-                    $name, $epoch, $patience
+                    $name, $epoch, AIIMPPATIENCE
                    );
           }
         
@@ -24089,7 +24154,6 @@ sub aiFannGetConResult {
       # Kombinatorik durch FEATURE_REGISTRY 
       #######################################
       my $regv     = _aiSelectRegistryVersion ($name);                                # verwendete Feature-Registry Version
-      $regv        = 'v3_sandbox';
       my $semantic = _aiFannFeatureBuilder ($regv,                                     
                        { pv_norm                => $pv_norm,                          # Erstatzwert für PV Ertrag min-max normalisiert
                          rr1c_norm              => $rr1c_norm,                        # Niederschlag, numerisch min-max normalisiert
@@ -24254,7 +24318,7 @@ sub _aiFannPredict {
       my $msg = "FANN Model '$fanntyp' did not return a valid result. New training is required.";
       $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
       
-      Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg, 300));               # Log mit Mehrfachverhinderung
+      Log3 ($name, 1, "$name - WARNING - $msg") if(askLogtime ($name, $msg, 300));               # Log mit Mehrfachverhinderung
       
       return (0, $bc, $zone);
   }
@@ -32035,7 +32099,7 @@ to ensure that the system configuration is correct.
          </ul>
        <br>
 
-       (*) Special features must be taken into account for consumer type <b>heatpump</b>: 
+       (*) The consumer type <b>heatpump</b> is always a <b>noSchedule</b> consumer, and there are other special features to note:
        <br>
        <br>
        
@@ -34624,8 +34688,18 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td>Trainingsparameter sind die weiteren beschriebenen verfügbar.                                                                                        </td></tr>
             <tr><td>                          </td><td><ul> * 0 - das neuronale Netz ist deaktiviert </ul>                                                                                                  </td></tr>
             <tr><td>                          </td><td><ul> * 1 - das neuronale Netz ist aktiviert </ul>                                                                                                    </td></tr>
-            <tr><td>                          </td><td><ul> * 2 - der Trainingsmodus des Netzes ist aktiviert, die KI-Verbrauchsprognose wird nicht verwendet </ul>                                         </td></tr>
+            <tr><td>                          </td><td><ul> * 2 - der Trainingsmodus mit max. 1 Trainingswiederholung ist aktiviert. Die KI-Verbrauchsprognose wird nicht verwendet </ul>                   </td></tr>
             <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2</b>, default: 0                                                                                                                  </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td> <b>aiConRegVersion</b>   </td><td>Auswahl der Eigenschaften des Haushalts. Die auswählbaren Registry Versionen verstärken bzw. betonen bestimmte Spezifika im Haushalt.                </td></tr>
+            <tr><td>                          </td><td>Die Versionsbezeichnung ist lediglich ein Anhaltspunkt. Man sollte die Version einstellen, mit der die besten Ergebnisse erzielt werden.             </td></tr>
+            <tr><td>                          </td><td>Ist aiConRegVersion nicht gesetzt, erfolgt durch das System eine automatische Auswahl der wahrscheinlich zutreffendsten Registry.                    </td></tr>
+            <tr><td>                          </td><td><ul> v1_common - Standardhaushalt </ul>                                                                                                              </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active - Standardhaushalt mit weiteren Semantiken </ul>                                                                               </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage </ul>                                                                            </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit weiteren Semantiken und stärkerer Gewichtung der PV-Anlage </ul>                                             </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump - Haushalt mit stärkerer Gewichtung der durch eine Wärmepunpe verursachten Charakteristiken  </ul>                                  </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit stärkerer Gewichtung von PV und Wärmepunpen Charakteristika </ul>                                                 </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                      </td></tr>
             <tr><td>                          </td><td><ul> * 0 - die KI-Ergebnisse werden nicht verwendet, nur Legacy Werte </ul>                                                                          </td></tr>
@@ -34947,7 +35021,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          </ul>
        <br>
        
-       (*) Für Verbrauchertyp <b>heatpump</b> sind Besonderheiten zu beachten: 
+       (*) Der Verbrauchertyp <b>heatpump</b> ist immer ein <b>noSchedule</b>-Verbraucher und es sind weitere Besonderheiten zu beachten: 
        <br>
        <br>
        
