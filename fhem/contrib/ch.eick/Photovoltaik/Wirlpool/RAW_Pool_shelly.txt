@@ -1,0 +1,88 @@
+defmod shellyplus2pm_b0a73246a024_CH1 MQTT2_DEVICE shellyplus2pm_10061c79632c
+attr shellyplus2pm_b0a73246a024_CH1 DbLogExclude .*
+attr shellyplus2pm_b0a73246a024_CH1 DbLogInclude CH._state.*,CH._apower.*,CH._aenergy_total
+attr shellyplus2pm_b0a73246a024_CH1 DbLogValueFn {\
+  if ($READING =~ /CH._aenergy_total/) {\
+    $VALUE = round($VALUE,0);;\
+    $TIMESTAMP = strftime("%Y-%m-%d %H:%M:00",localtime(time_str2num($TIMESTAMP)+30));;\
+  }\
+}
+attr shellyplus2pm_b0a73246a024_CH1 IODev MQTT2_FHEM_Server
+attr shellyplus2pm_b0a73246a024_CH1 alias Pool
+attr shellyplus2pm_b0a73246a024_CH1 autocreate 0
+attr shellyplus2pm_b0a73246a024_CH1 comment Channel 1 for shellyplus2pm_b0a73246a024, see also shellyplus2pm_b0a73246a024_CH2\
+\
+Version 2025.09.15\
+relais_0 => Pool limit 1000 W\
+relail_1 => Terrasse Lichterkette limit 100 W
+attr shellyplus2pm_b0a73246a024_CH1 devicetopic shellyplus2pm-b0a73246a024
+attr shellyplus2pm_b0a73246a024_CH1 disable 0
+attr shellyplus2pm_b0a73246a024_CH1 event-on-change-reading CH._state,CH._apower,CH._aenergy_total
+attr shellyplus2pm_b0a73246a024_CH1 event-on-update-reading online,S._aenergy_total
+attr shellyplus2pm_b0a73246a024_CH1 getList in_mode:noArg in_mode $DEVICETOPIC/rpc {"id": 1,"src":"$DEVICETOPIC", "method": "Switch.GetConfig", "params": {"id": 0}}
+attr shellyplus2pm_b0a73246a024_CH1 group PV Eigenverbrauch-Steuerung
+attr shellyplus2pm_b0a73246a024_CH1 icon message_socket
+attr shellyplus2pm_b0a73246a024_CH1 jsonMap rpc_events_params_switch_0_state:CH1_state S0_apower:CH1_apower
+attr shellyplus2pm_b0a73246a024_CH1 model shellyPlus_2pm_split
+attr shellyplus2pm_b0a73246a024_CH1 readingList $DEVICETOPIC/online:.* online\
+$DEVICETOPIC/status/switch.0:.* {return { online => 'true'} }\
+\
+\
+$DEVICETOPIC/events/rpc:.* { return if $EVENT !~ m{switch:0};; $EVENT =~ s/"output":true/"state":"on"/g;; $EVENT =~ s/"output":false/"state":"off"/g;; json2nameValue($EVENT,'rpc_events_',$JSONMAP) }\
+\
+$DEVICETOPIC/events/rpc:.* { return if $EVENT !~ m{switch:0};; json2nameValue($EVENT,'rpc_events_') }\
+$DEVICETOPIC/events/rpc:.* { return if $EVENT !~ m{switch:0};; return{ rpc_events_json => $EVENT} }\
+\
+$DEVICETOPIC/status/switch.0:.* { json2nameValue($EVENT, 'S0_',$JSONMAP) }\
+$DEVICETOPIC/status/switch.0:.* S0_json
+attr shellyplus2pm_b0a73246a024_CH1 room MQTT2_DEVICE,Shelly,Strom->Photovoltaik
+attr shellyplus2pm_b0a73246a024_CH1 setList toggle:noArg $DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Toggle","params": {"id":0}}\
+  off:noArg $DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":false}}\
+  on:noArg $DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":true}}\
+  on-for-timer $DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":true,"toggle_after":$EVTPART1}}\
+  off-for-timer $DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":false,"toggle_after":$EVTPART1}}
+attr shellyplus2pm_b0a73246a024_CH1 setStateList on off toggle on-for-timer off-for-timer
+attr shellyplus2pm_b0a73246a024_CH1 sortby 422
+attr shellyplus2pm_b0a73246a024_CH1 stateFormat {\
+my $polling = ReadingsTimestamp($name,'online',undef);;\
+   if (defined($polling)) {\
+     $polling = round(time() - time_str2num($polling),0) ;;\
+     if ($polling < 130) { $polling = 'true' } else { $polling = 'false' } ;;\
+   }\
+\
+my $onl = (ReadingsVal($name,'online','false') eq 'false' or $polling eq 'false') ?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen';; my $light = FW_makeImage(ReadingsVal($name,'CH1_state','off'));; \
+my $href_shelly="http://".ReadingsVal('shellyplus2pm_b0a73246a024','announce_ip','none')." \"target=\"_blank\">".FW_makeImage($onl) ;;\
+\
+\
+my $e0 = sprintf("%08.2f KWh",ReadingsVal($name,"CH1_aenergy_total",0)/1000);;\
+my $r0 = (ReadingsVal($name,"CH1_state","") eq "off") ? "<span style='color:red'>off</span>":"<span style='color:green'>on</span>";;\
+my $p0 = sprintf("%06.1f Watt",ReadingsVal($name,"CH1_apower",0));;\
+\
+qq(\
+ <a href=$href_shelly</a>\
+ <a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a>\
+ <table border=2 bordercolor='darkgreen' cellspacing=0 style='width: 100%'>\
+ <colgroup>\
+   <col span='1' style='width: 30%;;'>\
+   <col span='1' style='width: 30%;;'>\
+   <col span='1' style='width: 20%;;'>\
+ </colgroup>\
+<tr>\
+  <td style='text-align:left'>\
+    <a href=http://192.168.178.67>192.168.178.67</a>\
+  </td>\
+  <td style='text-align:left'>\
+  </td>\
+  <td style='text-align:right'>\
+     Gesamt 0: $e0\
+  </td>\
+  <td style='text-align:right'>\
+     Relais 0: $r0 $p0\
+  </td>\
+</tr>\
+</table>\
+)\
+}
+attr shellyplus2pm_b0a73246a024_CH1 userReadings CH1_aenergy_total:S0_aenergy_total.* monotonic { ReadingsVal($name,"S0_aenergy_total",0) }
+attr shellyplus2pm_b0a73246a024_CH1 verbose 2
+attr shellyplus2pm_b0a73246a024_CH1 webCmd :

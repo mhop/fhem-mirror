@@ -1,0 +1,418 @@
+defmod Pool_PV_Perl DOIF ################################################################################################################\
+## Eigenverbrauch einschalten: wenn PV Produktion über dem Mindestbedarf ist und die Laufzeit pro Tag noch nicht erreicht ist\
+##\
+01_1_Eigenverbrauch_automatisch_An\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    [WR_1:SW_Total_PV_P_reserve] >= [$SELF:PowerLimitOn]            ## Es besteht PV-Überschuss\
+     and [[$SELF:TimeStart]-[$SELF:TimeEnd]]                             ## Das Zeitfenster ist erreicht\
+     and get_Exec("PV_Modus_Ein_timer") < 1                              ## Der Wait Timer ist noch nicht gestartet\
+     and [$SELF:Pool_Status] eq "Aus"                                    ## Der Pool ist aus\
+     and [Pool_Counter:pulseTimePerDay] < [$SELF:RunTimePerDay]          ## Die maximale Laufzeit des Pools ist noch nicht erreicht\
+    )\
+    or [$SELF:ui_command_1] eq "01_1_Eigenverbrauch_automatisch_An"      ## Hier wird das uiTable select ausgewertet\
+   ) {\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "Pool_PV 01_1 : Pool on waiting"};;\
+\
+    set_Exec("PV_Modus_Ein_timer",[$SELF:PowerLevelMinTime],'set_Reading("Pool_Status","An");;PV_Modus_Ein_Pool()');; ## Den PV-Modus verzögert einschalten\
+    set_Reading("Pool_Status","Wartend");;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+    }\
+}\
+\
+################################################################################################################\
+## Manuell den Pool einschalten.\
+##\
+01_2_Eigenverbrauch_manuell_An\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [$SELF:ui_command_1] eq "01_2_Eigenverbrauch_manuell_An"          ## Hier wird das uiTable select ausgewertet\
+   ) {\
+   if( [$SELF:ui_command_1] eq "01_2_Eigenverbrauch_manuell_An" ) {      ## Hier wurde manuell eingeschaltet\
+     set_Reading("ui_command_1_before",[$SELF:ui_command_1]);;\
+   }\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "Pool_PV 01_2 : Pool on for manuel usage"};;\
+\
+    set_Reading("Pool_Status","manuell");;\
+    PV_Modus_Ein_Pool();;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## Manuell den Pool abschalten.\
+##\
+01_3_Eigenverbrauch_manuell_Aus\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [$SELF:ui_command_1] eq "01_3_Eigenverbrauch_manuell_Aus"         ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "Pool_PV 01_3 : Pool off after manuel usage"};;\
+\
+    PV_Modus_Aus_Pool();;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+################################################################################################################\
+## Eigenverbrauch abschalten: wenn Mindestlaufzeit erreicht wurde und Maximallaufzeit pro Tag erreicht ist\
+##\
+02_1_Eigenverbrauch_Laufzeit_Aus\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    [Pool_Counter:pulseTimePerDay] >= [$SELF:RunTimePerDay]         ## Die Tages Laufzeit ist überschritten\
+     and [Pool_Counter:pulseTimeIncrement] >= [$SELF:RunTimeMin]         ## Die Mindestlaufzeit ist überschritten\
+     and (   [$SELF:Pool_Status] eq "An"                                 ## Der Pool läuft\
+          or [$SELF:Pool_Status] eq "pflege")\
+    )\
+\
+    or [$SELF:ui_command_1] eq "02_1_Eigenverbrauch_Laufzeit_Aus"        ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "Pool_PV 02_1 : Pool off Laufzeit"};;\
+\
+    PV_Modus_Aus_Pool();;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+\
+################################################################################################################\
+## Eigenverbrauch abschalten: wenn Mindestlaufzeit erreicht wurde und die PV Produktion unter dem Mindestbedarf ist\
+##\
+02_2_Eigenverbrauch_PV_Min_Aus\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    ( (  [WR_1:SW_Home_own_consumption_from_grid]                        ## Nicht zuviel Bezug aus dem Netz\
+       + [WR_1:SW_Home_own_consumption_from_Battery]) > 200              ##     oder dem Speicher\
+     and [WB_1:cp_6_get_charge_state] eq "not loading"                   ## Wenn die WB lädt, soll der Pool weiter laufen\
+     and [WB_1:cp_7_get_charge_state] eq "not loading"                   ##     und anstatt dessen die WB reduzieren\
+     and [Pool_Counter:pulseTimeIncrement] >= [$SELF:RunTimeMin]         ## Die Mindestlaufzeit ist überschritten\
+     and [$SELF:Pool_Status] eq "An"                                     ## Der Pool läuft (nicht bei manuell)\
+    )\
+    or [$SELF:ui_command_1] eq "02_2_Eigenverbrauch_PV_Min_Aus"          ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "Pool_PV 02_2 : Pool off PV-Min"};;\
+\
+    PV_Modus_Aus_Pool();;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+\
+\
+################################################################################################################\
+## Stop, wenn es nur ein kurzer peak ist. Dieser Do Zweig setzt den wait timer vom Einschaltkommando cmd_4 wieder außer kraft,\
+## wenn während der Wartezeit die PV Anlage zuwenig liefert.\
+##\
+03___Stop_Wait_Timer\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (\
+     (    [WR_1:SW_Total_PV_P_reserve] < [$SELF:PowerLimitOn]            ## Ist die PV-Leistung zu niedrig?\
+      and get_Exec("PV_Modus_Ein_timer") > 0                             ## läuft eine Wartezeit\
+      and get_Exec("PV_Modus_Ein_timer") < 5                             ## läuft die Wartezeit bald ab\
+      and [$SELF:Pool_Status] eq "Wartend"                               ## und gibt es keine manuelle Einschaltung\
+     )\
+    )\
+    or [$SELF:ui_command_1] eq "03___Stop_Wait_Timer"                    ## Hier wird das uiTable select ausgewertet\
+   ) {\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "Pool_PV 03__ : Stop wait timer Pool"};;\
+    del_Exec("PV_Modus_Ein_timer");;                                      ## Der Pool wird nicht mehr eingeschaltet\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## Pool Ende\
+##\
+05___Pool_Ende\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+    (    [shellyplus2pm_b0a73246a024_CH1:CH1_apower] < 10                                         ## Die Poolpumpe ist bereits\
+     and [Pool_Counter:pauseTimeIncrement] > 900                         ## seit 5 Minuten aus\
+     and [$SELF:Pool_Status] ne "Aus"                                    ## und gibt es keine manuelle Einschaltung\
+     and [$SELF:Pool_Status] ne "Wartend"                                ## und es wird nicht wegen eines Peaks gewartet\
+    )\
+    or [$SELF:ui_command_1] eq "05___Pool_Ende"                          ## Hier wird das uiTable select ausgewertet\
+   ) {\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "Pool_PV 05__ : Pool run finished ".[shellyplus2pm_b0a73246a024_CH1:CH1_apower]." ".[Pool_Counter:pauseTimeIncrement]};;\
+\
+    PV_Modus_Aus_Pool();;\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## Pool Startzeit durch Forecast verschieben. Der Forecast wird um 7:00 im Device PV_Schedule aktualisiert\
+##\
+08___Startzeit_nach_forecast\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+     and\
+         [07:17]                                                         ## Der Forecast wird um 7:00 im Device PV_Schedule aktualisiert\
+      or [$SELF:ui_command_1] eq "08___Startzeit_nach_forecast"          ## Hier wird das uiTable select ausgewertet\
+   ) {\
+   if( [$SELF:ui_command_1] eq "08___Startzeit_nach_forecast" ) {        ## Hier wurde manuell eingeschaltet\
+     set_Reading("ui_command_1_before",[$SELF:ui_command_1]);;\
+   }\
+\
+   if( [WR_ctl:Yield_fc0_day] < [WR_1_Speicher_1_ExternControl:SpeicherMinSOC_fc1_Limit] or\
+       [Heizung:averageAmbientTemperature] <= 10 ) {\
+     set_Reading("TimeStart",[$SELF:TimeStartWinter]);;\
+     set_Reading("TimeEnd",[$SELF:TimeEndWinter]);;\
+   } else {\
+     set_Reading("TimeStart",[$SELF:TimeStartSummer]);;\
+     set_Reading("TimeEnd",[$SELF:TimeEndSummer]);;\
+   }\
+\
+   if (AttrVal("$SELF","verbose",0) >=3)\
+     {Log 3, "Pool_PV 08__ : Pool switched to TimeStart ".ReadingsVal("$SELF","TimeStart",0)." TimeEnd ".ReadingsVal("$SELF","TimeEnd",0)};;\
+\
+   set_Reading("ui_command_1","---");;                                    ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## Pool durch kürzere Laufzeit abkühlen lassen\
+##\
+09___Laufzeit_im_Sommer\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+     and\
+         [06:15] and [Heizung:averageAmbientTemperature]                 ## Pool durch kürzere Laufzeit abkühlen lassen\
+      or [$SELF:ui_command_1] eq "09___Laufzeit_im_Sommer"               ## Hier wird das uiTable select ausgewertet\
+   ) {                                                              \
+   if( [$SELF:ui_command_1] eq "09___Laufzeit_im_Sommer" ) {             ## Hier wurde manuell eingeschaltet\
+     set_Reading("ui_command_1_before",[$SELF:ui_command_1]);;\
+   }\
+\
+   if( [Heizung:averageAmbientTemperature] >= 18 ) {\
+     set_Reading("RunTimePerDay",[$SELF:RunTimePerDaySummer]);;\
+   } else {\
+     set_Reading("RunTimePerDay",[$SELF:RunTimePerDayWinter]);;\
+   }\
+\
+   if (AttrVal("$SELF","verbose",0) >=3)\
+     {Log 3, "Pool_PV 09__ : Pool switched to RunTimePerDay ".ReadingsVal("$SELF","RunTimePerDay",0)};;\
+\
+   set_Reading("ui_command_1","---");;                                    ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## Pflege Zwangseinschaltung: Es muss mindestens einmal pro Tag eingeschaltet werden, auch wenn kein PV Strom vorhanden war.\
+##\
+10___Pool_Pflege\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+     and\
+     ( [[$SELF:TimeEnd]]                                                 ## Hier sollte der Pool bereits gelaufen sein\
+      and\
+       ([Pool_Counter:pulseTimePerDay] < [$SELF:RunTimePerDay] or        ## Ist er zuwenig gelaufen\
+        [Pool_Counter:countsPerDay] eq 0)                                ## oder eventuell garnicht\
+     )\
+     or [$SELF:ui_command_1] eq "10___Pool_Pflege"                       ## Hier wird das uiTable select ausgewertet\
+   ) {                                                              \
+   if( [$SELF:ui_command_1] eq "10___Pool_Pflege" ) {                    ## Hier wurde manuell eingeschaltet\
+     set_Reading("ui_command_1_before",[$SELF:ui_command_1]);;\
+   }\
+\
+   if (AttrVal("$SELF","verbose",0) >=3)\
+     {Log 3, "Pool_PV 10__ : Pool on for maintanance"};;\
+\
+   set_Reading("Pool_Status","pflege");;\
+   PV_Modus_Ein_Pool();;\
+\
+   set_Reading("ui_command_1","---");;                                    ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+################################################################################################################\
+## 11 Stromboerse\
+##\
+11___Stromboerse\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+     and\
+      ((   [WR_ctl:Yield_fc0_day] < [WR_1_Speicher_1_ExternControl:SpeicherMinSOC_fc1_Limit]  ## Im Herbst/Winter ist wenig zu erwarten\
+       and [22:00-06:00]                                                 ## nur in dieser Zeit verwenden\
+\
+       and [$SELF:Pool_Stromboerse] eq "Tibber"                          ## Soll Tibber verwendet werden?\
+       and [Stromboerse_connect:fc0_trigger]                             ## Wurde der Trigger geändert\
+       )\
+       or [$SELF:ui_command_1] eq "11___Stromboerse"                     ## Hier wird das uiTable select ausgewertet\
+      )\
+   ) {\
+\
+\
+    if ([Stromboerse_connect:fc0_trigger] eq "on" ) {                    ## Der Trigger ist aktiv\
+\
+      if ([$SELF:Pool_Status] ne "Stromboerse") {                        ## Der Pool wurde noch nicht aktiviert\
+        if ( [Stromboerse_connect:fc0_trigger_dauer] >= [$SELF:RunTimeMin]/60 ) {   ## Die mögliche Restzeit sollte mindestens 2 h betragen\
+          set_Reading("Pool_TriggerLaden","An");;\
+          set_Reading("Pool_Status","Stromboerse");;\
+          PV_Modus_Ein_Pool();;\
+          Log 3, "Pool_PV 11__ : Stromboerse für ".[Stromboerse_connect:fc0_trigger_dauer]." Minuten freigegeben";;\
+        } else {\
+          Log 3, "Pool_PV 11__ : Die Stromboersezeit reicht nicht für die Mindestlaufzeit aus";;\
+          set_Reading("ui_command_1","---");;                             ## Hier wird das uiTable select wieder zurückgesetzt\
+          return;;\
+        }\
+      } else {\
+        Log 3, "Pool_PV 11__ : Stromboerse wurde bereits aktiviert";;\
+        set_Reading("ui_command_1","---");;                               ## Hier wird das uiTable select wieder zurückgesetzt\
+        return;;\
+      }\
+\
+    } else {\
+      if ([$SELF:Pool_Status] eq "An") {                                 ## nur abschalten, wenn nicht manuell eingeschaltet wurde\
+        set_Reading("Pool_TriggerLaden","Aus");;\
+        PV_Modus_Aus_Pool();;\
+        Log 3, "Pool_PV 11__ : Stromboerse wurde gestoppt";;\
+      }\
+    }\
+\
+   if (AttrVal("$SELF","verbose",0) >=3)\
+     {Log 3, "Pool_PV 11__ : Pool ".[Stromboerse_connect:fc0_trigger]." für ".[$SELF:Pool_Stromboerse]};;\
+\
+   set_Reading("ui_command_1","---");;                                    ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
+## Definition von Sub Routinen\
+subs {\
+  sub PV_Modus_Ein_Pool() {                                                   ## PV-Modus Einschalten\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "Pool_PV sub  : Pool on"};;\
+    fhem("set Pool_Counter pauseTimeIncrement 0");;\
+    fhem("".ReadingsVal("$SELF","SetCmdOn",0));;\
+    }\
+\
+  sub PV_Modus_Aus_Pool() {                                                   ## PV-Modus Ausschalten\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "Pool_PV sub  : Pool off"};;\
+    fhem("".ReadingsVal("$SELF","SetCmdOff",0));;\
+    set_Reading("Pool_Status","Aus");;\
+  }\
+}
+attr Pool_PV_Perl DbLogExclude .*
+attr Pool_PV_Perl DbLogInclude Pool_Status.*
+attr Pool_PV_Perl alias Pool_PV_Perl
+attr Pool_PV_Perl comment Version 2021.11.01 09:00
+attr Pool_PV_Perl disable 0
+attr Pool_PV_Perl event-on-change-reading .*
+attr Pool_PV_Perl group PV Eigenverbrauch-Steuerung
+attr Pool_PV_Perl icon scene_swimming
+attr Pool_PV_Perl room Strom->Photovoltaik
+attr Pool_PV_Perl sortby 421
+attr Pool_PV_Perl uiState {\
+package ui_Table;;\
+  $TABLE = "style='width:100%;;'";;\
+\
+  $TD{0..9}{0} = "style='border-top-style:solid;;border-bottom-style:solid;;border-left-style:solid;;border-left-width:2px;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..9}{1..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..9}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+\
+\
+sub $SELF_Device {\
+    return "Stromboerse_connect";;\
+  }\
+\
+sub $SELF_Format {\
+  my($i)=@_;;\
+\
+  if ($i eq "trigger_0") {\
+      return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_price",0)\
+                 or ::ReadingsVal($SELF_Device(),"fc0_trigger_start","") eq "null" ) ?\
+            "<span style='color:red'>Heute kein Trigger <br>mehr unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" :\
+            "<span style='color:green'>Trigger von<br>".\
+                 ::ReadingsVal($SELF_Device(),"fc0_trigger_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc0_trigger_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" ;;\
+    } elsif ($i eq "trigger_1") {\
+      return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_price",0)\
+                 or ::ReadingsVal($SELF_Device(),"fc1_trigger_start","") eq "null" ) ?\
+            "<span style='color:red'>Morgen kein Trigger <br>mehr unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" :\
+            "<span style='color:green'>Morgen ein Trigger von<br>".\
+                 ::ReadingsVal($SELF_Device(),"fc1_trigger_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc1_trigger_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" ;;\
+    }\
+  return "null";;\
+  }\
+\
+sub $SELF_FUNC_Status {\
+    my($value, $min, $colorMin,  $statusMin,  $colorMiddel, $statusMiddle, $max, $colorMax, $statusMax)=@_;;\
+    my $ret = ($value < $min)? '<span style="color:'.$colorMin.'">'.$statusMin.'</span>' : ($value > $max)? '<span style="color:'.$colorMax.'">'.$statusMax.'</span>' : '<span style="color:'.$colorMiddel.'">'.$statusMiddle.'</span>';;\
+    return $ret;;\
+  }\
+\
+}\
+\
+"Kommando<dd>Auswahl / Status /  / Pumpe Status</dd>"|\
+widget([$SELF:ui_command_1],"uzsuDropDown,---,01_1_Eigenverbrauch_automatisch_An,01_2_Eigenverbrauch_manuell_An,01_3_Eigenverbrauch_manuell_Aus,02_1_Eigenverbrauch_abschalten_Laufzeit,02_2_Eigenverbrauch_abschalten_PV_Min,03___Stop_Wait_Timer,05___Pool_Ende,08___Startzeit_nach_forecast,09___Laufzeit_im_Sommer,10___Pool_Pflege,11___Stromboerse") |\
+[$SELF:Pool_Status]|\
+::ReadingsTimestamp("$SELF","timer_PV_Modus_Ein_timer"," Heute ".::round(::ReadingsVal("Pool_Counter","pulseTimePerDay",0)/3600,1)." h")|\
+(([shellyplus2pm_b0a73246a024_CH1:CH1_apower] > 10)?'<span style="color:green">Pool_Pumpe_laeuft</span>' : '<span style="color:black">Pool_Pumpe_aus</span>')\
+\
+"Strombörse<dd>Auswahl / Ladefenster / Trigger Status </dd>" |\
+widget([$SELF:Pool_Stromboerse],"uzsuDropDown,Aus,Tibber") | \
+"<span style=font-weight:bold>Trigger fc0</span><br><br>".$SELF_Format("trigger_0")|\
+"<span style=font-weight:bold>Trigger fc1</span><br><br>".$SELF_Format("trigger_1")|\
+[Stromboerse_connect:fc0_trigger]\
+\
+"Konfiguration<dd>PowerLevelMinTime, | PowerLimit On/Off | Time Start/End</dd><dd>RunTime Min/PerDay</dd>"|\
+""|\
+widget([$SELF:PowerLevelMinTime],"selectnumbers,60,60,900,0,lin")."<br>".widget([$SELF:RunTimeMin],"selectnumbers,300,300,7200,0,lin").widget([$SELF:RunTimePerDay],"selectnumbers,900,300,28800,0,lin")|\
+widget([$SELF:PowerLimitOn],"selectnumbers,100,50,2000,0,lin").widget([$SELF:PowerLimitOff],"selectnumbers,50,50,2000,0,lin")|\
+widget([$SELF:TimeStart],"time").widget([$SELF:TimeEnd],"time")\
+\
+"<dd>Sommer, Winter / RunTimePerDay / Start / Ende</dd>"|\
+""|\
+widget([$SELF:RunTimePerDaySummer],"selectnumbers,900,300,28800,0,lin")."<br>".widget([$SELF:RunTimePerDayWinter],"selectnumbers,900,300,28800,0,lin")|\
+widget([$SELF:TimeStartSummer],"time").widget([$SELF:TimeStartWinter],"time").|\
+widget([$SELF:TimeEndSummer],"time").widget([$SELF:TimeEndWinter],"time")
+attr Pool_PV_Perl verbose 3
+
+setstate Pool_PV_Perl 2026-01-09 16:00:02 Pool_Status pflege
+setstate Pool_PV_Perl 2026-01-09 14:03:46 Pool_Stromboerse Tibber
+setstate Pool_PV_Perl 2026-01-09 14:05:15 Pool_TriggerLaden An
+setstate Pool_PV_Perl 2022-06-30 12:48:47 PowerLevelMinTime 300
+setstate Pool_PV_Perl 2022-05-10 15:51:44 PowerLimitOff 100
+setstate Pool_PV_Perl 2022-05-10 15:50:44 PowerLimitOn 1000
+setstate Pool_PV_Perl 2022-05-10 15:55:23 RunTimeMin 7200
+setstate Pool_PV_Perl 2026-01-09 06:15:00 RunTimePerDay 28800
+setstate Pool_PV_Perl 2021-06-23 14:55:42 RunTimePerDaySummer 7200
+setstate Pool_PV_Perl 2020-10-06 14:14:13 RunTimePerDayWinter 28800
+setstate Pool_PV_Perl 2025-09-13 15:48:01 SetCmdOff set shellyplus2pm_b0a73246a024_CH1 off
+setstate Pool_PV_Perl 2025-09-13 15:48:20 SetCmdOn set shellyplus2pm_b0a73246a024_CH1 on
+setstate Pool_PV_Perl 2026-01-09 07:17:00 TimeEnd 16:00
+setstate Pool_PV_Perl 2025-04-05 07:26:23 TimeEndSummer 16:00
+setstate Pool_PV_Perl 2021-12-05 14:20:48 TimeEndWinter 16:00
+setstate Pool_PV_Perl 2026-01-09 07:17:00 TimeStart 09:10
+setstate Pool_PV_Perl 2022-06-30 12:48:23 TimeStartSummer 12:35
+setstate Pool_PV_Perl 2020-09-03 13:10:56 TimeStartWinter 09:10
+
+setstate Pool_PV_Perl 2026-01-09 16:00:02 ui_command_1 ---
+setstate Pool_PV_Perl 2026-01-08 14:27:58 ui_command_1_before ---
