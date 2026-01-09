@@ -1716,18 +1716,20 @@ time_base => sub {
 seasonality => sub {
     my ($f) = @_;
     return [
-        $f->{month_sin},                                                    # Jahreszeit (sin) – glatte saisonale Kurve
-        $f->{month_cos},                                                    # Jahreszeit (cos) – ergänzt sin für eindeutige Kodierung
-        $f->{hod_sin},                                                      # Tageszyklus (sin) – glatte 24h-Periodik
-        $f->{hod_cos},                                                      # Tageszyklus (cos) – eindeutige Kodierung
-        $f->{wday_sin},                                                     # Wochenzyklus (sin) – glatte 7-Tage-Periodik
-        $f->{wday_cos},                                                     # Wochenzyklus (cos) – eindeutige Kodierung
-        $f->{sunaz_sin},                                                    # Sonnenstand (Azimut) – PV-Erwartung
-        $f->{sunaz_cos},                                                    # Sonnenstand (Azimut) – eindeutige Kodierung
-        $f->{sunalt_norm},                                                  # Sonnenhöhe – PV-Erzeugungspotenzial
+        $f->{month_sin},                                                    # Jahreszeit (glatte 12-Monats-Periodik)
+        $f->{month_cos},
+
+        $f->{hod_sin},                                                      # Tageszyklus (glatte 24h-Periodik)
+        $f->{hod_cos},
+
+        $f->{wday_sin},                                                     # Wochenzyklus (glatte 7-Tage-Periodik)
+        $f->{wday_cos},
+
+        $f->{sunaz_sin},                                                    # Sonnenstand (PV-relevant, aber range-sicher)
+        $f->{sunaz_cos},
+        $f->{sunalt_norm},
     ];
 },
-
 
 # --------------------------------------------------------
 # Lag-Features
@@ -1735,10 +1737,13 @@ seasonality => sub {
 lags => sub {
     my ($f) = @_;
     return [
-        $f->{delta1_norm_pos},         # Verbrauchsanstieg zur Vorstunde
-        $f->{delta1_norm_neg},         # Verbrauchsabsenkung zur Vorstunde
-        $f->{delta24_norm_pos},        # Verbrauchsanstieg zum Vortag (gleiche Stunde)
-        $f->{delta24_norm_neg},        # Verbrauchsabsenkung zum Vortag
+        # Kurzfristige Verbrauchsänderung (1h)
+        $f->{delta1_norm_pos},                                              # Verbrauchsanstieg zur Vorstunde
+        $f->{delta1_norm_neg},                                              # Verbrauchsabsenkung zur Vorstunde
+
+        # Tagesmuster (24h)
+        $f->{delta24_norm_pos},                                             # Verbrauchsanstieg zum Vortag (gleiche Stunde)
+        $f->{delta24_norm_neg},                                             # Verbrauchsabsenkung zum Vortag
     ];
 },
 
@@ -1748,12 +1753,13 @@ lags => sub {
 trends => sub {
     my ($f) = @_;
     return [
-        $f->{trend_up_strength},       # Stärke eines steigenden Verbrauchstrends
-        $f->{trend_down_strength},     # Stärke eines fallenden Verbrauchstrends
-        $f->{volatility_flag},         # Unruhe/Schwankung – Kochen, Gerätewechsel
-        $f->{trend_break},             # Trendbruch – Peak oder Lastabwurf
+        $f->{trend_up_strength},                                            # Trendrichtung Steigender Verbrauchstrend
+        $f->{trend_down_strength},                                          # Fallender Verbrauchstrend
+        $f->{volatility_flag},                                              # Kurzfristige Unruhe Gerätewechsel, Kochen, Aktivität
+        $f->{trend_break},                                                  # Trendbruch (Peak oder Lastabwurf)
     ];
 },
+
 
 # --------------------------------------------------------
 # Wetter
@@ -1761,9 +1767,9 @@ trends => sub {
 weather => sub {
     my ($f) = @_;
     return [
-        $f->{temp_norm},               # Temperatur – Heizung/Kühlung/Grundlast
-        $f->{wcc_norm},                # Bewölkung – PV-Erzeugung & Lichtbedarf
-        $f->{rr1c_norm},               # Niederschlag – Aktivität, Licht, Heizung
+        sqrt($f->{temp_norm}),                                              # wirkt stärker bei mittleren/kühlen Temperaturen
+        $f->{wcc_norm},                                                     # Bewölkung – PV-Erzeugung & Lichtbedarf
+        $f->{rr1c_norm},                                                    # Niederschlag – Aktivität, Licht, Heizung
     ];
 },
 
@@ -1774,18 +1780,19 @@ semantics_human_rhythm => sub {
     my ($f) = @_;
     return [
         # --- MORGEN ---
-        $f->{delta1_norm_pos}   * $f->{hour_class_morning},                             # Geräte an / Aufstehen
+        sqrt($f->{delta1_norm_pos} * $f->{hour_class_morning}),             # Aufstehen / Geräte an
 
         # --- MITTAG ---
-        $f->{delta1_norm_pos}   * $f->{hour_class_noon},                                # Kochen / Geräte
+        sqrt($f->{delta1_norm_pos} * $f->{hour_class_noon}),                # Kochen / Haushalt
 
         # --- ABEND ---
-        $f->{delta1_norm_pos}   * $f->{hour_class_evening},                             # Kochen / Geräte
+        sqrt($f->{delta1_norm_pos} * $f->{hour_class_evening}),             # Kochen / Abendaktivität
 
         # --- SPÄTER ABEND ---
-        $f->{delta1_norm_neg}     * $f->{hour_class_lateevening},                       # Geräte gehen aus
+        sqrt($f->{delta1_norm_neg} * $f->{hour_class_lateevening}),         # Geräte gehen aus
     ];
 },
+
 
 # --------------------------------------------------------
 # Semantik: erweiterter Menschlicher Tagesrhythmus
@@ -1794,41 +1801,41 @@ semantics_human_rhythm_advanced => sub {
     my ($f) = @_;
     return [
         # --- MORGEN ---
-        $f->{trend_up_strength} * $f->{hour_class_morning},                             # Starker Aktivitätsanstieg
-        $f->{delta24_norm_pos}  * $f->{hour_class_morning},                             # Muster vom Vortag (Aufstehen ähnlich)
-        $f->{roll_mean_3_norm}  * $f->{hour_class_morning},                             # Trägheit: Frühstück/Bad dauert an
-        $f->{temp_delta_1h_neg} * $f->{hour_class_morning},                             # Morgens: Bad/Heizung
+        sqrt($f->{trend_up_strength} * $f->{hour_class_morning}),
+        sqrt($f->{delta24_norm_pos}  * $f->{hour_class_morning}),
+        sqrt($f->{roll_mean_3_norm}  * $f->{hour_class_morning}),
+        sqrt($f->{temp_delta_1h_neg} * $f->{hour_class_morning}),
 
         # --- MITTAG ---
-        $f->{trend_up_strength} * $f->{hour_class_noon},                                # Starker Mittagsanstieg
-        $f->{trend_up_strength} * $f->{hour_class_noon} * $f->{delta1_norm_pos},        # sehr starker Mittagsanstieg
-        $f->{delta24_norm_pos}  * $f->{hour_class_noon},                                # Vortagsmuster
-        $f->{roll_mean_3_norm}  * $f->{hour_class_noon},                                # Mittag dauert oft 1–2h
-        $f->{temp_delta_1h_neg} * $f->{hour_class_noon},                                # Kalte Tage → mehr Heizung/Warmwasser
+        sqrt($f->{trend_up_strength} * $f->{hour_class_noon}),
+        sqrt($f->{trend_up_strength} * $f->{hour_class_noon} * $f->{delta1_norm_pos}),
+        sqrt($f->{delta24_norm_pos}  * $f->{hour_class_noon}),
+        sqrt($f->{roll_mean_3_norm}  * $f->{hour_class_noon}),
+        sqrt($f->{temp_delta_1h_neg} * $f->{hour_class_noon}),
 
         # --- ABEND ---
-        $f->{trend_up_strength} * $f->{hour_class_evening},                             # Abendanstieg
-        $f->{delta24_norm_pos}  * $f->{hour_class_evening},                             # Vortagsmuster
-        $f->{roll_mean_3_norm}  * $f->{hour_class_evening},                             # Abendessen/TV/Haushalt → Plateau
-        $f->{temp_delta_1h_neg} * $f->{hour_class_evening},                             # Kalter Abend → Heizerlast
+        sqrt($f->{trend_up_strength} * $f->{hour_class_evening}),
+        sqrt($f->{delta24_norm_pos}  * $f->{hour_class_evening}),
+        sqrt($f->{roll_mean_3_norm}  * $f->{hour_class_evening}),
+        sqrt($f->{temp_delta_1h_neg} * $f->{hour_class_evening}),
 
         # --- SPÄTER ABEND ---
-        $f->{trend_down_strength} * $f->{hour_class_lateevening},                       # Trendbruch -> Ruhephase
-        $f->{temp_delta_1h_neg}   * $f->{hour_class_lateevening},                       # Später Abend: Heizung fährt hoch
+        sqrt($f->{trend_down_strength} * $f->{hour_class_lateevening}),
+        sqrt($f->{temp_delta_1h_neg}   * $f->{hour_class_lateevening}),
 
         # --- NACHT ---
-        $f->{trend_down_strength} * $f->{hour_class_midnight},                          # Stabilität
-        $f->{roll_mean_3_norm}    * $f->{hour_class_midnight},                          # Nacht-Plateau
+        sqrt($f->{trend_down_strength} * $f->{hour_class_midnight}),
+        sqrt($f->{roll_mean_3_norm}    * $f->{hour_class_midnight}),
 
         # --- WOCHENENDE ---
-        $f->{hour_class_morning} * $f->{day_class_weekend},                             # Späteres Aufstehen
-        $f->{hour_class_noon}    * $f->{day_class_weekend},                             # Mehr Kochen / Haushalt
-        $f->{hour_class_evening} * $f->{day_class_weekend},                             # Längere Aktivität abends
-        $f->{roll_mean_3_norm}   * $f->{day_class_weekend},                             # Generell längere Aktivitätsphasen
+        sqrt($f->{hour_class_morning} * $f->{day_class_weekend}),
+        sqrt($f->{hour_class_noon}    * $f->{day_class_weekend}),
+        sqrt($f->{hour_class_evening} * $f->{day_class_weekend}),
+        sqrt($f->{roll_mean_3_norm}   * $f->{day_class_weekend}),
 
         # --- TAGESMUSTER VOM VORTAG ---
-        $f->{delta24_norm_pos} * $f->{hour_norm},                                       # Verstärkung
-        $f->{delta24_norm_neg} * $f->{hour_norm},                                       # Abschwächung
+        sqrt($f->{delta24_norm_pos} * $f->{hour_norm}),
+        sqrt($f->{delta24_norm_neg} * $f->{hour_norm}),
     ];
 },
 
@@ -1838,16 +1845,29 @@ semantics_human_rhythm_advanced => sub {
 semantics_pv => sub {
     my ($f) = @_;
     return [
-        $f->{pv_jump},                                                          # Plötzlicher PV-Anstieg (Wolkenloch)
-        $f->{pv_drop},                                                          # Plötzlicher PV-Abfall (Wolke)
-        $f->{pv_norm},                                                          # PV-Erzeugung – Batterieladung, Lastverschiebung
-        $f->{pv_norm} * $f->{hour_class_noon},                                  # PV-Lastverschiebung
-        $f->{pv_norm} * $f->{trend_up_strength},                                # PV + steigender Trend
-        $f->{pv_norm} * $f->{delta1_norm_pos},                                  # PV + Verbrauchsanstieg
-        $f->{pv_drop} * $f->{delta1_norm_neg},                                  # Lastabfall durch PV-Wegfall
-        $f->{pv_norm} * $f->{temp_delta_1h_neg},                                # Kälte + PV -> Heizer + Batterie
-        $f->{pv_drop} * $f->{temp_delta_1h_neg},                                # Kälte + PV-Drop -> Lastabfall
-        $f->{pv_norm} * $f->{temp_delta_1h_neg} * $f->{trend_up_strength},      # Kälte + PV + steigender Trend -> Peak
+        # --- PV-Dynamik ---
+        $f->{pv_jump},                                                              # Plötzlicher PV-Anstieg (Wolkenloch)
+        $f->{pv_drop},                                                              # Plötzlicher PV-Abfall (Wolke)
+
+        # --- PV-Level ---
+        $f->{pv_norm},                                                              # PV-Erzeugung – Grundsignal
+
+        # --- PV + Tageszeit ---
+        sqrt($f->{pv_norm}) * $f->{hour_class_noon},                                # PV-Lastverschiebung mittags
+
+        # --- PV + Verbrauchsdynamik ---
+        sqrt($f->{pv_norm} * $f->{trend_up_strength}),                              # PV + steigender Trend
+        sqrt($f->{pv_norm} * $f->{delta1_norm_pos}),                                # PV + Verbrauchsanstieg
+
+        # --- PV-Drop + Verbrauchsdynamik ---
+        sqrt($f->{pv_drop} * $f->{delta1_norm_neg}),                                # Lastabfall durch PV-Wegfall
+
+        # --- PV + Temperatur ---
+        sqrt($f->{pv_norm} * $f->{temp_delta_1h_neg}),                              # Kälte + PV -> Heizer + Batterie
+        sqrt($f->{pv_drop} * $f->{temp_delta_1h_neg}),                              # Kälte + PV-Drop -> Lastabfall
+
+        # --- PV + Temperatur + Trend ---
+        sqrt($f->{pv_norm} * $f->{temp_delta_1h_neg} * $f->{trend_up_strength}),    # Kälte + PV + steigender Trend -> Peak                                                                                   
     ];
 },
 
@@ -1857,45 +1877,8 @@ semantics_pv => sub {
 semantics_rueckfall => sub {
     my ($f) = @_;
     return [
-        $f->{trend_break} * $f->{delta1_norm_neg},           # Verbrauch fällt nach Peak abrupt
-        $f->{trend_break} * $f->{hour_class_lateevening},    # Tagesende-Rückfall
-    ];
-},
-
-# --------------------------------------------------------
-# Semantik für Wärmepumpen
-# --------------------------------------------------------
-semantics_heatpump => sub {
-    my ($f) = @_;
-    return [
-        $f->{heating_degree_norm},                           # Heizbedarf (Außentemp < Soll)
-        $f->{cooling_degree_norm},                           # Kühlbedarf (Außentemp > Soll)
-
-        $f->{hp_heating_mode},                               # WP im Heizmodus
-        $f->{hp_cooling_mode},                               # WP im Kühlmodus
-
-        $f->{ww_morning},                                    # Warmwasser morgens
-        $f->{ww_evening},                                    # Warmwasser abends
-        $f->{ww_cold_boost},                                 # Kaltstart-Boost
-        $f->{ww_pv_boost},                                   # PV-Überschuss-WW
-        $f->{ww_cycle_flag},                                 # WW-Zyklus erkannt
-
-        $f->{cop_proxy},                                     # Effizienzindikator
-        $f->{cop_inverse},                                   # Ineffizienzindikator
-        $f->{hp_power_factor},                               # Leistungsfaktor der WP
-
-        $f->{frost_protect},                                 # Frostschutz aktiv
-        $f->{frost_load},                                    # Frostlast (Heizbedarf bei Kälte)
-
-        $f->{temp_norm_lag1h},                               # Temperatur 1h zurück
-        $f->{temp_norm_lag3h},                               # Temperatur 3h zurück
-        $f->{temp_norm_lag24h},                              # Temperatur 24h zurück
-        $f->{temp_delta_1h_pos},                             # Temp-Anstieg 1h
-        $f->{temp_delta_1h_neg},                             # Temp-Abfall 1h
-        $f->{temp_delta_3h_pos},                             # Temp-Anstieg 3h
-        $f->{temp_delta_3h_neg},                             # Temp-Abfall 3h
-        $f->{temp_trend_pos},                                # Wärmetrend
-        $f->{temp_trend_neg},                                # Kältetrend
+        sqrt($f->{trend_break} * $f->{delta1_norm_neg}),                            # Rückfall nach Peak (Trendbruch + Verbrauch sinkt)
+        sqrt($f->{trend_break} * $f->{hour_class_lateevening}),                     # Tagesende-Rückfall (Trendbruch + später Abend)
     ];
 },
 
@@ -1904,8 +1887,98 @@ semantics_heatpump => sub {
 # --------------------------------------------------------
 semantics_cold => sub {
     my ($f) = @_;
-    return [                        
-        $f->{temp_delta_1h_neg} * $f->{trend_break},                             # Kälte + Trendbruch -> abruptes Ende
+    return [
+        sqrt($f->{temp_delta_1h_neg} * $f->{trend_break}),                          # Kälte + Trendbruch -> abruptes Ende
+    ];
+},
+
+# --------------------------------------------------------
+# Semantik für Wärmepumpen
+# --------------------------------------------------------
+heatpump_base => sub {
+    my ($f) = @_;
+    return [
+        # --- Heiz- und Kühlbedarf ---
+        $f->{heating_degree_norm},                                                  # Heizbedarf (Außentemp < Soll)
+        $f->{cooling_degree_norm},                                                  # Kühlbedarf (Außentemp > Soll)
+
+        # --- Betriebsmodi ---
+        $f->{hp_heating_mode},                                                      # WP im Heizmodus
+        $f->{hp_cooling_mode},                                                      # WP im Kühlmodus
+
+        # --- Warmwasser ---
+        $f->{ww_morning},                                                           # Warmwasser morgens
+        $f->{ww_evening},                                                           # Warmwasser abends
+        $f->{ww_cold_boost},                                                        # Kaltstart-Boost
+        $f->{ww_pv_boost},                                                          # PV-Überschuss-WW
+        $f->{ww_cycle_flag},                                                        # WW-Zyklus erkannt
+
+        # --- Effizienzindikatoren ---
+        $f->{cop_proxy},                                                            # Effizienzindikator
+        $f->{cop_inverse},                                                          # Ineffizienzindikator
+        $f->{hp_power_factor},                                                      # Leistungsfaktor der WP
+
+        # --- Frostschutz ---
+        $f->{frost_protect},                                                        # Frostschutz aktiv
+        $f->{frost_load},                                                           # Frostlast (Heizbedarf bei Kälte)
+
+        # --- Temperaturhistorie ---
+        $f->{temp_norm_lag1h},                                                      # Temperatur 1h zurück
+        $f->{temp_norm_lag3h},                                                      # Temperatur 3h zurück
+        $f->{temp_norm_lag24h},                                                     # Temperatur 24h zurück
+
+        # --- Temperaturdeltas ---
+        $f->{temp_delta_1h_pos},                                                    # Temp-Anstieg 1h
+        $f->{temp_delta_1h_neg},                                                    # Temp-Abfall 1h
+        $f->{temp_delta_3h_pos},                                                    # Temp-Anstieg 3h
+        $f->{temp_delta_3h_neg},                                                    # Temp-Abfall 3h
+
+        # --- Temperaturtrends ---
+        $f->{temp_trend_pos},                                                       # Wärmetrend
+        $f->{temp_trend_neg},                                                       # Kältetrend
+    ];
+},
+
+semantics_heatpump => sub {
+    my ($f) = @_;
+    return [
+        # --- HEIZEN ---
+        # Heizmodus + Kälte = hoher Verbrauch
+        sqrt($f->{hp_heating_mode} * $f->{temp_delta_1h_neg}),
+        sqrt($f->{hp_heating_mode} * $f->{temp_trend_neg}),
+        sqrt($f->{hp_heating_mode} * $f->{frost_load}),                             # Frostlast + Heizmodus
+
+        # Heizmodus + Tageszeit
+        sqrt($f->{hp_heating_mode} * $f->{hour_class_morning}),                     # morgens heizen
+        sqrt($f->{hp_heating_mode} * $f->{hour_class_evening}),                     # abends heizen
+
+        # --- KÜHLEN ---
+        sqrt($f->{hp_cooling_mode} * $f->{temp_delta_1h_pos}),
+        sqrt($f->{hp_cooling_mode} * $f->{temp_trend_pos}),
+        sqrt($f->{hp_cooling_mode} * $f->{hour_class_noon}),                        # mittags kühlen
+
+        # --- WARM-WASSER ---
+        sqrt($f->{ww_morning} * $f->{hp_heating_mode}),                             # WW morgens + Heizen
+        sqrt($f->{ww_evening} * $f->{hp_heating_mode}),                             # WW abends + Heizen
+        sqrt($f->{ww_cycle_flag} * $f->{hp_heating_mode}),                          # WW-Zyklus + Heizen
+
+        # Kaltstart
+        sqrt($f->{ww_cold_boost} * $f->{temp_delta_1h_neg}),                        # Kaltstart + Temperaturfall
+
+        # PV-Boost (nur sinnvoll in PV-Profilen)
+        sqrt($f->{ww_pv_boost} * $f->{pv_norm}),                                    # PV + Warmwasser
+
+        # --- EFFIZIENZ ---
+        sqrt($f->{cop_inverse} * $f->{trend_up_strength}),                          # ineffizient + steigender Trend
+        sqrt($f->{cop_proxy}   * $f->{trend_down_strength}),                        # effizient + fallender Trend
+
+        # --- FROSTSCHUTZ ---
+        sqrt($f->{frost_protect} * $f->{hour_class_midnight}),                      # Frostschutz nachts
+        sqrt($f->{frost_protect} * $f->{temp_delta_1h_neg}),                        # Frostschutz + Temperaturfall
+
+        # --- TEMPERATUR + TREND ---
+        sqrt($f->{temp_delta_3h_neg} * $f->{trend_up_strength}),                    # Kälte + steigender Trend
+        sqrt($f->{temp_delta_3h_pos} * $f->{trend_down_strength}),                  # Wärme + fallender Trend
     ];
 },
   
@@ -2009,7 +2082,7 @@ v1_heatpump => sub {
     my ($f) = @_;
     return [
         @{ $FEATURE_REGISTRY{v1_common}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) },
+        @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
     ];
 },
 
@@ -2020,7 +2093,7 @@ v1_heatpump_pv => sub {
     my ($f) = @_;
     return [
         @{ $FEATURE_REGISTRY{v1_common_pv}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) },
+        @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
     ];
 },
 
@@ -34695,10 +34768,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td>Die Versionsbezeichnung ist lediglich ein Anhaltspunkt. Man sollte die Version einstellen, mit der die besten Ergebnisse erzielt werden.             </td></tr>
             <tr><td>                          </td><td>Ist aiConProfile nicht gesetzt, erfolgt durch das System eine automatische Auswahl der wahrscheinlich zutreffendsten Registry.                       </td></tr>
             <tr><td>                          </td><td><ul> v1_common - Standardhaushalt </ul>                                                                                                              </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active - Standardhaushalt mit weiteren Semantiken </ul>                                                                               </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active - Standardhaushalt mit ausgeprägten Tagesrhythmen </ul>                                                                        </td></tr>
             <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage </ul>                                                                            </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit weiteren Semantiken und stärkerer Gewichtung der PV-Anlage </ul>                                             </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump - Haushalt mit stärkerer Gewichtung der durch eine Wärmepunpe verursachten Charakteristiken  </ul>                                  </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalte mit stärkerer Gewichtung der PV-Anlage und starkem Tagesrhythmus </ul>                                          </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump - Haushalte mit Wärmepumpe und Untergewichtung der PV-Anlage  </ul>                                                                 </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit stärkerer Gewichtung von PV und Wärmepunpen Charakteristika </ul>                                                 </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                      </td></tr>
