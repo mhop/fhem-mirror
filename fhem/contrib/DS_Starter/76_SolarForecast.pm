@@ -166,7 +166,7 @@ my %vNotesIntern = (
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
                            "new consumer type 'heatpump', new readings Today_CONdeviation, Today_CONforecast, Today_CONreal ".
-                           "show Con deviation in UI, new key aiControl->aiConRegVersion ".
+                           "show Con deviation in UI, new key aiControl->aiConProfile ".
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
@@ -7772,7 +7772,7 @@ sub _attraiControl {                     ## no critic "not used"
       aiConActFunc       => { comp => "($afreg)",                                                  act => 0 },
       aiConSteepness     => { comp => '(0\.[1-9]|1\.[0-5])',                                       act => 0 },
       aiConAlpha         => { comp => '(0(?:\.\d+)?|1)',                                           act => 0 },
-      aiConRegVersion    => { comp => "($rvreg)",                                                  act => 1 },
+      aiConProfile       => { comp => "($rvreg)",                                                  act => 1 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -8820,7 +8820,7 @@ sub __attrKeyAction {
           }
       }
       
-      if ($init_done && $akey eq 'aiConRegVersion') {
+      if ($init_done && $akey eq 'aiConProfile') {
           if ($keyval =~ /heatpump/xs) {
               my ($hp, $comftemp) = isHeatPumpUsed ($name);                                  # Consumer Nummer , Solltemp falls WP verwendet
               if (!$hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
@@ -22793,7 +22793,7 @@ sub _aiSelectRegistryVersion {
                ? 'v1_heatpump_pv'                                           # Haushalt mit Wärmepumpe + PV
                : 'v1_common_pv';                                            # Standardhaushalt + PV
             
-  my $frv = CurrentVal ($name, 'aiConRegVersion', $frvdef);                 # überschreiben durch aiConRegVersion
+  my $frv = CurrentVal ($name, 'aiConProfile',     $frvdef);                # überschreiben durch aiConProfile
   $frv    = $frvdef if($frv =~ /heatpump/xs && !defined $c);                # Rückfall wenn explizit '*heatpump*' gewählt, aber keine WP als Consumer definiert
       
 return $frv;
@@ -34691,9 +34691,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * 2 - der Trainingsmodus mit max. 1 Trainingswiederholung ist aktiviert. Die KI-Verbrauchsprognose wird nicht verwendet </ul>                   </td></tr>
             <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2</b>, default: 0                                                                                                                  </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConRegVersion</b>   </td><td>Auswahl der Eigenschaften des Haushalts. Die auswählbaren Registry Versionen verstärken bzw. betonen bestimmte Spezifika im Haushalt.                </td></tr>
+            <tr><td> <b>aiConProfile</b>      </td><td>Auswahl der Eigenschaften des Haushalts. Die auswählbaren Registry Versionen verstärken bzw. betonen bestimmte Spezifika im Haushalt.                </td></tr>
             <tr><td>                          </td><td>Die Versionsbezeichnung ist lediglich ein Anhaltspunkt. Man sollte die Version einstellen, mit der die besten Ergebnisse erzielt werden.             </td></tr>
-            <tr><td>                          </td><td>Ist aiConRegVersion nicht gesetzt, erfolgt durch das System eine automatische Auswahl der wahrscheinlich zutreffendsten Registry.                    </td></tr>
+            <tr><td>                          </td><td>Ist aiConProfile nicht gesetzt, erfolgt durch das System eine automatische Auswahl der wahrscheinlich zutreffendsten Registry.                       </td></tr>
             <tr><td>                          </td><td><ul> v1_common - Standardhaushalt </ul>                                                                                                              </td></tr>
             <tr><td>                          </td><td><ul> v1_common_active - Standardhaushalt mit weiteren Semantiken </ul>                                                                               </td></tr>
             <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage </ul>                                                                            </td></tr>
